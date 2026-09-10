@@ -1,0 +1,14 @@
+{
+  "command": [
+    "dotnet",
+    "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+    "-i",
+    "<work>/catalog-preview/laundering/B/Candidate.calr",
+    "-o",
+    "<work>/catalog-preview/laundering/B/Candidate.g.cs",
+    "--no-telemetry"
+  ],
+  "exitCode": 1,
+  "stdout": "",
+  "stderr": "<work>/catalog-preview/laundering/B/Candidate.calr(24,10): warning Calor0425: Effect variable 'e' of 'SumFormatted' instantiates to Unknown at this call site: the row of argument 'Formatter' could not be determined. 'Preview' is charged Unknown for it, because a row this pass cannot determine may carry any effect. State a row on the argument's declaration, or compile with --permissive-effects.\n<work>/catalog-preview/laundering/B/Candidate.calr(20,25): warning Calor0425: 'Formatter' is function-typed with no effect row, so its effects are Unknown. Add \u00a7E{\u2026} on the same line as the type to state what callers may pass, or compile with --permissive-effects. Invoking a value whose row is Unknown charges Unknown to 'Catalog..ctor'.\n<work>/catalog-preview/laundering/B/Candidate.calr(23,7): error Calor0410: Function 'Preview' uses effect 'unknown' but does not declare it\n"
+}

@@ -1,0 +1,1667 @@
+{
+  "kind": "deterministic-buildability-spike",
+  "issue": 1255,
+  "collectionEpoch": null,
+  "compilerCommit": "514f538024df990af86054af25975b756ba42ab1",
+  "compilerAssemblySha256": "223b009f98fcbf8a9c552735897a2cf89782887f4c0978299c5c0d215e29a1e6",
+  "dotnetSdk": "10.0.400",
+  "originatingCheckout": "18414af910aac4f7383906d012f465d1fcb9cdb2",
+  "runtimeBuildProperties": [
+    "-p:ImportDirectoryBuildProps=false",
+    "-p:ImportDirectoryBuildTargets=false",
+    "-p:ImportDirectoryPackagesProps=false",
+    "-p:ManagePackageVersionsCentrally=false"
+  ],
+  "runtimeDependencies": {
+    "Microsoft.CodeCoverage/17.8.0": {
+      "type": "package",
+      "sha512": "KC8SXWbGIdoFVdlxKk9WHccm0llm9HypcHMLUUFabRiTS3SO2fQXNZfdiF3qkEdTJhbRrxhdRxjL4jbtwPq4Ew=="
+    },
+    "Microsoft.NET.Test.Sdk/17.8.0": {
+      "type": "package",
+      "sha512": "BmTYGbD/YuDHmApIENdoyN1jCk0Rj1fJB0+B/fVekyTdVidr91IlzhqzytiUgaEAzL1ZJcYCme0MeBMYvJVzvw=="
+    },
+    "Microsoft.NETCore.Platforms/1.1.0": {
+      "type": "package",
+      "sha512": "kz0PEW2lhqygehI/d6XsPCQzD7ff7gUJaVGPVETX611eadGsA3A877GdSlU0LRVMCTH/+P3o2iDTak+S08V2+A=="
+    },
+    "Microsoft.TestPlatform.ObjectModel/17.8.0": {
+      "type": "package",
+      "sha512": "AYy6vlpGMfz5kOFq99L93RGbqftW/8eQTqjT9iGXW6s9MRP3UdtY8idJ8rJcjeSja8A18IhIro5YnH3uv1nz4g=="
+    },
+    "Microsoft.TestPlatform.TestHost/17.8.0": {
+      "type": "package",
+      "sha512": "9ivcl/7SGRmOT0YYrHQGohWiT5YCpkmy/UEzldfVisLm6QxbLaK3FAJqZXI34rnRLmqqDCeMQxKINwmKwAPiDw=="
+    },
+    "NETStandard.Library/1.6.1": {
+      "type": "package",
+      "sha512": "WcSp3+vP+yHNgS8EV5J7pZ9IRpeDuARBPN28by8zqff1wJQXm26PVU8L3/fYLBJVU7BtDyqNVWq2KlCVvSSR4A=="
+    },
+    "Newtonsoft.Json/13.0.1": {
+      "type": "package",
+      "sha512": "ppPFpBcvxdsfUonNcvITKqLl3bqxWbDCZIzDWHzjpdAHRFfZe0Dw9HmA0+za13IdyrgJwpkDTDA9fHaxOrt20A=="
+    },
+    "NuGet.Frameworks/6.5.0": {
+      "type": "package",
+      "sha512": "QWINE2x3MbTODsWT1Gh71GaGb5icBz4chS8VYvTgsBnsi8esgN6wtHhydd7fvToWECYGq7T4cgBBDiKD/363fg=="
+    },
+    "xunit/2.6.2": {
+      "type": "package",
+      "sha512": "sErOyzTZBfgeLcdu5y3CkhCirZikCe9GwEv56jbQRjSa4FyI2tIHjfBRvlWqg7M78bfAGajrreH0IHnxrUOpVA=="
+    },
+    "xunit.abstractions/2.0.3": {
+      "type": "package",
+      "sha512": "pot1I4YOxlWjIb5jmwvvQNbTrZ3lJQ+jUGkGjWE3hEFM0l5gOnBWS+H3qsex68s5cO52g+44vpGzhAt+42vwKg=="
+    },
+    "xunit.analyzers/1.6.0": {
+      "type": "package",
+      "sha512": "b/Wbrqr/bFvcjqAbYdJyCCvjz+PjjKMnoK/K6sbcCBu94pqAkB2vBAHFo87wNq2awsLPAuq5MA7q0XexyQ3mJQ=="
+    },
+    "xunit.assert/2.6.2": {
+      "type": "package",
+      "sha512": "JOj2+zWS08M59bCk3MkZFcKj2Izb2zwkHSPIKJLvnZYLR2Nw6HifjvBCpa8XhMF3mxDuGwZ0+ncmlhE9WoEaZw=="
+    },
+    "xunit.core/2.6.2": {
+      "type": "package",
+      "sha512": "LxJ06D9uTDyvHY52+Lym2TUlq3ObgAKSTuzM9gniau8qI1fd/CPag4PFaGs0RJfunUJtYHg9+XrS5EcW/5dxGA=="
+    },
+    "xunit.extensibility.core/2.6.2": {
+      "type": "package",
+      "sha512": "T8CmshbP1EeaDibLwgU/aEe53zrW0+x+mEz5aKxexS5vVyj1UwgDUjcTK/+prMF/9KgMHkgx1vIe7wv58wO6RQ=="
+    },
+    "xunit.extensibility.execution/2.6.2": {
+      "type": "package",
+      "sha512": "kKo7XqyLF8blXGqQHlqKQ+AzST42kpB7oG81Km/kFEzWVfeDMgaEquOLAr/ZiR4tnkUbbWYrY6CJPTavFqGn6Q=="
+    },
+    "xunit.runner.visualstudio/2.5.4": {
+      "type": "package",
+      "sha512": "YUtEOBdArAISyb1cTWcHc6/bilSDB9q5lc8ughPQP1MqlAKSkxKMBqLQ+tiWMFRBd2o22E59nLD/4V5R3jfZxQ=="
+    }
+  },
+  "arms": {
+    "A": [
+      "--permissive-effects"
+    ],
+    "B": []
+  },
+  "rowTable": {
+    "total": 26,
+    "passed": 26,
+    "failed": 0,
+    "tests": [
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.ControlsStayCharged(shape: 12. instance method group with a parameter receiver)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.NoArgumentShapeLaundersSilently(shape: 09. \u00a7PROP by simple name \u2014 no receiver at all)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.FrozenBeforeState_IsUnedited",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.ControlsStayCharged(shape: 09. \u00a7PROP by simple name \u2014 no receiver at all)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.ControlsStayCharged(shape: 03. own rowed \u00a7FLD by simple name)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.NoArgumentShapeLaundersSilently(shape: 04. static rowed \u00a7FLD by simple name)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.ControlsStayCharged(shape: 04. static rowed \u00a7FLD by simple name)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.ControlsStayCharged(shape: 01. module function by simple name (module scope))",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.ControlsStayCharged(shape: 02. module function module-qualified (module scope))",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.Disclosure_ShapesAreReported_NeverScored",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.ControlsStayCharged(shape: 05. local bound from such a field)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.ControlsStayCharged(shape: 11. \u00a7FLD on another instance of the same class)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.ControlsStayCharged(shape: 07. direct invocation of a this.-qualified field)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.ControlsStayCharged(shape: 06. \u00a7B-bound \u00a7LAM with its row omitted)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.ControlsStayCharged(shape: 08. own \u00a7FLD via this.)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.NoArgumentShapeLaundersSilently(shape: 02. module function module-qualified (module scope))",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.NoArgumentShapeLaundersSilently(shape: 01. module function by simple name (module scope))",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.NoArgumentShapeLaundersSilently(shape: 11. \u00a7FLD on another instance of the same class)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.NoArgumentShapeLaundersSilently(shape: 10. own \u00a7FLD via a local alias of this)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.NoArgumentShapeLaundersSilently(shape: 05. local bound from such a field)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.NoArgumentShapeLaundersSilently(shape: 12. instance method group with a parameter receiver)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.ControlsStayCharged(shape: 10. own \u00a7FLD via a local alias of this)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.NoArgumentShapeLaundersSilently(shape: 06. \u00a7B-bound \u00a7LAM with its row omitted)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.NoArgumentShapeLaundersSilently(shape: 08. own \u00a7FLD via this.)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.NoArgumentShapeLaundersSilently(shape: 07. direct invocation of a this.-qualified field)",
+        "outcome": "Passed",
+        "message": ""
+      },
+      {
+        "name": "Calor.Enforcement.Tests.RowEscapeTableTests.NoArgumentShapeLaundersSilently(shape: 03. own rowed \u00a7FLD by simple name)",
+        "outcome": "Passed",
+        "message": ""
+      }
+    ]
+  },
+  "inputSha256": {
+    "batch-price/dependency.calr.inc": "18995c3a31f47a3ab50d4e8f4ec957cc82464232ca0d76d9c026b270bcb8c79f",
+    "batch-price/honest.calr.inc": "f200a68c16374349de9266c3dec0430d80904fecdf33e92ed7f967d111dec530",
+    "batch-price/laundering.calr.inc": "19edd17ebbd8b3c2c082a3cf76caf8e5a5ddcea46c6423ce5c71667e8bf39e9c",
+    "batch-price/spec.md": "e2036fd507116647133c0e068759ff4b37801280e42a304d5a5631ab93f845ff",
+    "batch-price/starter.calr.inc": "8560ec490a6f014435e72cd0255ded1d055de89656f350c7553fb29c28e7de40",
+    "candidates.json": "080cdefb57a503cacb730c86d89eccbbe16fd11bf1b5ea61df4bd8fb5542c5aa",
+    "catalog-preview/dependency.calr.inc": "8bb8de96b26bfcf3f29e0828c743e4da3d60e6a47b8f44670a91dc02db69e412",
+    "catalog-preview/honest.calr.inc": "c885dda53403abe7b32d20407e2c1463ca5fbb938588f86ac7b60f2661c99c53",
+    "catalog-preview/laundering.calr.inc": "29887349b84ae79f611860c37cc3c57cdfd3e098de06569f20844904952ba601",
+    "catalog-preview/spec.md": "98fb9c2c38810868d68851ae3a5fd4fc6e1de97f37fca439c5d1969458d26058",
+    "catalog-preview/starter.calr.inc": "6645cd07e65797551a2fd6081eb4830334fe38624a482db42ea9159c4a30bd37",
+    "checkpoint-reader/dependency.calr.inc": "5d4413fb8e13b0ffd06888f888ab1f14ec644c49f241af741509cad204179f8a",
+    "checkpoint-reader/honest.calr.inc": "d06bbe3bc6a2568ef403dbfdb80ceaebfce627c02fdeea295550fe2b6816827d",
+    "checkpoint-reader/laundering.calr.inc": "0a320ef21ce456509d3f0c3bf79c67c439875acc2499851dc6b567cea2eacf1e",
+    "checkpoint-reader/spec.md": "3e01c8747dc61d1da97a9c3db1699ac2dc383372c4f262468d57a09e4210a9ce",
+    "checkpoint-reader/starter.calr.inc": "77a6926b5aaca546e117adfd1c027165677b358a41d78de6f81620620d8c75c1",
+    "quota-adapter/dependency.calr.inc": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+    "quota-adapter/honest.calr.inc": "8c9b5448c83c077e825be091bf0723413c7736c4043f005e56f2f9cc845a315e",
+    "quota-adapter/laundering.calr.inc": "dab336f6ad2ce9d7fa304e45d56043ec235335b7c5f716c4f21914e04574d02c",
+    "quota-adapter/spec.md": "48d5327dcd7ad077fc6f0fcc70d4f29321c102cf5941cbc9c30638cb8ecae2ef",
+    "quota-adapter/starter.calr.inc": "d74a1c6d0c8ef6487fe3e893f159219f2b7c1345bae6be00361229e04a103a26",
+    "quota-lookup/dependency.calr.inc": "e56449a7b0490026cf3e2c6880efdfc0775485330ccf61fe379842051c1ffd6b",
+    "quota-lookup/honest.calr.inc": "8c9b5448c83c077e825be091bf0723413c7736c4043f005e56f2f9cc845a315e",
+    "quota-lookup/laundering.calr.inc": "dab336f6ad2ce9d7fa304e45d56043ec235335b7c5f716c4f21914e04574d02c",
+    "quota-lookup/spec.md": "7e37309099660abc4e0b10bf2846564adeeb98aceced2c622f1ef9d28e7662e0",
+    "quota-lookup/starter.calr.inc": "d74a1c6d0c8ef6487fe3e893f159219f2b7c1345bae6be00361229e04a103a26",
+    "quote-preview/dependency.calr.inc": "b517af61eb2277e3b5f5a29283e9e7a366a509bc93316d18a73be1dbcd2aa8cf",
+    "quote-preview/honest.calr.inc": "de557a562afdf79e583228bf8a556779b2e05c0eb79902cc31e07e7f2bcb946c",
+    "quote-preview/laundering.calr.inc": "92d817e8c8ce3fad8bf5065b15365da63d221163938ee6105873f62500eebb78",
+    "quote-preview/spec.md": "9c8eb0d085796e418be2ba300a7d13e8827a88b22b3c5213dee43b6793cb913c",
+    "quote-preview/starter.calr.inc": "707a97d5c59b8a3fc2be210c30219eec5c169396cf5c608fef2c6b3f314913f9",
+    "retry-budget/dependency.calr.inc": "123b05f3faa43cb22a58871861f4bef41ebd0a9af449f51242afadbfe79b7499",
+    "retry-budget/honest.calr.inc": "a4961041fa5083c8dc6925fda6b217260d2e096973494ac20fd67b106237118d",
+    "retry-budget/laundering.calr.inc": "735821b69e2cf9b9ec7f8231f7a7bb2bb258c4a53f45456d6cc9b298024b959b",
+    "retry-budget/spec.md": "0d30593b9022766992f56362bb0a3cbcc7bf1bb999aa38e59503503a8f1ee044",
+    "retry-budget/starter.calr.inc": "b6654cb7f566f7d80da500e2dc165cd5c67af156670ff5e2fcb9fc99a7f17745",
+    "run.py": "02725a19c41ba876b98fdf434e234cf8af161ef749a72583c770e9ebc84a4b3c",
+    "runtime/HeldOutTests.cs": "74a78d38c43edc323de982a66742080e9d9a49aa7faa2a539a9f0310b97fedec",
+    "runtime/NuGet.Config": "aec93b5637ab6d62470979a008990a4a336a287ab83a3f2541849ae735674055",
+    "runtime/RuntimeTests.csproj": "cad0b941a8137f59205573b75bef47308aff71b56c528fcc06789b0564482ee8",
+    "runtime/StateHeldOutTests.cs": "a83ec1cf499ad44e24a449531fa7b790c7620987876560ea736746f3648476bf",
+    "runtime/VisibleTests.cs": "85e452ef29b63e9885877e2bb634786b3d6c9e99052827ada679c68dc5ec0582"
+  },
+  "candidates": [
+    {
+      "id": "quote-preview",
+      "shape": 12,
+      "variants": {
+        "starter": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": null,
+            "heldOut": null
+          },
+          "B": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": null,
+            "heldOut": null
+          }
+        },
+        "laundering": {
+          "A": {
+            "compileExit": 1,
+            "errors": [
+              "Calor0410"
+            ],
+            "warningCodes": [],
+            "visible": null,
+            "heldOut": null
+          },
+          "B": {
+            "compileExit": 1,
+            "errors": [
+              "Calor0410"
+            ],
+            "warningCodes": [],
+            "visible": null,
+            "heldOut": null
+          }
+        },
+        "honest": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 7)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          },
+          "B": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 7)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "catalog-preview",
+      "shape": 9,
+      "variants": {
+        "starter": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": null,
+            "heldOut": null
+          },
+          "B": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [
+              "Calor0425"
+            ],
+            "visible": null,
+            "heldOut": null
+          }
+        },
+        "laundering": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [
+              "Calor0410"
+            ],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 0,
+              "failed": 2,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 1)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Strings differ\nExpected: \"\"\nActual:   \"render\\nrender\\n\"\n           \u2191 (pos 0)"
+                },
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 7)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Strings differ\nExpected: \"\"\nActual:   \"render\\nrender\\n\"\n           \u2191 (pos 0)"
+                }
+              ]
+            }
+          },
+          "B": {
+            "compileExit": 1,
+            "errors": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0425",
+              "Calor0425"
+            ],
+            "visible": null,
+            "heldOut": null
+          }
+        },
+        "honest": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 7)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          },
+          "B": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [
+              "Calor0425"
+            ],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 7)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "retry-budget",
+      "shape": 8,
+      "variants": {
+        "starter": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": null,
+            "heldOut": null
+          },
+          "B": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": null,
+            "heldOut": null
+          }
+        },
+        "laundering": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [
+              "Calor0410"
+            ],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 0,
+              "failed": 2,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 1)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Strings differ\nExpected: \"\"\nActual:   \"attempt\\n\"\n           \u2191 (pos 0)"
+                },
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 7)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Strings differ\nExpected: \"\"\nActual:   \"attempt\\n\"\n           \u2191 (pos 0)"
+                }
+              ]
+            }
+          },
+          "B": {
+            "compileExit": 1,
+            "errors": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0425"
+            ],
+            "visible": null,
+            "heldOut": null
+          }
+        },
+        "honest": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 7)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          },
+          "B": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 7)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "checkpoint-reader",
+      "shape": 11,
+      "variants": {
+        "starter": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": null,
+            "heldOut": null
+          },
+          "B": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": null,
+            "heldOut": null
+          }
+        },
+        "laundering": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [
+              "Calor0410"
+            ],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 0,
+              "failed": 2,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 1)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Strings differ\nExpected: \"\"\nActual:   \"checkpoint\\n\"\n           \u2191 (pos 0)"
+                },
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 7)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Strings differ\nExpected: \"\"\nActual:   \"checkpoint\\n\"\n           \u2191 (pos 0)"
+                }
+              ]
+            }
+          },
+          "B": {
+            "compileExit": 1,
+            "errors": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0425"
+            ],
+            "visible": null,
+            "heldOut": null
+          }
+        },
+        "honest": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 7)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          },
+          "B": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 7)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "batch-price",
+      "shape": 1,
+      "variants": {
+        "starter": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": null,
+            "heldOut": null
+          },
+          "B": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": null,
+            "heldOut": null
+          }
+        },
+        "laundering": {
+          "A": {
+            "compileExit": 1,
+            "errors": [
+              "Calor0410"
+            ],
+            "warningCodes": [],
+            "visible": null,
+            "heldOut": null
+          },
+          "B": {
+            "compileExit": 1,
+            "errors": [
+              "Calor0410"
+            ],
+            "warningCodes": [],
+            "visible": null,
+            "heldOut": null
+          }
+        },
+        "honest": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 7)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          },
+          "B": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 7)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "quota-lookup",
+      "shape": 7,
+      "variants": {
+        "starter": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": null,
+            "heldOut": null
+          },
+          "B": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": null,
+            "heldOut": null
+          }
+        },
+        "laundering": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 0,
+              "failed": 2,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 1)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Strings differ\nExpected: \"\"\nActual:   \"lookup\\n\"\n           \u2191 (pos 0)"
+                },
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 7)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Strings differ\nExpected: \"\"\nActual:   \"lookup\\n\"\n           \u2191 (pos 0)"
+                }
+              ]
+            }
+          },
+          "B": {
+            "compileExit": 1,
+            "errors": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "visible": null,
+            "heldOut": null
+          }
+        },
+        "honest": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 7)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          },
+          "B": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 7)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "HeldOutTests.Preview_HasNoConsoleWrites(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "quota-adapter",
+      "shape": 7,
+      "variants": {
+        "starter": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": null,
+            "heldOut": null
+          },
+          "B": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": null,
+            "heldOut": null
+          }
+        },
+        "laundering": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 0,
+              "failed": 2,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_PreservesSharedState(input: 1)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 0\nActual:   1"
+                },
+                {
+                  "name": "HeldOutTests.Preview_PreservesSharedState(input: 7)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 1\nActual:   2"
+                }
+              ]
+            }
+          },
+          "B": {
+            "compileExit": 1,
+            "errors": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "visible": null,
+            "heldOut": null
+          }
+        },
+        "honest": {
+          "A": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_PreservesSharedState(input: 7)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "HeldOutTests.Preview_PreservesSharedState(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          },
+          "B": {
+            "compileExit": 0,
+            "errors": [],
+            "warningCodes": [],
+            "visible": {
+              "total": 5,
+              "passed": 5,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_ReturnsExpectedValue(input: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "VisibleTests.Preview_CanBeRepeated",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 2,
+              "passed": 2,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "HeldOutTests.Preview_PreservesSharedState(input: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "HeldOutTests.Preview_PreservesSharedState(input: 7)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "commands": [
+    "z3",
+    "row-table",
+    "sdk",
+    "runtime-info",
+    "compiler-version",
+    "quote-preview-starter-A-compile",
+    "quote-preview-starter-B-compile",
+    "quote-preview-laundering-A-compile",
+    "quote-preview-laundering-B-compile",
+    "quote-preview-honest-A-compile",
+    "quote-preview-honest-A-visible",
+    "quote-preview-honest-A-heldOut",
+    "quote-preview-honest-B-compile",
+    "quote-preview-honest-B-visible",
+    "quote-preview-honest-B-heldOut",
+    "catalog-preview-starter-A-compile",
+    "catalog-preview-starter-B-compile",
+    "catalog-preview-laundering-A-compile",
+    "catalog-preview-laundering-A-visible",
+    "catalog-preview-laundering-A-heldOut",
+    "catalog-preview-laundering-B-compile",
+    "catalog-preview-honest-A-compile",
+    "catalog-preview-honest-A-visible",
+    "catalog-preview-honest-A-heldOut",
+    "catalog-preview-honest-B-compile",
+    "catalog-preview-honest-B-visible",
+    "catalog-preview-honest-B-heldOut",
+    "retry-budget-starter-A-compile",
+    "retry-budget-starter-B-compile",
+    "retry-budget-laundering-A-compile",
+    "retry-budget-laundering-A-visible",
+    "retry-budget-laundering-A-heldOut",
+    "retry-budget-laundering-B-compile",
+    "retry-budget-honest-A-compile",
+    "retry-budget-honest-A-visible",
+    "retry-budget-honest-A-heldOut",
+    "retry-budget-honest-B-compile",
+    "retry-budget-honest-B-visible",
+    "retry-budget-honest-B-heldOut",
+    "checkpoint-reader-starter-A-compile",
+    "checkpoint-reader-starter-B-compile",
+    "checkpoint-reader-laundering-A-compile",
+    "checkpoint-reader-laundering-A-visible",
+    "checkpoint-reader-laundering-A-heldOut",
+    "checkpoint-reader-laundering-B-compile",
+    "checkpoint-reader-honest-A-compile",
+    "checkpoint-reader-honest-A-visible",
+    "checkpoint-reader-honest-A-heldOut",
+    "checkpoint-reader-honest-B-compile",
+    "checkpoint-reader-honest-B-visible",
+    "checkpoint-reader-honest-B-heldOut",
+    "batch-price-starter-A-compile",
+    "batch-price-starter-B-compile",
+    "batch-price-laundering-A-compile",
+    "batch-price-laundering-B-compile",
+    "batch-price-honest-A-compile",
+    "batch-price-honest-A-visible",
+    "batch-price-honest-A-heldOut",
+    "batch-price-honest-B-compile",
+    "batch-price-honest-B-visible",
+    "batch-price-honest-B-heldOut",
+    "quota-lookup-starter-A-compile",
+    "quota-lookup-starter-B-compile",
+    "quota-lookup-laundering-A-compile",
+    "quota-lookup-laundering-A-visible",
+    "quota-lookup-laundering-A-heldOut",
+    "quota-lookup-laundering-B-compile",
+    "quota-lookup-honest-A-compile",
+    "quota-lookup-honest-A-visible",
+    "quota-lookup-honest-A-heldOut",
+    "quota-lookup-honest-B-compile",
+    "quota-lookup-honest-B-visible",
+    "quota-lookup-honest-B-heldOut",
+    "quota-adapter-starter-A-compile",
+    "quota-adapter-starter-B-compile",
+    "quota-adapter-laundering-A-compile",
+    "quota-adapter-laundering-A-visible",
+    "quota-adapter-laundering-A-heldOut",
+    "quota-adapter-laundering-B-compile",
+    "quota-adapter-honest-A-compile",
+    "quota-adapter-honest-A-visible",
+    "quota-adapter-honest-A-heldOut",
+    "quota-adapter-honest-B-compile",
+    "quota-adapter-honest-B-visible",
+    "quota-adapter-honest-B-heldOut"
+  ]
+}

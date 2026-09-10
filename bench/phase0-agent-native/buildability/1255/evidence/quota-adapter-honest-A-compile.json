@@ -1,0 +1,15 @@
+{
+  "command": [
+    "dotnet",
+    "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+    "-i",
+    "<work>/quota-adapter/honest/A/Candidate.calr",
+    "-o",
+    "<work>/quota-adapter/honest/A/Candidate.g.cs",
+    "--no-telemetry",
+    "--permissive-effects"
+  ],
+  "exitCode": 0,
+  "stdout": "Compilation successful: <work>/quota-adapter/honest/A/Candidate.g.cs\n",
+  "stderr": ""
+}

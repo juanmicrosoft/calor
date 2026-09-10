@@ -4,181 +4,71 @@ section: "philosophy"
 order: 2
 ---
 
+**Reader question:** When is Calor worth evaluating instead of writing C#
+directly?
 
-Calor deliberately trades certain qualities for others. Understanding these tradeoffs helps you decide when Calor is the right tool.
+Calor adds a source language and compiler step to a .NET workflow. You gain
+declared effects, contracts in the syntax, and optional stable editing IDs.
+You also take on an unfamiliar language, another compiler boundary, and
+interop configuration. These mechanisms are not evidence that it reduces total
+cost or defects. [Design Principles](/docs/philosophy/design-principles/)
+explains those choices; this page helps you decide whether they fit your work.
 
----
+## Start with the requirement, not a benchmark score
 
-## The Core Tradeoff
+| Your requirement | Decision to evaluate |
+|:-----------------|:---------------------|
+| Enforce declared effects on supported Calor paths | Try a small module whose external calls have known effect coverage. Review all waivers and manifests. |
+| Check preconditions and postconditions | Compare Calor's runtime modes and supported proof model with ordinary C# validation and tests. |
+| Address edits by stable identity | Try explicit IDs on selected targets, then check that your editing workflow preserves them. |
+| Keep familiar source, libraries, and debugging tools | Writing C# directly avoids the translation step and may be simpler. |
+| Prove properties outside Calor's modeled contracts | Evaluate a proof assistant or domain-specific verification tool instead. |
 
-Calor trades **token efficiency** for **semantic explicitness**.
+An ID supplies a named target. Whether that improves real editing accuracy
+remains a workload-dependent hypothesis.
 
-```
-// C#: 4 tokens, implicit semantics
-return a + b;
+Contracts and effects are not a complete specification. A compiler check
+cannot establish correctness of arbitrary business behavior or external
+libraries. Keep the [verification limits](/docs/guides/verification-guarantees/)
+beside any decision that depends on those checks.
 
-// Calor: Explicit Lisp-style operations
-§R (+ a b)
-```
+## Account for integration and review costs
 
-This is a fundamental design choice, not a flaw to be fixed.
+Calor emits C#, so existing .NET libraries remain available. Their effect
+coverage may need manifests, and unsupported migration syntax may be preserved
+as raw C# rather than analyzed as Calor. Inspect generated code and diagnostics
+before expanding adoption. See
+[effect manifests and imports](/docs/guides/effect-manifests-dotnet-ecosystem/).
 
----
+Human reviewers still need to read the source. Prefix expressions and
+indentation may be unfamiliar, even when an agent writes the file. Try the
+[account-free first program](/docs/getting-started/hello-world/) and review one
+real change with the people who would maintain it. Provider integration is
+optional; it does not remove correctness ownership.
 
-## What Calor Optimizes For
+The CLI and language server support checking and editing. Verify the features
+your editor/client actually enables rather than assuming parity with C#'s
+tooling. Existing-project setup belongs in the
+[getting-started guide](/docs/getting-started/).
 
-| Quality | Calor Approach | Result |
-|:--------|:--------------|:-------|
-| **Comprehension** | Explicit structure and contracts | 1.84x in the static calculator |
-| **Error Detection** | First-class preconditions/postconditions | 1.49x in the static calculator |
-| **Edit Precision** | Optional stable IDs for structural targets | 1.36x in the static calculator |
-| **Parseability** | Indentation + prefix notation | Regular, compiler-defined grammar |
-| **Verifiability** | Contracts in syntax, not comments | Machine-checkable specs |
+## Measure your own workload
 
----
+Source size depends on the actual programs and tokenizer. There is no
+universal token premium or saving implied by prefix syntax. Record source
+versions, tokenizer/version, task inputs, and behavioral equivalence before
+comparing context cost.
 
-## What Calor Trades Away
+The published static source pairs are **not all behaviorally equivalent**.
+Their calculator ratios do not establish language quality or agent
+productivity. Consult the [dated snapshot and limits](/docs/benchmarking/results/#read-the-results-carefully)
+instead of treating a score table as an adoption recommendation.
 
-| Quality | Impact | Mitigation |
-|:--------|:-------|:-----------|
-| **Raw Token Count** | Calor pays a premium on small programs | Evaluate the full token/character/line composite |
-| **Information Density** | 0.97x vs C# | C# scores higher in the calculator |
-| **Human Readability** | Unfamiliar syntax | Not the target audience |
-| **Ecosystem** | .NET interop may require manifests or preserved C# | Import, effect manifests, and interop blocks |
-| **Tooling** | No bundled editor extension | Use the CLI, or point any LSP-capable editor at `calor lsp` |
+For a local evaluation, record installation effort, review time, diagnostic
+handling, test outcomes, and costs under both workflows. A failed or
+inconclusive comparison is useful evidence. Do not replace missing evidence
+with a claim that a model understands one syntax better.
 
----
-
-## Where to Evaluate the Tradeoff
-
-The examples below show the information Calor makes explicit. They are reasons
-to test the workflow, not evidence that it reduces total cost or defects on
-your workload.
-
-Candidate situations to evaluate include:
-
-### 1. Agents Need to Reason About Behavior
-
-```calor
-§F{f001:TransferFunds:pub}
-  §I{Account:from}
-  §I{Account:to}
-  §I{i32:amount}
-  §O{bool}
-  §E{db:rw}
-  §Q (> amount 0)
-  §Q (>= from.balance amount)
-  §S (== from.balance (- old_from_balance amount))
-  §S (== to.balance (+ old_to_balance amount))
-  // ...
-```
-
-The declaration makes these intended properties visible before reading the
-implementation:
-- It modifies database state
-- Amount must be positive
-- Source must have sufficient balance
-- The declared balance relationships are visible for review
-
-### 2. Agents Need to Detect Contract Violations
-
-```calor
-§F{f001:CalculateDiscount:pub}
-  §I{f64:price}
-  §I{f64:discount_percent}
-  §O{f64}
-  §Q (>= price 0)
-  §Q (>= discount_percent 0)
-  §Q (<= discount_percent 100)
-  §S (>= result 0)
-  §S (<= result price)
-  §R (* price (- 1 (/ discount_percent 100)))
-```
-
-An agent or reviewer can immediately identify the requested conditions:
-- Any call with `discount_percent > 100` violates preconditions
-- If result is negative, postcondition is violated
-- The contracts document edge cases explicitly
-
-### 3. Agents Need to Make Precise Edits
-
-```calor
-// Instruction: "Change the loop in f001 to iterate from 0 instead of 1"
-
-// Before
-§L{for1:i:1:100:1}
-
-// After - target is unambiguous
-§L{for1:i:0:100:1}
-```
-
-The ID gives the edit a stable target. Whether that improves real editing
-accuracy remains a workload-dependent hypothesis; the published edit-precision
-score is a source-pattern calculation, not executed agent edits.
-
----
-
-## When Traditional Languages Win
-
-Use C#/Python/etc when:
-
-### 1. Token Budget is Critical
-
-If you're operating at the edge of context window limits, C#'s compactness wins:
-
-| Code | Calor Tokens | C# Tokens |
-|:-----|:------------|:----------|
-| Hello World | ~25 | ~15 |
-| FizzBuzz | ~80 | ~50 |
-| Simple CRUD | ~200 | ~130 |
-
-### 2. Human Developers Are Primary Readers
-
-Calor's syntax is optimized for machine parsing:
-
-```
-// Familiar to humans
-if (x > 0) return x;
-
-// Less familiar
-§IF{if1} (> x 0) → §R x
-```
-
-### 3. You Need Library Ecosystem
-
-Calor compiles to C#, so interop is possible, but native library support doesn't exist.
-
-### 4. You Need Full Formal Methods
-
-If you need to prove arbitrary mathematical properties—cryptographic protocols, compiler correctness, or complex algorithms—use a proof assistant like LEAN, Isabelle, or Rocq. Calor provides lightweight verification for software contracts, not a theorem prover. It targets development teams defining business logic requirements that AI agents implement, not mathematicians writing proofs.
-
----
-
-## Measuring the Tradeoff
-
-The static calculator reports the following scores. Source pairs are not all
-behaviorally equivalent, so these ratios cannot establish a language or agent
-advantage. See the [snapshot provenance and limits](/docs/benchmarking/results/#read-the-results-carefully).
-
-| Metric | Measures | Calor Result |
-|:-------|:---------|:------------|
-| Token Economics | Token/character/line composite | 1.42x (Calor wins; raw tokens still cost more) |
-| Information Density | Semantic content per token | 0.97x (C# wins) |
-| Comprehension | Benefit of explicitness | 1.84x (Calor wins) |
-| Error Detection | Contract signals | 1.49x (Calor wins) |
-| Edit Precision | ID-based targeting | 1.36x (Calor wins) |
-| Correctness | Structural estimation signals | 1.29x (Calor wins) |
-| Generation Accuracy | Compilation and structural completeness | 1.02x (Calor wins) |
-| Refactoring Stability | ID-reference preservation | 1.38x (Calor wins) |
-
-The question is not settled by these scores. Measure correctness, review,
-repair, and exit costs on your own tasks, and read the
-[research evidence status](/docs/benchmarking/evidence-status/) before treating
-the calculator as adoption evidence.
-
----
-
-## Next
-
-- [Benchmarking Overview](/docs/benchmarking/) - How we measure these tradeoffs
-- [Results](/docs/benchmarking/results/) - Detailed evaluation data
+The [adoption playbook](/docs/guides/adoption-playbook/) gives a bounded
+integration path. The [research evidence status](/docs/benchmarking/evidence-status/)
+records the administrative stop and deferred studies; it supplies no
+production-safety or demand guarantee.

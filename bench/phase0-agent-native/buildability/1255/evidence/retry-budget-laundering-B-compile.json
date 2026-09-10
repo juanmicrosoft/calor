@@ -1,0 +1,14 @@
+{
+  "command": [
+    "dotnet",
+    "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+    "-i",
+    "<work>/retry-budget/laundering/B/Candidate.calr",
+    "-o",
+    "<work>/retry-budget/laundering/B/Candidate.g.cs",
+    "--no-telemetry"
+  ],
+  "exitCode": 1,
+  "stdout": "",
+  "stderr": "<work>/retry-budget/laundering/B/Candidate.calr(25,10): warning Calor0425: Effect variable 'e' of 'WithRetry' instantiates to Unknown at this call site: argument 1 of 'WithRetry' is not a function value this pass can name. 'Estimate' is charged Unknown for it, because a row this pass cannot determine may carry any effect. State a row on the argument's declaration, or compile with --permissive-effects.\n<work>/retry-budget/laundering/B/Candidate.calr(24,7): error Calor0410: Function 'Estimate' uses effect 'unknown' but does not declare it\n"
+}

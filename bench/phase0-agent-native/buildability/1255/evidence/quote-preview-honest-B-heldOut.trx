@@ -1,0 +1,40 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="ff7aca17-7bec-40cb-a782-b7cbc8519812" name="@Juans-MacBook-Pro 2026-09-09 21:23:57" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-09T21:23:57.5089030-04:00" queuing="2026-09-09T21:23:57.5089030-04:00" start="2026-09-09T21:23:57.1845150-04:00" finish="2026-09-09T21:23:57.5111830-04:00" />
+  <TestSettings name="default" id="a531a3ec-53f4-46a2-aa17-ab74cf60bafa">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-09_21_23_57" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="8e377b50-ae50-4ec5-bf6c-6562056aedc5" testId="7dd95004-23fc-5cae-b58d-83cd2c212827" testName="HeldOutTests.Preview_HasNoConsoleWrites(input: 1)" computerName="Juans-MacBook-Pro" duration="00:00:00.0048094" startTime="2026-09-09T21:23:57.4652820-04:00" endTime="2026-09-09T21:23:57.4652920-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8e377b50-ae50-4ec5-bf6c-6562056aedc5" />
+    <UnitTestResult executionId="e5be77d8-2abd-4800-b846-6070333c6d16" testId="e86b3dfb-3758-fad4-b355-a2b7ec893f0b" testName="HeldOutTests.Preview_HasNoConsoleWrites(input: 7)" computerName="Juans-MacBook-Pro" duration="00:00:00.0001856" startTime="2026-09-09T21:23:57.4665090-04:00" endTime="2026-09-09T21:23:57.4665090-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e5be77d8-2abd-4800-b846-6070333c6d16" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="HeldOutTests.Preview_HasNoConsoleWrites(input: 7)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-7/quote-preview/honest/b/heldout/bin/debug/net10.0/runtimetests.dll" id="e86b3dfb-3758-fad4-b355-a2b7ec893f0b">
+      <Execution id="e5be77d8-2abd-4800-b846-6070333c6d16" />
+      <TestMethod codeBase="&lt;work&gt;/quote-preview/honest/B/heldOut/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="HeldOutTests" name="Preview_HasNoConsoleWrites" />
+    </UnitTest>
+    <UnitTest name="HeldOutTests.Preview_HasNoConsoleWrites(input: 1)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-7/quote-preview/honest/b/heldout/bin/debug/net10.0/runtimetests.dll" id="7dd95004-23fc-5cae-b58d-83cd2c212827">
+      <Execution id="8e377b50-ae50-4ec5-bf6c-6562056aedc5" />
+      <TestMethod codeBase="&lt;work&gt;/quote-preview/honest/B/heldOut/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="HeldOutTests" name="Preview_HasNoConsoleWrites" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="7dd95004-23fc-5cae-b58d-83cd2c212827" executionId="8e377b50-ae50-4ec5-bf6c-6562056aedc5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e86b3dfb-3758-fad4-b355-a2b7ec893f0b" executionId="e5be77d8-2abd-4800-b846-6070333c6d16" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="2" executed="2" passed="2" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.4.1+b9eacec401 (64-bit .NET 10.0.11)
+[xUnit.net 00:00:00.03]   Discovering: RuntimeTests
+[xUnit.net 00:00:00.05]   Discovered:  RuntimeTests
+[xUnit.net 00:00:00.05]   Starting:    RuntimeTests
+[xUnit.net 00:00:00.07]   Finished:    RuntimeTests
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

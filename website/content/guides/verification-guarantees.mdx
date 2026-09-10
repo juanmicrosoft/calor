@@ -5,6 +5,9 @@ order: 2
 description: "How to interpret verification results and guard elision safely"
 ---
 
+**Reader question:** What does each check or proof status guarantee, and when
+does the generated program retain runtime checks?
+
 Calor verifies individual contract obligations under a positive, enumerated
 model of .NET behavior. It does not claim whole-program correctness, and the
 number of soundness gaps that have not yet been found is not knowable.
@@ -44,15 +47,14 @@ when contract mode is `off` or repair unsupported lowering.
 Preconditions are never elided from satisfiability results. A vacuous proof is
 reported with a flag and also keeps its runtime check.
 
-Since 0.15, compiling with `--verify` removes a runtime guard by default —
+Compiling with `--verify` removes an eligible runtime postcondition guard by default —
 but only after a clean, non-vacuous, assumption-free proof. `assumed` and
 inconclusive outcomes do not authorize proof-based removal. This does not
 promise a guard when checking is disabled or lowering is unsupported. Pass
 `--verify --keep-proven-guards` to retain otherwise-emitted guards and use verdicts as
-diagnostics only (the 0.13/0.14 behavior). The flip is backed by the
-solver-vs-runtime differential suite: 0 mismatches over the pinned
-modeled-forms denominator in that historical release, with elision coverage
-published at 40/65. That bounded result is not a proof of soundness for all programs.
+diagnostics only. Historical mode changes belong in the
+[changelog](/docs/changelog/). Regression suites cover bounded modeled forms;
+they do not prove soundness for all programs.
 
 ## Parameter mutation and numeric limits
 
@@ -105,9 +107,9 @@ with `Calor0326` before proof-based guard removal. There is no silent static-onl
 fallback, and even a `proven` result does not authorize unsupported runtime
 lowering. Disabling runtime contracts is a separate, explicit mode choice.
 
-## What Changed in v0.12
+## Modeling boundaries
 
-v0.12 closed a class of false `proven` results by changing the mechanism: if a
+If a
 proof is carried by a Z3 sort that is total where the .NET value may be null,
 the result is `assumed`, not `proven`.
 
@@ -146,8 +148,7 @@ runtime check on a false proof.
 ## Runtime Lowering Is a Separate Boundary
 
 A sound static proof and correct runtime-check placement are different
-problems. v0.12 fixed a quantified-contract lowering bug that had discarded
-part of an implication. Current lowering routes structured returns, including
+problems. Current lowering routes structured returns, including
 early and nested returns, through a shared postcondition exit when checks are
 enabled. Opaque raw-C# bodies are rejected with `Calor1001`, because their returns
 cannot be identified structurally. Iterator postconditions are rejected with
@@ -161,7 +162,7 @@ build command, `CALOR_NO_TYPE_CHECK=1` on other entry points, or
 `CalorTypeCheck=false` in MSBuild only as explicit migration opt-outs.
 
 Effect enforcement is also on by default. Interop assumptions propagate, and
-override/interface effect variance is checked. Since 0.15, calling a function
+override/interface effect variance is checked. Calling a function
 value — a callback parameter, a bound lambda, a callback field — is not an
 error: the compiler reads the callback's own `§E{…}` and charges it to the
 caller. `Calor0418` is reserved for invoking something that is provably not a
