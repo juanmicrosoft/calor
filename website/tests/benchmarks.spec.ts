@@ -19,6 +19,10 @@ for (const width of [1366, 390]) {
     await expect(article).not.toContainText('demonstrating advantages');
     await expect(article).not.toContainText('Calor Wins');
     await expect(article).not.toContainText('C# better');
+    await expect(page.getByRole('columnheader', { name: 'Static-score composite', exact: true })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Token Economics', exact: true })).toHaveCount(1);
+    await expect(page.getByRole('columnheader', { name: 'Tokens', exact: true })).toHaveCount(0);
+    await expect(article).toContainText('not raw-token savings');
     await expect(page.locator('[data-static-metric]')).toHaveCount(Object.keys(fixture.metrics).length);
     expect([...staticMetricOrder].sort()).toEqual(Object.keys(fixture.metrics).sort());
     expect(await page.locator('[data-static-metric]').evaluateAll(nodes =>
@@ -90,8 +94,8 @@ test('keyboard sort and filter expose state while preserving focus and membershi
   await expect(rows.locator('td:first-child')).toHaveText(
     fixture.programs.filter(p => p.level === 1).sort((a, b) => a.name.localeCompare(b.name)).map(p => p.name)
   );
-  await page.getByRole('button', { name: 'Adv', exact: true }).press('Enter');
-  await expect(page.getByRole('columnheader', { name: 'Adv', exact: true })).toHaveAttribute('aria-sort', 'ascending');
+  await page.getByRole('button', { name: 'Static-score composite', exact: true }).press('Enter');
+  await expect(page.getByRole('columnheader', { name: 'Static-score composite', exact: true })).toHaveAttribute('aria-sort', 'ascending');
   await expect(header).not.toHaveAttribute('aria-sort');
 });
 
