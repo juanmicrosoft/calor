@@ -1,6 +1,38 @@
 import { expect, test } from '@playwright/test';
 import fixture from '../public/data/benchmark-results.json';
 import { identifyPrograms } from '../src/lib/benchmark-identity';
+import { staticMetricOrder, staticMetricLabels } from '../src/lib/benchmark-labels';
+
+for (const width of [1366, 390]) {
+  test(`static evidence labels and provenance remain neutral at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.route('https://**/*', route => route.abort());
+    const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
+    await page.goto(`${base}/`);
+    const summary = page.getByRole('region', { name: 'Evidence and its limits' });
+    await expect(summary).toContainText('not all behaviorally equivalent');
+    await expect(summary).toContainText('not independently recorded');
+    await expect(summary).toContainText(String(fixture.programs.length));
+    await expect(summary).not.toContainText('wins');
+    await summary.getByRole('link', { name: 'Read results and provenance' }).click();
+    const article = page.locator('article');
+    await expect(article).not.toContainText('demonstrating advantages');
+    await expect(article).not.toContainText('Calor Wins');
+    await expect(article).not.toContainText('C# better');
+    await expect(page.locator('[data-static-metric]')).toHaveCount(Object.keys(fixture.metrics).length);
+    expect([...staticMetricOrder].sort()).toEqual(Object.keys(fixture.metrics).sort());
+    expect(await page.locator('[data-static-metric]').evaluateAll(nodes =>
+      nodes.map(node => node.getAttribute('data-static-metric')))).toEqual(staticMetricOrder);
+    for (const name of staticMetricOrder) {
+      const metric = fixture.metrics[name as keyof typeof fixture.metrics];
+      const row = page.locator(`[data-static-metric="${name}"]`);
+      await expect(row).toContainText(`${metric.ratio.toFixed(2)}x Calor/C#`);
+      await expect(row).toContainText(`${staticMetricLabels[name].name} static score`);
+    }
+    await expect(page.getByRole('note', { name: 'Benchmark provenance' })).toContainText(fixture.commit);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+}
 
 test('assembly validates identity without changing corpus IDs or metrics', () => {
   const programs = identifyPrograms(fixture.programs);

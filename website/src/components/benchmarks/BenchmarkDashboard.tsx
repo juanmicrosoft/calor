@@ -4,11 +4,12 @@ import { AgentRefactoringCard } from './AgentRefactoringCard';
 import { MetricCard } from './MetricCard';
 import { ProgramTable } from './ProgramTable';
 import { cn } from '@/lib/utils';
-import { BarChart3, FileCode, Trophy, Clock } from 'lucide-react';
+import { BarChart3, FileCode, Clock } from 'lucide-react';
 import { trackBenchmarkResultsView } from '@/lib/analytics';
 import { useEffect } from 'react';
 import { identifyPrograms } from '@/lib/benchmark-identity';
 import { formatTimestamp } from '@/lib/timestamps';
+import { staticMetricOrder } from '@/lib/benchmark-labels';
 
 // Build-time import of benchmark data
 import benchmarkData from '../../../public/data/benchmark-results.json';
@@ -80,17 +81,7 @@ export function BenchmarkDashboard() {
     trackBenchmarkResultsView();
   }, []);
 
-  // Sort metrics: Calor wins first, then by ratio descending
-  const sortedMetrics = Object.entries(data.metrics).sort(([, a], [, b]) => {
-    // Sort Calor-only metrics to the end, then Calor wins first, then by ratio descending
-    if (a.isCalorOnly && !b.isCalorOnly) return 1;
-    if (!a.isCalorOnly && b.isCalorOnly) return -1;
-    if (a.winner === 'calor' && b.winner !== 'calor') return -1;
-    if (a.winner !== 'calor' && b.winner === 'calor') return 1;
-    return b.ratio - a.ratio;
-  });
-
-  const metricNames = Object.keys(data.metrics);
+  const metricNames = staticMetricOrder.filter(name => data.metrics[name]);
 
   return (
     <div className="space-y-8">
@@ -125,33 +116,18 @@ export function BenchmarkDashboard() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <SummaryCard
           icon={<BarChart3 className="h-4 w-4" />}
-          label="Legacy Calculator Score"
+          label="Legacy Static-Score Composite"
           value={`${data.summary.overallAdvantage.toFixed(2)}x`}
           subtext="Calor/C# composite"
-          highlight={data.summary.overallAdvantage >= 1 ? 'calor' : 'csharp'}
         />
         <SummaryCard
           icon={<FileCode className="h-4 w-4" />}
-          label="Programs Tested"
+          label="Source Pairs"
           value={data.summary.programCount}
-          subtext={`${data.programs.filter((p) => p.calorSuccess).length} Calor successes`}
-        />
-        <SummaryCard
-          icon={<Trophy className="h-4 w-4" />}
-          label="Calor Wins"
-          value={data.summary.calorWins}
-          subtext={`of ${data.summary.metricCount} metrics`}
-          highlight="calor"
-        />
-        <SummaryCard
-          icon={<Trophy className="h-4 w-4" />}
-          label="C# Wins"
-          value={data.summary.cSharpWins}
-          subtext={`of ${data.summary.metricCount} metrics`}
-          highlight="csharp"
+          subtext={`${data.summary.metricCount} deterministic calculators`}
         />
       </div>
 
@@ -171,66 +147,29 @@ export function BenchmarkDashboard() {
 
       {/* Metric breakdown */}
       <div>
-        <h3 className="text-xl font-semibold mb-4">Metric Breakdown</h3>
+        <h3 className="text-xl font-semibold mb-4">Static Scores by Metric</h3>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Alphabetical metric order. Ratios above 1 mean a higher Calor calculator
+          score; below 1 mean a higher C# score. Neither means a language is better.
+        </p>
         <div className="space-y-6">
-          {sortedMetrics.map(([name, metric]) => (
+          {metricNames.map(name => (
             <MetricCard
               key={name}
               name={name}
-              ratio={metric.ratio}
-              winner={metric.winner}
-              isCalorOnly={metric.isCalorOnly}
+              ratio={data.metrics[name].ratio}
+              winner={data.metrics[name].winner}
+              isCalorOnly={data.metrics[name].isCalorOnly}
             />
           ))}
         </div>
 
-        {/* Legend */}
-        <div className="mt-6 flex items-center justify-center gap-8 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-calor-pink" />
-            <span>Calor better</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-calor-salmon" />
-            <span>Tie</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-calor-cerulean" />
-            <span>C# better</span>
-          </div>
-          <span className="text-xs">|</span>
-          <span className="text-xs">Center line = 1.0x (equal)</span>
-        </div>
-      </div>
-
-      {/* Key finding */}
-      <div className="p-6 rounded-lg border bg-muted/50">
-        <h3 className="font-semibold mb-2">Current Status</h3>
-        <p className="text-muted-foreground">
-          {data.summary.calorWins > data.summary.cSharpWins ? (
-            <>
-              Calor leads in {data.summary.calorWins} of {data.summary.metricCount} metrics,
-              demonstrating advantages in areas where explicitness matters.
-            </>
-          ) : data.summary.calorWins === data.summary.cSharpWins ? (
-            <>
-              Results are evenly split between Calor and C#, each winning {data.summary.calorWins} metrics.
-            </>
-          ) : (
-            <>
-              C# currently leads in {data.summary.cSharpWins} of {data.summary.metricCount} metrics.
-              Calor shows strength in Error Detection ({data.metrics.ErrorDetection?.ratio.toFixed(2)}x),
-              validating the value of explicit contracts. The token cost of explicitness remains
-              a tradeoff, but improvements in the V2 syntax continue to close the gap.
-            </>
-          )}
-        </p>
       </div>
 
       {/* Per-program table */}
       {data.programs.length > 0 && (
         <div>
-          <h3 className="text-xl font-semibold mb-4">Per-Program Results</h3>
+          <h3 className="text-xl font-semibold mb-4">Per-Program Static Scores</h3>
           <ProgramTable programs={data.programs} metricNames={metricNames} />
         </div>
       )}
