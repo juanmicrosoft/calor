@@ -93,7 +93,7 @@ class ProspectiveModelPinsTests(unittest.TestCase):
         self.assertEqual(amendment["replacementHarnessArtifacts"], gateway["supersededHarnessArtifacts"])
         self.assertEqual(spending.artifact_manifest(spending.GATEWAY), gateway["replacementHarnessArtifacts"])
         self.assertEqual(15, len(amendment["replacementHarnessArtifacts"]))
-        self.assertEqual(24, len(gateway["replacementHarnessArtifacts"]))
+        self.assertEqual(25, len(gateway["replacementHarnessArtifacts"]))
         analysis = load(METHOD / "analysis-registration.json")
         for reference in ("supersedes", "instrumentAmendment"):
             proof = analysis[reference]

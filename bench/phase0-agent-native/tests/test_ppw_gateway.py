@@ -673,7 +673,8 @@ class IsolationTests(Fixture):
         context_path = protected / "SYNTHETIC-invocation.json"
         context_path.write_text(json.dumps({"protectedRoot": str(protected),
                                            "baseUrl": "http://127.0.0.1:12345/SYNTHETIC",
-                                           "hiddenRoots": []}))
+                                           "hiddenRoots": [],
+                                           "repositoryReadDenyRoots": []}))
         evidence = {
             "kind": isolation.ISOLATION, "kernelProbe": dict(isolation.PROBE_EXPECTATIONS),
             "modelInvoked": False, "clientSha256": isolation.CLIENT_SHA256,
@@ -694,6 +695,157 @@ class IsolationTests(Fixture):
         path.chmod(0o644)
         with self.assertRaisesRegex(ValueError, "private"):
             isolation.read_isolation_evidence(context_path, work, output)
+
+    def test_git_inventory_parsers_are_nul_safe_portable_and_fail_closed(self):
+        spec = importlib.util.spec_from_file_location(
+            "git_inventory_parser", BENCH / "ppw-gateway-client.py")
+        isolation = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(isolation)
+        raw = (
+            b"worktree /tmp/SYNTHETIC main\0HEAD " + b"a" * 40
+            + b"\0branch refs/heads/main\0\0"
+            + b"worktree /tmp/SYNTHETIC linked\0HEAD " + b"b" * 40
+            + b"\0detached\0locked test-only\0\0"
+        )
+        self.assertEqual(
+            ["/tmp/SYNTHETIC main", "/tmp/SYNTHETIC linked"],
+            isolation.parse_worktree_porcelain(raw))
+        objects = self.root / "SYNTHETIC-objects"
+        relative = self.root / "SYNTHETIC-relative-objects"
+        absolute = self.root / "SYNTHETIC-absolute-objects"
+        for path in (objects, relative, absolute):
+            path.mkdir()
+        self.assertEqual(
+            [relative, absolute],
+            isolation.parse_alternate_object_directories(
+                ("../SYNTHETIC-relative-objects\n%s\n" % absolute).encode(), objects))
+        for malformed in (
+            raw[:-1],
+            raw.replace(b"branch refs/heads/main", b"unknown value"),
+            raw.replace(b"HEAD " + b"a" * 40 + b"\0", b""),
+        ):
+            with self.subTest(malformed=malformed), self.assertRaises(ValueError):
+                isolation.parse_worktree_porcelain(malformed)
+        with self.assertRaises(ValueError):
+            isolation.parse_alternate_object_directories(b"\n", objects)
+
+    def test_current_repository_discovery_is_explicit_and_does_not_hide_public_source(self):
+        spec = importlib.util.spec_from_file_location(
+            "current_repository_discovery", BENCH / "ppw-gateway-client.py")
+        isolation = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(isolation)
+        repository = BENCH.parents[1]
+        roots = set(map(Path, isolation.discover_sensitive_roots((repository,))))
+        common = Path(subprocess.check_output(
+            ["git", "-C", str(repository), "rev-parse", "--path-format=absolute",
+             "--git-common-dir"], text=True).strip())
+        self.assertIn(common, roots)
+        worktrees = isolation.parse_worktree_porcelain(subprocess.check_output(
+            ["git", "-C", str(repository), "worktree", "list", "--porcelain", "-z"]))
+        for worktree in map(Path, worktrees):
+            self.assertIn(worktree / "bench/phase0-agent-native/tasks", roots)
+        self.assertNotIn(BENCH / "ppw-gateway-client.py", roots)
+
+    @unittest.skipUnless(sys.platform == "darwin", "actual macOS git storage policy")
+    def test_registered_worktree_loose_packed_and_alternate_objects_are_hidden(self):
+        spec = importlib.util.spec_from_file_location(
+            "git_storage_policy", BENCH / "ppw-gateway-client.py")
+        isolation = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(isolation)
+        repository = self.root / "SYNTHETIC-repository"
+        other = self.root / "SYNTHETIC-other-worktree"
+        workspace = self.root / "SYNTHETIC-visible-workspace"
+        output = self.root / "SYNTHETIC-output"
+        for path in (repository, workspace, output):
+            path.mkdir()
+
+        def git(*arguments):
+            result = subprocess.run(
+                ["git", "-C", str(repository), *arguments],
+                capture_output=True, text=True, timeout=30)
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+            return result.stdout.strip()
+
+        git("init", "-b", "main")
+        git("config", "user.name", "SYNTHETIC")
+        git("config", "user.email", "synthetic@example.invalid")
+        hidden_relative = "bench/phase0-agent-native/tasks/SYNTHETIC/tests/HeldOutTests.cs"
+        public_relative = "bench/phase0-agent-native/helpers/public-helper.txt"
+        hidden = repository / hidden_relative
+        public = repository / public_relative
+        hidden.parent.mkdir(parents=True)
+        public.parent.mkdir(parents=True)
+        hidden.write_text("SYNTHETIC HIDDEN")
+        public.write_text("SYNTHETIC PUBLIC")
+        git("add", ".")
+        git("commit", "-m", "SYNTHETIC fixture")
+        git("worktree", "add", "-b", "synthetic-linked", str(other), "HEAD")
+        common = Path(git("rev-parse", "--path-format=absolute", "--git-common-dir"))
+        objects = common / "objects"
+        alternate = self.root / "SYNTHETIC-alternate-objects"
+        (alternate / "info").mkdir(parents=True)
+        alternate_sentinel = alternate / "SYNTHETIC-object"
+        alternate_sentinel.write_text("SYNTHETIC ALTERNATE")
+        (objects / "info/alternates").write_text(str(alternate) + "\n")
+        protected = common / "ppw-budget"
+        protected.mkdir()
+        roots = tuple(map(Path, isolation.discover_sensitive_roots((repository,))))
+        self.assertIn(common, roots)
+        self.assertIn(alternate, roots)
+        self.assertIn(other / "bench/phase0-agent-native/tasks", roots)
+        object_id = git("rev-parse", "HEAD:" + hidden_relative)
+        loose = objects / object_id[:2] / object_id[2:]
+        self.assertTrue(loose.is_file())
+        visible = workspace / "visible.txt"
+        visible.write_text("SYNTHETIC VISIBLE")
+        script = """
+import json,os,subprocess,sys
+from pathlib import Path
+def read(path):
+    try: return bool(Path(path).read_bytes())
+    except OSError: return False
+result={
+    "mainHidden":read(sys.argv[1]),"otherHidden":read(sys.argv[2]),
+    "object":read(sys.argv[5]),"alternate":read(sys.argv[6]),
+    "public":read(sys.argv[7]),"visible":read(sys.argv[8]),
+}
+for kind in ("hardlink","symlink"):
+    alias=Path(sys.argv[9]+"-"+kind)
+    try:
+        os.link(sys.argv[2],alias) if kind=="hardlink" else alias.symlink_to(sys.argv[2])
+        result[kind]=read(alias)
+    except OSError: result[kind]=False
+shown=subprocess.run(["git","--git-dir",sys.argv[3],"show","HEAD:"+sys.argv[4]],
+                     capture_output=True,timeout=10)
+result["gitShow"]=shown.returncode==0 and bool(shown.stdout)
+print(json.dumps(result))
+"""
+        arguments = [
+            str(hidden), str(other / hidden_relative), str(common), hidden_relative,
+            str(loose), str(alternate_sentinel), str(other / public_relative), str(visible),
+            str(workspace / "alias"),
+        ]
+        expected = {
+            "mainHidden": False, "otherHidden": False, "object": False,
+            "alternate": False, "public": True, "visible": True,
+            "hardlink": False, "symlink": False, "gitShow": False,
+        }
+        policy = isolation.sandbox_policy(workspace, output, protected, 1, roots, network=False)
+        model = subprocess.run(
+            ["/usr/bin/sandbox-exec", "-p", policy, sys.executable, "-c", script, *arguments],
+            cwd=workspace, capture_output=True, text=True, timeout=30)
+        self.assertEqual(0, model.returncode, model.stdout + model.stderr)
+        self.assertEqual(expected, json.loads(model.stdout))
+
+        git("gc", "--prune=now")
+        pack = next((objects / "pack").glob("*.pack"))
+        arguments[4] = str(pack)
+        generated = isolation.execute_generated(
+            workspace, output, protected, roots,
+            [sys.executable, "-c", script, *arguments], cwd=workspace,
+            environment=os.environ.copy(), timeout=30)
+        self.assertEqual(0, generated.returncode, generated.stdout + generated.stderr)
+        self.assertEqual(expected, json.loads(generated.stdout))
 
     @unittest.skipUnless(sys.platform == "darwin", "actual macOS kernel policy")
     def test_kernel_blocks_other_network_state_access_and_outside_signals(self):

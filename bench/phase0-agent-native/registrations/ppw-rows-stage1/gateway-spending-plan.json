@@ -146,7 +146,7 @@
   "ordering": "run ordinal, frozen task list, A then B",
   "perRunBudgetUsd": null,
   "plannedInvocations": 444,
-  "protocolSha256": "06a8e4afe2d38e93185b551497b14b8e7b5b79e71d161597c2f8c5bf6f6323db",
+  "protocolSha256": "72a7b8724678d9f0208db30dc6ac7bf137e1d3f9c7dca997f89d796454124ed5",
   "schemaVersion": 1,
   "stage": "pilot"
 }

@@ -176,6 +176,14 @@ for its phase, not unrelated observation directories. Source sealing revokes new
 model requests, terminates remaining process-group descendants and archives a
 stable declared-source copy before final grading.
 
+Trusted preflight also discovers every registered worktree for the harness and
+compiler repositories, their common Git storage and configured alternate object
+stores. Child policies deny hidden task/evidence categories in those worktrees
+and the object stores themselves, preventing `git show` or another checkout from
+bypassing a task-directory denial. Discovery errors fail closed. This covers
+known registered storage at discovery time, not arbitrary unregistered clones
+or files introduced elsewhere afterward.
+
 The current policy restricts networking, protected state access, outside signals,
 process metadata and task ports, Mach lookup/registration, POSIX IPC, Apple Events
 and Launch Services. The Mach lookup allowlist is limited to `securityd.xpc`,
@@ -194,6 +202,9 @@ cache, and its executable plus all DLL/JSON runtime dependencies are byte-bound.
 New inspection certificates preserve the original source-analysis results while
 explicitly superseding their execution-runtime identity; original certificates
 are not rewritten.
+Read-only archive analysis validates those recorded identities without requiring
+the collecting machine's runtime paths to exist. Live admission and execution
+still validate every local runtime byte.
 The implemented kernel probes establish only their stated
 controls; they are not a complete proof against every IPC/delegation route.
 The independent pinned-client probe must establish compatibility and any necessary

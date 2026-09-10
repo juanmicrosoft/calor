@@ -166,8 +166,9 @@ def run(client, scratch_root):
             hidden_test, seeded = hidden / "HeldOutTests.cs", hidden / "seeded.calr"
             hidden_test.write_text("SYNTHETIC hidden test")
             seeded.write_text("SYNTHETIC seeded solution")
+            repository_denials = isolation.discover_sensitive_roots((ROOT.parent.parent,))
             policy = isolation.sandbox_policy(
-                work, output, protected, server.server_port, (hidden,))
+                work, output, protected, server.server_port, (hidden, *repository_denials))
             evidence = isolation.kernel_probe(
                 policy, work, output, protected, (hidden_test, seeded),
                 server.server_port, os.getpid())

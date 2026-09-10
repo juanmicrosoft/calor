@@ -90,7 +90,13 @@ class GatewayArchiveTests(unittest.TestCase):
         return self.gateway.validate_archive(self.epoch, pins or self.pins, self.selected)
 
     def test_complete_actual_artifact_map_and_accounting_reach_registered_analyzer_readonly(self):
-        with patch("subprocess.run", side_effect=AssertionError("analysis must not execute commands")):
+        original_is_file = Path.is_file
+        def archive_only_is_file(path):
+            if "/source-inspection/cache/" in path.as_posix():
+                raise AssertionError("archived analysis must not access collector runtime files")
+            return original_is_file(path)
+        with patch("subprocess.run", side_effect=AssertionError("analysis must not execute commands")), \
+                patch.object(Path, "is_file", archive_only_is_file):
             projection = self.validate()
             result = analysis.adjudicate(self.epochs, self.epoch.name)
         self.assertEqual(444, projection["requestCount"])

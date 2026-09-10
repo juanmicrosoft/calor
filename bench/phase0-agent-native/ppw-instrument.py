@@ -478,15 +478,19 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
     require(not command(["git", "-C", str(REPO), "status", "--porcelain",
                          "--", str(BENCH)]), "harness checkout is dirty")
     require(os.environ.get("CLAUDE_MODEL") == selected["modelPin"], "CLAUDE_MODEL differs from registration")
+    harness_hashes = admission["harnessArtifacts"]
+    harness_files = tuple(harness_hashes)
+    require(spending.artifact_manifest(admission.get("mechanism", spending.CONTROL)) == harness_hashes,
+            "registered harness changed after admission")
+    repository_read_denials = []
+    if gateway_mode:
+        repository_read_denials = isolation.discover_sensitive_roots(
+            (REPO, Path(compiler_root).resolve()))
     client_command = admission["clientExecutable"] if gateway_mode else "claude"
     require(command([client_command, "--version"],
                     env=dict(os.environ, DISABLE_AUTOUPDATER="1")) == selected["agentVersion"],
             "agent version differs from registration")
     shared = product(compiler_root, registration["compilerCommit"])
-    harness_hashes = admission["harnessArtifacts"]
-    harness_files = tuple(harness_hashes)
-    require(spending.artifact_manifest(admission.get("mechanism", spending.CONTROL)) == harness_hashes,
-            "registered harness changed after admission")
     runtime = Path(compiler_root) / "src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll"
     if gateway_mode:
         require(runtime.is_file() and digest(runtime) == admission["runtimeSha256"],
@@ -596,14 +600,10 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                             require(seeded_paths, "a seeded solution is required for isolation probing")
                             seeded_root = original_task / seeded_paths[0]
                             seeded_file = next(path for path in seeded_root.rglob("*") if path.is_file())
-                            sensitive_names = (
-                                "tasks", "task-candidates", "task-validation",
-                                "epochs", "pairs", "buildability", "registrations",
-                            )
-                            hidden_roots = [Path(tasks_root).resolve(), epoch]
-                            for root in (BENCH, Path(compiler_root).resolve()
-                                         / "bench/phase0-agent-native"):
-                                hidden_roots.extend(root / name for name in sensitive_names)
+                            hidden_roots = [
+                                Path(tasks_root).resolve(), epoch,
+                                *(Path(path) for path in repository_read_denials),
+                            ]
                             hidden_roots = list(dict.fromkeys(path.resolve() for path in hidden_roots))
                             observer_module = helper("ppw-run-observer.py")
                             observer = observer_module.RunObserver(
@@ -628,6 +628,7 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                                         "observerUrl": gateway.observer_url,
                                         "observerControlUrl": gateway.observer_control_url,
                                         "hiddenRoots": [str(path) for path in hidden_roots],
+                                        "repositoryReadDenyRoots": repository_read_denials,
                                         "probeHiddenFiles": [str(hidden_test), str(seeded_file)],
                                         "executionRuntime": admission["executionRuntime"],
                                     }, stream)

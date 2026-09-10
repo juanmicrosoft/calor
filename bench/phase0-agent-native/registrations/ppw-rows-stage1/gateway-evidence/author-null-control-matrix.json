@@ -816,10 +816,10 @@
   "research": false,
   "sourceHashes": {
     "ppw-budget-gateway.py": "370fd35d61fa8aab5fdbb002e6b2dc6f020ec9fd9ccf8980fe9cc13f778f8e3a",
-    "ppw-gateway-client.py": "1a3cb6a1a99ab71c72b2bbde182364ce4704130b2a4c332cd53e822cf15db1a0",
+    "ppw-gateway-client.py": "12fe9fbc9005130f5e936b91f128bcf96037e258710ea8b86e0bef9ec8d57b41",
     "ppw-run-observer.py": "7555bac129bc6f36c902ff112bca3064f7ad26ffb3de40c571ff06a58879a02e",
     "ppw-source-assembly.py": "0e4002ff79aceb39658223c3820438a4b9832cf4c00ca107d37e47ad5f7c973c",
-    "ppw-source-inspection.py": "375f5c0553afb3cbc8adeaf836f36009866aebc95dc9f32c44aaff59e73fe789",
+    "ppw-source-inspection.py": "836027d7b3db07d061d68f128fff77ab3e1d4a840ef0f3148d9f8da8315727e8",
     "ppw-test-host.py": "41796877f49dfcf5ff51751eb1c24e1bb27c19d32ad77ab7b5f1d913f9a758c3",
     "run-pair.sh": "77b1b99c763ce14a341a62d0adc895a2b76b3f7d3a1062faa3cf485f5154212f",
     "source-inspection/PpwSourceInspector.csproj": "be41403479c72037d16bf22500ab597f1c65babbb3f9935805c90c7a7d64ec62",
@@ -845,7 +845,7 @@
       "probeCaught": false
     },
     "observations": 1,
-    "policySha256": "385e1c24ed85b02aaeb10f401dff38aadf5f031f89c487f2e2fcf671db2aa193",
+    "policySha256": "da571d1582cf83520374470cd1f4b72611fd8d7ee4dd5af7002889fbf734147a",
     "providerRequests": 0,
     "routeCalls": [
       "register",

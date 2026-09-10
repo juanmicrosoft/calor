@@ -42,7 +42,13 @@ BLOCKED_ENV = {
     "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY", "CLAUDE_CODE_USE_AWS",
     "NODE_OPTIONS", "BUN_OPTIONS", "BASH_ENV", "ENV", "SSL_CERT_FILE", "SSL_CERT_DIR",
     "SSLKEYLOGFILE", "NODE_DEBUG", "NODE_DEBUG_NATIVE",
+    "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
 }
+SENSITIVE_BENCH_NAMES = (
+    "tasks", "task-candidates", "task-validation",
+    "epochs", "pairs", "buildability", "registrations",
+)
 
 
 def require(condition, message):
@@ -60,6 +66,135 @@ def canonical_path(value):
 
 def contained(path, root):
     return path == root or root in path.parents
+
+
+def parse_worktree_porcelain(raw):
+    require(isinstance(raw, bytes) and raw.endswith(b"\0\0"),
+            "incomplete git worktree inventory")
+    worktrees = []
+    for raw_record in raw[:-2].split(b"\0\0"):
+        require(raw_record, "empty git worktree record")
+        fields = raw_record.split(b"\0")
+        values = {}
+        flags = set()
+        for raw_field in fields:
+            key, separator, value = raw_field.partition(b" ")
+            try:
+                name = key.decode("ascii")
+                text = value.decode("utf-8") if separator else ""
+            except UnicodeDecodeError as error:
+                raise ValueError("PP-W gateway isolation: unsupported git worktree encoding") from error
+            require(name in {"worktree", "HEAD", "branch", "detached", "bare", "locked", "prunable"},
+                    "unsupported git worktree field")
+            require(name not in values and name not in flags, "duplicate git worktree field")
+            if separator:
+                require(text and not any(ord(character) < 32 for character in text),
+                        "invalid git worktree field value")
+                values[name] = text
+            else:
+                require(name in {"detached", "bare", "locked", "prunable"},
+                        "git worktree field lacks a value")
+                flags.add(name)
+        require(set(values).issuperset({"worktree", "HEAD"})
+                and bool({"branch", "detached", "bare"} & (set(values) | flags)),
+                "incomplete git worktree record")
+        require("bare" not in flags, "bare repositories are unsupported for sensitive-root discovery")
+        worktrees.append(values["worktree"])
+    require(worktrees and len(worktrees) == len(set(worktrees)),
+            "git worktree inventory is empty or duplicated")
+    return worktrees
+
+
+def parse_alternate_object_directories(raw, object_directory):
+    require(isinstance(raw, bytes), "git alternates inventory must be bytes")
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ValueError("PP-W gateway isolation: unsupported git alternates encoding") from error
+    roots = []
+    for value in text.splitlines():
+        require(value and not any(ord(character) < 32 for character in value),
+                "invalid git alternate object directory")
+        candidate = Path(value)
+        if not candidate.is_absolute():
+            candidate = Path(object_directory) / candidate
+        candidate = Path(os.path.abspath(candidate))
+        roots.append(canonical_path(candidate))
+    require(len(roots) == len(set(roots)), "duplicate git alternate object directory")
+    return roots
+
+
+def git_output(repository, *arguments):
+    git = shutil.which("git")
+    require(git is not None, "git is required for sensitive-root discovery")
+    environment = {name: value for name, value in os.environ.items()
+                   if name not in BLOCKED_ENV}
+    result = subprocess.run(
+        [git, "-C", str(repository), *arguments],
+        capture_output=True, timeout=30, env=environment)
+    require(result.returncode == 0 and not result.stderr,
+            "cannot discover registered git storage")
+    return result.stdout
+
+
+def alternate_object_roots(object_directory):
+    roots = []
+    pending = [canonical_path(object_directory)]
+    visited = set()
+    while pending:
+        current = pending.pop()
+        if current in visited:
+            continue
+        visited.add(current)
+        require(current.is_dir(), "git object directory is missing")
+        alternates = current / "info/alternates"
+        if not alternates.exists():
+            continue
+        canonical_path(alternates)
+        require(alternates.is_file(), "git alternates inventory is not a regular file")
+        discovered = parse_alternate_object_directories(alternates.read_bytes(), current)
+        for root in discovered:
+            require(root.is_dir(), "git alternate object directory is missing")
+            if root not in visited:
+                roots.append(root)
+                pending.append(root)
+    return roots
+
+
+def discover_sensitive_roots(repository_roots):
+    require(isinstance(repository_roots, (list, tuple)) and repository_roots,
+            "repository roots are required for sensitive-root discovery")
+    require(not any(os.environ.get(name) for name in BLOCKED_ENV if name.startswith("GIT_")),
+            "git storage redirection environment is unsupported")
+    denied = []
+    seen_repositories = set()
+    for value in repository_roots:
+        repository = canonical_path(value)
+        require(repository.is_dir(), "repository root is missing")
+        metadata = git_output(
+            repository, "rev-parse", "--show-toplevel", "--path-format=absolute",
+            "--git-common-dir", "--git-path", "objects").decode("utf-8").splitlines()
+        require(len(metadata) == 3, "incomplete git repository metadata")
+        top, common, objects = map(lambda path: canonical_path(Path(path)), metadata)
+        require(top == repository and common.is_dir() and objects == common / "objects",
+                "repository root or common git storage differs")
+        if common in seen_repositories:
+            continue
+        seen_repositories.add(common)
+        worktrees = [
+            canonical_path(Path(path))
+            for path in parse_worktree_porcelain(
+                git_output(repository, "worktree", "list", "--porcelain", "-z"))
+        ]
+        require(repository in worktrees, "current repository is absent from git worktree inventory")
+        for worktree in worktrees:
+            for name in SENSITIVE_BENCH_NAMES:
+                sensitive = canonical_path(worktree / "bench/phase0-agent-native" / name)
+                require(contained(sensitive, worktree), "sensitive root escapes its worktree")
+                denied.append(sensitive)
+        denied.append(common)
+        denied.extend(alternate_object_roots(objects))
+    return [str(path) for path in dict.fromkeys(denied)]
 
 
 def narrow_read_denials(root, readable):
@@ -340,7 +475,7 @@ def read_isolation_evidence(context_path, workspace, output):
     require(contained(workspace_root, canonical_path(workspace))
             and authoritative == canonical_path(output), "isolation evidence paths differ")
     policy = sandbox_policy(workspace_root, authoritative, context["protectedRoot"],
-                            urlsplit(context["baseUrl"]).port, context["hiddenRoots"])
+                            urlsplit(context["baseUrl"]).port, context_hidden_roots(context))
     require(evidence["kind"] == ISOLATION and evidence["kernelProbe"] == PROBE_EXPECTATIONS
             and evidence["modelInvoked"] is False and evidence["clientSha256"] == CLIENT_SHA256
             and evidence["policySha256"] == hashlib.sha256(policy.encode()).hexdigest(),
@@ -377,7 +512,24 @@ def load_context(context_path):
     require(context.get("kind") == "pp-w-request-gateway-v1", "wrong gateway context")
     protected = canonical_path(context["protectedRoot"])
     require(contained(context_path, protected), "context is outside protected state")
+    context_hidden_roots(context)
     return context_path, context, protected
+
+
+def context_hidden_roots(context):
+    hidden = context.get("hiddenRoots")
+    repository = context.get("repositoryReadDenyRoots")
+    require(isinstance(hidden, list) and all(isinstance(path, str) for path in hidden),
+            "explicit hidden roots are required")
+    require(isinstance(repository, list) and all(isinstance(path, str) for path in repository),
+            "explicit repository read-deny roots are required")
+    hidden_paths = tuple(canonical_path(path) for path in hidden)
+    repository_paths = tuple(canonical_path(path) for path in repository)
+    require(len(hidden_paths) == len(set(hidden_paths))
+            and len(repository_paths) == len(set(repository_paths))
+            and set(repository_paths).issubset(hidden_paths),
+            "repository read-deny roots differ from hidden roots")
+    return hidden_paths
 
 
 def terminate_process_group(process, grace=2):
@@ -442,7 +594,8 @@ def execute_generated(workspace, authoritative, protected, hidden_roots, command
 def probe(context_path, workspace, authoritative):
     context_path, context, protected = load_context(context_path)
     endpoint = urlsplit(context["baseUrl"])
-    policy = sandbox_policy(workspace, authoritative, protected, endpoint.port, context["hiddenRoots"])
+    policy = sandbox_policy(
+        workspace, authoritative, protected, endpoint.port, context_hidden_roots(context))
     evidence = kernel_probe(policy, canonical_path(workspace), canonical_path(authoritative), protected,
                             context["probeHiddenFiles"], endpoint.port, context["gatewayPid"])
     evidence.update(clientSha256=CLIENT_SHA256, policySha256=hashlib.sha256(policy.encode()).hexdigest(),
@@ -458,7 +611,8 @@ def execute_client(context_path, workspace, authoritative, arguments):
     require(arguments and canonical_path(arguments[0]) == client,
             "only the registered client may enter the model sandbox")
     endpoint = urlsplit(context["baseUrl"])
-    policy = sandbox_policy(workspace, authoritative, protected, endpoint.port, context["hiddenRoots"])
+    policy = sandbox_policy(
+        workspace, authoritative, protected, endpoint.port, context_hidden_roots(context))
     environment = client_environment(workspace, context["baseUrl"])
     environment.update(NUGET_PACKAGES=context["testHost"]["packages"],
                        PPW_XUNIT_RUNTIME=context["testHost"]["manifest"],

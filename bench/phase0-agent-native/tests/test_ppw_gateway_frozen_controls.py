@@ -142,6 +142,7 @@ class FrozenGatewayControlTests(unittest.TestCase):
             raise unittest.SkipTest("frozen v0.18 product checkout is unavailable: " + str(error))
         if cls.product["calorSha256"] != FROZEN_COMPILER_SHA256:
             raise AssertionError("frozen compiler DLL differs from the registered SHA-256")
+        cls.repository_denials = isolation.discover_sensitive_roots((REPO, cls.frozen))
 
         configured_client = os.environ.get("PPW_CLAUDE_2_1_266")
         cls.client = Path(configured_client) if configured_client else CLIENT_DEFAULT
@@ -302,6 +303,7 @@ class FrozenGatewayControlTests(unittest.TestCase):
             TASKS.resolve(strict=True),
             (copied_task / "tests").resolve(strict=True),
             (copied_task / "seeded").resolve(strict=True),
+            *map(Path, self.repository_denials),
         ]
         copied_evidence = copied_task / "evidence"
         if copied_evidence.is_dir():
@@ -364,6 +366,7 @@ class FrozenGatewayControlTests(unittest.TestCase):
                     "observerUrl": gateway.observer_url,
                     "observerControlUrl": gateway.observer_control_url,
                     "hiddenRoots": [str(path) for path in observer.model_hidden_roots],
+                    "repositoryReadDenyRoots": self.repository_denials,
                     "probeHiddenFiles": [str(hidden_test), str(seeded_file)],
                     "executionRuntime": self.execution_runtime,
                 })
@@ -517,6 +520,7 @@ class FrozenGatewayControlTests(unittest.TestCase):
                 TASKS.resolve(strict=True),
                 (task / "tests").resolve(strict=True),
                 (task / "seeded").resolve(strict=True),
+                *map(Path, self.repository_denials),
             ),
             protected_root=protected,
             arm="calor",

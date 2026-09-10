@@ -2,7 +2,7 @@
   "analysisArithmeticChanged": false,
   "conditions": {
     "path": "gateway-instrument-amendment.md",
-    "sha256": "5298ef307015c8b383dd91ba585ce9284493952dd44e4e5d15da9c676b4447ac"
+    "sha256": "a49ae43d3f452b7dc3087cd59c0c748e8af61d938b6bc887b33d020dcffe2d9a"
   },
   "effectiveOn": "independently reviewed merge of the #1406 implementation PR",
   "issue": 1406,
@@ -28,14 +28,14 @@
     "harness-capture.py": "dc8a75ffb0abe9dd5a8997a06121ee1e2610cffa13cbc436e06524dc0c061c3d",
     "ppw-budget-gateway.py": "370fd35d61fa8aab5fdbb002e6b2dc6f020ec9fd9ccf8980fe9cc13f778f8e3a",
     "ppw-gateway-budget.py": "999af1d9b55a6bcc1dec1a4f8a92c0108830d4473582f1c01122bf48e4628ce1",
-    "ppw-gateway-client.py": "1a3cb6a1a99ab71c72b2bbde182364ce4704130b2a4c332cd53e822cf15db1a0",
+    "ppw-gateway-client.py": "12fe9fbc9005130f5e936b91f128bcf96037e258710ea8b86e0bef9ec8d57b41",
     "ppw-gateway-registration.py": "e67ecaa98b70ac01fbecbc7282f1d4167fc73b7fd80cda87616f61091bbde478",
-    "ppw-instrument.py": "8c709e90d0cdf569806a0f3792c6e641050bb180727c0493996e8f959185b71d",
+    "ppw-instrument.py": "2fd3ee26d17b389cbbbb7dc181a75bf3dcb3be3a3dd018ceb6b298e6579cba93",
     "ppw-pins.schema.json": "c737775a952adaeb066042c6d9d204bbfeae929c0bf6d5aa2e628422baf7e5f6",
     "ppw-registration.py": "ab9e86f08723827e5be56dee160cfa6db63849863df33b0428bdc782dfc20e0e",
     "ppw-run-observer.py": "7555bac129bc6f36c902ff112bca3064f7ad26ffb3de40c571ff06a58879a02e",
     "ppw-source-assembly.py": "0e4002ff79aceb39658223c3820438a4b9832cf4c00ca107d37e47ad5f7c973c",
-    "ppw-source-inspection.py": "375f5c0553afb3cbc8adeaf836f36009866aebc95dc9f32c44aaff59e73fe789",
+    "ppw-source-inspection.py": "836027d7b3db07d061d68f128fff77ab3e1d4a840ef0f3148d9f8da8315727e8",
     "ppw-spending.py": "f3c3506320b7852150a1dc3eed2d1db2584b06daa5b23aa55a12176b523534eb",
     "ppw-test-host.py": "41796877f49dfcf5ff51751eb1c24e1bb27c19d32ad77ab7b5f1d913f9a758c3",
     "run-pair.sh": "77b1b99c763ce14a341a62d0adc895a2b76b3f7d3a1062faa3cf485f5154212f",

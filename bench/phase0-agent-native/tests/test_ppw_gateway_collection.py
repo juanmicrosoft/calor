@@ -76,6 +76,7 @@ class CollectionTests(unittest.TestCase):
         }
         self.launched = []
         self.failure = None
+        self.discovery_complete = False
         self.registration_file = self.inputs / "registration.json"
         self.prepare_inventory(3, 74)
 
@@ -124,6 +125,7 @@ class CollectionTests(unittest.TestCase):
             if argv[-2:] == ["rev-parse", "HEAD"]:
                 return "f" * 40
         if argv == [self.admission["clientExecutable"], "--version"]:
+            self.assertTrue(self.discovery_complete)
             return self.isolation.CLIENT_VERSION
         if argv[0] == str(BENCH / "run-pair.sh") and "--canary-only" in argv:
             arm = argv[argv.index("--arm-label") + 1]
@@ -189,6 +191,13 @@ class CollectionTests(unittest.TestCase):
             "ppw-run-observer.py": Mock(RunObserver=lambda **values: Mock(
                 model_hidden_roots=tuple(values["hidden_roots"]))),
         }
+        repository_denials = [
+            str(self.root / "SYNTHETIC-other-worktree/bench/phase0-agent-native/tasks"),
+            str(self.root / "SYNTHETIC-common-git"),
+        ]
+        def discover(_):
+            self.discovery_complete = True
+            return repository_denials
         def synthetic_pins(pins, registration, stage, epoch_id):
             pins["dataKind"] = "synthetic"
             return validate_pins(pins, registration, stage, epoch_id)
@@ -201,6 +210,7 @@ class CollectionTests(unittest.TestCase):
                 patch.object(self.inspection, "prepare", return_value=self.admission["sourceInspector"]), \
                 patch.object(self.test_host, "validate_runtime"), \
                 patch.object(self.isolation, "validate_runtime"), \
+                patch.object(self.isolation, "discover_sensitive_roots", side_effect=discover), \
                 patch.object(instrument, "product", side_effect=lambda *_: dict(self.product)), \
                 patch.object(instrument, "command", side_effect=self.command), \
                 patch.object(instrument, "validate_pins", side_effect=synthetic_pins), \

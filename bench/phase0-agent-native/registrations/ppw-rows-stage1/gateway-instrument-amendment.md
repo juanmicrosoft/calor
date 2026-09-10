@@ -47,6 +47,11 @@ rejected before forwarding; CLI estimates never reconcile money.
   trusted sources against the prebuilt candidate DLL, without executing its
   MSBuild targets. Seal and archive declared source before final grading.
   Kernel checks are executed; a JSON capability assertion is insufficient.
+- Discover registered worktrees and common/alternate Git object storage in
+  trusted preflight. Deny hidden task/evidence categories in those checkouts
+  and Git storage itself, not just the selected task directory. Unsupported or
+  incomplete storage discovery prevents admission. This is a bound on known
+  registered storage, not arbitrary unregistered copies elsewhere.
 - Gateway-mode tests use the real existing xUnit v2 engine in-process instead
   of VSTest's TCP testhost. The framework is still 2.9.2 and the utility is the
   one bundled by adapter 2.8.2. Theories, fixtures, async behavior and named
@@ -62,6 +67,8 @@ rejected before forwarding; CLI estimates never reconcile money.
   binaries. Bind its executable and complete DLL/JSON runtime inventory.
   Prospectively reissue source-inspection certificates only when their frozen
   analysis results are identical; preserve the original certificates.
+  Read-only archive analysis checks recorded runtime identities without
+  depending on the collecting host's filesystem.
 
 ## Interruption, budget and financial lineage
 

@@ -60,7 +60,7 @@ def runtime_identity(cache, compiler):
     return runtime
 
 
-def validate_runtime(runtime, compiler=None):
+def validate_runtime_identity(runtime):
     fields = {"schemaVersion", "kind", "binary", "manifest", "compilerSha256",
               "sources", "files", "runtimeSha256"}
     if (not isinstance(runtime, dict) or set(runtime) != fields
@@ -71,6 +71,19 @@ def validate_runtime(runtime, compiler=None):
     if runtime["runtimeSha256"] != hashlib.sha256(json.dumps(
             unsigned, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest():
         raise ValueError("source inspector runtime identity hash differs")
+    files = runtime["files"]
+    if (not isinstance(files, dict)
+            or not re.fullmatch(r"[0-9a-f]{64}", runtime["compilerSha256"])
+            or files.get("calor.dll") != runtime["compilerSha256"]
+            or "ppw-source-inspector.dll" not in files
+            or any(not isinstance(name, str) or not name
+                   or not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest)
+                   for name, digest in files.items())):
+        raise ValueError("source inspector runtime inventory is malformed")
+
+
+def validate_runtime(runtime, compiler=None):
+    validate_runtime_identity(runtime)
     manifest = Path(runtime["manifest"])
     binary = Path(runtime["binary"])
     if (not manifest.is_absolute() or not binary.is_absolute() or not manifest.is_file()
@@ -240,7 +253,9 @@ def validate(report, pair, directories, compiler_sha, inspector_runtime=None):
     if not re.fullmatch(r"[0-9a-f]{64}", report.get("inspectorSha256", "")):
         raise ValueError("source inspection executable identity is missing")
     if inspector_runtime is not None:
-        validate_runtime(inspector_runtime)
+        # Archived reports bind recorded runtime identities, not paths on the
+        # analysis machine. Actual admission/execution validates local bytes.
+        validate_runtime_identity(inspector_runtime)
         if (report.get("inspectorSha256")
                 != inspector_runtime["files"].get("ppw-source-inspector.dll")
                 or report.get("inspectorRuntimeSha256") != inspector_runtime["runtimeSha256"]):
