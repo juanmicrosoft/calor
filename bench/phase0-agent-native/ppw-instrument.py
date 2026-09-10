@@ -158,6 +158,10 @@ def validate_pins(pins, registration, stage, epoch_id):
     require(all(value.get("compilerSha256") == compiler["calorSha256"]
                 for value in registration["sourceInspections"].values()),
             "source-inspection compiler differs from the shared compiler")
+    source_inspector = selected.get("sourceInspector")
+    if source_inspector is not None:
+        require(source_inspector.get("compilerSha256") == compiler["calorSha256"],
+                "registered source-inspector runtime uses another compiler")
     require(pins.get("dataKind") in ("empirical", "synthetic"), "dataKind must be explicit")
     require(pins.get("mode") == "live", "null-agent plumbing is not an analysable collection")
     require(pins.get("harnessCommit") and pins.get("modelPin") and pins.get("agentVersion"),
@@ -241,6 +245,7 @@ def analyze(epochs_root, epoch_id, stage):
     pins = load(epoch / "pins.json")
     registration = load(epoch / "registration.json")
     validate_pins(pins, registration, stage, epoch_id)
+    selected = registration["stages"][stage]
     require(digest(epoch / "registration.json") == pins.get("registrationSha256"),
             "registration hash differs from pins")
     validate_tasks(epoch / "tasks", registration)
@@ -335,7 +340,7 @@ def analyze(epochs_root, epoch_id, stage):
                 source_report = load(run_dir / "source-inspection.json")
                 starter = epoch / "tasks" / task / ("starter-" + arm.lower())
                 inspection.validate(source_report, pair, {"baseline": starter, "final": final_source},
-                                    pins["compiler"]["calorSha256"])
+                                    pins["compiler"]["calorSha256"], selected.get("sourceInspector"))
                 baseline = inspection.observation(source_report, "baseline")
                 frozen = inspection.observation(registration["sourceInspections"][task],
                                                 "starter-" + arm.lower())
@@ -486,7 +491,15 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
     if gateway_mode:
         require(runtime.is_file() and digest(runtime) == admission["runtimeSha256"],
                 "gateway requires the frozen prebuilt runtime, never a rebuilt product")
-        helper("ppw-source-inspection.py").prepare(shared["calorDll"])
+        inspection_runtime = helper("ppw-source-inspection.py").prepare(shared["calorDll"])
+        require(inspection_runtime == admission["sourceInspector"],
+                "prospective source-inspector rebuild differs from the registered runtime")
+        for certificate in registration["sourceInspections"].values():
+            require(certificate.get("inspectorSha256")
+                    == inspection_runtime["files"]["ppw-source-inspector.dll"]
+                    and certificate.get("inspectorRuntimeSha256")
+                    == inspection_runtime["runtimeSha256"],
+                    "gateway source-inspection certificate differs from the registered runtime")
         helper("ppw-test-host.py").validate_runtime(admission["testHost"])
     epoch = local(epochs_root, epoch_id)
     require(not epoch.exists(), "epoch already exists; use a reviewed new epoch id, never overwrite")
@@ -543,6 +556,7 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                        "instrumentAmendment", "spendingPlan")]
             if operational_profile:
                 proofs.append(selected["executionProfile"])
+                proofs.append(selected["sourceInspectionEvidence"])
             for proof in proofs:
                 destination = local(epoch, proof["path"])
                 require(not destination.exists(), "operational proof would overwrite an epoch artifact")
@@ -573,7 +587,35 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                         protected = Path(admission["ledgerPath"]).parent
                         context_path = protected / ("invocation-" + secrets.token_hex(16) + ".json")
                         try:
-                            with gateway_module.Gateway(ledger, owner, slot) as gateway:
+                            pair = load(epoch / "tasks" / task / "pair.json")
+                            original_task = Path(tasks_root).resolve() / task
+                            hidden_test = next((original_task / "tests").glob("*.cs"))
+                            seeded_paths = [value for group in pair.get("seeded", {}).values()
+                                            if isinstance(group, dict) for value in group.values()
+                                            if isinstance(value, str)]
+                            require(seeded_paths, "a seeded solution is required for isolation probing")
+                            seeded_root = original_task / seeded_paths[0]
+                            seeded_file = next(path for path in seeded_root.rglob("*") if path.is_file())
+                            sensitive_names = (
+                                "tasks", "task-candidates", "task-validation",
+                                "epochs", "pairs", "buildability", "registrations",
+                            )
+                            hidden_roots = [Path(tasks_root).resolve(), epoch]
+                            for root in (BENCH, Path(compiler_root).resolve()
+                                         / "bench/phase0-agent-native"):
+                                hidden_roots.extend(root / name for name in sensitive_names)
+                            hidden_roots = list(dict.fromkeys(path.resolve() for path in hidden_roots))
+                            observer_module = helper("ppw-run-observer.py")
+                            observer = observer_module.RunObserver(
+                                work_root=work, output=run_directory, hidden_roots=hidden_roots,
+                                protected_root=protected, arm="calor",
+                                fragment_glob="*.calr.inc" if "sourceAssembly" in pair else "*.calr",
+                                heldout_count=pair["tests"]["count"], compiler=shared["calorDll"],
+                                permissive=definition["policy"] == "permissive",
+                                test_runtime=admission["testHost"],
+                                execution_runtime=admission["executionRuntime"])
+                            hidden_roots = list(observer.model_hidden_roots)
+                            with gateway_module.Gateway(ledger, owner, slot, observer=observer) as gateway:
                                 descriptor = os.open(context_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
                                 with os.fdopen(descriptor, "w") as stream:
                                     json.dump({
@@ -583,16 +625,22 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                                         "shellExecutable": admission["shellExecutable"],
                                         "shellSha256": admission["shellSha256"],
                                         "testHost": admission["testHost"],
+                                        "observerUrl": gateway.observer_url,
+                                        "observerControlUrl": gateway.observer_control_url,
+                                        "hiddenRoots": [str(path) for path in hidden_roots],
+                                        "probeHiddenFiles": [str(hidden_test), str(seeded_file)],
                                         "executionRuntime": admission["executionRuntime"],
                                     }, stream)
                                 argv = [sys.executable, str(BENCH / "ppw-gateway-client.py"),
                                         "--context", str(context_path), "--workspace", str(work),
-                                        "--output", str(run_directory), "--"]
+                                        "--output", str(epoch), "--"]
                                 argv += pair_command(epoch / "tasks" / task, definition, shared,
                                                      epoch / "runs", run - 1)
                                 argv += ["--ppw-gateway-client", admission["clientExecutable"]]
+                                argv += ["--ppw-source-inspector-runtime",
+                                         admission["sourceInspector"]["manifest"]]
                                 command(argv, env=env)
-                            evidence = isolation.read_isolation_evidence(context_path, work, run_directory)
+                            evidence = isolation.read_isolation_evidence(context_path, work, epoch)
                             client_exit = load(run_directory / "client-invocation.json").get("exitCode")
                             ledger.complete_slot(owner, slot, evidence, client_exit)
                             write_new(run_directory / "gateway-isolation.json", evidence)

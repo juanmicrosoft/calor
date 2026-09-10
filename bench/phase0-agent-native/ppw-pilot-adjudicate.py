@@ -32,6 +32,7 @@ ARTIFACTS = (
     PRE_GATEWAY_MANIFEST, GATEWAY_PROFILE,
     "ppw-spending.py", "ppw-gateway-budget.py", "ppw-budget-gateway.py",
     "ppw-gateway-client.py", "ppw-gateway-registration.py", "ppw-test-host.py",
+    "ppw-run-observer.py",
     "run-pair.sh", "token-usage.sh", "gateway-tools/python3",
     "source-inspection/Program.cs", "source-inspection/PpwSourceInspector.csproj",
     "test-host/Program.cs", "test-host/PpwXunitHost.csproj",
@@ -44,8 +45,12 @@ ARTIFACTS = (
     "registrations/ppw-rows-stage1/gateway-authorization.json",
     "registrations/ppw-rows-stage1/gateway-spending-plan.json",
     "registrations/ppw-rows-stage1/gateway-price-contract.json",
+    "registrations/ppw-rows-stage1/gateway-source-inspections.json",
     "probe-ppw-gateway.py",
     "registrations/ppw-rows-stage1/gateway-evidence/author-native-no-forward.json",
+    "registrations/ppw-rows-stage1/gateway-evidence/author-native-no-forward.pre-boundary-1406.json",
+    "registrations/ppw-rows-stage1/gateway-evidence/author-null-control-matrix.json",
+    "registrations/ppw-rows-stage1/gateway-evidence/author-null-control-matrix.pre-boundary-1406.json",
 )
 CELL_FIELDS = {
     "pair", "arm", "plannedRuns", "validRuns", "invalidRuns", "censoredRuns",
@@ -202,6 +207,9 @@ def validate_scope(pins, registration, method, epoch_id, stage, epoch=None):
     instrument.local(Path("."), task_proof.get("path"))
     require(task_proof.get("sha256") == digest(BENCH / TASKS), "task supersession proof differs")
     frozen = load(BENCH / TASKS)
+    if "executionProfile" in selected:
+        gateway = module("gateway_source_certificates", "ppw-gateway-registration.py")
+        frozen["sourceInspections"] = gateway.resolve_profile(gateway.PROFILE)["sourceInspections"]
     for key in ("tasks", "artifacts", "sourceInspections", "compilerCommit",
                 "supersededPins", "replacementPins"):
         require(registration.get(key) == frozen[key], "frozen task registration differs: " + key)

@@ -32,7 +32,7 @@ class GatewayArchiveTests(unittest.TestCase):
                         harnessCommit="f" * 40, registrationSha256=analysis.digest(cls.epoch / "registration.json"))
         save(cls.epoch / "pins.json", cls.pins)
         for name in ("spendAuthorization", "spendingPlan", "stageRegistration", "modelRegistration",
-                     "instrumentAmendment", "executionProfile"):
+                     "instrumentAmendment", "executionProfile", "sourceInspectionEvidence"):
             proof = cls.selected[name]
             destination = cls.epoch / proof["path"]
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -56,6 +56,8 @@ class GatewayArchiveTests(unittest.TestCase):
             "kind": cls.isolation.ISOLATION, "kernelProbe": dict(cls.isolation.PROBE_EXPECTATIONS),
             "modelInvoked": False, "clientSha256": cls.isolation.CLIENT_SHA256,
             "policySha256": "e" * 64,
+            "workspaceRoot": str(cls.root / "SYNTHETIC-workspace"),
+            "authoritativeRoot": str(cls.epoch),
         }
         for slot in slots:
             task, arm, run = slot.split("/")
@@ -63,6 +65,11 @@ class GatewayArchiveTests(unittest.TestCase):
             record = analysis.load(directory / "result.json")
             record["epochId"] = cls.epoch.name
             save(directory / "result.json", record)
+            source_report = analysis.load(directory / "source-inspection.json")
+            runtime = cls.plan["clientControl"]["sourceInspector"]
+            source_report.update(inspectorSha256=runtime["files"]["ppw-source-inspector.dll"],
+                                 inspectorRuntimeSha256=runtime["runtimeSha256"])
+            save(directory / "source-inspection.json", source_report)
             identity = ledger.reserve(owner, slot, request)
             ledger.settle(owner, identity, *budget.reconciled_cost(request, budget.MODEL, usage(), "end_turn"))
             ledger.complete_slot(owner, slot, proof, 0)
@@ -89,7 +96,7 @@ class GatewayArchiveTests(unittest.TestCase):
         self.assertEqual(444, projection["requestCount"])
         self.assertEqual(444, projection["completedSlots"])
         self.assertEqual(1_000_000_000, projection["ceilingMicroUsd"])
-        self.assertEqual(24, len(self.pins["harnessArtifacts"]))
+        self.assertEqual(25, len(self.pins["harnessArtifacts"]))
         self.assertEqual("request-reserving-gateway-1406", projection["id"])
         self.assertEqual(projection, result["provenance"]["collectionExecutionProjection"])
         self.assertEqual("SYNTHETIC_ONLY", result["decision"]["status"])
@@ -102,6 +109,19 @@ class GatewayArchiveTests(unittest.TestCase):
         self.mutate("spending-final.json", lambda value: value.update(state="INCOMPLETE_BUDGET"))
         with self.assertRaisesRegex(ValueError, "incomplete accounting"):
             self.validate()
+
+    def test_foreign_source_inspector_and_rewritten_control_results_are_refused(self):
+        for field, value in (("inspectorRuntimeSha256", "0" * 64), ("sources", {})):
+            path = self.epoch / "registration.json"
+            original = path.read_bytes()
+            try:
+                registration = json.loads(original)
+                registration["sourceInspections"][self.pins["suite"][0]][field] = value
+                save(path, registration)
+                with self.assertRaisesRegex(ValueError, "source-inspection certificates"):
+                    self.validate()
+            finally:
+                path.write_bytes(original)
 
     def test_wrong_stage_or_epoch_and_mixed_source_maps_are_refused(self):
         for change in ({"stage": "confirmatory"}, {"epochId": "another"},

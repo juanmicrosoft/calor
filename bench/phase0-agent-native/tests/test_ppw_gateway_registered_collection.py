@@ -29,13 +29,14 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
         shutil.copy2(registration_helper.ROOT / transport["path"], destination)
         shutil.copytree(self.seed / "tasks", self.inputs / "tasks")
         for name in ("spendAuthorization", "spendingPlan", "stageRegistration",
-                     "modelRegistration", "instrumentAmendment"):
+                     "modelRegistration", "instrumentAmendment", "sourceInspectionEvidence"):
             proof = self.selected[name]
             path = self.inputs / proof["path"]
             path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(registration_helper.ROOT / proof["path"], path)
         plan = analysis.load(self.inputs / self.selected["spendingPlan"]["path"])
         self.admission.update(
+            sourceInspector=plan["clientControl"]["sourceInspector"],
             epochId=self.epoch_id, ceilingUnits=self.spending.units(plan["ceilingUsd"]),
             authorizationSha256=self.selected["spendAuthorization"]["sha256"],
             planSha256=self.selected["spendingPlan"]["sha256"], protocolSha256=plan["protocolSha256"],
@@ -45,7 +46,13 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
         )
 
     def seed_run(self, task, arm, run):
-        return self.seed / "runs" / task / arm / ("run-%d" % run)
+        directory = self.seed / "runs" / task / arm / ("run-%d" % run)
+        report = analysis.load(directory / "source-inspection.json")
+        runtime = self.admission["sourceInspector"]
+        report.update(inspectorSha256=runtime["files"]["ppw-source-inspector.dll"],
+                      inspectorRuntimeSha256=runtime["runtimeSha256"])
+        collection_tests.save(directory / "source-inspection.json", report)
+        return directory
 
     def test_exact_source_bound_collector_output_reaches_registered_adjudicator(self):
         self.collect()

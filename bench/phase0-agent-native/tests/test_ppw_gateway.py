@@ -7,12 +7,15 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import socket
+import subprocess
 import sys
 import threading
 import time
 import unittest
 from unittest.mock import Mock, patch
+from urllib.parse import urlsplit
 import uuid
 
 BENCH = Path(__file__).resolve().parents[1]
@@ -298,6 +301,7 @@ class AdmissionTests(Fixture):
                 "clientExecutable": str(self.root / "SYNTHETIC-client"),
                 "shellExecutable": str(self.root / "SYNTHETIC-shell"), "shellSha256": "1" * 64,
                 "runtimeSha256": "2" * 64,
+                "sourceInspector": {"kind": "SYNTHETIC-source-inspector-runtime"},
             },
         }
         return spending, isolation, registration, selected, authorization, plan
@@ -311,7 +315,9 @@ class AdmissionTests(Fixture):
         isolated = Mock(ISOLATION=isolation.ISOLATION, CLIENT_VERSION=isolation.CLIENT_VERSION)
         isolated.validate_client.side_effect = Path
         isolated.validate_shell.side_effect = lambda path, sha: Path(path)
-        modules = {"ppw-gateway-budget.py": budget, "ppw-gateway-client.py": isolated}
+        inspector = Mock()
+        modules = {"ppw-gateway-budget.py": budget, "ppw-gateway-client.py": isolated,
+                   "ppw-source-inspection.py": inspector}
         with patch.object(spending, "module", side_effect=modules.__getitem__), \
                 patch.object(spending, "gateway_ledger_location",
                              return_value=self.root / "SYNTHETIC-never-created.sqlite3"):
@@ -608,6 +614,48 @@ class TransportTests(Fixture):
 
 
 class IsolationTests(Fixture):
+    def test_observer_endpoint_exposes_only_typed_local_operations(self):
+        ledger, owner = self.ledger(planned=["SYNTHETIC-slot"])
+        observer = Mock()
+        observer.observe.return_value = {"ok": True}
+        observer.register.return_value = {"ok": True}
+        observer.seal.return_value = {"ok": True, "archivedFiles": 1}
+        observer.final.return_value = {"buildOk": True}
+        with gateway.Gateway(ledger, owner, "SYNTHETIC-slot", observer=observer) as proxy:
+            for url, operation, value, expected in (
+                (proxy.observer_url, "observe",
+                 {"kind": "ppw-dotnet-observation-v1", "command": "build",
+                  "exitCode": 0, "feedbackLatencyMs": 1}, {"ok": True}),
+                (proxy.observer_control_url, "register",
+                 {"kind": "ppw-observer-registration-v1", "workspace": "/SYNTHETIC",
+                  "output": "/SYNTHETIC"}, {"ok": True}),
+                (proxy.observer_control_url, "seal", {},
+                 {"ok": True, "archivedFiles": 1}),
+                (proxy.observer_control_url, "final", {}, {"buildOk": True}),
+            ):
+                endpoint = urlsplit(url)
+                client = http.client.HTTPConnection(endpoint.hostname, endpoint.port, timeout=10)
+                client.request("POST", endpoint.path + "/" + operation, json.dumps(value), {
+                    "Content-Type": "application/json",
+                })
+                response = client.getresponse()
+                self.assertEqual(200, response.status)
+                self.assertEqual(expected, json.loads(response.read()))
+                client.close()
+            endpoint = urlsplit(proxy.observer_url)
+            client = http.client.HTTPConnection(endpoint.hostname, endpoint.port, timeout=10)
+            client.request("POST", endpoint.path + "/final", "{}", {"Content-Type": "application/json"})
+            response = client.getresponse()
+            self.assertEqual(400, response.status)
+            response.read()
+            client.close()
+        observer.observe.assert_called_once()
+        observer.register.assert_called_once()
+        observer.seal.assert_called_once()
+        observer.final.assert_called_once()
+        observer.cancel.assert_called_once()
+        observer.close.assert_called_once()
+
     @unittest.skipIf(os.name == "nt", "private evidence uses Unix permission bits")
     def test_evidence_is_private_append_only_and_bound_to_the_exact_policy(self):
         spec = importlib.util.spec_from_file_location("isolation_test", BENCH / "ppw-gateway-client.py")
@@ -616,14 +664,22 @@ class IsolationTests(Fixture):
         work, output, protected = (self.root / name for name in ("work", "output", "protected"))
         for path in (work, output, protected):
             path.mkdir()
+        hidden = self.root / "hidden"
+        hidden.mkdir()
+        hidden_test = hidden / "HeldOutTests.cs"
+        seeded = hidden / "seeded.calr"
+        hidden_test.write_text("hidden")
+        seeded.write_text("seeded")
         context_path = protected / "SYNTHETIC-invocation.json"
         context_path.write_text(json.dumps({"protectedRoot": str(protected),
-                                           "baseUrl": "http://127.0.0.1:12345/SYNTHETIC"}))
+                                           "baseUrl": "http://127.0.0.1:12345/SYNTHETIC",
+                                           "hiddenRoots": []}))
         evidence = {
             "kind": isolation.ISOLATION, "kernelProbe": dict(isolation.PROBE_EXPECTATIONS),
             "modelInvoked": False, "clientSha256": isolation.CLIENT_SHA256,
             "policySha256": isolation.hashlib.sha256(
-                isolation.sandbox_policy(work, output, protected, 12345).encode()).hexdigest(),
+                isolation.sandbox_policy(work, output, protected, 12345, ()).encode()).hexdigest(),
+            "workspaceRoot": str(work), "authoritativeRoot": str(output),
         }
         isolation.write_isolation_evidence(context_path, evidence)
         path = isolation.isolation_evidence_path(context_path)
@@ -633,7 +689,7 @@ class IsolationTests(Fixture):
             isolation.write_isolation_evidence(context_path, evidence)
         (output / "gateway-isolation.json").write_text('{"SYNTHETIC":"untrusted child output"}')
         self.assertEqual(evidence, isolation.read_isolation_evidence(context_path, work, output))
-        with self.assertRaisesRegex(ValueError, "enforced policy"):
+        with self.assertRaisesRegex(ValueError, "paths differ"):
             isolation.read_isolation_evidence(context_path, work, work / "different-output")
         path.chmod(0o644)
         with self.assertRaisesRegex(ValueError, "private"):
@@ -647,17 +703,206 @@ class IsolationTests(Fixture):
         work, output, protected = (self.root / name for name in ("work", "output", "protected"))
         for path in (work, output, protected):
             path.mkdir()
+        hidden = self.root / "hidden"
+        hidden.mkdir()
+        hidden_test = hidden / "HeldOutTests.cs"
+        seeded = hidden / "seeded.calr"
+        hidden_test.write_text("hidden")
+        seeded.write_text("seeded")
         listener = socket.socket()
         listener.bind(("127.0.0.1", 0))
         listener.listen()
         self.addCleanup(listener.close)
         port = listener.getsockname()[1]
-        result = isolation.kernel_probe(isolation.sandbox_policy(work, output, protected, port),
-                                        work, protected, port, os.getpid())
+        result = isolation.kernel_probe(
+            isolation.sandbox_policy(work, output, protected, port, (hidden,)),
+            work, output, protected, (hidden_test, seeded), port, os.getpid())
         self.assertTrue(result["kernelProbe"]["gateway"])
         self.assertFalse(result["kernelProbe"]["outsideSignal"])
         self.assertFalse(result["kernelProbe"]["samePortIpv6"])
+        self.assertFalse(result["kernelProbe"]["authoritativeRead"])
+        self.assertFalse(result["kernelProbe"]["hiddenTestRead"])
+        self.assertFalse(result["kernelProbe"]["seededSolutionRead"])
+        self.assertTrue(result["kernelProbe"]["workspaceWrite"])
         self.assertFalse(result["modelInvoked"])
+
+    @unittest.skipUnless(sys.platform == "darwin" and shutil.which("dotnet"),
+                         "actual macOS generated-code policy")
+    def test_generated_dotnet_code_cannot_read_or_write_authoritative_or_hidden_files(self):
+        spec = importlib.util.spec_from_file_location("generated_policy_test",
+                                                     BENCH / "ppw-gateway-client.py")
+        isolation = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(isolation)
+        work, output, protected, hidden, build = (
+            self.root / name for name in ("work", "output", "protected", "hidden", "build"))
+        for path in (work, output, protected, hidden, build):
+            path.mkdir()
+        surfaces = []
+        for relative in ("heldout/HeldOut.csproj", "policy-before.json",
+                         "source-inspection.json", ".ho_final.txt"):
+            path = output / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("UNCHANGED")
+            surfaces.append(path)
+        hidden_test = hidden / "HeldOutTests.cs"
+        seeded = hidden / "seeded-solution.calr"
+        hidden_test.write_text("HIDDEN")
+        seeded.write_text("SEEDED")
+        project = build / "Probe.csproj"
+        project.write_text(
+            '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType>'
+            '<TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>')
+        (build / "Program.cs").write_text("""
+using System.Text.Json;
+static bool Read(string path) { try { File.ReadAllText(path); return true; } catch { return false; } }
+static bool Write(string path) { try { File.WriteAllText(path, "CHANGED"); return true; } catch { return false; } }
+Console.WriteLine(JsonSerializer.Serialize(new {
+    workspaceWrite = Write(args[0]),
+    authoritativeReads = args.Skip(1).Take(4).Select(Read).ToArray(),
+    authoritativeWrites = args.Skip(1).Take(4).Select(Write).ToArray(),
+    hiddenReads = args.Skip(5).Take(2).Select(Read).ToArray()
+}));
+""")
+        compiled = subprocess.run(["dotnet", "build", str(project), "--nologo", "-v", "q"],
+                                  capture_output=True, text=True, timeout=120)
+        self.assertEqual(0, compiled.returncode, compiled.stdout + compiled.stderr)
+        command = ["dotnet", str(build / "bin/Debug/net10.0/Probe.dll"),
+                   str(work / "allowed.txt"), *map(str, surfaces), str(hidden_test), str(seeded)]
+        result = isolation.execute_generated(
+            work, output, protected, (hidden,), command, cwd=work,
+            environment=dict(os.environ, DOTNET_EnableDiagnostics="0"), timeout=30)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        observed = json.loads(result.stdout)
+        self.assertTrue(observed["workspaceWrite"])
+        self.assertEqual([False] * 4, observed["authoritativeReads"])
+        self.assertEqual([False] * 4, observed["authoritativeWrites"])
+        self.assertEqual([False, False], observed["hiddenReads"])
+        self.assertTrue(all(path.read_text() == "UNCHANGED" for path in surfaces))
+
+    @unittest.skipUnless(sys.platform == "darwin", "actual narrow readable-child policy")
+    def test_readable_child_does_not_expose_execution_root_sibling(self):
+        spec = importlib.util.spec_from_file_location(
+            "generated_readable_child", BENCH / "ppw-gateway-client.py")
+        isolation = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(isolation)
+        execution, sandbox, output, protected = (
+            self.root / name for name in ("execution", "execution/sandbox", "output", "protected"))
+        for path in (sandbox, output, protected):
+            path.mkdir(parents=True)
+        own = sandbox / "own.txt"
+        sibling = execution / "unrelated-secret.txt"
+        own.write_text("OWN")
+        sibling.write_text("SECRET")
+        script = (
+            "import json,sys;from pathlib import Path\n"
+            "def read(path):\n"
+            " try:return Path(path).read_text()\n"
+            " except OSError:return None\n"
+            "print(json.dumps([read(sys.argv[1]),read(sys.argv[2])]))\n")
+        result = isolation.execute_generated(
+            sandbox, output, protected, (execution,),
+            [sys.executable, "-c", script, str(own), str(sibling)],
+            cwd=sandbox, environment=os.environ.copy(), timeout=30, readable=(sandbox,))
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual(["OWN", None], json.loads(result.stdout))
+
+    @unittest.skipUnless(sys.platform == "darwin", "actual generated process-group timeout")
+    def test_generated_timeout_terminates_nested_sandbox_descendants(self):
+        spec = importlib.util.spec_from_file_location("generated_timeout",
+                                                     BENCH / "ppw-gateway-client.py")
+        isolation = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(isolation)
+        work, output, protected, hidden = (
+            self.root / name for name in ("work", "output", "protected", "hidden"))
+        for path in (work, output, protected, hidden):
+            path.mkdir()
+        child_file = work / "child.pid"
+        with self.assertRaises(subprocess.TimeoutExpired):
+            isolation.execute_generated(
+                work, output, protected, (hidden,),
+                ["/bin/bash", "-c", "sleep 60 & echo $! > child.pid; wait"],
+                cwd=work, environment=os.environ.copy(), timeout=0.5)
+        child = int(child_file.read_text())
+        for _ in range(50):
+            if subprocess.run(["ps", "-p", str(child)], capture_output=True).returncode != 0:
+                break
+            time.sleep(0.02)
+        self.assertNotEqual(
+            0, subprocess.run(["ps", "-p", str(child)], capture_output=True).returncode)
+
+    @unittest.skipUnless(sys.platform == "darwin", "actual generated process-group sealing")
+    def test_generated_normal_exit_terminates_detached_stdio_descendant(self):
+        spec = importlib.util.spec_from_file_location(
+            "generated_normal_exit", BENCH / "ppw-gateway-client.py")
+        isolation = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(isolation)
+        work, output, protected, hidden = (
+            self.root / name for name in ("work", "output", "protected", "hidden"))
+        for path in (work, output, protected, hidden):
+            path.mkdir()
+        result = isolation.execute_generated(
+            work, output, protected, (hidden,),
+            ["/bin/bash", "-c",
+             "sleep 60 </dev/null >/dev/null 2>&1 & echo $! > child.pid"],
+            cwd=work, environment=os.environ.copy(), timeout=30)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        child = int((work / "child.pid").read_text())
+        for _ in range(50):
+            if subprocess.run(["ps", "-p", str(child)], capture_output=True).returncode != 0:
+                break
+            time.sleep(0.02)
+        self.assertNotEqual(
+            0, subprocess.run(["ps", "-p", str(child)], capture_output=True).returncode)
+
+    @unittest.skipUnless(sys.platform == "darwin", "actual run-pair process-group sealing")
+    def test_run_pair_gateway_group_seals_after_leader_exit(self):
+        runner = (BENCH / "run-pair.sh").read_text()
+        start = runner.index("gateway_group_live() {")
+        run_agent = runner.index("run_agent() {", start)
+        script = runner[start:run_agent] + r"""
+set -m
+/bin/bash -c 'sleep 60 </dev/null >/dev/null 2>&1 & echo $! > child.pid' &
+leader=$!
+wait "$leader"
+terminate_gateway_group "$leader"
+child=$(cat child.pid)
+for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    /bin/ps -p "$child" -o stat= 2>/dev/null | grep -qv '^[[:space:]]*Z' || exit 0
+    sleep 0.1
+done
+exit 9
+"""
+        result = subprocess.run(
+            ["/bin/bash", "--noprofile", "--norc", "-c", script],
+            cwd=self.root, capture_output=True, text=True, timeout=30)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    @unittest.skipUnless(sys.platform == "darwin", "actual nested sandbox process group")
+    def test_runner_timeout_can_terminate_nested_sandbox_descendants(self):
+        spec = importlib.util.spec_from_file_location("termination_test", BENCH / "ppw-gateway-client.py")
+        isolation = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(isolation)
+        work, output, protected, hidden = (
+            self.root / name for name in ("work", "output", "protected", "hidden"))
+        for path in (work, output, protected, hidden):
+            path.mkdir()
+        policy = isolation.sandbox_policy(work, output, protected, 1, (hidden,), network=False)
+        process = subprocess.Popen(
+            ["/usr/bin/sandbox-exec", "-p", policy, "/bin/bash", "-c",
+             "sleep 60 & child=$!; echo $child; wait $child"],
+            cwd=work, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            start_new_session=True)
+        child = int(process.stdout.readline().strip())
+        os.killpg(process.pid, signal.SIGTERM)
+        process.wait(timeout=10)
+        process.stdout.close()
+        process.stderr.close()
+        for _ in range(50):
+            if subprocess.run(["ps", "-p", str(child)], capture_output=True).returncode != 0:
+                break
+            time.sleep(0.02)
+        self.assertNotEqual(0, subprocess.run(
+            ["ps", "-p", str(child)], capture_output=True).returncode)
 
 
 if __name__ == "__main__":

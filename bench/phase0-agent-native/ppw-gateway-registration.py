@@ -56,10 +56,32 @@ def resolve_profile(path):
     selected = registration["stages"]["pilot"]
     selected["epochId"] = profile["epochId"]
     for name in ("spendAuthorization", "spendingPlan", "instrumentAmendment",
-                 "stageRegistration", "modelRegistration"):
+                 "stageRegistration", "modelRegistration", "sourceInspectionEvidence"):
         spending.pinned_document(Path(path).parent, profile[name], name)
         selected[name] = profile[name]
     selected["executionProfile"] = {"path": Path(path).name, "sha256": spending.digest(path)}
+    _, plan = spending.pinned_document(Path(path).parent, profile["spendingPlan"], "spendingPlan")
+    source_inspector = plan.get("clientControl", {}).get("sourceInspector")
+    require(isinstance(source_inspector, dict), "source-inspector runtime binding is required")
+    selected["sourceInspector"] = source_inspector
+    _, certificates = spending.pinned_document(
+        Path(path).parent, profile["sourceInspectionEvidence"], "sourceInspectionEvidence")
+    require(certificates.get("schemaVersion") == 1
+            and certificates.get("kind") == "pp-w-gateway-source-inspection-supersession"
+            and certificates.get("baselineRegistration") == profile["baselineRegistration"]
+            and certificates.get("runtimeSha256") == source_inspector.get("runtimeSha256")
+            and set(certificates.get("tasks", {})) == set(registration["tasks"]),
+            "source-inspection supersession differs from the preserved task set")
+    runtime_fields = {"inspectorSha256", "inspectorRuntimeSha256"}
+    for task, previous in registration["sourceInspections"].items():
+        current = certificates["tasks"][task]
+        require({key: value for key, value in current.items() if key not in runtime_fields}
+                == {key: value for key, value in previous.items() if key not in runtime_fields}
+                and current.get("inspectorSha256")
+                == source_inspector.get("files", {}).get("ppw-source-inspector.dll")
+                and current.get("inspectorRuntimeSha256") == source_inspector["runtimeSha256"],
+                "source-inspection supersession changed frozen observations: " + task)
+    registration["sourceInspections"] = certificates["tasks"]
     registration.update(collectionAuthorized=True, fundingStatus="approved")
     return registration
 
@@ -90,7 +112,7 @@ def validate_archive(epoch, pins, selected):
             "execution profile contents differ")
     proofs = {name: archive_proof(epoch, selected.get(name), profile[name])
               for name in ("spendAuthorization", "spendingPlan", "instrumentAmendment",
-                           "stageRegistration", "modelRegistration")}
+                           "stageRegistration", "modelRegistration", "sourceInspectionEvidence")}
     registration = json.loads((epoch / "registration.json").read_text())
     plan, authorization, amendment = (proofs[name] for name in
                                      ("spendingPlan", "spendAuthorization", "instrumentAmendment"))
@@ -101,6 +123,19 @@ def validate_archive(epoch, pins, selected):
     require(pins["harnessArtifacts"] == amendment["replacementHarnessArtifacts"]
             == spending.artifact_manifest(spending.GATEWAY), "mixed or changed gateway sources")
     require(plan["clientControl"]["kind"] == spending.GATEWAY, "unregistered gateway control")
+    source_inspector = plan["clientControl"].get("sourceInspector")
+    require(isinstance(source_inspector, dict)
+            and re.fullmatch(r"[0-9a-f]{64}",
+                             source_inspector.get("files", {}).get("ppw-source-inspector.dll", ""))
+            and re.fullmatch(r"[0-9a-f]{64}", source_inspector.get("runtimeSha256", "")),
+            "registered source-inspector runtime is missing")
+    require(all(certificate.get("inspectorSha256")
+                == source_inspector["files"]["ppw-source-inspector.dll"]
+                and certificate.get("inspectorRuntimeSha256") == source_inspector["runtimeSha256"]
+                for certificate in registration["sourceInspections"].values()),
+            "gateway source-inspection certificates differ from the registered runtime")
+    require(registration["sourceInspections"] == proofs["sourceInspectionEvidence"]["tasks"],
+            "archived source-inspection certificates differ from their selected proof")
     _, prices = spending.pinned_document(ROOT, plan["clientControl"]["priceContract"], "priceContract")
     require(prices == budget.price_contract(), "gateway prices differ from implemented accounting")
     require(plan["protocolSha256"] == spending.protocol_identity(
@@ -199,7 +234,8 @@ def validate_archive(epoch, pins, selected):
             requests = {name for name, row in rows.items() if row["slot"] == slot}
             require(requests and requests <= settled, "slot completed without reconciled traffic")
             proof = detail["isolation"]
-            require(set(proof) == {"kind", "kernelProbe", "modelInvoked", "clientSha256", "policySha256"}
+            require(set(proof) == {"kind", "kernelProbe", "modelInvoked", "clientSha256", "policySha256",
+                                   "workspaceRoot", "authoritativeRoot"}
                     and proof["kind"] == isolation.ISOLATION
                     and proof["kernelProbe"] == isolation.PROBE_EXPECTATIONS
                     and proof["modelInvoked"] is False and proof["clientSha256"] == isolation.CLIENT_SHA256
@@ -207,6 +243,12 @@ def validate_archive(epoch, pins, selected):
                     "missing registered isolation evidence")
             task, arm, run = slot.split("/")
             directory = epoch / "runs" / task / arm / ("run-" + run)
+            source_report = json.loads((directory / "source-inspection.json").read_text())
+            require(source_report.get("inspectorSha256")
+                    == source_inspector["files"]["ppw-source-inspector.dll"]
+                    and source_report.get("inspectorRuntimeSha256")
+                    == source_inspector["runtimeSha256"],
+                    "archived source inspection differs from the registered runtime")
             require(json.loads((directory / "gateway-isolation.json").read_text()) == proof,
                     "public isolation copy differs from protected accounting evidence")
             code = detail["clientExitCode"]

@@ -9,6 +9,7 @@ from pathlib import Path
 import secrets
 import socket
 import ssl
+import subprocess
 import threading
 from urllib.parse import urlsplit
 
@@ -67,12 +68,19 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.scheme or parsed.netloc or parsed.fragment:
             return None
         prefix, separator, path = parsed.path[1:].partition("/")
-        if not separator or not hmac.compare_digest(prefix, self.server.gateway.capability):
+        if not separator:
             return None
-        return "/" + path, parsed.query
+        gateway = self.server.gateway
+        if hmac.compare_digest(prefix, gateway.capability):
+            role = "client"
+        elif hmac.compare_digest(prefix, gateway.observer_capability):
+            role = "observer"
+        else:
+            return None
+        return role, "/" + path, parsed.query
 
     def do_HEAD(self):
-        if self.authorized_path() == ("/api/hello", ""):
+        if self.authorized_path() == ("client", "/api/hello", ""):
             self.send_response(200)
             self.send_header("Content-Length", "0")
             self.send_header("Connection", "close")
@@ -93,7 +101,49 @@ class Handler(BaseHTTPRequestHandler):
         if route is None:
             self.reply(403, "invalid gateway capability")
             return
-        path, query = route
+        role, path, query = route
+        if ((role == "client" and path == "/ppw/observe")
+                or (role == "observer" and path in
+                    ("/ppw/register", "/ppw/seal", "/ppw/final", "/ppw/source-inspection"))):
+            if gateway.observer is None or query:
+                gateway.fail("INCOMPLETE_POLICY")
+                self.reply(400, "observer operation is unavailable")
+                return
+            try:
+                length = int(self.headers.get("Content-Length", "-1"))
+                budget.require(self.headers.get_content_type() == "application/json"
+                               and 0 <= length <= 16 * 1024, "invalid observer request")
+                value = json.loads(self.rfile.read(length))
+                operation = path.rsplit("/", 1)[1]
+                if operation == "seal":
+                    budget.require(value == {}, "seal request must be empty")
+                    gateway.active = False
+                    result = gateway.observer.seal()
+                elif operation == "final":
+                    budget.require(value == {}, "final request must be empty")
+                    result = gateway.observer.final()
+                elif operation == "source-inspection":
+                    result = gateway.observer.source_inspection(
+                        value["pair"], value["baseline"], value["final"], value["runtime"])
+                else:
+                    result = getattr(gateway.observer, operation)(value)
+                raw = json.dumps(result, sort_keys=True, allow_nan=False).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(raw)))
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.wfile.write(raw)
+                self.close_connection = True
+            except (budget.Refusal, ValueError, OSError, KeyError, TypeError,
+                    subprocess.SubprocessError):
+                gateway.fail("INCOMPLETE_POLICY")
+                self.reply(400, "observer operation failed")
+            return
+        if role != "client":
+            gateway.fail("INCOMPLETE_POLICY")
+            self.reply(400, "unsupported observer operation")
+            return
         if path == "/v1/messages/count_tokens":
             self.reply(404, "optional token counting is unavailable; never a financial bound")
             return
@@ -200,10 +250,12 @@ class Handler(BaseHTTPRequestHandler):
 
 class Gateway:
     """One slot's endpoint; the request ledger remains shared across the entire pilot."""
-    def __init__(self, ledger, owner, slot, connection_factory=provider_connection):
+    def __init__(self, ledger, owner, slot, connection_factory=provider_connection, observer=None):
         self.ledger, self.owner, self.slot = ledger, owner, slot
         self.connection_factory = connection_factory
         self.capability = secrets.token_hex(32)
+        self.observer_capability = secrets.token_hex(32)
+        self.observer = observer
         self.active = True
         self.server = Server(("127.0.0.1", 0), Handler)
         self.server.gateway = self
@@ -217,6 +269,14 @@ class Gateway:
     def base_url(self):
         return "http://127.0.0.1:%d/%s" % (self.port, self.capability)
 
+    @property
+    def observer_url(self):
+        return self.base_url + "/ppw"
+
+    @property
+    def observer_control_url(self):
+        return "http://127.0.0.1:%d/%s/ppw" % (self.port, self.observer_capability)
+
     def start(self):
         self.thread.start()
         return self
@@ -226,9 +286,13 @@ class Gateway:
 
     def close(self):
         self.active = False
+        if self.observer is not None:
+            self.observer.cancel()
         self.server.shutdown()
         self.thread.join()
         self.server.server_close()
+        if self.observer is not None:
+            self.observer.close()
 
     def __enter__(self):
         return self.start()

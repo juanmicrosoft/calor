@@ -2,16 +2,25 @@ using System.Globalization;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Runtime.Loader;
+using System.Text.Json;
 using Xunit;
 using Xunit.Abstractions;
 
-if (args.Length != 1)
+if (args.Length is not (1 or 3) || (args.Length == 3 && args[1] != "--ppw-result-nonce"))
 {
-    Console.Error.WriteLine("Usage: ppw-xunit-host <compiled-test-assembly>");
+    Console.Error.WriteLine(
+        "Usage: ppw-xunit-host <compiled-test-assembly> [--ppw-result-nonce <64-hex>]");
     return 2;
 }
 
 var assemblyPath = Path.GetFullPath(args[0]);
+var resultNonce = args.Length == 3 ? args[2] : null;
+if (resultNonce is not null &&
+    (resultNonce.Length != 64 || resultNonce.Any(value => !Uri.IsHexDigit(value))))
+{
+    Console.Error.WriteLine("PPW_XUNIT_INFRASTRUCTURE_ERROR: invalid result nonce.");
+    return 2;
+}
 var resolver = new AssemblyDependencyResolver(assemblyPath);
 Assembly? ResolveManaged(AssemblyLoadContext context, AssemblyName name)
 {
@@ -109,6 +118,17 @@ try
     var label = summary.Failed == 0 ? "Passed!" : "Failed!";
     Console.WriteLine($"{label} - Failed: {summary.Failed}, Passed: {passed}, " +
                       $"Skipped: {summary.Skipped}, Total: {summary.Total}");
+    if (resultNonce is not null)
+    {
+        var receipt = JsonSerializer.Serialize(new
+        {
+            failed = summary.Failed,
+            passed,
+            skipped = summary.Skipped,
+            total = summary.Total,
+        });
+        Console.WriteLine($"PPW_XUNIT_RESULT_V1:{resultNonce}:{receipt}");
+    }
     return summary.Failed == 0 ? 0 : 1;
 }
 finally

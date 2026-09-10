@@ -26,7 +26,7 @@ class ProbeTests(unittest.TestCase):
         fixture.setUp()
         self.addCleanup(fixture.doCleanups)
         with patch.dict(os.environ, {"CLAUDE_MODEL": probe.budget.MODEL}):
-            fixture.fake_capture("success", gateway=True)
+            fixture.fake_capture("success")
         arguments = json.loads((fixture.root / "synthetic-agent-calls.arguments.json").read_text())
         self.assertEqual(probe.isolation.registered_client_flags() + ["--model", probe.budget.MODEL],
                          arguments[:-1])
@@ -46,12 +46,14 @@ class ProbeTests(unittest.TestCase):
         root = BENCH / "tests" / (".probe-env-" + uuid.uuid4().hex)
         root.mkdir()
         self.addCleanup(shutil.rmtree, root)
-        with patch.dict(os.environ, {"PATH": "SYNTHETIC_PATH"}, clear=True):
+        with patch.dict(os.environ, {"PATH": "SYNTHETIC_PATH",
+                                     "PPW_TRUSTED_OBSERVER_URL": "SYNTHETIC-secret"}, clear=True):
             environment = probe.isolation.client_environment(root, "http://127.0.0.1:12345/SYNTHETIC")
         self.assertEqual("1", environment["DISABLE_AUTOUPDATER"])
         self.assertNotIn("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", environment)
         self.assertNotIn("ANTHROPIC_API_KEY", environment)
         self.assertNotIn("ANTHROPIC_AUTH_TOKEN", environment)
+        self.assertNotIn("PPW_TRUSTED_OBSERVER_URL", environment)
         self.assertTrue(Path(environment["TMPDIR"]).is_relative_to(root))
         self.assertEqual(sys.executable, environment["PPW_PYTHON_EXECUTABLE"])
 

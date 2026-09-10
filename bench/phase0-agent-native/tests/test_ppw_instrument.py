@@ -368,7 +368,8 @@ if "build" in sys.argv:
         project = pathlib.Path(next(a for a in sys.argv if a.endswith(".csproj")))
     assembly = ET.parse(project).find(".//Target[@Name='_PpwAssembleSources']/Exec")
     if assembly is not None:
-        result = subprocess.run(shlex.split(assembly.attrib["Command"]), capture_output=True, text=True)
+        command = assembly.attrib["Command"].replace("$(MSBuildThisFileDirectory)", str(project.parent) + "/")
+        result = subprocess.run(shlex.split(command), capture_output=True, text=True)
         if result.returncode:
             print(result.stderr)
             sys.exit(result.returncode)

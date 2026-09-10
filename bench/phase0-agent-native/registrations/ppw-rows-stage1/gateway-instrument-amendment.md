@@ -38,9 +38,14 @@ rejected before forwarding; CLI estimates never reconcile money.
   arm-specific diagnostics, raw edit mechanism and starting task contents.
   Do not use bare mode, safe mode, tools-none or an alternate model to obtain
   admission. Disable auto-update for the retained invocation only.
-- Isolate the complete runner, including generated-code builds and tests.
-  Permit only its capability-protected gateway endpoint, not arbitrary
-  loopback, external networking, outside signals or gateway control writes.
+- Keep the authoritative runner and observation broker outside experimental
+  child policies. The native client and tools may write their workspace and
+  contact only their model gateway capability. They cannot read hidden tasks,
+  seeded solutions or authoritative output, or use trusted lifecycle controls.
+  Generated builds and tests run in private snapshots without network access
+  or writes back to the agent workspace. Compile hidden tests from read-only
+  trusted sources against the prebuilt candidate DLL, without executing its
+  MSBuild targets. Seal and archive declared source before final grading.
   Kernel checks are executed; a JSON capability assertion is insufficient.
 - Gateway-mode tests use the real existing xUnit v2 engine in-process instead
   of VSTest's TCP testhost. The framework is still 2.9.2 and the utility is the
@@ -49,6 +54,14 @@ rejected before forwarding; CLI estimates never reconcile money.
   presentation/filter options are not silently emulated. Errors are explicit.
   The prebuilt test host, framework dependencies and Runtime are source/byte
   bound and read-only to the experimental descendants.
+- Record hidden-test aggregates from one nonce-bound framework receipt. Reject
+  missing, duplicate or inconsistent receipts instead of parsing candidate
+  console counts. Preserve per-iteration observations and named test outcomes.
+  This does not assert protection from arbitrary reflection within one CLR.
+- Rebuild the source inspector from trusted sources before accepting cached
+  binaries. Bind its executable and complete DLL/JSON runtime inventory.
+  Prospectively reissue source-inspection certificates only when their frozen
+  analysis results are identical; preserve the original certificates.
 
 ## Interruption, budget and financial lineage
 

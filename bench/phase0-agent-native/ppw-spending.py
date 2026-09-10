@@ -25,6 +25,7 @@ COLLECTION_ARTIFACTS = (
 )
 GATEWAY_ARTIFACTS = COLLECTION_ARTIFACTS + (
     "ppw-gateway-budget.py", "ppw-budget-gateway.py", "ppw-gateway-client.py",
+    "ppw-run-observer.py",
     "gateway-tools/python3",
     "templates/calor-arm/CalorArm.Gateway.csproj.template",
     "ppw-test-host.py", "test-host/Program.cs", "test-host/PpwXunitHost.csproj",
@@ -190,6 +191,8 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
         client = isolation.validate_client(control.get("clientExecutable"))
         shell = isolation.validate_shell(control.get("shellExecutable"), control.get("shellSha256"))
         isolation.validate_runtime(control.get("executionRuntime"))
+        source_inspector = module("ppw-source-inspection.py")
+        source_inspector.validate_runtime(control.get("sourceInspector"))
         ledger = gateway_ledger_location(plan["ledgerBinding"])
         policy.RequestLedger(ledger)
         return {
@@ -201,6 +204,7 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
             "shellExecutable": str(shell), "shellSha256": control["shellSha256"],
             "runtimeSha256": control.get("runtimeSha256"), "slots": slots,
             "testHost": control.get("testHost"),
+            "sourceInspector": control.get("sourceInspector"),
             "executionRuntime": control.get("executionRuntime"),
         }
     ledger = plan.get("ledgerPath")

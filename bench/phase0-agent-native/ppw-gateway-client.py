@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Isolate the entire pinned runner under a process-local kernel policy, never global settings."""
+"""Launch the trusted runner and isolate its model/generated-code children with Seatbelt."""
 import argparse
 import _sqlite3
 import _ssl
@@ -12,6 +12,7 @@ from pathlib import Path
 import platform
 import plistlib
 import secrets
+import signal
 import shutil
 import socket
 import sqlite3
@@ -19,13 +20,17 @@ import ssl
 import subprocess
 import sys
 import tempfile
+import time
 from urllib.parse import urlsplit
 
 CLIENT_VERSION = "2.1.266 (Claude Code)"
 CLIENT_SHA256 = "553d1b9e9e7068b275c0a783c7e139ff6503096f286e674c8c919379fb0eca62"
 ISOLATION = "macos-seatbelt-request-gateway-v1"
 PROBE_EXPECTATIONS = {
-    "gateway": True, "otherPort": False, "stateWrite": False, "stateRead": False,
+    "gateway": True, "otherPort": False, "workspaceWrite": True,
+    "authoritativeWrite": False, "authoritativeRead": False,
+    "hiddenTestRead": False, "seededSolutionRead": False,
+    "stateWrite": False, "stateRead": False,
     "outsideSignal": False, "hardlinkWrite": False, "symlinkWrite": False,
     "samePortIpv6": False,
     "unixSocket": False, "delegatedPreferencesWrite": False,
@@ -55,6 +60,24 @@ def canonical_path(value):
 
 def contained(path, root):
     return path == root or root in path.parents
+
+
+def narrow_read_denials(root, readable):
+    allowed = tuple(path for path in readable if contained(path, root))
+    if not allowed:
+        return (root,)
+    denials = []
+    frontier = [root]
+    while frontier:
+        parent = frontier.pop()
+        require(parent.is_dir(), "readable child exception requires an existing directory ancestry")
+        for child in parent.iterdir():
+            descendants = tuple(path for path in allowed if contained(path, child))
+            if not descendants:
+                denials.append(child)
+            elif child not in allowed:
+                frontier.append(child)
+    return tuple(denials)
 
 
 def validate_client(path):
@@ -121,22 +144,44 @@ def validate_runtime(expected):
             "Python/TLS/SQLite/.NET/OS runtime identity differs from the registered execution profile")
 
 
-def sandbox_policy(workspace, output, protected, port):
-    workspace, output, protected = map(canonical_path, (workspace, output, protected))
+def sandbox_policy(workspace, authoritative, protected, port, hidden_roots=(), *,
+                   network=True, readable=(), writable=()):
+    workspace, authoritative, protected = map(
+        canonical_path, (workspace, authoritative, protected))
+    hidden_roots = tuple(canonical_path(path) for path in hidden_roots)
+    readable = tuple(canonical_path(path) for path in readable)
+    writable = tuple(canonical_path(path) for path in writable)
     require(type(port) is int and 1 <= port <= 65535, "invalid gateway port")
-    for writable in (workspace, output):
-        require(not contained(protected, writable) and not contained(writable, protected),
-                "writable workspace/output overlaps protected gateway state")
+    require(not contained(protected, workspace) and not contained(workspace, protected)
+            and not contained(authoritative, workspace) and not contained(workspace, authoritative),
+            "writable workspace overlaps authoritative or protected state")
+    require(all(not contained(path, authoritative) and not contained(authoritative, path)
+                and not contained(path, protected) and not contained(protected, path)
+                and not any(contained(path, hidden) or contained(hidden, path)
+                            for hidden in hidden_roots)
+                for path in writable),
+            "additional writable path overlaps protected, hidden, or authoritative state")
+    require(all(not contained(hidden, path) for path in readable for hidden in hidden_roots)
+            and all(not contained(authoritative, path) and not contained(protected, path)
+                    for path in readable),
+            "readable path must be a narrow child exception, not a protected ancestor")
     quote = lambda path: json.dumps(str(path))
-    return "\n".join([
+    rules = [
         "(version 1)",
         "(allow default)",
         "(deny network*)",
-        '(allow network-outbound (remote tcp4 "localhost:%d"))' % port,
         "(deny file-write*)",
         '(allow file-write* (literal "/dev/null"))',
-        "(allow file-write* (subpath %s) (subpath %s))" % (quote(workspace), quote(output)),
-        "(deny file-read* (subpath %s))" % quote(protected),
+        "(allow file-write* (subpath %s))" % quote(workspace),
+    ]
+    denied_roots = (authoritative, protected, *hidden_roots)
+    rules.extend("(deny file-read* (subpath %s))" % quote(path)
+                 for root in denied_roots for path in narrow_read_denials(root, readable))
+    rules.extend("(allow file-read* (subpath %s))" % quote(path) for path in readable)
+    rules.extend("(allow file-write* (subpath %s))" % quote(path) for path in writable)
+    if network:
+        rules.append('(allow network-outbound (remote tcp4 "localhost:%d"))' % port)
+    rules.extend([
         "(deny signal)",
         "(allow signal (target same-sandbox))",
         "(deny process-info*)",
@@ -154,10 +199,11 @@ def sandbox_policy(workspace, output, protected, port):
         "(deny mach-register)",
         "(deny ipc-posix-shm*)",
         "(deny ipc-posix-sem*)",
-    ]) + "\n"
+    ])
+    return "\n".join(rules) + "\n"
 
 
-def kernel_probe(policy, workspace, protected, gateway_port, gateway_pid):
+def kernel_probe(policy, workspace, authoritative, protected, hidden_files, gateway_port, gateway_pid):
     """Cost-free live enforcement checks, not a caller's asserted JSON capability."""
     validate_platform()
     with ExitStack() as resources:
@@ -187,6 +233,12 @@ def kernel_probe(policy, workspace, protected, gateway_port, gateway_pid):
         preferences.write_bytes(preferences_bytes)
         resources.callback(preferences.unlink, missing_ok=True)
         alias_prefix = workspace / ("state-alias-probe-" + secrets.token_hex(8))
+        workspace_sentinel = workspace / ("workspace-write-probe-" + secrets.token_hex(8))
+        resources.callback(workspace_sentinel.unlink, missing_ok=True)
+        authoritative_sentinel = authoritative / ("authoritative-probe-" + secrets.token_hex(8))
+        authoritative_sentinel.write_text("UNCHANGED")
+        resources.callback(authoritative_sentinel.unlink, missing_ok=True)
+        hidden_test, seeded_solution = map(canonical_path, hidden_files)
         for suffix in ("hardlink", "symlink", "source"):
             resources.callback(Path(str(alias_prefix) + "-" + suffix).unlink, missing_ok=True)
         script = """
@@ -204,6 +256,16 @@ try: Path(sys.argv[3]).write_text("CHANGED");result["stateWrite"]=True
 except OSError: result["stateWrite"]=False
 try: Path(sys.argv[3]).read_text();result["stateRead"]=True
 except OSError: result["stateRead"]=False
+try: Path(sys.argv[9]).write_text("WORKS");result["workspaceWrite"]=True
+except OSError: result["workspaceWrite"]=False
+try: Path(sys.argv[10]).write_text("CHANGED");result["authoritativeWrite"]=True
+except OSError: result["authoritativeWrite"]=False
+try: Path(sys.argv[10]).read_text();result["authoritativeRead"]=True
+except OSError: result["authoritativeRead"]=False
+try: Path(sys.argv[11]).read_text();result["hiddenTestRead"]=True
+except OSError: result["hiddenTestRead"]=False
+try: Path(sys.argv[12]).read_text();result["seededSolutionRead"]=True
+except OSError: result["seededSolutionRead"]=False
 try: os.kill(int(sys.argv[4]),0);result["outsideSignal"]=True
 except OSError: result["outsideSignal"]=False
 for kind in ("hardlink","symlink"):
@@ -235,13 +297,18 @@ print(json.dumps(result))
         result = subprocess.run(
             ["/usr/bin/sandbox-exec", "-p", policy, sys.executable, "-c", script,
              str(gateway_port), str(listener.getsockname()[1]), str(sentinel), str(gateway_pid),
-             str(alias_prefix), str(unix_path), str(preferences.with_suffix("")), str(readable_source)],
+             str(alias_prefix), str(unix_path), str(preferences.with_suffix("")), str(readable_source),
+             str(workspace_sentinel), str(authoritative_sentinel),
+             str(hidden_test), str(seeded_solution)],
             cwd=workspace, text=True, capture_output=True, timeout=15)
         require(result.returncode == 0, "kernel isolation probe could not execute")
         observed = json.loads(result.stdout)
         require(observed == PROBE_EXPECTATIONS
-                and sentinel.read_text() == "UNCHANGED" and preferences.read_bytes() == preferences_bytes,
+                and sentinel.read_text() == "UNCHANGED"
+                and authoritative_sentinel.read_text() == "UNCHANGED"
+                and preferences.read_bytes() == preferences_bytes,
                 "kernel isolation controls did not hold")
+        workspace_sentinel.unlink()
         require(readable_source.read_text() == "UNCHANGED", "readable source was modified through an alias")
         return {"kind": ISOLATION, "kernelProbe": observed, "modelInvoked": False}
 
@@ -265,10 +332,15 @@ def read_isolation_evidence(context_path, workspace, output):
     context = json.loads(Path(context_path).read_text())
     evidence = json.loads(path.read_text())
     require(isinstance(evidence, dict) and set(evidence) ==
-            {"kind", "kernelProbe", "modelInvoked", "clientSha256", "policySha256"},
+            {"kind", "kernelProbe", "modelInvoked", "clientSha256", "policySha256",
+             "workspaceRoot", "authoritativeRoot"},
             "isolation evidence fields differ")
-    policy = sandbox_policy(workspace, output, context["protectedRoot"],
-                            urlsplit(context["baseUrl"]).port)
+    workspace_root = canonical_path(evidence["workspaceRoot"])
+    authoritative = canonical_path(evidence["authoritativeRoot"])
+    require(contained(workspace_root, canonical_path(workspace))
+            and authoritative == canonical_path(output), "isolation evidence paths differ")
+    policy = sandbox_policy(workspace_root, authoritative, context["protectedRoot"],
+                            urlsplit(context["baseUrl"]).port, context["hiddenRoots"])
     require(evidence["kind"] == ISOLATION and evidence["kernelProbe"] == PROBE_EXPECTATIONS
             and evidence["modelInvoked"] is False and evidence["clientSha256"] == CLIENT_SHA256
             and evidence["policySha256"] == hashlib.sha256(policy.encode()).hexdigest(),
@@ -287,7 +359,9 @@ def client_environment(workspace, base_url):
     temporary.mkdir(exist_ok=True)
     dotnet_home = workspace / ".ppw-dotnet-home"
     dotnet_home.mkdir(exist_ok=True)
-    return dict(os.environ, ANTHROPIC_BASE_URL=base_url, DISABLE_AUTOUPDATER="1",
+    inherited = {name: value for name, value in os.environ.items()
+                 if not name.startswith("PPW_TRUSTED_")}
+    return dict(inherited, ANTHROPIC_BASE_URL=base_url, DISABLE_AUTOUPDATER="1",
                 TMPDIR=str(temporary), DOTNET_CLI_HOME=str(dotnet_home),
                 DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER="1", MSBUILDDISABLENODEREUSE="1",
                 GIT_OPTIONAL_LOCKS="0", PPW_INSPECTOR_READONLY="1", PPW_GATEWAY_ACTIVE="1",
@@ -295,7 +369,7 @@ def client_environment(workspace, base_url):
                 PATH=str(Path(__file__).resolve().parent / "gateway-tools") + os.pathsep + os.environ["PATH"])
 
 
-def launch(context_path, workspace, output, arguments):
+def load_context(context_path):
     context_path = canonical_path(context_path)
     require(context_path.is_file() and context_path.stat().st_mode & 0o077 == 0,
             "private gateway context required")
@@ -303,6 +377,98 @@ def launch(context_path, workspace, output, arguments):
     require(context.get("kind") == "pp-w-request-gateway-v1", "wrong gateway context")
     protected = canonical_path(context["protectedRoot"])
     require(contained(context_path, protected), "context is outside protected state")
+    return context_path, context, protected
+
+
+def terminate_process_group(process, grace=2):
+    def members():
+        result = subprocess.run(
+            ["/bin/ps", "-axo", "pid=,pgid=,stat="],
+            capture_output=True, text=True, timeout=10)
+        require(result.returncode == 0, "cannot inspect generated descendant process group")
+        return [int(line.split()[0]) for line in result.stdout.splitlines()
+                if len(line.split()) == 3 and int(line.split()[1]) == process.pid
+                and not line.split()[2].startswith("Z")]
+
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        process.wait(timeout=grace)
+        return
+    deadline = time.monotonic() + grace
+    while members() and time.monotonic() < deadline:
+        time.sleep(0.02)
+    if members():
+        os.killpg(process.pid, signal.SIGKILL)
+        deadline = time.monotonic() + grace
+        while members() and time.monotonic() < deadline:
+            time.sleep(0.02)
+    require(not members(), "generated descendant process group survived termination")
+    process.wait(timeout=grace)
+
+
+def execute_generated(workspace, authoritative, protected, hidden_roots, command, *,
+                      cwd, environment, timeout, readable=(), writable=(), input_text=None,
+                      started=None, finished=None):
+    workspace, authoritative, protected = map(
+        canonical_path, (workspace, authoritative, protected))
+    port = 1
+    policy = sandbox_policy(workspace, authoritative, protected, port, hidden_roots,
+                            network=False, readable=readable, writable=writable)
+    argv = ["/usr/bin/sandbox-exec", "-p", policy] + [str(value) for value in command]
+    process = subprocess.Popen(
+        argv, cwd=cwd, env=environment, stdin=subprocess.PIPE if input_text is not None else None,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+    try:
+        if started is not None:
+            started(process)
+        stdout, stderr = process.communicate(input=input_text, timeout=timeout)
+        returncode = process.returncode
+        terminate_process_group(process)
+        return subprocess.CompletedProcess(argv, returncode, stdout, stderr)
+    except subprocess.TimeoutExpired:
+        terminate_process_group(process)
+        process.communicate()
+        raise
+    except Exception:
+        terminate_process_group(process)
+        process.communicate()
+        raise
+    finally:
+        if finished is not None:
+            finished(process)
+
+
+def probe(context_path, workspace, authoritative):
+    context_path, context, protected = load_context(context_path)
+    endpoint = urlsplit(context["baseUrl"])
+    policy = sandbox_policy(workspace, authoritative, protected, endpoint.port, context["hiddenRoots"])
+    evidence = kernel_probe(policy, canonical_path(workspace), canonical_path(authoritative), protected,
+                            context["probeHiddenFiles"], endpoint.port, context["gatewayPid"])
+    evidence.update(clientSha256=CLIENT_SHA256, policySha256=hashlib.sha256(policy.encode()).hexdigest(),
+                    workspaceRoot=str(canonical_path(workspace)),
+                    authoritativeRoot=str(canonical_path(authoritative)))
+    write_isolation_evidence(context_path, evidence)
+    return evidence
+
+
+def execute_client(context_path, workspace, authoritative, arguments):
+    _, context, protected = load_context(context_path)
+    client = validate_client(context["clientExecutable"])
+    require(arguments and canonical_path(arguments[0]) == client,
+            "only the registered client may enter the model sandbox")
+    endpoint = urlsplit(context["baseUrl"])
+    policy = sandbox_policy(workspace, authoritative, protected, endpoint.port, context["hiddenRoots"])
+    environment = client_environment(workspace, context["baseUrl"])
+    environment.update(NUGET_PACKAGES=context["testHost"]["packages"],
+                       PPW_XUNIT_RUNTIME=context["testHost"]["manifest"],
+                       PPW_OBSERVER_URL=context["observerUrl"])
+    os.execve("/usr/bin/sandbox-exec",
+              ["/usr/bin/sandbox-exec", "-p", policy] + arguments, environment)
+
+
+def launch(context_path, workspace, output, arguments):
+    context_path, context, protected = load_context(context_path)
     client = validate_client(context["clientExecutable"])
     shell = validate_shell(context["shellExecutable"], context["shellSha256"])
     validate_runtime(context["executionRuntime"])
@@ -313,16 +479,16 @@ def launch(context_path, workspace, output, arguments):
             and not endpoint.query and not endpoint.fragment, "gateway must be the private loopback endpoint")
     runner = Path(__file__).resolve().parent / "run-pair.sh"
     require(arguments and Path(arguments[0]) == runner and "--ppw-gateway-client" in arguments,
-            "the entire registered runner must be isolated, including builds and held-out execution")
+            "registered runner/client binding is required")
     require(arguments[arguments.index("--ppw-gateway-client") + 1] == str(client)
             and os.environ.get("CLAUDE_MODEL") == "claude-opus-4-8",
             "registered model/client must be explicit")
     workspace, output = canonical_path(workspace), canonical_path(output)
-    policy = sandbox_policy(workspace, output, protected, endpoint.port)
-    evidence = kernel_probe(policy, workspace, protected, endpoint.port, context["gatewayPid"])
-    evidence.update(clientSha256=CLIENT_SHA256, policySha256=hashlib.sha256(policy.encode()).hexdigest())
-    write_isolation_evidence(context_path, evidence)
-    environment = client_environment(workspace, context["baseUrl"])
+    environment = dict(os.environ, PPW_GATEWAY_ACTIVE="1",
+                       PPW_TRUSTED_CONTEXT=str(context_path),
+                       PPW_TRUSTED_OBSERVER_URL=context["observerControlUrl"],
+                       PPW_OBSERVER_URL=context["observerUrl"],
+                       PPW_TRUSTED_ARCHIVE_ROOT=str(output))
     spec = importlib.util.spec_from_file_location("ppw_xunit_runtime",
                                                  runner.parent / "ppw-test-host.py")
     test_host = importlib.util.module_from_spec(spec)
@@ -330,10 +496,9 @@ def launch(context_path, workspace, output, arguments):
     test_host.validate_runtime(context["testHost"])
     environment.update(NUGET_PACKAGES=context["testHost"]["packages"],
                        PPW_XUNIT_RUNTIME=context["testHost"]["manifest"])
-    # exec keeps the existing runner's timeout/process-tree ownership intact.
-    os.execve("/usr/bin/sandbox-exec",
-              ["/usr/bin/sandbox-exec", "-p", policy, str(shell), "--noprofile", "--norc"] + arguments,
-              environment)
+    # The runner is trusted and owns authoritative output. It launches only
+    # the native client and generated code through the child policies above.
+    os.execve(str(shell), [str(shell), "--noprofile", "--norc"] + arguments, environment)
 
 
 def main():
@@ -341,13 +506,20 @@ def main():
         print(json.dumps(registered_client_flags()))
         return
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
+    parser.add_argument("--probe", action="store_true")
+    parser.add_argument("--exec-client", action="store_true")
     parser.add_argument("--context", required=True)
     parser.add_argument("--workspace", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     arguments = args.arguments[1:] if args.arguments[:1] == ["--"] else args.arguments
-    launch(args.context, args.workspace, args.output, arguments)
+    if args.probe:
+        print(json.dumps(probe(args.context, args.workspace, args.output), sort_keys=True))
+    elif args.exec_client:
+        execute_client(args.context, args.workspace, args.output, arguments)
+    else:
+        launch(args.context, args.workspace, args.output, arguments)
 
 
 if __name__ == "__main__":

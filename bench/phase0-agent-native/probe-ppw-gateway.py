@@ -157,13 +157,20 @@ def run(client, scratch_root):
     try:
         with tempfile.TemporaryDirectory(prefix="no-forward-", dir=scratch_root) as temporary:
             base = Path(temporary)
-            work, output, protected = (base / name for name in ("work", "output", "protected"))
-            for path in (work, output, protected):
+            work, output, protected, hidden = (
+                base / name for name in ("work", "output", "protected", "hidden"))
+            for path in (work, output, protected, hidden):
                 path.mkdir()
             source = work / "src"
             source.mkdir()
-            policy = isolation.sandbox_policy(work, output, protected, server.server_port)
-            evidence = isolation.kernel_probe(policy, work, protected, server.server_port, os.getpid())
+            hidden_test, seeded = hidden / "HeldOutTests.cs", hidden / "seeded.calr"
+            hidden_test.write_text("SYNTHETIC hidden test")
+            seeded.write_text("SYNTHETIC seeded solution")
+            policy = isolation.sandbox_policy(
+                work, output, protected, server.server_port, (hidden,))
+            evidence = isolation.kernel_probe(
+                policy, work, output, protected, (hidden_test, seeded),
+                server.server_port, os.getpid())
             endpoint = "http://127.0.0.1:%d/%s" % (server.server_port, server.capability)
             environment = isolation.client_environment(work, endpoint)
             environment["CLAUDE_MODEL"] = budget.MODEL

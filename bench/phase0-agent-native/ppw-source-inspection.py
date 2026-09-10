@@ -8,11 +8,14 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parent
 TOOL = ROOT / "source-inspection"
+RUNTIME_KIND = "ppw-source-inspector-runtime-v1"
+SOURCE_FILES = ("Program.cs", "PpwSourceInspector.csproj")
 
 
 def sha(path):
@@ -26,33 +29,136 @@ def assembly():
     return module
 
 
+def source_hashes():
+    return {name: sha(TOOL / name) for name in SOURCE_FILES}
+
+
+def runtime_files(directory):
+    directory = Path(directory)
+    return {path.relative_to(directory).as_posix(): sha(path)
+            for path in sorted(directory.rglob("*"))
+            if path.is_file() and path.name != "runtime.json"
+            and path.suffix in (".dll", ".json")}
+
+
+def runtime_identity(cache, compiler):
+    binary = cache / "bin/ppw-source-inspector.dll"
+    files = runtime_files(binary.parent)
+    if binary.name not in files or "calor.dll" not in files:
+        raise ValueError("source inspector runtime is incomplete")
+    runtime = {
+        "schemaVersion": 1,
+        "kind": RUNTIME_KIND,
+        "binary": str(binary),
+        "manifest": str(cache / "runtime.json"),
+        "compilerSha256": sha(compiler),
+        "sources": source_hashes(),
+        "files": files,
+    }
+    runtime["runtimeSha256"] = hashlib.sha256(json.dumps(
+        runtime, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+    return runtime
+
+
+def validate_runtime(runtime, compiler=None):
+    fields = {"schemaVersion", "kind", "binary", "manifest", "compilerSha256",
+              "sources", "files", "runtimeSha256"}
+    if (not isinstance(runtime, dict) or set(runtime) != fields
+            or runtime.get("schemaVersion") != 1 or runtime.get("kind") != RUNTIME_KIND
+            or runtime.get("sources") != source_hashes()):
+        raise ValueError("source inspector runtime identity differs")
+    unsigned = {name: value for name, value in runtime.items() if name != "runtimeSha256"}
+    if runtime["runtimeSha256"] != hashlib.sha256(json.dumps(
+            unsigned, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest():
+        raise ValueError("source inspector runtime identity hash differs")
+    manifest = Path(runtime["manifest"])
+    binary = Path(runtime["binary"])
+    if (not manifest.is_absolute() or not binary.is_absolute() or not manifest.is_file()
+            or not binary.is_file() or binary.parent.parent != manifest.parent
+            or binary.name != "ppw-source-inspector.dll"
+            or manifest.is_symlink() or binary.is_symlink()
+            or manifest.stat().st_nlink != 1 or binary.stat().st_nlink != 1
+            or any(path.is_symlink() for path in binary.parents)):
+        raise ValueError("source inspector runtime paths are missing, linked, or misplaced")
+    if json.loads(manifest.read_text(encoding="utf-8")) != runtime:
+        raise ValueError("source inspector runtime manifest changed")
+    runtime_paths = [path for path in binary.parent.rglob("*")
+                     if path.is_file() and path.name != "runtime.json"
+                     and path.suffix in (".dll", ".json")]
+    if (any(path.is_symlink() or path.stat().st_nlink != 1
+            or any(parent.is_symlink() for parent in path.parents
+                   if parent != binary.parent.parent)
+            for path in runtime_paths)
+            or runtime_files(binary.parent) != runtime["files"]):
+        raise ValueError("source inspector runtime dependency bytes changed")
+    if runtime["files"].get("ppw-source-inspector.dll") != sha(binary):
+        raise ValueError("source inspector executable bytes changed")
+    if runtime["files"].get("calor.dll") != runtime["compilerSha256"]:
+        raise ValueError("source inspector adjacent compiler differs")
+    if compiler is not None and sha(Path(compiler).resolve(strict=True)) != runtime["compilerSha256"]:
+        raise ValueError("source inspector compiler differs from the registered runtime")
+    return binary
+
+
+def build_runtime(compiler, directory):
+    result = subprocess.run(
+        ["dotnet", "build", str(TOOL / "PpwSourceInspector.csproj"),
+         "--configuration", "Release", "--output", str(directory / "bin"),
+         "--property:BaseIntermediateOutputPath=" + str(directory / "obj") + "/",
+         "--property:CalorCompilerDll=" + str(compiler), "--verbosity", "quiet"],
+        capture_output=True, text=True, timeout=180)
+    (directory / "build.log").write_text(result.stdout + result.stderr, encoding="utf-8")
+    binary = directory / "bin/ppw-source-inspector.dll"
+    if result.returncode or not binary.is_file():
+        raise ValueError("pinned source inspector failed to build: " + str(directory / "build.log"))
+    if sha(binary.parent / "calor.dll") != sha(compiler):
+        raise ValueError("source inspector does not load the shared pinned compiler")
+
+
 def prepare(compiler):
     compiler = Path(compiler).resolve(strict=True)
     fingerprint = hashlib.sha256(
-        compiler.read_bytes() + (TOOL / "Program.cs").read_bytes()
-        + (TOOL / "PpwSourceInspector.csproj").read_bytes()).hexdigest()
+        json.dumps({"builder": 4, "compiler": sha(compiler), "sources": source_hashes()},
+                   sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     cache = TOOL / "cache" / fingerprint
-    binary = cache / "bin/ppw-source-inspector.dll"
     if os.environ.get("PPW_INSPECTOR_READONLY") == "1":
-        if not binary.is_file() or sha(binary.parent / "calor.dll") != sha(compiler):
+        manifest = cache / "runtime.json"
+        if not manifest.is_file():
             raise ValueError("isolated source inspection requires the prebuilt pinned inspector")
-        return binary
+        runtime = json.loads(manifest.read_text(encoding="utf-8"))
+        validate_runtime(runtime, compiler)
+        return runtime
+    TOOL.joinpath("cache").mkdir(parents=True, exist_ok=True)
     cache.mkdir(parents=True, exist_ok=True)
     with (cache / "build.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        if not binary.is_file():
-            result = subprocess.run(
-                ["dotnet", "build", str(TOOL / "PpwSourceInspector.csproj"),
-                 "--configuration", "Release", "--output", str(cache / "bin"),
-                 "--property:BaseIntermediateOutputPath=" + str(cache / "obj") + "/",
-                 "--property:CalorCompilerDll=" + str(compiler), "--verbosity", "quiet"],
-                capture_output=True, text=True, timeout=180)
-            (cache / "build.log").write_text(result.stdout + result.stderr, encoding="utf-8")
-            if result.returncode or not binary.is_file():
-                raise ValueError("pinned source inspector failed to build: " + str(cache / "build.log"))
-        if sha(binary.parent / "calor.dll") != sha(compiler):
-            raise ValueError("source inspector does not load the shared pinned compiler")
-    return binary
+        staging = TOOL / "cache/.prospective" / fingerprint
+        if staging.exists():
+            shutil.rmtree(staging)
+        staging.mkdir(parents=True)
+        try:
+            build_runtime(compiler, staging)
+            candidate = runtime_identity(staging, compiler)
+            binary = cache / "bin/ppw-source-inspector.dll"
+            if binary.exists():
+                existing = runtime_identity(cache, compiler)
+                if existing["files"] != candidate["files"]:
+                    raise ValueError("prepopulated source inspector cache differs from a trusted rebuild")
+            else:
+                shutil.copytree(staging / "bin", cache / "bin")
+            runtime = runtime_identity(cache, compiler)
+            manifest = cache / "runtime.json"
+            if manifest.exists():
+                if json.loads(manifest.read_text(encoding="utf-8")) != runtime:
+                    raise ValueError("existing source inspector runtime manifest differs")
+            else:
+                with manifest.open("x", encoding="utf-8") as stream:
+                    json.dump(runtime, stream, sort_keys=True, allow_nan=False)
+                    stream.write("\n")
+        finally:
+            shutil.rmtree(staging, ignore_errors=True)
+        validate_runtime(runtime, compiler)
+        return runtime
 
 
 def inputs(pair, directory, name):
@@ -82,8 +188,9 @@ def inputs(pair, directory, name):
     return requests, hashes
 
 
-def inspect(pair, directories, compiler):
-    binary = prepare(compiler)
+def inspect(pair, directories, compiler, runtime=None):
+    runtime = prepare(compiler) if runtime is None else runtime
+    binary = validate_runtime(runtime, compiler)
     requests, hashes = [], {}
     for name, directory in directories.items():
         source_requests, hashes[name] = inputs(pair, Path(directory), name)
@@ -97,6 +204,7 @@ def inspect(pair, directories, compiler):
         raise ValueError("source inspector compiler identity differs from the pinned DLL")
     report["inputSha256"] = hashes
     report["inspectorSha256"] = sha(binary)
+    report["inspectorRuntimeSha256"] = runtime["runtimeSha256"]
     return report
 
 
@@ -125,12 +233,18 @@ def control_directories(pair, directory):
     return directories
 
 
-def validate(report, pair, directories, compiler_sha):
+def validate(report, pair, directories, compiler_sha, inspector_runtime=None):
     if (not isinstance(compiler_sha, str) or not re.fullmatch(r"[0-9a-f]{64}", compiler_sha)
             or report.get("schemaVersion") != 1 or report.get("compilerSha256") != compiler_sha):
         raise ValueError("source inspection uses a different compiler or schema")
     if not re.fullmatch(r"[0-9a-f]{64}", report.get("inspectorSha256", "")):
         raise ValueError("source inspection executable identity is missing")
+    if inspector_runtime is not None:
+        validate_runtime(inspector_runtime)
+        if (report.get("inspectorSha256")
+                != inspector_runtime["files"].get("ppw-source-inspector.dll")
+                or report.get("inspectorRuntimeSha256") != inspector_runtime["runtimeSha256"]):
+            raise ValueError("source inspection report differs from the registered inspector runtime")
     requests, hashes = [], {}
     for name, directory in directories.items():
         source_requests, hashes[name] = inputs(pair, Path(directory), name)
@@ -159,9 +273,9 @@ def observation(report, name):
         "publicApi": [value["publicApi"] for value in sources]}
 
 
-def validate_controls(report, pair, directory, compiler_sha):
+def validate_controls(report, pair, directory, compiler_sha, inspector_runtime=None):
     directories = control_directories(pair, directory)
-    validate(report, pair, directories, compiler_sha)
+    validate(report, pair, directories, compiler_sha, inspector_runtime)
     regex = re.compile(pair["shapeRealizedIndicator"]["sourceRegex"])
     baseline = observation(report, "starter-a")["publicApi"]
     for name in directories:
@@ -182,20 +296,29 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--compiler", required=True)
     parser.add_argument("--prepare", action="store_true")
+    parser.add_argument("--validate-runtime", action="store_true")
+    parser.add_argument("--runtime-manifest")
     parser.add_argument("--controls", action="store_true")
     parser.add_argument("--pair")
     parser.add_argument("--baseline")
     parser.add_argument("--final")
     args = parser.parse_args()
     if args.prepare:
-        print(prepare(args.compiler))
+        print(json.dumps(prepare(args.compiler), sort_keys=True))
+    elif args.validate_runtime:
+        if not args.runtime_manifest:
+            raise ValueError("--validate-runtime requires --runtime-manifest")
+        runtime = json.loads(Path(args.runtime_manifest).read_text(encoding="utf-8"))
+        print(validate_runtime(runtime, args.compiler))
     else:
         pair = json.loads(Path(args.pair).read_text(encoding="utf-8"))
         directories = (control_directories(pair, Path(args.pair).parent) if args.controls
                        else {"baseline": args.baseline, "final": args.final})
-        report = inspect(pair, directories, args.compiler)
+        runtime = (json.loads(Path(args.runtime_manifest).read_text(encoding="utf-8"))
+                   if args.runtime_manifest else None)
+        report = inspect(pair, directories, args.compiler, runtime)
         if args.controls:
-            validate_controls(report, pair, Path(args.pair).parent, sha(args.compiler))
+            validate_controls(report, pair, Path(args.pair).parent, sha(args.compiler), runtime)
         print(json.dumps(report, sort_keys=True))
 
 

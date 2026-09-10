@@ -68,10 +68,13 @@ def prepare(packages):
                "binaries": {path.name: digest(path) for path in sorted(binary.parent.iterdir())
                             if path.suffix in (".dll", ".json")}}
     runtime_path = Path(runtime["manifest"])
-    if not runtime_path.exists():
-        with runtime_path.open("x") as stream:
-            json.dump(runtime, stream, sort_keys=True)
-    require(json.loads(runtime_path.read_text()) == runtime, "existing runtime manifest differs")
+    with (cache / "build.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if not runtime_path.exists():
+            with runtime_path.open("x") as stream:
+                json.dump(runtime, stream, sort_keys=True)
+        require(json.loads(runtime_path.read_text()) == runtime,
+                "existing runtime manifest differs")
     return runtime
 
 

@@ -13,7 +13,7 @@
   "id": "request-reserving-gateway-1406",
   "instrumentAmendment": {
     "path": "gateway-instrument-amendment.json",
-    "sha256": "cf4284d9c80ca716948b49fbb3fb6659cb957466050520a48a18bce102d2ba60"
+    "sha256": "ecf2203563aa126f61a34b8e4bb8687271a5d7661f5fcc87f4ba384ff5021b68"
   },
   "kind": "pp-w-request-gateway-execution-profile",
   "modelRegistration": {
@@ -21,13 +21,17 @@
     "sha256": "60ebedeb63d6507f13b10f21dd7650c505d2f86358508d151e650fabbc06bf27"
   },
   "schemaVersion": 1,
+  "sourceInspectionEvidence": {
+    "path": "gateway-source-inspections.json",
+    "sha256": "9e443d86d0f1e7b9f926d03427e0f9aaaeee23c81a76796681fadc9c862a356d"
+  },
   "spendAuthorization": {
     "path": "gateway-authorization.json",
     "sha256": "9eb64e3b11bbfad69a932c4075ba10cea39d1d21de2e860d3b2eefaacb9a3050"
   },
   "spendingPlan": {
     "path": "gateway-spending-plan.json",
-    "sha256": "3face4157953f3a85c82bd5b61926d9b1fab450c435655078572255d6d6001d9"
+    "sha256": "614853d85733db0c6eeca97b4bf10afb2dfd3d1758abc5e05f1e72588d2c014a"
   },
   "stage": "pilot",
   "stage2Authorized": false,
@@ -37,6 +41,6 @@
   },
   "transportEvidence": {
     "path": "gateway-evidence/author-native-no-forward.json",
-    "sha256": "36f93ac3b461db2ca819c92309bfcf162778e156461b307350bf4b7d912fd0e3"
+    "sha256": "394fed62bb5b622c5247097092b641ddf2da0fdc54957edcae23f3129ab9e21d"
   }
 }

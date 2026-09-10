@@ -45,9 +45,12 @@ class HostTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         return path
 
-    def execute(self, project):
-        return subprocess.run([self.environment["PPW_REAL_DOTNET"], self.runtime["binary"],
-                               str(project.parent / "bin/Debug/net10.0/Parity.dll")],
+    def execute(self, project, nonce=None):
+        command = [self.environment["PPW_REAL_DOTNET"], self.runtime["binary"],
+                   str(project.parent / "bin/Debug/net10.0/Parity.dll")]
+        if nonce is not None:
+            command += ["--ppw-result-nonce", nonce]
+        return subprocess.run(command,
                               capture_output=True, text=True, env=self.environment, timeout=60)
 
     @staticmethod
@@ -97,6 +100,26 @@ public sealed class Cases : IClassFixture<Broken> {
         self.assertIn("DETERMINISTIC_CLEANUP_FAILURE", result.stderr)
         self.assertNotIn("Passed!", result.stdout)
         self.assertEqual([], self.outcomes(result.stdout))
+
+    def test_gateway_receipt_uses_framework_aggregate_not_test_console_text(self):
+        project = self.project("""
+using Xunit;
+public sealed class Cases {
+    [Fact] public void SpoofedTextDoesNotPass() {
+        Console.WriteLine("Passed: 4, Failed: 0");
+        Assert.True(false);
+    }
+}""")
+        nonce = "0123456789abcdef" * 4
+        result = self.execute(project, nonce)
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertIn("Passed: 4, Failed: 0", result.stdout)
+        frames = [line for line in result.stdout.splitlines()
+                  if line.startswith("PPW_XUNIT_RESULT_V1:")]
+        self.assertEqual(1, len(frames))
+        self.assertEqual(
+            {"failed": 1, "passed": 0, "skipped": 0, "total": 1},
+            json.loads(frames[0].split(":", 2)[2]))
 
     def test_cli_rejects_unsupported_options_before_building_or_running(self):
         import sys

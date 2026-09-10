@@ -11,7 +11,7 @@ control probes succeeded. The author-run shared registered-argument probe also
 reached the gateway with two authenticated Opus 4.8 requests; their actual body
 and capability sets pass the request-price contract. The server forwarded zero
 requests. Remaining independent IPC/socket review, the parent-owned full-pilot
-forecast and final review are still pending. The additive 24-artifact execution
+forecast and final review are still pending. The additive 25-artifact execution
 profile and 250-to-500-to-1000 financial lineage do not create a live ledger,
 epoch or scientific outcome. Credential and model availability are not blockers.
 
@@ -51,6 +51,12 @@ test CLI options/loggers fail explicitly rather than being silently ignored.
 Named results are emitted only after complete execution; discovery/cleanup
 errors have no success-shaped summary. Historical non-gateway execution still
 uses VSTest unchanged.
+
+The trusted observer records framework counts from one nonce-bound xUnit receipt,
+not arbitrary `Passed:` text printed by candidate code. Missing, duplicate or
+inconsistent receipts fail closed. This framing prevents ordinary console output
+from becoming a result; it is not a claim of isolation against hostile CLR
+reflection inside the test-host process.
 
 ## One request must mean one model iteration
 
@@ -154,10 +160,21 @@ results remain distinct.
 
 ## Isolation boundary
 
-The launcher isolates the entire runner, not only the client: generated-code
-builds and held-out execution are descendants too. The retained client and
-existing Bash 5 shell are pinned by bytes; no global tool or billing settings
-are changed. Gateway state remains outside writable work/output roots.
+The trusted runner owns authoritative output. It launches the native client and
+its tools in a child policy that permits writes only to their workspace and
+networking only to their model gateway capability. A separate typed observation
+capability can request observations but cannot register, seal or finalize a run.
+The retained client and existing Bash 5 shell are pinned by bytes; no global tool
+or billing settings are changed.
+
+Generated source builds and hidden-test execution use private snapshots with no
+network and no writes to the original agent workspace or authoritative output.
+Candidate builds finish before hidden tests are copied. Hidden-test compilation
+references the prebuilt candidate DLL, not candidate-controlled MSBuild targets;
+test sources stay read-only. A child can read only the private artifacts required
+for its phase, not unrelated observation directories. Source sealing revokes new
+model requests, terminates remaining process-group descendants and archives a
+stable declared-source copy before final grading.
 
 The current policy restricts networking, protected state access, outside signals,
 process metadata and task ports, Mach lookup/registration, POSIX IPC, Apple Events
@@ -172,6 +189,11 @@ used; no user preferences or global settings are modified.
 Python, its TLS/SQLite native extensions, .NET executable/runtime versions,
 the operating-system release, Bash and the prebuilt test host are also bound
 to the execution plan and checked around each invocation.
+The source inspector is rebuilt from trusted sources before accepting a populated
+cache, and its executable plus all DLL/JSON runtime dependencies are byte-bound.
+New inspection certificates preserve the original source-analysis results while
+explicitly superseding their execution-runtime identity; original certificates
+are not rewritten.
 The implemented kernel probes establish only their stated
 controls; they are not a complete proof against every IPC/delegation route.
 The independent pinned-client probe must establish compatibility and any necessary
@@ -187,10 +209,20 @@ and unknown-charge collections from reaching stage analysis.
 
 `test_ppw_gateway_registered_collection.py` additionally sends that actual
 collector's complete 444-slot output directly to the registered adjudicator
-using the real frozen task inventory and current 24-file execution map.
+using the real frozen task inventory and current 25-file execution map.
 All observations and the provider/compiler/OS boundaries are explicit synthetic
 fixtures. Both frozen estimands remain exactly one half in that fixture; the
 reported decision remains `SYNTHETIC_ONLY`.
+
+`test_ppw_gateway_frozen_controls.py` additionally exercises the real retained
+compiler, source-fragment assembly, visible shim and private observer against all
+18 null-agent controls. Six honest cases pass four held-out tests; six permissive
+effect controls build and fail held-out tests; six strict effect controls fail
+compilation. Every case reaches registration, two observations, sealing, source
+inspection and final grading without a model or provider request. The opt-in
+`PPW_RUN_FROZEN_GATEWAY_CONTROLS=1` run requires macOS and the retained product;
+other environments skip it explicitly. Earlier whole-run evidence is preserved
+in separate `pre-boundary-1406` records, not presented as proof of the new policy.
 
 ## Operational entrypoint
 

@@ -180,6 +180,7 @@ EDIT_MECHANISM="raw"
 CALOR_DLL_OVERRIDE=""
 PPW_SPEND_TICKET=""
 PPW_GATEWAY_CLIENT=""
+PPW_SOURCE_INSPECTOR_RUNTIME=""
 ARM_REPO_ROOT=""
 ARM_LABEL_OVERRIDE=""
 # W1 / roadmap §4.1: which `arms.<key>` entry of pair.json this invocation
@@ -212,6 +213,9 @@ while [[ $# -gt 0 ]]; do
                             PPW_SPEND_TICKET="$2"; shift 2 ;;
         --ppw-gateway-client) [[ -z "$PPW_GATEWAY_CLIENT" ]] || { echo "Duplicate gateway client" >&2; exit 2; }
                               PPW_GATEWAY_CLIENT="$2"; shift 2 ;;
+        --ppw-source-inspector-runtime)
+                              [[ -z "$PPW_SOURCE_INSPECTOR_RUNTIME" ]] || { echo "Duplicate source inspector runtime" >&2; exit 2; }
+                              PPW_SOURCE_INSPECTOR_RUNTIME="$2"; shift 2 ;;
         --arm-repo-root) ARM_REPO_ROOT="$2"; shift 2 ;;
         --run-offset) RUN_OFFSET="$2"; shift 2 ;;
         --arm-label) ARM_LABEL_OVERRIDE="$2"; shift 2 ;;
@@ -236,6 +240,11 @@ if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
         || { echo "Request gateway requires one redesigned run and no per-run spending ticket" >&2; exit 2; }
     [[ $CANARY_ONLY -eq 1 || "${PPW_GATEWAY_ACTIVE:-}" == "1" ]] \
         || { echo "Request gateway requires the isolated collector launcher" >&2; exit 2; }
+    if [[ $CANARY_ONLY -eq 0 ]]; then
+        [[ -n "${PPW_TRUSTED_CONTEXT:-}" && -n "${PPW_TRUSTED_OBSERVER_URL:-}" \
+           && -n "${PPW_TRUSTED_ARCHIVE_ROOT:-}" && -n "$PPW_SOURCE_INSPECTOR_RUNTIME" ]] \
+            || { echo "Request gateway requires trusted observer and source-inspector bindings" >&2; exit 2; }
+    fi
 fi
 
 # Per-arm PRODUCT checkout (guarantees plan G5, A-1.3 epoch): --calor-dll pins
@@ -426,7 +435,12 @@ render_template() {  # <dest csproj path>
 
 policy_changed() {  # <workspace> <run output>; return 0 means invalid
     [[ $REDESIGNED_POLICY -eq 1 ]] || return 1
-    if ! python3 "$HARNESS_CAPTURE" policy-snapshot "$1" > "$2/policy-after.json" 2> "$2/policy-after.err"; then
+    if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
+        if [[ ! -s "$2/policy-after.json" ]]; then
+            echo "trusted observer did not archive the generated workspace policy"
+            return 0
+        fi
+    elif ! python3 "$HARNESS_CAPTURE" policy-snapshot "$1" > "$2/policy-after.json" 2> "$2/policy-after.err"; then
         echo "generated workspace policy is unreadable: $(cat "$2/policy-after.err")"
         return 0
     fi
@@ -840,17 +854,17 @@ EOF
     # phantom edited:true iteration even when the agent has changed nothing.
     local base_hash
     base_hash=$(find "$ws/src" -type f \( -name '*.cs' -o -name '*.calr' -o -name "$SOURCE_FRAGMENT_GLOB" \) -not -path '*/obj/*' -not -path '*/bin/*' -exec shasum {} + 2>/dev/null | shasum | cut -d' ' -f1)
-    echo "$base_hash" > "$ws_out/.lasthash"
+    [[ -n "$PPW_GATEWAY_CLIENT" ]] || echo "$base_hash" > "$ws_out/.lasthash"
     # Iteration counter (v2 telemetry): 1-based ordinal among edited
     # invocations, persisted next to .lasthash so the shim can resume it.
-    echo 0 > "$ws_out/.itercount"
+    [[ -n "$PPW_GATEWAY_CLIENT" ]] || echo 0 > "$ws_out/.itercount"
     # Previous-iteration .calr snapshot for edit_target_ids attribution:
     # seeded from the starter fixture so the first edited build diffs against
     # the state the agent actually started from.
-    rm -rf "$ws_out/.prev-src"
-    mkdir -p "$ws_out/.prev-src"
+    [[ -n "$PPW_GATEWAY_CLIENT" ]] || rm -rf "$ws_out/.prev-src"
+    [[ -n "$PPW_GATEWAY_CLIENT" ]] || mkdir -p "$ws_out/.prev-src"
     # (portable relative-path copy: BSD cp has no --parents)
-    (cd "$ws/src" && find . -name '*.calr' -not -path '*/obj/*' -not -path '*/bin/*' | while IFS= read -r f; do
+    [[ -n "$PPW_GATEWAY_CLIENT" ]] || (cd "$ws/src" && find . -name '*.calr' -not -path '*/obj/*' -not -path '*/bin/*' | while IFS= read -r f; do
         mkdir -p "$ws_out/.prev-src/$(dirname "$f")"; cp "$f" "$ws_out/.prev-src/$f"; done)
 }
 
@@ -887,6 +901,19 @@ now_ms() {
     echo \$(( \$(date +%s) * 1000 ))
   fi
 }
+
+if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
+  t0=\$(now_ms)
+  run_dotnet "\$@"; rc=\$?
+  lat=\$(( \$(now_ms) - t0 )); [[ \$lat -lt 0 ]] && lat=0
+  case "\${1:-}" in
+    build|test|run)
+      python3 "$SCRIPT_DIR/ppw-run-observer.py" observe --url "\$PPW_OBSERVER_URL" \
+        --command "\$1" --exit-code "\$rc" --feedback-latency-ms "\$lat" >/dev/null || exit 2
+      ;;
+  esac
+  exit \$rc
+fi
 
 # The LABEL, not the language: both PP-W-rows arms are the calor language, so \$ARM
 # cannot tell the control arm's telemetry from the treatment arm's.
@@ -1087,6 +1114,28 @@ kill_agent_tree() {
     fi
 }
 
+gateway_group_live() {
+    local pgid="$1"
+    /bin/ps -axo pgid=,stat= | awk -v pgid="$pgid" \
+        '$1 == pgid && $2 !~ /^Z/ { found=1 } END { exit(found ? 0 : 1) }'
+}
+
+terminate_gateway_group() {
+    local pgid="$1" attempt
+    kill -TERM -- "-$pgid" 2>/dev/null || return 0
+    for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+        gateway_group_live "$pgid" || return 0
+        sleep 0.1
+    done
+    kill -KILL -- "-$pgid" 2>/dev/null || true
+    for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+        gateway_group_live "$pgid" || return 0
+        sleep 0.1
+    done
+    echo "gateway: descendant process group -$pgid survived termination" >&2
+    return 1
+}
+
 run_agent() {
     local ws="$1" ws_out="$2" shim_dir="$3" run_idx="$4"
     AGENT_RC=0
@@ -1143,6 +1192,11 @@ run_agent() {
         # agent, so its transcript is the one synthetic result event; turns
         # count 0 assistant messages.
         echo '{"type":"result","subtype":"null_agent","null_agent":true}' > "$ws_out/transcript.jsonl"
+        if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
+            python3 "$SCRIPT_DIR/ppw-run-observer.py" seal \
+                --url "$PPW_TRUSTED_OBSERVER_URL" >/dev/null || return 2
+            jq -n '{exitCode:0,synthetic:true}' > "$ws_out/client-invocation.json"
+        fi
         return 0
     fi
 
@@ -1192,8 +1246,12 @@ run_agent() {
     # top) makes rc claude's exit when it fails, not tee's or jq's.
     local claude_args=(--print --verbose --output-format stream-json --forward-subagent-text --dangerously-skip-permissions)
     local client_command="claude"
+    local client_prefix=()
     if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
         client_command="$PPW_GATEWAY_CLIENT"
+        client_prefix=(python3 "$SCRIPT_DIR/ppw-gateway-client.py" --exec-client
+            --context "$PPW_TRUSTED_CONTEXT" --workspace "$ws"
+            --output "$PPW_TRUSTED_ARCHIVE_ROOT" --)
         local gateway_flags flag_lines flag
         gateway_flags="$(python3 "$SCRIPT_DIR/ppw-gateway-client.py" --client-flags)" || exit 2
         flag_lines="$(jq -er 'if type == "array" and length > 0 and all(.[]; type == "string")
@@ -1216,11 +1274,11 @@ run_agent() {
             > "$ws_out/client-spending-control.json"
     fi
     local rc=0
-    if [[ -n "$timeout_bin" ]]; then
+    if [[ -n "$timeout_bin" && -z "$PPW_GATEWAY_CLIENT" ]]; then
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
             "$timeout_bin" -k 10 "$TIMEOUT_SECS" \
-            "$client_command" "${claude_args[@]}" ${model_args[@]+"${model_args[@]}"} ${mcp_args[@]+"${mcp_args[@]}"} \
-            "$prompt" 2> "$ws_out/agent.err" \
+            ${client_prefix[@]+"${client_prefix[@]}"} "$client_command" "${claude_args[@]}" ${model_args[@]+"${model_args[@]}"} ${mcp_args[@]+"${mcp_args[@]}"} \
+            "$prompt" 2> >(/bin/cat > "$ws_out/agent.err") \
             | tee "$ws_out/transcript.jsonl" | jq -c 'select(.type? == "result")' > "$ws_out/agent.json" ) || rc=$?
     else
         # Bash-watchdog fallback, hardened after ws2-exit-e2e-001 run 1: the
@@ -1234,29 +1292,35 @@ run_agent() {
         # pattern kill — logging every step to stderr.
         set -m
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
-            "$client_command" "${claude_args[@]}" ${model_args[@]+"${model_args[@]}"} ${mcp_args[@]+"${mcp_args[@]}"} \
-            "$prompt" 2> "$ws_out/agent.err" \
+            ${client_prefix[@]+"${client_prefix[@]}"} "$client_command" "${claude_args[@]}" ${model_args[@]+"${model_args[@]}"} ${mcp_args[@]+"${mcp_args[@]}"} \
+            "$prompt" 2> >(/bin/cat > "$ws_out/agent.err") \
             | tee "$ws_out/transcript.jsonl" | jq -c 'select(.type? == "result")' > "$ws_out/agent.json" ) &
-        local agent_pid=$!
+        local agent_pid=$! gateway_cleanup_failed=0
         local deadline=$(( SECONDS + TIMEOUT_SECS ))
         while kill -0 "$agent_pid" 2>/dev/null; do
             if (( SECONDS >= deadline )); then
                 echo "watchdog: agent exceeded ${TIMEOUT_SECS}s; killing pid $agent_pid and descendants" >&2
                 if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
-                    kill -TERM -- "-$agent_pid" 2>/dev/null || true
-                    sleep 10
-                    kill -KILL -- "-$agent_pid" 2>/dev/null || true
+                    terminate_gateway_group "$agent_pid" || gateway_cleanup_failed=1
                 else
                     kill_agent_tree "$agent_pid" "$ws" "$ws_out"
                 fi
                 break
             fi
-            sleep 5
+            if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then sleep 0.1; else sleep 5; fi
         done
         wait "$agent_pid" 2>/dev/null || rc=$?
+        if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
+            terminate_gateway_group "$agent_pid" || gateway_cleanup_failed=1
+        fi
         set +m
+        [[ $gateway_cleanup_failed -eq 0 ]] || return 2
     fi
     AGENT_RC=$rc
+    if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
+        python3 "$SCRIPT_DIR/ppw-run-observer.py" seal \
+            --url "$PPW_TRUSTED_OBSERVER_URL" >/dev/null || return 2
+    fi
     if [[ -n "$PPW_SPEND_TICKET" || -n "$PPW_GATEWAY_CLIENT" ]]; then
         jq -n --argjson code "$rc" '{exitCode:$code}' > "$ws_out/client-invocation.json"
     fi
@@ -1291,7 +1355,14 @@ extract_metrics() {
         # The redesigned instrument verifies named PASS as well as FAIL outcomes.
         heldout_logger=(--logger "console;verbosity=normal")
     fi
-    if CALOR_P0_SHIM_OFF=1 dotnet build "$ws/src/Src.csproj" --nologo -v q > "$ws_out/.src_final.txt" 2>&1; then
+    if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
+        local final_observation
+        final_observation="$(python3 "$SCRIPT_DIR/ppw-run-observer.py" final \
+            --url "$PPW_TRUSTED_OBSERVER_URL")" || return 2
+        final_build_ok=$(jq -r 'if .buildOk then 1 else 0 end' <<<"$final_observation")
+        final_pass=$(jq -r '.heldoutPassed' <<<"$final_observation")
+        final_fail=$(jq -r '.heldoutFailed' <<<"$final_observation")
+    elif CALOR_P0_SHIM_OFF=1 dotnet build "$ws/src/Src.csproj" --nologo -v q > "$ws_out/.src_final.txt" 2>&1; then
         final_build_ok=1
         if CALOR_P0_SHIM_OFF=1 run_tests "$ws_out/heldout/HeldOut.csproj" --nologo -v q ${heldout_logger[@]+"${heldout_logger[@]}"} > "$ws_out/.ho_final.txt" 2>&1; then
             final_fail=0
@@ -1387,7 +1458,9 @@ extract_metrics() {
         # caught=true demands the probe test to have RUN and PASSED — the
         # explicit "Passed: 1" summary line — because exit codes are
         # unreliable (zero-match filters and failed builds can exit 0).
-        if [[ $final_build_ok -eq 1 && -d "$ws_out/probe" ]]; then
+        if [[ -n "$PPW_GATEWAY_CLIENT" && $final_build_ok -eq 1 && -d "$ws_out/probe" ]]; then
+            defect_caught=$(jq -r '.probeCaught' <<<"$final_observation")
+        elif [[ $final_build_ok -eq 1 && -d "$ws_out/probe" ]]; then
             CALOR_P0_SHIM_OFF=1 DOTNET_CLI_UI_LANGUAGE=en run_tests \
                 "$ws_out/probe/Probe.csproj" --nologo \
                 > "$ws_out/.probe_final.txt" 2>&1 || true
@@ -1556,7 +1629,12 @@ if [[ $CANARY_ONLY -eq 1 ]]; then
 fi
 
 if [[ $REDESIGNED_POLICY -eq 1 ]]; then
-    python3 "$SCRIPT_DIR/ppw-source-inspection.py" --compiler "$CALOR_CLI_DLL" --prepare >/dev/null
+    if [[ -n "$PPW_SOURCE_INSPECTOR_RUNTIME" ]]; then
+        python3 "$SCRIPT_DIR/ppw-source-inspection.py" --compiler "$CALOR_CLI_DLL" \
+            --runtime-manifest "$PPW_SOURCE_INSPECTOR_RUNTIME" --validate-runtime >/dev/null
+    else
+        python3 "$SCRIPT_DIR/ppw-source-inspection.py" --compiler "$CALOR_CLI_DLL" --prepare >/dev/null
+    fi
 fi
 
 for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
@@ -1578,6 +1656,7 @@ for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
         # FileNotFoundException. One physical path removes the ambiguity.
         WS="$(cd "$WS" && pwd -P)"
         SHIM_DIR="$WS_OUT/.shim"
+        [[ -n "$PPW_GATEWAY_CLIENT" ]] && SHIM_DIR="$WS/.ppw-shim"
 
         if [[ $REDESIGNED_POLICY -eq 1 ]]; then
             python3 "$HARNESS_CAPTURE" isolate-workspace "$WS"
@@ -1588,17 +1667,28 @@ for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
         if [[ $REDESIGNED_POLICY -eq 1 ]]; then
             python3 "$HARNESS_CAPTURE" policy-snapshot "$WS" > "$WS_OUT/policy-before.json"
         fi
+        if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
+            python3 "$SCRIPT_DIR/ppw-run-observer.py" register --url "$PPW_TRUSTED_OBSERVER_URL" \
+                --workspace "$WS" --output "$WS_OUT" >/dev/null
+            python3 "$SCRIPT_DIR/ppw-gateway-client.py" --probe \
+                --context "$PPW_TRUSTED_CONTEXT" --workspace "$WS" \
+                --output "$PPW_TRUSTED_ARCHIVE_ROOT" >/dev/null
+        fi
         run_agent "$WS" "$WS_OUT" "$SHIM_DIR" "$run"
 
         # #1094: the agent's declared-done build state, before anything
         # below rebuilds the workspace.
-        archive_build_state "$WS" "$WS_OUT" "agent-workspace"
+        [[ -n "$PPW_GATEWAY_CLIENT" ]] \
+            || archive_build_state "$WS" "$WS_OUT" "agent-workspace"
 
         # Declared-done archival runs immediately after the agent stops —
         # before the final build below can rewrite anything — and its failure
         # is run-invalidating (A-1.3 item 4, #826 M2).
         archive_reason=""
-        if reason="$(archive_final_src "$WS" "$WS_OUT")"; then
+        if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
+            [[ -d "$WS_OUT/final-src" ]] \
+                || archive_reason="trusted observer did not archive declared-done source"
+        elif reason="$(archive_final_src "$WS" "$WS_OUT")"; then
             archive_reason="$reason"
         fi
         if reason="$(policy_changed "$WS" "$WS_OUT")" \
@@ -1619,9 +1709,21 @@ for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
         fi
 
         if [[ $REDESIGNED_POLICY -eq 1 ]]; then
-            if ! python3 "$SCRIPT_DIR/ppw-source-inspection.py" \
-                --compiler "$CALOR_CLI_DLL" --pair "$PAIR_DIR/pair.json" \
-                --baseline "$PAIR_DIR/$FIXTURE_DIR" --final "$WS_OUT/final-src" \
+            inspection_runtime_args=()
+            [[ -n "$PPW_SOURCE_INSPECTOR_RUNTIME" ]] \
+                && inspection_runtime_args=(--runtime-manifest "$PPW_SOURCE_INSPECTOR_RUNTIME")
+            if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
+                inspection_command=(python3 "$SCRIPT_DIR/ppw-run-observer.py" source-inspection
+                    --url "$PPW_TRUSTED_OBSERVER_URL" --pair "$PAIR_DIR/pair.json"
+                    --baseline "$PAIR_DIR/$FIXTURE_DIR" --final-source "$WS_OUT/final-src"
+                    --runtime-manifest "$PPW_SOURCE_INSPECTOR_RUNTIME")
+            else
+                inspection_command=(python3 "$SCRIPT_DIR/ppw-source-inspection.py"
+                    --compiler "$CALOR_CLI_DLL" --pair "$PAIR_DIR/pair.json"
+                    --baseline "$PAIR_DIR/$FIXTURE_DIR" --final "$WS_OUT/final-src"
+                    ${inspection_runtime_args[@]+"${inspection_runtime_args[@]}"})
+            fi
+            if ! "${inspection_command[@]}" \
                 > "$WS_OUT/source-inspection.json" 2> "$WS_OUT/source-inspection.err"; then
                 echo "Source inspection failed; preserving the attempt for fail-closed analysis." >&2
             fi

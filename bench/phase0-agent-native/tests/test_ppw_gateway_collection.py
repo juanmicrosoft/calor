@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import sys
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from urllib.parse import urlsplit
 import uuid
 
@@ -51,6 +51,14 @@ class CollectionTests(unittest.TestCase):
         runtime = Path(self.product["repoRoot"]) / "src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll"
         runtime.parent.mkdir(parents=True)
         runtime.write_bytes(b"SYNTHETIC nonexecutable runtime fixture")
+        inspector_manifest = self.root / "SYNTHETIC-source-inspector-runtime.json"
+        inspector = {
+            "kind": "SYNTHETIC-nonexecutable-inspector-runtime",
+            "manifest": str(inspector_manifest),
+            "files": {"ppw-source-inspector.dll": "9" * 64},
+            "runtimeSha256": "8" * 64,
+        }
+        save(inspector_manifest, inspector)
         self.admission = {
             "mechanism": self.spending.GATEWAY, "epochId": self.epoch_id, "stage": "pilot",
             "ceilingUnits": 500_000_000, "authorizationSha256": "a" * 64,
@@ -63,6 +71,7 @@ class CollectionTests(unittest.TestCase):
             "shellSha256": "e" * 64, "priceSha256": budget.price_identity(),
             "runtimeSha256": instrument.digest(runtime),
             "testHost": {"kind": "SYNTHETIC-nonexecutable-test-runtime"},
+            "sourceInspector": inspector,
             "executionRuntime": {"kind": "SYNTHETIC-local-runtime-double"},
         }
         self.launched = []
@@ -79,6 +88,8 @@ class CollectionTests(unittest.TestCase):
             task: copy.deepcopy(self.registration["sourceInspections"]["SYNTHETIC-task"])
             for task in self.registration["tasks"]
         }
+        for certificate in self.registration["sourceInspections"].values():
+            certificate.update(inspectorSha256="9" * 64, inspectorRuntimeSha256="8" * 64)
         for task in self.registration["tasks"]:
             target = root / task
             shutil.copytree(original, target)
@@ -119,20 +130,26 @@ class CollectionTests(unittest.TestCase):
             return json.dumps({"armCanary": "permissive-ok" if arm == "calor-permissive" else "strict-ok",
                                "compilerHash": self.compiler_hash})
         self.assertEqual([sys.executable, str(BENCH / "ppw-gateway-client.py")], argv[:2])
-        self.assertEqual("--ppw-gateway-client", argv[-2])
+        self.assertIn("--ppw-gateway-client", argv)
+        self.assertEqual(self.admission["clientExecutable"],
+                         argv[argv.index("--ppw-gateway-client") + 1])
         context_path = Path(argv[argv.index("--context") + 1])
         workspace = Path(argv[argv.index("--workspace") + 1])
-        output = Path(argv[argv.index("--output") + 1])
+        authoritative = Path(argv[argv.index("--output") + 1])
         context = instrument.load(context_path)
         endpoint = urlsplit(context["baseUrl"])
-        task, arm = output.parents[1].name, output.parent.name
-        run = int(output.name.split("-")[1])
+        task = Path(argv[argv.index("--pair") + 1]).name
+        arm = argv[argv.index("--arm-label") + 1]
+        run = int(argv[argv.index("--run-offset") + 1]) + 1
+        output = authoritative / "runs" / task / arm / ("run-%d" % run)
         self.launched.append("%s/%s/%d" % (task, arm, run))
         evidence = {
             "kind": self.isolation.ISOLATION, "kernelProbe": dict(self.isolation.PROBE_EXPECTATIONS),
             "modelInvoked": False, "clientSha256": self.isolation.CLIENT_SHA256,
             "policySha256": hashlib.sha256(self.isolation.sandbox_policy(
-                workspace, output, context["protectedRoot"], endpoint.port).encode()).hexdigest(),
+                workspace, authoritative, context["protectedRoot"], endpoint.port,
+                context["hiddenRoots"]).encode()).hexdigest(),
+            "workspaceRoot": str(workspace), "authoritativeRoot": str(authoritative),
         }
         # Only the OS/client boundary is a double. The real HTTP gateway and
         # request ledger execute unchanged against a deterministic local provider.
@@ -169,6 +186,8 @@ class CollectionTests(unittest.TestCase):
             "ppw-spending.py": self.spending, "ppw-budget-gateway.py": gateway,
             "ppw-gateway-client.py": self.isolation, "ppw-source-inspection.py": self.inspection,
             "ppw-test-host.py": self.test_host,
+            "ppw-run-observer.py": Mock(RunObserver=lambda **values: Mock(
+                model_hidden_roots=tuple(values["hidden_roots"]))),
         }
         def synthetic_pins(pins, registration, stage, epoch_id):
             pins["dataKind"] = "synthetic"
@@ -179,14 +198,14 @@ class CollectionTests(unittest.TestCase):
                 patch.object(instrument, "validate_collection_authorization",
                              return_value={"kind": "SYNTHETIC-not-an-approval"}), \
                 patch.object(self.spending, "admit", return_value=self.admission), \
-                patch.object(self.inspection, "prepare"), \
+                patch.object(self.inspection, "prepare", return_value=self.admission["sourceInspector"]), \
                 patch.object(self.test_host, "validate_runtime"), \
                 patch.object(self.isolation, "validate_runtime"), \
                 patch.object(instrument, "product", side_effect=lambda *_: dict(self.product)), \
                 patch.object(instrument, "command", side_effect=self.command), \
                 patch.object(instrument, "validate_pins", side_effect=synthetic_pins), \
-                patch.object(gateway, "Gateway", side_effect=lambda ledger, owner, slot:
-                             constructor(ledger, owner, slot, factory)), \
+                patch.object(gateway, "Gateway", side_effect=lambda ledger, owner, slot, observer=None:
+                             constructor(ledger, owner, slot, factory, observer)), \
                 patch.object(gateway.Server, "serve_forever", lambda server:
                              serve_forever(server, poll_interval=0.001)), \
                 patch.dict(os.environ, {"CLAUDE_MODEL": budget.MODEL}):
