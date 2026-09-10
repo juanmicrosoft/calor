@@ -225,6 +225,18 @@ public class MultilineCallExpressionTests
         Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions[1].Body));
     }
 
+    [Fact]
+    public void InlineInvalidArgument_PreservesEstablishedDiagnostic()
+    {
+        var source = ProgramSource("§R §C{Math.Abs} §A 3 §E{cw} §/C");
+        Parse(source, out var diagnostics);
+        var error = diagnostics.Errors.First();
+        Assert.Equal(DiagnosticCode.UnexpectedToken, error.Code);
+        Assert.Equal("Expected EndCall but found Effects", error.Message);
+        Assert.Equal(4, error.Span.Line);
+        Assert.Equal(source.Split('\n')[3].IndexOf("§E{cw}", StringComparison.Ordinal) + 1, error.Span.Column);
+    }
+
     private static string ProgramSource(string body) =>
         "§M{m1:Calls}\n  §F{f1:Probe:pub} () -> i32\n    §E{}\n"
         + string.Join("\n", body.Split('\n').Select(line => "    " + line)) + "\n";

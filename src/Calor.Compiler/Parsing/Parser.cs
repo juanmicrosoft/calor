@@ -10236,8 +10236,12 @@ public sealed class Parser
             return endSpan;
         }
         if (!endedAtDedent && !IsAtEnd)
+        {
+            if (Current.Span.Line == startToken.Span.Line)
+                return Expect(TokenKind.EndCall).Span;
             _diagnostics.ReportError(firstArgumentSpan ?? Current.Span, DiagnosticCode.ExpectedClosingTag,
                 $"Call '§C{{{target}}}' is missing '§/C' before the next statement or outer argument.");
+        }
         return lastSpan;
     }
 
