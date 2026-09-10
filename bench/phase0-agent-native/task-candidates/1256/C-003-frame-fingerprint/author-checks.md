@@ -1,6 +1,6 @@
 # Ordered fingerprint: author's R1–R8 check
 
-**Unregistered candidate; independent checkpoint and final selection pending.**
+**Unregistered candidate; second-reader checkpoint complete, final selection pending.**
 This workflow normalizes two independently varying keys before ordered
 composition. Asymmetric, reversed, clamped, extreme, and repeated inputs
 check that it is not implemented as sorting or clamping a combined value.

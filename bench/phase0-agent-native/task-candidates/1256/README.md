@@ -12,22 +12,25 @@ and [reviewed buildability spike](../../buildability/1255/README.md) govern this
 work. The existing A-1.12 pairs, registrations, epochs, and benefit ledger
 remain unchanged.
 
-## Gates still open
+## Gate status
 
 - #1256 requires the final task count to be selected **with #1261 sizing**.
   No approved sizing amendment exists. Three is the current candidate
   inventory, not an adopted sample size or an assertion that the floor alone
   makes a sound study. Repeated-shape dependence and limited coverage must
   enter that decision.
-- #1266 requires a second reader before freezing. Its text does not specify
-  reader qualifications. An explicitly labeled independent agent technical
-  review is not human methods approval.
+- #1266's [independent AI second-reader checkpoint](second-reader-1266.md)
+  is complete for this current inventory. All three candidates are retained;
+  all six earlier rejections stand. The issue imposes no human qualification,
+  and this review does not claim a human methods countersignature.
 - #1257 has not frozen these suites. They remain editable authoring inputs.
 - #1264 owns collection layout and execution. These directories follow its
   neutral per-task structure; source-fragment assembly and shape-control
   integration must be verified before claiming end-to-end readiness.
 - No monetary ceiling, null-result acceptance, participant approval,
   model selection, run count, or registered epoch is supplied here.
+  Unfunded prospective planning/registration is authorized work; missing
+  funding prevents collection, not that preparatory work.
 
 ## Candidate inventory
 
@@ -92,8 +95,9 @@ surface. Source-available library code is a different boundary.
 
 ## Checks and rejections
 
-Each task's `author-checks.md` records R1–R8 individually. These are author's
-claims awaiting the independent checkpoint, not a frozen acceptance list.
+Each task's `author-checks.md` records R1–R8 individually. The separate
+[second reader](second-reader-1266.md) has now examined every candidate and
+rejection; this is still not a frozen task-selection list.
 The [rejection record](rejections.md) retains all six rejected #1255
 candidates, the standard-spelling survey, and the authoring corrections.
 
@@ -133,6 +137,5 @@ binary parity with the existing row-table test product, version, and Z3
 assets, then uses `--no-build` for that existing instrument.
 
 These executable prerequisites do not freeze #1257's suites or finalize
-#1258's selected-task denominator. The independent checkpoint, final
-selection, and formal freeze remain separate work. No acceptance or issue
-closure is inferred from this authoring inventory.
+#1258's selected-task denominator. Final selection and formal freeze remain separate work. No collection
+authority or benefit result is inferred from this authoring inventory.

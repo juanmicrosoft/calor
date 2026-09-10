@@ -62,3 +62,13 @@ These corrections narrow the review's wording; they do not manufacture a
 reviewer retraction or strengthen the candidate acceptance. The original
 response and these explicit qualifications should be read together.
 Independent task selection and sizing remain open.
+
+## Separate #1266 checkpoint
+
+The user explicitly authorized an independent AI reader; #1266 imposes no
+human qualification. The separately documented
+[GPT-5.5 second-reader checkpoint](second-reader-1266.md) is now complete
+for the current three-candidate inventory, with every earlier rejection
+examined. It is not human methods approval or a task freeze.
+Unfunded prospective registration is authorized; funding remains a gate
+on collection, not on that planning work.

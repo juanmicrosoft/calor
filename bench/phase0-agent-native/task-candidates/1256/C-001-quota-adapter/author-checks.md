@@ -1,6 +1,6 @@
 # Quota adapter: author's R1–R8 check
 
-**Unregistered candidate; independent checkpoint and final selection pending.**
+**Unregistered candidate; second-reader checkpoint complete, final selection pending.**
 The code reuses #1255's seventh, independently accepted buildability witness.
 The specification no longer mandates one API spelling; the expanded numeric
 suite adds both integer extremes and boundary cases.
@@ -22,6 +22,6 @@ numeric cases. The starter's held-out failures occur at numeric assertions,
 without the state-effect signature, so they are not effect escapes.
 
 Shared-shape dependence, readable source, final count, and the outstanding
-layout/qualification gates are recorded in the [inventory](../README.md).
+layout/registration gates are recorded in the [inventory](../README.md).
 The [current-source local evidence](../evidence/results.json) includes the
 compatible marker. It is not an integrated collection-harness run.

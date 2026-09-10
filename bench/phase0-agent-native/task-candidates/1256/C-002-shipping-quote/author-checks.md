@@ -1,6 +1,6 @@
 # Shipping comparison: author's R1–R8 check
 
-**Unregistered candidate; independent checkpoint and final selection pending.**
+**Unregistered candidate; second-reader checkpoint complete, final selection pending.**
 This workflow obtains two quotes and compares them. Zone one is cheaper
 below weight 7, they tie at 7, and zone two is cheaper above 7. Zero and the
 maximum documented weight are also tested. It is not a renamed quota clamp.
