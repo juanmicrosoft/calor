@@ -2,6 +2,7 @@
 import copy
 import json
 import math
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -43,6 +44,20 @@ class PilotAdjudicationTests(unittest.TestCase):
     def raw_result(self):
         return (self.epoch / "runs" / self.pins["suite"][0]
                 / "calor-permissive/run-1/result.json")
+
+    def guarded_projection(self):
+        amendment = analysis.load(BENCH / analysis.SPENDING_AMENDMENT)
+        evidence = self.epoch / "admission/spending-instrument-amendment.json"
+        evidence.write_bytes((BENCH / analysis.SPENDING_AMENDMENT).read_bytes())
+        self.addCleanup(evidence.unlink)
+        self.change_json(self.epoch / "registration.json", lambda registration:
+                         registration["stages"]["pilot"].update(instrumentAmendment={
+                             "path": "admission/spending-instrument-amendment.json",
+                             "sha256": analysis.digest(BENCH / analysis.SPENDING_AMENDMENT)}))
+        self.change_json(self.epoch / "pins.json", lambda pins: pins.update(
+            harnessArtifacts=amendment["replacementHarnessArtifacts"],
+            harnessCommit="80e2d77579750e48d58088d4474ba5d3c35014c6",
+            registrationSha256=analysis.digest(self.epoch / "registration.json")))
 
     @staticmethod
     def eligible(cell, count):
@@ -338,6 +353,155 @@ class PilotAdjudicationTests(unittest.TestCase):
         with patch.object(analysis, "digest", side_effect=changed):
             with self.assertRaisesRegex(ValueError, "analysis artifact changed"):
                 analysis.validate_analysis_registration()
+
+    def test_guarded_synthetic_projection_preserves_math_and_never_invokes_commands(self):
+        before = analysis.adjudicate(self.epochs, self.epoch.name)
+        self.guarded_projection()
+        inventory = analysis.inventory(self.epoch, self.instrument)
+        with patch("subprocess.run", side_effect=AssertionError("analysis cannot invoke commands")):
+            report = analysis.adjudicate(self.epochs, self.epoch.name)
+        for field in ("estimands", "stoppingRules", "decision", "accounting"):
+            self.assertEqual(before[field], report[field], field)
+        self.assertEqual("SYNTHETIC_ONLY", report["decision"]["status"])
+        self.assertFalse(report["empirical"])
+        self.assertFalse(report["collectionAuthorized"])
+        self.assertEqual(15, len(report["provenance"]["collectionHarnessArtifacts"]))
+        self.assertEqual("guarded-fifteen-artifact-unactivated",
+                         report["provenance"]["collectionExecutionProjection"]["id"])
+        self.assertEqual(inventory, analysis.inventory(self.epoch, self.instrument))
+
+    def test_guarded_projection_refuses_unactivated_empirical_before_raw_analysis(self):
+        self.guarded_projection()
+        self.change_json(self.epoch / "pins.json", lambda pins: pins.update(dataKind="empirical"))
+        with self.assertRaisesRegex(ValueError, "guarded empirical analysis is not activated"):
+            analysis.adjudicate(self.epochs, self.epoch.name)
+
+    def test_guarded_projection_rejects_missing_altered_and_malformed_amendment(self):
+        self.guarded_projection()
+        pins = analysis.load(self.epoch / "pins.json")
+        original = analysis.load(self.epoch / "registration.json")["stages"]["pilot"]
+        changes = [
+            lambda selected: selected.pop("instrumentAmendment"),
+            lambda selected: selected["instrumentAmendment"].update(sha256="0" * 64),
+            lambda selected: selected["instrumentAmendment"].update(path="../foreign.json"),
+            lambda selected: selected["instrumentAmendment"].update(path="/foreign.json"),
+            lambda selected: selected.update(instrumentAmendment=[]),
+            lambda selected: selected.update(instrumentAmendment={}),
+            lambda selected: selected["instrumentAmendment"].update(unbound=True),
+        ]
+        for index, change in enumerate(changes):
+            selected = copy.deepcopy(original)
+            change(selected)
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                analysis.execution_projection(pins, selected, self.epoch)
+        selected = {"spendingPlan": {"path": "not-authorization.json", "sha256": "0" * 64}}
+        with self.assertRaisesRegex(ValueError, "pinned instrument amendment"):
+            analysis.execution_projection(pins, selected, self.epoch)
+
+    def test_guarded_projection_rejects_downgraded_partial_and_mixed_inventories(self):
+        self.guarded_projection()
+        pins = analysis.load(self.epoch / "pins.json")
+        selected = analysis.load(self.epoch / "registration.json")["stages"]["pilot"]
+        variants = [
+            self.pins["harnessArtifacts"],
+            {key: value for key, value in pins["harnessArtifacts"].items()
+             if key != "ppw-spending.py"},
+            {**pins["harnessArtifacts"], "ppw-instrument.py": "0" * 64},
+            {**pins["harnessArtifacts"], "unregistered.py": "0" * 64},
+        ]
+        for index, artifacts in enumerate(variants):
+            with self.subTest(index=index), self.assertRaisesRegex(ValueError, "inventory differs"):
+                analysis.execution_projection({**pins, "harnessArtifacts": artifacts}, selected,
+                                              self.epoch)
+
+    def test_guarded_projection_rejects_wrong_stage_and_missing_raw_run(self):
+        self.guarded_projection()
+        pins = analysis.load(self.epoch / "pins.json")
+        registration = analysis.load(self.epoch / "registration.json")
+        with self.assertRaisesRegex(ValueError, "confirmatory"):
+            analysis.validate_scope(pins, registration, self.method, self.epoch.name, "confirmatory")
+        path = self.raw_result()
+        moved = path.with_suffix(".preserved")
+        path.rename(moved)
+        try:
+            with self.assertRaisesRegex(ValueError, "run inventory"):
+                analysis.adjudicate(self.epochs, self.epoch.name)
+        finally:
+            moved.rename(path)
+
+    def test_projection_and_historical_manifest_drift_fail_before_loading_analysis(self):
+        original = analysis.digest
+        for filename in (analysis.GUARDED_PROJECTION, analysis.SPENDING_AMENDMENT,
+                         analysis.PRE_PROJECTION_MANIFEST):
+            with self.subTest(filename=filename), patch.object(
+                    analysis, "digest", side_effect=lambda path:
+                    "0" * 64 if Path(path) == BENCH / filename else original(path)):
+                with self.assertRaisesRegex(ValueError, "analysis artifact changed"):
+                    analysis.validate_analysis_registration()
+
+    def test_projection_semantics_cannot_promote_scope_or_authority(self):
+        original = analysis.load
+        changes = [
+            {"stage": "confirmatory"}, {"collectionAuthorized": True},
+            {"allowedDataKinds": ["empirical"]}, {"empiricalAdmissionRegistered": True},
+            {"kind": "ordinary-epoch-pins"},
+            {"baselinePins": {"path": "unregistered.json", "sha256": "0" * 64}},
+            {"instrumentAmendment": {"path": analysis.SPENDING_AMENDMENT, "sha256": "0" * 64}},
+        ]
+        for change in changes:
+            def changed(path):
+                result = original(path)
+                if Path(path) == BENCH / analysis.GUARDED_PROJECTION:
+                    result.update(change)
+                return result
+
+            with self.subTest(change=change), patch.object(analysis, "load", side_effect=changed):
+                with self.assertRaises(ValueError):
+                    analysis.validate_analysis_registration()
+
+    def test_guarded_proof_requires_exact_authority_or_verified_copied_evidence(self):
+        self.guarded_projection()
+        pins = analysis.load(self.epoch / "pins.json")
+        selected = analysis.load(self.epoch / "registration.json")["stages"]["pilot"]
+        projected = analysis.execution_projection(pins, selected, self.epoch)
+        self.assertEqual("verified-archive-local-file", projected["evidenceResolution"])
+        self.assertEqual(selected["instrumentAmendment"], projected["selectedInstrumentAmendment"])
+        for relative in ("not-the-amendment.json", "admission/stage1-method.json", "."):
+            altered = copy.deepcopy(selected)
+            altered["instrumentAmendment"]["path"] = relative
+            with self.subTest(relative=relative), self.assertRaises(ValueError):
+                analysis.execution_projection(pins, altered, self.epoch)
+
+        selected["instrumentAmendment"] = analysis.load(
+            BENCH / analysis.GUARDED_PROJECTION)["instrumentAmendment"]
+        projected = analysis.execution_projection(pins, selected, self.epoch)
+        self.assertEqual("exact-committed-authority-reference", projected["evidenceResolution"])
+        self.assertEqual(selected["instrumentAmendment"], projected["selectedInstrumentAmendment"])
+
+    def test_guarded_copied_evidence_tampering_cannot_hide_behind_known_hash(self):
+        self.guarded_projection()
+        evidence = self.epoch / "admission/spending-instrument-amendment.json"
+        self.change_json(evidence, lambda amendment: amendment.update(stage="confirmatory"))
+        with self.assertRaisesRegex(ValueError, "archive-local instrument amendment evidence differs"):
+            analysis.adjudicate(self.epochs, self.epoch.name)
+
+    def test_guarded_proof_rejects_foreign_platform_roots_even_with_matching_local_files(self):
+        self.guarded_projection()
+        pins = analysis.load(self.epoch / "pins.json")
+        selected = analysis.load(self.epoch / "registration.json")["stages"]["pilot"]
+        for relative in ("C:/foreign.json", r"C:\foreign.json", r"C:relative.json",
+                         r"\rooted.json", r"\\server\share\foreign.json",
+                         r"admission\..\foreign.json"):
+            if os.name != "nt":
+                evidence = self.epoch / relative
+                evidence.parent.mkdir(parents=True, exist_ok=True)
+                evidence.write_bytes((BENCH / analysis.SPENDING_AMENDMENT).read_bytes())
+                self.addCleanup(evidence.unlink)
+            altered = copy.deepcopy(selected)
+            altered["instrumentAmendment"]["path"] = relative
+            with self.subTest(relative=relative), self.assertRaisesRegex(
+                    ValueError, "relative evidence path"):
+                analysis.execution_projection(pins, altered, self.epoch)
 
 
 if __name__ == "__main__":
