@@ -1,0 +1,10 @@
+{
+  "featureKey": "char-literal-surrogate",
+  "supportLevel": "Full",
+  "lossKindCertifiedAbsent": "InteropPreserved",
+  "runtimeEntryPoint": "Verify",
+  "runtimeExpectedInt": 167935,
+  "convertedRuntimeEntryPoint": "Verify",
+  "convertedExpectedUndefinedInt": 167935,
+  "convertedExpectedDefinedInt": 167935
+}

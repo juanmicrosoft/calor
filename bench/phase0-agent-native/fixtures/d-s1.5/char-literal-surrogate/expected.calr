@@ -1,0 +1,6 @@
+§M{m001:Fixture:overflow=unchecked}
+  §CL{c001:SurrogateValues:pub:stat}
+    §MT{m002:Verify:pub:stat} () -> i32
+      §B{char:high} '\ud800'
+      §B{char:low} '\udfff'
+      §R (+ (* (cast i32 high) 2) (cast i32 low))
