@@ -139,6 +139,7 @@ public sealed class Parser
     /// pending ancestor call. See RFC v0.6 call-closer-elision §3.2.
     /// </summary>
     private int _inOuterCallArgDepth;
+    private readonly Dictionary<int, int> _callLineStarts = new();
 
     /// <summary>
     /// The most recently parsed <c>§IF</c> opener token. Used by
@@ -9971,10 +9972,7 @@ public sealed class Parser
     {
         var startPosition = _position;
         var startToken = Expect(TokenKind.Call);
-        var lineStart = startPosition;
-        while (lineStart > 0 && _tokens[lineStart - 1].Span.Line == startToken.Span.Line
-            && _tokens[lineStart - 1].Kind != TokenKind.Dedent)
-            lineStart--;
+        var lineStart = GetCallLineStart(startPosition);
         var lineColumn = _tokens[lineStart].Span.Column;
         // #911 review F6: exactly one header group — a following brace group is a
         // collection-initializer expression, not more header attributes.
@@ -10147,7 +10145,7 @@ public sealed class Parser
             TextSpan? firstArgumentSpan = null;
             while (!IsAtEnd && !IsBlockEnd(TokenKind.EndCall))
             {
-                if (Check(TokenKind.Arg) && CallOwnsArgument(startToken, lineColumn))
+                if (Check(TokenKind.Arg))
                 {
                     firstArgumentSpan ??= Current.Span;
                     _inOuterCallArgDepth++;
@@ -10201,6 +10199,19 @@ public sealed class Parser
 
         // Handle trailing member access (e.g., §C[Method]§/C.Property)
         return ParseTrailingMemberAccess(expr);
+    }
+
+    private int GetCallLineStart(int position)
+    {
+        var line = _tokens[position].Span.Line;
+        if (_callLineStarts.TryGetValue(line, out var start))
+            return start;
+        start = position;
+        while (start > 0 && _tokens[start - 1].Span.Line == line
+            && _tokens[start - 1].Kind != TokenKind.Dedent)
+            start--;
+        _callLineStarts.Add(line, start);
+        return start;
     }
 
     private bool IsIndentedCallContinuation(Token startToken, int lineColumn)

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using Calor.Compiler.Ast;
 using Calor.Compiler.CodeGen;
@@ -132,6 +133,52 @@ public class MultilineCallExpressionTests
             Assert.Empty(call.Arguments);
             Assert.Equal(2, Assert.IsType<IntLiteralNode>(constructor.Arguments[1]).Value);
         }
+    }
+
+    [Fact]
+    public void ExplicitInnerArgumentList_KeepsSameIndentContinuationArguments()
+    {
+        const string source = """
+            §M{m1:Calls}
+              §F{f1:Probe:pub} () -> i32
+                §E{alloc}
+                §B{pair:Tuple<i32,i32>} §NEW{Tuple<i32,i32>}
+                  §A §C{Math.Max} §A 3
+                  §A 7 §/C
+                  §A 9
+                §/NEW
+                §R pair.Item1
+            """;
+        var module = Parse(source, out var diagnostics);
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        foreach (var text in new[] { source, new CalorEmitter().Emit(module) })
+        {
+            var reparsed = Parse(text, out diagnostics);
+            Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+            var initializers = reparsed.Functions.Single().Body.OfType<BindStatementNode>()
+                .Select(binding => binding.Initializer).ToArray();
+            var constructor = Assert.Single(initializers.OfType<NewExpressionNode>());
+            Assert.Equal(2, constructor.Arguments.Count);
+            var call = constructor.Arguments[0] as CallExpressionNode
+                ?? Assert.Single(initializers.OfType<CallExpressionNode>());
+            Assert.Equal("Math.Max", call.Target);
+            Assert.Equal(new[] { 3L, 7L }, call.Arguments.Select(arg => Assert.IsType<IntLiteralNode>(arg).Value));
+            Assert.Equal(9, Assert.IsType<IntLiteralNode>(constructor.Arguments[1]).Value);
+        }
+    }
+
+    [Fact]
+    public void ManyCallsOnOneLine_DoNotRepeatedlyScanTheirContainingLine()
+    {
+        var source = ProgramSource("§R (+ " + string.Join(" ",
+            Enumerable.Repeat("§C{One} §/C", 20_000)) + ")");
+        var stopwatch = Stopwatch.StartNew();
+        var module = Parse(source, out var diagnostics);
+        stopwatch.Stop();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Errors));
+        Assert.IsType<ReturnStatementNode>(Assert.Single(module.Functions.Single().Body));
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(5),
+            $"Parsing a 280 KB call expression took {stopwatch.Elapsed}; containing-line lookup must be amortized linear.");
     }
 
     [Fact]
