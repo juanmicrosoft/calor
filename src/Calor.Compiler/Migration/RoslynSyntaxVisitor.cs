@@ -9153,24 +9153,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     }
 
     /// <summary>
-    /// Converts a C# char literal to Calor's native (char-lit "x") form (#774).
-    /// The char value round-trips as a single-character string argument (the
-    /// Calor parser enforces length 1) and the C# emitter reconstructs a real
-    /// char literal, preserving comparisons, switch labels, and overloads.
+    /// Preserves a C# char value in the existing char-operation AST. Both
+    /// emitters write escaped character literals, including lone UTF-16 surrogates.
     /// </summary>
     private ExpressionNode ConvertCharLiteral(LiteralExpressionSyntax literal)
     {
-        // #836 m1: a lone surrogate (e.g. '\uD83D') cannot survive the
-        // (char-lit "…") round trip — the UTF-8 file write replaces the
-        // unpaired surrogate with U+FFFD, silently corrupting the value.
-        // Escalate to member interop, which preserves the original ESCAPED
-        // source text ('\uD83D') verbatim.
         var value = literal.Token.ValueText;
-        if (value.Length == 1 && char.IsSurrogate(value[0]))
-        {
-            throw EscalateExpression(literal, "char-literal-surrogate");
-        }
-
         _context.RecordFeatureUsage("char-literal");
         return new CharOperationNode(GetTextSpan(literal), CharOp.CharLiteral,
             new List<ExpressionNode>

@@ -1111,10 +1111,6 @@ public class StringOperationTests
         Assert.Equal(expectedName, result);
     }
 
-    // Note: Tests for PadLeft/PadRight with char argument removed
-    // because Calor doesn't support single-quoted char literals ('0')
-    // The functionality works - we just can't test it with the current lexer
-
     [Fact]
     public void Parse_FormatMultipleArgs_ReturnsCorrectNode()
     {

@@ -25,7 +25,7 @@ Calor has a simple type system with primitives, optionals, results, and arrays.
 | `f64` | 64-bit floating point | `double` | ±1.8 × 10³⁰⁸ |
 | `str` | String | `string` | UTF-16 text |
 | `bool` | Boolean | `bool` | `true` or `false` |
-| `char` | Single Unicode character | `char` | U+0000 to U+FFFF |
+| `char` | UTF-16 code unit | `char` | U+0000 to U+FFFF |
 | `decimal` | 128-bit precise decimal | `decimal` | ±7.9 × 10²⁸ |
 | `void` | No value | `void` | (return type only) |
 
@@ -62,6 +62,28 @@ Calor supports two forms for decimal literals:
 §B{~total:decimal} 100m               // suffix form (m or M)
 §B{~rate:decimal} DEC:0.05            // short prefix form
 ```
+
+### Character Literals
+
+Single quotes produce `char`; double quotes produce `str`. Character literals
+contain exactly one UTF-16 code unit. Empty literals, multiple characters, raw
+line breaks, and invalid escapes report `Calor0112`.
+
+```
+§B{digit:char} '0'
+§B{newline:char} '\n'
+§B{quote:char} '\''
+§B{slash:char} '\\'
+§B{letter:char} '\u0041'
+```
+
+Escapes follow C#: `\0`, `\a`, `\b`, `\f`, `\n`, `\r`, `\t`, `\v`, `\'`, `\"`,
+`\\`, `\x` (one to four hexadecimal digits), `\u` (four digits), and `\U` (eight
+digits). The decoded value must fit one UTF-16 code unit; supplementary Unicode
+characters require a string. Escaped surrogate code units round-trip unchanged.
+
+Characters participate in numeric arithmetic: `(- c '0')` returns an `i32`.
+The existing `(char-lit "x")` spelling remains accepted and formats as `'x'`.
 
 ---
 

@@ -113,8 +113,7 @@ public sealed class CalorAttributeArgument
             BitwiseBinaryExpression bbe => FormatBitwiseBinary(bbe),
             // Bitwise NOT expression (e.g., ~A)
             BitwiseNotExpression bne => $"~{FormatSingleValue(bne.Operand)}",
-            // Char literals — quote them to avoid bare special characters
-            char c => $"\"{EscapeString(c.ToString())}\"",
+            char c => Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(c, quote: true),
             // Default: treat as identifier/enum value
             _ => value?.ToString() ?? "null"
         };

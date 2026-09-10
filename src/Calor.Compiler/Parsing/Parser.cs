@@ -18,6 +18,7 @@ public sealed class Parser
         {
             [TokenKind.IntLiteral] = static parser => parser.ParseIntLiteral(),
             [TokenKind.StrLiteral] = static parser => parser.ParseStringLiteral(),
+            [TokenKind.CharLiteral] = static parser => parser.ParseCharLiteral(),
             [TokenKind.BoolLiteral] = static parser => parser.ParseBoolLiteral(),
             [TokenKind.FloatLiteral] = static parser => parser.ParseFloatLiteral(),
             [TokenKind.DecimalLiteral] = static parser => parser.ParseDecimalLiteral(),
@@ -4523,6 +4524,13 @@ public sealed class Parser
         return new IntLiteralNode(token.Span, value);
     }
 
+    private ExpressionNode ParseCharLiteral()
+    {
+        var token = Expect(TokenKind.CharLiteral);
+        return new CharOperationNode(token.Span, CharOp.CharLiteral,
+            [new StringLiteralNode(token.Span, ((char)token.Value!).ToString())]);
+    }
+
     private ExpressionNode ParseStringLiteral()
     {
         var token = Expect(TokenKind.StrLiteral);
@@ -5209,7 +5217,7 @@ public sealed class Parser
             return new VariablePatternNode(token.Span, token.Text, token.Span);
         }
 
-        if (Check(TokenKind.IntLiteral) || Check(TokenKind.StrLiteral) ||
+        if (Check(TokenKind.IntLiteral) || Check(TokenKind.StrLiteral) || Check(TokenKind.CharLiteral) ||
             Check(TokenKind.BoolLiteral) || Check(TokenKind.FloatLiteral) ||
             Check(TokenKind.DecimalLiteral))
         {
@@ -5440,7 +5448,7 @@ public sealed class Parser
     /// </summary>
     private ExpressionNode ParseExpressionFromAttributeString(string attrStr, TextSpan span)
     {
-        if (attrStr.StartsWith("("))
+        if (attrStr.StartsWith("(") || attrStr.StartsWith("'"))
         {
             // S-expression: create a temporary lexer/parser to parse it
             var tempLexer = new Lexer(attrStr, _diagnostics);
@@ -6466,7 +6474,7 @@ public sealed class Parser
         {
             sb.Append(Advance().Value as string ?? "");
         }
-        else if (Check(TokenKind.IntLiteral))
+        else if (Check(TokenKind.IntLiteral) || Check(TokenKind.CharLiteral))
         {
             var token = Advance();
             sb.Append(token.Text);
@@ -6561,9 +6569,9 @@ public sealed class Parser
                 sb.Append("<<");
                 Advance();
             }
-            else if (Check(TokenKind.IntLiteral))
+            else if (Check(TokenKind.IntLiteral) || Check(TokenKind.CharLiteral))
             {
-                // Add space before integers if there's content before them (to separate from identifiers)
+                // Separate literal tokens from preceding identifiers.
                 if (sb.Length > 0 && !char.IsWhiteSpace(sb[sb.Length - 1]) && sb[sb.Length - 1] != '(')
                     sb.Append(' ');
                 sb.Append(Advance().Text);
@@ -6990,6 +6998,10 @@ public sealed class Parser
     /// </summary>
     private object ParseCSharpAttributePrimaryValue()
     {
+        if (Check(TokenKind.CharLiteral))
+        {
+            return (char)Advance().Value!;
+        }
         if (Check(TokenKind.StrLiteral))
         {
             return Advance().Value as string ?? "";
@@ -12305,7 +12317,7 @@ public sealed class Parser
         if (Current.Kind == TokenKind.Identifier && Peek(1).Kind == TokenKind.Equals)
             return false; // Don't consume property assignments as range operands
         return Current.Kind is TokenKind.IntLiteral or TokenKind.FloatLiteral
-            or TokenKind.DecimalLiteral or TokenKind.StrLiteral
+            or TokenKind.DecimalLiteral or TokenKind.StrLiteral or TokenKind.CharLiteral
             or TokenKind.Identifier or TokenKind.OpenParen or TokenKind.IndexEnd;
     }
 
@@ -13383,7 +13395,7 @@ public sealed class Parser
     /// </summary>
     private string? ParseEnumOperand()
     {
-        if (Check(TokenKind.IntLiteral))
+        if (Check(TokenKind.IntLiteral) || Check(TokenKind.CharLiteral))
         {
             return Advance().Text;
         }
@@ -13456,7 +13468,7 @@ public sealed class Parser
     /// </summary>
     private bool IsEnumOperandStart()
     {
-        return Check(TokenKind.IntLiteral) || Check(TokenKind.Identifier) ||
+        return Check(TokenKind.IntLiteral) || Check(TokenKind.CharLiteral) || Check(TokenKind.Identifier) ||
                Check(TokenKind.Tilde) || Check(TokenKind.OpenParen) ||
                (Check(TokenKind.Minus) && Peek(1).Kind == TokenKind.IntLiteral);
     }
