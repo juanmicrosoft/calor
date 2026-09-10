@@ -4,191 +4,93 @@ section: "philosophy"
 order: 1
 ---
 
+**Reader question:** Why does Calor represent contracts, effects, IDs, and
+expressions this way?
 
-Calor is built on five core principles that guide every language design decision. These principles serve a deeper goal: **enabling verification**. Every design choice makes contracts and effects machine-checkable, not just human-readable.
+Calor compiles structured source to C#. Its design makes selected intent
+available to compiler checks and editing tools. That is a mechanism, not
+evidence that agents write better programs.
 
----
+## Declared effects expose an interface constraint
 
-## The Five Principles
+An effect declaration lists effects a function permits. The compiler checks
+the effects it can resolve against that declaration. Callers can inspect the
+declared interface without rediscovering it from each implementation.
 
-| Principle | Implementation | Agent Benefit |
-|:----------|:---------------|:--------------|
-| **Explicit over implicit** | Effects declared with `§E{cw,fs:r,net:rw}` | Know side effects without reading implementation |
-| **Contracts are code** | First-class `§Q` (requires) and `§S` (ensures) | Generate tests from specs, verify correctness |
-| **Stable IDs when you want them** | `§F{f001:Main}`, `§L{l001:i:1:100:1}` (IDs optional) | Precise references that survive refactoring |
-| **Indent-based blocks** | Python-style indentation — no closer tags to mismatch | Lower edit cost; familiar from training data |
-| **Machine-readable semantics** | Lisp-style operators `(+ a b)` | Symbolic manipulation without text parsing |
-
----
-
-## 1. Explicit Over Implicit
-
-In traditional languages, side effects are implicit. You have to read the entire function body to know if it:
-- Writes to console
-- Reads from files
-- Makes network calls
-- Accesses a database
-
-Calor requires explicit effect declarations:
+Illustrative function-header fragment, not a complete program:
 
 ```calor
-§F{f001:SaveUser:pub}
-  §I{User:user}
-  §O{bool}
-  §E{db:rw,net:rw}        // Explicit: database and network effects
-  // ... implementation
+§F{f001:SaveUser:pub} (User:user) -> bool
+  §E{db:rw,net:rw}
 ```
 
-**Agent benefit:** An agent can immediately filter functions by their effects without analyzing implementation details.
+The declaration permits database and network access; it does not promise that
+either happens or specify its ordering, destinations, or business behavior.
+External libraries need coverage through known effects or manifests.
+Unresolved calls, interop, and waivers limit enforcement. Use the canonical
+[effect reference](/docs/syntax-reference/effects/) for codes and policies.
 
-### Effect Codes
+## Contracts state checkable obligations
 
-| Code | Effect |
-|:-----|:-------|
-| `cw` | Console write |
-| `cr` | Console read |
-| `fs:w` | Filesystem write |
-| `fs:r` | Filesystem read |
-| `fs:rw` | Filesystem read/write |
-| `net:r` | Network read |
-| `net:w` | Network write |
-| `net:rw` | Network read/write |
-| `db:r` | Database read |
-| `db:w` | Database write |
-| `db:rw` | Database read/write |
+`§Q` states a precondition; `§S` states a postcondition on normal returns.
+Runtime checking and optional static proof are separate operations with
+documented limits.
 
----
-
-## 2. Contracts Are Code
-
-Preconditions and postconditions aren't comments or assertions buried in code - they're first-class syntax elements:
+Illustrative function fragment:
 
 ```calor
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32}
-  §Q (!= b 0)              // Requires: b is not zero
-  §Q (>= a 0)              // Requires: a is non-negative
-  §S (>= result 0)         // Ensures: result is non-negative
+§F{f001:Divide:pub} (i32:a, i32:b) -> i32
+  §Q (>= a 0)
+  §Q (> b 0)
+  §S (>= result 0)
   §R (/ a b)
 ```
 
-**Agent benefit:**
-- Automatic test generation from contracts
-- Static verification of caller sites
-- Clear documentation of function behavior
+The positive divisor matters: merely excluding zero would allow a negative
+result for a negative divisor. These predicates describe selected properties,
+not a complete behavioral specification. Neither contracts nor effect rows
+prove arbitrary implementation correctness.
 
-### Contract Syntax
+See [contract syntax](/docs/syntax-reference/contracts/) and
+[verification guarantees](/docs/guides/verification-guarantees/) for runtime
+modes, proof statuses, and unsupported cases.
 
-| Tag | Purpose | Example |
-|:----|:--------|:--------|
-| `§Q` | Precondition (requires) | `§Q (> x 0)` |
-| `§S` | Postcondition (ensures) | `§S (!= result null)` |
-| `§Q{message="..."}` | With custom error | `§Q{message="x must be positive"} (> x 0)` |
+## Stable IDs are optional editing targets
 
----
+A structural element can carry an explicit ID. A tool can use it instead of a
+line number when the element moves or is renamed. This works only if edits
+preserve the ID and avoid duplicates; not every element must have one.
 
-## 3. Everything Has an ID
+For example, `f001` in `§F{f001:Divide:pub}` identifies the function independently
+of its display name. Short IDs in documentation are examples, not a production
+ID policy. See [stable identifiers](/docs/philosophy/stable-identifiers/) for
+generation, uniqueness checks, and limitations.
 
-Every structural element has a unique identifier that persists across refactoring:
+## Indentation carries block structure
 
-```calor
-§M{m001:Calculator}           // Module ID: m001
-  §F{f001:Add:pub}              // Function ID: f001
-    §L{for1:i:1:100:1}          // Loop ID: for1
-      §IF{if1} (> i 50)         // Conditional ID: if1
-    // ...
-```
+An opening tag introduces a body indented farther than its parent. Dedenting
+ends the block. Structural closer tags are rejected; call argument lists and
+block lambdas have their own delimiters.
 
-**Agent benefit:**
-- "Edit function f001" is unambiguous
-- IDs survive code movement and renaming
-- No reliance on line numbers that change
+This avoids maintaining a separate closing tag for each structural block.
+It also makes whitespace significant: an edit that moves indentation can
+change scope. Use [formatting](/docs/cli/format/) and compilation to check
+changes rather than assuming the visual layout is correct.
 
-### ID Conventions
+## Prefix notation makes grouping explicit
 
-Production code uses ULID-based IDs with kind prefixes:
-
-| Element | Prefix | Example |
-|:--------|:-------|:--------|
-| Modules | `m_` | `§M{m_01J5X7K9M2NPQRSTABWXYZ12:Calculator}` |
-| Functions | `f_` | `§F{f_01J5X7K9M2NPQRSTABWXYZ12:Add:pub}` |
-| Classes | `c_` | `§CL{c_01J5X7K9M2NPQRSTABWXYZ12:MyClass}` |
-| Methods | `mt_` | `§MT{mt_01J5X7K9M2NPQRSTABWXYZ12:Process:pub}` |
-
-Short test IDs (`f001`, `m001`) are allowed only in `tests/`, `docs/`, and examples.
-
-[Learn more: Stable Identifiers](/docs/philosophy/stable-identifiers/) - Why IDs matter and how challenges are overcome
-
----
-
-## 4. Indent-Based Structure
-
-Blocks are delimited by **indentation** (Python-style). Each opening
-tag introduces a block whose body must indent further; the block ends
-at the next line that dedents back to the parent column.
-
-```calor
-§M{Example}
-  §F{Main:pub}
-    §L{i:1:10:1}
-      §IF (> i 5)
-        // ...
-```
-
-**Agent benefit:**
-- Familiar to any agent trained on Python; no closer tag to forget or mismatch
-- Lower edit cost (in our edit-workload studies, indent form reduced agent token cost by ~16% with no regression in correctness)
-- Structure is visually unambiguous
-
-### Legacy Closer Tags
-
-Pre-Phase-4d Calor used explicit closer tags such as `§/M{m001}` and
-`§/F{f001}` (removed in Phase 4d). Modern Calor is indent-only; bulk-migrate
-older sources with [`calor format`](/docs/cli/format/).
-
----
-
-## 5. Machine-Readable Semantics
-
-Expressions use Lisp-style prefix notation that's directly manipulable:
+Calor expressions place the operator first:
 
 ```text
-// Calor: Clear AST structure
 (+ (* a b) (- c d))
-
-// Equivalent infix: Requires precedence parsing
-a * b + c - d     // Wait, is this (a*b)+(c-d) or a*(b+c)-d?
 ```
 
-**Agent benefit:**
-- No operator precedence ambiguity
-- Direct AST manipulation
-- Symbolic computation without parsing
+This expression fragment groups the same arithmetic as `(a * b) + (c - d)`
+in C#. C# also has defined precedence; it is not ambiguous. Calor chooses
+uniform prefix grouping rather than requiring an infix-precedence table.
 
-### Operators
-
-| Category | Operators |
-|:---------|:----------|
-| Arithmetic | `+`, `-`, `*`, `/`, `%` |
-| Comparison | `==`, `!=`, `<`, `<=`, `>`, `>=` |
-| Logical | `&&`, `\|\|`, `!` |
-
----
-
-## Principle Interactions
-
-These principles reinforce each other:
-
-1. **Stable IDs + Indentation** = Unambiguous scope references and refactoring-safe edits
-2. **Contracts + Explicit effects** = Complete behavioral specification
-3. **Lisp syntax + Contracts** = Symbolic verification possible
-4. **IDs + Contracts** = Traceable invariants across refactoring
-
----
-
-## Next
-
-- [Stable Identifiers](/docs/philosophy/stable-identifiers/) - Deep dive into language-level IDs
-- [Tradeoffs](/docs/philosophy/tradeoffs/) - What Calor gives up for these principles
+Both representations still need parsing into an AST. Symbolic transformation
+also needs type and runtime semantics: integer overflow, overloaded operators,
+and floating-point values can invalidate an algebraic rewrite.
+See [expressions](/docs/syntax-reference/expressions/) for the grammar and
+[Tradeoffs](/docs/philosophy/tradeoffs/) for adoption decisions.

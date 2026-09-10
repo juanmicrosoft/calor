@@ -79,7 +79,7 @@ test('current version and explicitly historical result provenance cannot silentl
   expect(results).toContain(provenance.sourceCommit);
   expect(results).toContain(provenance.sourceDeclaredVersion);
   expect(results).toContain('not all behaviorally equivalent');
-  for (const path of ['philosophy/index', 'philosophy/tradeoffs']) {
+  for (const path of ['philosophy/index']) {
     const source = await readFile(`content/${path}.mdx`, 'utf8');
     const densityClaims = source.split('\n').filter(line =>
       line.includes('Information Density') && /\d+\.\d+x/.test(line));
@@ -101,6 +101,30 @@ test('current version and explicitly historical result provenance cannot silentl
   }
   // Historical changelog versions remain valid; this check is deliberately scoped.
   expect(await readFile('content/changelog.mdx', 'utf8')).toContain('0.12');
+});
+
+test('conceptual pages have distinct purposes, credible examples and canonical limits', async ({ page }) => {
+  const pages = ['philosophy/design-principles', 'philosophy/tradeoffs',
+    'benchmarking/metrics/effect-discipline', 'guides/verification-guarantees'];
+  const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  await page.route('https://**/*', route => route.abort());
+  for (const path of pages) {
+    await page.goto(`${base}/docs/${path}/`);
+    const article = page.locator('article');
+    await expect(article).toContainText('Reader question:');
+    const links = await article.locator('a[href^="/"]').evaluateAll(elements =>
+      [...new Set(elements.map(element => element.getAttribute('href')!))]);
+    for (const link of links) expect((await page.request.get(link)).status(), link).toBe(200);
+  }
+  const design = await readFile('content/philosophy/design-principles.mdx', 'utf8');
+  expect(design).toContain('not every element must have one');
+  expect(design).not.toMatch(/Everything Has an ID|without (?:text )?parsing|~16%/);
+  const tradeoffs = await readFile('content/philosophy/tradeoffs.mdx', 'utf8');
+  expect(tradeoffs).not.toMatch(/Calor Tokens|old_from_balance|Calor wins/);
+  const effects = await readFile('content/benchmarking/metrics/effect-discipline.mdx', 'utf8');
+  expect(effects.replace(/\s+/g, ' ')).toContain('not an observed tie');
+  expect(effects).toContain('not an independent determinism proof');
+  expect(effects).not.toMatch(/How Often|Real Bug:/);
 });
 
 test('research milestones stay distinct from software releases', async () => {
