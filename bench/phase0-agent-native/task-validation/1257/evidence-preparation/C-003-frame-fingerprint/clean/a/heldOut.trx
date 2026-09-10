@@ -1,0 +1,52 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="9ad06f7c-17d6-4f1c-9680-abcfec17ab5e" name="@Juans-MacBook-Pro 2026-09-10 02:38:41" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-10T02:38:41.0779270-04:00" queuing="2026-09-10T02:38:41.0779270-04:00" start="2026-09-10T02:38:40.7203990-04:00" finish="2026-09-10T02:38:41.0799490-04:00" />
+  <TestSettings name="default" id="124770f7-d151-428a-8c95-90d72e746213">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-10_02_38_41" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="e9cd2ab4-c1e2-4427-88b9-6def47ec7eca" testId="7e9e88a9-50bc-2593-9e54-989fc2a71098" testName="FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 101, second: 5)" computerName="Juans-MacBook-Pro" duration="00:00:00.0001852" startTime="2026-09-10T02:38:41.0438190-04:00" endTime="2026-09-10T02:38:41.0438190-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e9cd2ab4-c1e2-4427-88b9-6def47ec7eca" />
+    <UnitTestResult executionId="ffde8e5d-89a4-488b-88b5-1baa18c5a040" testId="37697050-ecf4-16ef-cd6c-b1497f91c9d6" testName="FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 101, second: 5, expected: 10105)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000971" startTime="2026-09-10T02:38:41.0437160-04:00" endTime="2026-09-10T02:38:41.0437160-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ffde8e5d-89a4-488b-88b5-1baa18c5a040" />
+    <UnitTestResult executionId="e1b85d63-85c6-4a62-b0ec-5edc6de66402" testId="ef6ff985-4f65-b311-ac1f-78b8a64070bd" testName="FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 1, second: 2)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000466" startTime="2026-09-10T02:38:41.0438290-04:00" endTime="2026-09-10T02:38:41.0438290-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e1b85d63-85c6-4a62-b0ec-5edc6de66402" />
+    <UnitTestResult executionId="aee9cb1a-ef66-4762-b79f-dc5552f9361b" testId="c21207a6-2f79-be4b-bf07-4849c2b81630" testName="FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 1, second: 2, expected: 103)" computerName="Juans-MacBook-Pro" duration="00:00:00.0068669" startTime="2026-09-10T02:38:41.0427660-04:00" endTime="2026-09-10T02:38:41.0427720-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="aee9cb1a-ef66-4762-b79f-dc5552f9361b" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 1, second: 2)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-003-frame-fingerprint/clean/a/heldout/bin/debug/net10.0/heldout.dll" id="ef6ff985-4f65-b311-ac1f-78b8a64070bd">
+      <Execution id="e1b85d63-85c6-4a62-b0ec-5edc6de66402" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/clean/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintHeldOutTests" name="Fingerprint_PreservesJournal" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 1, second: 2, expected: 103)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-003-frame-fingerprint/clean/a/heldout/bin/debug/net10.0/heldout.dll" id="c21207a6-2f79-be4b-bf07-4849c2b81630">
+      <Execution id="aee9cb1a-ef66-4762-b79f-dc5552f9361b" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/clean/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintHeldOutTests" name="Fingerprint_ReturnsExpectedValue" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 101, second: 5)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-003-frame-fingerprint/clean/a/heldout/bin/debug/net10.0/heldout.dll" id="7e9e88a9-50bc-2593-9e54-989fc2a71098">
+      <Execution id="e9cd2ab4-c1e2-4427-88b9-6def47ec7eca" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/clean/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintHeldOutTests" name="Fingerprint_PreservesJournal" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 101, second: 5, expected: 10105)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-003-frame-fingerprint/clean/a/heldout/bin/debug/net10.0/heldout.dll" id="37697050-ecf4-16ef-cd6c-b1497f91c9d6">
+      <Execution id="ffde8e5d-89a4-488b-88b5-1baa18c5a040" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/clean/a/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintHeldOutTests" name="Fingerprint_ReturnsExpectedValue" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="7e9e88a9-50bc-2593-9e54-989fc2a71098" executionId="e9cd2ab4-c1e2-4427-88b9-6def47ec7eca" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="37697050-ecf4-16ef-cd6c-b1497f91c9d6" executionId="ffde8e5d-89a4-488b-88b5-1baa18c5a040" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ef6ff985-4f65-b311-ac1f-78b8a64070bd" executionId="e1b85d63-85c6-4a62-b0ec-5edc6de66402" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c21207a6-2f79-be4b-bf07-4849c2b81630" executionId="aee9cb1a-ef66-4762-b79f-dc5552f9361b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="4" executed="4" passed="4" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 10.0.11)
+[xUnit.net 00:00:00.03]   Discovering: HeldOut
+[xUnit.net 00:00:00.05]   Discovered:  HeldOut
+[xUnit.net 00:00:00.05]   Starting:    HeldOut
+[xUnit.net 00:00:00.07]   Finished:    HeldOut
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

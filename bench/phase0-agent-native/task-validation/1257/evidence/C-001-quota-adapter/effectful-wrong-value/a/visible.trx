@@ -1,0 +1,183 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="e3c9bb6e-c1a6-45cc-ad0b-f1f39188fe9f" name="@Juans-MacBook-Pro 2026-09-10 03:14:30" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-10T03:14:30.5341950-04:00" queuing="2026-09-10T03:14:30.5341950-04:00" start="2026-09-10T03:14:30.1510280-04:00" finish="2026-09-10T03:14:30.5365110-04:00" />
+  <TestSettings name="default" id="2b7269bf-da20-4a4b-a41c-9ef7c49900a3">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-10_03_14_30" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="29eaad04-6ec8-43fb-a9ec-50da3699eedc" testId="f6ba7b53-2bd6-deb1-0882-7a03ca7783d2" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 1, expected: 5)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000129" startTime="2026-09-10T03:14:30.4955870-04:00" endTime="2026-09-10T03:14:30.4955870-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="29eaad04-6ec8-43fb-a9ec-50da3699eedc">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 5
+Actual:   0</Message>
+          <StackTrace>   at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/VisibleTests.cs:line 19
+   at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="391b7126-8054-4548-9a7e-4bc0f666add5" testId="5ca4951b-4943-71a3-e4a2-d10aa89d112e" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -1, expected: 0)" computerName="Juans-MacBook-Pro" duration="00:00:00.0066239" startTime="2026-09-10T03:14:30.4892350-04:00" endTime="2026-09-10T03:14:30.4892420-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="391b7126-8054-4548-9a7e-4bc0f666add5" />
+    <UnitTestResult executionId="8e74c4f8-e17a-409c-9b6e-b6e30d03e99b" testId="2f50847f-a9f3-baf5-c172-c7aaff96561b" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 0, expected: 0)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000015" startTime="2026-09-10T03:14:30.4956140-04:00" endTime="2026-09-10T03:14:30.4956140-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8e74c4f8-e17a-409c-9b6e-b6e30d03e99b" />
+    <UnitTestResult executionId="48949759-e28e-4c6c-bd27-99221b407448" testId="9f32e513-3db7-7644-d25d-30486bb6d375" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 10, expected: 50)" computerName="Juans-MacBook-Pro" duration="00:00:00.0007312" startTime="2026-09-10T03:14:30.4946530-04:00" endTime="2026-09-10T03:14:30.4946530-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="48949759-e28e-4c6c-bd27-99221b407448">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 50
+Actual:   0</Message>
+          <StackTrace>   at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/VisibleTests.cs:line 19
+   at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="86091cda-e1e4-4c5e-be9d-429458a7b4d1" testId="f4cc4e47-9cf3-b44e-1998-c88cd3b01fb2" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 11, expected: 50)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000268" startTime="2026-09-10T03:14:30.4949500-04:00" endTime="2026-09-10T03:14:30.4949500-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="86091cda-e1e4-4c5e-be9d-429458a7b4d1">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 50
+Actual:   0</Message>
+          <StackTrace>   at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/VisibleTests.cs:line 19
+   at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="c82390b2-4041-4a85-aea8-94e0060e864b" testId="180d9d46-c770-fda4-02fd-0c2f2b9d72e6" testName="QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas" computerName="Juans-MacBook-Pro" duration="00:00:00.0000875" startTime="2026-09-10T03:14:30.4958140-04:00" endTime="2026-09-10T03:14:30.4958140-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c82390b2-4041-4a85-aea8-94e0060e864b">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 5
+Actual:   0</Message>
+          <StackTrace>   at QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas() in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/VisibleTests.cs:line 26
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="49bd73f3-686e-48c7-b7a1-7d60260b81d7" testId="e4a509f2-d975-87bb-92a5-aa40e27ee3c6" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 2147483647, expected: 50)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000152" startTime="2026-09-10T03:14:30.4953270-04:00" endTime="2026-09-10T03:14:30.4953270-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="49bd73f3-686e-48c7-b7a1-7d60260b81d7">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 50
+Actual:   0</Message>
+          <StackTrace>   at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/VisibleTests.cs:line 19
+   at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="0036cb8d-00e0-4b60-9df7-2f2fcc2eb683" testId="d7d111f1-9230-eade-90f8-45bb037bdc40" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -2147483648, expected: 0)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000009" startTime="2026-09-10T03:14:30.4956310-04:00" endTime="2026-09-10T03:14:30.4956310-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0036cb8d-00e0-4b60-9df7-2f2fcc2eb683" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 10, expected: 50)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/bin/debug/net10.0/smoke.dll" id="9f32e513-3db7-7644-d25d-30486bb6d375">
+      <Execution id="48949759-e28e-4c6c-bd27-99221b407448" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -2147483648, expected: 0)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/bin/debug/net10.0/smoke.dll" id="d7d111f1-9230-eade-90f8-45bb037bdc40">
+      <Execution id="0036cb8d-00e0-4b60-9df7-2f2fcc2eb683" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/bin/debug/net10.0/smoke.dll" id="180d9d46-c770-fda4-02fd-0c2f2b9d72e6">
+      <Execution id="c82390b2-4041-4a85-aea8-94e0060e864b" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="ConsecutiveRequestsReturnTheirQuotas" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 1, expected: 5)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/bin/debug/net10.0/smoke.dll" id="f6ba7b53-2bd6-deb1-0882-7a03ca7783d2">
+      <Execution id="29eaad04-6ec8-43fb-a9ec-50da3699eedc" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 2147483647, expected: 50)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/bin/debug/net10.0/smoke.dll" id="e4a509f2-d975-87bb-92a5-aa40e27ee3c6">
+      <Execution id="49bd73f3-686e-48c7-b7a1-7d60260b81d7" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 11, expected: 50)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/bin/debug/net10.0/smoke.dll" id="f4cc4e47-9cf3-b44e-1998-c88cd3b01fb2">
+      <Execution id="86091cda-e1e4-4c5e-be9d-429458a7b4d1" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 0, expected: 0)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/bin/debug/net10.0/smoke.dll" id="2f50847f-a9f3-baf5-c172-c7aaff96561b">
+      <Execution id="8e74c4f8-e17a-409c-9b6e-b6e30d03e99b" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -1, expected: 0)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/c-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/bin/debug/net10.0/smoke.dll" id="5ca4951b-4943-71a3-e4a2-d10aa89d112e">
+      <Execution id="391b7126-8054-4548-9a7e-4bc0f666add5" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="f6ba7b53-2bd6-deb1-0882-7a03ca7783d2" executionId="29eaad04-6ec8-43fb-a9ec-50da3699eedc" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5ca4951b-4943-71a3-e4a2-d10aa89d112e" executionId="391b7126-8054-4548-9a7e-4bc0f666add5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2f50847f-a9f3-baf5-c172-c7aaff96561b" executionId="8e74c4f8-e17a-409c-9b6e-b6e30d03e99b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9f32e513-3db7-7644-d25d-30486bb6d375" executionId="48949759-e28e-4c6c-bd27-99221b407448" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f4cc4e47-9cf3-b44e-1998-c88cd3b01fb2" executionId="86091cda-e1e4-4c5e-be9d-429458a7b4d1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="180d9d46-c770-fda4-02fd-0c2f2b9d72e6" executionId="c82390b2-4041-4a85-aea8-94e0060e864b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e4a509f2-d975-87bb-92a5-aa40e27ee3c6" executionId="49bd73f3-686e-48c7-b7a1-7d60260b81d7" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d7d111f1-9230-eade-90f8-45bb037bdc40" executionId="0036cb8d-00e0-4b60-9df7-2f2fcc2eb683" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="8" executed="8" passed="3" failed="5" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 10.0.11)
+[xUnit.net 00:00:00.03]   Discovering: Smoke
+[xUnit.net 00:00:00.05]   Discovered:  Smoke
+[xUnit.net 00:00:00.05]   Starting:    Smoke
+[xUnit.net 00:00:00.07]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.07]       Expected: 50
+[xUnit.net 00:00:00.07]       Actual:   0
+[xUnit.net 00:00:00.07]       Stack Trace:
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/VisibleTests.cs(19,0): at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected)
+[xUnit.net 00:00:00.07]            at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.07]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.07]       Expected: 50
+[xUnit.net 00:00:00.07]       Actual:   0
+[xUnit.net 00:00:00.07]       Stack Trace:
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/VisibleTests.cs(19,0): at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected)
+[xUnit.net 00:00:00.07]            at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.07]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.07]       Expected: 50
+[xUnit.net 00:00:00.07]       Actual:   0
+[xUnit.net 00:00:00.07]       Stack Trace:
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/VisibleTests.cs(19,0): at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected)
+[xUnit.net 00:00:00.07]            at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.07]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.07]       Expected: 5
+[xUnit.net 00:00:00.07]       Actual:   0
+[xUnit.net 00:00:00.07]       Stack Trace:
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/VisibleTests.cs(19,0): at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected)
+[xUnit.net 00:00:00.07]            at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.07]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.07]       Expected: 5
+[xUnit.net 00:00:00.07]       Actual:   0
+[xUnit.net 00:00:00.07]       Stack Trace:
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-001-quota-adapter/effectful-wrong-value/a/workspace/smoke/VisibleTests.cs(26,0): at QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas()
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.07]   Finished:    Smoke
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T03:14:30.4941010-04:00">
+        <Text>[xUnit.net 00:00:00.07]     QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 10, expected: 50) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T03:14:30.4950300-04:00">
+        <Text>[xUnit.net 00:00:00.07]     QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 11, expected: 50) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T03:14:30.4953160-04:00">
+        <Text>[xUnit.net 00:00:00.07]     QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 2147483647, expected: 50) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T03:14:30.4959360-04:00">
+        <Text>[xUnit.net 00:00:00.07]     QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 1, expected: 5) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T03:14:30.4959950-04:00">
+        <Text>[xUnit.net 00:00:00.07]     QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

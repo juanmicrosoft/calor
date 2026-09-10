@@ -1,0 +1,1724 @@
+{
+  "kind": "deterministic-frozen-release-sdk-suite-validation",
+  "agentInvoked": false,
+  "epochCreated": false,
+  "compilerCommit": "514f538024df990af86054af25975b756ba42ab1",
+  "instrumentCommit": "40f34dcdaed1d60d58509e3cac80d7dd92644f7a",
+  "configuration": {
+    "compiler": "Release",
+    "tasks": "Release",
+    "consumer": "Debug",
+    "consumerRuntime": "Debug",
+    "productReferences": "prebuilt; validation passes BuildProjectReferences=false"
+  },
+  "inputSha256": {
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/instrument-reference/bench/phase0-agent-native/ppw-source-assembly.py": "2ee3d3df9bc4d25b954d6e3b543c26beb46f2557d6db577c4d568712889ef729",
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/instrument-reference/bench/phase0-agent-native/harness-capture.py": "7290faa3cca3f764475df9738ffcee3c6c90783aa279dfba5d40a03f3c5e7ba0",
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/instrument-reference/bench/phase0-agent-native/run-pair.sh": "d09c2fdb78bc7b4fe5f9010c824ae0d72618d3d51241c3a6f0944313193a40fc",
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/instrument-reference/bench/phase0-agent-native/templates/calor-arm/CalorArm.csproj.template": "60b56d0475a5ce6f60493cffdab87eb8f90a17f058de7d6bff859769ae11f04c",
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw-v018/src/Calor.Compiler/bin/Release/net10.0/calor.dll": "8adf683d36296f92ddd6bdd414980f4ef3cca9bd16c78826621e866f1e8405d0",
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw-v018/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll": "6ec65e1b376f8bb09e81a1aa1aa4f15db71f35540d8e01e67410e457e9c3978b",
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw-v018/src/Calor.Tasks/bin/Release/net10.0/calor.dll": "8adf683d36296f92ddd6bdd414980f4ef3cca9bd16c78826621e866f1e8405d0",
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw-v018/src/Calor.Runtime/bin/Debug/net10.0/Calor.Runtime.dll": "da732699c8f3c6ee592f67623e1b72623dca7d7ece0b7351a2278567c523595f"
+  },
+  "taskArtifactSha256": {
+    "C-001-quota-adapter/pair.json": "052e2cabd47d2f485549521c89b14ed1685135310b3963c3add5d3012f577a7d",
+    "C-001-quota-adapter/seeded/effectful-throwing-a/dependency.calr.inc": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+    "C-001-quota-adapter/seeded/effectful-throwing-a/task.calr.inc": "a7041d996f6a1e8ce8a4dc1df2477f9d659d67b90e5fe7ae8a72678f73caa468",
+    "C-001-quota-adapter/seeded/effectful-throwing-b/dependency.calr.inc": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+    "C-001-quota-adapter/seeded/effectful-throwing-b/task.calr.inc": "a7041d996f6a1e8ce8a4dc1df2477f9d659d67b90e5fe7ae8a72678f73caa468",
+    "C-001-quota-adapter/seeded/effectful-wrong-value-a/dependency.calr.inc": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+    "C-001-quota-adapter/seeded/effectful-wrong-value-a/task.calr.inc": "cc26d2ec7091bf84931ee444e6e29bbad2540ec0262be424165544527c0df846",
+    "C-001-quota-adapter/seeded/effectful-wrong-value-b/dependency.calr.inc": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+    "C-001-quota-adapter/seeded/effectful-wrong-value-b/task.calr.inc": "cc26d2ec7091bf84931ee444e6e29bbad2540ec0262be424165544527c0df846",
+    "C-001-quota-adapter/seeded/honest-a/dependency.calr.inc": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+    "C-001-quota-adapter/seeded/honest-a/task.calr.inc": "8c9b5448c83c077e825be091bf0723413c7736c4043f005e56f2f9cc845a315e",
+    "C-001-quota-adapter/seeded/honest-b/dependency.calr.inc": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+    "C-001-quota-adapter/seeded/honest-b/task.calr.inc": "8c9b5448c83c077e825be091bf0723413c7736c4043f005e56f2f9cc845a315e",
+    "C-001-quota-adapter/seeded/laundering-a/dependency.calr.inc": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+    "C-001-quota-adapter/seeded/laundering-a/task.calr.inc": "dab336f6ad2ce9d7fa304e45d56043ec235335b7c5f716c4f21914e04574d02c",
+    "C-001-quota-adapter/seeded/laundering-b/dependency.calr.inc": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+    "C-001-quota-adapter/seeded/laundering-b/task.calr.inc": "dab336f6ad2ce9d7fa304e45d56043ec235335b7c5f716c4f21914e04574d02c",
+    "C-001-quota-adapter/smoke/VisibleTests.cs": "5ec03554921ab01ceaaef274537d35121f408d2c8783096ae2e2705b5f4b79be",
+    "C-001-quota-adapter/smoke/shims/SmokeShim.calor.cs": "6dcd522e2f7e2099c4f4c9b1166d47c57c7062c78f8b4527a326ae0ee891a11b",
+    "C-001-quota-adapter/spec.md": "58d99cfa5da7565296c5e1a29eb8419bdc57b70a9000c88516f37352f68ceedf",
+    "C-001-quota-adapter/starter-a/dependency.calr.inc": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+    "C-001-quota-adapter/starter-a/task.calr.inc": "d74a1c6d0c8ef6487fe3e893f159219f2b7c1345bae6be00361229e04a103a26",
+    "C-001-quota-adapter/starter-b/dependency.calr.inc": "554231439096fbe93c9868c074af8b0aa4168c6c64a12b16c8f07a0753c9d5df",
+    "C-001-quota-adapter/starter-b/task.calr.inc": "d74a1c6d0c8ef6487fe3e893f159219f2b7c1345bae6be00361229e04a103a26",
+    "C-001-quota-adapter/tests/HeldOutTests.cs": "051cf9dc14e036614a3e03cd1d6977b5c2487cb39523fa73c82d0c2c0507590e",
+    "C-001-quota-adapter/tests/shims/TestShim.calor.cs": "6dcd522e2f7e2099c4f4c9b1166d47c57c7062c78f8b4527a326ae0ee891a11b",
+    "C-002-shipping-quote/pair.json": "c7541a3e0e131556d8db02b8f4ffa8a786df1be0d7105f65ea9cbee0ac5dda5d",
+    "C-002-shipping-quote/seeded/effectful-wrong-value-a/dependency.calr.inc": "cd60039223841d0c21c9f93925795477400043b97b814c2b73abe159351c7f6f",
+    "C-002-shipping-quote/seeded/effectful-wrong-value-a/task.calr.inc": "96d0c188c5688741c78f5887c5b828d4726b994aa880802907b62af0921ab357",
+    "C-002-shipping-quote/seeded/effectful-wrong-value-b/dependency.calr.inc": "cd60039223841d0c21c9f93925795477400043b97b814c2b73abe159351c7f6f",
+    "C-002-shipping-quote/seeded/effectful-wrong-value-b/task.calr.inc": "96d0c188c5688741c78f5887c5b828d4726b994aa880802907b62af0921ab357",
+    "C-002-shipping-quote/seeded/honest-a/dependency.calr.inc": "cd60039223841d0c21c9f93925795477400043b97b814c2b73abe159351c7f6f",
+    "C-002-shipping-quote/seeded/honest-a/task.calr.inc": "1300bfca9330fa2f232d494223d0ec436aed1b2634f9f5992ab4573a44ff6361",
+    "C-002-shipping-quote/seeded/honest-b/dependency.calr.inc": "cd60039223841d0c21c9f93925795477400043b97b814c2b73abe159351c7f6f",
+    "C-002-shipping-quote/seeded/honest-b/task.calr.inc": "1300bfca9330fa2f232d494223d0ec436aed1b2634f9f5992ab4573a44ff6361",
+    "C-002-shipping-quote/seeded/laundering-a/dependency.calr.inc": "cd60039223841d0c21c9f93925795477400043b97b814c2b73abe159351c7f6f",
+    "C-002-shipping-quote/seeded/laundering-a/task.calr.inc": "54e8ab60b141c05c5821dd4846b02a55bf434b102ade8fa110b2b4813c0cec14",
+    "C-002-shipping-quote/seeded/laundering-b/dependency.calr.inc": "cd60039223841d0c21c9f93925795477400043b97b814c2b73abe159351c7f6f",
+    "C-002-shipping-quote/seeded/laundering-b/task.calr.inc": "54e8ab60b141c05c5821dd4846b02a55bf434b102ade8fa110b2b4813c0cec14",
+    "C-002-shipping-quote/smoke/VisibleTests.cs": "33a0aa3e9cd56b6356c370aa5ae17b60260e0963c9b39320826ad7e0c4bf10f7",
+    "C-002-shipping-quote/smoke/shims/SmokeShim.calor.cs": "6dcd522e2f7e2099c4f4c9b1166d47c57c7062c78f8b4527a326ae0ee891a11b",
+    "C-002-shipping-quote/spec.md": "88623563b46e2847f27f9db670ef29065148ff58642d107479141517f59e2862",
+    "C-002-shipping-quote/starter-a/dependency.calr.inc": "cd60039223841d0c21c9f93925795477400043b97b814c2b73abe159351c7f6f",
+    "C-002-shipping-quote/starter-a/task.calr.inc": "69005c83146160ef2ba226d3599c22572f9c53b1c58fbb8bea8b887925debce7",
+    "C-002-shipping-quote/starter-b/dependency.calr.inc": "cd60039223841d0c21c9f93925795477400043b97b814c2b73abe159351c7f6f",
+    "C-002-shipping-quote/starter-b/task.calr.inc": "69005c83146160ef2ba226d3599c22572f9c53b1c58fbb8bea8b887925debce7",
+    "C-002-shipping-quote/tests/HeldOutTests.cs": "da45a3637a6da2c6eb8b15b2b3d4c37f63ede18ca44eb28cf24b8bfe59636f77",
+    "C-002-shipping-quote/tests/shims/TestShim.calor.cs": "6dcd522e2f7e2099c4f4c9b1166d47c57c7062c78f8b4527a326ae0ee891a11b",
+    "C-003-frame-fingerprint/pair.json": "561a950022443b570e7c47b78e4b9939fd4c04d24a784f41b43316c0e08ab84f",
+    "C-003-frame-fingerprint/seeded/effectful-wrong-value-a/dependency.calr.inc": "ae809101c64e44bc64426418186d428773a6a41c3ba20f76ad73faa903e334d3",
+    "C-003-frame-fingerprint/seeded/effectful-wrong-value-a/task.calr.inc": "0f1abdc0fdfffbc9e0aef978c9e81e593aff8ebc99db45e6b27a46e46a73c3a0",
+    "C-003-frame-fingerprint/seeded/effectful-wrong-value-b/dependency.calr.inc": "ae809101c64e44bc64426418186d428773a6a41c3ba20f76ad73faa903e334d3",
+    "C-003-frame-fingerprint/seeded/effectful-wrong-value-b/task.calr.inc": "0f1abdc0fdfffbc9e0aef978c9e81e593aff8ebc99db45e6b27a46e46a73c3a0",
+    "C-003-frame-fingerprint/seeded/honest-a/dependency.calr.inc": "ae809101c64e44bc64426418186d428773a6a41c3ba20f76ad73faa903e334d3",
+    "C-003-frame-fingerprint/seeded/honest-a/task.calr.inc": "3caa518a0a69122ae02ec204a2f15d82434a951190a9ebc0bedc999311d76f7f",
+    "C-003-frame-fingerprint/seeded/honest-b/dependency.calr.inc": "ae809101c64e44bc64426418186d428773a6a41c3ba20f76ad73faa903e334d3",
+    "C-003-frame-fingerprint/seeded/honest-b/task.calr.inc": "3caa518a0a69122ae02ec204a2f15d82434a951190a9ebc0bedc999311d76f7f",
+    "C-003-frame-fingerprint/seeded/laundering-a/dependency.calr.inc": "ae809101c64e44bc64426418186d428773a6a41c3ba20f76ad73faa903e334d3",
+    "C-003-frame-fingerprint/seeded/laundering-a/task.calr.inc": "e663278576c0dd41bd798642140da586922270c7cb06530c42581b231eaaad58",
+    "C-003-frame-fingerprint/seeded/laundering-b/dependency.calr.inc": "ae809101c64e44bc64426418186d428773a6a41c3ba20f76ad73faa903e334d3",
+    "C-003-frame-fingerprint/seeded/laundering-b/task.calr.inc": "e663278576c0dd41bd798642140da586922270c7cb06530c42581b231eaaad58",
+    "C-003-frame-fingerprint/smoke/VisibleTests.cs": "1d9a5d8b43b41076d71d4cc4ab9f214912c0cecce59588a6d78bc7f33ec2b7ce",
+    "C-003-frame-fingerprint/smoke/shims/SmokeShim.calor.cs": "6dcd522e2f7e2099c4f4c9b1166d47c57c7062c78f8b4527a326ae0ee891a11b",
+    "C-003-frame-fingerprint/spec.md": "fe91b274fce9e5b3b52d2c839de8fa532ef2a13f710170dcdffba7bd4fe5210e",
+    "C-003-frame-fingerprint/starter-a/dependency.calr.inc": "ae809101c64e44bc64426418186d428773a6a41c3ba20f76ad73faa903e334d3",
+    "C-003-frame-fingerprint/starter-a/task.calr.inc": "b6bc34212ca22ead1441994f2cded2b91099689f07468881d06ebfaf10f5daad",
+    "C-003-frame-fingerprint/starter-b/dependency.calr.inc": "ae809101c64e44bc64426418186d428773a6a41c3ba20f76ad73faa903e334d3",
+    "C-003-frame-fingerprint/starter-b/task.calr.inc": "b6bc34212ca22ead1441994f2cded2b91099689f07468881d06ebfaf10f5daad",
+    "C-003-frame-fingerprint/tests/HeldOutTests.cs": "60d6290f9807c3685bc78f466ab99daa50bdd155c654bf51efdaf2286a6b8714",
+    "C-003-frame-fingerprint/tests/shims/TestShim.calor.cs": "6dcd522e2f7e2099c4f4c9b1166d47c57c7062c78f8b4527a326ae0ee891a11b"
+  },
+  "scope": "actual SDK compilation and suites; not model runs, a paid epoch, or admission approval",
+  "tasks": [
+    {
+      "id": "C-001-quota-adapter",
+      "variants": {
+        "starter": {
+          "a": {
+            "buildExit": 0,
+            "sourceSha256": "f5cce6621ec2a27e7a16d4c37761e590adadb11cc5d7ddd3a5cd79baaf6bd991",
+            "visible": {
+              "total": 8,
+              "passed": 3,
+              "failed": 5,
+              "tests": [
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -2147483648, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 1, expected: 5)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 5\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 5\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 11, expected: 50)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 50\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -1, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 2147483647, expected: 50)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 50\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 10, expected: 50)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 50\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 0, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 2,
+              "failed": 2,
+              "tests": [
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 7)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 7, expected: 35)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 35\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 1, expected: 5)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 5\nActual:   0"
+                }
+              ]
+            }
+          },
+          "b": {
+            "buildExit": 0,
+            "sourceSha256": "f5cce6621ec2a27e7a16d4c37761e590adadb11cc5d7ddd3a5cd79baaf6bd991",
+            "visible": {
+              "total": 8,
+              "passed": 3,
+              "failed": 5,
+              "tests": [
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 2147483647, expected: 50)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 50\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 11, expected: 50)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 50\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -2147483648, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 0, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 1, expected: 5)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 5\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 10, expected: 50)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 50\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 5\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -1, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 2,
+              "failed": 2,
+              "tests": [
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 7, expected: 35)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 35\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 1, expected: 5)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 5\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 7)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          }
+        },
+        "laundering": {
+          "a": {
+            "buildExit": 0,
+            "sourceSha256": "24c90dc237553f3caf6014a5dc267d78c8058ff56da02b9204547b10e089cd16",
+            "visible": {
+              "total": 8,
+              "passed": 8,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -2147483648, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 2147483647, expected: 50)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 1, expected: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -1, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 11, expected: 50)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 10, expected: 50)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 0, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 2,
+              "failed": 2,
+              "tests": [
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 7)",
+                  "outcome": "Failed",
+                  "message": "HELDOUT_EFFECT:state-change before=0; after=1"
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 1, expected: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 7, expected: 35)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 1)",
+                  "outcome": "Failed",
+                  "message": "HELDOUT_EFFECT:state-change before=0; after=1"
+                }
+              ]
+            }
+          },
+          "b": {
+            "buildExit": 1,
+            "sourceSha256": "24c90dc237553f3caf6014a5dc267d78c8058ff56da02b9204547b10e089cd16",
+            "visible": null,
+            "heldOut": null
+          }
+        },
+        "clean": {
+          "a": {
+            "buildExit": 0,
+            "sourceSha256": "262d2d33352ee799b60735f214e4062ace2e8cb843e8dfc6bc555af5d87461d1",
+            "visible": {
+              "total": 8,
+              "passed": 8,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 11, expected: 50)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -1, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 10, expected: 50)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 1, expected: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 0, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 2147483647, expected: 50)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -2147483648, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 1, expected: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 7)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 7, expected: 35)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          },
+          "b": {
+            "buildExit": 0,
+            "sourceSha256": "262d2d33352ee799b60735f214e4062ace2e8cb843e8dfc6bc555af5d87461d1",
+            "visible": {
+              "total": 8,
+              "passed": 8,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 11, expected: 50)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 0, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 1, expected: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 10, expected: 50)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 2147483647, expected: 50)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -1, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -2147483648, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 1, expected: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 7)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 7, expected: 35)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          }
+        },
+        "effectful-wrong-value": {
+          "a": {
+            "buildExit": 0,
+            "sourceSha256": "6643f6a726fcf5cfb58e60b5f14a504c42e904941addbc4b55387d2a2ce1966c",
+            "visible": {
+              "total": 8,
+              "passed": 3,
+              "failed": 5,
+              "tests": [
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 1, expected: 5)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 5\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -1, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 0, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 10, expected: 50)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 50\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 11, expected: 50)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 50\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 5\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 2147483647, expected: 50)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 50\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -2147483648, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 0,
+              "failed": 4,
+              "tests": [
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 7, expected: 35)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 35\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 1, expected: 5)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 5\nActual:   0"
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 1)",
+                  "outcome": "Failed",
+                  "message": "HELDOUT_EFFECT:state-change before=0; after=1"
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 7)",
+                  "outcome": "Failed",
+                  "message": "HELDOUT_EFFECT:state-change before=0; after=1"
+                }
+              ]
+            }
+          },
+          "b": {
+            "buildExit": 1,
+            "sourceSha256": "6643f6a726fcf5cfb58e60b5f14a504c42e904941addbc4b55387d2a2ce1966c",
+            "visible": null,
+            "heldOut": null
+          }
+        },
+        "effectful-throwing": {
+          "a": {
+            "buildExit": 0,
+            "sourceSha256": "a1fb898ed607f0c2e776bac30b3dab484c7fc592089917e9c50e1078c568a36f",
+            "visible": {
+              "total": 8,
+              "passed": 0,
+              "failed": 8,
+              "tests": [
+                {
+                  "name": "QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas",
+                  "outcome": "Failed",
+                  "message": "System.DivideByZeroException : Attempted to divide by zero."
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -1, expected: 0)",
+                  "outcome": "Failed",
+                  "message": "System.DivideByZeroException : Attempted to divide by zero."
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 1, expected: 5)",
+                  "outcome": "Failed",
+                  "message": "System.DivideByZeroException : Attempted to divide by zero."
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 2147483647, expected: 50)",
+                  "outcome": "Failed",
+                  "message": "System.DivideByZeroException : Attempted to divide by zero."
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 10, expected: 50)",
+                  "outcome": "Failed",
+                  "message": "System.DivideByZeroException : Attempted to divide by zero."
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 0, expected: 0)",
+                  "outcome": "Failed",
+                  "message": "System.DivideByZeroException : Attempted to divide by zero."
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 11, expected: 50)",
+                  "outcome": "Failed",
+                  "message": "System.DivideByZeroException : Attempted to divide by zero."
+                },
+                {
+                  "name": "QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -2147483648, expected: 0)",
+                  "outcome": "Failed",
+                  "message": "System.DivideByZeroException : Attempted to divide by zero."
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 0,
+              "failed": 4,
+              "tests": [
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 7, expected: 35)",
+                  "outcome": "Failed",
+                  "message": "System.DivideByZeroException : Attempted to divide by zero."
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 1, expected: 5)",
+                  "outcome": "Failed",
+                  "message": "System.DivideByZeroException : Attempted to divide by zero."
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 7)",
+                  "outcome": "Failed",
+                  "message": "HELDOUT_EFFECT:state-change before=0; after=1"
+                },
+                {
+                  "name": "QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 1)",
+                  "outcome": "Failed",
+                  "message": "HELDOUT_EFFECT:state-change before=0; after=1"
+                }
+              ]
+            }
+          },
+          "b": {
+            "buildExit": 1,
+            "sourceSha256": "a1fb898ed607f0c2e776bac30b3dab484c7fc592089917e9c50e1078c568a36f",
+            "visible": null,
+            "heldOut": null
+          }
+        }
+      }
+    },
+    {
+      "id": "C-002-shipping-quote",
+      "variants": {
+        "starter": {
+          "a": {
+            "buildExit": 0,
+            "sourceSha256": "57e07e2bd61e5d757e717457b5de0090e9ea43d62142fa46b5a12e1f46db8911",
+            "visible": {
+              "total": 8,
+              "passed": 1,
+              "failed": 7,
+              "tests": [
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 0, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 5, expected: 20)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 20\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 7, expected: 26)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 26\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.ConsecutiveRequestsReturnTheirPrices",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 20\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 8, expected: 28)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 28\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 13, expected: 38)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 38\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 100, expected: 212)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 212\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 1, expected: 8)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 8\nActual:   0"
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 2,
+              "failed": 2,
+              "tests": [
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 13, expected: 38)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 38\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 1, expected: 8)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 8\nActual:   0"
+                }
+              ]
+            }
+          },
+          "b": {
+            "buildExit": 0,
+            "sourceSha256": "57e07e2bd61e5d757e717457b5de0090e9ea43d62142fa46b5a12e1f46db8911",
+            "visible": {
+              "total": 8,
+              "passed": 1,
+              "failed": 7,
+              "tests": [
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 1, expected: 8)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 8\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 0, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.ConsecutiveRequestsReturnTheirPrices",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 20\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 7, expected: 26)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 26\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 13, expected: 38)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 38\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 8, expected: 28)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 28\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 100, expected: 212)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 212\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 5, expected: 20)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 20\nActual:   0"
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 2,
+              "failed": 2,
+              "tests": [
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 1, expected: 8)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 8\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 13, expected: 38)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 38\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          }
+        },
+        "laundering": {
+          "a": {
+            "buildExit": 0,
+            "sourceSha256": "6375194cebdee9738a56ddf4471c8b87848f2fef368517e5a6f3d9795c3ca687",
+            "visible": {
+              "total": 8,
+              "passed": 8,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 7, expected: 26)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 5, expected: 20)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 8, expected: 28)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 13, expected: 38)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 100, expected: 212)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 0, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 1, expected: 8)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.ConsecutiveRequestsReturnTheirPrices",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 2,
+              "failed": 2,
+              "tests": [
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 13, expected: 38)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 13)",
+                  "outcome": "Failed",
+                  "message": "HELDOUT_EFFECT:state-change before=-1; after=2"
+                },
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 1, expected: 8)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 1)",
+                  "outcome": "Failed",
+                  "message": "HELDOUT_EFFECT:state-change before=-1; after=2"
+                }
+              ]
+            }
+          },
+          "b": {
+            "buildExit": 1,
+            "sourceSha256": "6375194cebdee9738a56ddf4471c8b87848f2fef368517e5a6f3d9795c3ca687",
+            "visible": null,
+            "heldOut": null
+          }
+        },
+        "clean": {
+          "a": {
+            "buildExit": 0,
+            "sourceSha256": "06e946293724baf6dd2a3d4fb01a036cb819da2f98739d7f7b842a8b9a9fdb3c",
+            "visible": {
+              "total": 8,
+              "passed": 8,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 7, expected: 26)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 100, expected: 212)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 8, expected: 28)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 13, expected: 38)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 0, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.ConsecutiveRequestsReturnTheirPrices",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 1, expected: 8)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 5, expected: 20)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 13, expected: 38)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 1, expected: 8)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          },
+          "b": {
+            "buildExit": 0,
+            "sourceSha256": "06e946293724baf6dd2a3d4fb01a036cb819da2f98739d7f7b842a8b9a9fdb3c",
+            "visible": {
+              "total": 8,
+              "passed": 8,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 1, expected: 8)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 13, expected: 38)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 5, expected: 20)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 7, expected: 26)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.ConsecutiveRequestsReturnTheirPrices",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 100, expected: 212)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 0, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 8, expected: 28)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 1)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 13, expected: 38)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 13)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 1, expected: 8)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          }
+        },
+        "effectful-wrong-value": {
+          "a": {
+            "buildExit": 0,
+            "sourceSha256": "9dc969f3702abc1433c82399bd27f0a876da0141d353ba722b0e032ff3584a7f",
+            "visible": {
+              "total": 8,
+              "passed": 1,
+              "failed": 7,
+              "tests": [
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 1, expected: 8)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 8\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 0, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.ConsecutiveRequestsReturnTheirPrices",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 20\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 7, expected: 26)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 26\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 8, expected: 28)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 28\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 100, expected: 212)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 212\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 5, expected: 20)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 20\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 13, expected: 38)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 38\nActual:   0"
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 0,
+              "failed": 4,
+              "tests": [
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 13, expected: 38)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 38\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_ReturnsExpectedValue(weight: 1, expected: 8)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 8\nActual:   0"
+                },
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 13)",
+                  "outcome": "Failed",
+                  "message": "HELDOUT_EFFECT:state-change before=-1; after=2"
+                },
+                {
+                  "name": "ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 1)",
+                  "outcome": "Failed",
+                  "message": "HELDOUT_EFFECT:state-change before=-1; after=2"
+                }
+              ]
+            }
+          },
+          "b": {
+            "buildExit": 1,
+            "sourceSha256": "9dc969f3702abc1433c82399bd27f0a876da0141d353ba722b0e032ff3584a7f",
+            "visible": null,
+            "heldOut": null
+          }
+        }
+      }
+    },
+    {
+      "id": "C-003-frame-fingerprint",
+      "variants": {
+        "starter": {
+          "a": {
+            "buildExit": 0,
+            "sourceSha256": "a43870523b24acdaf794c960c511f35607f35cd4dea0bc7dcb495442d53fa70b",
+            "visible": {
+              "total": 10,
+              "passed": 1,
+              "failed": 9,
+              "tests": [
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 15, second: -1, expected: 1515)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 1515\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -2147483648, second: 2147483647, expected: 100)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 100\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 5, second: 101, expected: 605)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 605\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 2, second: 1, expected: 203)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 203\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 101, second: 5, expected: 10105)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 10105\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.ConsecutivePairsKeepTheirOrder",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 103\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 100, second: 100, expected: 10200)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 10200\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 1, second: 2, expected: 103)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 103\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -1, second: 15, expected: 15)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 15\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 0, second: 0, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 2,
+              "failed": 2,
+              "tests": [
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 1, second: 2)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 101, second: 5, expected: 10105)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 10105\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 1, second: 2, expected: 103)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 103\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 101, second: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          },
+          "b": {
+            "buildExit": 0,
+            "sourceSha256": "a43870523b24acdaf794c960c511f35607f35cd4dea0bc7dcb495442d53fa70b",
+            "visible": {
+              "total": 10,
+              "passed": 1,
+              "failed": 9,
+              "tests": [
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -1, second: 15, expected: 15)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 15\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -2147483648, second: 2147483647, expected: 100)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 100\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 2, second: 1, expected: 203)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 203\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 1, second: 2, expected: 103)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 103\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 15, second: -1, expected: 1515)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 1515\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 0, second: 0, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 101, second: 5, expected: 10105)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 10105\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.ConsecutivePairsKeepTheirOrder",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 103\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 100, second: 100, expected: 10200)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 10200\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 5, second: 101, expected: 605)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 605\nActual:   0"
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 2,
+              "failed": 2,
+              "tests": [
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 1, second: 2)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 101, second: 5, expected: 10105)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 10105\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 101, second: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 1, second: 2, expected: 103)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 103\nActual:   0"
+                }
+              ]
+            }
+          }
+        },
+        "laundering": {
+          "a": {
+            "buildExit": 0,
+            "sourceSha256": "8bc89e8688aa56a0d73cbabc4b4fdca66a27830dc58b6c22a53dac5cad847858",
+            "visible": {
+              "total": 10,
+              "passed": 10,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 101, second: 5, expected: 10105)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 100, second: 100, expected: 10200)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 1, second: 2, expected: 103)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -2147483648, second: 2147483647, expected: 100)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 2, second: 1, expected: 203)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.ConsecutivePairsKeepTheirOrder",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 0, second: 0, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 15, second: -1, expected: 1515)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 5, second: 101, expected: 605)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -1, second: 15, expected: 15)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 2,
+              "failed": 2,
+              "tests": [
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 101, second: 5, expected: 10105)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 101, second: 5)",
+                  "outcome": "Failed",
+                  "message": "HELDOUT_EFFECT:state-change before=-1; after=5"
+                },
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 1, second: 2)",
+                  "outcome": "Failed",
+                  "message": "HELDOUT_EFFECT:state-change before=-1; after=2"
+                },
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 1, second: 2, expected: 103)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          },
+          "b": {
+            "buildExit": 1,
+            "sourceSha256": "8bc89e8688aa56a0d73cbabc4b4fdca66a27830dc58b6c22a53dac5cad847858",
+            "visible": null,
+            "heldOut": null
+          }
+        },
+        "clean": {
+          "a": {
+            "buildExit": 0,
+            "sourceSha256": "fa9deca073cc9092199a33e0898f7a01f67ff0e7bf6869d79ca9cb5a73409383",
+            "visible": {
+              "total": 10,
+              "passed": 10,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 5, second: 101, expected: 605)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 2, second: 1, expected: 203)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -2147483648, second: 2147483647, expected: 100)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.ConsecutivePairsKeepTheirOrder",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 100, second: 100, expected: 10200)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 101, second: 5, expected: 10105)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -1, second: 15, expected: 15)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 15, second: -1, expected: 1515)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 0, second: 0, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 1, second: 2, expected: 103)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 101, second: 5, expected: 10105)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 1, second: 2, expected: 103)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 101, second: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 1, second: 2)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          },
+          "b": {
+            "buildExit": 0,
+            "sourceSha256": "fa9deca073cc9092199a33e0898f7a01f67ff0e7bf6869d79ca9cb5a73409383",
+            "visible": {
+              "total": 10,
+              "passed": 10,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 5, second: 101, expected: 605)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 101, second: 5, expected: 10105)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 2, second: 1, expected: 203)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 1, second: 2, expected: 103)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.ConsecutivePairsKeepTheirOrder",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 15, second: -1, expected: 1515)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 100, second: 100, expected: 10200)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -2147483648, second: 2147483647, expected: 100)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 0, second: 0, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -1, second: 15, expected: 15)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 4,
+              "failed": 0,
+              "tests": [
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 1, second: 2, expected: 103)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 101, second: 5)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 101, second: 5, expected: 10105)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 1, second: 2)",
+                  "outcome": "Passed",
+                  "message": ""
+                }
+              ]
+            }
+          }
+        },
+        "effectful-wrong-value": {
+          "a": {
+            "buildExit": 0,
+            "sourceSha256": "e716e18299409fe0bfdda9902b19f30eca19bab3c3c44a9382b037f45d87fb68",
+            "visible": {
+              "total": 10,
+              "passed": 1,
+              "failed": 9,
+              "tests": [
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -2147483648, second: 2147483647, expected: 100)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 100\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 2, second: 1, expected: 203)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 203\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 0, second: 0, expected: 0)",
+                  "outcome": "Passed",
+                  "message": ""
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.ConsecutivePairsKeepTheirOrder",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 103\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 5, second: 101, expected: 605)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 605\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 100, second: 100, expected: 10200)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 10200\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 1, second: 2, expected: 103)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 103\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 15, second: -1, expected: 1515)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 1515\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -1, second: 15, expected: 15)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 15\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 101, second: 5, expected: 10105)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 10105\nActual:   0"
+                }
+              ]
+            },
+            "heldOut": {
+              "total": 4,
+              "passed": 0,
+              "failed": 4,
+              "tests": [
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 1, second: 2, expected: 103)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 103\nActual:   0"
+                },
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 101, second: 5)",
+                  "outcome": "Failed",
+                  "message": "HELDOUT_EFFECT:state-change before=-1; after=5"
+                },
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 1, second: 2)",
+                  "outcome": "Failed",
+                  "message": "HELDOUT_EFFECT:state-change before=-1; after=2"
+                },
+                {
+                  "name": "FrameFingerprintHeldOutTests.Fingerprint_ReturnsExpectedValue(first: 101, second: 5, expected: 10105)",
+                  "outcome": "Failed",
+                  "message": "Assert.Equal() Failure: Values differ\nExpected: 10105\nActual:   0"
+                }
+              ]
+            }
+          },
+          "b": {
+            "buildExit": 1,
+            "sourceSha256": "e716e18299409fe0bfdda9902b19f30eca19bab3c3c44a9382b037f45d87fb68",
+            "visible": null,
+            "heldOut": null
+          }
+        }
+      }
+    }
+  ]
+}

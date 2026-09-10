@@ -1,0 +1,52 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="3757e17e-ea77-402f-8cb7-9e6e5add9a9d" name="@Juans-MacBook-Pro 2026-09-10 02:37:13" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-10T02:37:13.2235130-04:00" queuing="2026-09-10T02:37:13.2235130-04:00" start="2026-09-10T02:37:12.8410230-04:00" finish="2026-09-10T02:37:13.2256010-04:00" />
+  <TestSettings name="default" id="3dfb8ae1-5c4a-4033-a0f3-384dd6385b44">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-10_02_37_13" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="a76bf527-dc93-4771-a80e-781a8c9d616d" testId="3dd9eed7-74d8-6797-7577-2687cc9d7ee7" testName="QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 7)" computerName="Juans-MacBook-Pro" duration="00:00:00.0001829" startTime="2026-09-10T02:37:13.1877960-04:00" endTime="2026-09-10T02:37:13.1877960-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a76bf527-dc93-4771-a80e-781a8c9d616d" />
+    <UnitTestResult executionId="73a86069-cb34-4199-ba22-3aa71aa18d4d" testId="109ecbd3-5ed7-4c17-01dd-bd5df8792607" testName="QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 1, expected: 5)" computerName="Juans-MacBook-Pro" duration="00:00:00.0074938" startTime="2026-09-10T02:37:13.1867310-04:00" endTime="2026-09-10T02:37:13.1867370-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="73a86069-cb34-4199-ba22-3aa71aa18d4d" />
+    <UnitTestResult executionId="ead1fb79-97cd-491a-8126-cd57c87a3cfe" testId="2e1a287b-e8ed-db25-e43a-eb08665f5213" testName="QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 7, expected: 35)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000801" startTime="2026-09-10T02:37:13.1877030-04:00" endTime="2026-09-10T02:37:13.1877030-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ead1fb79-97cd-491a-8126-cd57c87a3cfe" />
+    <UnitTestResult executionId="c3ff1de7-6114-4a77-94c3-e511b9ceb16e" testId="67d7ef7f-3446-c0fd-3a7d-5df0f7eee4c2" testName="QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 1)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000412" startTime="2026-09-10T02:37:13.1878050-04:00" endTime="2026-09-10T02:37:13.1878050-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c3ff1de7-6114-4a77-94c3-e511b9ceb16e" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 7, expected: 35)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-001-quota-adapter/clean/b/heldout/bin/debug/net10.0/heldout.dll" id="2e1a287b-e8ed-db25-e43a-eb08665f5213">
+      <Execution id="ead1fb79-97cd-491a-8126-cd57c87a3cfe" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/clean/b/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterHeldOutTests" name="Preview_ReturnsExpectedValue" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 1)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-001-quota-adapter/clean/b/heldout/bin/debug/net10.0/heldout.dll" id="67d7ef7f-3446-c0fd-3a7d-5df0f7eee4c2">
+      <Execution id="c3ff1de7-6114-4a77-94c3-e511b9ceb16e" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/clean/b/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterHeldOutTests" name="Preview_PreservesRequestCounter" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 7)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-001-quota-adapter/clean/b/heldout/bin/debug/net10.0/heldout.dll" id="3dd9eed7-74d8-6797-7577-2687cc9d7ee7">
+      <Execution id="a76bf527-dc93-4771-a80e-781a8c9d616d" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/clean/b/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterHeldOutTests" name="Preview_PreservesRequestCounter" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterHeldOutTests.Preview_ReturnsExpectedValue(requested: 1, expected: 5)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-001-quota-adapter/clean/b/heldout/bin/debug/net10.0/heldout.dll" id="109ecbd3-5ed7-4c17-01dd-bd5df8792607">
+      <Execution id="73a86069-cb34-4199-ba22-3aa71aa18d4d" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/clean/b/heldout/bin/Debug/net10.0/HeldOut.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterHeldOutTests" name="Preview_ReturnsExpectedValue" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="3dd9eed7-74d8-6797-7577-2687cc9d7ee7" executionId="a76bf527-dc93-4771-a80e-781a8c9d616d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="109ecbd3-5ed7-4c17-01dd-bd5df8792607" executionId="73a86069-cb34-4199-ba22-3aa71aa18d4d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2e1a287b-e8ed-db25-e43a-eb08665f5213" executionId="ead1fb79-97cd-491a-8126-cd57c87a3cfe" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="67d7ef7f-3446-c0fd-3a7d-5df0f7eee4c2" executionId="c3ff1de7-6114-4a77-94c3-e511b9ceb16e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="4" executed="4" passed="4" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 10.0.11)
+[xUnit.net 00:00:00.03]   Discovering: HeldOut
+[xUnit.net 00:00:00.05]   Discovered:  HeldOut
+[xUnit.net 00:00:00.05]   Starting:    HeldOut
+[xUnit.net 00:00:00.07]   Finished:    HeldOut
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

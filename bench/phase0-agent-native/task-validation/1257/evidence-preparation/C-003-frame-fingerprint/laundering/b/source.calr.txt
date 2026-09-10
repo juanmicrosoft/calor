@@ -1,0 +1,26 @@
+§M{m201:FrameFingerprint}
+  §CL{c201:LookupJournal:pub}
+    §FLD{i32:LastKey:pub:stat} INT:-1
+
+  §F{f201:NormalizeValue:pub} (i32:key) -> i32
+    §E{}
+    §IF{if201} (< key INT:0)
+      §R INT:0
+    §IF{if202} (> key INT:100)
+      §R INT:100
+    §R key
+
+  §F{f202:Lookup:pub} (i32:key) -> i32
+    §E{mut}
+    §ASSIGN LookupJournal.LastKey key
+    §R §C{NormalizeValue} §A key §/C
+
+  §CL{c202:FrameCodec:pub}
+    §FLD{Func<i32,i32>:normalize:pri} §E{mut}
+    §CTOR{ctor201:pub} ()
+      §ASSIGN normalize FrameFingerprintModule.Lookup
+    §MT{mt201:Fingerprint:pub} (i32:first, i32:second) -> i32
+      §E{}
+      §B{left:i32} §C{this.normalize} §A first §/C
+      §B{right:i32} §C{this.normalize} §A second §/C
+      §R (+ (* left INT:101) right)

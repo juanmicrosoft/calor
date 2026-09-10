@@ -1,0 +1,18 @@
+{
+  "command": [
+    "dotnet",
+    "test",
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/laundering/a/workspace/smoke/Smoke.csproj",
+    "--nologo",
+    "-v:q",
+    "--logger",
+    "trx;LogFileName=tests.trx",
+    "--logger",
+    "console;verbosity=normal",
+    "--results-directory",
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/laundering/a/workspace/smoke/results"
+  ],
+  "exitCode": 0,
+  "stdout": "Test run for /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/laundering/a/workspace/smoke/bin/Debug/net10.0/Smoke.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 10.0.11)\n[xUnit.net 00:00:00.03]   Discovering: Smoke\n[xUnit.net 00:00:00.05]   Discovered:  Smoke\n[xUnit.net 00:00:00.05]   Starting:    Smoke\n[xUnit.net 00:00:00.07]   Finished:    Smoke\n  Passed ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 8, expected: 28) [7 ms]\n  Passed ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 7, expected: 26) [< 1 ms]\n  Passed ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 0, expected: 0) [< 1 ms]\n  Passed ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 1, expected: 8) [< 1 ms]\n  Passed ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 13, expected: 38) [< 1 ms]\n  Passed ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 100, expected: 212) [< 1 ms]\n  Passed ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 5, expected: 20) [< 1 ms]\n  Passed ShippingQuoteVisibleTests.ConsecutiveRequestsReturnTheirPrices [< 1 ms]\nResults File: /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/laundering/a/workspace/smoke/results/tests.trx\n\nTest Run Successful.\nTotal tests: 8\n     Passed: 8\n Total time: 0.3694 Seconds\n",
+  "stderr": ""
+}

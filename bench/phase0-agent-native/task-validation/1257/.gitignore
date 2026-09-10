@@ -1,0 +1,7 @@
+# These are recorded source snapshots, not live SDK build directories.
+!evidence/**/generated-csharp/obj/
+!evidence/**/generated-csharp/obj/**/
+!evidence/**/generated-csharp/obj/**/*.cs.txt
+!evidence-preparation/**/generated-csharp/obj/
+!evidence-preparation/**/generated-csharp/obj/**/
+!evidence-preparation/**/generated-csharp/obj/**/*.cs.txt

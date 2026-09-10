@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Src">
+      <HintPath>/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-003-frame-fingerprint/starter/a/workspace/src/bin/Debug/net10.0/Src.dll</HintPath>
+    </Reference>
+    <Reference Include="Calor.Runtime" Condition="Exists('/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-003-frame-fingerprint/starter/a/workspace/src/bin/Debug/net10.0/Calor.Runtime.dll')">
+      <HintPath>/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-artifact-freeze/work/C-003-frame-fingerprint/starter/a/workspace/src/bin/Debug/net10.0/Calor.Runtime.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>
