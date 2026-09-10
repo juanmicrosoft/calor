@@ -5,7 +5,7 @@ from fractions import Fraction
 import hashlib
 import importlib.util
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 import sys
 
@@ -118,9 +118,9 @@ def execution_projection(pins, selected, epoch=None):
     require(isinstance(proof, dict) and set(proof) == {"path", "sha256"},
             "guarded execution requires a pinned instrument amendment")
     relative = proof["path"]
-    require(isinstance(relative, str) and relative and not Path(relative).is_absolute()
-            and not Path(relative).drive and not Path(relative).root
-            and ".." not in Path(relative).parts,
+    require(isinstance(relative, str) and relative and all(
+            not path.is_absolute() and not path.drive and not path.root and ".." not in path.parts
+            for path in (PurePosixPath(relative), PureWindowsPath(relative))),
             "guarded instrument amendment requires a relative evidence path")
     require(proof["sha256"] == projection["instrumentAmendment"]["sha256"],
             "guarded execution selects an unregistered instrument amendment")

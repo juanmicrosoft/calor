@@ -2,6 +2,7 @@
 import copy
 import json
 import math
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -483,6 +484,24 @@ class PilotAdjudicationTests(unittest.TestCase):
         self.change_json(evidence, lambda amendment: amendment.update(stage="confirmatory"))
         with self.assertRaisesRegex(ValueError, "archive-local instrument amendment evidence differs"):
             analysis.adjudicate(self.epochs, self.epoch.name)
+
+    def test_guarded_proof_rejects_foreign_platform_roots_even_with_matching_local_files(self):
+        self.guarded_projection()
+        pins = analysis.load(self.epoch / "pins.json")
+        selected = analysis.load(self.epoch / "registration.json")["stages"]["pilot"]
+        for relative in ("C:/foreign.json", r"C:\foreign.json", r"C:relative.json",
+                         r"\rooted.json", r"\\server\share\foreign.json",
+                         r"admission\..\foreign.json"):
+            if os.name != "nt":
+                evidence = self.epoch / relative
+                evidence.parent.mkdir(parents=True, exist_ok=True)
+                evidence.write_bytes((BENCH / analysis.SPENDING_AMENDMENT).read_bytes())
+                self.addCleanup(evidence.unlink)
+            altered = copy.deepcopy(selected)
+            altered["instrumentAmendment"]["path"] = relative
+            with self.subTest(relative=relative), self.assertRaisesRegex(
+                    ValueError, "relative evidence path"):
+                analysis.execution_projection(pins, altered, self.epoch)
 
 
 if __name__ == "__main__":
