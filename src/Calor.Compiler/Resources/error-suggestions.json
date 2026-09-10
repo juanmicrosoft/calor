@@ -47,10 +47,10 @@
       "title": "Character Literal Syntax",
       "matchPatterns": ["Unexpected character '''", "single quote", "char literal", "'0'", "'-'"],
       "matchCodes": ["Calor0112"],
-      "description": "Calor does not support single-quoted character literals. Use character predicates or char-code instead.",
-      "wrongExample": "§IF{if1} (== c '0')   // ERROR: Single quotes not supported",
-      "correctExample": "§IF{if1} (is-digit c)                    // Check if digit\n§IF{if2} (== (char-code c) 45)           // Check if c == '-' (code 45)\n§B{equalChar} (char-from-code 61)        // '=' character (code 61)\n§B{equalChar} (char-at \"=\" 0)             // '=' from string",
-      "explanation": "Use (is-digit c) for digit checks, (char-code c) for numeric comparison, (char-from-code n) for constants, or (char-at \"x\" 0) to extract from a string."
+      "description": "A single-quoted character literal must contain one UTF-16 code unit or a valid C# escape sequence.",
+      "wrongExample": "§B{value:char} 'ab'   // ERROR: Two characters",
+      "correctExample": "§B{digit:char} '0'\n§B{newline:char} '\\n'\n§B{offset:i32} (- c '0')",
+      "explanation": "Use single quotes for char and double quotes for str. Escapes such as '\\n', '\\\\', '\\'', and '\\u0041' represent one character. Empty literals, multiple characters, raw line breaks, and invalid escapes are rejected."
     },
     {
       "id": "array-type-syntax",

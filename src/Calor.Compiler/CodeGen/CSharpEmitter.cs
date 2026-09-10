@@ -7965,6 +7965,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             FloatLiteralNode => "double",
             BoolLiteralNode => "bool",
             StringLiteralNode => "string",
+            CharOperationNode { Operation: CharOp.CharLiteral } => "char",
             ReferenceNode { Name: "null" } => "object",
             _ => null
         };
@@ -8707,13 +8708,17 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(CharOperationNode node)
     {
+        if (node.Operation == CharOp.CharLiteral
+            && node.Arguments is [StringLiteralNode { Value.Length: 1 } literal])
+            return SymbolDisplay.FormatLiteral(literal.Value[0], quote: true);
+
         var args = node.Arguments.Select((argument, index) =>
             index == 0 ? EmitGroupedOperand(argument) : argument.Accept(this)).ToList();
 
         return node.Operation switch
         {
             // Literal
-            CharOp.CharLiteral => EmitCharLiteral(args[0]),
+            CharOp.CharLiteral => throw new NotSupportedException("A char literal requires a single-character string payload."),
 
             // Extraction
             CharOp.CharAt => $"{args[0]}[{args[1]}]",
@@ -8732,33 +8737,6 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             CharOp.ToLowerChar => $"char.ToLower({args[0]})",
 
             _ => throw new NotSupportedException($"Unknown char operation: {node.Operation}")
-        };
-    }
-
-    /// <summary>
-    /// Emits a C# char literal from a string literal argument.
-    /// Input is the emitted C# string (e.g., "\"Y\""), output is a char literal (e.g., "'Y'").
-    /// Handles special characters that need different escaping in char vs string context.
-    /// </summary>
-    private static string EmitCharLiteral(string stringArg)
-    {
-        // Strip surrounding double quotes from the emitted string literal
-        var inner = stringArg;
-        if (inner.StartsWith('"') && inner.EndsWith('"'))
-        {
-            inner = inner[1..^1];
-        }
-
-        // Handle characters that need escaping in a char literal
-        return inner switch
-        {
-            "'" => @"'\''",        // single quote needs escaping in char context
-            "\\\\" => @"'\\'",     // already-escaped backslash stays as-is
-            "\\n" => "'\\n'",      // newline
-            "\\r" => "'\\r'",      // carriage return
-            "\\t" => "'\\t'",      // tab
-            "\\0" => "'\\0'",      // null
-            _ => $"'{inner}'"      // normal character
         };
     }
 

@@ -873,6 +873,13 @@ public sealed class TypeChecker
             FloatLiteralNode => PrimitiveType.Float,
             BoolLiteralNode => PrimitiveType.Bool,
             StringLiteralNode => PrimitiveType.String,
+            CharOperationNode operation => operation.Operation switch
+            {
+                CharOp.IsLetter or CharOp.IsDigit or CharOp.IsWhiteSpace
+                    or CharOp.IsUpper or CharOp.IsLower => PrimitiveType.Bool,
+                CharOp.CharCode => PrimitiveType.Int,
+                _ => PrimitiveType.Char
+            },
             ReferenceNode refNode => InferReferenceType(refNode),
             BinaryOperationNode binOp => InferBinaryOperationType(binOp),
             SomeExpressionNode some => InferSomeType(some),

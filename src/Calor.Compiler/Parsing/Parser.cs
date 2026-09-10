@@ -18,6 +18,7 @@ public sealed class Parser
         {
             [TokenKind.IntLiteral] = static parser => parser.ParseIntLiteral(),
             [TokenKind.StrLiteral] = static parser => parser.ParseStringLiteral(),
+            [TokenKind.CharLiteral] = static parser => parser.ParseCharLiteral(),
             [TokenKind.BoolLiteral] = static parser => parser.ParseBoolLiteral(),
             [TokenKind.FloatLiteral] = static parser => parser.ParseFloatLiteral(),
             [TokenKind.DecimalLiteral] = static parser => parser.ParseDecimalLiteral(),
@@ -4523,6 +4524,13 @@ public sealed class Parser
         return new IntLiteralNode(token.Span, value);
     }
 
+    private ExpressionNode ParseCharLiteral()
+    {
+        var token = Expect(TokenKind.CharLiteral);
+        return new CharOperationNode(token.Span, CharOp.CharLiteral,
+            [new StringLiteralNode(token.Span, ((char)token.Value!).ToString())]);
+    }
+
     private ExpressionNode ParseStringLiteral()
     {
         var token = Expect(TokenKind.StrLiteral);
@@ -5209,7 +5217,7 @@ public sealed class Parser
             return new VariablePatternNode(token.Span, token.Text, token.Span);
         }
 
-        if (Check(TokenKind.IntLiteral) || Check(TokenKind.StrLiteral) ||
+        if (Check(TokenKind.IntLiteral) || Check(TokenKind.StrLiteral) || Check(TokenKind.CharLiteral) ||
             Check(TokenKind.BoolLiteral) || Check(TokenKind.FloatLiteral) ||
             Check(TokenKind.DecimalLiteral))
         {
@@ -12335,7 +12343,7 @@ public sealed class Parser
         if (Current.Kind == TokenKind.Identifier && Peek(1).Kind == TokenKind.Equals)
             return false; // Don't consume property assignments as range operands
         return Current.Kind is TokenKind.IntLiteral or TokenKind.FloatLiteral
-            or TokenKind.DecimalLiteral or TokenKind.StrLiteral
+            or TokenKind.DecimalLiteral or TokenKind.StrLiteral or TokenKind.CharLiteral
             or TokenKind.Identifier or TokenKind.OpenParen or TokenKind.IndexEnd;
     }
 

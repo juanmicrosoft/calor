@@ -702,7 +702,7 @@ public sealed class Lexer
             '∀' => ScanUnicodeQuantifier("forall"),
             '∃' => ScanUnicodeQuantifier("exists"),
             '`' => ScanBacktickIdentifier(),
-            '\'' => ScanCharLiteralOrSkip(),
+            '\'' => ScanCharLiteral(),
             '$' => ScanDollarString(),
             ';' => ScanSkipSemicolon(),
             _ when char.IsLetter(Current) || Current == '_' => ScanIdentifierOrTypedLiteral(),
@@ -2481,27 +2481,32 @@ public sealed class Lexer
     }
 
     /// <summary>
-    /// Handles single-quote character: scans a char literal like 'a' or '\n',
-    /// and returns it as a string literal token. If malformed, reports an error.
+    /// Scans one UTF-16 character using C# escape syntax, without crossing a line.
     /// </summary>
-    private Token ScanCharLiteralOrSkip()
+    private Token ScanCharLiteral()
     {
         Advance(); // consume opening '
-        if (Current == '\\')
+        while (!IsAtEnd && Current is not ('\'' or '\r' or '\n'))
         {
-            Advance(); // consume backslash
-            Advance(); // consume escape char
-        }
-        else if (Current != '\'' && Current != '\0' && Current != '\n')
-        {
-            Advance(); // consume the character
+            if (Current == '\\')
+            {
+                Advance();
+                if (IsAtEnd || Current is '\r' or '\n')
+                    break;
+            }
+            Advance();
         }
         if (Current == '\'')
         {
-            Advance(); // consume closing '
-            return MakeToken(TokenKind.StrLiteral, _source[(_tokenStart + 1)..(_position - 1)]);
+            Advance();
+            var text = _source[_tokenStart.._position];
+            var literal = Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseToken(text);
+            if (!literal.ContainsDiagnostics && literal.Value is char value && literal.Text.Length == text.Length)
+                return MakeToken(TokenKind.CharLiteral, value);
         }
-        // Malformed — recover by continuing
+
+        _diagnostics.ReportError(CurrentSpan(), DiagnosticCode.InvalidCharLiteral,
+            "A character literal must contain exactly one UTF-16 character or a valid escape sequence, enclosed in single quotes.");
         return MakeToken(TokenKind.Error);
     }
 

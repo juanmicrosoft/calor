@@ -799,7 +799,7 @@ public static class FeatureSupport
         {
             Name = "char-literal",
             Support = SupportLevel.Full,
-            Description = "Char literals are converted to Calor's native (char-lit \"x\") form and emit compile-time-constant C# char literals"
+            Description = "Char literals use native single-quoted Calor syntax and emit compile-time-constant C# char literals"
         },
 
         // W1 Slice 3 (#774): escalation feature names — unsupported operator /
@@ -856,9 +856,8 @@ public static class FeatureSupport
         ["char-literal-surrogate"] = new FeatureInfo
         {
             Name = "char-literal-surrogate",
-            Support = SupportLevel.NotSupported,
-            Description = "Lone-surrogate char literals (e.g. '\\uD83D') cannot round-trip through UTF-8 Calor source; the containing member is preserved as §CSHARP interop with the escaped source text intact",
-            Workaround = "Use the integer code unit ((char)0xD83D) or keep the member as §CSHARP interop"
+            Support = SupportLevel.Full,
+            Description = "Lone-surrogate char literals round-trip as escaped UTF-16 code units in single-quoted Calor literals"
         },
         ["generic-delegate"] = new FeatureInfo
         {
