@@ -1,0 +1,88 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="cf249875-6479-41c9-9cbd-be5899531ef4" name="@Juans-MacBook-Pro 2026-09-09 23:22:34" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-09T23:22:34.4878430-04:00" queuing="2026-09-09T23:22:34.4878430-04:00" start="2026-09-09T23:22:34.1958740-04:00" finish="2026-09-09T23:22:34.4960370-04:00" />
+  <TestSettings name="default" id="99dfe0dd-2c0d-4bad-b7c4-8f0da9b1c258">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-09_23_22_34" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="e70846fd-24b0-434f-8830-ab17f17ab4a2" testId="81259e35-c5ab-9a1f-7ede-97ac96416a16" testName="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 100, second: 100, expected: 10200)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000006" startTime="2026-09-09T23:22:34.4641970-04:00" endTime="2026-09-09T23:22:34.4641970-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e70846fd-24b0-434f-8830-ab17f17ab4a2" />
+    <UnitTestResult executionId="79c25039-5b5b-499d-85e6-bbd544a90fed" testId="613fa2ca-b178-cfe0-709e-fe334dad3282" testName="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -1, second: 15, expected: 15)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000005" startTime="2026-09-09T23:22:34.4642090-04:00" endTime="2026-09-09T23:22:34.4642090-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="79c25039-5b5b-499d-85e6-bbd544a90fed" />
+    <UnitTestResult executionId="7918d3aa-f979-404d-ad1e-ba1bda4c6c02" testId="250e50bc-65c4-efac-b4ca-93b12244e4e3" testName="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 5, second: 101, expected: 605)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000007" startTime="2026-09-09T23:22:34.4641730-04:00" endTime="2026-09-09T23:22:34.4641730-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7918d3aa-f979-404d-ad1e-ba1bda4c6c02" />
+    <UnitTestResult executionId="8741c8f4-17f6-461e-9ac0-1931f811b4d1" testId="1cd5ca8c-e4ac-c2f2-5468-dbb3df58597b" testName="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 1, second: 2, expected: 103)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000006" startTime="2026-09-09T23:22:34.4641800-04:00" endTime="2026-09-09T23:22:34.4641800-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8741c8f4-17f6-461e-9ac0-1931f811b4d1" />
+    <UnitTestResult executionId="442ee58b-7921-4f4c-a252-ddab5091dec1" testId="2e430978-d8b0-833e-b27b-8f8800ab49cb" testName="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 101, second: 5, expected: 10105)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000010" startTime="2026-09-09T23:22:34.4641890-04:00" endTime="2026-09-09T23:22:34.4641900-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="442ee58b-7921-4f4c-a252-ddab5091dec1" />
+    <UnitTestResult executionId="2c265d3c-f91a-4da4-b17b-d384a9d18d77" testId="7cdef7c6-b07a-10d3-7682-f244059e054e" testName="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 15, second: -1, expected: 1515)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000016" startTime="2026-09-09T23:22:34.4641630-04:00" endTime="2026-09-09T23:22:34.4641630-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2c265d3c-f91a-4da4-b17b-d384a9d18d77" />
+    <UnitTestResult executionId="c9a38517-2062-435e-912c-c97e08ba612d" testId="a2206547-6611-1e04-47a5-8b7c6a30f6d7" testName="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 0, second: 0, expected: 0)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000996" startTime="2026-09-09T23:22:34.4640480-04:00" endTime="2026-09-09T23:22:34.4640480-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c9a38517-2062-435e-912c-c97e08ba612d" />
+    <UnitTestResult executionId="6c8f7c85-0a40-47bb-9ba5-039e3bb4036c" testId="c5bcd813-48f4-929c-7c04-86ea34e2cc3a" testName="FrameFingerprintVisibleTests.ConsecutivePairsKeepTheirOrder" computerName="Juans-MacBook-Pro" duration="00:00:00.0000409" startTime="2026-09-09T23:22:34.4731700-04:00" endTime="2026-09-09T23:22:34.4731700-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="6c8f7c85-0a40-47bb-9ba5-039e3bb4036c" />
+    <UnitTestResult executionId="a8acd0ef-9f46-4346-acf6-df11e3d4f41e" testId="73406cce-222a-8ccf-6a60-f95cb63faf90" testName="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -2147483648, second: 2147483647, expected: 100)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000022" startTime="2026-09-09T23:22:34.4642030-04:00" endTime="2026-09-09T23:22:34.4642030-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a8acd0ef-9f46-4346-acf6-df11e3d4f41e" />
+    <UnitTestResult executionId="86a78652-6b9b-4de5-80ca-68539ebb2bfe" testId="c5662338-d28c-ba95-0258-9bacfddedff2" testName="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 2, second: 1, expected: 203)" computerName="Juans-MacBook-Pro" duration="00:00:00.0033546" startTime="2026-09-09T23:22:34.4630440-04:00" endTime="2026-09-09T23:22:34.4630510-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="86a78652-6b9b-4de5-80ca-68539ebb2bfe" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 101, second: 5, expected: 10105)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-003-frame-fingerprint/honest/a/visible/bin/debug/net10.0/runtimetests.dll" id="2e430978-d8b0-833e-b27b-8f8800ab49cb">
+      <Execution id="442ee58b-7921-4f4c-a252-ddab5091dec1" />
+      <TestMethod codeBase="&lt;work&gt;/C-003-frame-fingerprint/honest/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="Fingerprint_NormalizesEachKeyBeforeCombining" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 0, second: 0, expected: 0)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-003-frame-fingerprint/honest/a/visible/bin/debug/net10.0/runtimetests.dll" id="a2206547-6611-1e04-47a5-8b7c6a30f6d7">
+      <Execution id="c9a38517-2062-435e-912c-c97e08ba612d" />
+      <TestMethod codeBase="&lt;work&gt;/C-003-frame-fingerprint/honest/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="Fingerprint_NormalizesEachKeyBeforeCombining" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 5, second: 101, expected: 605)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-003-frame-fingerprint/honest/a/visible/bin/debug/net10.0/runtimetests.dll" id="250e50bc-65c4-efac-b4ca-93b12244e4e3">
+      <Execution id="7918d3aa-f979-404d-ad1e-ba1bda4c6c02" />
+      <TestMethod codeBase="&lt;work&gt;/C-003-frame-fingerprint/honest/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="Fingerprint_NormalizesEachKeyBeforeCombining" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 100, second: 100, expected: 10200)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-003-frame-fingerprint/honest/a/visible/bin/debug/net10.0/runtimetests.dll" id="81259e35-c5ab-9a1f-7ede-97ac96416a16">
+      <Execution id="e70846fd-24b0-434f-8830-ab17f17ab4a2" />
+      <TestMethod codeBase="&lt;work&gt;/C-003-frame-fingerprint/honest/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="Fingerprint_NormalizesEachKeyBeforeCombining" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -1, second: 15, expected: 15)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-003-frame-fingerprint/honest/a/visible/bin/debug/net10.0/runtimetests.dll" id="613fa2ca-b178-cfe0-709e-fe334dad3282">
+      <Execution id="79c25039-5b5b-499d-85e6-bbd544a90fed" />
+      <TestMethod codeBase="&lt;work&gt;/C-003-frame-fingerprint/honest/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="Fingerprint_NormalizesEachKeyBeforeCombining" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 1, second: 2, expected: 103)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-003-frame-fingerprint/honest/a/visible/bin/debug/net10.0/runtimetests.dll" id="1cd5ca8c-e4ac-c2f2-5468-dbb3df58597b">
+      <Execution id="8741c8f4-17f6-461e-9ac0-1931f811b4d1" />
+      <TestMethod codeBase="&lt;work&gt;/C-003-frame-fingerprint/honest/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="Fingerprint_NormalizesEachKeyBeforeCombining" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintVisibleTests.ConsecutivePairsKeepTheirOrder" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-003-frame-fingerprint/honest/a/visible/bin/debug/net10.0/runtimetests.dll" id="c5bcd813-48f4-929c-7c04-86ea34e2cc3a">
+      <Execution id="6c8f7c85-0a40-47bb-9ba5-039e3bb4036c" />
+      <TestMethod codeBase="&lt;work&gt;/C-003-frame-fingerprint/honest/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="ConsecutivePairsKeepTheirOrder" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 15, second: -1, expected: 1515)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-003-frame-fingerprint/honest/a/visible/bin/debug/net10.0/runtimetests.dll" id="7cdef7c6-b07a-10d3-7682-f244059e054e">
+      <Execution id="2c265d3c-f91a-4da4-b17b-d384a9d18d77" />
+      <TestMethod codeBase="&lt;work&gt;/C-003-frame-fingerprint/honest/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="Fingerprint_NormalizesEachKeyBeforeCombining" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -2147483648, second: 2147483647, expected: 100)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-003-frame-fingerprint/honest/a/visible/bin/debug/net10.0/runtimetests.dll" id="73406cce-222a-8ccf-6a60-f95cb63faf90">
+      <Execution id="a8acd0ef-9f46-4346-acf6-df11e3d4f41e" />
+      <TestMethod codeBase="&lt;work&gt;/C-003-frame-fingerprint/honest/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="Fingerprint_NormalizesEachKeyBeforeCombining" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 2, second: 1, expected: 203)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-003-frame-fingerprint/honest/a/visible/bin/debug/net10.0/runtimetests.dll" id="c5662338-d28c-ba95-0258-9bacfddedff2">
+      <Execution id="86a78652-6b9b-4de5-80ca-68539ebb2bfe" />
+      <TestMethod codeBase="&lt;work&gt;/C-003-frame-fingerprint/honest/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="Fingerprint_NormalizesEachKeyBeforeCombining" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="81259e35-c5ab-9a1f-7ede-97ac96416a16" executionId="e70846fd-24b0-434f-8830-ab17f17ab4a2" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="613fa2ca-b178-cfe0-709e-fe334dad3282" executionId="79c25039-5b5b-499d-85e6-bbd544a90fed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="250e50bc-65c4-efac-b4ca-93b12244e4e3" executionId="7918d3aa-f979-404d-ad1e-ba1bda4c6c02" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="1cd5ca8c-e4ac-c2f2-5468-dbb3df58597b" executionId="8741c8f4-17f6-461e-9ac0-1931f811b4d1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2e430978-d8b0-833e-b27b-8f8800ab49cb" executionId="442ee58b-7921-4f4c-a252-ddab5091dec1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7cdef7c6-b07a-10d3-7682-f244059e054e" executionId="2c265d3c-f91a-4da4-b17b-d384a9d18d77" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="a2206547-6611-1e04-47a5-8b7c6a30f6d7" executionId="c9a38517-2062-435e-912c-c97e08ba612d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c5bcd813-48f4-929c-7c04-86ea34e2cc3a" executionId="6c8f7c85-0a40-47bb-9ba5-039e3bb4036c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="73406cce-222a-8ccf-6a60-f95cb63faf90" executionId="a8acd0ef-9f46-4346-acf6-df11e3d4f41e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c5662338-d28c-ba95-0258-9bacfddedff2" executionId="86a78652-6b9b-4de5-80ca-68539ebb2bfe" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="10" executed="10" passed="10" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.4.1+b9eacec401 (64-bit .NET 10.0.11)
+[xUnit.net 00:00:00.03]   Discovering: RuntimeTests
+[xUnit.net 00:00:00.05]   Discovered:  RuntimeTests
+[xUnit.net 00:00:00.05]   Starting:    RuntimeTests
+[xUnit.net 00:00:00.07]   Finished:    RuntimeTests
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>
