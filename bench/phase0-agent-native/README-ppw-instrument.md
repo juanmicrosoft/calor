@@ -18,10 +18,15 @@ enter the old analyzer, even with `--dry-run`, or replace the old benefit
 ledger. This is a versioned instrument supersession, not a rewrite of the
 claims in A-1.12. The original registration tests remain intact.
 
-**#1271 is not closed by this change.** Actual new starter git-blob hashes,
-task counts and identities must be recorded in a separately reviewed
-supersession after #1256/#1266/#1257/#1258 freeze the task set. The synthetic
-test fixture's strings and counts are not those pins.
+The actual task/compiler-policy supersession is
+[`registrations/ppw-redesign-task-supersession.json`](registrations/ppw-redesign-task-supersession.json),
+effective on the independently reviewed merge of PR #1360. It follows the
+genuine source/suite freeze (#1364) and R8 discrimination evidence (#1366).
+Its three tasks represent **one** compiler shape: three blind tasks, zero
+warning-vs-error tasks and three leg-B tasks. Six arm starters contribute
+twelve fragment Git blobs. These are actual source pins, not the fabricated
+strings/counts used by unit-test fixtures. This artifact is deliberately not
+an epoch registration or spending authorization.
 
 The #1271 mechanism checks an explicit `supersededPins` table against the
 preserved historical ledger: registration reference, starter freeze commit,
@@ -38,8 +43,10 @@ Each replacement starter slot records `task`, `arm` (`A`/`B`), task-root-relativ
 then sorted `.calr`/`.calr.inc` paths. SHA-256 still covers the entire task inventory;
 git-blob pins provide the separate starter-registration identity. Missing,
 edited, duplicated or mismatched slots fail admission and analysis.
-**No actual replacement table is supplied here.** The only new tables are
-deterministic synthetic test inputs, clearly marked not-a-registration.
+The supersession preserves all twelve historical starter slots and records
+the actual replacement table separately. Its complete 85-file inventory
+also binds the preserved R8 outputs; their old no-separator source hashes
+are not relabeled as observations from the updated assembler.
 
 ## Single epoch and stage
 
@@ -230,7 +237,9 @@ laundering positives, binds their exact source-file SHA-256 values and names
 the same compiler DLL as the stage pins. All controls must parse and preserve
 the same public contract. Generate a certificate only from the genuinely
 selected inputs and product, then include it in the independently reviewed
-supersession:
+supersession. The actual task supersession's certificates use the already-built
+Release DLL from R8 (`8adf683d…`); stage admission must still bind the exact
+product actually used by both arms:
 
 ```bash
 python3 bench/phase0-agent-native/ppw-source-inspection.py \
@@ -244,6 +253,10 @@ or inconsistent inspection evidence fails closed. This does not add an
 effect-forbidding cue to the agent prompt or make changed contracts disappear
 from denominators. Literal-marker, whitespace, changed-contract, wrong-value
 and throwing controls are engineering checks, not agent observations.
+Ordinary calls are attributed by their actual callee span, never by an editable
+module/class ancestor. Inline interpolation uses its physical string-token
+span because nested expression spans are local to the string parser; a string
+crossing an editable/immutable boundary is unscorable rather than guessed.
 
 `registration.json` must include:
 

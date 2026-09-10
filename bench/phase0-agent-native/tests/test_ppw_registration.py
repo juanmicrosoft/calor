@@ -1,4 +1,4 @@
-"""Expanded #1271 regression controls. No replacement registration is made."""
+"""Expanded #1271 controls plus the explicit frozen-task pin supersession."""
 import json
 import os
 from pathlib import Path
@@ -11,6 +11,63 @@ import uuid
 from ppw_redesign_epoch import BENCH, build, instrument, save
 
 registration_helper = instrument.helper("ppw-registration.py")
+
+
+class FrozenTaskSupersessionTests(unittest.TestCase):
+    def setUp(self):
+        self.path = BENCH / "registrations/ppw-redesign-task-supersession.json"
+        self.registration = json.loads(self.path.read_text())
+        self.root = BENCH.parent.parent / self.registration["taskRoot"]
+
+    def test_actual_pins_preserve_history_and_replace_all_five_registration_groups(self):
+        result = registration_helper.check_supersession(self.registration, self.root)
+        self.assertEqual("514f538024df990af86054af25975b756ba42ab1", result["compilerCommit"])
+        self.assertEqual({"tasks": 3, "blind": 3, "warningVsError": 0, "legB": 3}, result["pairCounts"])
+        self.assertEqual(12, result["starterSlots"])
+        self.assertEqual({"A": ["--permissive-effects"], "B": []},
+                         self.registration["replacementPins"]["policies"])
+        self.assertEqual(registration_helper.historical_pins(), self.registration["supersededPins"])
+        self.assertEqual(12, sum(len(value) for value in
+                                 self.registration["supersededPins"]["starterBlobs"].values()))
+        self.assertEqual({"taskCount": 3, "distinctShapes": [7], "distinctShapeCount": 1},
+                         self.registration["shapeInventory"])
+
+    def test_source_suite_and_r8_evidence_remain_bound_to_the_actual_merged_freezes(self):
+        repo = BENCH.parent.parent
+        for key, commit in (
+            ("sourceSuiteFreeze", "92d4517e89623c3450bc635ba1db9fc61c48acee"),
+            ("armDiscrimination", "92b906be25bde814d7a772bae4c8f554c081d46e"),
+        ):
+            evidence = self.registration[key]
+            self.assertEqual(commit, evidence["mergeCommit"])
+            self.assertEqual(evidence["sha256"], instrument.digest(repo / evidence["manifest"]))
+        freeze = json.loads((repo / self.registration["sourceSuiteFreeze"]["manifest"]).read_text())
+        for path, digest in freeze["sourceAndSuiteSha256"].items():
+            self.assertEqual(digest, instrument.digest(self.root / path), path)
+
+    def test_every_actual_fragment_slot_is_a_git_blob_not_a_synthetic_hash(self):
+        slots = self.registration["replacementPins"]["starterBlobs"]
+        self.assertEqual(6, len({(slot["task"], slot["arm"]) for slot in slots}))
+        for slot in slots:
+            actual = subprocess.check_output(
+                ["git", "hash-object", str(self.root / slot["path"])], text=True).strip()
+            self.assertEqual(actual, slot["blobSha"])
+
+    def test_native_control_certificates_and_complete_inventory_validate_offline(self):
+        sha = self.registration["inspectionWitness"]["calorSha256"]
+        self.assertEqual("8adf683d36296f92ddd6bdd414980f4ef3cca9bd16c78826621e866f1e8405d0", sha)
+        self.assertEqual({sha}, {value["compilerSha256"]
+                                for value in self.registration["sourceInspections"].values()})
+        instrument.validate_tasks(self.root, self.registration)
+        self.assertEqual(85, len(self.registration["artifacts"]))
+
+    def test_task_supersession_is_not_an_epoch_or_collection_authorization(self):
+        self.assertFalse(self.registration["collectionAuthorized"])
+        self.assertFalse(self.registration["epochCreated"])
+        self.assertNotIn("stages", self.registration)
+        self.assertNotIn("spendAuthorization", self.registration)
+        with self.assertRaisesRegex(ValueError, "schemaVersion must be 2"):
+            instrument.validate_registration(self.registration, "pilot", "not-an-epoch")
 
 
 class RegistrationTests(unittest.TestCase):

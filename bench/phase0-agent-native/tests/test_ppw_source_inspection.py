@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import unittest
 import uuid
 
@@ -117,6 +118,35 @@ class NativeSourceInspectionTests(unittest.TestCase):
         observed = inspection.observation(report, "final")
         self.assertTrue(observed["parseOk"])
         self.assertNotIn("§C{this.lookup}", observed["calls"])
+
+    def test_interpolation_crossing_fragment_ownership_is_unknown(self):
+        shutil.copyfile(self.task / "starter-a/dependency.calr.inc", self.root / "dependency.calr.inc")
+        (self.root / "task.calr.inc").write_text(
+            self.honest.split("      §R", 1)[0] + '      §B{marker:str} """\n${\n')
+        (self.root / "suffix.calr.inc").write_text(
+            '§C{this.lookup} §A requested §/C}\n"""\n      §R 0\n')
+        pair = dict(self.pair, sourceAssembly={
+            "parts": ["dependency.calr.inc", "task.calr.inc", "suffix.calr.inc"],
+            "editableParts": ["task.calr.inc"]})
+        value = inspection.observation(inspection.inspect(pair, {"final": self.root}, self.compiler), "final")
+        self.assertFalse(value["parseOk"])
+        self.assertEqual([], value["calls"])
+
+    def test_cold_build_cannot_resolve_a_different_calor_from_neighboring_cache(self):
+        poison = inspection.TOOL / "cache" / ("foreign-test-" + uuid.uuid4().hex)
+        poison.mkdir(parents=True)
+        self.addCleanup(shutil.rmtree, poison)
+        (poison / "calor.dll").write_bytes(b"not the pinned compiler")
+        output = self.root / "bin"
+        result = subprocess.run(
+            ["dotnet", "build", str(inspection.TOOL / "PpwSourceInspector.csproj"),
+             "--configuration", "Release", "--output", str(output),
+             "--property:BaseIntermediateOutputPath=" + str(self.root / "obj") + "/",
+             "--property:CalorCompilerDll=" + str(self.compiler), "--verbosity", "quiet"],
+            capture_output=True, text=True, timeout=120,
+            env=dict(os.environ, TMPDIR=str(self.root)))
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertEqual(inspection.sha(self.compiler), inspection.sha(output / "calor.dll"))
 
 
 if __name__ == "__main__":
