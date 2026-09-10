@@ -142,6 +142,15 @@ left active. Dependencies are integrity-protected, **not hidden or sandboxed**:
 they and generated build files remain readable. Whether that exposure meets
 R1 is a separate methods decision, not an engineering approval.
 
+The project also overrides the Calor SDK's on-disk C# fallback: only the
+compiler's authoritative output list and regenerated SDK source files may
+enter C# compilation. Arbitrary `.g.cs` files under `obj/calor` are not trusted.
+Compiler outputs/cache and SDK-generated C# inputs are regenerated before use,
+so editing an existing generated filename does not bypass the source partition.
+This deliberately disables warm Calor output-cache reuse in **both** arms.
+Its timing cost is part of the instrument and must be considered in the
+subsequent methods/sizing review; these checks establish no efficiency result.
+
 The agent prompt names the editable fragments. Changing an immutable part,
 adding another compiled source, or changing assembly/build configuration
 invalidates the attempted run without replacement. Its original fragments,

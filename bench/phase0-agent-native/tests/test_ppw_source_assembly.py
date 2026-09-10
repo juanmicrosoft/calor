@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import unittest
+import xml.etree.ElementTree as ET
 
 import test_ppw_instrument as instrument_tests
 from ppw_redesign_epoch import BENCH, instrument, save
@@ -210,6 +211,27 @@ class SourceAssemblyTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertEqual("this.lookup\nreturn 0\n", (source / assembly.OUTPUT).read_text())
 
+    @unittest.skipUnless(shutil.which("dotnet"), "real MSBuild required")
+    def test_generated_compile_target_rejects_non_authoritative_inputs(self):
+        _, source = self.workspace()
+        project = source / "Src.csproj"
+        xml = ET.parse(project)
+        ET.SubElement(ET.SubElement(xml.getroot(), "ItemGroup"), "Compile", Include="obj/rogue.cs")
+        ET.SubElement(xml.getroot(), "Target", Name="CompileCalorFiles")
+        xml.write(project, encoding="unicode")
+        result = subprocess.run(
+            ["dotnet", "msbuild", str(project), "-t:AddCalorGeneratedFilesToCompile", "-v:q"],
+            env=dict(os.environ, TMPDIR=str(self.root)), capture_output=True, text=True, timeout=60)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("Unregistered C# input", result.stdout + result.stderr)
+
+    def test_sdk_output_reset_cannot_delete_source_or_external_inputs(self):
+        _, source = self.workspace()
+        for path in (source / "task.calr.inc", self.root / "outside.cs"):
+            with self.subTest(path=path), self.assertRaisesRegex(ValueError, "source obj"):
+                assembly.reset_sdk_outputs(source, [str(path)])
+        self.assertTrue((source / "task.calr.inc").exists())
+
     @unittest.skipUnless(shutil.which("dotnet") and
                          (BENCH.parent.parent / "src/Calor.Tasks/bin/Debug/net10.0/Calor.Tasks.dll").exists(),
                          "real built Calor.Tasks Debug product required")
@@ -238,6 +260,16 @@ class SourceAssemblyTests(unittest.TestCase):
         self.assertEqual(dependency + starter, (source / assembly.OUTPUT).read_bytes())
         self.assertTrue((source / "bin/Debug/net10.0/Src.dll").exists())
         self.assertEqual(starter, (source / "task.calr.inc").read_bytes())
+        self.assertEqual(before, capture.policy_snapshot(workspace))
+        extra = source / "obj/calor/Unregistered.g.cs"
+        extra.write_text("#error UNREGISTERED_GENERATED_INPUT\n")
+        generated = list((source / "obj").rglob("*.cs"))
+        self.assertGreaterEqual(len(generated), 4)
+        for path in generated:
+            path.write_text("#error UNREGISTERED_GENERATED_INPUT\n")
+        result = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=180)
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertFalse(extra.exists())
         self.assertEqual(before, capture.policy_snapshot(workspace))
         honest = (fixture / "honest.calr.inc").read_bytes()
         (source / "task.calr.inc").write_bytes(honest)

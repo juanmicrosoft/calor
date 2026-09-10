@@ -7,12 +7,15 @@ import os
 from pathlib import Path
 import re
 import shlex
+import shutil
 import sys
 import uuid
 import xml.etree.ElementTree as ET
 
 MANIFEST = ".ppw-source-assembly.json"
 OUTPUT = "obj/ppw-source/Program.calr"
+SDK_OUTPUTS = ("$(GeneratedGlobalUsingsFile)", "$(GeneratedAssemblyInfoFile)",
+               "$(TargetFrameworkMonikerAssemblyAttributesPath)")
 
 
 def require(condition, message):
@@ -94,6 +97,23 @@ def setup(pair, source):
     command = " ".join(shlex.quote(str(arg)) for arg in
                        (sys.executable, Path(__file__).resolve(), "compose", manifest.resolve()))
     ET.SubElement(target, "Exec", Command=command)
+    reset = ET.SubElement(project.getroot(), "Target", Name="_PpwResetSdkSources",
+                          BeforeTargets="GenerateGlobalUsings;CoreGenerateAssemblyInfo;"
+                                        "GenerateTargetFrameworkMonikerAttribute")
+    command = " ".join(shlex.quote(str(arg)) for arg in
+                       (sys.executable, Path(__file__).resolve(), "reset-sdk", root.resolve()))
+    command += " " + " ".join('"' + path + '"' for path in SDK_OUTPUTS)
+    ET.SubElement(reset, "Exec", Command=command)
+    authoritative = ET.SubElement(project.getroot(), "Target", Name="AddCalorGeneratedFilesToCompile",
+                                  BeforeTargets="CoreCompile", DependsOnTargets="CompileCalorFiles",
+                                  Condition="'@(CalorCompile)' != ''")
+    items = ET.SubElement(authoritative, "ItemGroup")
+    ET.SubElement(items, "_PpwUnexpectedCompile", Include="@(Compile)",
+                  Exclude=";".join(SDK_OUTPUTS) + ";@(CalorGeneratedFiles)")
+    ET.SubElement(authoritative, "Error", Condition="'@(_PpwUnexpectedCompile)' != ''",
+                  Text="Unregistered C# input: @(_PpwUnexpectedCompile)")
+    items = ET.SubElement(authoritative, "ItemGroup")
+    ET.SubElement(items, "Compile", Include="@(CalorGeneratedFiles)")
     project.write(project_path, encoding="unicode")
     manifest.write_text(json.dumps({"sourceAssembly": config, "immutableSha256": immutable},
                                    indent=2) + "\n", encoding="utf-8")
@@ -118,6 +138,10 @@ def compose(manifest):
     output = root / OUTPUT
     for path in (root / "obj", output.parent, output):
         require(not path.is_symlink(), "linked generated output")
+    compiler_output = root / "obj/calor"
+    require(not compiler_output.is_symlink(), "linked compiler output")
+    if compiler_output.exists():
+        shutil.rmtree(compiler_output)
     require(not output.exists() or output.stat().st_nlink == 1, "hard-linked generated output")
     output.parent.mkdir(parents=True, exist_ok=True)
     if not output.exists() or output.read_bytes() != content:
@@ -132,6 +156,23 @@ def compose(manifest):
     return output
 
 
+def reset_sdk_outputs(source, paths):
+    root = Path(source).resolve()
+    require(not (root / "obj").is_symlink(), "linked SDK output directory")
+    for name in paths:
+        if not name:
+            continue
+        path = Path(name)
+        if not path.is_absolute():
+            path = root / path
+        require(path.resolve().is_relative_to(root / "obj") and path.suffix == ".cs",
+                "SDK output must stay inside the source obj directory")
+        require(not any(p.is_symlink() for p in (path, *path.parents) if p != root),
+                "linked SDK generated input")
+        if path.exists():
+            path.unlink()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="operation", required=True)
@@ -140,12 +181,17 @@ def main():
     configure.add_argument("source")
     generate = sub.add_parser("compose")
     generate.add_argument("manifest")
+    reset = sub.add_parser("reset-sdk")
+    reset.add_argument("source")
+    reset.add_argument("paths", nargs="*")
     args = parser.parse_args()
     try:
         if args.operation == "setup":
             setup(json.loads(Path(args.pair).read_text(encoding="utf-8")), args.source)
-        else:
+        elif args.operation == "compose":
             compose(args.manifest)
+        else:
+            reset_sdk_outputs(args.source, args.paths)
         return 0
     except (OSError, ValueError, ET.ParseError) as exc:
         print(str(exc), file=sys.stderr)
