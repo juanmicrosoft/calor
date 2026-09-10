@@ -69,7 +69,8 @@ Moving the product requires a reviewed, hash-verified registration update,
 not an unnoticed fallback to another compiler.
 
 The execution-code anchor is commit
-`58588813cb8c46446b695539b4fbd530ee6eaf51`, which adds the explicit authorization
-guard before these pin files. `harnessArtifacts` pins its actual execution
-files. The #1265 PR retains that commit in history with a merge commit;
+`7fa8df1d630d94e2e3309dffff429de582ff96fc`, which includes the explicit
+authorization guard and exact registered model/client binding before this
+final pin revision. `harnessArtifacts` pins its actual execution files.
+The #1265 PR retains that commit in history with a merge commit;
 squashing it would remove the intended main-history anchor.

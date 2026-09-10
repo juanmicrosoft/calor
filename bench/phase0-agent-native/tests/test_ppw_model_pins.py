@@ -75,6 +75,20 @@ class ProspectiveModelPinsTests(unittest.TestCase):
         for filename, sha in self.pins["harnessArtifacts"].items():
             self.assertEqual(digest(BENCH / filename), sha)
 
+    def test_actual_stage_rejects_model_or_client_drift_and_missing_identity(self):
+        for field in ("modelPin", "agentVersion"):
+            for value in ("different-identity", "", None, True):
+                pins = copy.deepcopy(self.pins)
+                pins[field] = value
+                with self.subTest(field=field, value=value), self.assertRaisesRegex(
+                        ValueError, field + " differs"):
+                    self.instrument.validate_pins(pins, self.registration, "pilot", "w-rows-pilot-001")
+            registration = copy.deepcopy(self.registration)
+            del registration["stages"]["pilot"][field]
+            with self.subTest(field=field, missing=True), self.assertRaisesRegex(
+                    ValueError, field + " differs"):
+                self.instrument.validate_pins(self.pins, registration, "pilot", "w-rows-pilot-001")
+
     def test_missing_authorization_refuses_before_any_product_or_agent_command(self):
         self.assertNotIn("spendAuthorization", self.registration["stages"]["pilot"])
         output = BENCH / ("never-created-pin-admission-" + uuid.uuid4().hex)
