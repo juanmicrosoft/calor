@@ -4,6 +4,7 @@ All files are materialized inside the caller's project-local scratch directory.
 Neither the arbitrary test counts nor the fabricated hashes are scientific pins.
 """
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
 
@@ -11,6 +12,24 @@ BENCH = Path(__file__).resolve().parent.parent
 spec = importlib.util.spec_from_file_location("ppw_instrument", BENCH / "ppw-instrument.py")
 instrument = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(instrument)
+SYNTHETIC_COMPILER_SHA = hashlib.sha256(b"synthetic product, not executable").hexdigest()
+
+
+def synthetic_inspection(pair, directories, compiler_sha=SYNTHETIC_COMPILER_SHA):
+    """Fabricated parser output for synthetic plumbing, not a compiler result."""
+    inspection = instrument.helper("ppw-source-inspection.py")
+    sources, hashes = {}, {}
+    for name, directory in directories.items():
+        requests, hashes[name] = inspection.inputs(pair, Path(directory), name)
+        for request in requests:
+            text = request["text"].encode("utf-16-le")
+            edited = "\n".join(text[a * 2:b * 2].decode("utf-16-le")
+                               for a, b in request["editableRanges"])
+            sources[request["name"]] = {
+                "parseOk": True, "publicApi": {"syntheticFixture": True},
+                "calls": ["§C{this.lookup}"] if "this.lookup" in edited else []}
+    return {"schemaVersion": 1, "compilerSha256": compiler_sha, "inspectorSha256": "e" * 64,
+            "sources": sources, "inputSha256": hashes}
 
 
 def save(path, data):
@@ -28,14 +47,15 @@ def build(root, stage="pilot", epoch_id=None):
     strict = {"enforceEffects": True, "permissiveEffects": False,
               "contractMode": "debug", "z3Required": True}
     pair = {
-        "id": task, "arms": {
+        "id": task, "class": "blind", "legB": True, "arms": {
             "calor-permissive": {"armId": "a", "fixture": "starter-a",
                                 "config": dict(strict, permissiveEffects=True, controlArmKind="permissive")},
             "calor-strict": {"armId": "b", "fixture": "starter-b", "config": strict}},
         "tests": {"path": "tests", "count": 1, "effectObservingTests": ["PreservesState"],
                   "effectFailureSignature": "HELDOUT_EFFECT:state-change"},
         "shapeRealizedIndicator": {"sourceRegex": "this.lookup"},
-        "seeded": {"clean": {"a": "seeded/clean-a", "b": "seeded/clean-b"}},
+        "seeded": {"clean": {"a": "seeded/clean-a", "b": "seeded/clean-b"},
+                   "laundering": {"a": "seeded/laundering-a", "b": "seeded/laundering-b"}},
     }
     save(directory / "pair.json", pair)
     (directory / "spec.md").write_text("SYNTHETIC TEST INPUT — not an empirical task.\n")
@@ -46,7 +66,8 @@ def build(root, stage="pilot", epoch_id=None):
         "using Xunit;\npublic class Tests {\n[Fact]\npublic void PreservesState() { Assert.True(true); }\n}\n")
     for arm in ("a", "b"):
         for subdir, source in (("starter-" + arm, "return 0"),
-                               ("seeded/clean-" + arm, "this.lookup")):
+                               ("seeded/clean-" + arm, "return 1"),
+                               ("seeded/laundering-" + arm, "this.lookup")):
             source_dir = directory / subdir
             source_dir.mkdir(parents=True)
             (source_dir / "Source.calr").write_text(source + "\n")
@@ -61,10 +82,25 @@ def build(root, stage="pilot", epoch_id=None):
         "tasks": [task], "artifacts": artifacts,
     }
     registration["stages"][stage]["epochId"] = epoch_id
+    pins_helper = instrument.helper("ppw-registration.py")
+    registration["supersededPins"] = pins_helper.historical_pins()
+    registration["replacementPins"] = {
+        "compilerCommit": registration["compilerCommit"],
+        "policies": {"A": ["--permissive-effects"], "B": []},
+        "pairCounts": {"tasks": 1, "blind": 1, "warningVsError": 0, "legB": 1},
+        "starterBlobs": [
+            {"task": task, "arm": arm, "path": task + "/starter-" + arm.lower() + "/Source.calr",
+             "blobSha": pins_helper.blob_sha(directory / ("starter-" + arm.lower()) / "Source.calr")}
+            for arm in ("A", "B")
+        ],
+    }
+    inspection = instrument.helper("ppw-source-inspection.py")
+    registration["sourceInspections"] = {
+        task: synthetic_inspection(pair, inspection.control_directories(pair, directory))}
     save(epoch / "registration.json", registration)
     compiler = {"commit": "a" * 40, "release": "v0.18.0",
                 "repoRoot": "/synthetic/product", "calorDll": "/synthetic/product/calor.dll",
-                "calorSha256": "b" * 64, "calorTasksSha256": "c" * 64, "compilerHash": "d" * 64}
+                "calorSha256": SYNTHETIC_COMPILER_SHA, "calorTasksSha256": "c" * 64, "compilerHash": "d" * 64}
     pins = {"schemaVersion": 2, "kind": instrument.KIND, "epochId": epoch_id, "stage": stage,
             "mode": "live", "dataKind": "synthetic", "lifecycle": "collected",
             "compiler": compiler, "arms": instrument.ARMS, "harnessCommit": "e" * 40,
@@ -83,6 +119,8 @@ def build(root, stage="pilot", epoch_id=None):
                                       "modelUsage": {"SYNTHETIC": {"outputTokens": 100}}})
             (path / "final-src").mkdir()
             (path / "final-src" / "Source.calr").write_text("this.lookup\n")
+            save(path / "source-inspection.json", synthetic_inspection(
+                pair, {"baseline": directory / ("starter-" + arm.lower()), "final": path / "final-src"}))
             snapshot = {"policy": {"CalorEnforceEffects": True, "CalorPermissiveEffects": arm == "A"},
                         "configurationSha256": {"src/Src.csproj": ("a" if arm == "A" else "b") * 64}}
             save(path / "policy-before.json", snapshot)

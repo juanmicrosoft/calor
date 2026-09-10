@@ -96,6 +96,7 @@ def validate_registration(registration, stage, epoch_id):
             "registration must pin the exact compiler commit")
     stages = registration.get("stages", {})
     require(isinstance(stages, dict) and stage in stages, "stage not registered: %s" % stage)
+    require(set(stages) <= {"pilot", "confirmatory"}, "unrecognized registered stage role")
     ids = [identifier(item.get("epochId")) for item in stages.values()]
     require(len(ids) == len(set(ids)), "pilot and confirmatory must have separate epoch ids")
     selected = stages[stage]
@@ -107,6 +108,10 @@ def validate_registration(registration, stage, epoch_id):
             "registration needs a nonempty unique task denominator")
     for task in tasks:
         identifier(task)
+    require(isinstance(registration.get("sourceInspections"), dict)
+            and set(registration["sourceInspections"]) == set(tasks)
+            and all(isinstance(value, dict) for value in registration["sourceInspections"].values()),
+            "frozen native source-inspection certificates required for every task")
     artifacts = registration.get("artifacts")
     require(isinstance(artifacts, dict) and artifacts, "frozen task artifact hashes required")
     for path, sha in artifacts.items():
@@ -144,6 +149,9 @@ def validate_pins(pins, registration, stage, epoch_id):
                 "shared compiler needs %s SHA-256" % key)
     require(compiler.get("repoRoot") and compiler.get("calorDll"),
             "shared compiler root and DLL required")
+    require(all(value.get("compilerSha256") == compiler["calorSha256"]
+                for value in registration["sourceInspections"].values()),
+            "source-inspection compiler differs from the shared compiler")
     require(pins.get("dataKind") in ("empirical", "synthetic"), "dataKind must be explicit")
     require(pins.get("mode") == "live", "null-agent plumbing is not an analysable collection")
     require(pins.get("harnessCommit") and pins.get("modelPin") and pins.get("agentVersion"),
@@ -161,6 +169,8 @@ def validate_tasks(root, registration):
     for path, sha in expected.items():
         require(digest(local(root, path)) == sha, "frozen artifact changed: %s" % path)
     capture = helper("harness-capture.py")
+    assembly = helper("ppw-source-assembly.py")
+    inspection = helper("ppw-source-inspection.py")
     for task in registration["tasks"]:
         directory = root / task
         pair = load(directory / "pair.json")
@@ -190,16 +200,31 @@ def validate_tasks(root, registration):
                 "explicit held-out effect-failure signature required (not aggregate failures)")
         indicator = pair.get("shapeRealizedIndicator", {}).get("sourceRegex")
         require(isinstance(indicator, str) and indicator, "shape indicator required")
-        regex = re.compile(indicator)
+        re.compile(indicator)
+        seeded = pair.get("seeded", {})
+        require(isinstance(seeded, dict), "explicit seeded control roles required")
+        _, honest = capture.honest_reference_cells(pair)
+        require(isinstance(honest, dict) and set(honest) == {"a", "b"},
+                "explicit seeded.clean or seeded.honest controls for both arms required")
+        require(isinstance(seeded.get("laundering"), dict) and set(seeded["laundering"]) == {"a", "b"},
+                "explicit seeded.laundering controls for both arms required")
         for arm in ("a", "b"):
-            starter = list((directory / ("starter-" + arm)).glob("*.calr"))
-            clean = local(directory, pair["seeded"]["clean"][arm])
-            clean_sources = list(clean.glob("*.calr"))
-            require(starter and clean_sources, "starter and clean seed sources required")
-            require(not any(regex.search(p.read_text()) for p in starter),
-                    "shape indicator matches its starter")
-            require(any(regex.search(p.read_text()) for p in clean_sources),
-                    "shape indicator misses its clean seed")
+            fixture = directory / ("starter-" + arm)
+            starter = assembly.source_paths(pair, fixture, editable_only=True)
+            clean = local(directory, honest[arm])
+            laundering = local(directory, seeded["laundering"][arm])
+            clean_sources = assembly.source_paths(pair, clean, editable_only=True)
+            laundering_sources = assembly.source_paths(pair, laundering, editable_only=True)
+            if assembly.definition(pair):
+                immutable = assembly.check_fragments(pair, fixture)
+                assembly.check_fragments(pair, clean, immutable)
+                assembly.check_fragments(pair, laundering, immutable)
+            require(starter and clean_sources and laundering_sources,
+                    "starter, honest negative, and laundering positive sources required")
+        certificate = registration.get("sourceInspections", {}).get(task)
+        require(isinstance(certificate, dict), "missing frozen source inspection: " + task)
+        inspection.validate_controls(certificate, pair, directory, certificate.get("compilerSha256"))
+    helper("ppw-registration.py").check_supersession(registration, root)
 
 
 def analyze(epochs_root, epoch_id, stage):
@@ -226,6 +251,8 @@ def analyze(epochs_root, epoch_id, stage):
               for path in (epoch / "runs").rglob("result.json")}
     require(actual == expected, "run inventory differs from registered cells; pooling or missing runs")
     capture = helper("harness-capture.py")
+    assembly = helper("ppw-source-assembly.py")
+    inspection = helper("ppw-source-inspection.py")
     token_usage = helper("token-usage.py")
     cells = []
     for task in pins["suite"]:
@@ -236,7 +263,9 @@ def analyze(epochs_root, epoch_id, stage):
                     "validRuns": 0, "invalidRuns": 0, "censoredRuns": 0,
                     "escapes": 0, "shapeRealized": 0, "didNotBuildAtDeclaredDone": 0,
                     "namedTestFailuresWithoutEffect": [], "outputTokens": [],
-                    "unscorableHeldoutRuns": [], "invalidReasons": [], "optionsHashes": []}
+                    "unscorableHeldoutRuns": [], "invalidReasons": [], "optionsHashes": [],
+                    "changedPublicApiRuns": [], "unscorablePublicApiRuns": [],
+                    "unscorableShapeRuns": []}
             for run in range(1, pins["runsPerArm"] + 1):
                 run_dir = epoch / "runs" / task / definition["label"] / ("run-%d" % run)
                 record = load(run_dir / "result.json")
@@ -290,9 +319,32 @@ def analyze(epochs_root, epoch_id, stage):
                 cell["validRuns"] += 1
                 cell["censoredRuns"] += int(record["censored"])
                 cell["didNotBuildAtDeclaredDone"] += int(not built)
-                sources = list((run_dir / "final-src").rglob("*.calr"))
+                final_source = run_dir / "final-src"
+                if assembly.definition(pair):
+                    frozen_source = epoch / "tasks" / task / ("starter-" + arm.lower())
+                    immutable = assembly.check_fragments(pair, frozen_source)
+                    assembly.check_fragments(pair, final_source, immutable)
+                sources = assembly.source_paths(pair, final_source, editable_only=True)
                 require(sources, "missing final sources for shape indicator")
-                cell["shapeRealized"] += int(any(regex.search(p.read_text()) for p in sources))
+                source_report = load(run_dir / "source-inspection.json")
+                starter = epoch / "tasks" / task / ("starter-" + arm.lower())
+                inspection.validate(source_report, pair, {"baseline": starter, "final": final_source},
+                                    pins["compiler"]["calorSha256"])
+                baseline = inspection.observation(source_report, "baseline")
+                frozen = inspection.observation(registration["sourceInspections"][task],
+                                                "starter-" + arm.lower())
+                require(baseline == frozen, "run baseline differs from frozen source inspection")
+                final = inspection.observation(source_report, "final")
+                api_preserved = None
+                if final["parseOk"]:
+                    api_preserved = final["publicApi"] == baseline["publicApi"]
+                    cell["shapeRealized"] += int(any(regex.search(call) for call in final["calls"]))
+                    if not api_preserved:
+                        cell["changedPublicApiRuns"].append(run)
+                else:
+                    cell["unscorableShapeRuns"].append(run)
+                    if built:
+                        cell["unscorablePublicApiRuns"].append(run)
                 if built:
                     log = run_dir / ".ho_final.txt"
                     require(log.is_file(), "built run missing held-out log")
@@ -308,16 +360,19 @@ def analyze(epochs_root, epoch_id, stage):
                     failed = {name for state, name, _ in outcomes if state == "FAIL"}
                     effect = {name for state, name, text in outcomes
                               if state == "FAIL" and text and signature in text}
-                    cell["escapes"] += int(readable and bool(set(observing) & effect))
-                    if (set(observing) & failed) - effect:
+                    cell["escapes"] += int(readable and api_preserved is True
+                                           and bool(set(observing) & effect))
+                    if failed - (set(observing) & effect):
                         cell["namedTestFailuresWithoutEffect"].append(run)
                 usage = token_usage.compute(token_usage.load_envelope(str(run_dir / "agent.json")))
                 require(usage["source"] != "missing", "missing agent token envelope")
                 cell["outputTokens"].append(usage["output_tokens_corrected"])
             valid = cell["validRuns"]
             cell["escapeRate"] = (round(cell["escapes"] / valid, 4)
-                                  if valid and not cell["unscorableHeldoutRuns"] else None)
-            cell["shapeRealizedRate"] = round(cell["shapeRealized"] / valid, 4) if valid else None
+                                  if valid and not cell["unscorableHeldoutRuns"]
+                                  and not cell["unscorablePublicApiRuns"] else None)
+            cell["shapeRealizedRate"] = (round(cell["shapeRealized"] / valid, 4)
+                                         if valid and not cell["unscorableShapeRuns"] else None)
             cells.append(cell)
     return {
         "schemaVersion": 2, "kind": KIND, "epoch": epoch_id, "stage": stage,
@@ -380,7 +435,9 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
     require(os.environ.get("CLAUDE_MODEL") == selected["modelPin"], "CLAUDE_MODEL differs from registration")
     require(command(["claude", "--version"]) == selected["agentVersion"], "agent version differs from registration")
     shared = product(compiler_root, registration["compilerCommit"])
-    harness_files = ("run-pair.sh", "harness-capture.py", "ppw-instrument.py", "token-usage.py",
+    harness_files = ("run-pair.sh", "harness-capture.py", "ppw-instrument.py", "ppw-registration.py",
+                     "ppw-source-assembly.py",
+                     "token-usage.py", "token-usage.sh", "telemetry-helpers.py", "ppw-pins.schema.json",
                      "templates/calor-arm/CalorArm.csproj.template",
                      "templates/calor-arm/policy-canary.calr.txt")
     harness_hashes = {name: digest(BENCH / name) for name in harness_files}
@@ -459,11 +516,18 @@ def stamp_run(result_path, pins):
     Path(result_path).write_text(json.dumps(result, indent=2) + "\n")
 
 
+class SingleOption(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        if getattr(namespace, self.dest, None) is not None:
+            parser.error("%s must occur exactly once" % option_string)
+        setattr(namespace, self.dest, values)
+
+
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("operation", choices=("run", "analyze"))
-    parser.add_argument("--epoch-id", required=True)
-    parser.add_argument("--stage", choices=("pilot", "confirmatory"), required=True)
+    parser.add_argument("--epoch-id", required=True, action=SingleOption)
+    parser.add_argument("--stage", choices=("pilot", "confirmatory"), required=True, action=SingleOption)
     parser.add_argument("--epochs-root", default=str(BENCH / "epochs"))
     parser.add_argument("--registration")
     parser.add_argument("--tasks-root")
