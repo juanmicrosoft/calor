@@ -180,6 +180,34 @@ Instead of infix `a + b`, Calor uses prefix `(+ a b)`:
 
 ---
 
+## Call expressions
+
+Calls in bindings, returns, and other expressions accept multi-line `§A`
+arguments, just like statement calls. Indent the arguments beneath the
+containing statement and align `§/C` with that statement:
+
+```calor
+§M{m001:CallExpressions}
+  §F{f001:ClampScore:pub} (i32:score) -> i32
+    §E{}
+    §B{value:i32} §C{Math.Clamp}
+      §A[value] score
+      §A[min] 0
+      §A[max] 100
+    §/C
+    §R value
+```
+
+The closer may also follow the last argument. An indented argument list can
+end at a dedent without `§/C`; the dedent does not end the surrounding function
+or loop. For nested calls, indent the inner argument list another level.
+An equally indented `§A` after an elided nested call remains an outer argument.
+
+The shorthand `§C{target} value` accepts only one unmarked argument on the
+same line. Multi-line arguments need `§A`. In the binding above, replacing
+an argument marker with a bare value reports the missing `§A` at that value,
+without blaming the following valid return statement.
+
 ## Using Expressions
 
 ### In Return Statements

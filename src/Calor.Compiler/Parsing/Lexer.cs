@@ -516,7 +516,10 @@ public sealed class Lexer
                                 tok.Span.Start,
                                 0,
                                 tok.Span.Line,
-                                indentStack.Peek() + 1));
+                                indentStack.Peek() + 1))
+                        {
+                            IndentationDepth = indentStack.Count - 1
+                        };
                     }
                     if (indentStack.Peek() != currentIndent)
                     {
@@ -610,7 +613,10 @@ public sealed class Lexer
                             tok.Span.Start,
                             0,
                             tok.Span.Line,
-                            indentStack.Peek() + 1));
+                            indentStack.Peek() + 1))
+                    {
+                        IndentationDepth = indentStack.Count - 1
+                    };
                 }
                 // Phase 3 (indent-aware): always emit one final implicit
                 // Dedent at EOF. This lets the outermost block (typically

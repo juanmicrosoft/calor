@@ -90,9 +90,9 @@ This checks typing and generated C#, not only parsing.
 Use `calor-fragment` only for schemas with placeholders or examples that require
 external declarations. A complete Calor declaration with another language label,
 an unterminated fence, a missing heredoc, or an empty example inventory fails
-with `Calor1330`. The tests also pin the complete-example count and the five
-regression examples: `TryDouble`, `SafeDivide`, `HasNegative`, `DigitValue`, and
-`Offset`. Update the count when deliberately adding or removing examples.
+with `Calor1330`. The tests also pin the complete-example count and the six
+regression examples: `TryDouble`, `SafeDivide`, `HasNegative`, `DigitValue`,
+`Offset`, and `ClampScore`. Update the count when deliberately adding or removing examples.
 The existing CI `self-check docs` step enforces this guard.
 
 ## Meta-notation policy

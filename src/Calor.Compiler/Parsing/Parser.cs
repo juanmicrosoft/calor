@@ -9969,7 +9969,13 @@ public sealed class Parser
     /// </summary>
     private ExpressionNode ParseCallExpression()
     {
+        var startPosition = _position;
         var startToken = Expect(TokenKind.Call);
+        var lineStart = startPosition;
+        while (lineStart > 0 && _tokens[lineStart - 1].Span.Line == startToken.Span.Line
+            && _tokens[lineStart - 1].Kind != TokenKind.Dedent)
+            lineStart--;
+        var lineColumn = _tokens[lineStart].Span.Column;
         // #911 review F6: exactly one header group — a following brace group is a
         // collection-initializer expression, not more header attributes.
         var attrs = ParseAttributes(maxGroups: 1);
@@ -10009,8 +10015,8 @@ public sealed class Parser
                 }
             }
 
-            var exprEndToken = ExpectBlockEnd(TokenKind.EndCall);
-            var exprSpan = startToken.Span.Union(exprEndToken.Span);
+            var exprEndSpan = FinishExpressionCall(startToken, "expression", exprArgs.FirstOrDefault()?.Span);
+            var exprSpan = startToken.Span.Union(exprEndSpan);
             ExpressionNode exprCall = new ExpressionCallNode(exprSpan, targetExpr, exprArgs);
             return ParseTrailingMemberAccess(exprCall);
         }
@@ -10022,21 +10028,24 @@ public sealed class Parser
 
         // Phase 1 (v0.6 call-closer-elision): try implicit-close forms first.
         // Skip the implicit path only when the next token is §A or §/C
-        // (canonical forms still apply). Note: §C is an inline expression,
-        // not an indent-aware block -- Dedent/Eof must NOT terminate the
-        // implicit path (they signal that we're at the call's end and the
-        // zero-arg implicit close should be taken). RFC v0.6 §3.2 / v0.6.1.
+        // (canonical forms still apply). Dedent/Eof must NOT terminate the
+        // implicit path: a zero-argument call owns no argument indentation
+        // and must leave its enclosing block boundary untouched.
         //
-        // CRITICAL (v0.6.1): A §A on a *different* line than §C{target}
-        // belongs to an outer call's argument list (e.g. §BASE / §THIS / §NEW
-        // emit each §A on its own indented line), not to this call. Without
-        // this guard, the standard-form branch would greedily consume the
-        // outer's §A as if it were this call's argument -- silent corruption
-        // when emitter elides §/C by default.
-        bool nextArgIsOnSameLine = Check(TokenKind.Arg)
-                                && Current.Span.Line == startToken.Span.Line;
+        // A same-indent §A following an elided call inside an outer argument
+        // belongs to that outer list. Deeper arguments belong to this call.
+        // Inside parentheses, columns distinguish continuation indentation
+        // because the lexer intentionally suppresses INDENT/DEDENT there.
+        bool ownsNextArgument = Check(TokenKind.Arg) && CallOwnsArgument(startToken, lineColumn);
         bool tryImplicit = !Check(TokenKind.EndCall)
-                        && (!Check(TokenKind.Arg) || !nextArgIsOnSameLine);
+                        && !ownsNextArgument;
+        // A bare value can diagnose a malformed top-level binding/return call.
+        // In headers or nested expressions it may instead start a block body
+        // or be the next Lisp operand, so preserve zero-argument elision there.
+        if (tryImplicit && _expressionDepth == 1
+            && _tokens[lineStart].Kind is TokenKind.Bind or TokenKind.Return
+            && IsExpressionStart() && IsIndentedCallContinuation(startToken, lineColumn))
+            tryImplicit = false;
 
         // Trailing-member-access markers (.member, ?.member) after
         // §C{target} attach to the zero-arg call result. Take the implicit
@@ -10134,11 +10143,13 @@ public sealed class Parser
         }
         else
         {
-            // Standard form: §A args (optional) and explicit §/C.
+            // Explicit §A arguments, closed by §/C or the argument list's dedent.
+            TextSpan? firstArgumentSpan = null;
             while (!IsAtEnd && !IsBlockEnd(TokenKind.EndCall))
             {
-                if (Check(TokenKind.Arg))
+                if (Check(TokenKind.Arg) && CallOwnsArgument(startToken, lineColumn))
                 {
+                    firstArgumentSpan ??= Current.Span;
                     _inOuterCallArgDepth++;
                     try
                     {
@@ -10151,8 +10162,13 @@ public sealed class Parser
                         _inOuterCallArgDepth--;
                     }
                 }
-                else if (IsExpressionStart())
+                else if (IsExpressionStart() && (Current.Span.Line == startToken.Span.Line
+                    || IsIndentedCallContinuation(startToken, lineColumn)))
                 {
+                    firstArgumentSpan ??= Current.Span;
+                    if (Current.Span.Line != startToken.Span.Line)
+                        _diagnostics.ReportError(Current.Span, DiagnosticCode.UnexpectedToken,
+                            $"Multiline argument to call '§C{{{target}}}' must begin with '§A'.");
                     // Legacy: single inline arg followed by explicit §/C.
                     // Preserved for backward compatibility (§C{f} x §/C).
                     arguments.Add(ParseExpression());
@@ -10165,8 +10181,7 @@ public sealed class Parser
                 }
             }
 
-            var endToken = ExpectBlockEnd(TokenKind.EndCall);
-            finalSpan = startToken.Span.Union(endToken.Span);
+            finalSpan = startToken.Span.Union(FinishExpressionCall(startToken, target, firstArgumentSpan));
         }
 
         var typeArguments = ExtractTrailingCallTypeArguments(ref target);
@@ -10186,6 +10201,42 @@ public sealed class Parser
 
         // Handle trailing member access (e.g., §C[Method]§/C.Property)
         return ParseTrailingMemberAccess(expr);
+    }
+
+    private bool IsIndentedCallContinuation(Token startToken, int lineColumn)
+        => Current.Span.Line != startToken.Span.Line
+           && (Current.IndentationDepth > startToken.IndentationDepth
+               || Current.IndentationDepth == startToken.IndentationDepth && Current.Span.Column > lineColumn);
+
+    private bool CallOwnsArgument(Token startToken, int lineColumn)
+        => Current.Span.Line == startToken.Span.Line
+           || IsIndentedCallContinuation(startToken, lineColumn)
+           || !_insideArgContext && Current.IndentationDepth >= startToken.IndentationDepth;
+
+    private TextSpan FinishExpressionCall(Token startToken, string target, TextSpan? firstArgumentSpan)
+    {
+        var lastSpan = _position > 0 ? PreviousToken.Span : startToken.Span;
+        var endedAtDedent = Check(TokenKind.Dedent);
+        ConsumeCallArgumentDedents(startToken);
+        if (Check(TokenKind.EndCall) && Current.IndentationDepth >= startToken.IndentationDepth)
+        {
+            var endSpan = Advance().Span;
+            ConsumeCallArgumentDedents(startToken);
+            return endSpan;
+        }
+        if (!endedAtDedent && !IsAtEnd)
+            _diagnostics.ReportError(firstArgumentSpan ?? Current.Span, DiagnosticCode.ExpectedClosingTag,
+                $"Call '§C{{{target}}}' is missing '§/C' before the next statement or outer argument.");
+        return lastSpan;
+    }
+
+    private void ConsumeCallArgumentDedents(Token startToken)
+    {
+        // A dedent records the depth after popping. Leave the enclosing
+        // function/loop/outer argument boundary for its own parser.
+        while (Check(TokenKind.Dedent) && Current.IndentationDepth > 0
+            && Current.IndentationDepth >= startToken.IndentationDepth)
+            Advance();
     }
 
     private static IReadOnlyList<string>? ExtractTrailingCallTypeArguments(ref string target)
