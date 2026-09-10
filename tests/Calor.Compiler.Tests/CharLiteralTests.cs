@@ -158,6 +158,7 @@ public class CharLiteralTests
     [InlineData("'x'")]
     [InlineData("(char-lit \"x\")")]
     [InlineData("(char-from-code 120)")]
+    [InlineData("(char-code (char-lit \"x\"))")]
     public void CharacterValues_WidenToDecimal(string expression)
     {
         var source = $$"""
@@ -189,6 +190,44 @@ public class CharLiteralTests
             Assert.Equal(10, Convert.ToInt32(Enum.Parse(type, "Newline")));
             Assert.Equal(66, Convert.ToInt32(Enum.Parse(type, "Cast")));
             Assert.Equal(67, Convert.ToInt32(Enum.Parse(type, "Sum")));
+        }
+    }
+
+    [Theory]
+    [InlineData("(char-lit \"c\")")]
+    [InlineData("'c'")]
+    [InlineData("(- 'd' 1)")]
+    public void LoopAttributes_PreserveCharacterBounds(string bound)
+    {
+        var source = $$"""
+            §M{m1:Characters}
+              §F{f1:Probe:pub} () -> i32
+                §E{}
+                §B{~sum:i32} 0
+                §L{for1:i:0:{{bound}}:1}
+                  §ASSIGN sum (+ sum i)
+                §R sum
+            """;
+        foreach (var text in RoundTrip(source))
+            Assert.Equal(4950, Invoke(Compile(text), "CharactersModule", "Probe"));
+    }
+
+    [Fact]
+    public void CSharpAttributeArguments_PreserveCharacterType()
+    {
+        const string source = """
+            §M{m1:Characters}
+              §CL{c1:AttributeCarrier}
+                §MT{mt1:Probe:pub:stat}[@System.ComponentModel.DefaultValue('x')]
+                  §O{char}
+                  §E{}
+                  §R 'x'
+            """;
+        foreach (var text in RoundTrip(source))
+        {
+            var method = Compile(text).GetTypes().Single(t => t.Name == "AttributeCarrier").GetMethod("Probe")!;
+            var attribute = method.GetCustomAttribute<System.ComponentModel.DefaultValueAttribute>()!;
+            Assert.Equal('x', Assert.IsType<char>(attribute.Value));
         }
     }
 

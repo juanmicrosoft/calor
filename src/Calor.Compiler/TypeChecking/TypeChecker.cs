@@ -1578,6 +1578,7 @@ public sealed class TypeChecker
         if (target.Equals(PrimitiveType.Int) && source.Equals(PrimitiveType.Char)) return true;
         if (target.Equals(PrimitiveType.Float) && source.Equals(PrimitiveType.Char)) return true;
         if (target.Equals(PrimitiveType.Decimal) && source.Equals(PrimitiveType.Char)) return true;
+        if (target.Equals(PrimitiveType.Decimal) && source.Equals(PrimitiveType.Int)) return true;
         // Refined type is a subtype of its base type (erasure)
         if (source is RefinedType refinedSource && IsAssignable(target, refinedSource.BaseType)) return true;
         return false;

@@ -5448,7 +5448,7 @@ public sealed class Parser
     /// </summary>
     private ExpressionNode ParseExpressionFromAttributeString(string attrStr, TextSpan span)
     {
-        if (attrStr.StartsWith("("))
+        if (attrStr.StartsWith("(") || attrStr.StartsWith("'"))
         {
             // S-expression: create a temporary lexer/parser to parse it
             var tempLexer = new Lexer(attrStr, _diagnostics);
@@ -6504,7 +6504,7 @@ public sealed class Parser
         {
             sb.Append(Advance().Value as string ?? "");
         }
-        else if (Check(TokenKind.IntLiteral))
+        else if (Check(TokenKind.IntLiteral) || Check(TokenKind.CharLiteral))
         {
             var token = Advance();
             sb.Append(token.Text);
@@ -6599,9 +6599,9 @@ public sealed class Parser
                 sb.Append("<<");
                 Advance();
             }
-            else if (Check(TokenKind.IntLiteral))
+            else if (Check(TokenKind.IntLiteral) || Check(TokenKind.CharLiteral))
             {
-                // Add space before integers if there's content before them (to separate from identifiers)
+                // Separate literal tokens from preceding identifiers.
                 if (sb.Length > 0 && !char.IsWhiteSpace(sb[sb.Length - 1]) && sb[sb.Length - 1] != '(')
                     sb.Append(' ');
                 sb.Append(Advance().Text);
@@ -7028,6 +7028,10 @@ public sealed class Parser
     /// </summary>
     private object ParseCSharpAttributePrimaryValue()
     {
+        if (Check(TokenKind.CharLiteral))
+        {
+            return (char)Advance().Value!;
+        }
         if (Check(TokenKind.StrLiteral))
         {
             return Advance().Value as string ?? "";
