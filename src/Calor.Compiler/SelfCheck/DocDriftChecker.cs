@@ -195,7 +195,7 @@ public static class DocDriftChecker
         }
         if (inputs.AgentTaskReferenceDoc is { } agentReference)
         {
-            diagnostics.AddRange(AgentTaskReferenceChecker.Check(agentReference));
+            diagnostics.AddRange(ExemplarCompileChecker.CheckAgentTaskReference(agentReference));
         }
 
         return diagnostics;
@@ -232,7 +232,7 @@ public static class DocDriftChecker
         // Exemplar sheets are load-bearing agent infrastructure (E1a: agents
         // copy their lines verbatim) and get full drift treatment.
         var exemplarDoc = LoadDoc(root, Path.Combine("src", "Calor.Compiler", "Resources", "agent-syntax-exemplar.md"), loadErrors);
-        var agentReferenceDoc = LoadDoc(root, AgentTaskReferenceChecker.RelativePath, loadErrors);
+        var agentReferenceDoc = LoadDoc(root, ExemplarCompileChecker.AgentTaskReferencePath, loadErrors);
 
         // The scanned set for the keyword and diagnostic-code checks:
         // CLAUDE.md + .github/copilot-instructions.md + every docs/syntax-reference/*.md
