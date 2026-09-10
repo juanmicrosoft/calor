@@ -76,7 +76,13 @@ comes before a task collection. Its 2026-09-09 acceptance rules require an
 executed example satisfying R1, R4, R5 and R8 for a buildable exit. A negative
 exit needs at least five attempted candidates across at least three shapes,
 with rejection reasons; an inconclusive search is not a negative verdict.
-These are gate rules, not a finding that either exit has been achieved.
+
+**Local buildability passed on 2026-09-10.** The
+[reviewed gate closure](https://github.com/juanmicrosoft/calor/pull/1348)
+records Exit A: a buildable local example under the frozen v0.18 release
+criteria. This deterministic engineering check is not an agent observation.
+The replacement task set and collection prerequisites remain incomplete;
+no redesigned agent collection or benefit result exists.
 
 The [pre-collection requirements, §7](https://github.com/juanmicrosoft/calor/blob/16880d006db760d7b47d829fd4282b033c3158a0/docs/plans/2026-09-05-ppw-rows-fixture-redesign.md#7-what-must-exist-before-collection)
 require checked tasks and frozen visible/held-out suites. The separate
