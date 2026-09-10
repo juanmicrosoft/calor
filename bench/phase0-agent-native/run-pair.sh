@@ -957,16 +957,24 @@ case "\${1:-}" in
     # Inputs are COPIES under .envelope-src/ — compiling in place would drop
     # .g.cs next to the agent's sources and flip the next src-tree hash.
     # Cached per src state: re-run only when the tree changed.
-    if [[ "\$arm" == "calor" && -n "$CALOR_CLI_DLL" ]] && command -v python3 >/dev/null 2>&1; then
+    if [[ ( "\$arm" == "calor" || "$REDESIGNED_POLICY" == "1" ) && -n "$CALOR_CLI_DLL" ]] && command -v python3 >/dev/null 2>&1; then
       if [[ "\$edited" == "true" || ! -s "$ws_out/.envelope-meta.json" ]]; then
         rm -rf "$ws_out/.envelope-src"; mkdir -p "$ws_out/.envelope-src"
         inputs=()
-        while IFS= read -r rel; do
-          mkdir -p "$ws_out/.envelope-src/\$(dirname "\$rel")"
-          cp "$ws/src/\$rel" "$ws_out/.envelope-src/\$rel"
-          inputs+=(--input "$ws_out/.envelope-src/\$rel")
-        done < <(cd "$ws/src" && find . -name '*.calr' -not -path '*/obj/*' -not -path '*/bin/*' | sed 's|^\\./||')
+        if [[ "$SOURCE_ASSEMBLY_ENABLED" == "1" ]]; then
+          cp "$ws/src/obj/ppw-source/Program.calr" "$ws_out/.envelope-src/Program.calr"
+          inputs+=(--input "$ws_out/.envelope-src/Program.calr")
+        else
+          while IFS= read -r rel; do
+            mkdir -p "$ws_out/.envelope-src/\$(dirname "\$rel")"
+            cp "$ws/src/\$rel" "$ws_out/.envelope-src/\$rel"
+            inputs+=(--input "$ws_out/.envelope-src/\$rel")
+          done < <(cd "$ws/src" && find . -name '*.calr' -not -path '*/obj/*' -not -path '*/bin/*' | sed 's|^\\./||')
+        fi
         if [[ \${#inputs[@]} -gt 0 ]]; then
+          if [[ "$REDESIGNED_POLICY" == "1" && "$PERMISSIVE_EFFECTS" == "true" ]]; then
+            inputs+=(--permissive-effects)
+          fi
           # Annex A-1.3 instrumentation item 2: the Guarantees-probe v0.10 arm
           # adds --verify so journal diagnostics carry Calor0711/0712 events
           # (M-G3 build-proof channel). Off unless the arm config sets it.
@@ -1067,7 +1075,7 @@ run_agent() {
     fi
     prompt="You are working in $ws/src. Read $ws/spec.md and complete the task it describes — implementing missing operations and/or modifying existing behavior as specified — in the existing source files, following the conventions already present. The iteration budget is $ITERATION_BUDGET build/test cycles. Build with 'dotnet build' from $ws/src to check your work. $test_rule Stop when the spec is fully satisfied and the project builds cleanly (the starter already builds, so a clean build alone does not mean you are done)."
     if [[ $SOURCE_ASSEMBLY_ENABLED -eq 1 ]]; then
-        prompt+=$'\n\n'"Edit only these source fragments: $(jq -r '.sourceAssembly.editableParts | join(", ")' "$PAIR_DIR/pair.json"). The other fragments are immutable dependencies. The build assembles Program.calr under obj/; do not edit or copy generated source into the editable fragments, and do not add other compiled sources."
+        prompt+=$'\n\n'"Edit only these source fragments: $(jq -r '.sourceAssembly.editableParts | join(", ")' "$ws/src/.ppw-source-assembly.json"). The other fragments are immutable dependencies. The build assembles Program.calr under obj/; do not edit or copy generated source into the editable fragments, and do not add other compiled sources."
     fi
     if [[ -n "$EXEMPLAR_FILE" ]]; then
         prompt+=$'\n\n'"$(cat "$EXEMPLAR_FILE")"
@@ -1477,6 +1485,10 @@ if [[ $CANARY_ONLY -eq 1 ]]; then
     exit 0
 fi
 
+if [[ $REDESIGNED_POLICY -eq 1 ]]; then
+    python3 "$SCRIPT_DIR/ppw-source-inspection.py" --compiler "$CALOR_CLI_DLL" --prepare >/dev/null
+fi
+
 for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
     WS_OUT="$OUT_DIR/$PAIR_ID/$ARM_LABEL/run-$run"
     mkdir -p "$WS_OUT"
@@ -1536,6 +1548,14 @@ for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
             break
         fi
 
+        if [[ $REDESIGNED_POLICY -eq 1 ]]; then
+            if ! python3 "$SCRIPT_DIR/ppw-source-inspection.py" \
+                --compiler "$CALOR_CLI_DLL" --pair "$PAIR_DIR/pair.json" \
+                --baseline "$PAIR_DIR/$FIXTURE_DIR" --final "$WS_OUT/final-src" \
+                > "$WS_OUT/source-inspection.json" 2> "$WS_OUT/source-inspection.err"; then
+                echo "Source inspection failed; preserving the attempt for fail-closed analysis." >&2
+            fi
+        fi
         extract_metrics "$WS" "$WS_OUT" "$run"
         rm -rf "$WS"
         break

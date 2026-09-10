@@ -1,0 +1,123 @@
+"""Native parser controls; local observations are not agent measurements."""
+import json
+import os
+from pathlib import Path
+import shutil
+import unittest
+import uuid
+
+from ppw_redesign_epoch import BENCH, instrument
+
+inspection = instrument.helper("ppw-source-inspection.py")
+
+
+class NativeSourceInspectionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.compiler = Path(os.environ.get(
+            "PPW_INSPECTION_TEST_COMPILER",
+            str(BENCH.parent.parent / "src/Calor.Compiler/bin/Debug/net10.0/calor.dll")))
+        if not shutil.which("dotnet") or not cls.compiler.is_file():
+            raise unittest.SkipTest("a built compiler and .NET are required for native AST controls")
+
+    def setUp(self):
+        self.root = BENCH / "tests" / (".instrument-test-" + uuid.uuid4().hex)
+        self.root.mkdir()
+        self.addCleanup(shutil.rmtree, self.root)
+        self.task = BENCH / "task-candidates/1256/C-001-quota-adapter"
+        self.pair = json.loads((self.task / "pair.json").read_text())
+        self.honest = (self.task / "seeded/honest-a/task.calr.inc").read_text()
+        self.positive = (self.task / "seeded/laundering-a/task.calr.inc").read_text()
+
+    def report(self, variants):
+        directories = {}
+        for name, text in dict(baseline=self.honest, **variants).items():
+            directory = self.root / name
+            directory.mkdir()
+            shutil.copyfile(self.task / "starter-a/dependency.calr.inc", directory / "dependency.calr.inc")
+            (directory / "task.calr.inc").write_text(text)
+            directories[name] = directory
+        report = inspection.inspect(self.pair, directories, self.compiler)
+        inspection.validate(report, self.pair, directories, inspection.sha(self.compiler))
+        return {name: inspection.observation(report, name) for name in directories}
+
+    def test_literal_text_is_not_a_call_but_legal_whitespace_and_interpolation_are(self):
+        snippets = {
+            "line-comment": "      // §C{this.lookup}\n",
+            "string": '      §B{note:str} STR:"§C{this.lookup}"\n',
+            "escaped-quote": '      §B{note:str} STR:"say \\" §C{this.lookup}"\n',
+            "multiline": '      §B{note:str} """\n§C{this.lookup}\n"""\n',
+            "escaped-interpolation": '      §B{note:str} STR:"\\${§C{this.lookup}}"\n',
+        }
+        variants = {name: self.honest.replace("      §R", snippet + "      §R")
+                    for name, snippet in snippets.items()}
+        variants["whitespace"] = self.positive.replace("§C{this.lookup}", "§C{ this.lookup }")
+        variants["interpolation"] = self.honest.replace(
+            "      §R", '      §B{note:str} STR:"${§C{this.lookup} §A requested §/C}"\n      §R')
+        observed = self.report(variants)
+        for name, value in observed.items():
+            with self.subTest(name=name):
+                self.assertTrue(value["parseOk"], value)
+                self.assertEqual(observed["baseline"]["publicApi"], value["publicApi"])
+                self.assertEqual(name in ("whitespace", "interpolation"),
+                                 "§C{this.lookup}" in value["calls"])
+
+    def test_public_effect_rows_and_signatures_are_preserved_without_banning_private_helpers(self):
+        variants = {
+            "widened": self.honest.replace("§E{}", "§E{mut}").replace("§C{Calculate}", "§C{Lookup}"),
+            "removed-row": self.honest.replace("      §E{}\n", ""),
+            "visibility": self.honest.replace(":pub}", ":pri}"),
+            "parameter": self.honest.replace("requested", "count"),
+            "return": self.honest.replace("-> i32", "-> i64"),
+            "public-helper": self.honest + "    §MT{extra:Helper:pub} () -> i32\n      §E{}\n      §R 0\n",
+            "private-helper": self.honest + "    §MT{extra:Helper:pri} () -> i32\n      §E{}\n      §R 0\n",
+            "whitespace": self.honest.replace("§MT{mt001:Preview:pub}", "§MT{ mt001 : Preview : pub }"),
+            "new-id": self.honest.replace("mt001", "differentId"),
+        }
+        observed = self.report(variants)
+        for name, value in observed.items():
+            with self.subTest(name=name):
+                self.assertTrue(value["parseOk"], value)
+                expected = name in ("baseline", "private-helper", "whitespace", "new-id")
+                self.assertEqual(expected, value["publicApi"] == observed["baseline"]["publicApi"])
+
+    def test_unparseable_source_is_unknown_not_a_negative_observation(self):
+        values = self.report({
+            "broken": '    §MT{bad:Broken:pub} () -> i32\n      §R "',
+            "unsupported-block-comment": self.honest.replace(
+                "      §R", "      /* §C{this.lookup} */\n      §R"),
+        })
+        for name in ("broken", "unsupported-block-comment"):
+            self.assertFalse(values[name]["parseOk"])
+            self.assertIsNone(values[name]["publicApi"])
+            self.assertEqual([], values[name]["calls"])
+
+    def test_control_certificate_binds_raw_source_and_exact_compiler(self):
+        directories = inspection.control_directories(self.pair, self.task)
+        report = inspection.inspect(self.pair, directories, self.compiler)
+        inspection.validate_controls(report, self.pair, self.task, inspection.sha(self.compiler))
+        with self.assertRaisesRegex(ValueError, "different compiler"):
+            inspection.validate_controls(report, self.pair, self.task, "f" * 64)
+        report["inputSha256"]["honest-a"]["task.calr.inc"] = "f" * 64
+        with self.assertRaisesRegex(ValueError, "input hashes"):
+            inspection.validate_controls(report, self.pair, self.task, inspection.sha(self.compiler))
+
+    def test_editable_module_header_does_not_own_calls_in_an_immutable_descendant(self):
+        dependency = (self.task / "starter-a/dependency.calr.inc").read_text()
+        header, remainder = dependency.split("\n", 1)
+        (self.root / "header.calr.inc").write_text(header + "\n")
+        (self.root / "dependency.calr.inc").write_text(
+            remainder + "    §MT{hidden:Hidden:pri} (i32:x) -> i32\n"
+            "      §E{}\n      §R §C{this.lookup} §A x §/C\n")
+        (self.root / "task.calr.inc").write_text(self.honest)
+        pair = dict(self.pair, sourceAssembly={
+            "parts": ["header.calr.inc", "dependency.calr.inc", "task.calr.inc"],
+            "editableParts": ["header.calr.inc", "task.calr.inc"]})
+        report = inspection.inspect(pair, {"final": self.root}, self.compiler)
+        observed = inspection.observation(report, "final")
+        self.assertTrue(observed["parseOk"])
+        self.assertNotIn("§C{this.lookup}", observed["calls"])
+
+
+if __name__ == "__main__":
+    unittest.main()

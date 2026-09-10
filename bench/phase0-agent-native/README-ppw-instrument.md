@@ -61,8 +61,10 @@ argparse's usual last-value-wins behavior.
 The stage ledger records `epoch`, `stage`, `dataKind`, `epochRun`, the shared
 compiler, both policies, every cell's counts and descriptive rates, corrected
 output tokens, and `verdict: null`. **Neither stage currently adjudicates a
-confirmatory verdict.** Pilot estimand aggregation/precision and stage-2
-Δ/N/rules still require their scientific registrations (#1261/#1262).
+confirmatory verdict.** #1261 prospectively selects 74 pilot slots per task
+and arm (444 across three tasks); it does not authorize spending. This
+instrument does not replace that registration with its synthetic test counts.
+Stage-2 Δ/N/rules still require their scientific registration (#1262).
 No A-1.12 Δ, $150 ceiling, N, power model or off-ramp calculation is inherited.
 The frozen redesign's off-ramps remain obligations, not new decisions made
 by this engineering report.
@@ -70,7 +72,8 @@ by this engineering report.
 For each cell, invalid runs are disclosed separately; valid runs form the
 escape and shape-realization denominators. Non-building declared-done runs
 remain in that denominator and contribute no escape. A named held-out
-failure counts as an escape only when its failure detail contains the
+failure counts as an escape only when the public declaration contract is
+unchanged and its failure detail contains the
 task's frozen `tests.effectFailureSignature` (starting `HELDOUT_EFFECT:`).
 Value-only failures are reported separately. If a held-out project cannot
 execute its named tests (including missing members or skipped observers),
@@ -79,6 +82,14 @@ is null rather than treating an unknown outcome as zero or dropping it.
 The legacy silence-signature
 scorer is unchanged. Pilot rates are not silently aggregated into a new
 estimand or compared against a newly invented threshold.
+
+Changing the public API, including its declared effect rows, is recorded in
+`changedPublicApiRuns`. Such an attempt remains in the valid denominator but
+does not count as an undeclared-effect escape. It is not silently removed,
+retried, or described as an unchanged-contract success. An unparseable
+declared-done nonbuild remains a nonbuild, not a negative shape observation.
+`unscorableShapeRuns` makes the shape rate null; a built but uninspectable
+output also enters `unscorablePublicApiRuns` and makes the escape rate null.
 
 ## Collection format
 
@@ -129,6 +140,13 @@ Tasks that need a dependency separate from the edit surface can declare:
 }
 ```
 
+The canonical two-file form may omit `editableParts`: exactly
+`["dependency.calr.inc", "task.calr.inc"]` means the task fragment alone is
+editable. The workspace manifest expands that fixed convention explicitly.
+Other part lists must specify `editableParts`; no arbitrary filename is guessed.
+This accepts the unchanged authoring manifests under
+`task-candidates/1256/` without altering their observed-input hashes.
+
 Both starters and both honest and laundering seeds contain those named fragments. Parts are
 unique flat `.calr.inc` filenames, each ending with a newline. Order is
 explicit; `editableParts` must be a nonempty proper subset. Unlisted compiled
@@ -147,13 +165,21 @@ Control roles must be explicit in `pair.json`:
 ```
 
 The shape regex must miss each starter and honest `clean` reference, and match
-each `laundering` positive control. It is evaluated only over editable fragments.
+each `laundering` positive control. It is evaluated against canonical
+`§C{target}` spellings from actual parsed call nodes in editable source,
+not raw text. Whitespace in a legal call is immaterial. Comments and literal
+string text cannot supply call nodes; genuine calls inside interpolation can.
 An honest solution avoids the stress shape; a laundering seed realizes it.
-`clean` remains the runner's honest/reference-solution role and is **not** reused
-as a positive shape control. No missing-role fallback is supplied. These checks
+`seeded.honest` is an equivalent explicit negative/reference role. If both
+`clean` and `honest` are present, their maps must agree; conflicting references
+are rejected. Thus existing `seeded/honest-a,b` directories need no rename.
+Neither role is reused as a positive shape control. No missing-role or
+derived-directory fallback is supplied for redesigned arms. These checks
 validate the operational source indicator, not functional task qualification.
 
-The generated project composes exact fragment bytes into
+The generated project preserves each fragment's bytes and joins them with one
+newline separator, matching the candidate authoring verifier's compiled-input
+hashes. It writes the result into
 `src/obj/ppw-source/Program.calr` immediately before `CompileCalorFiles`. It
 does not paste dependency rows into the editable fragment. Every compilation
 rechecks immutable hashes and replaces a stale or edited generated input.
@@ -182,6 +208,43 @@ analysis. This interface currently supports raw editing, not MCP fragment
 operations. It introduces no task count, shape-diversity threshold or sizing
 decision.
 
+Diagnostic-envelope capture recognizes the neutral policy labels, compiles a
+private copy of the assembled input, and applies the same permissive/strict
+flag as the actual build. It never tries to compile a partial method fragment
+or reports strict-only diagnostics as observations from the permissive arm.
+
+### Native source inspection and contract integrity
+
+`source-inspection/PpwSourceInspector.csproj` references the already-built
+shared compiler DLL. It uses that DLL's lexer/parser, never a second compiler
+version, and never executes task code. The inspector is prepared before an
+agent starts. Its compiler SHA-256 is checked against the shared product.
+It archives normalized public declarations, including parameters, return
+types, visibility and effect rows. Method bodies, declaration IDs, comments
+and source positions are not public-contract identity; private helper
+additions and harmless reformatting do not change that identity.
+
+The replacement registration includes `sourceInspections`, keyed by task ID.
+Each certificate covers both starters, both honest negatives and both
+laundering positives, binds their exact source-file SHA-256 values and names
+the same compiler DLL as the stage pins. All controls must parse and preserve
+the same public contract. Generate a certificate only from the genuinely
+selected inputs and product, then include it in the independently reviewed
+supersession:
+
+```bash
+python3 bench/phase0-agent-native/ppw-source-inspection.py \
+  --compiler <shared-pinned-calor.dll> --pair <selected-task>/pair.json --controls
+```
+
+Every non-invalid attempt retains `source-inspection.json`, binding the frozen
+starter and archived final source. Offline stage analysis checks those hashes,
+the compiler identity and the frozen baseline before using the facts. Missing
+or inconsistent inspection evidence fails closed. This does not add an
+effect-forbidding cue to the agent prompt or make changed contracts disappear
+from denominators. Literal-marker, whitespace, changed-contract, wrong-value
+and throwing controls are engineering checks, not agent observations.
+
 `registration.json` must include:
 
 - `schemaVersion: 2`, `status: frozen`, `supersedes: A-1.12`, a written
@@ -189,6 +252,7 @@ decision.
 - the exact `compilerCommit` (the frozen v0.18.0 release);
 - an explicit unique `tasks` denominator and SHA-256 `artifacts` map covering
   **every** task-relative file, including each `pair.json`;
+- native `sourceInspections` control certificates for exactly those tasks;
 - a `stages` map. Each registered stage names its own `epochId` and
   `runsPerArm`. Pilot and confirmatory ids cannot coincide. No count defaults;
 - for collection, each stage also supplies `modelPin`, `agentVersion`, and
@@ -290,3 +354,30 @@ under permissive policy and failed under strict policy (`Calor0410`, `Calor0411`
 All six invocations used the same unchanged DLL and left the editable fragment
 untouched. This reproduces an existing compiler control, not an agent-effect
 measurement, task qualification, or task-count decision.
+
+### Opt-in actual-candidate local integration
+
+`tests/ppw_local_candidate_integration.py` runs the unchanged concrete candidate
+inventory through real `run-pair.sh`, a real shared v0.18 Release product,
+visible and held-out suites, capture, and an explicitly synthetic stage ledger.
+The stand-in performs three predetermined controls (starter, honest,
+laundering), makes no model API requests, and reports zero synthetic token
+usage. Three is test coverage here, **not** a proposed study size.
+
+Prepare a separate clean v0.18 Release checkout under this worktree's
+`.instrument-validation/`, with verified Z3 assets and compiler/Tasks products.
+Do not rebuild another owner's product. Then run:
+
+```bash
+python3 bench/phase0-agent-native/tests/ppw_local_candidate_integration.py \
+  --product-root .instrument-validation/product-v018 \
+  --output .instrument-validation/new-local-integration
+```
+
+The output directory must not already exist. Original candidate files are
+never modified. Registration-shaped data appears only inside clearly named
+synthetic test fixtures, with synthetic identifiers, toy classification
+settings and `dataKind: synthetic`; none is an actual registration or a
+replacement for the real task freeze. Keep the engineering report and those
+limitations together. This test does not invoke the paid collection driver
+or supply spending authorization.

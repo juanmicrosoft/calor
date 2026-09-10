@@ -447,7 +447,15 @@ def isolate_workspace(workspace):
         "</PropertyGroup></Project>\n", encoding="utf-8")
 
 
-def resolve_reference(pair_json, pair, entry, fixture):
+def honest_reference_cells(pair):
+    seeded = pair.get("seeded") if isinstance(pair.get("seeded"), dict) else {}
+    clean, honest = seeded.get("clean"), seeded.get("honest")
+    if clean is not None and honest is not None and clean != honest:
+        raise ValueError("conflicting seeded.clean and seeded.honest reference maps")
+    return ("clean", clean) if clean is not None else ("honest", honest)
+
+
+def resolve_reference(pair_json, pair, entry, fixture, redesigned=False):
     """Locate the null-agent reference solution for one arm entry.
 
     The null path applies a *correct* solution to the workspace and checks that the
@@ -486,6 +494,17 @@ def resolve_reference(pair_json, pair, entry, fixture):
         if not full.startswith(pair_dir + os.sep):
             return None
         return full if os.path.isdir(full) else None
+
+    if redesigned:
+        role, cells = honest_reference_cells(pair)
+        arm_id = entry.get("armId")
+        declared = cells.get(arm_id) if isinstance(cells, dict) else None
+        if declared is None:
+            return None, "seeded-honest-or-clean-required"
+        source = "seeded-%s-declared" % role
+        if inside(declared):
+            return declared, source
+        return None, source + "-missing:%s" % declared
 
     candidate = os.path.join("reference", fixture)
     if inside(candidate):
@@ -534,7 +553,13 @@ def resolve_pair_config(pair_json, key, arm=None):
     fixture = entry.get("fixture")
     if not isinstance(fixture, str) or not fixture:
         fixture = arm
-    reference, reference_source = resolve_reference(pair_json, pair, entry, fixture)
+    try:
+        reference, reference_source = resolve_reference(
+            pair_json, pair, entry, fixture, key in ("calor-permissive", "calor-strict"))
+    except ValueError as exc:
+        return {"admitted": False, "reason": str(exc), "armConfigKey": key, "arm": arm,
+                "controlArmKind": None, "permissiveEffects": None, "fixture": fixture,
+                "reference": None, "referenceSource": "none"}
     base = {"armConfigKey": key, "arm": arm, "fixture": fixture,
             "reference": reference, "referenceSource": reference_source,
             "pairId": pair.get("id")}

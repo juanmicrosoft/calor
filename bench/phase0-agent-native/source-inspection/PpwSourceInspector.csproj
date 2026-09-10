@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>ppw-source-inspector</AssemblyName>
+    <UseAppHost>false</UseAppHost>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <AssemblySearchPaths>{HintPathFromItem};{TargetFrameworkDirectory};{RawFileName}</AssemblySearchPaths>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Reference Include="calor">
+      <HintPath>$(CalorCompilerDll)</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+  <Target Name="RequirePinnedCompiler" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(CalorCompilerDll)')" Text="The exact pinned compiler DLL is required." />
+  </Target>
+</Project>

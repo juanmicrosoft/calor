@@ -9,7 +9,7 @@ import unittest
 import xml.etree.ElementTree as ET
 
 import test_ppw_instrument as instrument_tests
-from ppw_redesign_epoch import BENCH, instrument, save
+from ppw_redesign_epoch import BENCH, instrument, save, synthetic_inspection
 
 assembly = instrument.helper("ppw-source-assembly.py")
 capture = instrument.helper("harness-capture.py")
@@ -57,6 +57,19 @@ class SourceAssemblyTests(unittest.TestCase):
             for arm in ("A", "B")
             for path in sorted((self.task / ("starter-" + arm.lower())).glob("*.calr.inc"))
         ]
+        pair = json.loads((self.task / "pair.json").read_text())
+        inspection = instrument.helper("ppw-source-inspection.py")
+        try:
+            controls = inspection.control_directories(pair, self.task)
+        except ValueError:
+            controls = None
+        if controls is not None:
+            registration["sourceInspections"] = {"SYNTHETIC-task": synthetic_inspection(pair, controls)}
+        for arm, definition in instrument.ARMS.items():
+            for directory in (self.epoch / "runs" / "SYNTHETIC-task" / definition["label"]).glob("run-*"):
+                save(directory / "source-inspection.json", synthetic_inspection(
+                    pair, {"baseline": self.task / ("starter-" + arm.lower()),
+                           "final": directory / "final-src"}))
         save(self.epoch / "registration.json", registration)
         pins = json.loads((self.epoch / "pins.json").read_text())
         pins["registrationSha256"] = instrument.digest(self.epoch / "registration.json")
@@ -82,7 +95,7 @@ class SourceAssemblyTests(unittest.TestCase):
         original = (source / "task.calr.inc").read_bytes()
         output = assembly.compose(source / assembly.MANIFEST)
         self.assertEqual(source / "obj/ppw-source/Program.calr", output)
-        self.assertEqual(b"this.lookup\nreturn 0\n", output.read_bytes())
+        self.assertEqual(b"this.lookup\n\nreturn 0\n", output.read_bytes())
         self.assertEqual(original, (source / "task.calr.inc").read_bytes())
         self.assertFalse((source / "Program.calr").exists())
 
@@ -92,7 +105,7 @@ class SourceAssemblyTests(unittest.TestCase):
         assembly.compose(source / assembly.MANIFEST)
         (source / "task.calr.inc").write_text("this.lookup\n")
         output = assembly.compose(source / assembly.MANIFEST)
-        self.assertEqual(b"this.lookup\nthis.lookup\n", output.read_bytes())
+        self.assertEqual(b"this.lookup\n\nthis.lookup\n", output.read_bytes())
         self.assertEqual(before, capture.policy_snapshot(workspace))
 
     def test_immutable_edits_are_neither_compiled_nor_treated_as_task_failure(self):
@@ -103,10 +116,10 @@ class SourceAssemblyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "immutable dependency"):
             capture.policy_snapshot(workspace)
 
-    def test_requires_explicit_editable_parts_and_safe_ordered_inputs(self):
+    def test_noncanonical_parts_require_safe_explicit_editable_inputs(self):
         for config in (
             None,
-            {"parts": ["dependency.calr.inc", "task.calr.inc"]},
+            {"parts": ["library.calr.inc", "task.calr.inc"]},
             {"parts": ["../dependency.calr.inc", "task.calr.inc"], "editableParts": ["task.calr.inc"]},
             {"parts": ["task.calr.inc", "task.calr.inc"], "editableParts": ["task.calr.inc"]},
             {"parts": ["dependency.calr.inc", "task.calr.inc"], "editableParts": ["foreign.calr.inc"]},
@@ -115,6 +128,71 @@ class SourceAssemblyTests(unittest.TestCase):
         ):
             with self.subTest(config=config), self.assertRaises(ValueError):
                 assembly.definition({"sourceAssembly": config})
+
+    def test_canonical_compact_parts_name_only_the_task_as_editable(self):
+        compact = {"parts": ["dependency.calr.inc", "task.calr.inc"]}
+        self.pair["sourceAssembly"] = compact
+        _, source = self.workspace()
+        manifest = json.loads((source / assembly.MANIFEST).read_text())
+        self.assertEqual(["task.calr.inc"], manifest["sourceAssembly"]["editableParts"])
+        self.assertEqual({"parts"}, set(compact))
+        self.assertEqual({"dependency.calr.inc"}, set(assembly.workspace_snapshot(source)))
+
+    def test_explicit_honest_alias_is_negative_and_resolves_the_reference(self):
+        self.pair["seeded"]["honest"] = self.pair["seeded"].pop("clean")
+        save(self.task / "pair.json", self.pair)
+        self.refresh_synthetic_inventory()
+        self.fixture.analyze()
+        config = capture.resolve_pair_config(str(self.task / "pair.json"), "calor-strict", "calor")
+        self.assertTrue(config["admitted"])
+        self.assertEqual("seeded/clean-b", config["reference"])
+        self.assertEqual("seeded-honest-declared", config["referenceSource"])
+        self.pair["seeded"]["clean"] = dict(self.pair["seeded"]["honest"])
+        save(self.task / "pair.json", self.pair)
+        self.refresh_synthetic_inventory()
+        self.fixture.analyze()
+
+    def test_conflicting_honest_and_clean_roles_are_rejected(self):
+        self.pair["seeded"]["honest"] = dict(self.pair["seeded"]["laundering"])
+        save(self.task / "pair.json", self.pair)
+        self.refresh_synthetic_inventory()
+        config = capture.resolve_pair_config(str(self.task / "pair.json"), "calor-strict", "calor")
+        self.assertFalse(config["admitted"])
+        self.assertIn("conflicting seeded", config["reason"])
+        with self.assertRaisesRegex(ValueError, "conflicting seeded"):
+            self.fixture.analyze()
+
+    def test_unchanged_candidate_layout_matches_observed_compilation_bytes(self):
+        candidates = BENCH / "task-candidates/1256"
+        report = json.loads((candidates / "evidence/results.json").read_text())
+        for candidate in report["candidates"]:
+            task = candidates / candidate["id"]
+            pair = json.loads((task / "pair.json").read_text())
+            self.assertEqual("unregistered-candidate", pair["authoringStatus"])
+            self.assertEqual(["task.calr.inc"], assembly.definition(pair)["editableParts"])
+            _, negative = capture.honest_reference_cells(pair)
+            pattern = re.compile(pair["shapeRealizedIndicator"]["sourceRegex"])
+            for arm, label in (("a", "calor-permissive"), ("b", "calor-strict")):
+                self.assertTrue(capture.resolve_pair_config(str(task / "pair.json"), label, "calor")["reference"])
+                immutable = assembly.check_fragments(pair, task / pair["arms"][label]["fixture"])
+                for role, relative, positive in (
+                    ("starter", pair["arms"][label]["fixture"], False),
+                    ("honest", negative[arm], False),
+                    ("laundering", pair["seeded"]["laundering"][arm], True),
+                ):
+                    with self.subTest(task=candidate["id"], role=role, arm=arm):
+                        origin = task / relative
+                        assembly.check_fragments(pair, origin, immutable)
+                        self.assertEqual(positive, any(pattern.search(p.read_text())
+                                                       for p in assembly.source_paths(pair, origin, True)))
+                        source = self.root / "concrete" / candidate["id"] / role / arm
+                        shutil.copytree(origin, source)
+                        (source / "Src.csproj").write_text(
+                            '<Project><ItemGroup><CalorCompile Include="**/*.calr" /></ItemGroup></Project>')
+                        assembly.setup(pair, source)
+                        output = assembly.compose(source / assembly.MANIFEST)
+                        self.assertEqual(candidate["variants"][role][arm.upper()]["sourceSha256"],
+                                         instrument.digest(output))
 
     def test_extra_compiled_source_is_not_an_alternate_edit_surface(self):
         workspace, source = self.workspace()
@@ -127,7 +205,7 @@ class SourceAssemblyTests(unittest.TestCase):
         output = assembly.compose(source / assembly.MANIFEST)
         output.write_text("tampered generated source\n")
         assembly.compose(source / assembly.MANIFEST)
-        self.assertEqual("this.lookup\nreturn 0\n", output.read_text())
+        self.assertEqual("this.lookup\n\nreturn 0\n", output.read_text())
 
     def test_generated_output_cannot_link_outside_workspace(self):
         _, source = self.workspace()
@@ -152,6 +230,7 @@ class SourceAssemblyTests(unittest.TestCase):
     def test_dependency_marker_does_not_count_as_agent_realizing_shape(self):
         for directory in (self.epoch / "runs").rglob("final-src"):
             (directory / "task.calr.inc").write_text("return 0\n")
+        self.refresh_synthetic_inventory()
         result = self.fixture.analyze()
         self.assertEqual([0, 0], [cell["shapeRealized"] for cell in result["perCell"]])
 
@@ -233,6 +312,10 @@ class SourceAssemblyTests(unittest.TestCase):
                 captured = self.fixture.fake_capture("fragment-edit", arm, run)
                 entries = [json.loads(line) for line in (captured / "journal.jsonl").read_text().splitlines()]
                 self.assertEqual(1, sum(entry["edited"] for entry in entries))
+                self.assertTrue(all(entry["envelope_valid"] for entry in entries))
+                envelope = json.loads((captured / ".envelope.json").read_text())
+                self.assertEqual(arm == "A", envelope["syntheticPermissive"])
+                self.assertEqual(["Program.calr"], envelope["syntheticInputs"])
                 self.assertFalse((captured / "final-src/Program.calr").exists())
                 instrument.stamp_run(captured / "result.json", pins)
                 target = self.fixture.result(instrument.ARMS[arm]["label"], run).parent
@@ -252,7 +335,7 @@ class SourceAssemblyTests(unittest.TestCase):
         result = subprocess.run(["dotnet", "msbuild", str(project), "-t:CompileCalorFiles", "-v:q"],
                                 env=environment, capture_output=True, text=True, timeout=60)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertEqual("this.lookup\nreturn 0\n", (source / assembly.OUTPUT).read_text())
+        self.assertEqual("this.lookup\n\nreturn 0\n", (source / assembly.OUTPUT).read_text())
 
     @unittest.skipUnless(shutil.which("dotnet"), "real MSBuild required")
     def test_generated_compile_target_rejects_non_authoritative_inputs(self):
@@ -300,7 +383,7 @@ class SourceAssemblyTests(unittest.TestCase):
                    "-p:CalorTasksAssembly=" + str(repo / "src/Calor.Tasks/bin/Debug/net10.0/Calor.Tasks.dll")]
         result = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=180)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertEqual(dependency + starter, (source / assembly.OUTPUT).read_bytes())
+        self.assertEqual(dependency + b"\n" + starter, (source / assembly.OUTPUT).read_bytes())
         self.assertTrue((source / "bin/Debug/net10.0/Src.dll").exists())
         self.assertEqual(starter, (source / "task.calr.inc").read_bytes())
         self.assertEqual(before, capture.policy_snapshot(workspace))
@@ -318,7 +401,7 @@ class SourceAssemblyTests(unittest.TestCase):
         (source / "task.calr.inc").write_bytes(honest)
         result = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=180)
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertEqual(dependency + honest, (source / assembly.OUTPUT).read_bytes())
+        self.assertEqual(dependency + b"\n" + honest, (source / assembly.OUTPUT).read_bytes())
         self.assertEqual(honest, (source / "task.calr.inc").read_bytes())
         self.assertEqual(before, capture.policy_snapshot(workspace))
 

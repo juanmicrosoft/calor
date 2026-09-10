@@ -122,6 +122,57 @@ class InstrumentTests(unittest.TestCase):
                         lambda r: r["buildState"].update(optionsHash="policy-A"))
         self.assertEqual(2, len(self.analyze()["perCell"]))
 
+    def test_changed_public_contract_is_not_an_escape_and_does_not_remove_a_slot(self):
+        path = self.result().parent / "source-inspection.json"
+        self.mutate(path, lambda r: r["sources"]["final:0"]["publicApi"].update(effects=["mut"]))
+        cell = self.analyze()["perCell"][0]
+        self.assertEqual((2, 0, 1, 0.5),
+                         (cell["validRuns"], cell["invalidRuns"], cell["escapes"], cell["escapeRate"]))
+        self.assertEqual([1], cell["changedPublicApiRuns"])
+
+    def test_unparseable_nonbuild_retains_denominator_without_claiming_a_negative_shape(self):
+        path = self.result().parent / "source-inspection.json"
+        self.mutate(path, lambda r: r["sources"]["final:0"].update(
+            parseOk=False, publicApi=None, calls=[]))
+        self.mutate(self.result(), lambda r: r.update(finalBuild={"ok": False}))
+        cell = self.analyze()["perCell"][0]
+        self.assertEqual((2, 0, 1, 0.5),
+                         (cell["validRuns"], cell["invalidRuns"], cell["escapes"], cell["escapeRate"]))
+        self.assertEqual([1], cell["unscorableShapeRuns"])
+        self.assertIsNone(cell["shapeRealizedRate"])
+        self.assertEqual([], cell["unscorablePublicApiRuns"])
+
+    def test_built_but_uninspectable_output_cannot_produce_an_escape_rate(self):
+        self.mutate(self.result().parent / "source-inspection.json",
+                    lambda r: r["sources"]["final:0"].update(parseOk=False, publicApi=None, calls=[]))
+        cell = self.analyze()["perCell"][0]
+        self.assertEqual((2, 0), (cell["validRuns"], cell["invalidRuns"]))
+        self.assertEqual([1], cell["unscorablePublicApiRuns"])
+        self.assertIsNone(cell["escapeRate"])
+
+    def test_native_inspection_cannot_be_reused_for_changed_source_or_another_compiler(self):
+        path = self.result().parent / "source-inspection.json"
+        original = path.read_text()
+        for change, message in (
+            (lambda r: r.update(compilerSha256="f" * 64), "different compiler"),
+            (lambda r: r["inputSha256"]["final"].update({"Source.calr": "f" * 64}), "input hashes"),
+            (lambda r: r["sources"]["baseline:0"]["publicApi"].update(changed=True), "baseline differs"),
+            (lambda r: r["sources"].update({"foreign:0": {}}), "inventory"),
+        ):
+            with self.subTest(message=message):
+                self.mutate(path, change)
+                with self.assertRaisesRegex(ValueError, message):
+                    self.analyze()
+            path.write_text(original)
+
+    def test_native_control_certificate_cannot_pin_another_compiler(self):
+        path = self.epoch / "registration.json"
+        self.mutate(path, lambda r: r["sourceInspections"]["SYNTHETIC-task"].update(compilerSha256="f" * 64))
+        self.mutate(self.epoch / "pins.json",
+                    lambda p: p.update(registrationSha256=instrument.digest(path)))
+        with self.assertRaisesRegex(ValueError, "source-inspection compiler"):
+            self.analyze()
+
     def test_wrong_effective_policy_is_rejected_despite_disjoint_hashes(self):
         for name in ("policy-before.json", "policy-after.json"):
             self.mutate(self.result("calor-strict").parent / name,
@@ -273,8 +324,33 @@ class InstrumentTests(unittest.TestCase):
         prior_calls = len(calls.read_text().splitlines()) if calls.exists() else 0
         fake_dotnet = executable / "dotnet"
         fake_dotnet.write_text("""#!/usr/bin/env python3
-import json, pathlib, shlex, subprocess, sys, xml.etree.ElementTree as ET
+import hashlib, json, pathlib, shlex, shutil, subprocess, sys, xml.etree.ElementTree as ET
 if "--help" in sys.argv:
+    sys.exit(0)
+if any(a.endswith("PpwSourceInspector.csproj") for a in sys.argv):
+    output = pathlib.Path(sys.argv[sys.argv.index("--output") + 1])
+    output.mkdir(parents=True, exist_ok=True)
+    (output / "ppw-source-inspector.dll").write_text("synthetic inspector, not executable")
+    compiler = next(a.split("=", 1)[1] for a in sys.argv if a.startswith("--property:CalorCompilerDll="))
+    shutil.copyfile(compiler, output / "calor.dll")
+    sys.exit(0)
+if len(sys.argv) > 1 and sys.argv[1].endswith("ppw-source-inspector.dll"):
+    request = json.load(sys.stdin)
+    sources = {}
+    for item in request["sources"]:
+        text = item["text"].encode("utf-16-le")
+        edited = "\\n".join(text[a*2:b*2].decode("utf-16-le") for a,b in item["editableRanges"])
+        sources[item["name"]] = {"parseOk":True, "publicApi":{"syntheticFixture":True},
+                                "calls":["§C{this.lookup}"] if "this.lookup" in edited else []}
+    dll = pathlib.Path(sys.argv[1]).parent / "calor.dll"
+    print(json.dumps({"schemaVersion":1, "compilerSha256":hashlib.sha256(dll.read_bytes()).hexdigest(),
+                      "sources":sources}))
+    sys.exit(0)
+if "--input" in sys.argv and "--format" in sys.argv:
+    inputs = [sys.argv[i+1] for i,a in enumerate(sys.argv) if a == "--input"]
+    print(json.dumps({"version":"SYNTHETIC", "diagnostics":[],
+                      "syntheticPermissive":"--permissive-effects" in sys.argv,
+                      "syntheticInputs":[pathlib.Path(p).name for p in inputs]}))
     sys.exit(0)
 project = pathlib.Path.cwd() / "Src.csproj"
 if "build" in sys.argv:

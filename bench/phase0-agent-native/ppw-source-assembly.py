@@ -27,6 +27,9 @@ def definition(pair):
     if "sourceAssembly" not in pair:
         return None
     value = pair["sourceAssembly"]
+    if (isinstance(value, dict) and set(value) == {"parts"}
+            and value["parts"] == ["dependency.calr.inc", "task.calr.inc"]):
+        value = dict(value, editableParts=["task.calr.inc"])
     require(isinstance(value, dict) and set(value) == {"parts", "editableParts"},
             "parts and editableParts must be explicit")
     parts, editable = value["parts"], value["editableParts"]
@@ -134,7 +137,7 @@ def compose(manifest):
     root = manifest.parent
     workspace_snapshot(root)
     config = json.loads(manifest.read_text(encoding="utf-8"))
-    content = b"".join(path.read_bytes() for path in source_paths(config, root))
+    content = b"\n".join(path.read_bytes() for path in source_paths(config, root))
     output = root / OUTPUT
     for path in (root / "obj", output.parent, output):
         require(not path.is_symlink(), "linked generated output")
