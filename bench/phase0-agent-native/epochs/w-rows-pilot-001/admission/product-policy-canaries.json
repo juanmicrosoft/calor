@@ -1,0 +1,36 @@
+{
+  "kind": "actual-sdk-policy-canaries-not-epoch-pins",
+  "wrapperExecuted": false,
+  "method": "same harness canary source and project template; explicit project-local directories, prebuilt product references; no agent loop",
+  "sourceSha256": "205ad82b07e0781968425b414bde2aa817e93ca9a9392e6727167eed5b46f10e",
+  "observations": {
+    "A": {
+      "command": [
+        "dotnet",
+        "build",
+        "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/product-policy-canaries/A/src/Src.csproj",
+        "--nologo",
+        "-v:q",
+        "-p:BuildProjectReferences=false"
+      ],
+      "exitCode": 0,
+      "stdout": "\nBuild succeeded.\n    0 Warning(s)\n    0 Error(s)\n\nTime Elapsed 00:00:01.95\n",
+      "stderr": "",
+      "compilerHash": "9f3ad1c6aa101c60313b33ad42527b3d256de5cf841c4fbeabeedec613548f24"
+    },
+    "B": {
+      "command": [
+        "dotnet",
+        "build",
+        "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/product-policy-canaries/B/src/Src.csproj",
+        "--nologo",
+        "-v:q",
+        "-p:BuildProjectReferences=false"
+      ],
+      "exitCode": 1,
+      "stdout": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/product-policy-canaries/B/src/canary.calr(11,10): Calor warning Calor0411: Unknown external call to 'this.read'. Add effect declaration in a .calor-effects.json manifest. [/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/product-policy-canaries/B/src/Src.csproj]\n/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/product-policy-canaries/B/src/canary.calr(10,7): Calor error Calor0410: Function 'Read' uses effect 'unknown' but does not declare it [/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/product-policy-canaries/B/src/Src.csproj]\n\nBuild FAILED.\n\n/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/product-policy-canaries/B/src/canary.calr(11,10): Calor warning Calor0411: Unknown external call to 'this.read'. Add effect declaration in a .calor-effects.json manifest. [/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/product-policy-canaries/B/src/Src.csproj]\n/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/product-policy-canaries/B/src/canary.calr(10,7): Calor error Calor0410: Function 'Read' uses effect 'unknown' but does not declare it [/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/product-policy-canaries/B/src/Src.csproj]\n    1 Warning(s)\n    1 Error(s)\n\nTime Elapsed 00:00:00.56\n",
+      "stderr": "",
+      "compilerHash": "9f3ad1c6aa101c60313b33ad42527b3d256de5cf841c4fbeabeedec613548f24"
+    }
+  }
+}

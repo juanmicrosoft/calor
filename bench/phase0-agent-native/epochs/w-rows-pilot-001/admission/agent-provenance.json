@@ -1,0 +1,12 @@
+{
+  "command": [
+    "claude",
+    "--version"
+  ],
+  "stdout": "2.1.266 (Claude Code)\n",
+  "stderr": "",
+  "exitCode": 0,
+  "executable": "/Users/juanrivera/.local/share/claude/versions/2.1.266",
+  "executableSha256": "553d1b9e9e7068b275c0a783c7e139ff6503096f286e674c8c919379fb0eca62",
+  "modelInvoked": false
+}

@@ -59,6 +59,15 @@ class InstrumentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "wrong-stage"):
             self.analyze(stage="confirmatory")
 
+    def test_model_and_client_must_match_registered_stage(self):
+        original = (self.epoch / "pins.json").read_text()
+        for field in ("modelPin", "agentVersion"):
+            with self.subTest(field=field):
+                self.mutate(self.epoch / "pins.json", lambda pins: pins.update({field: "DIFFERENT"}))
+                with self.assertRaisesRegex(ValueError, field + " differs"):
+                    self.analyze()
+            (self.epoch / "pins.json").write_text(original)
+
     def test_confirmatory_reads_only_its_own_epoch(self):
         build(self.root, "confirmatory")
         before = self.analyze("confirmatory", "synthetic-confirmatory")
@@ -300,7 +309,7 @@ class InstrumentTests(unittest.TestCase):
             legacy.build_ledger(self.analyze())
 
     def test_runner_refuses_missing_authorization_before_creating_epoch(self):
-        with self.assertRaisesRegex(ValueError, "artifact path"):
+        with self.assertRaisesRegex(ValueError, "registration does not authorize collection"):
             instrument.run_epoch(self.epoch / "registration.json", self.epoch / "tasks",
                                  self.root / "compiler", self.root, "synthetic-pilot", "pilot")
 

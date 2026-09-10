@@ -3,7 +3,10 @@
 This is unpaid instrument engineering, **not collection authorization, a task
 freeze, or a new scientific registration**. The frozen design is
 [`2026-09-05-ppw-rows-fixture-redesign.md`](../../docs/plans/2026-09-05-ppw-rows-fixture-redesign.md).
-No real epoch or registration pins are created by this change.
+The original #1264 engineering created no real epoch pins. Subsequent
+task supersession (#1271) is described below; the separate
+[#1265 prospective pilot inputs](epochs/w-rows-pilot-001/README.md) are
+unfunded and unrun, not permission to collect.
 
 ## Historical compatibility and explicit supersession
 
@@ -266,9 +269,11 @@ crossing an editable/immutable boundary is unscorable rather than guessed.
 - an explicit unique `tasks` denominator and SHA-256 `artifacts` map covering
   **every** task-relative file, including each `pair.json`;
 - native `sourceInspections` control certificates for exactly those tasks;
-- a `stages` map. Each registered stage names its own `epochId` and
-  `runsPerArm`. Pilot and confirmatory ids cannot coincide. No count defaults;
-- for collection, each stage also supplies `modelPin`, `agentVersion`, and
+- a `stages` map. Each registered stage names its own `epochId`, `runsPerArm`,
+  `modelPin` and `agentVersion`. Epoch pins must match both nonempty stage
+  identities exactly, even before collection. Pilot and confirmatory ids
+  cannot coincide. No count defaults;
+- for collection, each stage also supplies
   `spendAuthorization`, `stageRegistration`, `modelRegistration` evidence
   objects (`path` relative to the registration, plus `sha256`).
 
@@ -312,6 +317,17 @@ CLAUDE_MODEL=<registered-model> bash bench/phase0-agent-native/run-ppw-epoch.sh 
 **Do not execute this now.** No monetary ceiling or null-result acceptance
 was approved by #1264. The command requires supplied authorization evidence,
 but the tool cannot judge whether prose constitutes valid maintainer approval.
+Collection also requires the stage registration's `collectionAuthorized: true`
+and `fundingStatus: approved`; an unfunded registration cannot be activated by
+adding an opaque file reference or passing the CLI confirmation flag.
+The hashed spending artifact must be a nonempty JSON object with
+`kind: pp-w-rows-spending-authorization`, the matching `epochId` and `stage`,
+an explicitly supplied positive finite `spendingCeilingUsd`,
+`nullResultAccepted: true`, and nonempty `approvedBy` and `approvalReference`.
+These are structural admission checks, not proof that a claimed approval is
+authentic or a per-call billing cap. A genuine maintainer ceiling and separate
+null-result acceptance under #1259 are still required; no artifact here
+supplies them.
 Build the one shared Release compiler/Tasks/runtime product first. The runner
 verifies its release commit, checkout cleanliness, hashes, both canaries,
 model and agent version before invoking any agent. Product drift is checked
