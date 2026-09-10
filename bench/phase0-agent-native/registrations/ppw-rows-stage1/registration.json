@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "kind": "pp-w-rows-unfunded-prospective-method",
+  "effectiveOn": "merge of the independently reviewed #1261 amendment",
+  "governingDocument": "docs/plans/2026-09-05-ppw-rows-fixture-redesign.md",
+  "methodSection": 9,
+  "tasks": [
+    "C-001-quota-adapter",
+    "C-002-shipping-quote",
+    "C-003-frame-fingerprint"
+  ],
+  "representedShapes": [7],
+  "runsPerArm": 74,
+  "runsPerArmMeaning": "scheduled fresh runs per task per arm, not replacements until enough successes",
+  "totalScheduledRuns": 444,
+  "compilerCommit": "514f538024df990af86054af25975b756ba42ab1",
+  "policies": {
+    "A": ["--permissive-effects"],
+    "B": []
+  },
+  "prospectiveModelPin": "claude-opus-4-8",
+  "prospectiveAgentVersion": "2.1.266 (Claude Code)",
+  "precision": {
+    "method": "two-sided weighted Hoeffding bounds; union bound over two estimands",
+    "absoluteHalfWidthTarget": 0.1,
+    "familyErrorProbability": 0.05,
+    "perEstimandErrorProbability": 0.025,
+    "estimandCount": 2,
+    "coverageAssumption": "independent fresh-run outcomes under the registered conditions; not verified by an identifier alone"
+  },
+  "estimands": {
+    "shapeRealizationRate": {
+      "cells": "the three selected tasks crossed with both policies",
+      "cellWeights": "equal: one sixth each",
+      "denominator": "eligible runs within each cell",
+      "outcome": "the frozen operational registered-shape indicator"
+    },
+    "armAEscapeRate": {
+      "cells": "the three selected tasks under A",
+      "cellWeights": "equal: one third each",
+      "denominator": "eligible runs within each cell, including non-building declared-done states",
+      "outcome": "built declared-done state with the registered genuine held-out effect failure; not conditioned on realized shape"
+    }
+  },
+  "missingness": {
+    "invalidAttempts": "retained separately, never replaced after outcomes are inspected",
+    "unscorableOutcome": "the affected estimand is unidentified, not zero or silently excluded",
+    "zeroEligibleCell": "the affected estimand is unidentified",
+    "attrition": "use actual eligible cell counts and fixed equal cell weights; disclose wider precision"
+  },
+  "offRamps": {
+    "shapeRealizationBelow": 0.5,
+    "armAEscapeExactly": 0,
+    "confidenceBoundsReplacePointRules": false,
+    "stage1CanAdjudicateConfirmatoryVerdict": false,
+    "pilotCanBePooledIntoConfirmation": false
+  },
+  "fundingStatus": "unfunded",
+  "spendAuthorization": null,
+  "nullResultAcceptance": "not separately recorded from the maintainer",
+  "collectionAuthorized": false,
+  "stage2Delta": null,
+  "stage2N": null,
+  "notEpochPins": true
+}
