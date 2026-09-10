@@ -119,9 +119,9 @@ export function BenchmarkDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <SummaryCard
           icon={<BarChart3 className="h-4 w-4" />}
-          label="Legacy Static-Score Composite"
+          label="Legacy Direction-Normalized Composite"
           value={`${data.summary.overallAdvantage.toFixed(2)}x`}
-          subtext="Calor/C# composite"
+          subtext="Above 1 favors Calor"
         />
         <SummaryCard
           icon={<FileCode className="h-4 w-4" />}
@@ -149,8 +149,9 @@ export function BenchmarkDashboard() {
       <div>
         <h3 className="text-xl font-semibold mb-4">Static Scores by Metric</h3>
         <p className="mb-4 text-sm text-muted-foreground">
-          Alphabetical metric order. Ratios above 1 mean a higher Calor calculator
-          score; below 1 mean a higher C# score. Neither means a language is better.
+          Alphabetical metric order. Ratios are direction-normalized: above 1
+          favors Calor and below 1 favors C#. Lower-is-better metrics invert their
+          raw score ratio. Neither means a language is better.
         </p>
         <div className="space-y-6">
           {metricNames.map(name => (

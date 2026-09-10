@@ -42,7 +42,7 @@ calor benchmark --calor Calculator.calr --csharp Calculator.cs
 # Benchmark entire project
 calor benchmark ./src
 
-# Quick token-only comparison
+# Quick source-size comparison
 calor benchmark --calor file.calr --csharp file.cs --quick
 
 # Generate markdown report
@@ -61,7 +61,7 @@ calor benchmark ./src --format markdown --output report.md
 | `--format` | `-f` | `console` | Output format: `console`, `markdown`, `json` |
 | `--output` | `-o` | stdout | Save results to file |
 | `--verbose` | `-v` | `false` | Show detailed per-metric breakdown |
-| `--quick` | `-q` | `false` | Quick token-only benchmark |
+| `--quick` | `-q` | `false` | Quick source-size benchmark over tokens, lines, and characters |
 
 ---
 

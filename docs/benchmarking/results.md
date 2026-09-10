@@ -1,6 +1,5 @@
 <!-- THIS FILE IS AUTO-GENERATED. DO NOT EDIT MANUALLY. -->
 <!-- Generated from website/public/data/benchmark-results.json by CI/CD -->
-<!-- Last generated: 2026-02-24T14:37:29.066Z -->
 
 ---
 layout: default
@@ -11,156 +10,46 @@ nav_order: 2
 
 # Benchmark Results
 
-Evaluated across 207 paired Calor/C# programs.
+This fixed-source artifact contains 217 paired programs
+and 8 deterministic metrics. It was recorded on
+2026-09-10 from source `1caf9138` with
+30 repetitions.
 
-**Last updated:** February 24, 2026 (commit: c7665e6)
+**Legacy composite direction-normalized ratio:** 1.32x
 
----
+Each metric is normalized so values above 1 favor Calor and values below 1
+favor C#. Lower-is-better metrics invert their raw score ratio. These static
+calculator outputs do not establish a language, coding-agent productivity,
+correctness, or safety advantage.
 
-## Summary Table
+## Metric Ratios
 
-| Category | Calor vs C# | Winner | Interpretation |
-|:---------|:-----------|:-------|:---------------|
-| Comprehension | **2.12x** | Calor | Explicit structure aids understanding |
-| Error Detection | **1.75x** | Calor | Contracts surface invariant violations |
-| Edit Precision | **1.38x** | Calor | Unique IDs enable targeted changes |
-| Refactoring Stability | **1.30x** | Calor | Structural IDs preserve refactoring intent |
-| Generation Accuracy | **1.02x** | Calor | Better code generation from prompts |
-| Token Economics | 0.73x | C# | Calor's explicit syntax uses more tokens |
-| Information Density | **1.08x** | Calor | More semantic content per token |
+| Metric | Direction-normalized ratio | Favored language | Reported 95% interval |
+|:-------|:---------------------------|:-----------------|:----------------------|
+| Token Economics | 1.42x | Calor | [1.417, 1.417] |
+| Generation Accuracy | 1.02x | Calor | [1.017, 1.017] |
+| Comprehension | 1.84x | Calor | [1.836, 1.836] |
+| Edit Precision | 1.36x | Calor | [1.358, 1.358] |
+| Error Detection | 1.49x | Calor | [1.492, 1.492] |
+| Information Density | 0.97x | C# | [0.970, 0.970] |
+| Refactoring Stability | 1.38x | Calor | [1.378, 1.378] |
+| Correctness | 1.29x | Calor | [1.295, 1.295] |
 
----
+## Parse Checks
 
-## Category Breakdown
+- Calor parser accepted: 217
+- Roslyn syntax parser accepted: 217
+- Parse acceptance does not establish generated-code build success or runtime correctness.
 
-### Where Calor Wins
+## Interpretation Limits
 
-#### Comprehension (2.12x)
-
-Calor's explicit structure provides clear signals for understanding:
-
-| Factor | Calor | C# |
-|:-------|:-----|:---|
-| Module boundaries | `§M{id:name}` opener + indented body (indent form) | `namespace Name { }` |
-| Function signatures | `§F{id:name:vis}` with `§I`, `§O` | Method declarations |
-| Side effects | Explicit `§E{cw,db:rw}` | Must infer from code |
-| Contracts | First-class `§Q`, `§S` | Comments or assertions |
-
-#### Error Detection (1.75x)
-
-Contracts make invariants explicit:
-
-```
-// Calor: Contracts are syntax
-§Q (>= x 0)
-§S (>= result 0)
-
-// C#: Contracts are implementation detail
-if (x < 0) throw new ArgumentException();
-Debug.Assert(result >= 0);
-```
-
-#### Edit Precision (1.38x)
-
-Unique IDs enable precise targeting:
-
-```
-// "Modify loop for1" - unambiguous
-§L{for1:i:1:100:1}
-
-// "Modify the for loop" - which one?
-for (int i = 0; i < 100; i++)
-```
-
-#### Refactoring Stability (1.30x)
-
-Structural IDs maintain references across refactoring operations, enabling reliable multi-step transformations.
-
-#### Generation Accuracy (1.02x)
-
-Calor benefits from explicit structure that reduces generation ambiguity.
-
-#### Information Density (1.08x)
-
-Calor achieves higher density through semantic annotations.
-
----
-
-### Where C# Wins
-
-#### Token Economics (0.73x)
-
-C# is more compact:
-
-| Operation | Calor | C# |
-|:----------|:-----|:---|
-| Return sum | `§R (+ a b)` | `return a + b;` |
-| Print value | `§P x` | `Console.WriteLine(x);` |
-| Function def | 5-7 lines | 3-5 lines |
-
-Average: Calor uses ~1.5x more tokens than C#.
-
----
-
-## The Tradeoff Visualized
-
-```
-                    Calor better <-  -> C# better
-                         |
-Comprehension     ████████████████  2.12x
-Error Detection   ██████████████░░  1.75x
-Edit Precision    ███████████░░░░░  1.38x
-Refactoring Stability██████████░░░░░░  1.30x
-                         |
-Generation Accuracy████████░░░░░░░░  1.02x
-Token Economics   ░░░░░░░░░░██████  0.73x
-Information Density█████████░░░░░░░  1.08x
-```
-
----
-
-## Key Findings
-
-### 1. Explicitness Has Value
-
-Calor's comprehension advantage suggests explicit structure genuinely aids understanding, even at token cost.
-
-### 2. Contracts Matter
-
-The error detection advantage comes directly from first-class contracts—not from implementation complexity.
-
-### 3. IDs Enable Precision
-
-The edit precision advantage validates the unique ID design decision.
-
-### 4. The Cost is Real
-
-The token economics ratio means Calor consumes more context window. This is the price of explicitness.
-
-### 5. Not a Universal Win
-
-C# still wins on generation and completion metrics, reflecting ecosystem maturity and LLM training data bias toward familiar languages.
-
----
-
-## When to Use Calor
-
-Based on results, Calor is most valuable when:
-
-- Agent comprehension is critical
-- Contract verification matters
-- Edit precision is important
-- Token budget is flexible
-
-Use C# when:
-
-- Token efficiency is paramount
-- Ecosystem libraries are needed
-- Human readability is priority
-
----
+- The repetitions repeat deterministic observations over a fixed corpus; they
+  are not independent program samples.
+- The source pairs are not all behaviorally equivalent.
+- Direction-normalized ratios are not raw Calor/C# score ratios.
+- No agent executed these programs as part of this static artifact.
 
 ## Next
 
-- [Methodology](/calor/benchmarking/methodology/) - How these were measured
-- [Individual Metrics](/calor/benchmarking/metrics/comprehension/) - Deep dive into each metric
+- [Website methodology](../../website/content/benchmarking/methodology.mdx)
+- [Website results and provenance](../../website/content/benchmarking/results.mdx)

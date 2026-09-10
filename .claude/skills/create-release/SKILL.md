@@ -53,15 +53,24 @@ Run the benchmark suite in statistical mode (30 runs with confidence intervals) 
    dotnet run --project tests/Calor.Evaluation -c Release -- run --format website --output website/public/data/benchmark-results.json --statistical --runs 30
    ```
 
-3. Read `benchmark-results.md` and extract a summary for the CHANGELOG. The summary should include:
-   - Overall advantage score
-   - Win counts (Calor vs C#)
-   - Key metric highlights with confidence intervals
+3. Read `benchmark-results.md` and `website/public/data/benchmark-results.json`
+   and extract a summary for the CHANGELOG. Use the Markdown report for ratios,
+   parse counts, source provenance, and interpretation limits. Use each JSON
+   metric's `ci95` field for interval bounds. The summary should include:
+   - Legacy composite direction-normalized ratio
+   - Counts of category ratios favoring each language
+   - Key metric ratios with reported intervals
    - Number of programs tested
+   - Parse-check counts
+   - Source commit and source-declared compiler version
+   - Interpretation limits: deterministic repetitions, non-equivalent pairs,
+     and no measured language, agent-productivity, correctness, or safety advantage
 
 4. Format the benchmark summary for CHANGELOG (see format below).
 
-**Note**: Statistical benchmark runs (30 iterations) add approximately 5-10 minutes to the release process but provide confidence intervals for more rigorous results.
+**Note**: Statistical benchmark runs (30 iterations) add approximately 5-10
+minutes. The reported intervals repeat deterministic observations over a fixed
+corpus; they do not establish independent sampling uncertainty.
 
 ### 3. Update Version Files
 
@@ -71,10 +80,15 @@ Update these files with the new version:
 |------|----------------|
 | `Directory.Build.props` | `<Version>X.Y.Z</Version>` |
 | `website/package.json` | `"version": "X.Y.Z"` |
+| `website/package-lock.json` | Root and workspace package versions |
 | `website/src/lib/version.ts` | `SITE_VERSION = 'X.Y.Z'` — this is the pill next to "calor" in the site header; if you skip it, the header keeps showing the previous version even after CHANGELOG and banner update |
 | `CHANGELOG.md` | Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` and add benchmark summary |
 | `website/content/changelog.mdx` | Add new version section at the top (same content as CHANGELOG.md but MDX format, no benchmark stats) |
 | `website/src/components/landing/WhatsNewBanner.tsx` | Update version number and one-line description of the release |
+| `website/public/data/benchmark-provenance.json` | Match the regenerated benchmark source commit and declared source version |
+| `website/content/benchmarking/{index,methodology,results}.mdx` | Match the regenerated benchmark date and provenance |
+| `website/content/philosophy/index.mdx` | Match the publishing release, benchmark source, declared source version, and run count |
+| `website/tests/public-claims.spec.ts` | Update `currentRelease` and keep release/provenance drift gates current |
 
 **How to verify you got all the version spots**: after editing, run
 `grep -rn "$OLD_VERSION" website/src website/package.json Directory.Build.props`
@@ -105,13 +119,19 @@ When updating WhatsNewBanner.tsx:
 ## [X.Y.Z] - YYYY-MM-DD
 
 ### Benchmark Results (Statistical: 30 runs)
-- **Overall Advantage**: X.XX (Calor/C# leads)
-- **Metrics**: Calor wins N, C# wins M
+- **Legacy Composite Direction-Normalized Ratio**: X.XX (not a measured language advantage)
+- **Metrics**: N category ratios favor Calor; M favor C#
 - **Highlights**:
-  - MetricName1: X.XXx ± 0.XX (winner)
-  - MetricName2: X.XXx ± 0.XX (winner)
-  - MetricName3: X.XXx ± 0.XX (winner)
+  - MetricName1: X.XXx [lower, upper]
+  - MetricName2: X.XXx [lower, upper]
+  - MetricName3: X.XXx [lower, upper]
 - **Programs Tested**: NN
+- **Parse Checks**: Calor NN; C# NN
+- **Recorded Source**: `COMMIT` (declares version SOURCE_DECLARED_VERSION)
+- **Interpretation Limits**: Deterministic repetitions are not independent
+  samples; each metric is direction-normalized so values above 1 favor Calor;
+  source pairs are not all behaviorally equivalent; no language, productivity,
+  correctness, or safety advantage is established.
 
 ### Changes
 [existing changelog content under ## [Unreleased]]
@@ -123,7 +143,10 @@ Extract the key metrics from the benchmark markdown output's Executive Summary s
 
 ```bash
 git checkout -b release/vX.Y.Z
-git add Directory.Build.props website/package.json CHANGELOG.md website/public/data/benchmark-results.json website/content/changelog.mdx website/src/components/landing/WhatsNewBanner.tsx
+# Start from a clean release branch. Stage the complete reviewed release diff,
+# including new tests, while leaving the temporary Markdown report untracked.
+git add -A -- . ':(exclude)benchmark-results.md'
+git status --short
 git commit -m "chore: bump version to X.Y.Z"
 git push -u origin release/vX.Y.Z
 ```
@@ -144,10 +167,16 @@ gh pr create --title "Release vX.Y.Z" --body "$(cat <<'EOF'
 ## Checklist
 - [ ] Version updated in Directory.Build.props
 - [ ] Version updated in website/package.json
+- [ ] Version updated in website/package-lock.json
+- [ ] Version updated in website/src/lib/version.ts
 - [ ] CHANGELOG.md updated with version, date, and benchmark summary
 - [ ] website/content/changelog.mdx updated with version and changes (no benchmark stats)
 - [ ] website/src/components/landing/WhatsNewBanner.tsx updated with version and headline
 - [ ] website/public/data/benchmark-results.json updated with latest results
+- [ ] website/public/data/benchmark-provenance.json matches the benchmark source
+- [ ] Benchmark index, methodology, and results pages match the new artifact
+- [ ] Philosophy benchmark summary matches release, source, version, and run count
+- [ ] website/tests/public-claims.spec.ts pins every live release surface
 EOF
 )"
 ```

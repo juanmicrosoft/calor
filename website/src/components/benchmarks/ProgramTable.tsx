@@ -115,10 +115,10 @@ export function ProgramTable({ programs, metricNames }: ProgramTableProps) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Values are Calor/C# static-score ratios: above 1 means a higher Calor
-        calculator score, below 1 a higher C# score, and 1 equal scores.
-        The legacy composite combines metric scores; Token Economics combines
-        token, character, and line ratios, not raw-token savings.
+        Values are direction-normalized ratios: above 1 favors Calor, below 1
+        favors C#, and 1 is neutral. Lower-is-better metrics invert their raw
+        score ratio. The legacy composite combines metric ratios; Token Economics
+        combines token, character, and line ratios, not raw-token savings.
       </p>
       {/* Level filter */}
       <div className="flex items-center gap-2 text-sm">
@@ -164,7 +164,7 @@ export function ProgramTable({ programs, metricNames }: ProgramTableProps) {
               <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">
                 Status
               </th>
-              <SortHeader {...sortProps} field="advantage">Static-score composite</SortHeader>
+              <SortHeader {...sortProps} field="advantage">Direction-normalized composite</SortHeader>
               {metricNames.map((metric) => (
                 <SortHeader {...sortProps} key={metric} field={metric}>
                   {staticMetricLabels[metric]?.name || metric}

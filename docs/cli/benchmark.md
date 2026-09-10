@@ -41,7 +41,7 @@ calor benchmark --calor Calculator.calr --csharp Calculator.cs
 # Benchmark entire project
 calor benchmark ./src
 
-# Quick token-only comparison
+# Quick source-size comparison
 calor benchmark --calor file.calr --csharp file.cs --quick
 
 # Generate markdown report
@@ -68,7 +68,7 @@ calor benchmark ./src --format markdown --output report.md
 | `--format` | `-f` | `console` | Output format: `console`, `markdown`, `json` |
 | `--output` | `-o` | stdout | Save results to file |
 | `--verbose` | `-v` | `false` | Show detailed per-metric breakdown |
-| `--quick` | `-q` | `false` | Quick token-only benchmark |
+| `--quick` | `-q` | `false` | Quick source-size benchmark over tokens, lines, and characters |
 
 ### Category Values
 
@@ -222,12 +222,12 @@ calor benchmark ./src --format json --output benchmark.json
 ```
 
 Creates machine-readable output wrapped in the
-[envelope schema v1.1](/calor/cli/envelope-schema/) — the command's payload
+[envelope schema v2.0](/calor/cli/envelope-schema/) — the command's payload
 lives under `data`:
 
 ```json
 {
-  "version": "1.1",
+  "version": "2.0",
   "command": "benchmark",
   "diagnostics": [],
   "summary": { "total": 0, "errors": 0, "warnings": 0, "info": 0 },
@@ -238,8 +238,8 @@ lives under `data`:
       "benchmarkCount": 12
     },
     "summary": {
-      "overallCalorAdvantage": 1.27,
-      "categoryAdvantages": { "TokenEconomics": 1.48 }
+      "overallDirectionNormalizedRatio": 1.27,
+      "categoryDirectionNormalizedRatios": { "TokenEconomics": 1.48 }
     },
     "categoryResults": { "...": "per-category scores" },
     "detailedResults": [ { "...": "per-case metrics" } ]
@@ -247,11 +247,14 @@ lives under `data`:
 }
 ```
 
-Quick mode (`--quick`) uses the same envelope with its token-only payload:
+Quick mode (`--quick`) uses the same envelope with source-size measurements:
+The clearer ratio names shown below are additive; legacy `advantageRatio`,
+`overallAdvantage`, and per-file `advantage` aliases remain in schema v2.0 for
+compatibility.
 
 ```json
 {
-  "version": "1.1",
+  "version": "2.0",
   "command": "benchmark",
   "diagnostics": [],
   "summary": { "total": 0, "errors": 0, "warnings": 0, "info": 0 },
@@ -263,7 +266,7 @@ Quick mode (`--quick`) uses the same envelope with its token-only payload:
       "lines": { "csharp": 60, "calor": 38, "savings": 36.7 },
       "characters": { "csharp": 1930, "calor": 1105, "savings": 42.7 }
     },
-    "advantageRatio": 1.68
+    "compactnessRatio": 1.68
   }
 }
 ```

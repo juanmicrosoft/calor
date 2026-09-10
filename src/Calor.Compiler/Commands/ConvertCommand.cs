@@ -843,6 +843,7 @@ public static class ConvertCommand
                 OutputCharacters = metrics.OutputCharacters,
                 TokenReductionPercent = metrics.TokenReduction,
                 LineReductionPercent = metrics.LineReduction,
+                CompactnessRatio = BenchmarkIntegration.CalculateAdvantageRatio(metrics),
                 AdvantageRatio = BenchmarkIntegration.CalculateAdvantageRatio(metrics)
             };
         }
@@ -922,6 +923,7 @@ public static class ConvertCommand
         public int OutputCharacters { get; init; }
         public double TokenReductionPercent { get; init; }
         public double LineReductionPercent { get; init; }
+        public double CompactnessRatio { get; init; }
         public double AdvantageRatio { get; init; }
     }
 }

@@ -654,7 +654,7 @@ public static class Program
         // Print summary
         Console.WriteLine();
         Console.WriteLine("Summary:");
-        Console.WriteLine($"  Overall Calor Advantage: {result.Summary.OverallCalorAdvantage:F2}x");
+        Console.WriteLine($"  Legacy composite direction-normalized ratio: {result.Summary.OverallCalorAdvantage:F2}x");
 
         if (result.HasStatisticalAnalysis)
         {
@@ -669,10 +669,10 @@ public static class Program
             .ToHashSet();
 
         Console.WriteLine();
-        Console.WriteLine("  Category Advantages:");
+        Console.WriteLine("  Category direction-normalized ratios:");
         foreach (var (category, advantage) in result.Summary.CategoryAdvantages.OrderByDescending(kv => kv.Value))
         {
-            // Calor-only categories are always Calor wins (when they have any score)
+            // Calor-only categories always favor Calor when they have a score.
             var isCalorOnly = calorOnlyCategories.Contains(category);
             var indicator = (advantage > 1.0 || isCalorOnly) ? "+" : (advantage < 1.0 ? "-" : "=");
             var ciStr = "";
@@ -700,10 +700,10 @@ public static class Program
                 foreach (var cat in significantCategories)
                 {
                     var summary = result.StatisticalSummaries.First(s => s.Category == cat);
-                    // Calor-only categories are always Calor wins
+                    // Calor-only categories always favor Calor.
                     var isCalorOnly = calorOnlyCategories.Contains(cat);
-                    var winner = (summary.AdvantageRatioMean > 1.0 || isCalorOnly) ? "Calor" : "C#";
-                    Console.WriteLine($"    * {cat}: {winner} wins (d={summary.CohensD:F2}, {summary.EffectSizeInterpretation} effect)");
+                    var favoredLanguage = (summary.AdvantageRatioMean > 1.0 || isCalorOnly) ? "Calor" : "C#";
+                    Console.WriteLine($"    * {cat}: ratio favors {favoredLanguage} (d={summary.CohensD:F2}, {summary.EffectSizeInterpretation} effect)");
                 }
             }
             else
@@ -869,11 +869,11 @@ public static class Program
 <body>
     <div class=""container"">
         <h1>Calor Benchmark Results</h1>
-        <p class=""subtitle"">Comparing Calor vs C# for AI coding agent effectiveness</p>
+        <p class=""subtitle"">Deterministic, direction-normalized static metric ratios</p>
 
         <div class=""summary-grid"">
             <div class=""card"">
-                <div class=""card-label"">Overall Advantage</div>
+                <div class=""card-label"">Legacy Direction-Normalized Composite</div>
                 <div class=""card-value {(result.Summary.OverallCalorAdvantage > 1 ? "calor" : "csharp")}"">{result.Summary.OverallCalorAdvantage:F2}x</div>
             </div>
             <div class=""card"">
@@ -881,11 +881,11 @@ public static class Program
                 <div class=""card-value"">{result.BenchmarkCount}</div>
             </div>
             <div class=""card"">
-                <div class=""card-label"">Calor Wins</div>
+                <div class=""card-label"">Calor-Favoring Categories</div>
                 <div class=""card-value calor"">{result.Summary.TopCalorCategories.Count}</div>
             </div>
             <div class=""card"">
-                <div class=""card-label"">C# Wins</div>
+                <div class=""card-label"">C#-Favoring Categories</div>
                 <div class=""card-value csharp"">{result.Summary.CSharpAdvantageCategories.Count}</div>
             </div>
         </div>
@@ -896,8 +896,8 @@ public static class Program
                 <thead>
                     <tr>
                         <th>Category</th>
-                        <th>Ratio</th>
-                        <th>Winner</th>
+                        <th>Direction-Normalized Ratio</th>
+                        <th>Favored Language</th>
                         <th>95% CI</th>
                     </tr>
                 </thead>
@@ -907,6 +907,9 @@ public static class Program
             </table>
         </div>
 
+        <p>Each metric is normalized so values above 1 favor Calor, including
+        lower-is-better metrics whose raw score ratio is inverted. These static
+        calculator outputs do not establish language or coding-agent effectiveness.</p>
         <p class=""timestamp"">Generated: {result.Timestamp:yyyy-MM-dd HH:mm:ss UTC}{(result.CommitHash != null ? $" | Commit: {result.CommitHash}" : "")}</p>
     </div>
 </body>
@@ -950,7 +953,7 @@ public static class Program
         foreach (var (category, advantage) in result.Summary.CategoryAdvantages.OrderByDescending(kv => kv.Value))
         {
             var isCalorOnly = calorOnlyCategories.Contains(category);
-            var winner = (advantage > 1.0 || isCalorOnly) ? "Calor" : (advantage < 1.0 ? "C#" : "Tie");
+            var favoredLanguage = (advantage > 1.0 || isCalorOnly) ? "Calor" : (advantage < 1.0 ? "C#" : "Tie");
             var winnerClass = (advantage > 1.0 || isCalorOnly) ? "winner-calor" : (advantage < 1.0 ? "winner-csharp" : "");
             var badgeClass = (advantage > 1.0 || isCalorOnly) ? "badge-calor" : "badge-csharp";
 
@@ -964,7 +967,7 @@ public static class Program
             rows.AppendLine($@"                    <tr>
                         <td>{displayName}</td>
                         <td class=""{winnerClass}"">{advantage:F2}x</td>
-                        <td><span class=""badge {badgeClass}"">{winner}</span></td>
+                        <td><span class=""badge {badgeClass}"">{favoredLanguage}</span></td>
                         <td>{ciStr}</td>
                     </tr>");
         }

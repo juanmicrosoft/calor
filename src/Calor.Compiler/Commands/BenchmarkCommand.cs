@@ -49,7 +49,7 @@ public static class BenchmarkCommand
 
         var quickOption = new Option<bool>(
             aliases: new[] { "--quick", "-q" },
-            description: "Use quick token-only benchmark (skip full 7-metric evaluation)");
+            description: "Use quick source-size benchmark over tokens, lines, and characters");
 
         var command = new Command("benchmark", "Compare Calor vs C# across 7 evaluation categories")
         {
@@ -175,7 +175,7 @@ public static class BenchmarkCommand
                 Console.Error.WriteLine("  calor benchmark --calor file.calr --csharp file.cs --category TokenEconomics");
                 Console.Error.WriteLine("  calor benchmark ./MyProject");
                 Console.Error.WriteLine("  calor benchmark ./MyProject --format markdown -o report.md");
-                Console.Error.WriteLine("  calor benchmark --calor file.calr --csharp file.cs --quick  # Token-only");
+                Console.Error.WriteLine("  calor benchmark --calor file.calr --csharp file.cs --quick  # Source-size comparison");
                 exitCode = 1;
             }
         }
@@ -516,7 +516,9 @@ public static class BenchmarkCommand
             | Lines | {m.OriginalLines:N0} | {m.OutputLines:N0} | {m.LineReduction:F1}% |
             | Characters | {m.OriginalCharacters:N0} | {m.OutputCharacters:N0} | {m.CharReduction:F1}% |
 
-            **Overall Calor Advantage:** {result.AdvantageRatio:F2}x
+            **Geometric Compactness Ratio:** {result.CompactnessRatio:F2}x
+
+            This ratio combines token, line, and character counts; it is not a raw token-savings percentage.
             """;
     }
 
@@ -537,7 +539,8 @@ public static class BenchmarkCommand
                 lines = new { csharp = m.OriginalLines, calor = m.OutputLines, savings = Math.Round(m.LineReduction, 1) },
                 characters = new { csharp = m.OriginalCharacters, calor = m.OutputCharacters, savings = Math.Round(m.CharReduction, 1) }
             },
-            advantageRatio = Math.Round(result.AdvantageRatio, 2)
+            compactnessRatio = Math.Round(result.CompactnessRatio, 2),
+            advantageRatio = Math.Round(result.CompactnessRatio, 2)
         };
 
         return EnvelopeWriter.Serialize("benchmark", data);
@@ -553,15 +556,16 @@ public static class BenchmarkCommand
         sb.AppendLine("Summary:");
         sb.AppendLine($"  Total tokens: {summary.TotalOriginalTokens:N0} -> {summary.TotalOutputTokens:N0} ({summary.TokenSavingsPercent:F1}% savings)");
         sb.AppendLine($"  Total lines: {summary.TotalOriginalLines:N0} -> {summary.TotalOutputLines:N0} ({summary.LineSavingsPercent:F1}% savings)");
-        sb.AppendLine($"  Overall Calor advantage: {summary.OverallAdvantage:F2}x");
+        sb.AppendLine($"  Aggregate token ratio (C#/Calor): {summary.OverallAdvantage:F2}x");
         sb.AppendLine();
         sb.AppendLine("By File:");
 
         foreach (var (calor, cs, metrics) in pairs.OrderByDescending(p => BenchmarkIntegration.CalculateAdvantageRatio(p.metrics)))
         {
             var advantage = BenchmarkIntegration.CalculateAdvantageRatio(metrics);
-            var indicator = advantage > 1 ? "+" : "";
-            sb.AppendLine($"  {Path.GetFileName(calor)}: {indicator}{(advantage - 1) * 100:F0}% tokens ({metrics.OriginalTokens} -> {metrics.OutputTokens})");
+            sb.AppendLine(
+                $"  {Path.GetFileName(calor)}: {metrics.TokenReduction:F1}% token savings "
+                + $"({metrics.OriginalTokens} -> {metrics.OutputTokens}); {advantage:F2}x compactness ratio");
         }
 
         return sb.ToString();
@@ -582,17 +586,21 @@ public static class BenchmarkCommand
         sb.AppendLine($"| Tokens | {summary.TotalOriginalTokens:N0} | {summary.TotalOutputTokens:N0} | {summary.TokenSavingsPercent:F1}% |");
         sb.AppendLine($"| Lines | {summary.TotalOriginalLines:N0} | {summary.TotalOutputLines:N0} | {summary.LineSavingsPercent:F1}% |");
         sb.AppendLine();
-        sb.AppendLine($"**Overall Calor Advantage:** {summary.OverallAdvantage:F2}x");
+        sb.AppendLine($"**Aggregate Token Ratio (C#/Calor):** {summary.OverallAdvantage:F2}x");
+        sb.AppendLine();
+        sb.AppendLine("This aggregate ratio uses total token counts only. Per-file compactness ratios combine token, line, and character counts.");
         sb.AppendLine();
         sb.AppendLine("## By File");
         sb.AppendLine();
-        sb.AppendLine("| File | C# Tokens | Calor Tokens | Advantage |");
-        sb.AppendLine("|------|-----------|-------------|-----------|");
+        sb.AppendLine("| File | C# Tokens | Calor Tokens | Token Savings | Compactness Ratio |");
+        sb.AppendLine("|------|-----------|--------------|---------------|-------------------|");
 
         foreach (var (calor, cs, metrics) in pairs.OrderByDescending(p => BenchmarkIntegration.CalculateAdvantageRatio(p.metrics)))
         {
             var advantage = BenchmarkIntegration.CalculateAdvantageRatio(metrics);
-            sb.AppendLine($"| {Path.GetFileName(calor)} | {metrics.OriginalTokens} | {metrics.OutputTokens} | {advantage:F2}x |");
+            sb.AppendLine(
+                $"| {Path.GetFileName(calor)} | {metrics.OriginalTokens} | {metrics.OutputTokens} "
+                + $"| {metrics.TokenReduction:F1}% | {advantage:F2}x |");
         }
 
         return sb.ToString();
@@ -613,6 +621,7 @@ public static class BenchmarkCommand
                 totalCSharpLines = summary.TotalOriginalLines,
                 totalCalorLines = summary.TotalOutputLines,
                 lineSavings = Math.Round(summary.LineSavingsPercent, 1),
+                aggregateTokenRatio = Math.Round(summary.OverallAdvantage, 2),
                 overallAdvantage = Math.Round(summary.OverallAdvantage, 2)
             },
             files = pairs.Select(p => new
@@ -621,6 +630,7 @@ public static class BenchmarkCommand
                 csharp = Path.GetFileName(p.cs),
                 csharpTokens = p.metrics.OriginalTokens,
                 calorTokens = p.metrics.OutputTokens,
+                compactnessRatio = Math.Round(BenchmarkIntegration.CalculateAdvantageRatio(p.metrics), 2),
                 advantage = Math.Round(BenchmarkIntegration.CalculateAdvantageRatio(p.metrics), 2)
             }).ToList()
         };

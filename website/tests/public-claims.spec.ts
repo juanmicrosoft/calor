@@ -12,8 +12,10 @@ const metricPages = ['comprehension', 'correctness', 'edit-precision', 'error-de
   'generation-accuracy', 'information-density', 'refactoring-stability', 'token-economics'];
 const verificationPages = ['philosophy/static-verification', 'syntax-reference/contracts',
   'cli/compile', 'cli/verify', 'benchmarking/metrics/contract-verification'];
-const currentRelease = '0.19.0';
+const currentRelease = '0.20.0';
 const execFileAsync = promisify(execFile);
+const calorParseCount = data.programs.filter(program => program.calorSuccess).length;
+const cSharpParseCount = data.programs.filter(program => program.cSharpSuccess).length;
 
 test('effect-rows outcome publishes a no-run disposition without substituting historical data', async ({ page }) => {
   const ledger = JSON.parse(await readFile('../bench/phase0-agent-native/effect-rows-benefit-ledger.json', 'utf8'));
@@ -86,9 +88,37 @@ test('task-first workflow keeps an account-free path and bounded provider guidan
 });
 
 test('current version and explicitly historical result provenance cannot silently drift', async () => {
+  await expect(readFile('public/data/dashboard.html', 'utf8')).rejects.toThrow();
+  await expect(readFile('public/data/dashboard.json', 'utf8')).rejects.toThrow();
+  const generatedResults = await readFile('../docs/benchmarking/results.md', 'utf8');
+  expect(generatedResults).toContain(`source \`${data.commit}\``);
+  expect(generatedResults).toContain(`${data.summary.statisticalRunCount} repetitions`);
+  expect(generatedResults).toContain(
+    `**Legacy composite direction-normalized ratio:** ${data.summary.overallAdvantage.toFixed(2)}x`,
+  );
+  expect(generatedResults).toContain(`Calor parser accepted: ${calorParseCount}`);
+  expect(generatedResults).toContain(`Roslyn syntax parser accepted: ${cSharpParseCount}`);
+  expect(generatedResults).toContain('Lower-is-better metrics invert their raw score ratio');
+  expect(generatedResults).toContain('source pairs are not all behaviorally equivalent');
+  expect(generatedResults).not.toMatch(
+    /Overall Advantage|Winner|Where (?:Calor|C#) Wins|AI coding agent effectiveness/,
+  );
   const props = await readFile('../Directory.Build.props', 'utf8');
+  const fullSourceCommit = (await execFileAsync(
+    'git',
+    ['rev-parse', provenance.sourceCommit],
+    { cwd: '..' },
+  )).stdout.trim();
+  const sourceProps = (await execFileAsync(
+    'git',
+    ['show', `${fullSourceCommit}:Directory.Build.props`],
+    { cwd: '..' },
+  )).stdout;
   expect(SITE_VERSION).toBe(props.match(/<Version>(.*?)<\/Version>/)![1]);
   expect(provenance.sourceCommit).toBe(data.commit);
+  expect(fullSourceCommit).toHaveLength(40);
+  expect(sourceProps.match(/<Version>(.*?)<\/Version>/)![1])
+    .toBe(provenance.sourceDeclaredVersion);
   expect(provenance.programCount).toBe(data.programs.length);
   expect([...provenance.metricNames].sort()).toEqual(Object.keys(data.metrics).sort());
   expect(provenance.agentTasks.sourceCommit).toBe(agents.commit);
@@ -98,9 +128,18 @@ test('current version and explicitly historical result provenance cannot silentl
   const results = await readFile('content/benchmarking/results.mdx', 'utf8');
   expect(results).toContain(provenance.sourceCommit);
   expect(results).toContain(provenance.sourceDeclaredVersion);
+  expect(results).toContain(data.timestamp.slice(0, 10));
   expect(results).toContain('not all behaviorally equivalent');
+  for (const path of ['index', 'methodology']) {
+    const source = (await readFile(`content/benchmarking/${path}.mdx`, 'utf8')).replace(/\s+/g, ' ');
+    expect(source).toContain(provenance.sourceCommit);
+    expect(source).toContain(provenance.sourceDeclaredVersion);
+    expect(source).toContain(data.timestamp.slice(0, 10));
+    expect(source).toContain(`${data.summary.statisticalRunCount} repetitions`);
+  }
   for (const path of ['philosophy/index']) {
     const source = await readFile(`content/${path}.mdx`, 'utf8');
+    const normalized = source.replace(/\s+/g, ' ');
     const densityClaims = source.split('\n').filter(line =>
       line.includes('Information Density') && /\d+\.\d+x/.test(line));
     expect(densityClaims.length).toBeGreaterThan(0);
@@ -108,6 +147,10 @@ test('current version and explicitly historical result provenance cannot silentl
       expect(claim).toContain(`${data.metrics.InformationDensity.ratio.toFixed(2)}x`);
     }
     expect(source.replace(/\s+/g, ' ')).toContain('not all behaviorally equivalent');
+    expect(normalized).toContain(`published with v${currentRelease}`);
+    expect(normalized).toContain(`source \`${provenance.sourceCommit}\``);
+    expect(normalized).toContain(`declared compiler v${provenance.sourceDeclaredVersion}`);
+    expect(normalized).toContain(`${data.summary.statisticalRunCount} repetitions`);
   }
   for (const path of ['methodology', ...metricPages.map(name => `metrics/${name}`)]) {
     const source = await readFile(`content/benchmarking/${path}.mdx`, 'utf8');
@@ -151,8 +194,20 @@ test('research milestones stay distinct from software releases', async () => {
   const status = await readFile('content/benchmarking/evidence-status.mdx', 'utf8');
   const props = await readFile('../Directory.Build.props', 'utf8');
   const packageJson = JSON.parse(await readFile('package.json', 'utf8')) as { version: string };
+  const packageLock = JSON.parse(await readFile('package-lock.json', 'utf8')) as {
+    version: string;
+    packages: Record<string, { version?: string }>;
+  };
   const banner = await readFile('src/components/landing/WhatsNewBanner.tsx', 'utf8');
-  const changelog = await readFile('content/changelog.mdx', 'utf8');
+  const rootChangelog = await readFile('../CHANGELOG.md', 'utf8');
+  const websiteChangelog = await readFile('content/changelog.mdx', 'utf8');
+  const rootCurrentSection = rootChangelog.match(
+    new RegExp(`^## \\[${currentRelease.replaceAll('.', '\\.')}\\][\\s\\S]*?(?=^## \\[)`, 'm'),
+  )?.[0] ?? '';
+  const normalizedRootCurrentSection = rootCurrentSection.replace(/\s+/g, ' ');
+  const websiteCurrentSection = websiteChangelog.match(
+    new RegExp(`^## \\[${currentRelease.replaceAll('.', '\\.')}\\][\\s\\S]*?(?=^## \\[)`, 'm'),
+  )?.[0] ?? '';
   expect(status).toContain('UNADJUDICATED');
   expect(status).toContain('administrative stop');
   expect(status).toContain('did not itself change `Directory.Build.props`');
@@ -161,9 +216,56 @@ test('research milestones stay distinct from software releases', async () => {
   expect(props).toContain(`<Version>${currentRelease}</Version>`);
   expect(SITE_VERSION).toBe(currentRelease);
   expect(packageJson.version).toBe(currentRelease);
+  expect(packageLock.version).toBe(currentRelease);
+  expect(packageLock.packages[''].version).toBe(currentRelease);
   expect(banner).toContain(`v${currentRelease}`);
-  expect(changelog.match(/^## \[([^\]]+)\]/m)?.[1]).toBe('Unreleased');
-  expect(changelog.match(/^## \[(\d+\.\d+\.\d+)\]/m)?.[1]).toBe(currentRelease);
+  expect(rootChangelog.match(/^## \[([^\]]+)\]/m)?.[1]).toBe('Unreleased');
+  expect(rootChangelog.match(/^## \[(\d+\.\d+\.\d+)\]/m)?.[1]).toBe(currentRelease);
+  expect(rootCurrentSection).toContain('Benchmark Results (Statistical: 30 runs)');
+  expect(rootCurrentSection).toContain('Programs Tested');
+  expect(websiteChangelog.match(/^## \[([^\]]+)\]/m)?.[1]).toBe('Unreleased');
+  expect(websiteChangelog.match(/^## \[(\d+\.\d+\.\d+)\]/m)?.[1]).toBe(currentRelease);
+  expect(rootCurrentSection).toContain(
+    `Benchmark Results (Statistical: ${data.summary.statisticalRunCount} runs)`,
+  );
+  expect(rootCurrentSection).toContain(
+    `Legacy Composite Direction-Normalized Ratio**: ${data.summary.overallAdvantage.toFixed(2)}`,
+  );
+  expect(rootCurrentSection).toContain(
+    `${data.summary.calorWins} category ratios favor Calor; ${data.summary.cSharpWins} favors C#`,
+  );
+  expect(normalizedRootCurrentSection).toContain(
+    `Programs Tested**: ${data.summary.programCount}; Calor parser accepted ${calorParseCount}; Roslyn syntax parser accepted ${cSharpParseCount}`,
+  );
+  expect(rootCurrentSection).toContain(`Recorded source**: \`${provenance.sourceCommit}\``);
+  expect(rootCurrentSection).toContain(`declares version ${provenance.sourceDeclaredVersion}`);
+  for (const metric of ['Comprehension', 'ErrorDetection', 'TokenEconomics', 'InformationDensity'] as const) {
+    const result = data.metrics[metric];
+    expect(normalizedRootCurrentSection).toContain(
+      `${metric} ${result.ratio.toFixed(2)}x [${result.ci95[0].toFixed(3)}, ${result.ci95[1].toFixed(3)}]`,
+    );
+  }
+  expect(normalizedRootCurrentSection).toContain('repeat deterministic observations over a fixed corpus');
+  expect(normalizedRootCurrentSection).toContain('do not establish independent sampling uncertainty');
+  expect(normalizedRootCurrentSection).toContain(
+    'Each metric is direction-normalized so a value above 1 favors Calor',
+  );
+  expect(normalizedRootCurrentSection).toContain('source pairs are not all behaviorally equivalent');
+  expect(normalizedRootCurrentSection).toContain(
+    'no measured language, agent-productivity, correctness, or safety advantage',
+  );
+  expect(rootCurrentSection).not.toContain('Overall Advantage');
+  expect(rootCurrentSection).not.toContain('Calor scores higher');
+  expect(rootCurrentSection).not.toContain('higher calculator score');
+  expect(websiteCurrentSection).not.toMatch(/Benchmark Results|Statistical: \d+ runs|Overall Advantage/);
+  expect(websiteCurrentSection).not.toContain(
+    `${data.summary.overallAdvantage.toFixed(2)}x`,
+  );
+  expect(websiteCurrentSection).not.toContain(`${data.summary.programCount} programs`);
+  expect(websiteCurrentSection).not.toContain(provenance.sourceCommit);
+  for (const metric of Object.values(data.metrics)) {
+    expect(websiteCurrentSection).not.toContain(`${metric.ratio.toFixed(2)}x`);
+  }
   for (const path of ['benchmarking/index', 'benchmarking/results', 'guides/adoption-playbook']) {
     const source = await readFile(`content/${path}.mdx`, 'utf8');
     expect(source).toContain('/docs/benchmarking/evidence-status/');
@@ -261,8 +363,8 @@ test('benchmark methodology distinguishes artifacts, failed runs and proposals',
   const inventory = [
     {
       label: 'Eight-metric static dashboard',
-      text: ['2026-09-09', '217 source pairs', 'legacy 1.32x composite'],
-      href: 'https://github.com/juanmicrosoft/calor/commit/3a452b09',
+      text: [data.timestamp.slice(0, 10), '217 source pairs', 'legacy 1.32x composite'],
+      href: `https://github.com/juanmicrosoft/calor/commit/${provenance.sourceCommit}`,
     },
     {
       label: 'Correctness estimation mode',
@@ -480,7 +582,7 @@ test('readers can distinguish runtime modes, optional proofs and historical meas
   await expect(note).toContainText('not all behaviorally equivalent');
   expect(data.metrics.InformationDensity.winner).toBe('csharp');
   expect(data.metrics.InformationDensity.ratio).toBeLessThan(1);
-  await expect(page.locator('article')).toContainText('where C# leads');
+  await expect(page.locator('article')).toContainText('normalized ratio favors C#');
 });
 
 for (const width of [1366, 390]) {
@@ -499,7 +601,7 @@ for (const width of [1366, 390]) {
       await page.locator('article').getByRole('link', { name: 'snapshot provenance and limits', exact: true }).click();
       await expect(page).toHaveURL(/\/results\/#read-the-results-carefully$/);
       await expect(page.getByRole('heading', { name: 'Read the Results Carefully', exact: true })).toBeInViewport();
-      await expect(page.locator('article')).toContainText('where C# leads');
+      await expect(page.locator('article')).toContainText('normalized ratio favors C#');
     }
     for (const path of verificationPages) {
       await page.goto(`${base}/docs/${path}/`);

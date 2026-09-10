@@ -16,7 +16,9 @@ export function MetricCard({ name, ratio, description, isCalorOnly }: MetricCard
     <div className="space-y-2 border-b border-border pb-4" data-static-metric={name}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h4 className="font-medium">{label?.name || name} static score</h4>
-        <span className="font-mono">{isCalorOnly ? 'No comparison' : `${ratio.toFixed(2)}x Calor/C#`}</span>
+        <span className="font-mono">
+          {isCalorOnly ? 'No comparison' : `${ratio.toFixed(2)}x direction-normalized`}
+        </span>
       </div>
       <p className="text-sm text-muted-foreground">{description || label?.description}</p>
     </div>

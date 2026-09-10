@@ -207,7 +207,7 @@ public sealed class BenchmarkIntegration
 
         // Build category table
         sb.AppendLine("+-------------------------+--------+--------+-----------+");
-        sb.AppendLine("| Category                | C#     | Calor   | Advantage |");
+        sb.AppendLine("| Category                | C#     | Calor   | Dir. Ratio|");
         sb.AppendLine("+-------------------------+--------+--------+-----------+");
 
         // Group metrics by category and calculate averages
@@ -217,6 +217,12 @@ public sealed class BenchmarkIntegration
 
         foreach (var category in byCategory)
         {
+            if (category.All(IsCalorOnly))
+            {
+                sb.AppendLine($"| {category.Key,-23} | {"n/a",6} | {"Calor",6} | {"n/a",9} |");
+                continue;
+            }
+
             var avgCalor = category.Average(m => m.CalorScore);
             var avgCSharp = category.Average(m => m.CSharpScore);
             var avgAdvantage = category.Average(m => m.AdvantageRatio);
@@ -231,12 +237,15 @@ public sealed class BenchmarkIntegration
         sb.AppendLine("+-------------------------+--------+--------+-----------+");
         sb.AppendLine();
 
-        // Overall advantage
-        var overallAdvantage = result.Summary.OverallCalorAdvantage > 0
-            ? result.Summary.OverallCalorAdvantage
-            : CalculateGeometricMean(byCategory.Select(g => g.Average(m => m.AdvantageRatio)));
-
-        sb.AppendLine($"Overall Calor Advantage: {overallAdvantage:F2}x (geometric mean)");
+        if (result.Summary.CategoryAdvantages.Count > 0)
+        {
+            sb.AppendLine($"Legacy composite direction-normalized ratio: {result.Summary.OverallCalorAdvantage:F2}x (geometric mean)");
+            sb.AppendLine("Values above 1 favor Calor; lower-is-better metrics invert the raw score ratio.");
+        }
+        else
+        {
+            sb.AppendLine("No comparable metric ratios; all reported metrics are Calor-only.");
+        }
 
         // Verbose mode: show per-metric breakdown
         if (verbose)
@@ -250,8 +259,13 @@ public sealed class BenchmarkIntegration
                 sb.AppendLine($"  {category.Key}:");
                 foreach (var metric in category)
                 {
-                    var indicator = metric.AdvantageRatio > 1 ? "+" : "";
-                    sb.AppendLine($"    {metric.MetricName}: Calor={metric.CalorScore:F0}, C#={metric.CSharpScore:F0} ({indicator}{(metric.AdvantageRatio - 1) * 100:F0}%)");
+                    if (IsCalorOnly(metric))
+                    {
+                        sb.AppendLine($"    {metric.MetricName}: Calor raw={metric.CalorScore:F0}, C# comparator unavailable");
+                        continue;
+                    }
+
+                    sb.AppendLine($"    {metric.MetricName}: Calor raw={metric.CalorScore:F0}, C# raw={metric.CSharpScore:F0}, normalized={metric.AdvantageRatio:F2}x");
                 }
             }
         }
@@ -279,7 +293,7 @@ public sealed class BenchmarkIntegration
         // Summary table by category
         sb.AppendLine("Category Summary:");
         sb.AppendLine("+-------------------------+-----------+-----------+-----------+");
-        sb.AppendLine("| Category                | Avg Calor  | Avg C#    | Advantage |");
+        sb.AppendLine("| Category                | Avg Calor  | Avg C#    | Dir. Ratio|");
         sb.AppendLine("+-------------------------+-----------+-----------+-----------+");
 
         // Aggregate all metrics from all cases
@@ -290,6 +304,12 @@ public sealed class BenchmarkIntegration
 
         foreach (var category in byCategory)
         {
+            if (category.All(IsCalorOnly))
+            {
+                sb.AppendLine($"| {category.Key,-23} | {"Calor-only",9} | {"n/a",9} | {"n/a",9} |");
+                continue;
+            }
+
             var avgCalor = category.Average(m => m.CalorScore);
             var avgCSharp = category.Average(m => m.CSharpScore);
             var avgAdvantage = category.Average(m => m.AdvantageRatio);
@@ -300,21 +320,37 @@ public sealed class BenchmarkIntegration
         sb.AppendLine("+-------------------------+-----------+-----------+-----------+");
         sb.AppendLine();
 
-        sb.AppendLine($"Overall Calor Advantage: {result.Summary.OverallCalorAdvantage:F2}x");
+        if (result.Summary.CategoryAdvantages.Count > 0)
+        {
+            sb.AppendLine($"Legacy composite direction-normalized ratio: {result.Summary.OverallCalorAdvantage:F2}x");
+            sb.AppendLine("Values above 1 favor Calor; lower-is-better metrics invert the raw score ratio.");
+        }
+        else
+        {
+            sb.AppendLine("No comparable metric ratios; all reported metrics are Calor-only.");
+        }
         sb.AppendLine();
 
         // Per-file breakdown
         sb.AppendLine("By File:");
         foreach (var caseResult in result.ProjectResults.OrderByDescending(c => c.AverageAdvantage))
         {
-            var indicator = caseResult.AverageAdvantage > 1 ? "+" : "";
-            sb.AppendLine($"  {caseResult.FileName}: {indicator}{(caseResult.AverageAdvantage - 1) * 100:F0}% advantage ({caseResult.Metrics.Count} metrics)");
+            var comparable = caseResult.Metrics.Where(m => !IsCalorOnly(m)).ToList();
+            if (comparable.Count == 0)
+            {
+                sb.AppendLine($"  {caseResult.FileName}: no comparable metrics ({caseResult.Metrics.Count} Calor-only metrics)");
+                continue;
+            }
+
+            sb.AppendLine(
+                $"  {caseResult.FileName}: {comparable.Average(m => m.AdvantageRatio):F2}x "
+                + $"direction-normalized ({caseResult.Metrics.Count} metrics)");
         }
 
         if (verbose)
         {
             sb.AppendLine();
-            sb.AppendLine("Top Calor Advantages:");
+            sb.AppendLine("Top Calor-favoring categories:");
             foreach (var cat in result.Summary.TopCalorCategories.Take(3))
             {
                 sb.AppendLine($"  - {cat}");
@@ -323,7 +359,7 @@ public sealed class BenchmarkIntegration
             if (result.Summary.CSharpAdvantageCategories.Count > 0)
             {
                 sb.AppendLine();
-                sb.AppendLine("C# Advantages:");
+                sb.AppendLine("C#-favoring categories:");
                 foreach (var cat in result.Summary.CSharpAdvantageCategories)
                 {
                     sb.AppendLine($"  - {cat}");
@@ -385,7 +421,7 @@ public sealed class BenchmarkIntegration
               After:  {metrics.OutputTokens:N0} tokens, {metrics.OutputLines:N0} lines
               Token Savings: {metrics.TokenReduction:F1}%
               Line Savings: {metrics.LineReduction:F1}%
-              Overall Advantage: {advantage:F2}x
+              Overall Compactness Ratio: {advantage:F2}x
             """;
     }
 
@@ -416,7 +452,7 @@ public sealed class BenchmarkIntegration
         return new BenchmarkResult
         {
             Metrics = metrics,
-            AdvantageRatio = advantage,
+            CompactnessRatio = advantage,
             Summary = FormatComparison(metrics)
         };
     }
@@ -488,7 +524,9 @@ public sealed class BenchmarkIntegration
         // Calculate average advantage per category
         foreach (var (category, metrics) in byCategory)
         {
-            var validMetrics = metrics.Where(m => m.AdvantageRatio > 0).ToList();
+            var validMetrics = metrics
+                .Where(m => !IsCalorOnly(m) && m.AdvantageRatio >= 0)
+                .ToList();
             if (validMetrics.Count > 0)
             {
                 var product = validMetrics.Aggregate(1.0, (acc, m) => acc * m.AdvantageRatio);
@@ -542,7 +580,9 @@ public sealed class BenchmarkIntegration
         // Calculate average advantage per category
         foreach (var (category, metrics) in byCategory)
         {
-            var validMetrics = metrics.Where(m => m.AdvantageRatio > 0).ToList();
+            var validMetrics = metrics
+                .Where(m => !IsCalorOnly(m) && m.AdvantageRatio >= 0)
+                .ToList();
             if (validMetrics.Count > 0)
             {
                 var product = validMetrics.Aggregate(1.0, (acc, m) => acc * m.AdvantageRatio);
@@ -577,6 +617,9 @@ public sealed class BenchmarkIntegration
 
         return summary;
     }
+
+    private static bool IsCalorOnly(MetricResult metric) =>
+        metric.Details.TryGetValue("isCalorOnly", out var value) && value is true;
 
     private static double NormalizeScore(double score, double otherScore, string category)
     {
@@ -630,6 +673,6 @@ public sealed class FullBenchmarkResult
 public sealed class BenchmarkResult
 {
     public required FileMetrics Metrics { get; init; }
-    public required double AdvantageRatio { get; init; }
+    public required double CompactnessRatio { get; init; }
     public required string Summary { get; init; }
 }

@@ -16,7 +16,7 @@ namespace Calor.Compiler.Tests;
 /// ordinary bot run replaces a 30-run <c>overallAdvantage</c> with a single-run one under the same
 /// key, in a PR whose body says "latest metrics". Measured at <c>74ba4973</c>: 30 runs / 1.32
 /// becomes 0 runs / 1.28 over the same eight metrics. Read as a diff, that is a regression in
-/// Calor's advantage. It is not — the two numbers are not measuring the same thing.</para>
+/// the direction-normalized composite. It is not — the two numbers are not measuring the same thing.</para>
 ///
 /// <para>The workflow-side guard is <c>scripts/check-benchmark-methodology.js</c>, which refuses the
 /// swap before a PR is opened. This is the other half: the published artefacts must agree with each
@@ -26,8 +26,9 @@ public class BenchmarkMethodologyAgreementTests
 {
     /// <summary>
     /// The changelog's benchmark block, as 0.16 and 0.17 both write it:
-    /// <c>### Benchmark Results (Statistical: 30 runs)</c>, then <c>- **Overall Advantage**: 1.32
-    /// (Calor leads)</c> and <c>- **Programs Tested**: 217</c>.
+    /// <c>### Benchmark Results (Statistical: 30 runs)</c>, then
+    /// <c>- **Legacy Composite Direction-Normalized Ratio**: 1.32</c> and
+    /// <c>- **Programs Tested**: 217</c>.
     /// </summary>
     /// <summary>
     /// The explicit authorisation for a changelog/website mismatch. Deliberately a comment and
@@ -61,7 +62,9 @@ public class BenchmarkMethodologyAgreementTests
 
         var block = Block(changelog, header);
         var changelogRuns = int.Parse(header.Groups["runs"].Value);
-        var changelogAdvantage = Number(block, @"\*\*Overall Advantage\*\*:\s*([0-9.]+)");
+        var changelogAdvantage = Number(
+            block,
+            @"\*\*Legacy Composite Direction-Normalized Ratio\*\*:\s*([0-9.]+)");
         var changelogPrograms = (int?)Number(block, @"\*\*Programs Tested\*\*:\s*([0-9]+)");
 
         // Gate 16's "or the difference is stated in both" needs an EXPLICIT marker, not a phrase.
@@ -117,7 +120,7 @@ public class BenchmarkMethodologyAgreementTests
             ## [0.18.0] - 2026-09-08
 
             ### Benchmark Results (Statistical: 30 runs)
-            - **Overall Advantage**: 1.32 (Calor leads)
+            - **Legacy Composite Direction-Normalized Ratio**: 1.32
             - **Programs Tested**: 217
             """;
 
@@ -126,7 +129,9 @@ public class BenchmarkMethodologyAgreementTests
         var block = Block(changelog, header);
 
         Assert.Equal(30, int.Parse(header.Groups["runs"].Value));
-        Assert.Equal(1.32, Number(block, @"\*\*Overall Advantage\*\*:\s*([0-9.]+)"));
+        Assert.Equal(
+            1.32,
+            Number(block, @"\*\*Legacy Composite Direction-Normalized Ratio\*\*:\s*([0-9.]+)"));
 
         // The #1148 website file: same key, single run, a different figure.
         const int websiteRuns = 0;

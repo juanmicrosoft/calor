@@ -378,7 +378,10 @@ public class ConvertFormatEnvelopeTests : IDisposable
         var benchmark = root.GetProperty("data").GetProperty("benchmark");
         Assert.True(benchmark.GetProperty("originalTokens").GetInt32() > 0);
         Assert.True(benchmark.GetProperty("outputTokens").GetInt32() > 0);
-        Assert.True(benchmark.GetProperty("advantageRatio").GetDouble() > 0);
+        Assert.True(benchmark.GetProperty("compactnessRatio").GetDouble() > 0);
+        Assert.Equal(
+            benchmark.GetProperty("compactnessRatio").GetDouble(),
+            benchmark.GetProperty("advantageRatio").GetDouble());
         // The human-readable comparison table moves to stderr
         Assert.Contains("Token Economics", stdErr);
         Assert.DoesNotContain("Token Economics", stdOut);

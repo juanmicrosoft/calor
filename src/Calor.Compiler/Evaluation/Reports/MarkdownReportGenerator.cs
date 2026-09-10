@@ -16,10 +16,10 @@ public class MarkdownReportGenerator
         var sb = new StringBuilder();
 
         WriteHeader(sb, result);
-        WriteSummary(sb, result.Summary);
+        WriteSummary(sb, result);
         WriteCategoryBreakdown(sb, result);
         WriteDetailedResults(sb, result);
-        WriteConclusions(sb, result);
+        WriteInterpretationLimits(sb);
 
         return sb.ToString();
     }
@@ -32,7 +32,7 @@ public class MarkdownReportGenerator
         var sb = new StringBuilder();
 
         WriteHeader(sb, result);
-        WriteSummary(sb, result.Summary);
+        WriteSummary(sb, result);
 
         return sb.ToString();
     }
@@ -58,46 +58,59 @@ public class MarkdownReportGenerator
         sb.AppendLine();
     }
 
-    private static void WriteSummary(StringBuilder sb, EvaluationSummary summary)
+    private static void WriteSummary(StringBuilder sb, EvaluationResult result)
     {
+        var summary = result.Summary;
         sb.AppendLine("## Executive Summary");
         sb.AppendLine();
 
-        // Overall result
-        var overallAdvantage = summary.OverallCalorAdvantage;
-        var advantagePercent = (overallAdvantage - 1.0) * 100;
-        var winner = overallAdvantage > 1.0 ? "Calor" : (overallAdvantage < 1.0 ? "C#" : "Neither");
-
-        sb.AppendLine($"**Overall Winner:** {winner}");
-        sb.AppendLine($"**Overall Advantage Ratio:** {overallAdvantage:F2}x");
-
-        if (overallAdvantage != 1.0)
+        if (summary.CategoryAdvantages.Count > 0)
         {
-            sb.AppendLine($"**Advantage Percentage:** {Math.Abs(advantagePercent):F1}% in favor of {winner}");
+            sb.AppendLine($"**Legacy Composite Direction-Normalized Ratio:** {summary.OverallCalorAdvantage:F2}x");
+            sb.AppendLine("Each metric is normalized so values above 1 favor Calor, including lower-is-better metrics whose raw score ratio is inverted.");
+            sb.AppendLine("This static calculator output is not a measured language, agent-productivity, correctness, or safety advantage.");
+        }
+        else
+        {
+            sb.AppendLine("**Comparable Direction-Normalized Ratios:** none");
+            sb.AppendLine("All reported metrics are Calor-only and have no C# comparator.");
         }
 
         sb.AppendLine();
 
-        // Category breakdown table
-        sb.AppendLine("### Category Advantages");
+        sb.AppendLine("### Category Direction-Normalized Ratios");
         sb.AppendLine();
-        sb.AppendLine("| Category | Advantage Ratio | Winner |");
-        sb.AppendLine("|----------|-----------------|--------|");
+        sb.AppendLine("| Category | Direction-normalized ratio | Favored language |");
+        sb.AppendLine("|----------|----------------------------|------------------|");
+
+        var calorOnlyCategories = result.Metrics
+            .Where(IsCalorOnly)
+            .Select(metric => metric.Category)
+            .ToHashSet();
 
         foreach (var (category, ratio) in summary.CategoryAdvantages.OrderByDescending(kv => kv.Value))
         {
-            var catWinner = ratio > 1.0 ? "Calor" : (ratio < 1.0 ? "C#" : "Tie");
-            var indicator = ratio > 1.2 ? "+" : (ratio < 0.8 ? "-" : "=");
-            sb.AppendLine($"| {category} | {ratio:F2}x | {indicator} {catWinner} |");
+            if (calorOnlyCategories.Contains(category))
+            {
+                sb.AppendLine($"| {category} | No comparison | Calor-only |");
+                continue;
+            }
+
+            var favoredLanguage = ratio > 1.0 ? "Calor" : (ratio < 1.0 ? "C#" : "Tie");
+            sb.AppendLine($"| {category} | {ratio:F2}x | {favoredLanguage} |");
+        }
+        foreach (var category in calorOnlyCategories.OrderBy(category => category))
+        {
+            sb.AppendLine($"| {category} | No comparison | Calor-only |");
         }
 
         sb.AppendLine();
 
-        // Pass counts
-        sb.AppendLine("### Compilation Success");
+        sb.AppendLine("### Recorded Success Flags");
         sb.AppendLine();
-        sb.AppendLine($"- Calor passed: {summary.CalorPassCount}");
-        sb.AppendLine($"- C# passed: {summary.CSharpPassCount}");
+        sb.AppendLine($"- Calor inputs marked successful: {summary.CalorPassCount}");
+        sb.AppendLine($"- C# inputs marked successful: {summary.CSharpPassCount}");
+        sb.AppendLine("- These flags do not by themselves establish build success or runtime correctness.");
         sb.AppendLine();
     }
 
@@ -112,24 +125,33 @@ public class MarkdownReportGenerator
 
         foreach (var category in byCategory)
         {
+            var isCalorOnly = category.Any(IsCalorOnly);
             var avgAdvantage = category.Average(m => m.AdvantageRatio);
             var calorWins = category.Count(m => m.AdvantageRatio > 1.0);
             var csharpWins = category.Count(m => m.AdvantageRatio < 1.0);
 
             sb.AppendLine($"### {category.Key}");
             sb.AppendLine();
-            sb.AppendLine($"**Average Advantage:** {avgAdvantage:F2}x");
-            sb.AppendLine($"**Calor wins:** {calorWins} | **C# wins:** {csharpWins}");
+            if (isCalorOnly)
+            {
+                sb.AppendLine("**Calor-only metric:** no C# comparison");
+            }
+            else
+            {
+                sb.AppendLine($"**Average Direction-Normalized Ratio:** {avgAdvantage:F2}x");
+                sb.AppendLine($"**Calor-favoring:** {calorWins} | **C#-favoring:** {csharpWins}");
+            }
             sb.AppendLine();
 
             // Top metrics
             var topMetrics = category.OrderByDescending(m => m.AdvantageRatio).Take(5);
-            sb.AppendLine("| Metric | Calor | C# | Ratio |");
-            sb.AppendLine("|--------|------|-----|-------|");
+            sb.AppendLine("| Metric | Calor raw score | C# raw score | Direction-normalized ratio |");
+            sb.AppendLine("|--------|-----------------|--------------|----------------------------|");
 
             foreach (var metric in topMetrics)
             {
-                sb.AppendLine($"| {metric.MetricName} | {metric.CalorScore:F2} | {metric.CSharpScore:F2} | {metric.AdvantageRatio:F2}x |");
+                var ratio = IsCalorOnly(metric) ? "No comparison" : $"{metric.AdvantageRatio:F2}x";
+                sb.AppendLine($"| {metric.MetricName} | {metric.CalorScore:F2} | {metric.CSharpScore:F2} | {ratio} |");
             }
 
             sb.AppendLine();
@@ -151,87 +173,38 @@ public class MarkdownReportGenerator
         {
             sb.AppendLine($"### Level {level.Key}");
             sb.AppendLine();
-            sb.AppendLine("| Benchmark | Calor OK | C# OK | Avg Advantage |");
-            sb.AppendLine("|-----------|---------|-------|---------------|");
+            sb.AppendLine("| Benchmark | Calor success flag | C# success flag | Average Direction-Normalized Ratio |");
+            sb.AppendLine("|-----------|--------------------|-----------------|------------------------------------|");
 
             foreach (var caseResult in level.OrderByDescending(c => c.AverageAdvantage))
             {
                 var calorOk = caseResult.CalorSuccess ? "Yes" : "No";
                 var csharpOk = caseResult.CSharpSuccess ? "Yes" : "No";
-                sb.AppendLine($"| {caseResult.FileName} | {calorOk} | {csharpOk} | {caseResult.AverageAdvantage:F2}x |");
+                var comparable = caseResult.Metrics.Where(metric => !IsCalorOnly(metric)).ToList();
+                var ratio = comparable.Count == 0
+                    ? "No comparison"
+                    : $"{comparable.Average(metric => metric.AdvantageRatio):F2}x";
+                sb.AppendLine($"| {caseResult.FileName} | {calorOk} | {csharpOk} | {ratio} |");
             }
 
             sb.AppendLine();
         }
     }
 
-    private static void WriteConclusions(StringBuilder sb, EvaluationResult result)
+    private static void WriteInterpretationLimits(StringBuilder sb)
     {
-        sb.AppendLine("## Conclusions");
+        sb.AppendLine("## Interpretation Limits");
         sb.AppendLine();
-
-        var summary = result.Summary;
-
-        // Key findings
-        sb.AppendLine("### Key Findings");
-        sb.AppendLine();
-
-        if (summary.TopCalorCategories.Count > 0)
-        {
-            sb.AppendLine($"1. **Calor excels in:** {string.Join(", ", summary.TopCalorCategories)}");
-        }
-
-        if (summary.CSharpAdvantageCategories.Count > 0)
-        {
-            sb.AppendLine($"2. **C# advantages:** {string.Join(", ", summary.CSharpAdvantageCategories)}");
-        }
-
-        // Token economics highlight
-        if (summary.CategoryAdvantages.TryGetValue("TokenEconomics", out var tokenAdvantage))
-        {
-            var savings = (1 - 1.0 / tokenAdvantage) * 100;
-            if (savings > 0)
-            {
-                sb.AppendLine($"3. **Compactness:** Calor is approximately {savings:F0}% more compact than equivalent C# code (composite of token, character, and line counts)");
-            }
-        }
-
-        // Information density highlight
-        if (summary.CategoryAdvantages.TryGetValue("InformationDensity", out var densityAdvantage))
-        {
-            if (densityAdvantage > 1.0)
-            {
-                sb.AppendLine($"4. **Information density:** Calor carries {densityAdvantage:F1}x more semantic information per token");
-            }
-        }
-
-        sb.AppendLine();
-
-        // Recommendations
-        sb.AppendLine("### Recommendations");
-        sb.AppendLine();
-        sb.AppendLine("Based on the evaluation results:");
-        sb.AppendLine();
-
-        if (summary.OverallCalorAdvantage > 1.2)
-        {
-            sb.AppendLine("- Consider using Calor for AI agent interactions to reduce token costs");
-            sb.AppendLine("- Calor's explicit structure may improve AI code generation accuracy");
-        }
-        else if (summary.OverallCalorAdvantage < 0.8)
-        {
-            sb.AppendLine("- C# may be more suitable for the evaluated use cases");
-            sb.AppendLine("- Consider the specific task requirements when choosing");
-        }
-        else
-        {
-            sb.AppendLine("- Results are similar; choose based on team familiarity and tooling");
-            sb.AppendLine("- Consider category-specific advantages for specialized tasks");
-        }
-
+        sb.AppendLine("- Direction normalization describes which side a metric's rule favors; it is not a raw Calor/C# score ratio.");
+        sb.AppendLine("- Static calculator outputs are not observed coding-agent outcomes.");
+        sb.AppendLine("- Source pairs may not be behaviorally equivalent.");
+        sb.AppendLine("- Success flags do not establish generated-code build success or runtime correctness.");
         sb.AppendLine();
         sb.AppendLine("---");
         sb.AppendLine();
         sb.AppendLine("*Report generated by Calor Evaluation Framework*");
     }
+
+    private static bool IsCalorOnly(MetricResult metric) =>
+        metric.Details.TryGetValue("isCalorOnly", out var value) && value is true;
 }
