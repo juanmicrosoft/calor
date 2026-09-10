@@ -22,10 +22,7 @@ class SuiteFreezeEvidenceTests(unittest.TestCase):
         spec.loader.exec_module(cls.runner)
 
     def test_exact_observed_task_inputs_are_preserved(self):
-        actual = {
-            path.relative_to(TASKS).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
-            for path in TASKS.rglob("*") if path.is_file()
-        }
+        actual = self.runner.task_input_hashes(TASKS)
         self.assertEqual(self.report["taskArtifactSha256"], actual)
         self.assertFalse(self.report["agentInvoked"])
         self.assertFalse(self.report["epochCreated"])
@@ -37,6 +34,12 @@ class SuiteFreezeEvidenceTests(unittest.TestCase):
             pair = json.loads((TASKS / task["id"] / "pair.json").read_text())
             self.assertEqual(7, pair["registeredShape"])
             self.assertEqual("prepared-not-frozen", pair["freezeStatus"])
+
+    def test_derived_evidence_does_not_change_frozen_execution_inputs(self):
+        self.assertFalse(self.runner.is_task_input(Path("C-001/evidence/r8/a.json")))
+        for path in ("C-001/pair.json", "C-001/spec.md", "C-001/starter-a/task.calr.inc",
+                     "C-001/tests/HeldOutTests.cs", "C-001/starter-a/evidence/extra.calr"):
+            self.assertTrue(self.runner.is_task_input(Path(path)))
 
     def test_actual_control_outcomes_and_complete_case_counts(self):
         self.runner.validate_observations(self.report, EVIDENCE)

@@ -54,6 +54,13 @@ directory inside this worktree. It:
 6. Rejects changed inputs, missing tests, unexpected compiler failures,
    missing state witnesses, or a canonical solution that fails visible tests.
 
+The execution-input inventory covers task metadata, source, specifications,
+and suites. It excludes only each task's top-level `evidence/` directory,
+where #1258 will append derived compiler observations without changing those
+inputs. The later complete epoch artifact inventory must pin that evidence
+too. The archived `evidence/run.py` remains the actual script used for its
+recorded execution, even when the current verifier gains additional guards.
+
 The dependency remains readable and immutable; it is not hidden from the
 agent. Only the declared task fragment is editable. Immutable-source and
 generated-source enforcement are instrument checks, not evidence that an

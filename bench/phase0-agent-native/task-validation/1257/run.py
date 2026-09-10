@@ -37,6 +37,16 @@ def git(root, *args):
     return subprocess.check_output(["git", "-C", str(root), *args], text=True).strip()
 
 
+def is_task_input(relative):
+    return len(relative.parts) < 2 or relative.parts[1] != "evidence"
+
+
+def task_input_hashes(root):
+    return {path.relative_to(root).as_posix(): digest(path)
+            for path in sorted(root.rglob("*"))
+            if path.is_file() and is_task_input(path.relative_to(root))}
+
+
 def validate_observations(report, evidence):
     visible_counts = {
         "C-001-quota-adapter": 8, "C-002-shipping-quote": 8,
@@ -128,8 +138,7 @@ def main():
     before = {str(p): digest(p) for p in inputs}
     if digest(inputs[-4]) != COMPILER_SHA or digest(inputs[-2]) != COMPILER_SHA:
         parser.error("CLI and Tasks-hosted compiler must match the observed frozen-release DLL")
-    artifacts = {str(p.relative_to(TASKS)): digest(p)
-                 for p in sorted(TASKS.rglob("*")) if p.is_file()}
+    artifacts = task_input_hashes(TASKS)
     output.mkdir()
     evidence = output / "evidence"
     evidence.mkdir()
@@ -244,8 +253,7 @@ def main():
         raise RuntimeError("instrument or product changed during validation")
     if instrument_head != git(instrument_root, "rev-parse", "HEAD"):
         raise RuntimeError("instrument checkout moved during validation")
-    if artifacts != {str(p.relative_to(TASKS)): digest(p)
-                     for p in sorted(TASKS.rglob("*")) if p.is_file()}:
+    if artifacts != task_input_hashes(TASKS):
         raise RuntimeError("task inputs changed during validation")
     write_json(evidence / "results.json", report)
     validate_observations(report, evidence)
