@@ -74,7 +74,7 @@
       }
     ]
   },
-  "MeasuredCommit": "46baabf8dfbb32d512ecf3f8350454ecbe4bce59",
+  "MeasuredCommit": "9a1e84c03f0697692db4c0d939ebe0211f5e9081",
   "AggregateDiagnostics": 117,
   "AggregateModulesWithDiagnostics": 47,
   "AggregateModulesEnforced": 326,
@@ -157,7 +157,7 @@
         "Calor0250 Serilog/Settings/KeyValuePairs/SettingValueConversions.cs"
       ],
       "BindFailureMultiCause": 4,
-      "Calor0411Sites": 544,
+      "Calor0411Sites": 543,
       "Calor0411Modules": 61
     },
     {
