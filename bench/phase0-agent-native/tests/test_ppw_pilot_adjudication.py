@@ -46,6 +46,9 @@ class PilotAdjudicationTests(unittest.TestCase):
 
     def guarded_projection(self):
         amendment = analysis.load(BENCH / analysis.SPENDING_AMENDMENT)
+        evidence = self.epoch / "admission/spending-instrument-amendment.json"
+        evidence.write_bytes((BENCH / analysis.SPENDING_AMENDMENT).read_bytes())
+        self.addCleanup(evidence.unlink)
         self.change_json(self.epoch / "registration.json", lambda registration:
                          registration["stages"]["pilot"].update(instrumentAmendment={
                              "path": "admission/spending-instrument-amendment.json",
@@ -389,10 +392,10 @@ class PilotAdjudicationTests(unittest.TestCase):
             selected = copy.deepcopy(original)
             change(selected)
             with self.subTest(index=index), self.assertRaises(ValueError):
-                analysis.execution_projection(pins, selected)
+                analysis.execution_projection(pins, selected, self.epoch)
         selected = {"spendingPlan": {"path": "not-authorization.json", "sha256": "0" * 64}}
         with self.assertRaisesRegex(ValueError, "pinned instrument amendment"):
-            analysis.execution_projection(pins, selected)
+            analysis.execution_projection(pins, selected, self.epoch)
 
     def test_guarded_projection_rejects_downgraded_partial_and_mixed_inventories(self):
         self.guarded_projection()
@@ -407,7 +410,8 @@ class PilotAdjudicationTests(unittest.TestCase):
         ]
         for index, artifacts in enumerate(variants):
             with self.subTest(index=index), self.assertRaisesRegex(ValueError, "inventory differs"):
-                analysis.execution_projection({**pins, "harnessArtifacts": artifacts}, selected)
+                analysis.execution_projection({**pins, "harnessArtifacts": artifacts}, selected,
+                                              self.epoch)
 
     def test_guarded_projection_rejects_wrong_stage_and_missing_raw_run(self):
         self.guarded_projection()
@@ -453,6 +457,32 @@ class PilotAdjudicationTests(unittest.TestCase):
             with self.subTest(change=change), patch.object(analysis, "load", side_effect=changed):
                 with self.assertRaises(ValueError):
                     analysis.validate_analysis_registration()
+
+    def test_guarded_proof_requires_exact_authority_or_verified_copied_evidence(self):
+        self.guarded_projection()
+        pins = analysis.load(self.epoch / "pins.json")
+        selected = analysis.load(self.epoch / "registration.json")["stages"]["pilot"]
+        projected = analysis.execution_projection(pins, selected, self.epoch)
+        self.assertEqual("verified-archive-local-file", projected["evidenceResolution"])
+        self.assertEqual(selected["instrumentAmendment"], projected["selectedInstrumentAmendment"])
+        for relative in ("not-the-amendment.json", "admission/stage1-method.json", "."):
+            altered = copy.deepcopy(selected)
+            altered["instrumentAmendment"]["path"] = relative
+            with self.subTest(relative=relative), self.assertRaises(ValueError):
+                analysis.execution_projection(pins, altered, self.epoch)
+
+        selected["instrumentAmendment"] = analysis.load(
+            BENCH / analysis.GUARDED_PROJECTION)["instrumentAmendment"]
+        projected = analysis.execution_projection(pins, selected, self.epoch)
+        self.assertEqual("exact-committed-authority-reference", projected["evidenceResolution"])
+        self.assertEqual(selected["instrumentAmendment"], projected["selectedInstrumentAmendment"])
+
+    def test_guarded_copied_evidence_tampering_cannot_hide_behind_known_hash(self):
+        self.guarded_projection()
+        evidence = self.epoch / "admission/spending-instrument-amendment.json"
+        self.change_json(evidence, lambda amendment: amendment.update(stage="confirmatory"))
+        with self.assertRaisesRegex(ValueError, "archive-local instrument amendment evidence differs"):
+            analysis.adjudicate(self.epochs, self.epoch.name)
 
 
 if __name__ == "__main__":

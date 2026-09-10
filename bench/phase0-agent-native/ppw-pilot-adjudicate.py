@@ -105,7 +105,7 @@ def validate_analysis_registration():
     return manifest
 
 
-def execution_projection(pins, selected):
+def execution_projection(pins, selected, epoch=None):
     baseline = load(BENCH / PILOT_PINS)
     if "instrumentAmendment" not in selected and "spendingPlan" not in selected:
         require(pins.get("harnessArtifacts") == baseline["harnessArtifacts"],
@@ -119,10 +119,26 @@ def execution_projection(pins, selected):
             "guarded execution requires a pinned instrument amendment")
     relative = proof["path"]
     require(isinstance(relative, str) and relative and not Path(relative).is_absolute()
+            and not Path(relative).drive and not Path(relative).root
             and ".." not in Path(relative).parts,
             "guarded instrument amendment requires a relative evidence path")
     require(proof["sha256"] == projection["instrumentAmendment"]["sha256"],
             "guarded execution selects an unregistered instrument amendment")
+    evidence = None
+    if epoch is not None:
+        evidence = Path(epoch)
+        require(not evidence.is_symlink(), "linked guarded evidence root")
+        for part in Path(relative).parts:
+            evidence /= part
+            require(not evidence.is_symlink(), "linked guarded instrument amendment evidence")
+    if evidence is not None and evidence.exists():
+        require(evidence.is_file() and digest(evidence) == proof["sha256"],
+                "archive-local instrument amendment evidence differs from its registered hash")
+        resolution = "verified-archive-local-file"
+    else:
+        require(proof == projection["instrumentAmendment"],
+                "noncanonical instrument amendment requires verified archive-local evidence")
+        resolution = "exact-committed-authority-reference"
     amendment = load(BENCH / SPENDING_AMENDMENT)
     require(pins.get("harnessArtifacts") == amendment["replacementHarnessArtifacts"],
             "guarded execution inventory differs; no downgrade or mixed source inventories")
@@ -130,10 +146,11 @@ def execution_projection(pins, selected):
             "guarded empirical analysis is not activated by this prospective projection")
     return {"id": projection["id"],
             "authority": {"path": GUARDED_PROJECTION, "sha256": digest(BENCH / GUARDED_PROJECTION)},
-            "instrumentAmendment": projection["instrumentAmendment"]}
+            "instrumentAmendment": projection["instrumentAmendment"],
+            "selectedInstrumentAmendment": proof, "evidenceResolution": resolution}
 
 
-def validate_scope(pins, registration, method, epoch_id, stage):
+def validate_scope(pins, registration, method, epoch_id, stage, epoch=None):
     instrument = module("pilot_scope_instrument", "ppw-instrument.py")
     require(stage == "pilot", "pilot analysis cannot select a confirmatory stage")
     instrument.validate_pins(pins, registration, stage, epoch_id)
@@ -159,7 +176,7 @@ def validate_scope(pins, registration, method, epoch_id, stage):
         require(registration.get(key) == frozen[key], "frozen task registration differs: " + key)
     prospective = load(BENCH / PILOT_PINS)
     require(pins["compiler"] == prospective["compiler"], "prospective shared product pins differ")
-    execution_projection(pins, selected)
+    execution_projection(pins, selected, epoch)
     require(re.fullmatch(r"[0-9a-f]{40}", pins.get("harnessCommit", "")),
             "collection commit identity is missing")
     return instrument
@@ -301,7 +318,7 @@ def adjudicate(epochs_root, epoch_id, stage="pilot"):
     epoch = instrument.local(epochs_root, epoch_id)
     before = inventory(epoch, instrument)
     pins, registration = load(epoch / "pins.json"), load(epoch / "registration.json")
-    validate_scope(pins, registration, method, epoch_id, stage)
+    validate_scope(pins, registration, method, epoch_id, stage, epoch)
     reject_synthetic_markers(epoch, pins)
     report = instrument.analyze(epochs_root, epoch_id, stage)
     result = aggregate(report, pins, method)
@@ -321,7 +338,7 @@ def adjudicate(epochs_root, epoch_id, stage="pilot"):
             "collectionHarnessCommit": pins["harnessCommit"],
             "collectionHarnessArtifacts": pins["harnessArtifacts"],
             "collectionExecutionProjection": execution_projection(
-                pins, registration["stages"]["pilot"]),
+                pins, registration["stages"]["pilot"], epoch),
             "modelPin": pins["modelPin"], "agentVersion": pins["agentVersion"],
             "compiler": pins["compiler"],
             "countsSource": "recomputed from this epoch's raw archive by ppw-instrument.analyze",

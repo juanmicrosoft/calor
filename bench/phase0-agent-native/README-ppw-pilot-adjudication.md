@@ -107,12 +107,15 @@ separate **non-runnable, synthetic-analysis-only** projection of that exact
 reviewed instrument amendment.
 
 An archived selected-stage `instrumentAmendment` must identify the registered
-amendment by relative path and SHA. Its hash resolves against the committed
-authority, like the other copied admission references. The execution
+amendment by relative path and SHA. An exact registered path/SHA pair can
+resolve against the committed authority. Any different relative path must
+name an archive-local file whose bytes match the registered hash. Present
+but changed evidence is rejected, including at the canonical path. The execution
 inventory must equal the amendment's complete replacement map. Missing or
 unregistered references, mixed inventories and downgrades to the old map
 are refused. A spending-plan marker without the amendment is also refused.
-The chosen projection is disclosed in output provenance; no archive or
+The chosen projection, selected proof and resolution source are disclosed
+in output provenance; no archive or
 source identity is rewritten to force a match.
 
 Current guarded selection accepts **only explicitly synthetic input**.
