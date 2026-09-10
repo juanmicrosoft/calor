@@ -578,3 +578,53 @@ Any later model/client or material instrument-pin change requires a reviewed
 amendment with its reason before the affected stage. This binding does not
 supply a ceiling, separate null-result acceptance, stage-2 design, collected
 epoch, or benefit verdict. **#1259 remains the paid-collection gate.**
+
+## 11. Actual pilot-only authorization and bounded execution hold (#1259)
+
+**Date: 2026-09-10.** The coordinating parent relayed the user's new
+authorization, preserved exactly in
+[`authorization-250/source-quote.txt`](../../bench/phase0-agent-native/registrations/ppw-rows-stage1/authorization-250/source-quote.txt)
+and [the #1259 source record](https://github.com/juanmicrosoft/calor/issues/1259#issuecomment-5618103570):
+
+> I authorize the redesigned PP-W-rows [pilot only / entire two-stage study], with a total spending ceiling of $250. I accept the registered stopping rules and publication of negative or null results. Do not exceed this ceiling or weaken the protocol to finish within it.
+
+The bracketed scope placeholder was not selected. As the parent told the
+user, the conservative interpretation is **pilot only**, with **$250 USD
+total**, not per task, arm, scheduled slot or invocation. No stage-2 budget
+or automatic continuation is inferred. The record supplies the separate
+narrower-study financial decision and stopping-rule/negative/null-publication
+acceptance. It does not alter M0's historical UNADJUDICATED disposition.
+
+The [machine-readable receipt and assessment](../../bench/phase0-agent-native/registrations/ppw-rows-stage1/authorization-250/)
+distinguish financial approval from operational admission. Sections 1–10
+remain byte-for-byte historical records. In particular, the original
+unfunded method/model/epoch files retain their hashes; their old funding
+strings do not negate this subsequent approval.
+
+The unchanged pilot requires **444 scheduled runs**. The historical
+**$2.0278/run** planning reference multiplies to **$900.3432**. The approved
+ceiling permits an all-in mean of at most **$250/444 = $0.563063…** per
+scheduled slot, including all chargeable failed/interrupted/retried work.
+This is an aggregate constraint, not a per-run truncation allocation.
+**The historical estimate is not a cost lower bound or proof that the
+redesigned pilot cannot cost less.**
+
+No experimental call is admitted until #1378 provides trustworthy reviewed
+enforcement/accounting, any execution-pin changes are coherently registered,
+and a defensible plan can support the **full unchanged pilot** within $250.
+Current evidence does not establish that plan. The parent reports a
+claude.ai Max/firstParty session; official documentation describes its local
+dollar figures as estimates, not authoritative billing. Subscription access
+is not reinterpreted as zero study cost.
+
+The present operational assessment is **BUDGET_NOT_RUN** because a defensible
+complete-pilot plan within the bound has not been established. Reassess it
+against #1378's actual reviewed enforcement contract; do not convert an
+estimate into a claim of impossibility. N, model/client, task validity and
+stopping rules cannot be weakened to fit the cap. Starving runs so they fail
+is not a valid negative finding.
+
+This is not a not-buildable result (the genuine Exit A remains), an observed
+pilot null/negative, or the separately registered stage-2
+**UNDERPOWERED-CARRIED** off-ramp. No stage-2 N/Δ or outcome is supplied.
+#1267, #1262 and #1254 remain open until their actual requirements are met.

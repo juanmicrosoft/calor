@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "kind": "pp-w-rows-billing-evidence-not-a-cost-guarantee",
+  "retrievedDate": "2026-09-10",
+  "accountContext": {
+    "reportedMode": "claude.ai Max / firstParty",
+    "source": "Coordinating parent's authorization handoff; not a new authentication observation by this author",
+    "credentialsOrPersonalBillingDetailsCollected": false
+  },
+  "officialDocumentation": [
+    {
+      "url": "https://code.claude.com/docs/en/costs",
+      "section": "Track your costs / Using the /usage command",
+      "shortExcerpt": "Claude Code computes the dollar figure locally from token counts at list price",
+      "relevance": "A local token-price calculation is not an independently enforced aggregate billing limit."
+    },
+    {
+      "url": "https://code.claude.com/docs/en/costs",
+      "section": "Track your costs / Using the /usage command",
+      "shortExcerpt": "The figure is an estimate, so for authoritative billing see the Usage page in the Claude Console.",
+      "relevance": "Do not claim authoritative billing or a hard upper bound from the displayed estimate."
+    },
+    {
+      "url": "https://code.claude.com/docs/en/costs",
+      "section": "Subscription note",
+      "shortExcerpt": "the session cost figure isn't relevant for billing purposes",
+      "relevance": "The note concerns Max/Pro subscriptions. It does not authorize treating this study as zero cost or ignoring the user's ceiling."
+    }
+  ],
+  "limits": [
+    "Documentation was read without invoking an experimental model or changing authentication.",
+    "This record does not establish an authoritative hard bound for the reported firstParty/Max route.",
+    "Runtime enforcement and accounting across failed, interrupted, retried, concurrent and in-flight calls remain #1378 work.",
+    "No subscription, local estimate, or historical mean is treated as a guarantee that the unchanged pilot fits $250."
+  ],
+  "experimentalModelInvoked": false,
+  "billingGuaranteeEstablished": false
+}
