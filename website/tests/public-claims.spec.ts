@@ -25,9 +25,22 @@ test('effect-rows outcome publishes a no-run disposition without substituting hi
     await page.locator('article a[href$="/docs/benchmarking/results/#redesigned-pp-w-rows-deferred"]').click();
     await expect(page.getByRole('heading', { name: 'Redesigned PP-W-rows: deferred' })).toBeInViewport();
     await expect(page.locator('article')).toContainText('no redesigned confirmatory result exists');
+    await expect(page.locator('article')).toContainText('Local buildability passed on 2026-09-10');
+    await expect(page.locator('article')).toContainText('not an agent observation');
+    await expect(page.locator('article')).toContainText('no redesigned agent collection or benefit result exists');
+    await expect(page.locator('article')).not.toContainText('No candidate has established');
+    await expect(page.getByRole('link', { name: 'reviewed gate closure', exact: true }))
+      .toHaveAttribute('href', 'https://github.com/juanmicrosoft/calor/pull/1348');
     await expect(page.locator('article')).toContainText('Null means uncollected');
     await expect(page.locator('article')).toContainText('two cost-eligible task pairs (12 runs)');
   }
+  await page.goto(`${base}/docs/benchmarking/evidence-status/`);
+  for (const text of ['Local buildability passed on 2026-09-10', 'not an agent observation',
+    'no redesigned agent collection or benefit result exists', 'UNADJUDICATED', 'administrative stop']) {
+    await expect(page.locator('article')).toContainText(text);
+  }
+  await expect(page.getByRole('link', { name: 'reviewed gate closure', exact: true }))
+    .toHaveAttribute('href', 'https://github.com/juanmicrosoft/calor/pull/1348');
 });
 
 test('effect-rows methodology separates registration, tooling, observations and approval', async ({ page }) => {
@@ -43,9 +56,13 @@ test('effect-rows methodology separates registration, tooling, observations and 
     await page.locator('article a[href$="/docs/benchmarking/effect-rows-study/"]').first().click();
     await expect(page).toHaveURL(/\/effect-rows-study\/$/);
     for (const text of ['UNADJUDICATED', 'administrative stop', 'No redesigned confirmatory result',
-      'below 50%', 'UNDERPOWERED-CARRIED', 'not implemented evidence']) {
+      'below 50%', 'UNDERPOWERED-CARRIED', 'not implemented evidence',
+      'Local buildability passed on 2026-09-10', 'not an agent observation',
+      'no redesigned agent collection or benefit result exists']) {
       await expect(page.locator('article')).toContainText(text);
     }
+    await expect(page.getByRole('link', { name: 'reviewed gate closure', exact: true }))
+      .toHaveAttribute('href', 'https://github.com/juanmicrosoft/calor/pull/1348');
   }
 });
 
@@ -307,7 +324,8 @@ test('benchmark methodology distinguishes artifacts, failed runs and proposals',
     },
     {
       label: 'Redesigned PP-W-rows protocol',
-      text: ['2026-09-08', 'No pilot or confirmatory runs', 'R1/R4', 'No result'],
+      text: ['2026-09-08', 'No pilot or confirmatory runs', 'Local buildability subsequently passed',
+        '2026-09-10', 'No agent-benefit result'],
       href: 'https://github.com/juanmicrosoft/calor/blob/16880d006db760d7b47d829fd4282b033c3158a0/docs/plans/2026-09-05-ppw-rows-fixture-redesign.md',
     },
   ];
