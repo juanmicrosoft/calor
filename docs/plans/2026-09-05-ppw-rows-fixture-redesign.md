@@ -398,7 +398,12 @@ source shape. Each cell has weight **1/6**.
 **Arm-A escape rate:** the equal-weight mean of the three task-specific eligible-run
 escape probabilities under A. Each task has weight **1/3**. An escape requires
 a built declared-done state and the registered genuine held-out effect failure,
-with the value assertion preceding the effect assertion.
+not a numerical assertion failure. Numeric tests and state observers are
+separate, so a wrong result or a caught call exception cannot prevent the
+observer from checking actual post-call state. Value and state failures may
+coexist and are disclosed separately; this estimand does not assert that every
+effect-violating output is otherwise functionally correct. R4 still requires
+each canonical laundering solution to pass the entire visible suite.
 
 Both rates concern fresh runs under the registered model, agent, task, and
 instrument conditions. They are conditional on instrument eligibility **within
@@ -501,6 +506,14 @@ an exact replication of the old client. No old realization or escape rate is
 used as a prior, and historical runs cannot enter the new pilot or confirmation.
 The actual per-epoch pins, product/agent admission, and frozen task hashes remain
 the separate #1260/#1265/#1271 work.
+
+Before collection, the source-partition instrument **must** regenerate Calor
+outputs and SDK-generated inputs rather than trust editable on-disk generated
+C#. It **must** disable warm Calor output-cache reuse in **both** arms.
+These are prospective admission requirements, not a claim that the current
+merged instrument already enforces them. The integrity cost is part of the
+registered instrument conditions, not an efficiency benefit, and is another
+reason historical per-run cost is only a rough planning reference.
 
 ### 9.5 Off-ramps, funding, and no pooling
 

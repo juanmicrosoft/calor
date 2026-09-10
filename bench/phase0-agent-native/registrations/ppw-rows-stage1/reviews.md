@@ -53,3 +53,64 @@ unit-test inputs, not pilot observations.
    freeze, operational indicator verification, admission/pins, and
    collection remain separate. No stage-2 Δ/N, margin, or verdict is
    invented, and the frozen off-ramps are not weakened.
+
+## Pre-freeze oracle correction: independent review
+
+Reviewer: `oracle-method-review`, independent read-only code-review agent,
+model **gpt-5.5**. This remains AI technical review, not experimental
+model execution or spending approval.
+
+The old authoring evidence used a numeric assertion before its state
+assertion. Inspection and four actual locally compiled regression controls
+showed that a wrong value or thrown exception could therefore mask an
+actual state violation. Before task freeze or collection, the proposed
+final suites split those checks into separate numeric and state cases.
+The state observer catches the call exception and still checks the actual
+before/after state; numeric tests disclose wrong values and exceptions.
+Historical authoring source/evidence is retained, not rewritten.
+
+The reader inspected the new tests and the four raw control records:
+three effectful-wrong-value programs and one effectful-throwing program.
+Each compiled under the real permissive release compiler; each produced
+two genuine state failures alongside two numeric/exception failures.
+These are deterministic instrument controls, not agent observations.
+
+**Oracle disposition:** the reader found the split consistent with frozen
+R4/R5. R4 requires each canonical laundering solution to pass the entire
+visible suite. No frozen text conditions empirical effect escapes on an
+otherwise-correct numeric output. Numeric failure alone remains insufficient
+for an escape. §9 now explicitly discloses coexisting failures and does not
+claim otherwise-correct outputs.
+
+The review also identified two integration findings:
+
+1. The merged instrument's `seeded.clean` admission does not yet accept the
+   prepared tasks' explicit `seeded.laundering`/`seeded.honest` roles.
+   This is a real task-freeze/collection integration obligation. No legacy
+   alias was used to falsely label laundering as honest, and this methods
+   amendment does not claim task freeze or final admission.
+2. The draft said cache-cold regeneration was already implemented. Corrected
+   to an explicit **prospective pre-collection requirement**. Independent
+   review and merging of actual enforcement remain required; a local
+   draft-helper experiment is not evidence of merged enforcement.
+
+The size, mathematical method, fixed weights, point-estimate off-ramps,
+original sections 1–8, and absence of collected data are unchanged.
+
+## Independent remediation review
+
+Reviewer: `prospective-admission-review`, independent read-only code-review
+agent, model **claude-sonnet-5**.
+
+**Clean: no significant issue found in the three-file methods follow-up.**
+The reader checked the actual untracked test/source structure, current
+instrument admission, and tracked prose/JSON. They verified that the
+unresolved task-admission mismatch remains disclosed, cold-cache enforcement
+is a future requirement rather than a shipped claim, and no task freeze,
+epoch pin, funding, or collection authorization is asserted.
+
+This reader inspected source structure rather than re-executing the task
+matrix. Their structural R4 assessment is not substituted for observed
+visible-suite execution; actual runs remain the task-freeze evidence.
+The author separately reran the thirteen mathematical/candidate guards
+and the byte comparison of frozen sections 1–8: all passed.

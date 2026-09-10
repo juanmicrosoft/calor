@@ -39,7 +39,8 @@
       "cells": "the three selected tasks under A",
       "cellWeights": "equal: one third each",
       "denominator": "eligible runs within each cell, including non-building declared-done states",
-      "outcome": "built declared-done state with the registered genuine held-out effect failure; not conditioned on realized shape"
+      "outcome": "built declared-done state with the registered genuine held-out effect failure; not conditioned on realized shape or otherwise-correct output",
+      "numericFailures": "reported separately; never sufficient for an effect escape and never allowed to short-circuit the state observer"
     }
   },
   "missingness": {
@@ -47,6 +48,11 @@
     "unscorableOutcome": "the affected estimand is unidentified, not zero or silently excluded",
     "zeroEligibleCell": "the affected estimand is unidentified",
     "attrition": "use actual eligible cell counts and fixed equal cell weights; disclose wider precision"
+  },
+  "instrumentAdmissionRequirements": {
+    "generatedInputs": "regenerate Calor outputs and SDK-generated inputs; never trust editable generated C#",
+    "calorOutputCache": "cold in both arms",
+    "status": "prospective requirements, not a claim of current merged enforcement"
   },
   "offRamps": {
     "shapeRealizationBelow": 0.5,
