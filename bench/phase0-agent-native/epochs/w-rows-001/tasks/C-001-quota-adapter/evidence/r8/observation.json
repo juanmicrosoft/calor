@@ -1,0 +1,47 @@
+{
+  "kind": "deterministic-frozen-release-arm-discrimination",
+  "task": "C-001-quota-adapter",
+  "registeredShape": 7,
+  "compilerCommit": "514f538024df990af86054af25975b756ba42ab1",
+  "compilerConfiguration": "Release",
+  "compilerSha256": "8adf683d36296f92ddd6bdd414980f4ef3cca9bd16c78826621e866f1e8405d0",
+  "sourceSha256": "24c90dc237553f3caf6014a5dc267d78c8058ff56da02b9204547b10e089cd16",
+  "agentInvoked": false,
+  "suiteReexecuted": false,
+  "arms": {
+    "A": {
+      "command": [
+        "dotnet",
+        "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw-v018/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+        "-i",
+        "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/r8-scoped-final/C-001-quota-adapter/source.calr",
+        "-o",
+        "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/r8-scoped-final/C-001-quota-adapter/A.generated.cs",
+        "--no-telemetry",
+        "--permissive-effects"
+      ],
+      "policyFlags": [
+        "--permissive-effects"
+      ],
+      "exitCode": 0,
+      "stdout": "Compilation successful: /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/r8-scoped-final/C-001-quota-adapter/A.generated.cs\n",
+      "stderr": ""
+    },
+    "B": {
+      "command": [
+        "dotnet",
+        "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw-v018/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+        "-i",
+        "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/r8-scoped-final/C-001-quota-adapter/source.calr",
+        "-o",
+        "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/r8-scoped-final/C-001-quota-adapter/B.generated.cs",
+        "--no-telemetry"
+      ],
+      "policyFlags": [],
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/r8-scoped-final/C-001-quota-adapter/source.calr(24,10): warning Calor0411: Unknown external call to 'this.lookup'. Add effect declaration in a .calor-effects.json manifest.\n/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/r8-scoped-final/C-001-quota-adapter/source.calr(23,7): error Calor0410: Function 'Preview' uses effect 'unknown' but does not declare it\n"
+    }
+  },
+  "verdictDifference": "A accepts without diagnostics; B rejects unknown with Calor0410."
+}

@@ -1,0 +1,48 @@
+{
+  "agentVersion": "2.1.266 (Claude Code)",
+  "arms": {
+    "A": {
+      "editMechanism": "raw",
+      "flags": [
+        "--permissive-effects"
+      ],
+      "label": "calor-permissive",
+      "policy": "permissive"
+    },
+    "B": {
+      "editMechanism": "raw",
+      "flags": [],
+      "label": "calor-strict",
+      "policy": "strict"
+    }
+  },
+  "collectionAuthorized": false,
+  "compiler": {
+    "calorDll": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw-v018/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+    "calorSha256": "8adf683d36296f92ddd6bdd414980f4ef3cca9bd16c78826621e866f1e8405d0",
+    "calorTasksSha256": "6ec65e1b376f8bb09e81a1aa1aa4f15db71f35540d8e01e67410e457e9c3978b",
+    "commit": "514f538024df990af86054af25975b756ba42ab1",
+    "compilerHash": "9f3ad1c6aa101c60313b33ad42527b3d256de5cf841c4fbeabeedec613548f24",
+    "release": "v0.18.0",
+    "repoRoot": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw-v018"
+  },
+  "dataKind": "unrun",
+  "effectSizeDelta": null,
+  "epochId": "w-rows-001",
+  "fundingStatus": "unfunded",
+  "identityStatus": "Prospective identity references copied from the pilot; no active stage-2 registration.",
+  "kind": "pp-w-rows-confirmatory-reservation",
+  "lifecycle": "reserved-unregistered",
+  "modelPin": "claude-opus-4-8",
+  "noninferiorityMargin": null,
+  "registrationSha256": "8cd57d14f49c04f66fb8efeeebc1592ad900e17e1eee802dde0d2cf1efc76e77",
+  "runsPerArm": null,
+  "schemaVersion": 1,
+  "sourcePilotEpochId": "w-rows-pilot-001",
+  "stage": "confirmatory",
+  "suite": [
+    "C-001-quota-adapter",
+    "C-002-shipping-quote",
+    "C-003-frame-fingerprint"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "collectionAuthorized": false,
+  "dataPolicy": "No runs or stage ledger. Never copy pilot outcomes into this input template or confirmatory analysis.",
+  "epochId": "w-rows-001",
+  "fundingStatus": "unfunded",
+  "identityStatus": "References the preselected pilot identities; not an active confirmatory registration.",
+  "kind": "pp-w-rows-stage-reservation",
+  "pendingGates": [
+    "Genuine spending ceiling and separate null-result acceptance (#1259)",
+    "Authorized pilot collection and its registered off-ramp decision (#1267)",
+    "Reviewed stage-2 size, effect size and decision rules using actual pilot evidence (#1262)",
+    "Reviewed replacement of this reservation by a complete stage-specific registration"
+  ],
+  "pilotInputPins": {
+    "path": "admission/pilot-pins.json",
+    "sha256": "73ab4b9df4d4520a7754a4fb30063e8a567a2c07a5ff6ea452985b0109694bf3"
+  },
+  "schemaVersion": 1,
+  "sourcePilotEpochId": "w-rows-pilot-001",
+  "stage": "confirmatory",
+  "status": "reserved-unregistered",
+  "taskSupersession": {
+    "path": "admission/task-supersession.json",
+    "sha256": "b40bfe20e468145f083151e58a0264564a4c55ad7f580213b24bcafcba0e1a0d"
+  }
+}

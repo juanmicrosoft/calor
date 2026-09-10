@@ -1,0 +1,15 @@
+{
+  "command": [
+    "dotnet",
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw-v018/src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+    "-i",
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/r8-scoped-final/C-001-quota-adapter/source.calr",
+    "-o",
+    "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/r8-scoped-final/C-001-quota-adapter/B.generated.cs",
+    "--no-telemetry"
+  ],
+  "policyFlags": [],
+  "exitCode": 1,
+  "stdout": "",
+  "stderr": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/r8-scoped-final/C-001-quota-adapter/source.calr(24,10): warning Calor0411: Unknown external call to 'this.lookup'. Add effect declaration in a .calor-effects.json manifest.\n/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/r8-scoped-final/C-001-quota-adapter/source.calr(23,7): error Calor0410: Function 'Preview' uses effect 'unknown' but does not declare it\n"
+}
