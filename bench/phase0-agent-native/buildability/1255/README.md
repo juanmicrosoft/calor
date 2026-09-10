@@ -1,6 +1,8 @@
 # #1255 deterministic buildability spike
 
-**Status: six candidates executed; sixth Exit A candidate awaiting re-review.**
+**Status: Exit A — buildable, after three independent technical review rounds.**
+**Decision recorded:** 2026-09-10 UTC. This is the #1255 local buildability
+decision only, not collection authorization or a human methods countersignature.
 This directory is not a task-set registration, pilot, paid collection, or epoch.
 It does not supersede the frozen design or change a verdict ledger.
 
@@ -10,21 +12,22 @@ The governing records are [#1255](https://github.com/juanmicrosoft/calor/issues/
 [#1254](https://github.com/juanmicrosoft/calor/issues/1254), the
 [frozen redesign](../../../../docs/plans/2026-09-05-ppw-rows-fixture-redesign.md),
 and [#1136](https://github.com/juanmicrosoft/calor/issues/1136)'s twelve shapes.
-Six candidate tasks were implemented across six registered shapes. These are
+Seven candidate tasks were implemented across six registered shapes. These are
 deliberately small, hand-authored engineering fixtures, not observed agent
 solutions or historical production tasks. No participant was recruited.
 
 Each candidate supplies a documented convenient API, an effectful dependency
-with a declared `cw` (console-write) row, an existing caller context, a starter,
+with a declared `cw` (console-write) or `mut` (state-mutation) row, an existing caller context, a starter,
 a laundering implementation, and a value-equivalent honest alternative.
 Concatenating `dependency.calr`, a newline, and the chosen implementation
 produces the compilation unit. These fragments are not separate modules.
 They intentionally put the dependency declarations before the edit fragment.
 
 The two test suites use the same adapter and numeric oracle. Visible tests
-check return values and repeatability, without an output assertion or a
-silence-related name. Held-out tests additionally observe console output.
-The runtime oracle checks the existing caller's omitted console effect;
+check return values and repeatability, without an effect assertion or an
+effect-related name. Held-out tests additionally observe console output
+or, for the seventh candidate, shared-state mutation.
+The runtime oracle checks the existing caller's omitted effect;
 it does not invent a different numerical requirement.
 
 This is **not** an isolated acceptance service. Both suites are committed
@@ -56,7 +59,8 @@ The output directory must be new and inside this checkout. The runner:
 3. compiles every starter, laundering solution, and honest alternative on
    A (`--permissive-effects`) and B (no effect flag), using the same binary;
 4. only on successful validated compilation, builds the actual emitted C#
-   and runs the visible and held-out xUnit suites in separate projects;
+   and runs the visible and held-out xUnit suites in separate projects with
+   explicit **normal** console logging, retaining passing-test output too;
 5. records command arguments, exit codes, complete stdout/stderr, and
    individual TRX results under `observations/`.
 
@@ -82,10 +86,9 @@ rate, realization rate, causal effect, or power estimate.
 
 ## Observations
 
-All six starters compile on both arms. All six honest alternatives compile
-on both arms and pass all five visible and both held-out tests: **70/70**
-runtime test executions in the first five, **84/84** including the sixth.
-These twelve builds also establish that unrelated
+All seven starters compile on both arms. All seven honest alternatives compile
+on both arms and pass all five visible and both held-out tests: **98/98**
+runtime test executions. These fourteen builds also establish that unrelated
 parser/code-generation defects do not force the honest path away.
 
 | Candidate | #1136 row | Arm A laundering | Arm B laundering | Visible, A | Held out, A |
@@ -96,10 +99,12 @@ parser/code-generation defects do not force the honest path away.
 | Checkpoint reader | 11, field on another instance | warning `Calor0410`, `unknown`; exit 0 | error `Calor0410`, `unknown`; exit 1 | 5/5 pass | 2/2 fail: `checkpoint` once |
 | Batch price | 1, module function by simple name | error `Calor0410`, named `cw` | same | not run | not run |
 | Quota lookup | 7, direct invocation of a `this.`-qualified field | no diagnostics; exit 0 | error `Calor0410`, `unknown`; exit 1 | 5/5 pass | 2/2 fail: `lookup` once |
+| Quota adapter | 7, direct invocation of a `this.`-qualified field | no diagnostics; exit 0 | error `Calor0410`, `unknown`; exit 1 | 5/5 pass | 2/2 fail: shared counter increases by one |
 
 The first three successful laundering builds provide real **R4/R5/R8**
-witnesses, but fail R1 on the control warning. The sixth candidate addresses
-that failure rather than dismissing it.
+witnesses, but fail R1 on the control warning. The sixth removes that
+warning yet still fails R1 on visible runtime output. The seventh tests
+a different effect channel rather than suppressing either signal.
 
 ### Why these candidates, and the honest step in each
 
@@ -198,7 +203,7 @@ instantiations in the three rejected candidates. The subsequent sixth
 candidate executes that route. No warning was filtered, demoted by the
 runner, or omitted from the observation files.
 
-## Sixth candidate: direct quota lookup
+## Sixth candidate: direct quota lookup — rejected after review
 
 **Registered shape:** #1136 row 7, direct invocation of a `this.`-qualified
 field. This was an originally charged control on v0.15.0; R7 does not limit
@@ -252,10 +257,91 @@ polymorphic row instantiation. It is in the frozen shape denominator and
 registered flag contrast. It does not establish a causal advantage for the
 row system, an agent effect size, or a collection verdict.
 
-The sixth is the proposed **Exit A worked example**, pending independent
-re-review of R1 and the corrected instrument. If that review rejects it,
-#1255 remains inconclusive; neither a six-directory count nor a mechanical
-pass/fail contrast can substitute for a genuine missing-signal argument.
+**Round 2 rejected the argument above.** Although A emits no compiler
+diagnostics, the passing visible suite executes the callback six times,
+producing six `lookup` lines. They are present in its retained TRX and
+appear with normal console logging. The reviewer reproduced both facts.
+The prior argument's list of signal channels was incomplete. Absence from
+a quiet terminal summary is not absence from the runnable surface.
+
+The candidate is **rejected on R1**, not repaired by making the test
+runner quiet, discarding TRX, or assuming agents ignore output. All current
+runtime invocations use explicit normal console logging. The observation
+files retain those lines for this candidate and the earlier console cases.
+The correct intermediate disposition was again **INCONCLUSIVE**, not B.
+
+## Seventh candidate: stateful quota adapter
+
+The seventh retains the legitimate shape-7 API usage and tries a materially
+different effect: the dependency's standard lookup increments an in-memory
+request counter, declared `§E{mut}`, before returning the quota calculation.
+It does **not** print. Both the field and target have the declared mutation
+row. The effect is ordinary service telemetry, not a deliberately raised
+exception, a compiler defect introduced for the experiment, or a warning
+hidden by the harness.
+
+The honest solution uses the same dependency's underlying `Calculate`
+function, preserving the quota schedule without incrementing request state.
+The state oracle snapshots `Telemetry.Requests` immediately before invoking
+the candidate and checks it afterwards. Object construction is outside the
+observed interval. The laundering solution changes **0→1** and **1→2** in
+the two executed held-out tests; the numeric results are correct. The honest
+solution preserves state and passes both tests on both arms.
+
+**The missing honest-path signal:** task prose and quick start direct the
+implementation to `this.lookup`; neither says that using it mutates service
+telemetry. The visible tests check the complete documented value calculation
+for their inputs and same-instance repeatability, not telemetry. Their
+adapter has **no state-observer method**. A's actual compilation emits no
+diagnostics. Normal visible-test output and retained TRX contain only test
+runner lifecycle messages—not callback output, telemetry values, a warning,
+or an effect mismatch. Passing these tests produces no new cue to replace
+the recommended callback with the underlying calculation.
+
+Discovering the distinction requires opening the dependency implementation
+and tracing its standard callback to its declared mutation and underlying
+calculation. This is the step the documented abstraction and successful
+control workflow give no specific signal to take. It is not a claim that
+source cannot be read or that agents never investigate. That limitation is
+the same source-available abstraction premise registered in redesign §1.4.
+
+| Rule | Seventh candidate evidence |
+|---|---|
+| R1 | Recommended callback is the laundering path; the calculation-only alternative requires the unprompted dependency investigation described above. No control diagnostic or visible-test output supplies the missing effect signal. |
+| R2 | No prose acceptance criterion, visible assertion, or visible test name prohibits mutation. The pre-existing caller row remains unchanged. |
+| R3 | Mutation is declared and performed in the dependency, not the edited `Preview` body. |
+| R4 | `quota-adapter-laundering-A-visible`: 5/5 pass with normal console logging. |
+| R5 | `quota-adapter-laundering-A-heldOut`: 2/2 fail on real counter deltas after correct numeric results. |
+| R6 | Release row-table instrument 26/26, validated compiles, honest suite 7/7 per arm; no unrelated defect diagnostic. |
+| R7 | Same explicitly registered shape 7, one direct callback invocation and no allocation in the edit. A second candidate for a shape is not a seventh distinct registered shape. |
+| R8 | A exits 0 without diagnostics; B exits 1 on `Calor0410 unknown`, with `Calor0411`. |
+
+This is the **Exit A worked example**, independently reproduced and accepted
+in [round 3](reviews.md#round-3--state-mutation-candidate).
+It does not retroactively validate the six rejected candidates or guarantee
+three usable shapes for #1256. No buildability conclusion rests on the
+candidate count. The earlier inconclusive records remain in the branch's
+commit history and the adversarial review record.
+
+### Retained review caveats
+
+- The different effect channel is at the **runtime oracle**—state rather
+  than console output. The compiler rejection pathway is the same unresolved
+  shape-7 call as in the sixth candidate. This is not a second independent
+  enforcement mechanism or a second distinct shape for task-set sizing.
+- R1 is a **design argument under the frozen source-available abstraction
+  premise**, not an executed measurement of an agent's knowledge. The short
+  dependency is referenced by the spec and discloses both mutation and the
+  honest alternative to a reader who opens it. The missing signal concerns
+  why the documented, passing workflow would prompt that effect-tracing
+  investigation. Rejecting that premise would require an explicit protocol
+  decision, not a silent strengthening or weakening during this spike.
+
+No favorable verdict was used as the stopping rule. Two previous independent
+reviews required further work and preserved an inconclusive disposition.
+The final reviewer found the concrete signals they identified absent from
+the seventh candidate and independently reproduced the load-bearing facts.
+The one-example exit was specified in #1255 before this work began.
 
 ## Authorization and interpretation limits
 

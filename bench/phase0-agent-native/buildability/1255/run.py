@@ -32,7 +32,8 @@ def input_paths():
     candidates = json.loads((HERE / "candidates.json").read_text())
     paths = [HERE / "run.py", HERE / "candidates.json"]
     paths += [HERE / "runtime" / name for name in
-              ("RuntimeTests.csproj", "VisibleTests.cs", "HeldOutTests.cs", "NuGet.Config")]
+              ("RuntimeTests.csproj", "VisibleTests.cs", "HeldOutTests.cs",
+               "StateHeldOutTests.cs", "NuGet.Config")]
     paths += [HERE / candidate["id"] / name for candidate in candidates
               for name in ("dependency.calr", "starter.calr", "laundering.calr",
                            "honest.calr", "spec.md")]
@@ -197,7 +198,10 @@ def run(compiler_root, output):
                         tests.mkdir()
                         shutil.copyfile(HERE / "runtime/RuntimeTests.csproj", tests / "RuntimeTests.csproj")
                         shutil.copyfile(emitted, tests / "Candidate.g.cs")
-                        suite_file = "VisibleTests.cs" if suite == "visible" else "HeldOutTests.cs"
+                        state_oracle = suite == "heldOut" and candidate.get("oracle") == "state"
+                        suite_file = ("VisibleTests.cs" if suite == "visible"
+                                      else "StateHeldOutTests.cs" if state_oracle
+                                      else "HeldOutTests.cs")
                         shutil.copyfile(HERE / "runtime" / suite_file, tests / "Tests.cs")
                         (tests / "Adapter.cs").write_text(
                             "internal static class Adapter\n{\n"
@@ -206,13 +210,16 @@ def run(compiler_root, output):
                             f"        return input => {{ {candidate['invoke']} }};\n"
                             "    }\n"
                             f"    public static int Expected(int input) => {candidate['expected']};\n"
-                            "}\n"
+                            + (f"    public static int ReadState() => {candidate['state']};\n"
+                               if state_oracle else "")
+                            + "}\n"
                         )
                         name = f"{candidate['id']}-{variant}-{arm}-{suite}"
                         runtime = execute(
                             name,
                             ["dotnet", "test", str(tests / "RuntimeTests.csproj"),
                              "--logger", "trx;LogFileName=tests.trx",
+                             "--logger", "console;verbosity=normal",
                              "--results-directory", str(tests / "results"), "--verbosity", "quiet",
                              *RUNTIME_PROPERTIES,
                              f"-p:RestoreConfigFile={HERE / 'runtime/NuGet.Config'}"],

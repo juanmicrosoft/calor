@@ -25,13 +25,14 @@ class BuildabilityEvidenceTests(unittest.TestCase):
         self.assertIsNone(self.report["collectionEpoch"])
         self.assertEqual({"A": ["--permissive-effects"], "B": []}, self.report["arms"])
         self.assertEqual({1, 7, 8, 9, 11, 12}, {c["shape"] for c in self.report["candidates"]})
-        self.assertEqual(6, len(self.report["candidates"]))
+        self.assertEqual(7, len(self.report["candidates"]))
         self.assertEqual(26, self.report["rowTable"]["passed"])
         self.assertEqual(0, self.report["rowTable"]["failed"])
 
     def test_observations_match_executed_source_and_suites(self):
         required = {"run.py", "candidates.json", "runtime/RuntimeTests.csproj",
-                    "runtime/VisibleTests.cs", "runtime/HeldOutTests.cs", "runtime/NuGet.Config"}
+                    "runtime/VisibleTests.cs", "runtime/HeldOutTests.cs",
+                    "runtime/StateHeldOutTests.cs", "runtime/NuGet.Config"}
         for candidate in self.report["candidates"]:
             required.update(f"{candidate['id']}/{name}" for name in
                             ("spec.md", "dependency.calr", "starter.calr",
@@ -146,6 +147,7 @@ class BuildabilityEvidenceTests(unittest.TestCase):
                             self.assertEqual([
                                 "dotnet", "test", f"{project}/RuntimeTests.csproj",
                                 "--logger", "trx;LogFileName=tests.trx",
+                                "--logger", "console;verbosity=normal",
                                 "--results-directory", f"{project}/results",
                                 "--verbosity", "quiet",
                                 "-p:ImportDirectoryBuildProps=false",
@@ -186,6 +188,28 @@ class BuildabilityEvidenceTests(unittest.TestCase):
             self.assertNotIn("new ", candidate["invoke"])
             if candidate["id"] != "batch-price":
                 self.assertIn("new ", candidate["setup"])
+
+    def test_mutation_candidate_has_no_visible_output_and_real_state_failures(self):
+        candidate = next(c for c in self.report["candidates"] if c["id"] == "quota-adapter")
+        a, b = (candidate["variants"]["laundering"][arm] for arm in ("A", "B"))
+        self.assertEqual((0, 1), (a["compileExit"], b["compileExit"]))
+        self.assertEqual([], a["warningCodes"])
+        self.assertEqual(5, a["visible"]["passed"])
+        self.assertEqual(2, a["heldOut"]["failed"])
+        compile_log = json.loads(
+            (SPIKE / "evidence/quota-adapter-laundering-A-compile.json").read_text())
+        self.assertEqual("", compile_log["stderr"])
+        tree = spike.ET.parse(SPIKE / "evidence/quota-adapter-laundering-A-visible.trx")
+        for stdout in tree.findall(".//t:StdOut", spike.TRX):
+            for line in (stdout.text or "").splitlines():
+                if line.strip():
+                    self.assertRegex(
+                        line, r"^\[xUnit.net [0-9:.]+\]\s+(xUnit.net VSTest Adapter .*|"
+                              r"(Discovering|Discovered|Starting|Finished):\s+RuntimeTests)$")
+        for test in a["heldOut"]["tests"]:
+            expected = int(re.search(r"Expected: (\d+)", test["message"]).group(1))
+            actual = int(re.search(r"Actual:\s+(\d+)", test["message"]).group(1))
+            self.assertEqual(expected + 1, actual)
 
     def test_runner_rejects_existing_output_before_invoking_compiler(self):
         with self.assertRaisesRegex(ValueError, "new directory"):

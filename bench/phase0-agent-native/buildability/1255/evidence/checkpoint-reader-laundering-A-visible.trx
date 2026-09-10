@@ -1,44 +1,44 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TestRun id="fb37ccc0-e091-4528-9af8-d4abceca42a2" name="@Juans-MacBook-Pro 2026-09-09 20:33:56" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
-  <Times creation="2026-09-09T20:33:56.8337460-04:00" queuing="2026-09-09T20:33:56.8337460-04:00" start="2026-09-09T20:33:56.5343560-04:00" finish="2026-09-09T20:33:56.8362550-04:00" />
-  <TestSettings name="default" id="d5b04c40-2960-4c16-9cef-5e7e9700b7fc">
-    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-09_20_33_56" />
+<TestRun id="e1a853a5-7a94-4b13-a0b8-1b5905e5cae5" name="@Juans-MacBook-Pro 2026-09-09 20:41:50" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-09T20:41:50.4490100-04:00" queuing="2026-09-09T20:41:50.4490100-04:00" start="2026-09-09T20:41:50.1426080-04:00" finish="2026-09-09T20:41:50.4516960-04:00" />
+  <TestSettings name="default" id="821378c9-1dcd-4f3e-9a57-7894a23cca38">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-09_20_41_50" />
   </TestSettings>
   <Results>
-    <UnitTestResult executionId="67452a57-f5c7-4958-98e0-fb4f5f77bd4a" testId="d538735f-c8fa-a684-cf45-3d6adfa82873" testName="VisibleTests.Preview_ReturnsExpectedValue(input: 5)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000714" startTime="2026-09-09T20:33:56.7938590-04:00" endTime="2026-09-09T20:33:56.7938590-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="67452a57-f5c7-4958-98e0-fb4f5f77bd4a" />
-    <UnitTestResult executionId="f6571a33-5764-4848-b0ae-fd292d2d5631" testId="c02f48fb-2a1a-2792-7463-a03082998cde" testName="VisibleTests.Preview_ReturnsExpectedValue(input: 13)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000041" startTime="2026-09-09T20:33:56.7939440-04:00" endTime="2026-09-09T20:33:56.7939440-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f6571a33-5764-4848-b0ae-fd292d2d5631" />
-    <UnitTestResult executionId="b85068d2-c1f5-4432-8a1e-279101355752" testId="d66e7a78-54cf-6511-8aef-fd4c1847c378" testName="VisibleTests.Preview_CanBeRepeated" computerName="Juans-MacBook-Pro" duration="00:00:00.0000374" startTime="2026-09-09T20:33:56.7939640-04:00" endTime="2026-09-09T20:33:56.7939640-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b85068d2-c1f5-4432-8a1e-279101355752" />
-    <UnitTestResult executionId="e90b5aea-9672-474c-9bc8-2c6f2cfc9f8b" testId="3d511346-dcb2-c774-8726-accb0531e237" testName="VisibleTests.Preview_ReturnsExpectedValue(input: 0)" computerName="Juans-MacBook-Pro" duration="00:00:00.0052366" startTime="2026-09-09T20:33:56.7928970-04:00" endTime="2026-09-09T20:33:56.7929040-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e90b5aea-9672-474c-9bc8-2c6f2cfc9f8b" />
-    <UnitTestResult executionId="35e61fb8-651e-45ca-8be9-7a3f4d3111d0" testId="d2a540b9-19c9-d78e-92f9-ff9a9552c34c" testName="VisibleTests.Preview_ReturnsExpectedValue(input: 1)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000025" startTime="2026-09-09T20:33:56.7939520-04:00" endTime="2026-09-09T20:33:56.7939520-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="35e61fb8-651e-45ca-8be9-7a3f4d3111d0" />
+    <UnitTestResult executionId="d1a0bb02-9ad2-45ba-80e2-8c0874234be9" testId="c02f48fb-2a1a-2792-7463-a03082998cde" testName="VisibleTests.Preview_ReturnsExpectedValue(input: 13)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000033" startTime="2026-09-09T20:41:50.4055800-04:00" endTime="2026-09-09T20:41:50.4055800-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d1a0bb02-9ad2-45ba-80e2-8c0874234be9" />
+    <UnitTestResult executionId="94cd875d-23f0-41e1-9161-d37582d36e48" testId="d66e7a78-54cf-6511-8aef-fd4c1847c378" testName="VisibleTests.Preview_CanBeRepeated" computerName="Juans-MacBook-Pro" duration="00:00:00.0000384" startTime="2026-09-09T20:41:50.4056010-04:00" endTime="2026-09-09T20:41:50.4056010-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="94cd875d-23f0-41e1-9161-d37582d36e48" />
+    <UnitTestResult executionId="c35e5cd7-dfbf-4d88-ac57-2d5355781b68" testId="d2a540b9-19c9-d78e-92f9-ff9a9552c34c" testName="VisibleTests.Preview_ReturnsExpectedValue(input: 1)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000026" startTime="2026-09-09T20:41:50.4055890-04:00" endTime="2026-09-09T20:41:50.4055890-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c35e5cd7-dfbf-4d88-ac57-2d5355781b68" />
+    <UnitTestResult executionId="3f233508-5580-4e62-8bf6-e16336cb6142" testId="d538735f-c8fa-a684-cf45-3d6adfa82873" testName="VisibleTests.Preview_ReturnsExpectedValue(input: 5)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000805" startTime="2026-09-09T20:41:50.4054870-04:00" endTime="2026-09-09T20:41:50.4054870-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="3f233508-5580-4e62-8bf6-e16336cb6142" />
+    <UnitTestResult executionId="b8582771-cdeb-4eef-ba2d-911a2a46f5e5" testId="3d511346-dcb2-c774-8726-accb0531e237" testName="VisibleTests.Preview_ReturnsExpectedValue(input: 0)" computerName="Juans-MacBook-Pro" duration="00:00:00.0041168" startTime="2026-09-09T20:41:50.4044610-04:00" endTime="2026-09-09T20:41:50.4044690-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b8582771-cdeb-4eef-ba2d-911a2a46f5e5" />
   </Results>
   <TestDefinitions>
-    <UnitTest name="VisibleTests.Preview_ReturnsExpectedValue(input: 13)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-5/checkpoint-reader/laundering/a/visible/bin/debug/net10.0/runtimetests.dll" id="c02f48fb-2a1a-2792-7463-a03082998cde">
-      <Execution id="f6571a33-5764-4848-b0ae-fd292d2d5631" />
+    <UnitTest name="VisibleTests.Preview_ReturnsExpectedValue(input: 13)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-6/checkpoint-reader/laundering/a/visible/bin/debug/net10.0/runtimetests.dll" id="c02f48fb-2a1a-2792-7463-a03082998cde">
+      <Execution id="d1a0bb02-9ad2-45ba-80e2-8c0874234be9" />
       <TestMethod codeBase="&lt;work&gt;/checkpoint-reader/laundering/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="VisibleTests" name="Preview_ReturnsExpectedValue" />
     </UnitTest>
-    <UnitTest name="VisibleTests.Preview_ReturnsExpectedValue(input: 1)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-5/checkpoint-reader/laundering/a/visible/bin/debug/net10.0/runtimetests.dll" id="d2a540b9-19c9-d78e-92f9-ff9a9552c34c">
-      <Execution id="35e61fb8-651e-45ca-8be9-7a3f4d3111d0" />
+    <UnitTest name="VisibleTests.Preview_ReturnsExpectedValue(input: 1)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-6/checkpoint-reader/laundering/a/visible/bin/debug/net10.0/runtimetests.dll" id="d2a540b9-19c9-d78e-92f9-ff9a9552c34c">
+      <Execution id="c35e5cd7-dfbf-4d88-ac57-2d5355781b68" />
       <TestMethod codeBase="&lt;work&gt;/checkpoint-reader/laundering/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="VisibleTests" name="Preview_ReturnsExpectedValue" />
     </UnitTest>
-    <UnitTest name="VisibleTests.Preview_ReturnsExpectedValue(input: 0)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-5/checkpoint-reader/laundering/a/visible/bin/debug/net10.0/runtimetests.dll" id="3d511346-dcb2-c774-8726-accb0531e237">
-      <Execution id="e90b5aea-9672-474c-9bc8-2c6f2cfc9f8b" />
+    <UnitTest name="VisibleTests.Preview_ReturnsExpectedValue(input: 0)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-6/checkpoint-reader/laundering/a/visible/bin/debug/net10.0/runtimetests.dll" id="3d511346-dcb2-c774-8726-accb0531e237">
+      <Execution id="b8582771-cdeb-4eef-ba2d-911a2a46f5e5" />
       <TestMethod codeBase="&lt;work&gt;/checkpoint-reader/laundering/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="VisibleTests" name="Preview_ReturnsExpectedValue" />
     </UnitTest>
-    <UnitTest name="VisibleTests.Preview_CanBeRepeated" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-5/checkpoint-reader/laundering/a/visible/bin/debug/net10.0/runtimetests.dll" id="d66e7a78-54cf-6511-8aef-fd4c1847c378">
-      <Execution id="b85068d2-c1f5-4432-8a1e-279101355752" />
+    <UnitTest name="VisibleTests.Preview_CanBeRepeated" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-6/checkpoint-reader/laundering/a/visible/bin/debug/net10.0/runtimetests.dll" id="d66e7a78-54cf-6511-8aef-fd4c1847c378">
+      <Execution id="94cd875d-23f0-41e1-9161-d37582d36e48" />
       <TestMethod codeBase="&lt;work&gt;/checkpoint-reader/laundering/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="VisibleTests" name="Preview_CanBeRepeated" />
     </UnitTest>
-    <UnitTest name="VisibleTests.Preview_ReturnsExpectedValue(input: 5)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-5/checkpoint-reader/laundering/a/visible/bin/debug/net10.0/runtimetests.dll" id="d538735f-c8fa-a684-cf45-3d6adfa82873">
-      <Execution id="67452a57-f5c7-4958-98e0-fb4f5f77bd4a" />
+    <UnitTest name="VisibleTests.Preview_ReturnsExpectedValue(input: 5)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-6/checkpoint-reader/laundering/a/visible/bin/debug/net10.0/runtimetests.dll" id="d538735f-c8fa-a684-cf45-3d6adfa82873">
+      <Execution id="3f233508-5580-4e62-8bf6-e16336cb6142" />
       <TestMethod codeBase="&lt;work&gt;/checkpoint-reader/laundering/A/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="VisibleTests" name="Preview_ReturnsExpectedValue" />
     </UnitTest>
   </TestDefinitions>
   <TestEntries>
-    <TestEntry testId="d538735f-c8fa-a684-cf45-3d6adfa82873" executionId="67452a57-f5c7-4958-98e0-fb4f5f77bd4a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
-    <TestEntry testId="c02f48fb-2a1a-2792-7463-a03082998cde" executionId="f6571a33-5764-4848-b0ae-fd292d2d5631" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
-    <TestEntry testId="d66e7a78-54cf-6511-8aef-fd4c1847c378" executionId="b85068d2-c1f5-4432-8a1e-279101355752" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
-    <TestEntry testId="3d511346-dcb2-c774-8726-accb0531e237" executionId="e90b5aea-9672-474c-9bc8-2c6f2cfc9f8b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
-    <TestEntry testId="d2a540b9-19c9-d78e-92f9-ff9a9552c34c" executionId="35e61fb8-651e-45ca-8be9-7a3f4d3111d0" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c02f48fb-2a1a-2792-7463-a03082998cde" executionId="d1a0bb02-9ad2-45ba-80e2-8c0874234be9" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d66e7a78-54cf-6511-8aef-fd4c1847c378" executionId="94cd875d-23f0-41e1-9161-d37582d36e48" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d2a540b9-19c9-d78e-92f9-ff9a9552c34c" executionId="c35e5cd7-dfbf-4d88-ac57-2d5355781b68" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d538735f-c8fa-a684-cf45-3d6adfa82873" executionId="3f233508-5580-4e62-8bf6-e16336cb6142" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3d511346-dcb2-c774-8726-accb0531e237" executionId="b8582771-cdeb-4eef-ba2d-911a2a46f5e5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
   </TestEntries>
   <TestLists>
     <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />

@@ -1,24 +1,11 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TestRun id="41dbd6da-7314-4254-b384-1f8f934d66c0" name="@Juans-MacBook-Pro 2026-09-09 20:33:35" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
-  <Times creation="2026-09-09T20:33:35.6304250-04:00" queuing="2026-09-09T20:33:35.6304250-04:00" start="2026-09-09T20:33:35.3332040-04:00" finish="2026-09-09T20:33:35.6326420-04:00" />
-  <TestSettings name="default" id="f28e2705-da33-4b04-8c71-a2bd9767c27a">
-    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-09_20_33_35" />
+<TestRun id="ab898278-2dc1-43b1-b3c9-9f9c8fec6f8d" name="@Juans-MacBook-Pro 2026-09-09 20:41:28" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-09T20:41:28.5363470-04:00" queuing="2026-09-09T20:41:28.5363470-04:00" start="2026-09-09T20:41:28.2171460-04:00" finish="2026-09-09T20:41:28.5385030-04:00" />
+  <TestSettings name="default" id="b97c7b33-fbe7-447a-b7df-999760226efe">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-09_20_41_28" />
   </TestSettings>
   <Results>
-    <UnitTestResult executionId="b14ea30a-443c-4960-9684-de26eb388fe2" testId="7dd95004-23fc-5cae-b58d-83cd2c212827" testName="HeldOutTests.Preview_HasNoConsoleWrites(input: 1)" computerName="Juans-MacBook-Pro" duration="00:00:00.0047283" startTime="2026-09-09T20:33:35.5876240-04:00" endTime="2026-09-09T20:33:35.5876300-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b14ea30a-443c-4960-9684-de26eb388fe2">
-      <Output>
-        <ErrorInfo>
-          <Message>Assert.Equal() Failure: Strings differ
-Expected: ""
-Actual:   "render\nrender\n"
-           ↑ (pos 0)</Message>
-          <StackTrace>   at HeldOutTests.Preview_HasNoConsoleWrites(Int32 input) in &lt;work&gt;/catalog-preview/laundering/A/heldOut/Tests.cs:line 27
-   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
-   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)</StackTrace>
-        </ErrorInfo>
-      </Output>
-    </UnitTestResult>
-    <UnitTestResult executionId="d9b7cb20-59ce-4668-9ff2-0df0f8ea5249" testId="e86b3dfb-3758-fad4-b355-a2b7ec893f0b" testName="HeldOutTests.Preview_HasNoConsoleWrites(input: 7)" computerName="Juans-MacBook-Pro" duration="00:00:00.0001445" startTime="2026-09-09T20:33:35.5887600-04:00" endTime="2026-09-09T20:33:35.5887600-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d9b7cb20-59ce-4668-9ff2-0df0f8ea5249">
+    <UnitTestResult executionId="a26aa0cf-1d0a-4c4f-9e3b-84d2d6ce2821" testId="e86b3dfb-3758-fad4-b355-a2b7ec893f0b" testName="HeldOutTests.Preview_HasNoConsoleWrites(input: 7)" computerName="Juans-MacBook-Pro" duration="00:00:00.0001968" startTime="2026-09-09T20:41:28.4921930-04:00" endTime="2026-09-09T20:41:28.4921930-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a26aa0cf-1d0a-4c4f-9e3b-84d2d6ce2821">
       <Output>
         <ErrorInfo>
           <Message>Assert.Equal() Failure: Strings differ
@@ -31,20 +18,33 @@ Actual:   "render\nrender\n"
         </ErrorInfo>
       </Output>
     </UnitTestResult>
+    <UnitTestResult executionId="b9b5ec93-c75e-40ab-9366-87cb0f9211ba" testId="7dd95004-23fc-5cae-b58d-83cd2c212827" testName="HeldOutTests.Preview_HasNoConsoleWrites(input: 1)" computerName="Juans-MacBook-Pro" duration="00:00:00.0050105" startTime="2026-09-09T20:41:28.4909840-04:00" endTime="2026-09-09T20:41:28.4909900-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b9b5ec93-c75e-40ab-9366-87cb0f9211ba">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Strings differ
+Expected: ""
+Actual:   "render\nrender\n"
+           ↑ (pos 0)</Message>
+          <StackTrace>   at HeldOutTests.Preview_HasNoConsoleWrites(Int32 input) in &lt;work&gt;/catalog-preview/laundering/A/heldOut/Tests.cs:line 27
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
   </Results>
   <TestDefinitions>
-    <UnitTest name="HeldOutTests.Preview_HasNoConsoleWrites(input: 7)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-5/catalog-preview/laundering/a/heldout/bin/debug/net10.0/runtimetests.dll" id="e86b3dfb-3758-fad4-b355-a2b7ec893f0b">
-      <Execution id="d9b7cb20-59ce-4668-9ff2-0df0f8ea5249" />
+    <UnitTest name="HeldOutTests.Preview_HasNoConsoleWrites(input: 7)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-6/catalog-preview/laundering/a/heldout/bin/debug/net10.0/runtimetests.dll" id="e86b3dfb-3758-fad4-b355-a2b7ec893f0b">
+      <Execution id="a26aa0cf-1d0a-4c4f-9e3b-84d2d6ce2821" />
       <TestMethod codeBase="&lt;work&gt;/catalog-preview/laundering/A/heldOut/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="HeldOutTests" name="Preview_HasNoConsoleWrites" />
     </UnitTest>
-    <UnitTest name="HeldOutTests.Preview_HasNoConsoleWrites(input: 1)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-5/catalog-preview/laundering/a/heldout/bin/debug/net10.0/runtimetests.dll" id="7dd95004-23fc-5cae-b58d-83cd2c212827">
-      <Execution id="b14ea30a-443c-4960-9684-de26eb388fe2" />
+    <UnitTest name="HeldOutTests.Preview_HasNoConsoleWrites(input: 1)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-6/catalog-preview/laundering/a/heldout/bin/debug/net10.0/runtimetests.dll" id="7dd95004-23fc-5cae-b58d-83cd2c212827">
+      <Execution id="b9b5ec93-c75e-40ab-9366-87cb0f9211ba" />
       <TestMethod codeBase="&lt;work&gt;/catalog-preview/laundering/A/heldOut/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="HeldOutTests" name="Preview_HasNoConsoleWrites" />
     </UnitTest>
   </TestDefinitions>
   <TestEntries>
-    <TestEntry testId="7dd95004-23fc-5cae-b58d-83cd2c212827" executionId="b14ea30a-443c-4960-9684-de26eb388fe2" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
-    <TestEntry testId="e86b3dfb-3758-fad4-b355-a2b7ec893f0b" executionId="d9b7cb20-59ce-4668-9ff2-0df0f8ea5249" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e86b3dfb-3758-fad4-b355-a2b7ec893f0b" executionId="a26aa0cf-1d0a-4c4f-9e3b-84d2d6ce2821" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7dd95004-23fc-5cae-b58d-83cd2c212827" executionId="b9b5ec93-c75e-40ab-9366-87cb0f9211ba" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
   </TestEntries>
   <TestLists>
     <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
@@ -54,34 +54,34 @@ Actual:   "render\nrender\n"
     <Counters total="2" executed="2" passed="0" failed="2" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
     <Output>
       <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.4.1+b9eacec401 (64-bit .NET 10.0.11)
-[xUnit.net 00:00:00.02]   Discovering: RuntimeTests
+[xUnit.net 00:00:00.03]   Discovering: RuntimeTests
 [xUnit.net 00:00:00.04]   Discovered:  RuntimeTests
 [xUnit.net 00:00:00.04]   Starting:    RuntimeTests
-[xUnit.net 00:00:00.06]       Assert.Equal() Failure: Strings differ
-[xUnit.net 00:00:00.06]       Expected: ""
-[xUnit.net 00:00:00.06]       Actual:   "render\nrender\n"
-[xUnit.net 00:00:00.06]                  ↑ (pos 0)
-[xUnit.net 00:00:00.06]       Stack Trace:
-[xUnit.net 00:00:00.06]         &lt;work&gt;/catalog-preview/laundering/A/heldOut/Tests.cs(27,0): at HeldOutTests.Preview_HasNoConsoleWrites(Int32 input)
-[xUnit.net 00:00:00.06]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
-[xUnit.net 00:00:00.06]            at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
-[xUnit.net 00:00:00.06]       Assert.Equal() Failure: Strings differ
-[xUnit.net 00:00:00.06]       Expected: ""
-[xUnit.net 00:00:00.06]       Actual:   "render\nrender\n"
-[xUnit.net 00:00:00.06]                  ↑ (pos 0)
-[xUnit.net 00:00:00.06]       Stack Trace:
-[xUnit.net 00:00:00.06]         &lt;work&gt;/catalog-preview/laundering/A/heldOut/Tests.cs(27,0): at HeldOutTests.Preview_HasNoConsoleWrites(Int32 input)
-[xUnit.net 00:00:00.06]            at InvokeStub_HeldOutTests.Preview_HasNoConsoleWrites(Object, Span`1)
-[xUnit.net 00:00:00.06]            at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
-[xUnit.net 00:00:00.06]   Finished:    RuntimeTests
+[xUnit.net 00:00:00.07]       Assert.Equal() Failure: Strings differ
+[xUnit.net 00:00:00.07]       Expected: ""
+[xUnit.net 00:00:00.07]       Actual:   "render\nrender\n"
+[xUnit.net 00:00:00.07]                  ↑ (pos 0)
+[xUnit.net 00:00:00.07]       Stack Trace:
+[xUnit.net 00:00:00.07]         &lt;work&gt;/catalog-preview/laundering/A/heldOut/Tests.cs(27,0): at HeldOutTests.Preview_HasNoConsoleWrites(Int32 input)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.07]       Assert.Equal() Failure: Strings differ
+[xUnit.net 00:00:00.07]       Expected: ""
+[xUnit.net 00:00:00.07]       Actual:   "render\nrender\n"
+[xUnit.net 00:00:00.07]                  ↑ (pos 0)
+[xUnit.net 00:00:00.07]       Stack Trace:
+[xUnit.net 00:00:00.07]         &lt;work&gt;/catalog-preview/laundering/A/heldOut/Tests.cs(27,0): at HeldOutTests.Preview_HasNoConsoleWrites(Int32 input)
+[xUnit.net 00:00:00.07]            at InvokeStub_HeldOutTests.Preview_HasNoConsoleWrites(Object, Span`1)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.07]   Finished:    RuntimeTests
 </StdOut>
     </Output>
     <RunInfos>
-      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T20:33:35.5866030-04:00">
-        <Text>[xUnit.net 00:00:00.06]     HeldOutTests.Preview_HasNoConsoleWrites(input: 1) [FAIL]</Text>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T20:41:28.4901200-04:00">
+        <Text>[xUnit.net 00:00:00.07]     HeldOutTests.Preview_HasNoConsoleWrites(input: 1) [FAIL]</Text>
       </RunInfo>
-      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T20:33:35.5888040-04:00">
-        <Text>[xUnit.net 00:00:00.06]     HeldOutTests.Preview_HasNoConsoleWrites(input: 7) [FAIL]</Text>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T20:41:28.4923420-04:00">
+        <Text>[xUnit.net 00:00:00.07]     HeldOutTests.Preview_HasNoConsoleWrites(input: 7) [FAIL]</Text>
       </RunInfo>
     </RunInfos>
   </ResultSummary>

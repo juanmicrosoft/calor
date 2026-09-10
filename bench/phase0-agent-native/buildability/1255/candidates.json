@@ -40,5 +40,14 @@
     "setup": "var service = new QuotaLookup.QuotaService();",
     "invoke": "return service.Preview(input);",
     "expected": "Math.Clamp(input, 0, 10) * 5"
+  },
+  {
+    "id": "quota-adapter",
+    "shape": 7,
+    "setup": "var service = new QuotaAdapter.QuotaService();",
+    "invoke": "return service.Preview(input);",
+    "expected": "Math.Clamp(input, 0, 10) * 5",
+    "oracle": "state",
+    "state": "QuotaAdapter.Telemetry.Requests"
   }
 ]

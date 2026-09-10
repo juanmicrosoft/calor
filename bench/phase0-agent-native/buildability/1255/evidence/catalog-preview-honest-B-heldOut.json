@@ -5,6 +5,8 @@
     "<work>/catalog-preview/honest/B/heldOut/RuntimeTests.csproj",
     "--logger",
     "trx;LogFileName=tests.trx",
+    "--logger",
+    "console;verbosity=normal",
     "--results-directory",
     "<work>/catalog-preview/honest/B/heldOut/results",
     "--verbosity",
@@ -16,6 +18,6 @@
     "-p:RestoreConfigFile=<repo>/bench/phase0-agent-native/buildability/1255/runtime/NuGet.Config"
   ],
   "exitCode": 0,
-  "stdout": "Test run for <work>/catalog-preview/honest/B/heldOut/bin/Debug/net10.0/RuntimeTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\nResults File: <work>/catalog-preview/honest/B/heldOut/results/tests.trx\n\nPassed!  - Failed:     0, Passed:     2, Skipped:     0, Total:     2, Duration: 5 ms - RuntimeTests.dll (net10.0)\n",
+  "stdout": "Test run for <work>/catalog-preview/honest/B/heldOut/bin/Debug/net10.0/RuntimeTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.4.1+b9eacec401 (64-bit .NET 10.0.11)\n[xUnit.net 00:00:00.03]   Discovering: RuntimeTests\n[xUnit.net 00:00:00.04]   Discovered:  RuntimeTests\n[xUnit.net 00:00:00.04]   Starting:    RuntimeTests\n[xUnit.net 00:00:00.06]   Finished:    RuntimeTests\n  Passed HeldOutTests.Preview_HasNoConsoleWrites(input: 1) [4 ms]\n  Passed HeldOutTests.Preview_HasNoConsoleWrites(input: 7) [< 1 ms]\nResults File: <work>/catalog-preview/honest/B/heldOut/results/tests.trx\n\nTest Run Successful.\nTotal tests: 2\n     Passed: 2\n Total time: 0.3006 Seconds\n",
   "stderr": ""
 }
