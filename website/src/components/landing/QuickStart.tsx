@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { trackInstallCommandCopy } from '@/lib/analytics';
-import { useScrollReveal } from '@/hooks/useScrollReveal';
 import Link from 'next/link';
 
 const commands = [
@@ -27,8 +26,6 @@ const commands = [
 
 export function QuickStart() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const sectionRef = useScrollReveal<HTMLDivElement>();
-  const terminalRef = useScrollReveal<HTMLDivElement>();
 
   const copyToClipboard = async (text: string, index: number) => {
     await navigator.clipboard.writeText(text.replace(/\\\n/g, ''));
@@ -38,17 +35,12 @@ export function QuickStart() {
   };
 
   return (
-    <section className="relative py-24 overflow-hidden">
-      <div className="gradient-mesh gradient-mesh-pink absolute bottom-0 right-0 w-[400px] h-[400px] -z-10" />
-
+    <section className="py-16">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center" ref={sectionRef}>
+        <div className="mx-auto max-w-3xl">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Try It Now
+            Use an existing .NET project
           </h2>
-          <p className="mt-4 text-lg text-muted-foreground font-body">
-            Existing .NET project integration
-          </p>
           <p className="mt-3 text-muted-foreground font-body">
             Requires the .NET 10 SDK. Run these commands in a directory containing
             your <code>.csproj</code> and Calor source files; keep your existing entry point.
@@ -59,10 +51,9 @@ export function QuickStart() {
           </p>
         </div>
 
-        <div className="mt-12 mx-auto max-w-3xl" ref={terminalRef}>
-          <div className="relative rounded-xl overflow-hidden shadow-2xl shadow-calor-navy/30">
-            {/* CRT container */}
-            <div className="bg-calor-navy crt-curve" role="region" aria-label="Existing-project commands">
+        <div className="mt-6 mx-auto max-w-3xl">
+          <div className="rounded-lg overflow-hidden border">
+            <div className="bg-calor-navy" role="region" aria-label="Existing-project commands">
               {/* Terminal header */}
               <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
                 <div className="flex gap-1.5">
@@ -85,7 +76,7 @@ export function QuickStart() {
                           {cmd.label}
                         </span>
                         <pre className="text-sm sm:text-base text-white font-terminal whitespace-pre-wrap leading-relaxed">
-                          <span className="terminal-glow text-calor-cyan">$</span> {cmd.command}
+                          <span className="text-calor-cyan">$</span> {cmd.command}
                         </pre>
                         <p className="text-xs text-white/80 font-body">{cmd.description}</p>
                       </div>
@@ -114,8 +105,6 @@ export function QuickStart() {
                   </div>
                 ))}
 
-                {/* CRT scanline overlay */}
-                <div className="crt-scanlines absolute inset-0 rounded-b-xl" />
               </div>
             </div>
           </div>

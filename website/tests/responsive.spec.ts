@@ -26,6 +26,35 @@ for (const viewport of [{ width: 1366, height: 768 }, { width: 390, height: 844 
   });
 }
 
+for (const width of [1366, 390, 320]) {
+  test(`homepage sections stay task-oriented and secondary help stays distinct at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.route('https://**/*', route => route.abort());
+    await page.goto(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/`);
+    for (const name of ['Compare runtime contracts', 'Find an undeclared network effect',
+      'Evidence and its limits', 'Use an existing .NET project', 'Reference and help']) {
+      await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+    }
+    await expect(page.getByRole('heading', { name: 'Built for How AI Actually Writes Code' })).toHaveCount(0);
+    await expect(page.getByText('Verified findings default', { exact: true })).toHaveCount(0);
+    await expect(page.locator('.animate-pulse-glow')).toHaveCount(0);
+    const comparison = page.getByRole('region', { name: 'Compare runtime contracts' });
+    await expect(comparison).toContainText('function fragments');
+    await comparison.getByRole('button', { name: 'C# guard clauses' }).press('Enter');
+    await expect(comparison).toContainText('checked(x * x)');
+    await expect(comparison).not.toContainText('AI has to read');
+    const help = page.getByRole('region', { name: 'Reference and help' });
+    await expect(help).toContainText('account-free');
+    await expect(help).toContainText('may require a ChatGPT account or plan');
+    await expect(help.getByRole('link', { name: 'Ask Calor on ChatGPT (external)' }))
+      .toHaveAttribute('rel', 'noopener noreferrer');
+    await help.getByRole('link', { name: 'Search the documentation' }).click();
+    await expect(page).toHaveURL(/\/docs\/$/);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+}
+
 // The header's bottom border sits flush on the hero video's first row, so at the top
 // of the landing page it drew a slate line straight across the footage and defeated
 // the fade there. It is suppressed while the header is at rest and restored once it is

@@ -102,15 +102,15 @@ test('keyboard sort and filter expose state while preserving focus and membershi
 test('comparison buttons expose exclusive pressed state through keyboard operation', async ({ page }) => {
   await page.route('https://**/*', route => route.abort());
   await page.goto(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/`);
-  const calor = page.getByRole('button', { name: 'Calor - Rules Are Visible' });
-  const csharp = page.getByRole('button', { name: 'C# - Rules in Control Flow' });
+  const calor = page.getByRole('button', { name: 'Calor contract syntax' });
+  const csharp = page.getByRole('button', { name: 'C# guard clauses' });
   await expect(calor).toHaveAttribute('aria-pressed', 'true');
   await csharp.press('Enter');
   await expect(csharp).toHaveAttribute('aria-pressed', 'true');
   await expect(calor).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByText('Program.cs', { exact: true })).toBeVisible();
+  await expect(page.getByText('Program.cs — fragment', { exact: true })).toBeVisible();
   await calor.press('Space');
   await expect(calor).toHaveAttribute('aria-pressed', 'true');
   await expect(csharp).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByText('program.calr', { exact: true })).toBeVisible();
+  await expect(page.getByText('program.calr — fragment', { exact: true })).toBeVisible();
 });

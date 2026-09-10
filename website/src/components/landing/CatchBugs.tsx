@@ -1,155 +1,60 @@
-'use client';
-
-import { useScrollReveal } from '@/hooks/useScrollReveal';
+import Link from 'next/link';
 
 export function CatchBugs() {
-  const sectionRef = useScrollReveal<HTMLDivElement>();
-  const codeRef = useScrollReveal<HTMLDivElement>({ direction: 'left' });
-  const errorRef = useScrollReveal<HTMLDivElement>({ direction: 'right' });
+  const calorCode = `§F{f001:ProcessOrder:pub} (Order:order) -> void
+  §E{db:rw}
+  §C{SaveOrder} §A order §/C
+  §C{NotifyCustomer} §A order §/C`;
 
-  const calorCode = `§M{m001:Orders}
-  §F{f001:ProcessOrder:pub} (Order:order) -> bool
-    §E{db}
-    §C{SaveOrder} §A order §/C
-    §C{NotifyCustomer} §A order §/C`;
+  const errorOutput = `Calor0410: ProcessOrder uses a network effect
+that its declaration does not permit.
 
-  const errorOutput = `error CALOR0410: Function 'ProcessOrder' uses effect 'net'
-                   but does not declare it
-
-  Call chain: ProcessOrder → NotifyCustomer → SendEmail
-              → HttpClient.PostAsync
-
-  Declared effects: §E{db}
-  Required effects: §E{db,net}
-
-  Fix: Add 'net' to the effect declaration:
-       §E{db,net}`;
+Review the call and either remove the effect
+or declare it if the operation is intended.`;
 
   return (
-    <section className="relative py-24 overflow-hidden">
-      {/* Gradient mesh */}
-      <div className="gradient-mesh gradient-mesh-salmon absolute top-20 left-0 w-[400px] h-[400px] -z-10" />
-
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center" ref={sectionRef}>
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Your AI Forgot a Network Call. The Compiler Didn&apos;t.
-          </h2>
-          <p className="mt-4 text-lg text-muted-foreground font-body">
-            Check declared effects across supplied Calor modules and known or manifested calls.
-          </p>
-        </div>
-
-        <div className="mt-16 mx-auto max-w-5xl">
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Code block */}
-            <div ref={codeRef} className="rounded-lg border border-calor-navy/20 bg-calor-navy overflow-hidden shadow-lg">
-              <div className="border-b border-white/10 px-4 py-2">
-                <span className="text-sm text-calor-cyan/70 font-mono">order-service.calr</span>
-              </div>
-              <pre className="p-5 text-sm leading-7 overflow-x-auto">
-                <code className="text-calor-cyan font-mono">{calorCode}</code>
-              </pre>
+    <section className="py-16" aria-labelledby="effect-example-heading">
+      <div className="mx-auto max-w-5xl px-6 lg:px-8">
+        <h2 id="effect-example-heading" className="text-3xl font-bold tracking-tight">
+          Find an undeclared network effect
+        </h2>
+        <p className="mt-4 text-muted-foreground font-body">
+          Illustrative fragment: assume SaveOrder declares database access and
+          NotifyCustomer declares network access. Their definitions, the Order type,
+          and a caller are omitted. This is not a runnable example.
+        </p>
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <div className="min-w-0 rounded-lg border bg-calor-navy">
+            <div className="border-b border-white/10 px-4 py-2 text-sm text-calor-cyan font-mono">
+              order-service.calr — fragment
             </div>
-
-            {/* Error output — dramatic treatment */}
-            <div ref={errorRef} className="rounded-lg overflow-hidden animate-pulse-glow"
-              style={{ animationDelay: '1s' }}
-            >
-              <div className="rounded-lg border-2 border-calor-pink/40 bg-calor-navy overflow-hidden">
-                <div className="border-b border-calor-pink/30 px-4 py-2 bg-calor-pink/10">
-                  <span className="text-sm text-calor-salmon font-mono font-bold">
-                    Illustrative diagnostic (abridged)
-                  </span>
-                </div>
-                {/* No horizontal scrolling. The longest line is 58 characters, which
-                    needs ~487px at text-sm and had only ~456px of content box — the
-                    31px overflow that produced the scrollbar. 13px type plus tighter
-                    padding on small screens fits it, and `whitespace-pre-wrap` is the
-                    guarantee: at any width too narrow for the line, it wraps instead of
-                    scrolling. `overflow-x-auto` stays only as a fallback for an
-                    unbreakable token; in normal use nothing overflows. */}
-                <pre className="p-4 sm:p-5 text-[13px] leading-6 whitespace-pre-wrap break-words overflow-x-auto">
-                  <code className="text-calor-salmon font-mono">{errorOutput}</code>
-                </pre>
-              </div>
-            </div>
+            <pre className="p-4 sm:p-5 text-[13px] leading-6 whitespace-pre-wrap break-words overflow-x-auto">
+              <code className="font-mono text-calor-cyan">{calorCode}</code>
+            </pre>
           </div>
-
-          {/* Explanation — overlapping card */}
-          {/* Sits BELOW the code panels rather than overlapping them. It used to carry
-              `lg:-mt-4 z-10`, which pulled it 16px over the diagnostic and made it the
-              topmost element there. */}
-          <div className="mt-8 relative mx-auto max-w-3xl">
-            <div className="p-6 rounded-lg border bg-background shadow-lg">
-              <p className="text-muted-foreground font-body">
-                <strong className="text-foreground">What happened:</strong> Your AI wrote code that calls <code className="text-sm bg-calor-navy/5 text-calor-cerulean px-1.5 py-0.5 rounded font-mono">NotifyCustomer</code>, which
-                calls <code className="text-sm bg-calor-navy/5 text-calor-cerulean px-1.5 py-0.5 rounded font-mono">SendEmail</code>, which makes a network request.
-                When these calls are resolved in the analyzed inputs, effect enforcement can report the missing declaration.
-                Unknown external calls and raw C# require separate diagnostics, manifests, or review.
-              </p>
+          <div className="min-w-0 rounded-lg border bg-calor-navy">
+            <div className="border-b border-white/10 px-4 py-2 text-sm text-calor-salmon font-mono">
+              Illustrative diagnostic (abridged, not captured output)
             </div>
-          </div>
-
-          {/* Static Analysis section */}
-          <div className="mt-20 mx-auto max-w-2xl text-center">
-            <h3 className="text-2xl font-bold tracking-tight sm:text-3xl">
-              Additional Static Analysis
-            </h3>
-            <p className="mt-4 text-lg text-muted-foreground font-body">
-              Run <code className="text-sm bg-calor-navy/5 text-calor-cerulean px-1.5 py-0.5 rounded font-mono">calor --analyze</code> to
-              look for supported null, taint-flow, and arithmetic patterns in the Calor inputs you supply.
-              This is not whole-codebase coverage or a guarantee that all defects are found.
-            </p>
-          </div>
-
-          <div className="mt-10 mx-auto max-w-3xl">
-            <div className="rounded-lg border border-calor-navy/20 bg-calor-navy overflow-hidden shadow-lg">
-              <div className="border-b border-white/10 px-4 py-2">
-                <span className="text-sm text-calor-cyan/70 font-mono">$ calor --analyze --input NullPropagationTransform.calr</span>
-              </div>
-              {/* Same treatment as the diagnostic panel above, for the same reason:
-                  the longest line here is 62 characters and overflowed its content box
-                  by 13px at a ~600px viewport, producing a horizontal scrollbar. */}
-              <pre className="p-4 sm:p-5 text-[13px] leading-6 whitespace-pre-wrap break-words overflow-x-auto">
-                <code className="font-mono">
-                  <span className="text-calor-salmon">{'warning Calor0922: Potential unsafe unwrap without prior\n'}</span>
-                  <span className="text-calor-salmon">{'                   Option/Result check\n'}</span>
-                  <span className="text-white/50">{'\n'}</span>
-                  <span className="text-calor-cyan/70">{'  NullPropagationTransform.calr(75,9)\n'}</span>
-                  <span className="text-calor-cyan/70">{'  NullPropagationTransform.calr(81,9)\n'}</span>
-                  <span className="text-calor-cyan/70">{'  NullPropagationTransform.calr(86,9)\n'}</span>
-                  <span className="text-white/50">{'\n'}</span>
-                  <span className="text-calor-salmon">{'warning Calor0983: Potential path traversal: tainted data\n'}</span>
-                  <span className="text-calor-salmon">{'                   from FileRead flows to file path\n'}</span>
-                  <span className="text-white/50">{'\n'}</span>
-                  <span className="text-calor-cyan/70">{'  FtpClient.calr(1201,11)\n'}</span>
-                  <span className="text-white/50">{'\n'}</span>
-                  <span className="text-green-400">{'Illustrative findings; availability depends on analyzed inputs.\n'}</span>
-                </code>
-              </pre>
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="text-center p-4 rounded-lg border bg-background">
-                <div className="text-2xl font-bold text-calor-cerulean">On</div>
-                <div className="text-xs text-muted-foreground mt-1">Effect checks by default</div>
-              </div>
-              <div className="text-center p-4 rounded-lg border bg-background">
-                <div className="text-2xl font-bold text-calor-cerulean">On</div>
-                <div className="text-xs text-muted-foreground mt-1">Type checks by default</div>
-              </div>
-              <div className="text-center p-4 rounded-lg border bg-background">
-                <div className="text-2xl font-bold text-calor-salmon">7</div>
-                <div className="text-xs text-muted-foreground mt-1">Verification statuses</div>
-              </div>
-              <div className="text-center p-4 rounded-lg border bg-background">
-                <div className="text-2xl font-bold text-green-500">Clean</div>
-                <div className="text-xs text-muted-foreground mt-1">Verified findings default</div>
-              </div>
-            </div>
+            <pre className="p-4 sm:p-5 text-[13px] leading-6 whitespace-pre-wrap break-words overflow-x-auto">
+              <code className="font-mono text-calor-salmon">{errorOutput}</code>
+            </pre>
           </div>
         </div>
+        <p className="mt-6 text-muted-foreground font-body">
+          Effect checking follows resolved calls across the supplied Calor inputs.
+          Unknown external calls and raw C# need separate diagnostics, manifests,
+          or review. A missing declaration is not permission to broaden an
+          interface automatically. See the{' '}
+          <Link href="/docs/syntax-reference/effects/" className="text-primary underline">effect reference</Link>.
+        </p>
+        <p className="mt-4 text-sm text-muted-foreground">
+          Type and effect checks are on by default. Static bug-pattern analysis
+          requires --analyze; contract verification requires --verify. Supported
+          checks, runtime modes and opt-outs are documented in{' '}
+          <Link href="/docs/cli/compile/" className="text-primary underline">compile options</Link>.
+          None guarantees that every defect is found.
+        </p>
       </div>
     </section>
   );
