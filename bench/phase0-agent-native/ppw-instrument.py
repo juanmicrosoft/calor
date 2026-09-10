@@ -96,6 +96,7 @@ def validate_registration(registration, stage, epoch_id):
             "registration must pin the exact compiler commit")
     stages = registration.get("stages", {})
     require(isinstance(stages, dict) and stage in stages, "stage not registered: %s" % stage)
+    require(set(stages) <= {"pilot", "confirmatory"}, "unrecognized registered stage role")
     ids = [identifier(item.get("epochId")) for item in stages.values()]
     require(len(ids) == len(set(ids)), "pilot and confirmatory must have separate epoch ids")
     selected = stages[stage]
@@ -200,6 +201,7 @@ def validate_tasks(root, registration):
                     "shape indicator matches its starter")
             require(any(regex.search(p.read_text()) for p in clean_sources),
                     "shape indicator misses its clean seed")
+    helper("ppw-registration.py").check_supersession(registration, root)
 
 
 def analyze(epochs_root, epoch_id, stage):
@@ -380,7 +382,8 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
     require(os.environ.get("CLAUDE_MODEL") == selected["modelPin"], "CLAUDE_MODEL differs from registration")
     require(command(["claude", "--version"]) == selected["agentVersion"], "agent version differs from registration")
     shared = product(compiler_root, registration["compilerCommit"])
-    harness_files = ("run-pair.sh", "harness-capture.py", "ppw-instrument.py", "token-usage.py",
+    harness_files = ("run-pair.sh", "harness-capture.py", "ppw-instrument.py", "ppw-registration.py",
+                     "token-usage.py", "token-usage.sh", "telemetry-helpers.py", "ppw-pins.schema.json",
                      "templates/calor-arm/CalorArm.csproj.template",
                      "templates/calor-arm/policy-canary.calr.txt")
     harness_hashes = {name: digest(BENCH / name) for name in harness_files}
@@ -459,11 +462,18 @@ def stamp_run(result_path, pins):
     Path(result_path).write_text(json.dumps(result, indent=2) + "\n")
 
 
+class SingleOption(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        if getattr(namespace, self.dest, None) is not None:
+            parser.error("%s must occur exactly once" % option_string)
+        setattr(namespace, self.dest, values)
+
+
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("operation", choices=("run", "analyze"))
-    parser.add_argument("--epoch-id", required=True)
-    parser.add_argument("--stage", choices=("pilot", "confirmatory"), required=True)
+    parser.add_argument("--epoch-id", required=True, action=SingleOption)
+    parser.add_argument("--stage", choices=("pilot", "confirmatory"), required=True, action=SingleOption)
     parser.add_argument("--epochs-root", default=str(BENCH / "epochs"))
     parser.add_argument("--registration")
     parser.add_argument("--tasks-root")

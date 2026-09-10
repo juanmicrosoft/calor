@@ -28,7 +28,7 @@ def build(root, stage="pilot", epoch_id=None):
     strict = {"enforceEffects": True, "permissiveEffects": False,
               "contractMode": "debug", "z3Required": True}
     pair = {
-        "id": task, "arms": {
+        "id": task, "class": "blind", "legB": True, "arms": {
             "calor-permissive": {"armId": "a", "fixture": "starter-a",
                                 "config": dict(strict, permissiveEffects=True, controlArmKind="permissive")},
             "calor-strict": {"armId": "b", "fixture": "starter-b", "config": strict}},
@@ -61,6 +61,18 @@ def build(root, stage="pilot", epoch_id=None):
         "tasks": [task], "artifacts": artifacts,
     }
     registration["stages"][stage]["epochId"] = epoch_id
+    pins_helper = instrument.helper("ppw-registration.py")
+    registration["supersededPins"] = pins_helper.historical_pins()
+    registration["replacementPins"] = {
+        "compilerCommit": registration["compilerCommit"],
+        "policies": {"A": ["--permissive-effects"], "B": []},
+        "pairCounts": {"tasks": 1, "blind": 1, "warningVsError": 0, "legB": 1},
+        "starterBlobs": [
+            {"task": task, "arm": arm, "path": task + "/starter-" + arm.lower() + "/Source.calr",
+             "blobSha": pins_helper.blob_sha(directory / ("starter-" + arm.lower()) / "Source.calr")}
+            for arm in ("A", "B")
+        ],
+    }
     save(epoch / "registration.json", registration)
     compiler = {"commit": "a" * 40, "release": "v0.18.0",
                 "repoRoot": "/synthetic/product", "calorDll": "/synthetic/product/calor.dll",

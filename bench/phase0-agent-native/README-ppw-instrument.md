@@ -23,6 +23,24 @@ task counts and identities must be recorded in a separately reviewed
 supersession after #1256/#1266/#1257/#1258 freeze the task set. The synthetic
 test fixture's strings and counts are not those pins.
 
+The #1271 mechanism checks an explicit `supersededPins` table against the
+preserved historical ledger: registration reference, starter freeze commit,
+both old arm objects, old pair counts and all twelve starter git-blob slots.
+It never edits that ledger or its original tests. `replacementPins` separately
+records the shared `compilerCommit`, `policies` (`A: ["--permissive-effects"]`,
+`B: []`), `pairCounts` and `starterBlobs`. Counts come from frozen task manifests,
+not inherited A-1.12 defaults. Each manifest explicitly states `class` (`blind`
+or `warning-vs-error`) and Boolean `legB`. Those metadata do not add an estimand
+or decide any new stage's sample size.
+
+Each replacement starter slot records `task`, `arm` (`A`/`B`), task-root-relative
+`path`, and Git `blobSha`. The required order is registered task order, then A/B,
+then sorted `.calr` paths. SHA-256 still covers the entire task inventory;
+git-blob pins provide the separate starter-registration identity. Missing,
+edited, duplicated or mismatched slots fail admission and analysis.
+**No actual replacement table is supplied here.** The only new tables are
+deterministic synthetic test inputs, clearly marked not-a-registration.
+
 ## Single epoch and stage
 
 The stage-record entry point takes exactly one epoch id:
@@ -37,6 +55,8 @@ It is append-only: an existing record is never overwritten. A confirmatory
 invocation must name `--stage confirmatory` and that stage's distinct,
 registered id. The analyzer does not enumerate sibling epochs, accept a
 second epoch, or read caller-selected task/scoring files.
+Repeated `--epoch-id` or `--stage` arguments are rejected rather than applying
+argparse's usual last-value-wins behavior.
 
 The stage ledger records `epoch`, `stage`, `dataKind`, `epochRun`, the shared
 compiler, both policies, every cell's counts and descriptive rates, corrected
@@ -178,3 +198,9 @@ release-commit binary: permissive succeeds, strict reports `Calor0410 unknown`.
 That is an instrument check, not an agent-effect measurement. Full paid
 collection and eventual confirmatory adjudication are not validated by
 synthetic inputs.
+
+`tests/test_ppw_registration.py` adds independent negative controls for the
+supersession pin tables, nested/cross-linked epoch data, stage promotion and
+CLI option overrides. It also protects the lifecycle test pair's complementary
+`epochRun` checks and expected skip counts. These tests cannot close #1271's
+remaining obligation to re-pin the actual task set after its freeze and review.
