@@ -479,6 +479,19 @@ WRONG (will not compile):
 
 Function names are NOT operators - always use §C{FunctionName} with §A arguments.
 
+Calls in bindings and returns also accept multi-line arguments. Indent each
+`§A` beneath the statement; nested calls indent their arguments another level:
+```
+§F{f004:ClampScore:pub} (i32:score) -> i32
+  §E{}
+  §B{value:i32} §C{Math.Clamp}
+    §A[value] score
+    §A[min] 0
+    §A[max] 100
+  §/C
+  §R value
+```
+
 ### Examples
 
 **Simple function with precondition:**
