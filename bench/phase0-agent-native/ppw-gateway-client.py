@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Launch the pinned client under a process-local kernel policy, never global settings."""
+"""Isolate the entire pinned runner under a process-local kernel policy, never global settings."""
 import argparse
 import hashlib
 import json
@@ -15,6 +15,10 @@ from urllib.parse import urlsplit
 CLIENT_VERSION = "2.1.266 (Claude Code)"
 CLIENT_SHA256 = "553d1b9e9e7068b275c0a783c7e139ff6503096f286e674c8c919379fb0eca62"
 ISOLATION = "macos-seatbelt-request-gateway-v1"
+PROBE_EXPECTATIONS = {
+    "gateway": True, "otherPort": False, "stateWrite": False, "stateRead": False,
+    "outsideSignal": False, "hardlinkWrite": False, "symlinkWrite": False,
+}
 BLOCKED_ENV = {
     "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_OAUTH_TOKEN",
     "ANTHROPIC_CUSTOM_HEADERS", "CLAUDE_CONFIG_DIR", "CLAUDE_CODE_USE_BEDROCK",
@@ -99,7 +103,11 @@ def sandbox_policy(workspace, output, protected, port):
         "(deny appleevent-send)",
         "(deny lsopen)",
         "(deny mach-lookup)",
-        '(allow mach-lookup (global-name "com.apple.securityd") (global-name "com.apple.trustd.agent"))',
+        '(allow mach-lookup (global-name "com.apple.securityd.xpc")'
+        ' (global-name "com.apple.SecurityServer")'
+        ' (global-name "com.apple.cfprefsd.agent")'
+        ' (global-name "com.apple.cfprefsd.daemon")'
+        ' (global-name "com.apple.logd"))',
         "(deny mach-register)",
         "(deny ipc-posix-shm*)",
         "(deny ipc-posix-sem*)",
@@ -148,9 +156,7 @@ print(json.dumps(result))
             cwd=workspace, text=True, capture_output=True, timeout=15)
         require(result.returncode == 0, "kernel isolation probe could not execute")
         observed = json.loads(result.stdout)
-        require(observed == {"gateway": True, "otherPort": False, "stateWrite": False,
-                             "stateRead": False, "outsideSignal": False, "hardlinkWrite": False,
-                             "symlinkWrite": False}
+        require(observed == PROBE_EXPECTATIONS
                 and sentinel.read_text() == "UNCHANGED", "kernel isolation controls did not hold")
         return {"kind": ISOLATION, "kernelProbe": observed, "modelInvoked": False}
     finally:
@@ -158,6 +164,36 @@ print(json.dumps(result))
         sentinel.unlink(missing_ok=True)
         for suffix in ("hardlink", "symlink"):
             Path(str(alias_prefix) + "-" + suffix).unlink(missing_ok=True)
+
+
+def isolation_evidence_path(context_path):
+    return canonical_path(context_path).with_suffix(".isolation.json")
+
+
+def write_isolation_evidence(context_path, evidence):
+    path = isolation_evidence_path(context_path)
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w") as stream:
+        json.dump(evidence, stream, sort_keys=True, allow_nan=False)
+        stream.write("\n")
+
+
+def read_isolation_evidence(context_path, workspace, output):
+    path = canonical_path(isolation_evidence_path(context_path))
+    require(path.is_file() and path.stat().st_mode & 0o077 == 0 and path.stat().st_nlink == 1,
+            "private, unlinked isolation evidence required")
+    context = json.loads(Path(context_path).read_text())
+    evidence = json.loads(path.read_text())
+    require(isinstance(evidence, dict) and set(evidence) ==
+            {"kind", "kernelProbe", "modelInvoked", "clientSha256", "policySha256"},
+            "isolation evidence fields differ")
+    policy = sandbox_policy(workspace, output, context["protectedRoot"],
+                            urlsplit(context["baseUrl"]).port)
+    require(evidence["kind"] == ISOLATION and evidence["kernelProbe"] == PROBE_EXPECTATIONS
+            and evidence["modelInvoked"] is False and evidence["clientSha256"] == CLIENT_SHA256
+            and evidence["policySha256"] == hashlib.sha256(policy.encode()).hexdigest(),
+            "isolation evidence does not bind this invocation's enforced policy")
+    return evidence
 
 
 def launch(context_path, workspace, output, arguments):
@@ -185,7 +221,7 @@ def launch(context_path, workspace, output, arguments):
     policy = sandbox_policy(workspace, output, protected, endpoint.port)
     evidence = kernel_probe(policy, workspace, protected, endpoint.port, context["gatewayPid"])
     evidence.update(clientSha256=CLIENT_SHA256, policySha256=hashlib.sha256(policy.encode()).hexdigest())
-    (output / "gateway-isolation.json").write_text(json.dumps(evidence, indent=2) + "\n")
+    write_isolation_evidence(context_path, evidence)
     temporary = workspace / ".ppw-client-tmp"
     temporary.mkdir(exist_ok=True)
     dotnet_home = workspace / ".ppw-dotnet-home"

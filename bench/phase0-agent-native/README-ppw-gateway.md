@@ -71,6 +71,13 @@ modifier is absent. CLI cost estimates never reconcile liability. Missing,
 truncated, interrupted or ambiguous charges remain reserved; no expiry or
 automatic restart resets them.
 
+The collector binds every scheduled slot into the ledger. A slot cannot complete
+without reconciled gateway traffic and a non-interrupted client exit record.
+Kernel evidence is written beside the private invocation context, not into
+child-writable output. The collector checks its exact policy/client binding and
+stores it in the protected ledger before publishing the output copy. Scope
+completion requires the entire registered slot inventory.
+
 Budget exhaustion produces `INCOMPLETE_BUDGET`, not a reduced-N experiment, a
 scientific null or a stage-2 decision. A complete schedule is still required for
 adjudication. Financial authorization, operational admission and scientific
@@ -85,8 +92,18 @@ are changed. Gateway state remains outside writable work/output roots.
 
 The current policy restricts networking, protected state access, outside signals,
 process metadata and task ports, Mach lookup/registration, POSIX IPC, Apple Events
-and Launch Services. The implemented kernel probes establish only their stated
+and Launch Services. The Mach lookup allowlist is limited to `securityd.xpc`,
+`SecurityServer`, `cfprefsd.agent`, `cfprefsd.daemon` and `logd` in the
+`com.apple` namespace. No `trustd.agent` delegation is admitted.
+The implemented kernel probes establish only their stated
 controls; they are not a complete proof against every IPC/delegation route.
 The independent pinned-client probe must establish compatibility and any necessary
 allowances before operational registration. Saved-login execution must not use
 `--bare`, replace credentials, or disable protocol features merely to pass a probe.
+
+`test_ppw_gateway_collection.py` exercises all 444 scheduled slots through the
+real collector, loopback gateway, request ledger and descriptive stage analyzer.
+The provider, client/OS boundary, compiler product and authorization are explicit
+synthetic doubles; this is not empirical collection or an independent kernel
+proof. Its negative controls prevent budget-stopped, missing-request, interrupted
+and unknown-charge collections from reaching stage analysis.

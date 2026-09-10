@@ -379,6 +379,11 @@ class RequestLedger:
         require(type(ceiling_micro) is int and 0 < ceiling_micro <= 2 ** 63 - 1, "invalid ceiling")
         require(binding.get("stage") == "pilot" and binding.get("priceSha256") == price_identity(),
                 "wrong pilot or price binding")
+        planned = binding.get("plannedSlots")
+        if planned is not None:
+            require(isinstance(planned, list) and planned
+                    and all(isinstance(slot, str) and slot for slot in planned)
+                    and len(set(planned)) == len(planned), "invalid registered slot inventory")
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         with self.transaction() as db:
             db.execute("CREATE TABLE IF NOT EXISTS scope "
@@ -420,6 +425,8 @@ class RequestLedger:
             row = db.execute("SELECT * FROM scope").fetchone()
             require(row and row["owner"] == owner and row["state"] == "collecting",
                     "budget scope is not collecting")
+            planned = decode(row["binding"]).get("plannedSlots")
+            require(planned is None or slot in planned, "unregistered gateway slot")
             exposure = db.execute("SELECT COALESCE(SUM(charge),0) AS total FROM requests").fetchone()["total"]
             maximum = request["maximumMicroUsd"]
             require(request["priceSha256"] == price_identity() and
@@ -466,6 +473,23 @@ class RequestLedger:
                 db.execute("UPDATE scope SET state=?", (reason,))
                 self.event(db, "stopped", None, {"reason": reason})
 
+    def complete_slot(self, owner, slot, evidence, exit_code):
+        require(type(exit_code) is int and 0 <= exit_code < 128 and exit_code != 124,
+                "missing or interrupted client invocation")
+        require(isinstance(evidence, dict), "trusted isolation evidence required")
+        with self.transaction() as db:
+            scope = db.execute("SELECT * FROM scope").fetchone()
+            require(scope and scope["owner"] == owner and scope["state"] == "collecting",
+                    "incomplete scope cannot complete a slot")
+            requests = db.execute("SELECT state FROM requests WHERE slot=?", (slot,)).fetchall()
+            require(requests and all(row["state"] == "reconciled" for row in requests),
+                    "slot lacks complete gateway-accounted requests")
+            completed = db.execute("SELECT detail FROM events WHERE kind='slot-complete'").fetchall()
+            require(all(decode(row["detail"])["slot"] != slot for row in completed),
+                    "duplicate slot completion")
+            self.event(db, "slot-complete", None,
+                       {"slot": slot, "clientExitCode": exit_code, "isolation": evidence})
+
     def complete(self, owner):
         with self.transaction() as db:
             row = db.execute("SELECT * FROM scope").fetchone()
@@ -473,6 +497,12 @@ class RequestLedger:
                     "incomplete scope cannot complete")
             require(not db.execute("SELECT 1 FROM requests WHERE state!='reconciled'").fetchone(),
                     "in-flight or unknown charge remains")
+            planned = decode(row["binding"]).get("plannedSlots")
+            if planned is not None:
+                completed = [decode(event["detail"])["slot"] for event in db.execute(
+                    "SELECT detail FROM events WHERE kind='slot-complete'")]
+                require(len(completed) == len(planned) and set(completed) == set(planned),
+                        "complete registered slot inventory is required")
             db.execute("UPDATE scope SET state='complete'")
             self.event(db, "collection-complete", None, {})
 

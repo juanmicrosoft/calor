@@ -74,10 +74,13 @@ class Fixture(unittest.TestCase):
         self.root.mkdir()
         self.addCleanup(shutil.rmtree, self.root)
 
-    def ledger(self, ceiling=500_000_000):
+    def ledger(self, ceiling=500_000_000, planned=None):
         ledger = budget.RequestLedger(self.root / ("SYNTHETIC-" + uuid.uuid4().hex + ".sqlite3"))
-        ledger.initialize({"stage": "pilot", "epochId": "SYNTHETIC", "priceSha256": budget.price_identity(),
-                           "authorization": "SYNTHETIC"}, ceiling)
+        binding = {"stage": "pilot", "epochId": "SYNTHETIC", "priceSha256": budget.price_identity(),
+                   "authorization": "SYNTHETIC"}
+        if planned is not None:
+            binding["plannedSlots"] = planned
+        ledger.initialize(binding, ceiling)
         return ledger, ledger.start()
 
 
@@ -295,6 +298,35 @@ class AdmissionTests(Fixture):
 
 
 class LedgerTests(Fixture):
+    def test_slot_completion_requires_accounted_traffic_exit_and_entire_inventory(self):
+        ledger, owner = self.ledger(planned=["SYNTHETIC-1", "SYNTHETIC-2"])
+        request = budget.admit_request(body())
+        evidence = {"kind": "SYNTHETIC-isolation-not-real-evidence"}
+        with self.assertRaisesRegex(budget.Refusal, "unregistered gateway slot"):
+            ledger.reserve(owner, "foreign", request)
+        with self.assertRaisesRegex(budget.Refusal, "lacks complete"):
+            ledger.complete_slot(owner, "SYNTHETIC-1", evidence, 0)
+        first = ledger.reserve(owner, "SYNTHETIC-1", request)
+        with self.assertRaisesRegex(budget.Refusal, "lacks complete"):
+            ledger.complete_slot(owner, "SYNTHETIC-1", evidence, 0)
+        ledger.settle(owner, first, *budget.reconciled_cost(request, budget.MODEL, usage(), "end_turn"))
+        for code in (None, True, -9, -15, 124, 137, 143):
+            with self.subTest(code=code), self.assertRaisesRegex(budget.Refusal, "interrupted"):
+                ledger.complete_slot(owner, "SYNTHETIC-1", evidence, code)
+        ledger.complete_slot(owner, "SYNTHETIC-1", evidence, 0)
+        with self.assertRaisesRegex(budget.Refusal, "duplicate"):
+            ledger.complete_slot(owner, "SYNTHETIC-1", evidence, 0)
+        with self.assertRaisesRegex(budget.Refusal, "registered slot inventory"):
+            ledger.complete(owner)
+        second = ledger.reserve(owner, "SYNTHETIC-2", request)
+        ledger.settle(owner, second, *budget.reconciled_cost(request, budget.MODEL, usage(), "end_turn"))
+        ledger.complete_slot(owner, "SYNTHETIC-2", evidence, 0)
+        ledger.complete(owner)
+        events = [budget.decode(row["detail"]) for row in ledger.snapshot()["events"]
+                  if row["kind"] == "slot-complete"]
+        self.assertEqual(["SYNTHETIC-1", "SYNTHETIC-2"], [value["slot"] for value in events])
+        self.assertEqual([evidence, evidence], [value["isolation"] for value in events])
+
     def test_complete_provider_usage_releases_unused_request_reservation(self):
         ledger, owner = self.ledger()
         request = budget.admit_request(body())
@@ -512,6 +544,37 @@ class TransportTests(Fixture):
 
 
 class IsolationTests(Fixture):
+    @unittest.skipIf(os.name == "nt", "private evidence uses Unix permission bits")
+    def test_evidence_is_private_append_only_and_bound_to_the_exact_policy(self):
+        spec = importlib.util.spec_from_file_location("isolation_test", BENCH / "ppw-gateway-client.py")
+        isolation = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(isolation)
+        work, output, protected = (self.root / name for name in ("work", "output", "protected"))
+        for path in (work, output, protected):
+            path.mkdir()
+        context_path = protected / "SYNTHETIC-invocation.json"
+        context_path.write_text(json.dumps({"protectedRoot": str(protected),
+                                           "baseUrl": "http://127.0.0.1:12345/SYNTHETIC"}))
+        evidence = {
+            "kind": isolation.ISOLATION, "kernelProbe": dict(isolation.PROBE_EXPECTATIONS),
+            "modelInvoked": False, "clientSha256": isolation.CLIENT_SHA256,
+            "policySha256": isolation.hashlib.sha256(
+                isolation.sandbox_policy(work, output, protected, 12345).encode()).hexdigest(),
+        }
+        isolation.write_isolation_evidence(context_path, evidence)
+        path = isolation.isolation_evidence_path(context_path)
+        self.assertEqual(protected, path.parent)
+        self.assertEqual(0, path.stat().st_mode & 0o077)
+        with self.assertRaises(FileExistsError):
+            isolation.write_isolation_evidence(context_path, evidence)
+        (output / "gateway-isolation.json").write_text('{"SYNTHETIC":"untrusted child output"}')
+        self.assertEqual(evidence, isolation.read_isolation_evidence(context_path, work, output))
+        with self.assertRaisesRegex(ValueError, "enforced policy"):
+            isolation.read_isolation_evidence(context_path, work, work / "different-output")
+        path.chmod(0o644)
+        with self.assertRaisesRegex(ValueError, "private"):
+            isolation.read_isolation_evidence(context_path, work, output)
+
     @unittest.skipUnless(sys.platform == "darwin", "actual macOS kernel policy")
     def test_kernel_blocks_other_network_state_access_and_outside_signals(self):
         spec = importlib.util.spec_from_file_location("kernel_test", BENCH / "ppw-gateway-client.py")

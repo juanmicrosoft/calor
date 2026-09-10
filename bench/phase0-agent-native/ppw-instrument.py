@@ -466,6 +466,7 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
         registration, selected, authorization, registration_path.parent, epoch_id, stage)
     gateway_mode = admission.get("mechanism") == spending.GATEWAY
     gateway_module = helper("ppw-budget-gateway.py") if gateway_mode else None
+    isolation = helper("ppw-gateway-client.py") if gateway_mode else None
     require(not command(["git", "-C", str(REPO), "status", "--porcelain",
                          "--", str(BENCH)]), "harness checkout is dirty")
     require(os.environ.get("CLAUDE_MODEL") == selected["modelPin"], "CLAUDE_MODEL differs from registration")
@@ -515,6 +516,7 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                 "authorizationSha256": admission["authorizationSha256"],
                 "protocolSha256": admission["protocolSha256"], "planSha256": admission["planSha256"],
                 "harnessArtifacts": harness_hashes,
+                "plannedSlots": [slot["id"] for slot in admission["slots"]],
             }, admission["ceilingUnits"])
         else:
             ledger = spending.Ledger(admission["ledgerPath"])
@@ -578,8 +580,13 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                                                      epoch / "runs", run - 1)
                                 argv += ["--ppw-gateway-client", admission["clientExecutable"]]
                                 command(argv, env=env)
+                            evidence = isolation.read_isolation_evidence(context_path, work, run_directory)
+                            client_exit = load(run_directory / "client-invocation.json").get("exitCode")
+                            ledger.complete_slot(owner, slot, evidence, client_exit)
+                            write_new(run_directory / "gateway-isolation.json", evidence)
                         finally:
                             context_path.unlink(missing_ok=True)
+                            isolation.isolation_evidence_path(context_path).unlink(missing_ok=True)
                         require(ledger.snapshot()["state"] == "collecting",
                                 "pilot incomplete: " + ledger.snapshot()["state"])
                         require(digest(runtime) == admission["runtimeSha256"], "runtime drift after run")
