@@ -3,7 +3,7 @@
   "name": "Extract with contracts (Calor)",
   "category": "refactoring-benchmark",
   "fixture": "refactor-extract-calor",
-  "prompt": "In Extract.calr, extract the bounds validation logic from `ProcessArray` (f002) into a new function called `ValidateIndex` with ID f006. The new function should:\n- Take parameters index (i32) and length (i32)\n- Return bool indicating if index is valid\n- Have contracts: \u00a7Q (>= length 0) and \u00a7S (== result (and (>= index 0) (< index length)))\n\nUpdate ProcessArray to call ValidateIndex and preserve its original contracts.\n\nNew function structure:\n\u00a7F{f006:ValidateIndex:pub}\n  \u00a7I{i32:index}\n  \u00a7I{i32:length}\n  \u00a7O{bool}\n  \u00a7Q (>= length 0)\n  \u00a7S (== result (and (>= index 0) (< index length)))\n  \u00a7R (and (>= index 0) (< index length))\n\u00a7/F{f006}",
+  "prompt": "In Extract.calr, extract the bounds validation logic from `ProcessArray` (f002) into a new function called `ValidateIndex` with ID f006. The new function should:\n- Take parameters index (i32) and length (i32)\n- Return bool indicating if index is valid\n- Have contracts: §Q (>= length 0) and §S (== result (and (>= index 0) (< index length)))\n\nUpdate ProcessArray to call ValidateIndex and preserve its original contracts.\n\nNew function structure:\n§F{f006:ValidateIndex:pub}\n  §I{i32:index}\n  §I{i32:length}\n  §O{bool}\n  §Q (>= length 0)\n  §S (== result (and (>= index 0) (< index length)))\n  §R (and (>= index 0) (< index length))",
   "verification": {
     "compilation": {
       "mustSucceed": true

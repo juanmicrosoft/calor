@@ -3,7 +3,7 @@
   "name": "Add effect declaration (Calor)",
   "category": "refactoring-benchmark",
   "fixture": "refactor-contract-calor",
-  "prompt": "In Contract.calr, add an effect declaration to the `PrintValue` function (f004) indicating it writes to the console. Add:\n\n\u00a7E{cw}\n\nThe function should look like:\n\u00a7F{f004:PrintValue:pub}\n  \u00a7I{i32:x}\n  \u00a7O{void}\n  \u00a7E{cw}\n  \u00a7C{Console.WriteLine}\n    \u00a7A x\n  \u00a7/C\n\u00a7/F{f004}\n\nIMPORTANT: The function ID f004 must NOT change. The \u00a7E{cw} goes after \u00a7O{void} and before the \u00a7C call.",
+  "prompt": "In Contract.calr, add an effect declaration to the `PrintValue` function (f004) indicating it writes to the console. Add:\n\n§E{cw}\n\nThe function should look like:\n§F{f004:PrintValue:pub}\n  §I{i32:x}\n  §O{void}\n  §E{cw}\n  §C{Console.WriteLine}\n    §A x\n  §/C\n\nIMPORTANT: The function ID f004 must NOT change. The §E{cw} goes after §O{void} and before the §C call.",
   "verification": {
     "compilation": {
       "mustSucceed": true

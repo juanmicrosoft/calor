@@ -3,7 +3,7 @@
   "name": "Extract simple expression (Calor)",
   "category": "refactoring-benchmark",
   "fixture": "refactor-extract-calor",
-  "prompt": "In Extract.calr, extract the calculation `(+ (* x x) (* y y))` from the `Distance` function (f001) into a new function called `SumOfSquares` with ID f005 that takes two i32 parameters (a and b) and returns i32. Update the original Distance function to call the new SumOfSquares function.\n\nExpected structure for new function:\n\u00a7F{f005:SumOfSquares:pub}\n  \u00a7I{i32:a}\n  \u00a7I{i32:b}\n  \u00a7O{i32}\n  \u00a7R (+ (* a a) (* b b))\n\u00a7/F{f005}\n\nUpdate Distance to call SumOfSquares:\n\u00a7R \u00a7C{SumOfSquares}\n    \u00a7A x\n    \u00a7A y\n  \u00a7/C",
+  "prompt": "In Extract.calr, extract the calculation `(+ (* x x) (* y y))` from the `Distance` function (f001) into a new function called `SumOfSquares` with ID f005 that takes two i32 parameters (a and b) and returns i32. Update the original Distance function to call the new SumOfSquares function.\n\nExpected structure for new function:\n§F{f005:SumOfSquares:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R (+ (* a a) (* b b))\n\nUpdate Distance to call SumOfSquares:\n§R §C{SumOfSquares}\n    §A x\n    §A y\n  §/C",
   "verification": {
     "compilation": {
       "mustSucceed": true

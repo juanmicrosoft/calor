@@ -3,7 +3,7 @@
   "name": "Extract with effects (Calor)",
   "category": "refactoring-benchmark",
   "fixture": "refactor-extract-calor",
-  "prompt": "In Extract.calr, extract the pure computation `(+ a b)` from `LogAndCompute` (f003) into a new function called `ComputeSum` with ID f007. The new function should be pure (no effects), while LogAndCompute keeps the console write effect.\n\nNew pure function (no \u00a7E declaration):\n\u00a7F{f007:ComputeSum:pub}\n  \u00a7I{i32:a}\n  \u00a7I{i32:b}\n  \u00a7O{i32}\n  \u00a7R (+ a b)\n\u00a7/F{f007}\n\nUpdated LogAndCompute (keeps \u00a7E{cw}):\n\u00a7F{f003:LogAndCompute:pub}\n  \u00a7I{i32:a}\n  \u00a7I{i32:b}\n  \u00a7O{i32}\n  \u00a7E{cw}\n  \u00a7C{Console.WriteLine}\n    \u00a7A \"Computing sum\"\n  \u00a7/C\n  \u00a7R \u00a7C{ComputeSum}\n      \u00a7A a\n      \u00a7A b\n    \u00a7/C\n\u00a7/F{f003}\n\nThis demonstrates Calor's effect tracking: ComputeSum is pure, LogAndCompute has effects.",
+  "prompt": "In Extract.calr, extract the pure computation `(+ a b)` from `LogAndCompute` (f003) into a new function called `ComputeSum` with ID f007. The new function should be pure (no effects), while LogAndCompute keeps the console write effect.\n\nNew pure function (no §E declaration):\n§F{f007:ComputeSum:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §R (+ a b)\n\nUpdated LogAndCompute (keeps §E{cw}):\n§F{f003:LogAndCompute:pub}\n  §I{i32:a}\n  §I{i32:b}\n  §O{i32}\n  §E{cw}\n  §C{Console.WriteLine}\n    §A \"Computing sum\"\n  §/C\n  §R §C{ComputeSum}\n      §A a\n      §A b\n    §/C\n\nThis demonstrates Calor's effect tracking: ComputeSum is pure, LogAndCompute has effects.",
   "verification": {
     "compilation": {
       "mustSucceed": true

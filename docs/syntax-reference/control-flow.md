@@ -107,6 +107,7 @@ integral type (`i8` through `u64`) and avoids mixed-type `+=` or narrowing.
 ```
 §DO{id}
   // body (executes at least once)
+§/DO{id} (condition)
 ```
 
 | Part | Description |
@@ -116,6 +117,10 @@ integral type (`i8` through `u64`) and avoids mixed-type `+=` or narrowing.
 
 The condition is placed at the end to match the semantics: the body always executes at least once, then the condition is checked.
 
+The loop variable must be declared MUTABLE (`§B{~name:type}`) and updated with `§ASSIGN` inside the body. Re-binding it with a second `§B` inside the loop shadows the outer one, which is `Calor0255` (C# forbids it, CS0136), and the condition on the closer would then reference a variable the generated code cannot see.
+
+`§/DO{id} (condition)` is **required**. It is retained — unlike the structural closers removed in Phase 4d — precisely because it carries the condition, and there is nowhere else to put it. The id must match the opening `§DO{id}`; a mismatch is reported as a mismatched-id error.
+
 ### Do-While Loop Examples
 
 **Execute at least once:**
@@ -124,23 +129,26 @@ The condition is placed at the end to match the semantics: the body always execu
 §DO{do1}
   §P i
   §ASSIGN i (+ i 1)
+§/DO{do1} (< i INT:10)
 ```
 
 **Menu loop (always show menu first):**
 ```
-§B{choice} 0
+§B{~choice:i32} 0
 §DO{do1}
   §P "1. Option A"
   §P "2. Option B"
   §P "3. Exit"
-  §B{choice} §C{ReadChoice} §/C
+  §ASSIGN choice §C{ReadChoice} §/C
+§/DO{do1} (!= choice INT:3)
 ```
 
 **Retry until success:**
 ```
-§B{success} false
+§B{~success:bool} false
 §DO{do1}
-  §B{success} §C{TryOperation} §/C
+  §ASSIGN success §C{TryOperation} §/C
+§/DO{do1} (not success)
 ```
 
 ---

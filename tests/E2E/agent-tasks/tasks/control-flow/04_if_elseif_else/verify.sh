@@ -7,17 +7,13 @@ CALR_FILE="$WORKSPACE/Calculator.calr"
 
 [[ -f "$CALR_FILE" ]] || { echo "Calculator.calr not found"; exit 1; }
 
-# Check for Classify function
-grep -q "Classify" "$CALR_FILE" || { echo "Classify function not found"; exit 1; }
+# Scope every check to the declaration the task asked for. A file-global grep passes a
+# wrong answer where the construct sits in some unrelated function and the target is an
+# empty stub -- demonstrated against this verifier.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/lib/verify-lib.sh"
 
-# Check for if statement syntax §IF{
-grep -q "§IF{" "$CALR_FILE" || { echo "If statement (§IF) not found"; exit 1; }
-
-# Check for else-if or else (§EI and §EL don't take attributes/braces)
-grep -qE "(§EI |§EL)" "$CALR_FILE" || { echo "Else-if (§EI) or else (§EL) not found"; exit 1; }
-
-# Check for if closing tag
-grep -q "§/I{" "$CALR_FILE" || { echo "If closing tag not found"; exit 1; }
+require_in_body "$CALR_FILE" 'Classify' '-q' '§IF{' -- 'If statement (§IF) not found in Classify'
+require_in_body "$CALR_FILE" 'Classify' '-qE' '(§EI |§EL)' -- 'Else-if (§EI) or else (§EL) not found in Classify'
 
 echo "Verification passed: Classify function found with if-elseif-else"
 exit 0

@@ -3,7 +3,7 @@
   "name": "Change return type (Calor)",
   "category": "refactoring-benchmark",
   "fixture": "refactor-signature-calor",
-  "prompt": "In Signature.calr, change the return type of the `TryParse` function (f002) from `i32` to `Option<i32>` to properly handle parse failures. Return None for invalid input.\n\nBefore:\n§F{f002:TryParse:pub}\n  §I{str:input}\n  §O{i32}\n  §R 0\n§/F{f002}\n\nAfter:\n§F{f002:TryParse:pub}\n  §I{str:input}\n  §O{Option<i32>}\n  §R §NN\n§/F{f002}\n\nIMPORTANT:\n1. The function ID f002 must NOT change\n2. Use §NN for None (not 'None' as a word)\n3. Use §SM value for Some(value) if needed",
+  "prompt": "In Signature.calr, change the return type of the `TryParse` function (f002) from `i32` to `Option<i32>` to properly handle parse failures. Return None for invalid input.\n\nBefore:\n§F{f002:TryParse:pub}\n  §I{str:input}\n  §O{i32}\n  §R 0\n\nAfter:\n§F{f002:TryParse:pub}\n  §I{str:input}\n  §O{Option<i32>}\n  §R §NN\n\nIMPORTANT:\n1. The function ID f002 must NOT change\n2. Use §NN for None (not 'None' as a word)\n3. Use §SM value for Some(value) if needed",
   "verification": {
     "compilation": {
       "mustSucceed": true

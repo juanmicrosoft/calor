@@ -295,8 +295,21 @@ init_calor() {
 
 This is a Calor project. Write code in `.calr` files.
 
-Blocks use indentation only (two spaces per level). Do not write structural
-closing tags. Only call argument lists and block lambdas use `§/C` and `§/LAM`.
+Blocks use indentation only (two spaces per level). A structural block ends at the
+DEDENT of its body. Writing a structural closer is a HARD ERROR (`Calor0830`):
+never write `§/M` `§/F` `§/AF` `§/W` `§/L` `§/WH` `§/I` `§/EACH` `§/EACHKV` `§/IFACE`
+`§/MT` `§/CL`. (`§/BODY` is also gone, reported as `Calor0006`.)
+
+**Some closers are still REQUIRED — do not delete these.** They are not structural: each
+carries payload or delimits a value that indentation does not. Omitting one is a hard
+parse error:
+
+| Closer | Required for |
+|:-------|:-------------|
+| `§/C` | end of a call's argument list |
+| `§/LAM` | end of a block lambda |
+| `§/DO{id} (condition)` | end of a do-while — it carries the condition |
+| `§/LIST{name}` `§/DICT{name}` `§/HSET{name}` | end of a collection literal (omitting is `Calor0100`) |
 Complete declaration examples below are compiled by `calor self-check docs` in CI;
 `calor-fragment` fences are schemas or snippets with explicitly external dependencies.
 
@@ -443,6 +456,17 @@ Effects declare what side-effects a function may have:
 - `db` = database access
 
 Effect modes: `§E{fs:r}` (read), `§E{fs:w}` (write), `§E{fs:rw}` (read-write), `§E{net:rw}` (network read-write)
+
+Reading from the console uses `Console.ReadLine` and the `cr` effect — declare `§E{cr}`,
+NOT `§E{cw}`. A function that both prints and reads declares both: `§E{cw,cr}`.
+
+```
+§F{f001:ReadInput:pub}
+  §O{str}
+  §E{cr}
+  §B{line} §C{Console.ReadLine} §/C
+  §R line
+```
 
 Example with effects:
 ```
@@ -659,6 +683,29 @@ Example:
 Key while loop syntax:
 - `§WH{id} condition` — begin while loop with unique id and boolean condition
 - Dedent to end the while-loop body.
+
+### Do-While Loops
+
+Runs the body **at least once**, then checks the condition. The condition lives on the
+CLOSING tag, which is why `§/DO` is one of the few closers you write by hand.
+
+```
+§F{f001:DoWhileDemo:pub}
+  §O{void}
+  §E{cw}
+  §B{i32:x} 0
+  §DO{do1}
+    §C{Console.WriteLine}
+      §A x
+    §/C
+    §ASSIGN x (+ x 1)
+  §/DO{do1} (< x INT:3)
+```
+
+- `§DO{id}` — begin the loop; the body always runs at least once
+- `§/DO{id} (condition)` — end the loop AND carry its condition; both REQUIRED, and the
+  id MUST match the opening tag
+- Do NOT put the condition on `§DO{id}` — it belongs on the closer
 - Use `§B` before the loop to declare the loop variable
 - Use `§ASSIGN` inside the loop body to update the variable
 
@@ -1111,6 +1158,47 @@ When fully specifying behavior, use multiple §S postconditions:
   §/C
 ```
 
+### String and Character Operations
+
+Built-in operations, written in the same Lisp-style prefix form as arithmetic. These are
+compiler built-ins, NOT method calls — do NOT wrap them in `§C{...}`.
+
+| Operation | Calor | C# equivalent |
+|:----------|:------|:--------------|
+| Length | `(len s)` | `s.Length` |
+| Contains | `(contains s sub)` | `s.Contains(sub)` |
+| Starts / ends | `(starts s p)` / `(ends s p)` | `s.StartsWith(p)` / `s.EndsWith(p)` |
+| Index of | `(indexof s sub)` | `s.IndexOf(sub)` |
+| Upper / lower | `(upper s)` / `(lower s)` | `s.ToUpper()` / `s.ToLower()` |
+| Character at | `(char-at s i)` | `s[i]` |
+| Character code | `(char-code c)` | `(int)c` |
+| Is letter / digit | `(is-letter c)` / `(is-digit c)` | `char.IsLetter(c)` / `char.IsDigit(c)` |
+| Regex test | `(regex-test s pattern)` | `Regex.IsMatch(s, pattern)` |
+
+The character type is `char`, so a function returning one declares `§O{char}`.
+
+There is NO char literal. `'0'` lexes as a **string**, so `(- c '0')` is a type error
+(`Calor0202`, "got char and str"). Get a char from a string with `(char-at "0" 0)`, and
+compare or subtract via `(char-code ...)`.
+
+```
+§F{f001:GetFirstChar:pub}
+  §I{str:s}
+  §O{char}
+  §E{}
+  §Q (> (len s) 0)
+  §R (char-at s 0)
+```
+
+```
+§F{f002:StringContains:pub}
+  §I{str:s}
+  §I{str:sub}
+  §O{bool}
+  §E{}
+  §R (contains s sub)
+```
+
 ### StringBuilder Operations
 
 StringBuilder uses **functional-style calls** (NOT method calls like `§C{sb.Append}`):
@@ -1241,6 +1329,16 @@ setup_workspace() {
 # Cleanup workspace
 cleanup_workspace() {
     local workspace="$1"
+    # KEEP_WORKSPACE=1 preserves the sandbox (agent output, generated .calr, build logs)
+    # so a failing task can actually be diagnosed. Without it a failure leaves nothing
+    # behind but "0/1 passed", which says nothing about why.
+    if [[ "${KEEP_WORKSPACE:-0}" == "1" ]]; then
+        log_info "KEEP_WORKSPACE=1 - preserving $workspace"
+        if [[ "$ACTIVE_WORKSPACE" == "$workspace" ]]; then
+            ACTIVE_WORKSPACE=""
+        fi
+        return 0
+    fi
     if [[ -d "$workspace" && "$workspace" == *calor-agent-* ]]; then
         rm -rf "$workspace"
     fi

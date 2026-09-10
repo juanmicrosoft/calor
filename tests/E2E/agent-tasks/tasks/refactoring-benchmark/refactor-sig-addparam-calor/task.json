@@ -3,7 +3,7 @@
   "name": "Add parameter to function (Calor)",
   "category": "refactoring-benchmark",
   "fixture": "refactor-signature-calor",
-  "prompt": "In Signature.calr, add a `greeting` parameter of type `str` to the `Greet` function (f001). The function should concatenate the greeting with the name.\n\nBefore:\n\u00a7F{f001:Greet:pub}\n  \u00a7I{str:name}\n  \u00a7O{str}\n  \u00a7R name\n\u00a7/F{f001}\n\nAfter:\n\u00a7F{f001:Greet:pub}\n  \u00a7I{str:greeting}\n  \u00a7I{str:name}\n  \u00a7O{str}\n  \u00a7R (concat greeting name)\n\u00a7/F{f001}\n\nNote: Use `(concat a b)` for string concatenation in Calor.\n\nIMPORTANT: The function ID f001 must NOT change.",
+  "prompt": "In Signature.calr, add a `greeting` parameter of type `str` to the `Greet` function (f001). The function should concatenate the greeting with the name.\n\nBefore:\n§F{f001:Greet:pub}\n  §I{str:name}\n  §O{str}\n  §R name\n\nAfter:\n§F{f001:Greet:pub}\n  §I{str:greeting}\n  §I{str:name}\n  §O{str}\n  §R (concat greeting name)\n\nNote: Use `(concat a b)` for string concatenation in Calor.\n\nIMPORTANT: The function ID f001 must NOT change.",
   "verification": {
     "compilation": {
       "mustSucceed": true

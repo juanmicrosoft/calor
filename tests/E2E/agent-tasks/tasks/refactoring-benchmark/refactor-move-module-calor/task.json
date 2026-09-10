@@ -3,7 +3,7 @@
   "name": "Move function to different module (Calor)",
   "category": "refactoring-benchmark",
   "fixture": "refactor-move-calor",
-  "prompt": "In the Calor project, move the `Abs` function (f001) from src/Math.calr (MathModule, m001) to src/Utils.calr (UtilsModule, m002). The function must keep its unique ID f001 and all its contracts.\n\nSteps:\n1. Remove the Abs function from src/Math.calr\n2. Add it to src/Utils.calr (inside the §M{m002:UtilsModule}...§/M{m002} block)\n3. Update the caller `Distance` (f003) in Math.calr to use the qualified call if needed\n\nIMPORTANT: The function ID f001 must NOT change. The postcondition §S (>= result 0) must be preserved.",
+  "prompt": "In the Calor project, move the `Abs` function (f001) from src/Math.calr (MathModule, m001) to src/Utils.calr (UtilsModule, m002). The function must keep its unique ID f001 and all its contracts.\n\nSteps:\n1. Remove the Abs function from src/Math.calr\n2. Add it to src/Utils.calr (inside the §M{m002:UtilsModule} module)\n3. Update the caller `Distance` (f003) in Math.calr to use the qualified call if needed\n\nIMPORTANT: The function ID f001 must NOT change. The postcondition §S (>= result 0) must be preserved.",
   "verification": {
     "compilation": {
       "mustSucceed": false
