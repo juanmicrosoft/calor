@@ -85,6 +85,20 @@ class Fixture(unittest.TestCase):
 
 
 class PriceTests(Fixture):
+    def test_exact_metadata_limits_and_native_output_request_are_source_bound(self):
+        self.assertEqual(1_000_000, budget.CONTEXT)
+        self.assertEqual(128_000, budget.OUTPUT)
+        source = budget.price_contract()["modelLimitsSource"]
+        self.assertEqual({"id": budget.MODEL, "max_input_tokens": 1_000_000, "max_tokens": 128_000},
+                         source["responseFields"])
+        self.assertEqual("GET", source["method"])
+        self.assertEqual(0, source["upstreamInferenceRequests"])
+        self.assertEqual(25_520_000, budget.admit_request(body(max_tokens=64_000))["maximumMicroUsd"])
+        self.assertEqual(29_040_000, budget.admit_request(body(max_tokens=128_000))["maximumMicroUsd"])
+        for overlimit in (128_001, 131_072):
+            with self.subTest(overlimit=overlimit), self.assertRaises(budget.Refusal):
+                budget.admit_request(body(max_tokens=overlimit))
+
     def test_real_supported_model_has_positive_implemented_request_bound(self):
         request = budget.admit_request(body(max_tokens=budget.OUTPUT))
         self.assertGreater(request["maximumMicroUsd"], 0)
@@ -103,6 +117,19 @@ class PriceTests(Fixture):
         self.assertEqual(863, budget.reconciled_cost(request, budget.MODEL, counters, "end_turn")[0])
         counters.update(speed="fast", inference_geo="us")
         self.assertEqual(1898, budget.reconciled_cost(request, budget.MODEL, counters, "end_turn")[0])
+
+    def test_service_tier_uses_published_categories_and_honors_standard_only(self):
+        automatic = budget.admit_request(body())
+        standard = budget.admit_request(body(service_tier="standard_only"))
+        self.assertEqual("auto", automatic["serviceTier"])
+        self.assertEqual("standard_only", standard["serviceTier"])
+        counters = usage(speed="standard", inference_geo="global")
+        amount = budget.reconciled_cost(automatic, budget.MODEL, counters, "end_turn")[0]
+        self.assertEqual(amount, budget.reconciled_cost(standard, budget.MODEL, counters, "end_turn")[0])
+        counters["service_tier"] = "priority"
+        self.assertEqual(amount, budget.reconciled_cost(automatic, budget.MODEL, counters, "end_turn")[0])
+        with self.assertRaisesRegex(budget.Refusal, "service tier differs"):
+            budget.reconciled_cost(standard, budget.MODEL, counters, "end_turn")
 
     def test_unpriced_models_fields_server_tools_and_overlimits_refuse(self):
         for changes in (
@@ -337,6 +364,8 @@ class LedgerTests(Fixture):
         snapshot = ledger.snapshot()
         self.assertEqual(100, len(snapshot["requests"]))
         self.assertEqual(100 * expected_charge(), snapshot["exposureMicroUsd"])
+        self.assertEqual(request, budget.decode(snapshot["requests"][0]["request"]))
+        self.assertEqual("auto", budget.decode(snapshot["requests"][0]["request"])["serviceTier"])
         ledger.complete(owner)
         self.assertIsNone(ledger.snapshot()["verdict"])
 

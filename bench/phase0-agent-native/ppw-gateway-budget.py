@@ -10,9 +10,9 @@ import sqlite3
 MICRO = 1_000_000
 KIND = "pp-w-request-gateway-v1"
 MODEL = "claude-opus-4-8"
-# Binary interpretations of the documented 1M/128K limits are the larger bounds.
-CONTEXT = 1_048_576
-OUTPUT = 131_072
+# Exact limits confirmed by the independent, metadata-only Models API preflight.
+CONTEXT = 1_000_000
+OUTPUT = 128_000
 REQUEST_FIELDS = {
     "model", "max_tokens", "messages", "system", "stream", "tools", "tool_choice",
     "thinking", "output_config", "output_format", "temperature", "top_p", "top_k",
@@ -84,10 +84,22 @@ def price_contract():
     return {
         "schemaVersion": 1, "model": MODEL, "upstream": "https://api.anthropic.com",
         "contextUpperTokens": CONTEXT, "outputUpperTokens": OUTPUT,
+        "modelLimitsSource": {
+            "method": "GET", "path": "/v1/models/" + MODEL,
+            "responseFields": {"id": MODEL, "max_input_tokens": CONTEXT, "max_tokens": OUTPUT},
+            "verification": "independent parent-reported metadata-only preflight, 2026-09-10",
+            "status": 200, "upstreamInferenceRequests": 0,
+        },
         "ratesUsdPerMillion": {"input": "5", "output": "25", "cacheWrite5m": "6.25",
                               "cacheWrite1h": "10", "cacheRead": "0.50",
                               "fastInput": "10", "fastOutput": "50"},
         "residencyMaximumMultiplier": "1.1",
+        "serviceTierPolicy": {
+            "requests": ["auto", "standard_only"],
+            "responses": ["standard", "priority"],
+            "pricing": "published token-category rates; priority draws existing capacity",
+            "capacityPurchases": "not performed by this Messages request adapter",
+        },
         "reservation": "full context at fast 1h-write rate plus requested output at fast rate; 1.1x",
         "reconciliation": "complete provider category counts; higher priced speed/residency/cache TTL if absent",
         "serverOperations": "not admitted; request fails before forwarding, never stripped",
@@ -98,6 +110,7 @@ def price_contract():
             "https://platform.claude.com/docs/en/models/opus-4-8/overview",
             "https://platform.claude.com/docs/en/about-claude/pricing",
             "https://platform.claude.com/docs/en/api/messages/create",
+            "https://platform.claude.com/docs/en/api/models/retrieve",
             "https://platform.claude.com/docs/en/api/service-tiers",
             "https://platform.claude.com/docs/en/build-with-claude/compaction",
             "https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback",
@@ -220,7 +233,7 @@ def admit_request(raw, beta_header=None):
         validate_cache_control(body["cache_control"])
     return {"model": MODEL, "maxTokens": maximum, "stream": body.get("stream", False),
             "maximumMicroUsd": upper_cost(CONTEXT, maximum), "priceSha256": price_identity(),
-            "betaCapabilities": capabilities}
+            "betaCapabilities": capabilities, "serviceTier": body.get("service_tier", "auto")}
 
 
 def validate_response_content(content):
@@ -240,6 +253,9 @@ def reconciled_cost(request, model, usage, stop_reason):
     total_input = sum(counts[name] for name in COUNTERS if name != "output_tokens")
     require(total_input <= CONTEXT, "provider input exceeds context bound")
     require(usage.get("service_tier") in ("standard", "priority"), "unknown provider service tier")
+    require(request.get("serviceTier") in ("auto", "standard_only")
+            and (request["serviceTier"] != "standard_only" or usage["service_tier"] == "standard"),
+            "provider service tier differs from the admitted request")
     require(usage.get("inference_geo", "global") in ("global", "us"), "unknown provider geography")
     require(usage.get("speed", "standard") in ("standard", "fast"), "unknown provider speed")
     allowed = set(COUNTERS) | {"service_tier", "inference_geo", "speed", "cache_creation", "server_tool_use"}
@@ -510,7 +526,7 @@ class RequestLedger:
         with self.transaction() as db:
             scope = dict(db.execute("SELECT * FROM scope").fetchone())
             requests = [dict(row) for row in db.execute(
-                "SELECT id,slot,reserved,charge,state,reason,usage FROM requests ORDER BY rowid")]
+                "SELECT id,slot,request,reserved,charge,state,reason,usage FROM requests ORDER BY rowid")]
             events = [dict(row) for row in db.execute("SELECT * FROM events ORDER BY id")]
         return {"kind": KIND, "state": scope["state"], "binding": decode(scope["binding"]),
                 "ceilingMicroUsd": scope["ceiling"], "exposureMicroUsd": sum(r["charge"] for r in requests),

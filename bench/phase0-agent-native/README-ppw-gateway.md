@@ -6,8 +6,10 @@ entire 444-slot pilot will fit the authorized ceiling. Historical spending
 receipts and the estimate-only adapter remain separate.
 
 **Integration status:** the deterministic HTTP positive path and local kernel/SDK
-canaries exist. The independent retained-client transport/IPC probe, complete
-operational source/profile/funding supersession, and final review remain pending.
+canaries exist. Independent no-forward diagnostic-client transport and protected
+control probes succeeded. Registered-argument/capability parity, the remaining
+IPC/socket checks, complete operational source/profile/funding supersession, and
+final review remain pending. Credential and model availability are not blockers.
 The capability list is not yet claimed to admit the pinned client's full request
 set, including its exact OAuth capability. No experimental invocation, live
 ledger, or scientific outcome is created by these fixtures.
@@ -15,15 +17,35 @@ ledger, or scientific outcome is created by these fixtures.
 ## One request must mean one model iteration
 
 `ppw-gateway-budget.py::price_contract` binds the model, limits, prices, capability
-list and primary source URLs. The supported model is `claude-opus-4-8`. The larger
-binary interpretations of the documented 1M context and 128K synchronous output
-limits are used: 1,048,576 and 131,072 tokens.
+list and primary source URLs. The supported model is `claude-opus-4-8`.
+An independent metadata-only preflight on September 10, 2026 returned HTTP 200
+from `GET /v1/models/claude-opus-4-8`, confirming the exact model ID,
+`max_input_tokens: 1000000` and `max_tokens: 128000`.
+The controller uses those exact limits, rather than binary approximations.
+See the [Models API reference](https://platform.claude.com/docs/en/api/models/retrieve)
+and the [Messages API definition](https://platform.claude.com/docs/en/api/messages/create)
+of `max_tokens` as an absolute output maximum. The reported preflight made one
+metadata GET and forwarded no upstream inference. No credentials or raw
+authentication payloads are part of this record.
 
 Before opening an upstream connection, the controller reserves the full context
 at the highest admitted input-category rate, plus the request's `max_tokens` at
 the highest admitted output rate. Rates cover fast mode, one-hour cache writes
 and the 1.1x US-residency multiplier. Every attempt, including a client retry or
 helper request, requires its own durable reservation.
+
+The [service-tier reference](https://platform.claude.com/docs/en/api/service-tiers)
+describes `auto` using existing Priority capacity when available. It does not
+document a separate per-token Priority multiplier or a Messages operation that
+purchases a capacity commitment. The controller applies the published token
+categories rather than inventing a premium. A request explicitly selecting
+`standard_only` must report standard-tier usage to reconcile.
+
+This is a bound for the documented first-party per-request usage charges, not
+an account-wide invoice limit. The adapter cannot establish private contractual
+economics, allocate unrelated existing commitments, cover unrelated account
+activity, or control taxes and fees absent from the published price contract.
+Those are not silently priced as zero or inferred from CLI estimates.
 
 That formula is **not** a bound for arbitrary Messages API features:
 
