@@ -21,7 +21,7 @@
   "effectiveOn": "independently reviewed merge of the #1378 implementation PR",
   "instrumentAmendment": {
     "path": "registrations/ppw-rows-stage1/spending-instrument-amendment.json",
-    "sha256": "6101e11f26a6285aaa97534fa81ce3e7f27919a291994e867b1d295effe665c5"
+    "sha256": "a3a33debc9ef5a6d995564ef553bbf08830a117165b212d2988c04ecbf9ec3c2"
   },
   "kind": "pp-w-rows-stage1-analysis-registration",
   "methodSection": 9,

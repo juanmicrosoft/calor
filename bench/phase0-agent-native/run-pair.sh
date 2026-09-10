@@ -1174,11 +1174,11 @@ run_agent() {
     if [[ -n "$PPW_SPEND_TICKET" ]]; then
         local client_help budget_limit
         client_help="$(claude --help)" \
-            || { echo "Cannot verify registered client spending-control support" >&2; return 2; }
+            || { echo "Cannot verify registered client spending-control support" >&2; exit 2; }
         grep -q -- '--max-budget-usd' <<<"$client_help" \
-            || { echo "Registered client lacks --max-budget-usd" >&2; return 2; }
+            || { echo "Registered client lacks --max-budget-usd" >&2; exit 2; }
         budget_limit="$(python3 "$SCRIPT_DIR/ppw-spending.py" claim --ticket "$PPW_SPEND_TICKET" \
-                         --task "$PAIR_ID" --arm "$ARM_LABEL" --run "$run_idx")" || return 2
+                         --task "$PAIR_ID" --arm "$ARM_LABEL" --run "$run_idx")" || exit 2
         claude_args+=(--max-budget-usd "$budget_limit")
         jq -n --arg limit "$budget_limit" \
             '{kind:"claude-code-max-budget-usd",limitUsd:$limit,invoiceHardCap:false}' \

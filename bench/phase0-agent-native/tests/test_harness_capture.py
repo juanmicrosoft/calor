@@ -371,7 +371,7 @@ class CompilerHashIsSurfaced(unittest.TestCase):
 
     def test_run_pair_archives_before_deleting_the_workspace(self):
         src = _read(RUN_PAIR)
-        agent_stop = src.index('run_agent "$WS" "$WS_OUT" "$SHIM_DIR"\n\n')
+        agent_stop = src.index('run_agent "$WS" "$WS_OUT" "$SHIM_DIR" "$run"\n\n')
         archive = src.index('archive_build_state "$WS" "$WS_OUT" "agent-workspace"')
         final_src = src.index('reason="$(archive_final_src "$WS" "$WS_OUT")"')
         delete = src.index('extract_metrics "$WS" "$WS_OUT" "$run"\n        rm -rf "$WS"')
