@@ -34,6 +34,13 @@ test('effect-rows outcome publishes a no-run disposition without substituting hi
     await expect(page.locator('article')).toContainText('Null means uncollected');
     await expect(page.locator('article')).toContainText('two cost-eligible task pairs (12 runs)');
   }
+  await page.goto(`${base}/docs/benchmarking/evidence-status/`);
+  for (const text of ['Local buildability passed on 2026-09-10', 'not an agent observation',
+    'no redesigned agent collection or benefit result exists', 'UNADJUDICATED', 'administrative stop']) {
+    await expect(page.locator('article')).toContainText(text);
+  }
+  await expect(page.getByRole('link', { name: 'reviewed gate closure', exact: true }))
+    .toHaveAttribute('href', 'https://github.com/juanmicrosoft/calor/pull/1348');
 });
 
 test('effect-rows methodology separates registration, tooling, observations and approval', async ({ page }) => {
