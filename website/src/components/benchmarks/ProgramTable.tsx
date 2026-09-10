@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronUp, ChevronDown, Check, X } from 'lucide-react';
 import { trackProgramTableSort, trackProgramTableFilter } from '@/lib/analytics';
+import { staticMetricLabels } from '@/lib/benchmark-labels';
 
 interface ProgramData {
   identity: string;
@@ -25,29 +26,8 @@ interface ProgramTableProps {
 type SortField = 'name' | 'level' | 'advantage' | string;
 type SortDirection = 'asc' | 'desc';
 
-// Human-readable metric names
-const metricDisplayNames: Record<string, string> = {
-  TokenEconomics: 'Tokens',
-  GenerationAccuracy: 'Gen Acc',
-  Comprehension: 'Comp',
-  EditPrecision: 'Edit',
-  ErrorDetection: 'Err Det',
-  InformationDensity: 'Info Den',
-  TaskCompletion: 'Task',
-  RefactoringStability: 'Refactor',
-  Safety: 'Safety',
-  EffectDiscipline: 'Effects',
-  Correctness: 'Correct',
-};
-
 function formatValue(value: number): string {
   return value.toFixed(2);
-}
-
-function getValueColor(value: number): string {
-  if (value >= 1.0) return 'text-calor-pink font-medium';
-  if (value >= 0.8) return 'text-muted-foreground';
-  return 'text-calor-cerulean';
 }
 
 function SortHeader({ field, children, className, sortField, sortDirection, onSort }: {
@@ -134,6 +114,12 @@ export function ProgramTable({ programs, metricNames }: ProgramTableProps) {
 
   return (
     <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Values are Calor/C# static-score ratios: above 1 means a higher Calor
+        calculator score, below 1 a higher C# score, and 1 equal scores.
+        The legacy composite combines metric scores; Token Economics combines
+        token, character, and line ratios, not raw-token savings.
+      </p>
       {/* Level filter */}
       <div className="flex items-center gap-2 text-sm">
         <span className="text-muted-foreground">Filter by level:</span>
@@ -178,10 +164,10 @@ export function ProgramTable({ programs, metricNames }: ProgramTableProps) {
               <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">
                 Status
               </th>
-              <SortHeader {...sortProps} field="advantage">Adv</SortHeader>
+              <SortHeader {...sortProps} field="advantage">Static-score composite</SortHeader>
               {metricNames.map((metric) => (
                 <SortHeader {...sortProps} key={metric} field={metric}>
-                  {metricDisplayNames[metric] || metric}
+                  {staticMetricLabels[metric]?.name || metric}
                 </SortHeader>
               ))}
             </tr>
@@ -227,16 +213,13 @@ export function ProgramTable({ programs, metricNames }: ProgramTableProps) {
                     </span>
                   </div>
                 </td>
-                <td className={cn('px-3 py-2 font-mono', getValueColor(program.advantage))}>
+                <td className="px-3 py-2 font-mono">
                   {formatValue(program.advantage)}
                 </td>
                 {metricNames.map((metric) => (
                   <td
                     key={metric}
-                    className={cn(
-                      'px-3 py-2 font-mono',
-                      getValueColor(program.metrics[metric] ?? 0)
-                    )}
+                    className="px-3 py-2 font-mono"
                   >
                     {formatValue(program.metrics[metric] ?? 0)}
                   </td>
@@ -249,7 +232,6 @@ export function ProgramTable({ programs, metricNames }: ProgramTableProps) {
 
       <p className="text-xs text-muted-foreground">
         Showing {sortedPrograms.length} of {programs.length} programs.
-        Values above 1.0 favor Calor (highlighted in pink), values below 1.0 favor C# (highlighted in teal).
       </p>
     </div>
   );
