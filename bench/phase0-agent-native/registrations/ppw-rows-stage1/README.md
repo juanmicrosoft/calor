@@ -39,10 +39,14 @@ complete environment identity, paid model invocation, or installed
 historical client version. The deliberate model/agent choice is carried
 into actual epoch pins by #1265.
 
-The task freeze, validated operational indicator, preserved API contract,
-product/pin admission, and one-epoch collection/analysis path are still
-required. This calculator does not silently replace the shared analyzer;
-#1264's owner integrates the reviewed method.
+The task freeze, operational indicator, preserved API contract and prospective
+product/pin admission landed in their separately reviewed prerequisite PRs.
+This calculator does not replace the shared descriptive analyzer. The separate
+[#1267 read-only pilot adjudication command](../../README-ppw-pilot-adjudication.md)
+integrates its two estimands, exact stopping rules and bands with authoritative
+counts recomputed from one completed epoch. It is an explicit analysis step,
+not an automatic collection-side invocation. Its new analysis-code manifest
+does not change existing collection pins, thresholds or the frozen method.
 
 No spending ceiling or separate null-result acceptance has been recorded.
 #1259 blocks every paid run. Stage-2 Δ/N and its outcome are deliberately
