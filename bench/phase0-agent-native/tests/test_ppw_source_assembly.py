@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import unittest
@@ -30,7 +31,8 @@ class SourceAssemblyTests(unittest.TestCase):
         for arm in ("a", "b"):
             for directory, editable in (
                 (self.task / ("starter-" + arm), "return 0\n"),
-                (self.task / "seeded" / ("clean-" + arm), "this.lookup\n"),
+                (self.task / "seeded" / ("clean-" + arm), "return 1\n"),
+                (self.task / "seeded" / ("laundering-" + arm), "this.lookup\n"),
             ):
                 (directory / "Source.calr").unlink()
                 (directory / "dependency.calr.inc").write_text("this.lookup\n")
@@ -158,6 +160,47 @@ class SourceAssemblyTests(unittest.TestCase):
         self.refresh_synthetic_inventory()
         with self.assertRaisesRegex(ValueError, "immutable dependency"):
             self.fixture.analyze()
+
+    def test_honest_is_negative_and_laundering_is_positive_in_each_arm(self):
+        self.fixture.analyze()
+        for arm in ("a", "b"):
+            for role, replacement, message in (
+                ("clean", "this.lookup\n", "honest negative"),
+                ("laundering", "return 1\n", "laundering positive"),
+            ):
+                path = self.task / "seeded" / (role + "-" + arm) / "task.calr.inc"
+                original = path.read_text()
+                with self.subTest(arm=arm, role=role):
+                    path.write_text(replacement)
+                    self.refresh_synthetic_inventory()
+                    with self.assertRaisesRegex(ValueError, message):
+                        self.fixture.analyze()
+                path.write_text(original)
+        self.refresh_synthetic_inventory()
+
+    def test_control_roles_cannot_silently_default_back_to_clean_positive(self):
+        for role in ("clean", "laundering"):
+            original = self.pair["seeded"].pop(role)
+            save(self.task / "pair.json", self.pair)
+            self.refresh_synthetic_inventory()
+            with self.subTest(role=role), self.assertRaisesRegex(ValueError, "explicit seeded." + role):
+                self.fixture.analyze()
+            self.pair["seeded"][role] = original
+        save(self.task / "pair.json", self.pair)
+
+    def test_laundering_positive_must_preserve_immutable_dependency(self):
+        (self.task / "seeded/laundering-a/dependency.calr.inc").write_text("changed dependency\n")
+        self.refresh_synthetic_inventory()
+        with self.assertRaisesRegex(ValueError, "immutable dependency"):
+            self.fixture.analyze()
+
+    def test_preserved_quota_template_has_honest_negative_and_laundering_positive(self):
+        fixture = BENCH / "buildability/1255/quota-adapter"
+        pattern = re.compile(r"§C\{this\.lookup\}")
+        for name, expected in (("starter", False), ("honest", False), ("laundering", True)):
+            with self.subTest(control=name):
+                text = (fixture / (name + ".calr.inc")).read_text()
+                self.assertEqual(expected, bool(pattern.search(text)))
 
     def test_final_dependency_is_checked_against_frozen_original(self):
         final = self.fixture.result().parent / "final-src/dependency.calr.inc"

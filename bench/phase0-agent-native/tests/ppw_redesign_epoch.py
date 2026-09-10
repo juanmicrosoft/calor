@@ -35,7 +35,8 @@ def build(root, stage="pilot", epoch_id=None):
         "tests": {"path": "tests", "count": 1, "effectObservingTests": ["PreservesState"],
                   "effectFailureSignature": "HELDOUT_EFFECT:state-change"},
         "shapeRealizedIndicator": {"sourceRegex": "this.lookup"},
-        "seeded": {"clean": {"a": "seeded/clean-a", "b": "seeded/clean-b"}},
+        "seeded": {"clean": {"a": "seeded/clean-a", "b": "seeded/clean-b"},
+                   "laundering": {"a": "seeded/laundering-a", "b": "seeded/laundering-b"}},
     }
     save(directory / "pair.json", pair)
     (directory / "spec.md").write_text("SYNTHETIC TEST INPUT — not an empirical task.\n")
@@ -46,7 +47,8 @@ def build(root, stage="pilot", epoch_id=None):
         "using Xunit;\npublic class Tests {\n[Fact]\npublic void PreservesState() { Assert.True(true); }\n}\n")
     for arm in ("a", "b"):
         for subdir, source in (("starter-" + arm, "return 0"),
-                               ("seeded/clean-" + arm, "this.lookup")):
+                               ("seeded/clean-" + arm, "return 1"),
+                               ("seeded/laundering-" + arm, "this.lookup")):
             source_dir = directory / subdir
             source_dir.mkdir(parents=True)
             (source_dir / "Source.calr").write_text(source + "\n")

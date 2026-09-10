@@ -193,19 +193,30 @@ def validate_tasks(root, registration):
         indicator = pair.get("shapeRealizedIndicator", {}).get("sourceRegex")
         require(isinstance(indicator, str) and indicator, "shape indicator required")
         regex = re.compile(indicator)
+        seeded = pair.get("seeded", {})
+        require(isinstance(seeded, dict), "explicit seeded control roles required")
+        for role in ("clean", "laundering"):
+            require(isinstance(seeded.get(role), dict) and set(seeded[role]) == {"a", "b"},
+                    "explicit seeded.%s controls for both arms required" % role)
         for arm in ("a", "b"):
             fixture = directory / ("starter-" + arm)
             starter = assembly.source_paths(pair, fixture, editable_only=True)
-            clean = local(directory, pair["seeded"]["clean"][arm])
+            clean = local(directory, seeded["clean"][arm])
+            laundering = local(directory, seeded["laundering"][arm])
             clean_sources = assembly.source_paths(pair, clean, editable_only=True)
+            laundering_sources = assembly.source_paths(pair, laundering, editable_only=True)
             if assembly.definition(pair):
                 immutable = assembly.check_fragments(pair, fixture)
                 assembly.check_fragments(pair, clean, immutable)
-            require(starter and clean_sources, "starter and clean seed sources required")
+                assembly.check_fragments(pair, laundering, immutable)
+            require(starter and clean_sources and laundering_sources,
+                    "starter, honest negative, and laundering positive sources required")
             require(not any(regex.search(p.read_text()) for p in starter),
                     "shape indicator matches its starter")
-            require(any(regex.search(p.read_text()) for p in clean_sources),
-                    "shape indicator misses its clean seed")
+            require(not any(regex.search(p.read_text()) for p in clean_sources),
+                    "shape indicator matches its honest negative control")
+            require(any(regex.search(p.read_text()) for p in laundering_sources),
+                    "shape indicator misses its laundering positive control")
     helper("ppw-registration.py").check_supersession(registration, root)
 
 

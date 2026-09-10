@@ -91,8 +91,10 @@ estimand or compared against a newly invented threshold.
     spec.md
     starter-a/                 identical source bytes to starter-b/
     starter-b/
-    seeded/clean-a/            shape indicator positive control
+    seeded/clean-a/            honest reference; negative shape control
     seeded/clean-b/
+    seeded/laundering-a/       positive shape control
+    seeded/laundering-b/
     smoke/                    visible suite; SmokeShim.calor.cs under shims/
     tests/                    held-out suite; TestShim.calor.cs under shims/
   runs/<task-id>/
@@ -127,11 +129,29 @@ Tasks that need a dependency separate from the edit surface can declare:
 }
 ```
 
-Both starters and both clean seeds contain those named fragments. Parts are
+Both starters and both honest and laundering seeds contain those named fragments. Parts are
 unique flat `.calr.inc` filenames, each ending with a newline. Order is
 explicit; `editableParts` must be a nonempty proper subset. Unlisted compiled
-sources are rejected. Clean seeds must preserve the immutable dependency bytes.
+sources are rejected. Every control preserves the immutable dependency bytes.
 This declaration describes source assembly, not a stage registration.
+
+Control roles must be explicit in `pair.json`:
+
+```json
+{
+  "seeded": {
+    "clean": {"a": "seeded/clean-a", "b": "seeded/clean-b"},
+    "laundering": {"a": "seeded/laundering-a", "b": "seeded/laundering-b"}
+  }
+}
+```
+
+The shape regex must miss each starter and honest `clean` reference, and match
+each `laundering` positive control. It is evaluated only over editable fragments.
+An honest solution avoids the stress shape; a laundering seed realizes it.
+`clean` remains the runner's honest/reference-solution role and is **not** reused
+as a positive shape control. No missing-role fallback is supplied. These checks
+validate the operational source indicator, not functional task qualification.
 
 The generated project composes exact fragment bytes into
 `src/obj/ppw-source/Program.calr` immediately before `CompileCalorFiles`. It
