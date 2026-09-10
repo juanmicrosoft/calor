@@ -142,9 +142,9 @@ Calor is not trying to replace C#, Python, or any other language. It's a researc
 
 | For you if… | Not for you if… |
 |:------------|:----------------|
-| You ship .NET code with AI coding agents and want compile-time guarantees on effects and contracts | Your team dislikes explicit annotations or prefers to author every line of source by hand |
+| You ship .NET code with AI coding agents and want compile-time effect checks, runtime contracts, and explicit proof verdicts | Your team dislikes explicit annotations or prefers to author every line of source by hand |
 | You are comfortable running a pre-1.0 tool from a single maintainer | You need a stable v1 API today or commercial support |
-| You want to shift review from line-by-line code to requirements, contracts, and proof verdicts | Human readability of source is the priority and no agent is involved |
+| You want to test whether review can lead with requirements, contracts, and proof verdicts on your workload | Human readability of source is the priority and no agent is involved |
 | You value a tested eject path — the generated C# is yours and can be built without Calor | You depend on features that would require heavy interop (delegate-heavy or reflection-heavy service layers) |
 
 See the [adoption playbook](/docs/guides/adoption-playbook/) for the incremental
@@ -163,7 +163,9 @@ and interop boundaries they approve. An agent can translate requirements into
 Calor; the compiler then checks types and effects and classifies supported
 contract obligations.
 
-Think of it this way: you don't need to learn assembly language to write software, and you don't need to learn Calor to benefit from it. The AI handles the language; you handle the intent.
+An agent can author Calor, but reviewers still need enough language knowledge to
+understand the specifications and boundaries they approve. The agent does not
+remove human ownership of intent, tests, or accepted behavior.
 
 ### "Do I still need to do code reviews?"
 
@@ -180,7 +182,11 @@ obligation under Calor's modeled semantics; it is not a whole-program guarantee.
 
 ### "What if I want to understand the code?"
 
-Calor compiles to readable C# code. For debugging or auditing purposes, you can inspect the generated `.cs` files—they're standard, idiomatic C# that any .NET developer can understand. But this is the exception, not the workflow: normally you review contracts and verification results, not implementation. The Calor source is the "agent-facing" representation; the C# output exists for tooling compatibility and the rare cases when you need to investigate behavior.
+Calor emits ordinary C# that can be inspected with .NET tooling. Generated code
+is a compatibility and exit artifact, not proof that every lowering is
+idiomatic or correct. Review contracts and verification results first, then
+inspect generated C#, tests, interop blocks, and waivers where the evidence
+requires it.
 
 ### "This seems verbose compared to C#"
 
@@ -191,32 +197,42 @@ tradeoff, not a universal efficiency win.
 
 ### "My team will never adopt this"
 
-Adoption is gradual and low-risk:
+Adoption can be gradual and reversible, but the project has not measured its
+organizational risk or total cost:
 1. **Start with AI-generated modules**—let your coding agent write Calor for new features
 2. **Review contracts first**—then inspect the unproven remainder, tests, and generated boundary code
-3. **Interoperate seamlessly**—Calor compiles to standard .NET assemblies that work with existing C# code
-4. **Organizational flexibility**—the generated C# is always available if your organization requires it for compliance, auditing, or legacy integration
+3. **Test interoperation**—Calor emits .NET assemblies, but manifests, preserved C#, and unsupported forms still need review
+4. **Keep the exit path tested**—retain generated C# and its dependencies for compliance, auditing, or migration back to C#
 
 ### "What about tooling? IDE support?"
 
-Calor compiles to standard .NET assemblies. That means:
-- Your existing debugger works (on the generated C#)
-- Your existing profiler works
-- Your existing CI/CD pipeline works
-- NuGet packages work
+Calor emits standard .NET assemblies and C#, so existing debuggers, profilers,
+CI systems, and NuGet workflows can be integrated. Verify each toolchain on
+your target runtime and keep generated-code/source-map limitations visible.
 
 The Calor CLI includes a language server (`calor lsp`) that speaks standard LSP over stdio and works with any LSP-capable editor. The dedicated VS Code Marketplace extension was withdrawn after v0.13.1; see the [changelog](/docs/changelog/).
 
 ### "Is this production-ready?"
 
-Calor is a pre-1.0 research project exploring AI-native language design. It emits strongly typed C# for .NET, but its verifier supports only a documented subset. Forms outside that subset report `unsupported`; modeled proofs that depend on named assumptions report `assumed`. Neither is presented as a clean proof. Conversion and tooling also retain known limitations. Start with a narrow pilot, keep generated C# and tests in review, and follow the [adoption playbook](/docs/guides/adoption-playbook/) and [verification guarantees](/docs/guides/verification-guarantees/) before expanding its role.
+Calor is a pre-1.0 research project exploring AI-native language design. It
+emits strongly typed C# for .NET, but its verifier supports only a documented
+subset. Forms outside that subset report `unsupported`; modeled proofs that
+depend on named assumptions report `assumed`. Neither is presented as a clean
+proof. Conversion and tooling also retain known limitations. No qualifying adopter,
+independent adopter handoff, economic advantage, or safety advantage has been
+established.
+Start with a narrow pilot, keep generated C# and tests in review, and follow the
+[adoption playbook](/docs/guides/adoption-playbook/),
+[verification guarantees](/docs/guides/verification-guarantees/), and
+[research evidence status](/docs/benchmarking/evidence-status/) before
+expanding its role.
 
 ---
 
 ## Learn More
 
 - [Design Principles](/docs/philosophy/design-principles/) - The five core principles behind Calor
-- [Stable Identifiers](/docs/philosophy/stable-identifiers/) - How language-level IDs enable reliable AI workflows
+- [Stable Identifiers](/docs/philosophy/stable-identifiers/) - How language-level IDs provide durable structural targets
 - [Tradeoffs](/docs/philosophy/tradeoffs/) - What Calor gives up for explicitness
 - [Static Contract Verification](/docs/philosophy/static-verification/) - Proving contracts at compile time with Z3
 - [Benchmarking](/docs/benchmarking/) - How we measure success

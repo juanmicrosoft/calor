@@ -49,9 +49,13 @@ This is a fundamental design choice, not a flaw to be fixed.
 
 ---
 
-## When the Tradeoff Pays Off
+## Where to Evaluate the Tradeoff
 
-Calor's tradeoff pays off when:
+The examples below show the information Calor makes explicit. They are reasons
+to test the workflow, not evidence that it reduces total cost or defects on
+your workload.
+
+Candidate situations to evaluate include:
 
 ### 1. Agents Need to Reason About Behavior
 
@@ -69,7 +73,8 @@ Calor's tradeoff pays off when:
   // ...
 ```
 
-An agent can reason about this function's behavior without reading the implementation:
+The declaration makes these intended properties visible before reading the
+implementation:
 - It modifies database state
 - Amount must be positive
 - Source must have sufficient balance
@@ -90,7 +95,7 @@ An agent can reason about this function's behavior without reading the implement
   §R (* price (- 1 (/ discount_percent 100)))
 ```
 
-An agent can immediately verify:
+An agent or reviewer can immediately identify the requested conditions:
 - Any call with `discount_percent > 100` violates preconditions
 - If result is negative, postcondition is violated
 - The contracts document edge cases explicitly
@@ -107,8 +112,9 @@ An agent can immediately verify:
 §L{for1:i:0:100:1}
 ```
 
-The ID gives the edit a stable target and reduces the risk of changing the
-wrong loop.
+The ID gives the edit a stable target. Whether that improves real editing
+accuracy remains a workload-dependent hypothesis; the published edit-precision
+score is a source-pattern calculation, not executed agent edits.
 
 ---
 
@@ -165,7 +171,10 @@ advantage. See the [snapshot provenance and limits](/docs/benchmarking/results/#
 | Generation Accuracy | Compilation and structural completeness | 1.02x (Calor wins) |
 | Refactoring Stability | ID-reference preservation | 1.38x (Calor wins) |
 
-The question isn't "which is better" but "which matters more for your use case."
+The question is not settled by these scores. Measure correctness, review,
+repair, and exit costs on your own tasks, and read the
+[research evidence status](/docs/benchmarking/evidence-status/) before treating
+the calculator as adoption evidence.
 
 ---
 
