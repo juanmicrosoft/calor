@@ -53,6 +53,18 @@ try {
   run(compile);
   assert.equal(run(execute), expected);
   console.log('Published standalone and .NET project recipes passed; template conflict reproduced and fixed.');
+
+  const workflow = await readFile('content/getting-started/how-it-works.mdx', 'utf8');
+  const workflowSource = workflow.match(/```calor\n([\s\S]*?)```/)?.[1];
+  assert.ok(workflowSource, 'Missing complete How It Works example');
+  const workflowCommands = blocks(workflow)[1].split('\n');
+  await writeFile(path.join(cwd, 'Program.calr'), workflowSource);
+  run(workflowCommands[0]);
+  assert.equal(run(workflowCommands[1]), expected);
+  await writeFile(path.join(cwd, 'Program.calr'), workflowSource.replace('Hello from Calor!', 'Hello again!'));
+  run(workflowCommands[0]);
+  assert.equal(run(workflowCommands[1]), 'Hello again!');
+  console.log('Published How It Works compile/run/revise workflow passed.');
 } finally {
   await rm(workspace, { recursive: true, force: true });
 }

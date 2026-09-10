@@ -12,6 +12,24 @@ const verificationPages = ['philosophy/static-verification', 'syntax-reference/c
   'cli/compile', 'cli/verify', 'benchmarking/metrics/contract-verification'];
 const currentRelease = '0.19.0';
 
+test('effect-rows outcome publishes a no-run disposition without substituting historical data', async ({ page }) => {
+  const ledger = JSON.parse(await readFile('../bench/phase0-agent-native/effect-rows-benefit-ledger.json', 'utf8'));
+  expect(ledger.epochRun).toBe(false);
+  expect(ledger.verdict).toBe('UNDERPOWERED');
+  expect(ledger.legA).toBeNull();
+  expect(ledger.legB).toBeNull();
+  const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  await page.route('https://**/*', route => route.abort());
+  for (const path of ['benchmarking', 'benchmarking/agent-tasks', 'benchmarking/metrics/effect-discipline']) {
+    await page.goto(`${base}/docs/${path}/`);
+    await page.locator('article a[href$="/docs/benchmarking/results/#redesigned-pp-w-rows-deferred"]').click();
+    await expect(page.getByRole('heading', { name: 'Redesigned PP-W-rows: deferred' })).toBeInViewport();
+    await expect(page.locator('article')).toContainText('no redesigned confirmatory result exists');
+    await expect(page.locator('article')).toContainText('Null means uncollected');
+    await expect(page.locator('article')).toContainText('two cost-eligible task pairs (12 runs)');
+  }
+});
+
 test('effect-rows methodology separates registration, tooling, observations and approval', async ({ page }) => {
   const source = await readFile('content/benchmarking/effect-rows-study.mdx', 'utf8');
   expect(source).toContain('16880d006db760d7b47d829fd4282b033c3158a0');
@@ -28,6 +46,22 @@ test('effect-rows methodology separates registration, tooling, observations and 
       'below 50%', 'UNDERPOWERED-CARRIED', 'not implemented evidence']) {
       await expect(page.locator('article')).toContainText(text);
     }
+  }
+});
+
+test('task-first workflow keeps an account-free path and bounded provider guidance', async ({ page }) => {
+  await page.route('https://**/*', route => route.abort());
+  const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  await page.goto(`${base}/docs/getting-started/how-it-works/`);
+  const article = page.locator('article');
+  await expect(article).toContainText('without an AI account');
+  await expect(article).toContainText('not a filesystem sandbox');
+  await expect(article).not.toContainText('reliable system, not a hopeful one');
+  const links = await article.locator('a[href^="/"]').evaluateAll(elements =>
+    [...new Set(elements.map(element => element.getAttribute('href')!))]);
+  for (const link of links) {
+    const response = await page.request.get(link);
+    expect(response.status(), link).toBe(200);
   }
 });
 
@@ -267,10 +301,10 @@ test('readers can distinguish runtime modes, optional proofs and historical meas
   await page.route('https://**/*', route => route.abort());
   const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
   await page.goto(`${base}/`);
-  const contract = page.getByRole('heading', { name: 'Explicit Contracts', exact: true }).locator('..');
+  const contract = page.getByRole('region', { name: 'Compare runtime contracts', exact: true });
   await expect(contract).toContainText('Optional --verify');
   await expect(contract).toContainText('Runtime checks depend on contract mode');
-  await contract.getByRole('link', { name: 'Learn more' }).click();
+  await contract.getByRole('link', { name: 'verification guarantees and limits' }).click();
   await expect(page).toHaveURL(/\/verification-guarantees\/$/);
   const article = page.locator('article');
   for (const text of ['--contract-mode debug', '--contract-mode release', '--contract-mode off',
