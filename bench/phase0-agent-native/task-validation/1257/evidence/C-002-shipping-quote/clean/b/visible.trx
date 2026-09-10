@@ -1,0 +1,76 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="7cfe1819-c273-4aa3-9789-1aeb5119b8ed" name="@Juans-MacBook-Pro 2026-09-10 02:37:56" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-10T02:37:56.6394670-04:00" queuing="2026-09-10T02:37:56.6394680-04:00" start="2026-09-10T02:37:56.2810960-04:00" finish="2026-09-10T02:37:56.6414950-04:00" />
+  <TestSettings name="default" id="65cb3ed7-173a-47d0-8183-9a558088d170">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-10_02_37_56" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="1c597c89-d730-4e25-a3a3-8d286a8f1888" testId="8372a212-436d-2c4e-2a86-9c4fa9719136" testName="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 1, expected: 8)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000008" startTime="2026-09-10T02:37:56.6052820-04:00" endTime="2026-09-10T02:37:56.6052820-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="1c597c89-d730-4e25-a3a3-8d286a8f1888" />
+    <UnitTestResult executionId="ca2f25ad-bf17-4506-9f8f-0fdec28f91fb" testId="5056b9cf-b13c-34ec-b353-0a63e761623d" testName="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 7, expected: 26)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000899" startTime="2026-09-10T02:37:56.6051850-04:00" endTime="2026-09-10T02:37:56.6051850-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ca2f25ad-bf17-4506-9f8f-0fdec28f91fb" />
+    <UnitTestResult executionId="16e07288-3b1f-4bb3-acc1-f9944348d61c" testId="a8fbe0cb-965f-ceb8-99f6-f3b7ba37f31c" testName="ShippingQuoteVisibleTests.ConsecutiveRequestsReturnTheirPrices" computerName="Juans-MacBook-Pro" duration="00:00:00.0000395" startTime="2026-09-10T02:37:56.6053290-04:00" endTime="2026-09-10T02:37:56.6053290-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="16e07288-3b1f-4bb3-acc1-f9944348d61c" />
+    <UnitTestResult executionId="69d9092a-97cd-474f-8944-774169d7527d" testId="fae1cffc-17a1-b676-f14a-a1b2b1eff2bf" testName="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 100, expected: 212)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000008" startTime="2026-09-10T02:37:56.6053070-04:00" endTime="2026-09-10T02:37:56.6053070-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="69d9092a-97cd-474f-8944-774169d7527d" />
+    <UnitTestResult executionId="82dda223-7b6b-4a27-8a6a-b3951654e2df" testId="fb162d1b-e7f6-1df8-bb4c-24c825f1eb80" testName="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 0, expected: 0)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000014" startTime="2026-09-10T02:37:56.6052730-04:00" endTime="2026-09-10T02:37:56.6052730-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="82dda223-7b6b-4a27-8a6a-b3951654e2df" />
+    <UnitTestResult executionId="2d2fedc5-4e31-4e2b-bc27-3a1a2a77534c" testId="7aa2169e-fbab-748c-01e0-84d4d177b3e6" testName="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 8, expected: 28)" computerName="Juans-MacBook-Pro" duration="00:00:00.0071735" startTime="2026-09-10T02:37:56.6041790-04:00" endTime="2026-09-10T02:37:56.6041870-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2d2fedc5-4e31-4e2b-bc27-3a1a2a77534c" />
+    <UnitTestResult executionId="c1ffc097-53ac-4968-a353-5276934374f6" testId="a932df65-1a39-4ccf-79c7-b1bbc0a15ead" testName="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 5, expected: 20)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000005" startTime="2026-09-10T02:37:56.6053160-04:00" endTime="2026-09-10T02:37:56.6053160-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c1ffc097-53ac-4968-a353-5276934374f6" />
+    <UnitTestResult executionId="34efa1d1-c03d-4baa-9df6-0ccf32809821" testId="cf235ed4-7aa9-4dca-3db7-a3be2c7e472c" testName="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 13, expected: 38)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000006" startTime="2026-09-10T02:37:56.6052900-04:00" endTime="2026-09-10T02:37:56.6052910-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="34efa1d1-c03d-4baa-9df6-0ccf32809821" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 5, expected: 20)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-002-shipping-quote/clean/b/workspace/smoke/bin/debug/net10.0/smoke.dll" id="a932df65-1a39-4ccf-79c7-b1bbc0a15ead">
+      <Execution id="c1ffc097-53ac-4968-a353-5276934374f6" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/clean/b/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteVisibleTests" name="Cheapest_ReturnsExpectedPrice" />
+    </UnitTest>
+    <UnitTest name="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 13, expected: 38)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-002-shipping-quote/clean/b/workspace/smoke/bin/debug/net10.0/smoke.dll" id="cf235ed4-7aa9-4dca-3db7-a3be2c7e472c">
+      <Execution id="34efa1d1-c03d-4baa-9df6-0ccf32809821" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/clean/b/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteVisibleTests" name="Cheapest_ReturnsExpectedPrice" />
+    </UnitTest>
+    <UnitTest name="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 0, expected: 0)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-002-shipping-quote/clean/b/workspace/smoke/bin/debug/net10.0/smoke.dll" id="fb162d1b-e7f6-1df8-bb4c-24c825f1eb80">
+      <Execution id="82dda223-7b6b-4a27-8a6a-b3951654e2df" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/clean/b/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteVisibleTests" name="Cheapest_ReturnsExpectedPrice" />
+    </UnitTest>
+    <UnitTest name="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 7, expected: 26)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-002-shipping-quote/clean/b/workspace/smoke/bin/debug/net10.0/smoke.dll" id="5056b9cf-b13c-34ec-b353-0a63e761623d">
+      <Execution id="ca2f25ad-bf17-4506-9f8f-0fdec28f91fb" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/clean/b/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteVisibleTests" name="Cheapest_ReturnsExpectedPrice" />
+    </UnitTest>
+    <UnitTest name="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 8, expected: 28)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-002-shipping-quote/clean/b/workspace/smoke/bin/debug/net10.0/smoke.dll" id="7aa2169e-fbab-748c-01e0-84d4d177b3e6">
+      <Execution id="2d2fedc5-4e31-4e2b-bc27-3a1a2a77534c" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/clean/b/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteVisibleTests" name="Cheapest_ReturnsExpectedPrice" />
+    </UnitTest>
+    <UnitTest name="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 1, expected: 8)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-002-shipping-quote/clean/b/workspace/smoke/bin/debug/net10.0/smoke.dll" id="8372a212-436d-2c4e-2a86-9c4fa9719136">
+      <Execution id="1c597c89-d730-4e25-a3a3-8d286a8f1888" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/clean/b/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteVisibleTests" name="Cheapest_ReturnsExpectedPrice" />
+    </UnitTest>
+    <UnitTest name="ShippingQuoteVisibleTests.ConsecutiveRequestsReturnTheirPrices" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-002-shipping-quote/clean/b/workspace/smoke/bin/debug/net10.0/smoke.dll" id="a8fbe0cb-965f-ceb8-99f6-f3b7ba37f31c">
+      <Execution id="16e07288-3b1f-4bb3-acc1-f9944348d61c" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/clean/b/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteVisibleTests" name="ConsecutiveRequestsReturnTheirPrices" />
+    </UnitTest>
+    <UnitTest name="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 100, expected: 212)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-002-shipping-quote/clean/b/workspace/smoke/bin/debug/net10.0/smoke.dll" id="fae1cffc-17a1-b676-f14a-a1b2b1eff2bf">
+      <Execution id="69d9092a-97cd-474f-8944-774169d7527d" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-002-shipping-quote/clean/b/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteVisibleTests" name="Cheapest_ReturnsExpectedPrice" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="8372a212-436d-2c4e-2a86-9c4fa9719136" executionId="1c597c89-d730-4e25-a3a3-8d286a8f1888" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5056b9cf-b13c-34ec-b353-0a63e761623d" executionId="ca2f25ad-bf17-4506-9f8f-0fdec28f91fb" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="a8fbe0cb-965f-ceb8-99f6-f3b7ba37f31c" executionId="16e07288-3b1f-4bb3-acc1-f9944348d61c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="fae1cffc-17a1-b676-f14a-a1b2b1eff2bf" executionId="69d9092a-97cd-474f-8944-774169d7527d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="fb162d1b-e7f6-1df8-bb4c-24c825f1eb80" executionId="82dda223-7b6b-4a27-8a6a-b3951654e2df" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7aa2169e-fbab-748c-01e0-84d4d177b3e6" executionId="2d2fedc5-4e31-4e2b-bc27-3a1a2a77534c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="a932df65-1a39-4ccf-79c7-b1bbc0a15ead" executionId="c1ffc097-53ac-4968-a353-5276934374f6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="cf235ed4-7aa9-4dca-3db7-a3be2c7e472c" executionId="34efa1d1-c03d-4baa-9df6-0ccf32809821" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="8" executed="8" passed="8" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 10.0.11)
+[xUnit.net 00:00:00.04]   Discovering: Smoke
+[xUnit.net 00:00:00.05]   Discovered:  Smoke
+[xUnit.net 00:00:00.05]   Starting:    Smoke
+[xUnit.net 00:00:00.07]   Finished:    Smoke
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

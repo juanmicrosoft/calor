@@ -1,0 +1,230 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="b8812f21-de19-450d-b129-0197c5a9b53f" name="@Juans-MacBook-Pro 2026-09-10 02:37:24" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-10T02:37:24.2081910-04:00" queuing="2026-09-10T02:37:24.2081910-04:00" start="2026-09-10T02:37:23.8310890-04:00" finish="2026-09-10T02:37:24.2107100-04:00" />
+  <TestSettings name="default" id="9200a8fc-2666-41ae-8d0f-1d0b61830e64">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-10_02_37_24" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="56404360-2929-4008-b8a1-eca30eaf177e" testId="f4cc4e47-9cf3-b44e-1998-c88cd3b01fb2" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 11, expected: 50)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000138" startTime="2026-09-10T02:37:24.1720700-04:00" endTime="2026-09-10T02:37:24.1720700-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="56404360-2929-4008-b8a1-eca30eaf177e">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DivideByZeroException : Attempted to divide by zero.</Message>
+          <StackTrace>   at QuotaAdapter.QuotaService.Preview(Int32 requested) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr:line 25
+   at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/VisibleTests.cs:line 19
+   at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="7067d6e5-b3c1-432a-b258-5eceec983b6b" testId="5ca4951b-4943-71a3-e4a2-d10aa89d112e" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -1, expected: 0)" computerName="Juans-MacBook-Pro" duration="00:00:00.0055890" startTime="2026-09-10T02:37:24.1705490-04:00" endTime="2026-09-10T02:37:24.1705550-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7067d6e5-b3c1-432a-b258-5eceec983b6b">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DivideByZeroException : Attempted to divide by zero.</Message>
+          <StackTrace>   at QuotaAdapter.QuotaService.Preview(Int32 requested) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr:line 25
+   at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/VisibleTests.cs:line 19
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="d12e8e0d-dd51-4506-b298-60a5860f1c01" testId="180d9d46-c770-fda4-02fd-0c2f2b9d72e6" testName="QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas" computerName="Juans-MacBook-Pro" duration="00:00:00.0000705" startTime="2026-09-10T02:37:24.1729570-04:00" endTime="2026-09-10T02:37:24.1729570-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d12e8e0d-dd51-4506-b298-60a5860f1c01">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DivideByZeroException : Attempted to divide by zero.</Message>
+          <StackTrace>   at QuotaAdapter.QuotaService.Preview(Int32 requested) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr:line 25
+   at QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas() in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/VisibleTests.cs:line 26
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="520d3182-8795-441f-8f70-f53e4d356fb5" testId="f6ba7b53-2bd6-deb1-0882-7a03ca7783d2" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 1, expected: 5)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000117" startTime="2026-09-10T02:37:24.1724190-04:00" endTime="2026-09-10T02:37:24.1724190-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="520d3182-8795-441f-8f70-f53e4d356fb5">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DivideByZeroException : Attempted to divide by zero.</Message>
+          <StackTrace>   at QuotaAdapter.QuotaService.Preview(Int32 requested) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr:line 25
+   at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/VisibleTests.cs:line 19
+   at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="99820a11-3af7-4a97-8e18-d5b7019538d8" testId="2f50847f-a9f3-baf5-c172-c7aaff96561b" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 0, expected: 0)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000098" startTime="2026-09-10T02:37:24.1725950-04:00" endTime="2026-09-10T02:37:24.1725950-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="99820a11-3af7-4a97-8e18-d5b7019538d8">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DivideByZeroException : Attempted to divide by zero.</Message>
+          <StackTrace>   at QuotaAdapter.QuotaService.Preview(Int32 requested) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr:line 25
+   at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/VisibleTests.cs:line 19
+   at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="5de828a5-9c5b-46a1-a84b-46e44d09ab90" testId="9f32e513-3db7-7644-d25d-30486bb6d375" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 10, expected: 50)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000976" startTime="2026-09-10T02:37:24.1716610-04:00" endTime="2026-09-10T02:37:24.1716610-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5de828a5-9c5b-46a1-a84b-46e44d09ab90">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DivideByZeroException : Attempted to divide by zero.</Message>
+          <StackTrace>   at QuotaAdapter.QuotaService.Preview(Int32 requested) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr:line 25
+   at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/VisibleTests.cs:line 19
+   at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="241467b0-5dd7-4956-956f-c4f29e0f04b8" testId="e4a509f2-d975-87bb-92a5-aa40e27ee3c6" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 2147483647, expected: 50)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000109" startTime="2026-09-10T02:37:24.1722490-04:00" endTime="2026-09-10T02:37:24.1722490-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="241467b0-5dd7-4956-956f-c4f29e0f04b8">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DivideByZeroException : Attempted to divide by zero.</Message>
+          <StackTrace>   at QuotaAdapter.QuotaService.Preview(Int32 requested) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr:line 25
+   at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/VisibleTests.cs:line 19
+   at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="23777eda-9938-4b4b-84f8-5b3a5a600c1a" testId="d7d111f1-9230-eade-90f8-45bb037bdc40" testName="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -2147483648, expected: 0)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000102" startTime="2026-09-10T02:37:24.1727760-04:00" endTime="2026-09-10T02:37:24.1727760-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="23777eda-9938-4b4b-84f8-5b3a5a600c1a">
+      <Output>
+        <ErrorInfo>
+          <Message>System.DivideByZeroException : Attempted to divide by zero.</Message>
+          <StackTrace>   at QuotaAdapter.QuotaService.Preview(Int32 requested) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr:line 25
+   at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/VisibleTests.cs:line 19
+   at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 10, expected: 50)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-001-quota-adapter/effectful-throwing/a/workspace/smoke/bin/debug/net10.0/smoke.dll" id="9f32e513-3db7-7644-d25d-30486bb6d375">
+      <Execution id="5de828a5-9c5b-46a1-a84b-46e44d09ab90" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -2147483648, expected: 0)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-001-quota-adapter/effectful-throwing/a/workspace/smoke/bin/debug/net10.0/smoke.dll" id="d7d111f1-9230-eade-90f8-45bb037bdc40">
+      <Execution id="23777eda-9938-4b4b-84f8-5b3a5a600c1a" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-001-quota-adapter/effectful-throwing/a/workspace/smoke/bin/debug/net10.0/smoke.dll" id="180d9d46-c770-fda4-02fd-0c2f2b9d72e6">
+      <Execution id="d12e8e0d-dd51-4506-b298-60a5860f1c01" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="ConsecutiveRequestsReturnTheirQuotas" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 1, expected: 5)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-001-quota-adapter/effectful-throwing/a/workspace/smoke/bin/debug/net10.0/smoke.dll" id="f6ba7b53-2bd6-deb1-0882-7a03ca7783d2">
+      <Execution id="520d3182-8795-441f-8f70-f53e4d356fb5" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 2147483647, expected: 50)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-001-quota-adapter/effectful-throwing/a/workspace/smoke/bin/debug/net10.0/smoke.dll" id="e4a509f2-d975-87bb-92a5-aa40e27ee3c6">
+      <Execution id="241467b0-5dd7-4956-956f-c4f29e0f04b8" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 11, expected: 50)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-001-quota-adapter/effectful-throwing/a/workspace/smoke/bin/debug/net10.0/smoke.dll" id="f4cc4e47-9cf3-b44e-1998-c88cd3b01fb2">
+      <Execution id="56404360-2929-4008-b8a1-eca30eaf177e" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 0, expected: 0)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-001-quota-adapter/effectful-throwing/a/workspace/smoke/bin/debug/net10.0/smoke.dll" id="2f50847f-a9f3-baf5-c172-c7aaff96561b">
+      <Execution id="99820a11-3af7-4a97-8e18-d5b7019538d8" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -1, expected: 0)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-001-quota-adapter/effectful-throwing/a/workspace/smoke/bin/debug/net10.0/smoke.dll" id="5ca4951b-4943-71a3-e4a2-d10aa89d112e">
+      <Execution id="7067d6e5-b3c1-432a-b258-5eceec983b6b" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterVisibleTests" name="Preview_ReturnsQuotaForRequestedSlots" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="f4cc4e47-9cf3-b44e-1998-c88cd3b01fb2" executionId="56404360-2929-4008-b8a1-eca30eaf177e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5ca4951b-4943-71a3-e4a2-d10aa89d112e" executionId="7067d6e5-b3c1-432a-b258-5eceec983b6b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="180d9d46-c770-fda4-02fd-0c2f2b9d72e6" executionId="d12e8e0d-dd51-4506-b298-60a5860f1c01" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f6ba7b53-2bd6-deb1-0882-7a03ca7783d2" executionId="520d3182-8795-441f-8f70-f53e4d356fb5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2f50847f-a9f3-baf5-c172-c7aaff96561b" executionId="99820a11-3af7-4a97-8e18-d5b7019538d8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9f32e513-3db7-7644-d25d-30486bb6d375" executionId="5de828a5-9c5b-46a1-a84b-46e44d09ab90" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e4a509f2-d975-87bb-92a5-aa40e27ee3c6" executionId="241467b0-5dd7-4956-956f-c4f29e0f04b8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d7d111f1-9230-eade-90f8-45bb037bdc40" executionId="23777eda-9938-4b4b-84f8-5b3a5a600c1a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="8" executed="8" passed="0" failed="8" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 10.0.11)
+[xUnit.net 00:00:00.03]   Discovering: Smoke
+[xUnit.net 00:00:00.05]   Discovered:  Smoke
+[xUnit.net 00:00:00.05]   Starting:    Smoke
+[xUnit.net 00:00:00.07]       System.DivideByZeroException : Attempted to divide by zero.
+[xUnit.net 00:00:00.07]       Stack Trace:
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr(25,0): at QuotaAdapter.QuotaService.Preview(Int32 requested)
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/VisibleTests.cs(19,0): at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.07]       System.DivideByZeroException : Attempted to divide by zero.
+[xUnit.net 00:00:00.07]       Stack Trace:
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr(25,0): at QuotaAdapter.QuotaService.Preview(Int32 requested)
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/VisibleTests.cs(19,0): at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected)
+[xUnit.net 00:00:00.07]            at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.07]       System.DivideByZeroException : Attempted to divide by zero.
+[xUnit.net 00:00:00.07]       Stack Trace:
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr(25,0): at QuotaAdapter.QuotaService.Preview(Int32 requested)
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/VisibleTests.cs(19,0): at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected)
+[xUnit.net 00:00:00.07]            at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.07]       System.DivideByZeroException : Attempted to divide by zero.
+[xUnit.net 00:00:00.07]       Stack Trace:
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr(25,0): at QuotaAdapter.QuotaService.Preview(Int32 requested)
+[xUnit.net 00:00:00.07]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/VisibleTests.cs(19,0): at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected)
+[xUnit.net 00:00:00.07]            at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.08]       System.DivideByZeroException : Attempted to divide by zero.
+[xUnit.net 00:00:00.08]       Stack Trace:
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr(25,0): at QuotaAdapter.QuotaService.Preview(Int32 requested)
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/VisibleTests.cs(19,0): at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected)
+[xUnit.net 00:00:00.08]            at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.08]       System.DivideByZeroException : Attempted to divide by zero.
+[xUnit.net 00:00:00.08]       Stack Trace:
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr(25,0): at QuotaAdapter.QuotaService.Preview(Int32 requested)
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/VisibleTests.cs(19,0): at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected)
+[xUnit.net 00:00:00.08]            at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.08]       System.DivideByZeroException : Attempted to divide by zero.
+[xUnit.net 00:00:00.08]       Stack Trace:
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr(25,0): at QuotaAdapter.QuotaService.Preview(Int32 requested)
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/VisibleTests.cs(19,0): at QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Int32 requested, Int32 expected)
+[xUnit.net 00:00:00.08]            at InvokeStub_QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(Object, Span`1)
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.08]       System.DivideByZeroException : Attempted to divide by zero.
+[xUnit.net 00:00:00.08]       Stack Trace:
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/src/obj/ppw-source/Program.calr(25,0): at QuotaAdapter.QuotaService.Preview(Int32 requested)
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-001-quota-adapter/effectful-throwing/a/workspace/smoke/VisibleTests.cs(26,0): at QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas()
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.08]   Finished:    Smoke
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:37:24.1697070-04:00">
+        <Text>[xUnit.net 00:00:00.07]     QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -1, expected: 0) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:37:24.1717760-04:00">
+        <Text>[xUnit.net 00:00:00.07]     QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 10, expected: 50) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:37:24.1721140-04:00">
+        <Text>[xUnit.net 00:00:00.07]     QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 11, expected: 50) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:37:24.1731290-04:00">
+        <Text>[xUnit.net 00:00:00.07]     QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 2147483647, expected: 50) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:37:24.1731980-04:00">
+        <Text>[xUnit.net 00:00:00.07]     QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 1, expected: 5) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:37:24.1732780-04:00">
+        <Text>[xUnit.net 00:00:00.08]     QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: 0, expected: 0) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:37:24.1733340-04:00">
+        <Text>[xUnit.net 00:00:00.08]     QuotaAdapterVisibleTests.Preview_ReturnsQuotaForRequestedSlots(requested: -2147483648, expected: 0) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:37:24.1733990-04:00">
+        <Text>[xUnit.net 00:00:00.08]     QuotaAdapterVisibleTests.ConsecutiveRequestsReturnTheirQuotas [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

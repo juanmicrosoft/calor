@@ -1,0 +1,279 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="1500e66d-ceb4-4323-926f-129a9c1e2b51" name="@Juans-MacBook-Pro 2026-09-10 02:38:26" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-10T02:38:26.1745690-04:00" queuing="2026-09-10T02:38:26.1745690-04:00" start="2026-09-10T02:38:25.7832930-04:00" finish="2026-09-10T02:38:26.1860370-04:00" />
+  <TestSettings name="default" id="058f5ccc-2642-4eba-b24c-29d193e78aff">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-10_02_38_26" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="9f5acbad-e4e3-45b6-93e9-05caad6d9422" testId="e126370f-5631-b347-7390-04679213d692" testName="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -2147483648, second: 2147483647, expected: 100)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000145" startTime="2026-09-10T02:38:26.1528090-04:00" endTime="2026-09-10T02:38:26.1528090-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9f5acbad-e4e3-45b6-93e9-05caad6d9422">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 100
+Actual:   0</Message>
+          <StackTrace>   at FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Int32 first, Int32 second, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/VisibleTests.cs:line 21
+   at InvokeStub_FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="92310821-f55a-4310-84df-cf4ef6bf8959" testId="31347338-12ca-b83c-e16f-c61f6dd28fa8" testName="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 2, second: 1, expected: 203)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000189" startTime="2026-09-10T02:38:26.1520790-04:00" endTime="2026-09-10T02:38:26.1520790-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="92310821-f55a-4310-84df-cf4ef6bf8959">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 203
+Actual:   0</Message>
+          <StackTrace>   at FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Int32 first, Int32 second, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/VisibleTests.cs:line 21
+   at InvokeStub_FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="b5b0e620-7520-47a4-b37a-d495e912ec73" testId="7be3169e-f538-fb19-4dd8-2add3394c649" testName="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 100, second: 100, expected: 10200)" computerName="Juans-MacBook-Pro" duration="00:00:00.0001802" startTime="2026-09-10T02:38:26.1514750-04:00" endTime="2026-09-10T02:38:26.1514750-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b5b0e620-7520-47a4-b37a-d495e912ec73">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 10200
+Actual:   0</Message>
+          <StackTrace>   at FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Int32 first, Int32 second, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/VisibleTests.cs:line 21
+   at InvokeStub_FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="80a95536-e62b-432a-9c47-6c4a189b0c7d" testId="13dbda7a-25c7-fd97-2ca2-74f8ee837d19" testName="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 5, second: 101, expected: 605)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000117" startTime="2026-09-10T02:38:26.1531310-04:00" endTime="2026-09-10T02:38:26.1531310-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="80a95536-e62b-432a-9c47-6c4a189b0c7d">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 605
+Actual:   0</Message>
+          <StackTrace>   at FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Int32 first, Int32 second, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/VisibleTests.cs:line 21
+   at InvokeStub_FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="7fa320fa-9f25-4992-b96f-d13034eec5f3" testId="6873c9a9-5855-df4e-995e-fbee38af7428" testName="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -1, second: 15, expected: 15)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000177" startTime="2026-09-10T02:38:26.1529670-04:00" endTime="2026-09-10T02:38:26.1529670-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7fa320fa-9f25-4992-b96f-d13034eec5f3">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 15
+Actual:   0</Message>
+          <StackTrace>   at FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Int32 first, Int32 second, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/VisibleTests.cs:line 21
+   at InvokeStub_FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="f4ab2aa3-d19b-49d2-9605-f2ec60d78e04" testId="030ce32e-5ef4-673b-470f-a563b0c0df55" testName="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 101, second: 5, expected: 10105)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000177" startTime="2026-09-10T02:38:26.1524850-04:00" endTime="2026-09-10T02:38:26.1524850-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f4ab2aa3-d19b-49d2-9605-f2ec60d78e04">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 10105
+Actual:   0</Message>
+          <StackTrace>   at FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Int32 first, Int32 second, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/VisibleTests.cs:line 21
+   at InvokeStub_FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="a57f6191-8ba9-4db6-914a-fc9d34019b1e" testId="51239ea7-db90-6ee7-b944-c830b88033fb" testName="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 1, second: 2, expected: 103)" computerName="Juans-MacBook-Pro" duration="00:00:00.0079773" startTime="2026-09-10T02:38:26.1501680-04:00" endTime="2026-09-10T02:38:26.1501740-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a57f6191-8ba9-4db6-914a-fc9d34019b1e">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 103
+Actual:   0</Message>
+          <StackTrace>   at FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Int32 first, Int32 second, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/VisibleTests.cs:line 21
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="75427aa4-eb70-48f4-8cd8-514cf70547b4" testId="4e1c0b83-0ea5-9f75-38ce-cd28b7d4904b" testName="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 15, second: -1, expected: 1515)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000132" startTime="2026-09-10T02:38:26.1526530-04:00" endTime="2026-09-10T02:38:26.1526530-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="75427aa4-eb70-48f4-8cd8-514cf70547b4">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 1515
+Actual:   0</Message>
+          <StackTrace>   at FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Int32 first, Int32 second, Int32 expected) in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/VisibleTests.cs:line 21
+   at InvokeStub_FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="e14f4bc5-7786-4865-af4d-45e708bfdb02" testId="a4c29b2b-e1f9-ad22-2ea8-622920c221a2" testName="FrameFingerprintVisibleTests.ConsecutivePairsKeepTheirOrder" computerName="Juans-MacBook-Pro" duration="00:00:00.0000950" startTime="2026-09-10T02:38:26.1628950-04:00" endTime="2026-09-10T02:38:26.1628950-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e14f4bc5-7786-4865-af4d-45e708bfdb02">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 103
+Actual:   0</Message>
+          <StackTrace>   at FrameFingerprintVisibleTests.ConsecutivePairsKeepTheirOrder() in /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/VisibleTests.cs:line 28
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="957e4c68-aa93-413a-98c1-b0997b6f8263" testId="f6da22f7-1307-2040-56e3-06ccea053f7b" testName="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 0, second: 0, expected: 0)" computerName="Juans-MacBook-Pro" duration="00:00:00.0003370" startTime="2026-09-10T02:38:26.1522700-04:00" endTime="2026-09-10T02:38:26.1522700-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="957e4c68-aa93-413a-98c1-b0997b6f8263" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 2, second: 1, expected: 203)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-003-frame-fingerprint/starter/b/workspace/smoke/bin/debug/net10.0/smoke.dll" id="31347338-12ca-b83c-e16f-c61f6dd28fa8">
+      <Execution id="92310821-f55a-4310-84df-cf4ef6bf8959" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="Fingerprint_NormalizesEachKeyBeforeCombining" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 5, second: 101, expected: 605)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-003-frame-fingerprint/starter/b/workspace/smoke/bin/debug/net10.0/smoke.dll" id="13dbda7a-25c7-fd97-2ca2-74f8ee837d19">
+      <Execution id="80a95536-e62b-432a-9c47-6c4a189b0c7d" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="Fingerprint_NormalizesEachKeyBeforeCombining" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 1, second: 2, expected: 103)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-003-frame-fingerprint/starter/b/workspace/smoke/bin/debug/net10.0/smoke.dll" id="51239ea7-db90-6ee7-b944-c830b88033fb">
+      <Execution id="a57f6191-8ba9-4db6-914a-fc9d34019b1e" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="Fingerprint_NormalizesEachKeyBeforeCombining" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -2147483648, second: 2147483647, expected: 100)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-003-frame-fingerprint/starter/b/workspace/smoke/bin/debug/net10.0/smoke.dll" id="e126370f-5631-b347-7390-04679213d692">
+      <Execution id="9f5acbad-e4e3-45b6-93e9-05caad6d9422" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="Fingerprint_NormalizesEachKeyBeforeCombining" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 100, second: 100, expected: 10200)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-003-frame-fingerprint/starter/b/workspace/smoke/bin/debug/net10.0/smoke.dll" id="7be3169e-f538-fb19-4dd8-2add3394c649">
+      <Execution id="b5b0e620-7520-47a4-b37a-d495e912ec73" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="Fingerprint_NormalizesEachKeyBeforeCombining" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintVisibleTests.ConsecutivePairsKeepTheirOrder" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-003-frame-fingerprint/starter/b/workspace/smoke/bin/debug/net10.0/smoke.dll" id="a4c29b2b-e1f9-ad22-2ea8-622920c221a2">
+      <Execution id="e14f4bc5-7786-4865-af4d-45e708bfdb02" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="ConsecutivePairsKeepTheirOrder" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 0, second: 0, expected: 0)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-003-frame-fingerprint/starter/b/workspace/smoke/bin/debug/net10.0/smoke.dll" id="f6da22f7-1307-2040-56e3-06ccea053f7b">
+      <Execution id="957e4c68-aa93-413a-98c1-b0997b6f8263" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="Fingerprint_NormalizesEachKeyBeforeCombining" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -1, second: 15, expected: 15)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-003-frame-fingerprint/starter/b/workspace/smoke/bin/debug/net10.0/smoke.dll" id="6873c9a9-5855-df4e-995e-fbee38af7428">
+      <Execution id="7fa320fa-9f25-4992-b96f-d13034eec5f3" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="Fingerprint_NormalizesEachKeyBeforeCombining" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 15, second: -1, expected: 1515)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-003-frame-fingerprint/starter/b/workspace/smoke/bin/debug/net10.0/smoke.dll" id="4e1c0b83-0ea5-9f75-38ce-cd28b7d4904b">
+      <Execution id="75427aa4-eb70-48f4-8cd8-514cf70547b4" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="Fingerprint_NormalizesEachKeyBeforeCombining" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 101, second: 5, expected: 10105)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/c-003-frame-fingerprint/starter/b/workspace/smoke/bin/debug/net10.0/smoke.dll" id="030ce32e-5ef4-673b-470f-a563b0c0df55">
+      <Execution id="f4ab2aa3-d19b-49d2-9605-f2ec60d78e04" />
+      <TestMethod codeBase="/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/bin/Debug/net10.0/Smoke.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintVisibleTests" name="Fingerprint_NormalizesEachKeyBeforeCombining" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="e126370f-5631-b347-7390-04679213d692" executionId="9f5acbad-e4e3-45b6-93e9-05caad6d9422" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="31347338-12ca-b83c-e16f-c61f6dd28fa8" executionId="92310821-f55a-4310-84df-cf4ef6bf8959" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7be3169e-f538-fb19-4dd8-2add3394c649" executionId="b5b0e620-7520-47a4-b37a-d495e912ec73" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="13dbda7a-25c7-fd97-2ca2-74f8ee837d19" executionId="80a95536-e62b-432a-9c47-6c4a189b0c7d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6873c9a9-5855-df4e-995e-fbee38af7428" executionId="7fa320fa-9f25-4992-b96f-d13034eec5f3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="030ce32e-5ef4-673b-470f-a563b0c0df55" executionId="f4ab2aa3-d19b-49d2-9605-f2ec60d78e04" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="51239ea7-db90-6ee7-b944-c830b88033fb" executionId="a57f6191-8ba9-4db6-914a-fc9d34019b1e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="4e1c0b83-0ea5-9f75-38ce-cd28b7d4904b" executionId="75427aa4-eb70-48f4-8cd8-514cf70547b4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="a4c29b2b-e1f9-ad22-2ea8-622920c221a2" executionId="e14f4bc5-7786-4865-af4d-45e708bfdb02" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f6da22f7-1307-2040-56e3-06ccea053f7b" executionId="957e4c68-aa93-413a-98c1-b0997b6f8263" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="10" executed="10" passed="1" failed="9" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 10.0.11)
+[xUnit.net 00:00:00.03]   Discovering: Smoke
+[xUnit.net 00:00:00.05]   Discovered:  Smoke
+[xUnit.net 00:00:00.05]   Starting:    Smoke
+[xUnit.net 00:00:00.08]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.08]       Expected: 103
+[xUnit.net 00:00:00.08]       Actual:   0
+[xUnit.net 00:00:00.08]       Stack Trace:
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/VisibleTests.cs(21,0): at FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Int32 first, Int32 second, Int32 expected)
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.08]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.08]       Expected: 10200
+[xUnit.net 00:00:00.08]       Actual:   0
+[xUnit.net 00:00:00.08]       Stack Trace:
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/VisibleTests.cs(21,0): at FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Int32 first, Int32 second, Int32 expected)
+[xUnit.net 00:00:00.08]            at InvokeStub_FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Object, Span`1)
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.08]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.08]       Expected: 203
+[xUnit.net 00:00:00.08]       Actual:   0
+[xUnit.net 00:00:00.08]       Stack Trace:
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/VisibleTests.cs(21,0): at FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Int32 first, Int32 second, Int32 expected)
+[xUnit.net 00:00:00.08]            at InvokeStub_FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Object, Span`1)
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.08]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.08]       Expected: 10105
+[xUnit.net 00:00:00.08]       Actual:   0
+[xUnit.net 00:00:00.08]       Stack Trace:
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/VisibleTests.cs(21,0): at FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Int32 first, Int32 second, Int32 expected)
+[xUnit.net 00:00:00.08]            at InvokeStub_FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Object, Span`1)
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.08]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.08]       Expected: 1515
+[xUnit.net 00:00:00.08]       Actual:   0
+[xUnit.net 00:00:00.08]       Stack Trace:
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/VisibleTests.cs(21,0): at FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Int32 first, Int32 second, Int32 expected)
+[xUnit.net 00:00:00.08]            at InvokeStub_FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Object, Span`1)
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.08]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.08]       Expected: 100
+[xUnit.net 00:00:00.08]       Actual:   0
+[xUnit.net 00:00:00.08]       Stack Trace:
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/VisibleTests.cs(21,0): at FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Int32 first, Int32 second, Int32 expected)
+[xUnit.net 00:00:00.08]            at InvokeStub_FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Object, Span`1)
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.08]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.08]       Expected: 15
+[xUnit.net 00:00:00.08]       Actual:   0
+[xUnit.net 00:00:00.08]       Stack Trace:
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/VisibleTests.cs(21,0): at FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Int32 first, Int32 second, Int32 expected)
+[xUnit.net 00:00:00.08]            at InvokeStub_FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Object, Span`1)
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.08]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.08]       Expected: 605
+[xUnit.net 00:00:00.08]       Actual:   0
+[xUnit.net 00:00:00.08]       Stack Trace:
+[xUnit.net 00:00:00.08]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/VisibleTests.cs(21,0): at FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Int32 first, Int32 second, Int32 expected)
+[xUnit.net 00:00:00.08]            at InvokeStub_FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(Object, Span`1)
+[xUnit.net 00:00:00.08]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.09]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.09]       Expected: 103
+[xUnit.net 00:00:00.09]       Actual:   0
+[xUnit.net 00:00:00.09]       Stack Trace:
+[xUnit.net 00:00:00.09]         /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/sdk-release-validation-1/work/C-003-frame-fingerprint/starter/b/workspace/smoke/VisibleTests.cs(28,0): at FrameFingerprintVisibleTests.ConsecutivePairsKeepTheirOrder()
+[xUnit.net 00:00:00.09]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+[xUnit.net 00:00:00.09]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.09]   Finished:    Smoke
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:38:26.1491510-04:00">
+        <Text>[xUnit.net 00:00:00.08]     FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 1, second: 2, expected: 103) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:38:26.1516560-04:00">
+        <Text>[xUnit.net 00:00:00.08]     FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 100, second: 100, expected: 10200) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:38:26.1519040-04:00">
+        <Text>[xUnit.net 00:00:00.08]     FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 2, second: 1, expected: 203) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:38:26.1530600-04:00">
+        <Text>[xUnit.net 00:00:00.08]     FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 101, second: 5, expected: 10105) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:38:26.1534150-04:00">
+        <Text>[xUnit.net 00:00:00.08]     FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 15, second: -1, expected: 1515) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:38:26.1534740-04:00">
+        <Text>[xUnit.net 00:00:00.08]     FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -2147483648, second: 2147483647, expected: 100) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:38:26.1535290-04:00">
+        <Text>[xUnit.net 00:00:00.08]     FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -1, second: 15, expected: 15) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:38:26.1535850-04:00">
+        <Text>[xUnit.net 00:00:00.08]     FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 5, second: 101, expected: 605) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-10T02:38:26.1770810-04:00">
+        <Text>[xUnit.net 00:00:00.09]     FrameFingerprintVisibleTests.ConsecutivePairsKeepTheirOrder [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

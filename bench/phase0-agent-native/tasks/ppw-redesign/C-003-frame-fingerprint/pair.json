@@ -1,0 +1,69 @@
+{
+  "id": "C-003-frame-fingerprint",
+  "category": "PP-W-rows",
+  "freezeStatus": "prepared-not-frozen",
+  "class": "blind",
+  "legB": true,
+  "iterationBudget": 10,
+  "timeoutSeconds": 600,
+  "registeredShape": 7,
+  "shapeName": "direct invocation of a this-qualified rowed field",
+  "compilerCommit": "514f538024df990af86054af25975b756ba42ab1",
+  "spec": "spec.md",
+  "sourceAssembly": {
+    "parts": ["dependency.calr.inc", "task.calr.inc"],
+    "editableParts": ["task.calr.inc"]
+  },
+  "arms": {
+    "calor-permissive": {
+      "armId": "a",
+      "fixture": "starter-a",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": true,
+        "controlArmKind": "permissive",
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    },
+    "calor-strict": {
+      "armId": "b",
+      "fixture": "starter-b",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "seeded": {
+    "laundering": {
+      "a": "seeded/laundering-a",
+      "b": "seeded/laundering-b"
+    },
+    "clean": {
+      "a": "seeded/honest-a",
+      "b": "seeded/honest-b"
+    },
+    "effectful-wrong-value": {
+      "a": "seeded/effectful-wrong-value-a",
+      "b": "seeded/effectful-wrong-value-b"
+    }
+  },
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "count": 4,
+    "heldOut": true,
+    "shim": "tests/shims/TestShim.calor.cs",
+    "effectObservingTests": ["Fingerprint_PreservesJournal"],
+    "effectFailureSignature": "HELDOUT_EFFECT:state-change"
+  },
+  "shapeRealizedIndicator": {
+    "sourceRegex": "§C\\s*\\{\\s*this\\.normalize\\s*\\}",
+    "measuredOn": "the archived editable task.calr.inc, not the dependency field declaration",
+    "note": "Two normalizations realize one row-7 shape. Laundering is positive; starter and honest are negative."
+  },
+  "note": "Same registered shape and unknown-call policy contrast as C-001. Ordered composition and independent input normalization vary the numeric workflow, not the compiler mechanism. No study task count, model, runsPerArm, budget, freeze, or collection authorization is asserted."
+}
