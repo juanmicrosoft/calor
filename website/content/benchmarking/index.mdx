@@ -6,9 +6,10 @@ hasChildren: true
 ---
 
 
-The dashboard was rerun for v0.19.0 on **217 source pairs across eight
-deterministic metrics**, with **30 repetitions**. It reports a 1.32x legacy Calor/C# composite,
-with Calor ahead in seven metrics and C# ahead in information density.
+The historical dashboard covers **217 source pairs across eight
+deterministic metrics**, with **30 repetitions**. Its recorded source revision
+`3a452b09` declares compiler `0.19.0`; the executed binary was not independently
+recorded. It reports a 1.32x legacy Calor/C# static-score composite.
 The pairs are not all behaviorally equivalent, and the reported intervals do not
 establish independent sampling uncertainty. These scores cannot establish a
 language or coding-agent advantage. Read the
@@ -23,16 +24,18 @@ release.
 
 ### Published Metrics
 
-| Category | What It Measures | Why It Matters |
-|:---------|:-----------------|:---------------|
-| [**Comprehension**](/docs/benchmarking/metrics/comprehension/) | Structural clarity, semantic extractability | Can agents understand code without deep analysis? |
-| [**Error Detection**](/docs/benchmarking/metrics/error-detection/) | Bug identification, contract violation detection | Can agents find issues using explicit semantics? |
-| [**Edit Precision**](/docs/benchmarking/metrics/edit-precision/) | Heuristic targetability and change isolation | Do explicit IDs and markers provide stronger source targets? |
-| [**Generation Accuracy**](/docs/benchmarking/metrics/generation-accuracy/) | Compilation success, structural correctness | Can agents produce valid code? |
-| [**Token Economics**](/docs/benchmarking/metrics/token-economics/) | Tokens required to represent logic | How much context window does code consume? |
-| [**Information Density**](/docs/benchmarking/metrics/information-density/) | Semantic elements per token | How much meaning per token? |
-| [**Refactoring Stability**](/docs/benchmarking/metrics/refactoring-stability/) | ID-based reference preservation | Are explicit IDs preserved by modeled transformations? |
-| [**Correctness**](/docs/benchmarking/metrics/correctness/) | Edge case handling, bug prevention | Does code produce correct results for edge cases? |
+The names below identify calculator rules, not observed agent abilities:
+
+| Static metric | Calculator input or rule |
+|:--------------|:-------------------------|
+| [Comprehension](/docs/benchmarking/metrics/comprehension/) | Structural and semantic signals |
+| [Correctness](/docs/benchmarking/metrics/correctness/) | Static correctness signals |
+| [Edit Precision](/docs/benchmarking/metrics/edit-precision/) | Heuristic targetability and change isolation |
+| [Error Detection](/docs/benchmarking/metrics/error-detection/) | Explicit detection signals |
+| [Generation Accuracy](/docs/benchmarking/metrics/generation-accuracy/) | Compilation and structural signals |
+| [Information Density](/docs/benchmarking/metrics/information-density/) | Counted semantic elements per token |
+| [Refactoring Stability](/docs/benchmarking/metrics/refactoring-stability/) | Reference preservation under modeled transformations |
+| [Token Economics](/docs/benchmarking/metrics/token-economics/) | Composite of token, character, and line ratios |
 
 The repository also contains separate LLM and estimation-mode suites for
 [task completion](/docs/benchmarking/metrics/task-completion/),
@@ -42,36 +45,24 @@ results are not included in the eight-metric headline or the 1.32x composite.
 
 ---
 
-## Summary Results
+## Static Score Ratios
 
 <BenchmarkSummaryTable />
 
-**Current pattern:** Calor leads seven categories. C# leads information density
-at 0.97x Calor/C#.
-
----
-
-## Key Insight
-
-The highest calculator ratios are comprehension (1.84x), error detection
-(1.49x), token economics (1.42x composite), and refactoring stability (1.38x).
-Generation accuracy is close at 1.02x. Information density is 0.97x, the only
-current C# win.
-
-Token economics is a composite of token, character, and line ratios. Calor
-still uses more raw tokens on small programs, so the 1.42x composite must not be
-read as a raw-token advantage.
+Ratios above 1 indicate a higher Calor calculator score; below 1 indicate a
+higher C# score. They are not measurements of language quality. The token
+economics composite must not be read as a raw-token saving. Use the
+[dated source, method, and limitations](/docs/benchmarking/results/#read-the-results-carefully)
+when interpreting any row.
 
 ---
 
 ## Agent Task Benchmark
 
-The [Agent Task Benchmark](/docs/benchmarking/agent-tasks/) tests Claude's ability to generate correct Calor code from natural language prompts. It validates skill documentation quality by measuring how well Claude can learn Calor syntax.
-
-The latest committed agent-task artifact is dated **2026-02-16 (point-in-time,
-pre-0.13.x)** and reports an **86.5% pass rate** (77 of 89 tasks across 17
-categories). It is a separate, single-run benchmark and is not part of the
-dashboard composite. A regenerate against 0.13.x is a tracked follow-up.
+The [Agent Task Benchmark](/docs/benchmarking/agent-tasks/) reports a separate
+historical prompt-to-code artifact. Its pass/fail results are not static
+calculator scores and are not part of the dashboard composite. That page
+records its date, task denominator, method, and missing provenance.
 
 ---
 
