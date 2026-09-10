@@ -344,3 +344,204 @@ rule.
 - **The arm lens**, per shape — mechanised as R8.
 - **The pilot-contamination lens**, once stage 1 has run: trace every path by which its data could
   reach stage 2's verdict.
+
+---
+
+## 9. Unfunded prospective stage-1 registration (#1261)
+
+**Date: 2026-09-10. Effective when this separately reviewed amendment merges.**
+This section supplies §7(5), not §7(4). It registers a method before collection;
+it does not authorize spending, claim an experimental result, or change M0's
+UNADJUDICATED administrative stop. Sections 1–8 and their off-ramps remain intact.
+No experimental agent has been run for this redesigned study.
+
+The machine-readable method and its arithmetic are in
+[`registrations/ppw-rows-stage1/`](../../bench/phase0-agent-native/registrations/ppw-rows-stage1/).
+That method file is **not** the collection instrument's task/epoch registration
+or `pins.json`. The task freeze, operational indicator validation, exact artifact
+pins, and collection admission remain separately required.
+
+### 9.1 Task count chosen with sizing, not with a quota
+
+Select the three reviewed workflows authored in #1256 / PR #1359:
+
+1. `C-001-quota-adapter`
+2. `C-002-shipping-quote`
+3. `C-003-frame-fingerprint`
+
+They are **three tasks representing one shape**, #1136 row 7. R7 says one shape
+per task; it does not require different shapes across tasks. Three satisfies
+#1256's task floor without adding an unsupported uniqueness rule. The existing
+rejections remain part of the record; no rule was weakened to obtain this count.
+
+The workflows exercise different value requirements: quota boundaries, changing
+quote ordering, and ordered normalization. They do not supply independent
+compiler mechanisms. The current twelve-spelling survey is bounded evidence
+about its exact sources, not proof that another shape could never work.
+
+This is a **fixed three-task mixture**, not a random sample of production tasks
+or of the twelve-shape table. No population-wide task or mechanism inference is
+registered. Choosing this count jointly with §9.3 gives 74 runs per task per arm,
+rather than inheriting the old six-task count or a dry-run realization prior.
+
+The separate AI second-reader record is #1266 / PR #1362. It retains all three
+current candidates and all six prior rejections under §1.4's source-available
+abstraction premise. That premise is not measured agent ignorance. The user
+authorized the AI reader; no human qualification was required or invented.
+
+### 9.2 The two estimands and their denominators
+
+**Shape realization rate:** the equal-weight mean of the six task × arm
+cell-specific probabilities that an eligible run realizes its frozen registered
+source shape. Each cell has weight **1/6**.
+
+**Arm-A escape rate:** the equal-weight mean of the three task-specific eligible-run
+escape probabilities under A. Each task has weight **1/3**. An escape requires
+a built declared-done state and the registered genuine held-out effect failure,
+not a numerical assertion failure. Numeric tests and state observers are
+separate, so a wrong result or a caught call exception cannot prevent the
+observer from checking actual post-call state. Value and state failures may
+coexist and are disclosed separately; this estimand does not assert that every
+effect-violating output is otherwise functionally correct. R4 still requires
+each canonical laundering solution to pass the entire visible suite.
+
+Both rates concern fresh runs under the registered model, agent, task, and
+instrument conditions. They are conditional on instrument eligibility **within
+each cell**. Eligible non-building declared-done runs remain in the denominator
+and contribute zero escape. Escape is not conditioned on successful building or
+realized shape; doing so would change the estimand.
+
+The operational shape indicator is frozen with the task set and instrument.
+It must distinguish the direct-field-call shape from mere field presence;
+the immutable dependency and preserved caller API/effect contract are part of
+the task condition. Lexical seed checks alone do not prove semantic or runtime
+realization. Their operational meaning and source/fixture controls must be
+verified before collection. No runtime execution of the callback is inferred
+merely from a source match.
+
+Invalid attempts stay archived and separately counted; they are never replaced
+after outcomes are inspected. Positive eligible cell counts may differ after
+attrition, but the **cell weights do not change**. This avoids silently changing
+the task mixture toward cells with fewer invalid attempts.
+
+If any required cell has zero eligible observations, or any eligible outcome
+needed for that estimand is unscorable, the affected estimate is **unidentified**.
+For example, a held-out project that cannot execute its named observers does not
+produce a known zero escape. Report the unknown outcome and an uninformative
+[0,1] range; do not drop it, impute zero, or claim the planned precision.
+An incomplete pilot cannot establish permission to proceed to stage 2.
+
+### 9.3 Size derived from precision, not a prior or Δ
+
+The prospective target is an **absolute half-width of 0.10** for each of the two
+fixed-mixture rates, at joint nominal coverage of at least **95%**, under the
+independence assumptions below. Ten percentage points is an explicit coarse
+pilot-estimation judgment, not a quantity learned from the deliberately
+laundering seeds or the old agent collections. It does not resolve arbitrarily
+rare escapes or make a point estimate near the 50% off-ramp decisive by itself.
+
+Use two-sided **Hoeffding bounds** for independent bounded observations,
+allocating error probability **0.025 to each estimand**. A union bound gives
+joint error probability at most 0.05. The two estimates share observations;
+the union bound does not require independence between the estimates.
+
+For cell counts `n_i > 0`, success counts `k_i`, and fixed cell weights `w_i`:
+
+```text
+estimate = Σ_i w_i k_i / n_i
+half-width = sqrt[ log(2 / 0.025) / 2 × Σ_i w_i² / n_i ]
+interval = [estimate − half-width, estimate + half-width] intersect [0,1]
+```
+
+This follows by applying Hoeffding's inequality to each weighted Bernoulli
+outcome, whose range has width `w_i / n_i`. Task probabilities need not be
+identical. The reference is Hoeffding, “Probability inequalities for sums of
+bounded random variables,” *JASA* 58 (1963), 13–30,
+[doi:10.1080/01621459.1963.10500830](https://doi.org/10.1080/01621459.1963.10500830).
+
+At full allocation, the arm-A estimand has the smaller sample. With three tasks
+and `N` scheduled runs **per task per arm**:
+
+```text
+sqrt[ log(80) / (2 × 3 × N) ] <= 0.10
+N >= log(80) / 0.06
+minimum integer N = 74
+```
+
+| Allocation | Arm-A half-width | Meets 0.10 target? |
+|---|---:|---|
+| 73 per task per arm | 0.1000231324 | No |
+| **74 per task per arm** | **0.0993450017** | **Yes** |
+
+Register **`runsPerArm: 74`**, meaning 74 fresh scheduled runs for each task and
+each arm: **222 arm-A runs, 222 arm-B runs, 444 total slots**.
+The planned shape-realization half-width is **0.0702475244**, using all six cells.
+There is no Δ, prior escape probability, expected realization rate, power target,
+or monetary ceiling in this derivation.
+
+Use actual eligible cell counts in the same formula after attrition and report
+wider intervals. Do not increase the registered count or replace invalid slots
+after inspecting results. These are precision targets at full usable allocation,
+not promises that unknown outcomes or infrastructure failures cannot occur.
+
+The probability guarantee assumes independent fresh-run outcomes under the
+registered conditions. A model name, a fresh process, or a hash does not prove
+independence or stable serving behavior. Retain run order, identity and serving
+metadata, disclose dependence/drift limitations, and do not remove inconvenient
+runs to restore the assumption. The interval is not over a sampled population
+of tasks. This is estimation-only pilot work, not a confirmatory hypothesis test.
+
+### 9.4 Model and agent provenance
+
+Deliberately retain provider model identifier **`claude-opus-4-8`** for
+comparability with the historical collection. It has not been invoked as an
+experimental subject to check availability; collection admission must verify
+the requested and served identity without silently substituting another model.
+A model identifier is not a cryptographic hash of provider weights.
+
+The actually installed CLI reports **`2.1.266 (Claude Code)`**, rather than the
+historical `2.1.252`. Register that deliberate agent-version choice in #1265,
+with the observation retained beside this method. This is a version change, not
+an exact replication of the old client. No old realization or escape rate is
+used as a prior, and historical runs cannot enter the new pilot or confirmation.
+The actual per-epoch pins, product/agent admission, and frozen task hashes remain
+the separate #1260/#1265/#1271 work.
+
+Before collection, the source-partition instrument **must** regenerate Calor
+outputs and SDK-generated inputs rather than trust editable on-disk generated
+C#. It **must** disable warm Calor output-cache reuse in **both** arms.
+These are prospective admission requirements, not a claim that the current
+merged instrument already enforces them. The integrity cost is part of the
+registered instrument conditions, not an efficiency benefit, and is another
+reason historical per-run cost is only a rough planning reference.
+
+### 9.5 Off-ramps, funding, and no pooling
+
+Use §5's **point-estimate** rules, not confidence-bound replacements:
+
+- Shape realization **below 0.50** stops stage 2 as a protocol defect.
+  The registered rate uses both arms; it is not narrowed to A to rescue a
+  treatment arm that avoids the source shape.
+- Arm-A escape **exactly zero** stops stage 2 and publishes the redesign as
+  unsuccessful. Zero observed escapes does not prove the population rate is
+  zero; report its uncertainty without explaining away the registered stop.
+
+Evaluate these boundaries using the exact count-derived rational point estimate,
+not a floating-point rounding tolerance. The calculator retains its numerator
+and denominator; displayed decimal values are not a different stopping rule.
+
+No confirmatory Δ, N, loop-cost margin, power calculation, or benefit verdict is
+registered here. Stage 2 still requires actual pilot rates, its own reviewed
+registration, and the written ceiling. Its insufficient-budget and
+properly-powered-null off-ramps are unchanged. Task loop-cost eligibility does
+not import A-1.12's retired margin or add a third pilot estimand.
+
+Pilot and confirmatory data remain in distinct epoch identities. Pilot data
+cannot be pooled into confirmation, and the confirmatory verdict cannot be
+read from the pilot. No legacy outcome ledger or gate 10 is updated here.
+
+At the historical $2.0278/run planning reference, 444 slots multiply to
+**$900.3432**. This is neither a ceiling nor a guarantee: tasks, client behavior,
+and realized usage differ. No maintainer spending ceiling, separate
+null-result acceptance, or activation/funding decision is supplied by this
+amendment. **#1259 still blocks every paid run.**
