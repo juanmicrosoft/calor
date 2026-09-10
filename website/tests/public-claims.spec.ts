@@ -92,6 +92,39 @@ test('research milestones stay distinct from software releases', async () => {
   }
 });
 
+test('adoption guidance separates compiler behavior from workflow evidence', async () => {
+  const howItWorks = await readFile('content/getting-started/how-it-works.mdx', 'utf8');
+  const adoption = await readFile('content/guides/adoption-playbook.mdx', 'utf8');
+  const philosophy = await readFile('content/philosophy/index.mdx', 'utf8');
+  const tradeoffs = await readFile('content/philosophy/tradeoffs.mdx', 'utf8');
+  const normalizedHow = howItWorks.replace(/\s+/g, ' ');
+  const normalizedAdoption = adoption.replace(/\s+/g, ' ');
+  const normalizedPhilosophy = philosophy.replace(/\s+/g, ' ');
+  const normalizedTradeoffs = tradeoffs.replace(/\s+/g, ' ');
+  expect(howItWorks).not.toContain('creates a reliable system, not a hopeful one');
+  expect(howItWorks).not.toContain('typically writes Calor correctly');
+  expect(howItWorks).not.toContain('automatically retries with the correct');
+  expect(howItWorks).not.toContain('AI Models Are Excellent Learners');
+  expect(howItWorks).not.toContain('more robust than either alone');
+  expect(normalizedHow).toContain('did not test the full feedback loop');
+  expect(normalizedHow).toContain('not a model-wide reliability result');
+  expect(normalizedHow).toContain('does not guarantee a correct retry');
+  expect(normalizedAdoption).toContain('Workflow savings are unmeasured');
+  expect(normalizedAdoption).toContain('not established a qualifying adopter');
+  expect(normalizedAdoption).toContain('Only a clean, non-vacuous, assumption-free `proven`');
+  expect(normalizedPhilosophy).toContain('No qualifying adopter, independent adopter handoff');
+  expect(normalizedPhilosophy).toContain('economic advantage');
+  expect(philosophy).not.toContain('Interoperate seamlessly');
+  expect(philosophy).not.toContain('existing CI/CD pipeline works');
+  expect(philosophy).not.toContain('reliable AI workflows');
+  expect(normalizedTradeoffs).toContain('not evidence that it reduces total cost or defects');
+  expect(normalizedTradeoffs).toContain('Whether that improves real editing accuracy remains a workload-dependent hypothesis');
+  expect(tradeoffs).not.toContain('tradeoff pays off');
+  for (const source of [howItWorks, adoption, philosophy, tradeoffs]) {
+    expect(source).toContain('/docs/benchmarking/evidence-status/');
+  }
+});
+
 test('readers can distinguish runtime modes, optional proofs and historical measurements', async ({ page }) => {
   await page.route('https://**/*', route => route.abort());
   const base = process.env.NEXT_PUBLIC_BASE_PATH || '';

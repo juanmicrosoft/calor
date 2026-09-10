@@ -37,7 +37,9 @@ When Claude Code starts a session, it reads `CLAUDE.md` from your project root. 
 - **Syntax overview**: Key constructs and their meanings
 - **Type mappings**: How C# types translate to Calor (`int` → `i32`)
 
-Modern AI models are remarkably good at following instructions. When you tell Claude "use this syntax for modules: `§M{id:Name}`", it does.
+Modern AI models can follow novel syntax instructions, but reliability depends
+on the model, task, context, and feedback loop. The compiler, not the
+instruction alone, determines whether generated Calor is valid.
 
 ### 2. Skills (Detailed Syntax Reference)
 
@@ -63,23 +65,28 @@ Hook response: BLOCKED
 "This is a Calor-first project. Create UserService.calr instead."
 ```
 
-Claude receives this feedback and automatically retries with the correct file extension. The enforcement is automatic - no human intervention required.
+The agent receives this feedback and may retry with the correct file extension.
+The hook blocks the selected file operation; it does not guarantee a correct
+retry or remove the need for review.
 
 ---
 
-## Why This Works
+## Why This Can Work
 
-### AI Models Are Excellent Learners
+### Models Can Use Runtime Guidance
 
-Modern large language models like Claude aren't just pattern matchers trained on existing code. They're capable of:
+Depending on the model and task, runtime guidance can help an agent:
 
-- **Following novel instructions** - Claude can write code in formats it's never seen if you explain them clearly
-- **Generalizing from examples** - A few templates are enough to extrapolate
-- **Adapting to constraints** - When blocked from one approach, Claude tries alternatives
+- **Follow novel instructions** - use a syntax reference supplied in context
+- **Generalize from examples** - adapt templates to related constructs
+- **Respond to constraints** - revise an attempt after a hook or compiler error
+
+These are capabilities to evaluate, not guaranteed outcomes.
 
 ### Calor's Syntax Is Designed for This
 
-Calor wasn't designed arbitrarily. Its syntax choices make it easier for AI to learn:
+Calor's syntax is designed to make structure and constraints explicit. Whether
+that makes a particular model more reliable is an empirical question:
 
 | Design Choice | Why It Helps |
 |:--------------|:-------------|
@@ -88,17 +95,21 @@ Calor wasn't designed arbitrarily. Its syntax choices make it easier for AI to l
 | Lisp-style expressions | Unambiguous operator precedence |
 | Declared effects | AI knows what side effects are allowed |
 
-The syntax is regular and predictable. Once Claude understands `§F{id:Name:vis}` for functions, it naturally extends to `§M{id:Name}` for modules, `§L{id:var:from:to:step}` for loops, and so on.
+The syntax uses recurring declaration patterns such as `§F{id:Name:vis}`,
+`§M{id:Name}`, and `§L{id:var:from:to:step}`. The reference documents those
+patterns; it does not prove that every model extrapolates them correctly.
 
 ### The Feedback Loop Works
 
-When the hook blocks a `.cs` file, Claude doesn't just fail - it learns from the feedback in that session. After being blocked once, Claude typically writes Calor correctly for the rest of the conversation.
+When the hook blocks a `.cs` file, the agent receives actionable feedback and
+can retry with Calor. The repository has not measured how often one correction
+is sufficient across current models and real projects.
 
 ---
 
 ## Evidence from Practice
 
-We've tested this approach extensively:
+The repository contains bounded tests of this approach:
 
 The repository includes deterministic generation and structure calculators, but
 they are not a substitute for a blinded, live-agent success study. In practice,
@@ -106,7 +117,12 @@ agents should use the compiler feedback loop: generate a small change, run
 `calor -i change.calr -o change.g.cs`, and repair any syntax, type, contract,
 or effect diagnostics. MCP clients can use the equivalent `calor_check` tool.
 
-The combination of instructions + skills + hooks creates a reliable system, not a hopeful one.
+Instructions, skills, hooks, and compiler diagnostics form a concrete feedback
+loop. The dated agent-task snapshot records 77 successful tasks out of 89 for
+its model, prompt, and verifier configuration. That runner skipped lifecycle
+hooks and made one agent invocation per task, so it did not test the full
+feedback loop. It is not a model-wide reliability result or an independent
+adopter study.
 
 ---
 
@@ -118,27 +134,38 @@ Calor compiles to C#. Claude already knows C# deeply. It's translating concepts 
 
 ### "What if Claude hallucinates syntax?"
 
-The Calor compiler validates all code. If Claude invents syntax that doesn't exist, compilation fails with clear error messages. Claude reads these errors and fixes them.
+The Calor compiler rejects invalid syntax and reports diagnostics. An agent can
+use those diagnostics to retry, but a diagnostic does not guarantee that the
+next attempt compiles or satisfies the intended behavior.
 
 ### "Is this just prompt engineering?"
 
-Yes and no. Prompt engineering (CLAUDE.md, skills) teaches Claude *what* to do. Hooks *enforce* compliance. The combination is more robust than either alone.
+Yes and no. Project instructions and skills describe what to do. Hooks can block selected
+operations, and compiler diagnostics reject invalid programs. Their combined
+reliability has not been established across adopters or current models.
 
 ### "Will this work with other AI models?"
 
-We support Claude Code, Gemini CLI, Codex CLI, and GitHub Copilot. Models that support hooks (Claude, Gemini) get enforcement. Others rely on guidance. See the [integration pages](/docs/getting-started/) for details.
+We provide integration guidance for Claude Code, Gemini CLI, Codex CLI, and
+GitHub Copilot. Their lifecycle and policy-hook capabilities differ and evolve;
+see the [integration pages](/docs/getting-started/) for the current setup and
+verify the behavior of the installed client.
 
 ---
 
 ## The Bottom Line
 
-Calor works not because AI was trained on it, but because:
+The Calor workflow is designed around:
 
-1. **Modern AI can follow novel instructions** - CLAUDE.md provides the rules
+1. **Novel instructions** - CLAUDE.md provides the rules
 2. **Reference documentation helps** - Skills provide syntax details
-3. **Enforcement catches mistakes** - Hooks ensure compliance
+3. **Mechanical feedback** - Hooks block selected policy violations and the compiler rejects invalid programs
 
-You don't need to trust that Claude will "just know" Calor. The system is designed to teach, guide, and enforce.
+You do not need to assume that an agent already knows Calor. You still need to
+measure the workflow on your tasks, review the generated behavior, and keep the
+documented exit path. The
+[research evidence status](/docs/benchmarking/evidence-status/) explains what
+has and has not been established.
 
 Try it yourself. Initialize a project, ask Claude to write some code, and see what happens:
 

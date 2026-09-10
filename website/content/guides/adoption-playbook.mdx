@@ -9,7 +9,7 @@ Calor adoption is deliberately incremental: place a `.calr` module beside
 your C# sources, let the MSBuild SDK compile it, and expand only after the
 verification and effect reports are useful to your team.
 
-The project has not established an independent adopter handoff, economic
+The project has not established a qualifying adopter, independent adopter handoff, economic
 advantage, or safety advantage over protected C#. Read the
 [research evidence status](/docs/benchmarking/evidence-status/) before treating
 repository benchmarks as an adoption result.
@@ -26,9 +26,14 @@ repository benchmarks as an adoption result.
 - **Waivers void guarantees.** `--permissive-effects` assumes unknown calls are
   pure. `--contract-mode off` removes contract checks. A review packet produced
   with either option says so on its first line.
+- **Workflow savings are unmeasured.** The project has not established that
+  Calor reduces total review/repair cost versus ordinary or strongly protected
+  C#. No qualifying adopter or independent handoff was established.
 
 Start with pure, contract-dense modules and first-order effect-checked code.
 Delegate-heavy or reflection-heavy service layers are a poor first target.
+Treat the first module as your own bounded pilot: record translation, compiler,
+review, repair, and eject-path costs before expanding.
 
 ## 1. Install the MSBuild SDK
 
@@ -75,8 +80,10 @@ The [full list of build settings](/docs/cli/init/#build-settings) is on the
     §R amount
 ```
 
-- `§Q` preconditions and `§S` postconditions are proved where their forms are
-  modeled and otherwise remain runtime checks.
+- `§Q` preconditions and `§S` postconditions receive one of the documented
+  proof statuses where verification is requested. Only a clean, non-vacuous,
+  assumption-free `proven` result can authorize guard removal; runtime checks
+  also depend on contract mode and supported lowering.
 - `§E{...}` declares effects; `§E{}` is explicitly pure.
 - A missing declared effect is an error with its call chain.
 
