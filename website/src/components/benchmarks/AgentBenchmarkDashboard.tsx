@@ -131,16 +131,24 @@ function CategoryBar({ name, displayName, description, passed, total, rate }: Ca
 }
 
 export function AgentBenchmarkDashboard() {
-  const passRateSuccess = data.summary.passRate >= data.summary.threshold;
-
   // Sort categories by rate descending
   const sortedCategories = Object.entries(data.categories).sort(
     ([, a], [, b]) => b.rate - a.rate
   );
 
+  const categoryTotals = sortedCategories.reduce(
+    (totals, [, category]) => ({
+      passed: totals.passed + category.passed,
+      total: totals.total + category.total,
+    }),
+    { passed: 0, total: 0 }
+  );
+  const categoryRate = categoryTotals.total === 0
+    ? 0
+    : (categoryTotals.passed / categoryTotals.total) * 100;
+
   // Count perfect and struggling categories
   const perfectCount = sortedCategories.filter(([, c]) => c.rate === 100).length;
-  const strugglingCount = sortedCategories.filter(([, c]) => c.rate < 80).length;
 
   return (
     <div className="space-y-8">
@@ -149,10 +157,10 @@ export function AgentBenchmarkDashboard() {
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Bot className="h-6 w-6 text-calor-pink" />
-            Historical Agent Task Benchmark
+            Historical Single-Run Task Snapshot
           </h2>
           <p className="text-muted-foreground mt-1">
-            Historical task results, not an evaluation of the current docs release
+            Dated task-check results, not a current model reliability measurement
           </p>
         </div>
         <div className="text-right text-sm text-muted-foreground">
@@ -164,36 +172,43 @@ export function AgentBenchmarkDashboard() {
       <p className="text-sm text-muted-foreground">
         {provenance.method}. Corpus: <code>{provenance.corpus}</code>.
         {' '}Recorded source <code>{provenance.sourceCommit}</code> declares compiler v{provenance.sourceDeclaredVersion}.
-        The exact measurement binary was not independently recorded.
+        The exact Claude model, Claude Code version, measurement binary, working-tree
+        state, and host configuration were not independently recorded.
       </p>
+
+      <div className="p-4 rounded-lg border border-yellow-500/50 bg-yellow-500/5 text-sm">
+        <strong>Unreconciled artifact totals:</strong> the recorded summary reports{' '}
+        {data.summary.passed}/{data.summary.totalTasks} passes, {data.summary.categoryCount}{' '}
+        categories, and {data.summary.passRate.toFixed(1)}%. The {sortedCategories.length}{' '}
+        category entries sum to {categoryTotals.passed}/{categoryTotals.total}, or{' '}
+        {categoryRate.toFixed(1)}%. The cards preserve the recorded summary; the category
+        list renders the entries.
+      </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <SummaryCard
           icon={<Target className="h-4 w-4" />}
-          label="Pass Rate"
+          label="Recorded Summary Rate"
           value={`${data.summary.passRate.toFixed(1)}%`}
-          subtext={passRateSuccess ? "Meets 80% threshold" : "Below 80% threshold"}
-          status={passRateSuccess ? 'success' : 'warning'}
+          subtext="Above the project-defined 80% gate"
         />
         <SummaryCard
           icon={<CheckCircle className="h-4 w-4" />}
-          label="Tests Passed"
+          label="Recorded Summary Passes"
           value={data.summary.passed}
           subtext={`of ${data.summary.totalTasks} total`}
-          status="success"
         />
         <SummaryCard
           icon={<XCircle className="h-4 w-4" />}
-          label="Tests Failed"
+          label="Recorded Summary Failures"
           value={data.summary.failed}
-          status={data.summary.failed > 0 ? 'warning' : 'success'}
         />
         <SummaryCard
           icon={<Layers className="h-4 w-4" />}
-          label="Categories"
+          label="Recorded Summary Categories"
           value={data.summary.categoryCount}
-          subtext={`${perfectCount} at 100%`}
+          subtext={`${sortedCategories.length} entries; ${perfectCount} at 100%`}
         />
       </div>
 
@@ -202,7 +217,7 @@ export function AgentBenchmarkDashboard() {
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold flex items-center gap-2">
             <TrendingUp className="h-5 w-5" />
-            Overall Progress
+            Recorded Summary
           </h3>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1">
@@ -299,10 +314,18 @@ export function AgentBenchmarkDashboard() {
               <span className="font-medium">{data.methodology.votingMode}</span>
             </div>
             <div>
-              <span className="text-muted-foreground">Threshold:</span>{' '}
+              <span className="text-muted-foreground">Project-defined gate:</span>{' '}
               <span className="font-medium">{data.methodology.threshold}</span>
             </div>
           </div>
+          <p className="text-xs text-muted-foreground mt-4">
+            This gate is not a calibrated production reliability or adoption threshold.
+            All {provenance.transpilationChecks} tasks required Calor-to-C# transpilation,
+            and all {provenance.syntaxPatternScripts} used text-pattern scripts. There were{' '}
+            {provenance.contractVerificationTasks} enabled contract-verdict checks and{' '}
+            {provenance.behavioralExecutionTasks} behavioral executions. The generated C#
+            was not built or executed. The runner skipped Calor agent lifecycle hooks.
+          </p>
         </div>
       )}
     </div>
