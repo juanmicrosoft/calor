@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "kind": "pp-w-rows-pilot-model-agent-registration",
+  "stage": "pilot",
+  "epochId": "w-rows-pilot-001",
+  "effectiveOn": "merge of the separately reviewed #1265 pin registration",
+  "modelPin": "claude-opus-4-8",
+  "agentVersion": "2.1.266 (Claude Code)",
+  "runsPerArm": 74,
+  "runsPerArmMeaning": "scheduled fresh runs per selected task per arm",
+  "methodRegistration": {
+    "repositoryPath": "bench/phase0-agent-native/registrations/ppw-rows-stage1/registration.json",
+    "sha256": "5db51f1b1451ed0b5d1596faebb50f8576d3b29413970e31422cc243905b5001",
+    "governingSection": 9,
+    "decisionPullRequest": 1363
+  },
+  "clientObservation": {
+    "command": ["claude", "--version"],
+    "stdout": "2.1.266 (Claude Code)\n",
+    "exitCode": 0,
+    "executableSha256": "553d1b9e9e7068b275c0a783c7e139ff6503096f286e674c8c919379fb0eca62",
+    "hashScope": "observed local macOS arm64 executable, not provider weights or a cross-platform package identity"
+  },
+  "comparability": {
+    "model": "Deliberately retain the historical model identifier; this does not prove unchanged provider weights or serving conditions.",
+    "agent": "The observed client is 2.1.266, not the historical 2.1.252. The difference is disclosed; no effect on realization or escape rates is assumed.",
+    "pooling": "Historical and pilot observations must not enter the confirmatory analysis."
+  },
+  "availability": "Only the local client version was checked. No model availability or inference request was made.",
+  "amendments": "Any changed model or client pin requires a separately reviewed amendment with a stated reason before the affected stage.",
+  "fundingStatus": "unfunded",
+  "collectionAuthorized": false,
+  "modelInvoked": false,
+  "stage2SampleSize": null,
+  "stage2EffectSize": null
+}

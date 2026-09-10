@@ -545,3 +545,36 @@ At the historical $2.0278/run planning reference, 444 slots multiply to
 and realized usage differ. No maintainer spending ceiling, separate
 null-result acceptance, or activation/funding decision is supplied by this
 amendment. **#1259 still blocks every paid run.**
+
+## 10. Prospective pilot model/agent pin binding (#1265)
+
+**Date: 2026-09-10. Effective on merge of the independently reviewed #1265
+registration.** This binds §9's existing decisions to the actual
+[`w-rows-pilot-001` input pins](../../bench/phase0-agent-native/epochs/w-rows-pilot-001/pins.json).
+It does not activate collection or change any threshold or off-ramp.
+
+The pilot retains model identifier `claude-opus-4-8`. Its deliberately chosen
+client is the locally observed `2.1.266 (Claude Code)`, not the historical
+2.1.252. A fresh `claude --version` check returned the same version and local
+executable checksum recorded in §9. No model availability or inference request
+was made. The identifier does not certify unchanged provider weights, and the
+client difference is not assumed to preserve historical rates. Historical
+and pilot observations remain excluded from confirmation.
+
+The pins carry **74 scheduled runs per task per arm** for the fixed three-task
+mixture. Their stage registration hashes the separate method/model evidence
+and the reviewed #1271 task supersession, including actual native control
+certificates. The shared Release compiler/Tasks identity is recorded from the
+verified product, not inferred from its version string.
+
+`lifecycle: scaffolded` records an unrun prospective input. The schema's
+`mode: live` and `dataKind: empirical` describe intended future collection,
+not an observed result or permission to run. No spending authorization is
+supplied; the driver fails closed before agent commands. The confirmatory
+stage has no registered sample size or effect size here. #1260 supplies the
+complete task scaffold and a separate unregistered confirmation reservation.
+
+Any later model/client or material instrument-pin change requires a reviewed
+amendment with its reason before the affected stage. This binding does not
+supply a ceiling, separate null-result acceptance, stage-2 design, collected
+epoch, or benefit verdict. **#1259 remains the paid-collection gate.**
