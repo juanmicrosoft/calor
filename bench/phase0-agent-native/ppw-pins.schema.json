@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ppw-pins/2",
+  "title": "Redesigned PP-W single-epoch pins (not a scientific registration)",
+  "type": "object",
+  "required": ["schemaVersion", "kind", "epochId", "stage", "dataKind", "mode", "lifecycle", "compiler", "arms", "harnessCommit", "modelPin", "agentVersion", "runsPerArm", "suite", "registrationSha256"],
+  "properties": {
+    "schemaVersion": {"const": 2},
+    "kind": {"const": "pp-w-rows-redesign"},
+    "epochId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"},
+    "stage": {"enum": ["pilot", "confirmatory"]},
+    "dataKind": {"enum": ["synthetic", "empirical"]},
+    "mode": {"const": "live"},
+    "lifecycle": {"enum": ["scaffolded", "collecting", "collected", "archived"]},
+    "compiler": {
+      "type": "object",
+      "required": ["release", "commit", "repoRoot", "calorDll", "calorSha256", "calorTasksSha256", "compilerHash"],
+      "additionalProperties": false,
+      "properties": {
+        "release": {"const": "v0.18.0"},
+        "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "repoRoot": {"type": "string", "minLength": 1},
+        "calorDll": {"type": "string", "minLength": 1},
+        "calorSha256": {"$ref": "#/$defs/sha256"},
+        "calorTasksSha256": {"$ref": "#/$defs/sha256"},
+        "compilerHash": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "arms": {
+      "const": {
+        "A": {"label": "calor-permissive", "policy": "permissive", "flags": ["--permissive-effects"], "editMechanism": "raw"},
+        "B": {"label": "calor-strict", "policy": "strict", "flags": [], "editMechanism": "raw"}
+      }
+    },
+    "harnessCommit": {"type": "string", "minLength": 1},
+    "harnessArtifacts": {"type": "object", "additionalProperties": {"$ref": "#/$defs/sha256"}},
+    "modelPin": {"type": "string", "minLength": 1},
+    "agentVersion": {"type": "string", "minLength": 1},
+    "runsPerArm": {"type": "integer", "minimum": 1},
+    "suite": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "registrationSha256": {"$ref": "#/$defs/sha256"}
+  },
+  "additionalProperties": false,
+  "$defs": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

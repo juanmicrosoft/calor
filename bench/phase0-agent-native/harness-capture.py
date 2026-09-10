@@ -44,11 +44,13 @@ Subcommands (each prints one JSON document to stdout; exit codes below):
 
     pair-config <pair.json> <arm-config-key> [--arm calor|csharp]
         Admission of the calor-arm config pin (gates doc §1) plus the ADDITIVE
-        pre-rows control arm (roadmap §4.1). Exactly two configs are admitted:
+        historical pre-rows and redesigned permissive control arms:
             strict:   enforceEffects true, permissiveEffects false,
                       contractMode "debug", z3Required true, no controlArmKind
             pre-rows: the same with permissiveEffects true AND
                       controlArmKind "pre-rows"
+            permissive: the same with permissiveEffects true AND
+                      controlArmKind "permissive" (one-compiler redesign)
         Anything else — permissive without controlArmKind, controlArmKind
         without permissive, an unknown controlArmKind, any other value of
         the four pins, a missing arm entry — is rejected: reason on stdout in
@@ -95,9 +97,12 @@ Python 3.9 compatible; standard library only.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
+from pathlib import Path
+import xml.etree.ElementTree as ET
 import sys
 
 # `calor` must be an INVOCATION, not any occurrence of the word. The calor arm's workspace
@@ -118,7 +123,7 @@ STRICT_CONFIG = {
     "z3Required": True,
 }
 PRE_ROWS_KIND = "pre-rows"
-ADMITTED_CONTROL_ARM_KINDS = (PRE_ROWS_KIND,)
+ADMITTED_CONTROL_ARM_KINDS = (PRE_ROWS_KIND, "permissive")
 PAIR_CONFIG_REJECT_EXIT = 3
 
 
@@ -369,13 +374,15 @@ def admit_config(config):
     if kind is not None and kind not in ADMITTED_CONTROL_ARM_KINDS:
         return False, None, "unknown controlArmKind %r (admitted: %s)" % (
             kind, ", ".join(ADMITTED_CONTROL_ARM_KINDS))
-    if kind == PRE_ROWS_KIND:
+    if kind in (PRE_ROWS_KIND, "permissive"):
         expected = dict(STRICT_CONFIG, permissiveEffects=True)
         if pins != expected:
             return False, None, (
-                "controlArmKind 'pre-rows' requires exactly %s; got %s"
-                % (_fmt(expected), _fmt(pins)))
-        return True, PRE_ROWS_KIND, "pre-rows control arm (roadmap §4.1, additive to gates §1)"
+                "controlArmKind %r requires exactly %s; got %s"
+                % (kind, _fmt(expected), _fmt(pins)))
+        if kind == PRE_ROWS_KIND:
+            return True, kind, "pre-rows control arm (roadmap §4.1, additive to gates §1)"
+        return True, kind, "permissive control arm (2026-09-05 redesign §3, shared compiler)"
     if permissive is True:
         return False, None, (
             "permissiveEffects true is admitted only together with "
@@ -388,6 +395,48 @@ def admit_config(config):
 
 def _fmt(pins):
     return json.dumps(pins, sort_keys=True)
+
+
+def policy_snapshot(workspace):
+    """Archive effective generated project policy plus configuration integrity.
+
+    Compiler optionsHash includes the absolute project directory, so disjoint
+    hashes cannot establish a policy contrast between different workspaces.
+    """
+    root = Path(workspace)
+    project = root / "src" / "Src.csproj"
+    document = ET.parse(project).getroot()
+    values = {}
+    for name in ("CalorEnforceEffects", "CalorPermissiveEffects"):
+        matches = list(document.iter(name))
+        if len(matches) != 1 or matches[0].text not in ("true", "false"):
+            raise ValueError("generated project has ambiguous or missing %s" % name)
+        values[name] = matches[0].text == "true"
+    files = {}
+    for path in root.rglob("*"):
+        relative = path.relative_to(root)
+        if {"bin", "obj"} & set(relative.parts):
+            continue
+        if path.suffix.lower() in (".csproj", ".props", ".targets", ".rsp", ".json"):
+            if path.is_symlink():
+                raise ValueError("symlinked workspace configuration: %s" % relative)
+            if path.is_file():
+                files[str(relative)] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return {"policy": values, "configurationSha256": files}
+
+
+def isolate_workspace(workspace):
+    """Stop project-local scratch builds inheriting repository build policy."""
+    root = Path(workspace)
+    root.mkdir(parents=True, exist_ok=True)
+    for name in ("Directory.Build.props", "Directory.Build.targets"):
+        (root / name).write_text("<Project />\n", encoding="utf-8")
+    (root / "Directory.Packages.props").write_text(
+        "<Project><PropertyGroup>"
+        "<ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>"
+        "<RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>"
+        "<RestoreLockedMode>false</RestoreLockedMode>"
+        "</PropertyGroup></Project>\n", encoding="utf-8")
 
 
 def resolve_reference(pair_json, pair, entry, fixture):
@@ -728,6 +777,8 @@ def main(argv=None):
     p.add_argument("--arm", default=None, choices=(None, "calor", "csharp"))
     p = sub.add_parser("leg-b-pairs"); p.add_argument("pins_json")
     p = sub.add_parser("heldout-final"); p.add_argument("path")
+    p = sub.add_parser("policy-snapshot"); p.add_argument("workspace")
+    p = sub.add_parser("isolate-workspace"); p.add_argument("workspace")
     sub.add_parser("self-test")
     args = parser.parse_args(argv)
     if args.cmd == "turns":
@@ -745,6 +796,17 @@ def main(argv=None):
     if args.cmd == "heldout-final":
         json.dump(read_heldout_final(args.path), sys.stdout, sort_keys=True)
         sys.stdout.write("\n")
+        return 0
+    if args.cmd == "policy-snapshot":
+        try:
+            json.dump(policy_snapshot(args.workspace), sys.stdout, sort_keys=True)
+            sys.stdout.write("\n")
+            return 0
+        except (OSError, ValueError, ET.ParseError) as exc:
+            sys.stderr.write("invalid workspace policy: %s\n" % exc)
+            return 3
+    if args.cmd == "isolate-workspace":
+        isolate_workspace(args.workspace)
         return 0
     if args.cmd == "pair-config":
         result = resolve_pair_config(args.pair_json, args.key, args.arm)
