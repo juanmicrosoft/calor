@@ -3528,13 +3528,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
     public string Visit(OkExpressionNode node)
     {
         var value = node.Value.Accept(this);
-        return $"§OK{{{value}}}";
+        return $"§OK {value}";
     }
 
     public string Visit(ErrExpressionNode node)
     {
         var error = node.Error.Accept(this);
-        return $"§ERR{{{error}}}";
+        return $"§ERR {error}";
     }
 
     public string Visit(ArrayCreationNode node)
@@ -4704,6 +4704,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(CharOperationNode node)
     {
+        if (node.Operation == CharOp.CharLiteral
+            && node.Arguments is [StringLiteralNode { Value.Length: 1 } literal])
+            return Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(literal.Value[0], quote: true);
+
         // AcceptInInlineSibling: args in Lisp (op a b) form are space-separated,
         // so a nested zero-arg call without §/C would absorb the next arg.
         var opName = node.Operation.ToCalorName();

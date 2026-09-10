@@ -302,7 +302,7 @@ public class RegistryConformanceTests
     }
 
     // ------------------------------------------------------------------
-    // Char literals (#774): native (char-lit "x") representation, never a
+    // Char literals (#774, #1335): native character representation, never a
     // silent string literal.
     // ------------------------------------------------------------------
 
@@ -313,7 +313,7 @@ public class RegistryConformanceTests
     }
 
     [Fact]
-    public void CharLiteral_ConvertsToNativeCharLit()
+    public void CharLiteral_ConvertsToNativeCharacterLiteral()
     {
         var result = RoundTrip("""
             public class Chars
@@ -326,7 +326,7 @@ public class RegistryConformanceTests
             """);
 
         _output.WriteLine(result.CalorSource!);
-        Assert.Contains("(char-lit \"/\")", result.CalorSource);
+        Assert.Contains("'/'", result.CalorSource);
 
         // Emitted C# has a real char literal — char semantics preserved.
         _output.WriteLine(result.EmittedCSharp!);
@@ -987,11 +987,8 @@ public class RegistryConformanceTests
     }
 
     [Fact]
-    public void CharLiteral_LoneSurrogate_EscalatesToInterop()
+    public void CharLiteral_LoneSurrogate_RoundTripsNatively()
     {
-        // #836 m1: '\uD83D' (lone high surrogate) previously became '�' via
-        // the UTF-8 replacement fallback while reporting success. The member
-        // escalates to interop, preserving the ESCAPED source text.
         var csharp = """
             public class Chars
             {
@@ -1002,15 +999,13 @@ public class RegistryConformanceTests
             }
             """;
 
-        var result = Convert(csharp);
-
-        Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
+        var result = RoundTrip(csharp);
         _output.WriteLine(result.CalorSource!);
 
-        Assert.Contains("§CSHARP", result.CalorSource);
-        Assert.Contains("'\\uD83D'", result.CalorSource);
+        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        Assert.Contains("'\\ud83d'", result.CalorSource, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("�", result.CalorSource);
-        Assert.Contains(result.Context.Losses, l => l.Kind == ConversionLossKind.InteropPreserved);
+        Assert.True(result.RoslynSuccess, string.Join("; ", result.RoslynErrors));
     }
 
     [Fact]

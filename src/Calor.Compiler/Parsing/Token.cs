@@ -342,6 +342,7 @@ public enum TokenKind
     // Typed Literals
     IntLiteral,         // INT:42
     StrLiteral,         // STR:"hello"
+    CharLiteral,        // 'x'
     BoolLiteral,        // BOOL:true
     FloatLiteral,       // FLOAT:3.14
     DecimalLiteral,     // DECIMAL:18.00M or DEC:18.00 or 18.00m
@@ -372,6 +373,7 @@ public readonly struct Token : IEquatable<Token>
     public string Text { get; }
     public TextSpan Span { get; }
     public object? Value { get; }
+    internal int IndentationDepth { get; init; }
 
     public Token(TokenKind kind, string text, TextSpan span, object? value = null)
     {
@@ -383,7 +385,7 @@ public readonly struct Token : IEquatable<Token>
 
     public bool IsKeyword => Kind is >= TokenKind.Module and <= TokenKind.EndNamespace;
 
-    public bool IsLiteral => Kind is TokenKind.IntLiteral or TokenKind.StrLiteral
+    public bool IsLiteral => Kind is TokenKind.IntLiteral or TokenKind.StrLiteral or TokenKind.CharLiteral
         or TokenKind.BoolLiteral or TokenKind.FloatLiteral or TokenKind.DecimalLiteral;
 
     public bool IsTrivia => Kind is TokenKind.Whitespace or TokenKind.Newline;

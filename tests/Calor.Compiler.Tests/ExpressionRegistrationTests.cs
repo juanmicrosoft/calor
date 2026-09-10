@@ -21,6 +21,7 @@ public class ExpressionRegistrationTests
         {
             [TokenKind.IntLiteral] = ("1", nameof(IntLiteralNode)),
             [TokenKind.StrLiteral] = ("\"x\"", nameof(StringLiteralNode)),
+            [TokenKind.CharLiteral] = ("'x'", nameof(CharOperationNode)),
             [TokenKind.BoolLiteral] = ("true", nameof(BoolLiteralNode)),
             [TokenKind.FloatLiteral] = ("1.5", nameof(FloatLiteralNode)),
             [TokenKind.DecimalLiteral] = ("DEC:1.5", nameof(DecimalLiteralNode)),

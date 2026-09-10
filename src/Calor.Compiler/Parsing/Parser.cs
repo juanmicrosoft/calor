@@ -18,6 +18,7 @@ public sealed class Parser
         {
             [TokenKind.IntLiteral] = static parser => parser.ParseIntLiteral(),
             [TokenKind.StrLiteral] = static parser => parser.ParseStringLiteral(),
+            [TokenKind.CharLiteral] = static parser => parser.ParseCharLiteral(),
             [TokenKind.BoolLiteral] = static parser => parser.ParseBoolLiteral(),
             [TokenKind.FloatLiteral] = static parser => parser.ParseFloatLiteral(),
             [TokenKind.DecimalLiteral] = static parser => parser.ParseDecimalLiteral(),
@@ -4523,6 +4524,13 @@ public sealed class Parser
         return new IntLiteralNode(token.Span, value);
     }
 
+    private ExpressionNode ParseCharLiteral()
+    {
+        var token = Expect(TokenKind.CharLiteral);
+        return new CharOperationNode(token.Span, CharOp.CharLiteral,
+            [new StringLiteralNode(token.Span, ((char)token.Value!).ToString())]);
+    }
+
     private ExpressionNode ParseStringLiteral()
     {
         var token = Expect(TokenKind.StrLiteral);
@@ -5209,7 +5217,7 @@ public sealed class Parser
             return new VariablePatternNode(token.Span, token.Text, token.Span);
         }
 
-        if (Check(TokenKind.IntLiteral) || Check(TokenKind.StrLiteral) ||
+        if (Check(TokenKind.IntLiteral) || Check(TokenKind.StrLiteral) || Check(TokenKind.CharLiteral) ||
             Check(TokenKind.BoolLiteral) || Check(TokenKind.FloatLiteral) ||
             Check(TokenKind.DecimalLiteral))
         {
@@ -5440,7 +5448,7 @@ public sealed class Parser
     /// </summary>
     private ExpressionNode ParseExpressionFromAttributeString(string attrStr, TextSpan span)
     {
-        if (attrStr.StartsWith("("))
+        if (attrStr.StartsWith("(") || attrStr.StartsWith("'"))
         {
             // S-expression: create a temporary lexer/parser to parse it
             var tempLexer = new Lexer(attrStr, _diagnostics);
@@ -5597,42 +5605,48 @@ public sealed class Parser
         // Check for arrow syntax: §IF{id} condition → statement
         if (Check(TokenKind.Arrow))
         {
-            Advance(); // consume arrow
-            var singleStmt = ParseStatement();
-            if (singleStmt != null)
+            var lastBodySpan = startToken.Span;
+
+            List<StatementNode> ParseClauseBody()
             {
-                thenBody.Add(singleStmt);
+                var body = new List<StatementNode>();
+                var ownsDedent = true;
+                if (Check(TokenKind.Arrow))
+                {
+                    var arrowToken = Advance();
+                    // An inline statement creates no indentation level. Its next
+                    // dedent belongs to the enclosing loop, branch, or function.
+                    ownsDedent = Current.IndentationDepth > arrowToken.IndentationDepth;
+                    var statement = ParseStatement();
+                    if (statement != null)
+                        body.Add(statement);
+                }
+                else
+                {
+                    while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf)
+                        && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf))
+                    {
+                        var statement = ParseStatement();
+                        if (statement != null)
+                            body.Add(statement);
+                    }
+                }
+
+                if (body.Count > 0)
+                    lastBodySpan = body[^1].Span;
+                if (ownsDedent && Check(TokenKind.Dedent))
+                    lastBodySpan = Advance().Span;
+                return body;
             }
+
+            thenBody = ParseClauseBody();
 
             // Parse optional §EI (else if) and §EL (else) with arrow syntax
             while (Check(TokenKind.ElseIf))
             {
                 var elseIfToken = Expect(TokenKind.ElseIf);
                 var elseIfCondition = ParseExpression();
-                var elseIfBody = new List<StatementNode>();
-
-                if (Check(TokenKind.Arrow))
-                {
-                    Advance(); // consume arrow
-                    var elseIfStmt = ParseStatement();
-                    if (elseIfStmt != null)
-                    {
-                        elseIfBody.Add(elseIfStmt);
-                    }
-                }
-                else
-                {
-                    // Multi-statement body (until next clause or end)
-                    while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf) && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf))
-                    {
-                        var stmt = ParseStatement();
-                        if (stmt != null)
-                        {
-                            elseIfBody.Add(stmt);
-                        }
-                    }
-                }
-
+                var elseIfBody = ParseClauseBody();
                 elseIfClauses.Add(new ElseIfClauseNode(elseIfToken.Span, elseIfCondition, elseIfBody));
             }
 
@@ -5640,41 +5654,13 @@ public sealed class Parser
             if (Check(TokenKind.Else))
             {
                 Expect(TokenKind.Else);
-                elseBody = new List<StatementNode>();
-
-                if (Check(TokenKind.Arrow))
-                {
-                    Advance(); // consume arrow
-                    var elseStmt = ParseStatement();
-                    if (elseStmt != null)
-                    {
-                        elseBody.Add(elseStmt);
-                    }
-                }
-                else
-                {
-                    while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf))
-                    {
-                        var stmt = ParseStatement();
-                        if (stmt != null)
-                        {
-                            elseBody.Add(stmt);
-                        }
-                    }
-                }
+                elseBody = ParseClauseBody();
             }
 
-            // Phase 4d: under indent-form, an arrow-form §IF that has no
-            // body block (i.e. no §EI/§EL chain present and no explicit
-            // §/I closer following) self-terminates after the inline
-            // statement. Only call ExpectBlockEnd if there is actually a
-            // block-end to consume -- otherwise the next token may be a
-            // sibling statement (e.g. another §IF at the same indent).
-            Token endToken;
-            bool hasChain = elseIfClauses.Count > 0 || elseBody != null;
-            if (hasChain || Check(TokenKind.EndIf) || Check(TokenKind.Dedent))
+            if (Check(TokenKind.EndIf))
             {
-                endToken = ExpectBlockEnd(TokenKind.EndIf);
+                var endToken = ExpectBlockEnd(TokenKind.EndIf);
+                lastBodySpan = endToken.Span;
                 var endAttrs = ParseAttributes();
                 var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
 
@@ -5683,15 +5669,7 @@ public sealed class Parser
                     _diagnostics.ReportMismatchedIdWithFix(endToken.Span, "IF", id, "END_IF", endId);
                 }
             }
-            else
-            {
-                // Arrow-only IF with no chain -- span ends at the inline statement.
-                endToken = singleStmt?.Span is { } stmtSpan
-                    ? new Token(TokenKind.Eof, "", stmtSpan)
-                    : startToken;
-            }
-
-            var span = startToken.Span.Union(endToken.Span);
+            var span = startToken.Span.Union(lastBodySpan);
             return new IfStatementNode(span, id, condition, thenBody, elseIfClauses, elseBody, attrs);
         }
 
@@ -6496,7 +6474,7 @@ public sealed class Parser
         {
             sb.Append(Advance().Value as string ?? "");
         }
-        else if (Check(TokenKind.IntLiteral))
+        else if (Check(TokenKind.IntLiteral) || Check(TokenKind.CharLiteral))
         {
             var token = Advance();
             sb.Append(token.Text);
@@ -6591,9 +6569,9 @@ public sealed class Parser
                 sb.Append("<<");
                 Advance();
             }
-            else if (Check(TokenKind.IntLiteral))
+            else if (Check(TokenKind.IntLiteral) || Check(TokenKind.CharLiteral))
             {
-                // Add space before integers if there's content before them (to separate from identifiers)
+                // Separate literal tokens from preceding identifiers.
                 if (sb.Length > 0 && !char.IsWhiteSpace(sb[sb.Length - 1]) && sb[sb.Length - 1] != '(')
                     sb.Append(' ');
                 sb.Append(Advance().Text);
@@ -7020,6 +6998,10 @@ public sealed class Parser
     /// </summary>
     private object ParseCSharpAttributePrimaryValue()
     {
+        if (Check(TokenKind.CharLiteral))
+        {
+            return (char)Advance().Value!;
+        }
         if (Check(TokenKind.StrLiteral))
         {
             return Advance().Value as string ?? "";
@@ -12335,7 +12317,7 @@ public sealed class Parser
         if (Current.Kind == TokenKind.Identifier && Peek(1).Kind == TokenKind.Equals)
             return false; // Don't consume property assignments as range operands
         return Current.Kind is TokenKind.IntLiteral or TokenKind.FloatLiteral
-            or TokenKind.DecimalLiteral or TokenKind.StrLiteral
+            or TokenKind.DecimalLiteral or TokenKind.StrLiteral or TokenKind.CharLiteral
             or TokenKind.Identifier or TokenKind.OpenParen or TokenKind.IndexEnd;
     }
 
@@ -13413,7 +13395,7 @@ public sealed class Parser
     /// </summary>
     private string? ParseEnumOperand()
     {
-        if (Check(TokenKind.IntLiteral))
+        if (Check(TokenKind.IntLiteral) || Check(TokenKind.CharLiteral))
         {
             return Advance().Text;
         }
@@ -13486,7 +13468,7 @@ public sealed class Parser
     /// </summary>
     private bool IsEnumOperandStart()
     {
-        return Check(TokenKind.IntLiteral) || Check(TokenKind.Identifier) ||
+        return Check(TokenKind.IntLiteral) || Check(TokenKind.CharLiteral) || Check(TokenKind.Identifier) ||
                Check(TokenKind.Tilde) || Check(TokenKind.OpenParen) ||
                (Check(TokenKind.Minus) && Peek(1).Kind == TokenKind.IntLiteral);
     }
