@@ -10,6 +10,7 @@ const metricPages = ['comprehension', 'correctness', 'edit-precision', 'error-de
   'generation-accuracy', 'information-density', 'refactoring-stability', 'token-economics'];
 const verificationPages = ['philosophy/static-verification', 'syntax-reference/contracts',
   'cli/compile', 'cli/verify', 'benchmarking/metrics/contract-verification'];
+const currentRelease = '0.19.0';
 
 test('current version and explicitly historical result provenance cannot silently drift', async () => {
   const props = await readFile('../Directory.Build.props', 'utf8');
@@ -47,6 +48,29 @@ test('current version and explicitly historical result provenance cannot silentl
   }
   // Historical changelog versions remain valid; this check is deliberately scoped.
   expect(await readFile('content/changelog.mdx', 'utf8')).toContain('0.12');
+});
+
+test('research milestones stay distinct from software releases', async () => {
+  const status = await readFile('content/benchmarking/evidence-status.mdx', 'utf8');
+  const props = await readFile('../Directory.Build.props', 'utf8');
+  const packageJson = JSON.parse(await readFile('package.json', 'utf8')) as { version: string };
+  const banner = await readFile('src/components/landing/WhatsNewBanner.tsx', 'utf8');
+  const changelog = await readFile('content/changelog.mdx', 'utf8');
+  expect(status).toContain('UNADJUDICATED');
+  expect(status).toContain('administrative stop');
+  expect(status).toContain('did not itself change `Directory.Build.props`');
+  expect(status).toContain('At the M0 closeout, the current compiler remained v0.19.0');
+  expect(status).toContain('/docs/changelog/');
+  expect(props).toContain(`<Version>${currentRelease}</Version>`);
+  expect(SITE_VERSION).toBe(currentRelease);
+  expect(packageJson.version).toBe(currentRelease);
+  expect(banner).toContain(`v${currentRelease}`);
+  expect(changelog.match(/^## \[([^\]]+)\]/m)?.[1]).toBe('Unreleased');
+  expect(changelog.match(/^## \[(\d+\.\d+\.\d+)\]/m)?.[1]).toBe(currentRelease);
+  for (const path of ['benchmarking/index', 'benchmarking/results', 'guides/adoption-playbook']) {
+    const source = await readFile(`content/${path}.mdx`, 'utf8');
+    expect(source).toContain('/docs/benchmarking/evidence-status/');
+  }
 });
 
 test('readers can distinguish runtime modes, optional proofs and historical measurements', async ({ page }) => {
