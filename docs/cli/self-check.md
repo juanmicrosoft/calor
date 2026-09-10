@@ -33,6 +33,8 @@ Findings use the `Calor1320`–`Calor1328` band (see
 - every `docs/cli/*.md`
 - every undated, top-level `docs/semantics/*.md` page; dated planning records
   and nested planning directories are excluded from normative checks
+- the agent syntax exemplar and the `CALOR_REFERENCE` heredoc in
+  `tests/E2E/agent-tasks/lib/helpers.sh`, which agents receive during tasks
 - the **version scan only** additionally covers all of `docs/**/*.md`,
   excluding dated records under `docs/plans/`, `docs/experiments/`,
   `docs/design/`, and `docs/process/`
@@ -53,6 +55,7 @@ Findings use the `Calor1320`–`Calor1328` band (see
 | Every complete-program example still parses (see below) | `Calor1328` |
 | Generated mirrors (`AGENTS.md`, semantics AST inventory) match their sources (`CLAUDE.md`, `eng/ast-schema.json`) | `Calor1329` |
 | Every complete `§M` program in the agent syntax exemplar compiles to valid C# (Roslyn-semantic-checked) | `Calor1330` |
+| Every complete declaration example in the agent-task reference compiles to valid C# | `Calor1330` |
 | The exemplar never binds an array-returning BCL call to a generic collection type (the E1a trap) | `Calor1331` |
 
 ## Parse-checked examples
@@ -75,6 +78,22 @@ emits but the C# compiler rejects (`CS0029`). The copyable fragment reference
 lines cannot be compiled standalone (they intermix prose and free identifiers),
 so that one recurring trap is additionally caught by a lint (`Calor1331`):
 array-returning BCL calls must bind to the array form `[T]`.
+
+## Agent-task reference
+
+The same full compilation check runs on the actual `CALOR_REFERENCE` heredoc
+in `tests/E2E/agent-tasks/lib/helpers.sh`, not a separate copy. Bare and `calor`
+fences starting with a module, function, class, interface, or delegate are
+compiled independently. Non-module declarations get a synthetic module wrapper.
+This checks typing and generated C#, not only parsing.
+
+Use `calor-fragment` only for schemas with placeholders or examples that require
+external declarations. A complete Calor declaration with another language label,
+an unterminated fence, a missing heredoc, or an empty example inventory fails
+with `Calor1330`. The tests also pin the complete-example count and the six
+regression examples: `TryDouble`, `SafeDivide`, `HasNegative`, `DigitValue`,
+`Offset`, and `ClampScore`. Update the count when deliberately adding or removing examples.
+The existing CI `self-check docs` step enforces this guard.
 
 ## Meta-notation policy
 

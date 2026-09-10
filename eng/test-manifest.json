@@ -5,7 +5,7 @@
       "path": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 8636,
+      "expectedTotal": 8668,
       "expectedSkipped": 3,
       "note": "2026-09-08 (#1173): 8030 -> 8041, +11 from Issue1173ConverterEffectRowTests — the converter now derives its \u00a7E rows from the compiler's own effect inference over the emitted text (5 under-declared constructs as theory rows, plus chain desugaring, interface/override variance repair, the pure-body case, row round-trip, widen-never-narrow, codegen neutrality, and parallel-vs-serial conversion). #1197: 8048 -> 8052, four production-path native arithmetic, operand-order, and conditional-laziness mutation regressions. #1184: 8052 -> 8085, 32 typed contract/runtime interaction cases plus an expression-wrapper traversal architecture regression."
     },
@@ -129,12 +129,12 @@
       "count": 2
     },
     {
-      "_comment": "PP-W-rows' ledger pin (A-1.12, gate 10) has an epoch-conditional pair: the not-run assertions skip once epochs/w-rows-001 is archived, and the per-cell assertions skip until it is. Exactly one of the two runs at any commit.",
-      "reason": "epoch w-rows-001 has been archived; the run assertions below cover it",
+      "_comment": "PP-W-rows' ledger pin (A-1.12, gate 10) has an epoch-conditional pair keyed on ledger epochRun, not directory existence. Scaffolding is not collection. Exactly one of the two runs at any commit.",
+      "reason": "ledger records epochRun true; the run assertions below cover it",
       "count": 1
     },
     {
-      "reason": "epoch w-rows-001 not archived yet",
+      "reason": "ledger records epochRun false",
       "count": 1
     },
     {

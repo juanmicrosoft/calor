@@ -1,0 +1,14 @@
+{
+  "command": [
+    "dotnet",
+    "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+    "-i",
+    "<work>/C-003-frame-fingerprint/laundering/B/Candidate.calr",
+    "-o",
+    "<work>/C-003-frame-fingerprint/laundering/B/Candidate.g.cs",
+    "--no-telemetry"
+  ],
+  "exitCode": 1,
+  "stdout": "",
+  "stderr": "<work>/C-003-frame-fingerprint/laundering/B/Candidate.calr(25,20): warning Calor0411: Unknown external call to 'this.normalize'. Add effect declaration in a .calor-effects.json manifest.\n<work>/C-003-frame-fingerprint/laundering/B/Candidate.calr(26,21): warning Calor0411: Unknown external call to 'this.normalize'. Add effect declaration in a .calor-effects.json manifest.\n<work>/C-003-frame-fingerprint/laundering/B/Candidate.calr(24,7): error Calor0410: Function 'Fingerprint' uses effect 'unknown' but does not declare it\n"
+}

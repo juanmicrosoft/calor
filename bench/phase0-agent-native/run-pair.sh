@@ -213,6 +213,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$PAIR_DIR" && -n "$ARM" ]] || { echo "Usage: --pair <dir> --arm calor|csharp [--arm-config <arms.key>] [--canary-only] [--runs N] [--null-agent] [--exemplar <file>] [--edit-mechanism raw|mcp-file|mcp-node] [--calor-dll <path>] [--arm-repo-root <path>] [--out <dir>]" >&2; exit 2; }
+REDESIGNED_POLICY=0
+if [[ "$ARM_CONFIG_KEY" == "calor-permissive" || "$ARM_CONFIG_KEY" == "calor-strict" ]]; then
+    REDESIGNED_POLICY=1
+    # One attempted run per registered slot. Historical callers retain their
+    # old retry policy, but the redesign must not silently buy replacement data.
+    MAX_INVALID_RETRIES=0
+fi
 
 # Per-arm PRODUCT checkout (guarantees plan G5, A-1.3 epoch): --calor-dll pins
 # only the CLI/MCP/envelope build; the workspace's own `dotnet build` binds
@@ -378,7 +385,7 @@ fi
 # ---------------------------------------------------------------------------
 TEMPLATE_SOURCE="arm-repo-root"
 TEMPLATE_PATH="$ARM_REPO_ROOT/bench/phase0-agent-native/templates/calor-arm/CalorArm.csproj.template"
-if [[ "$CONTROL_ARM_KIND" == "pre-rows" ]]; then
+if [[ "$CONTROL_ARM_KIND" == "pre-rows" || "$ARM_CONFIG_KEY" == "calor-permissive" || "$ARM_CONFIG_KEY" == "calor-strict" ]]; then
     TEMPLATE_SOURCE="harness"
     TEMPLATE_PATH="$SCRIPT_DIR/templates/calor-arm/CalorArm.csproj.template"
 fi
@@ -386,6 +393,19 @@ render_template() {  # <dest csproj path>
     sed -e "s|__REPO_ROOT__|$ARM_REPO_ROOT|g" \
         -e "s|__CALOR_PERMISSIVE_EFFECTS__|$PERMISSIVE_EFFECTS|g" \
         "$TEMPLATE_PATH" > "$1"
+}
+
+policy_changed() {  # <workspace> <run output>; return 0 means invalid
+    [[ $REDESIGNED_POLICY -eq 1 ]] || return 1
+    if ! python3 "$HARNESS_CAPTURE" policy-snapshot "$1" > "$2/policy-after.json"; then
+        echo "generated workspace policy is unreadable"
+        return 0
+    fi
+    if ! cmp -s "$2/policy-before.json" "$2/policy-after.json"; then
+        echo "generated workspace policy/configuration changed during the run"
+        return 0
+    fi
+    return 1
 }
 
 # ---------------------------------------------------------------------------
@@ -424,6 +444,11 @@ render_template() {  # <dest csproj path>
 # Prints the reason and returns 1 when the arm cannot honor its configuration.
 # ---------------------------------------------------------------------------
 PERMISSIVE_CANARY="$SCRIPT_DIR/templates/calor-arm/permissive-canary.calr"
+if [[ "$ARM_CONFIG_KEY" == "calor-permissive" || "$ARM_CONFIG_KEY" == "calor-strict" ]]; then
+    # Named effects are errors under both redesigned policies. Only an unresolved
+    # callback call witnesses the registered strict/permissive distinction.
+    PERMISSIVE_CANARY="$SCRIPT_DIR/templates/calor-arm/policy-canary.calr.txt"
+fi
 arm_canary() {
     local dir out rc=0 expect="$1"
     dir="$(mktemp -d "${TMPDIR:-/tmp}/p0-arm-canary-XXXXXX")"
@@ -432,6 +457,9 @@ arm_canary() {
     # HERE, when the trap is set: a single-quoted body would be evaluated after the
     # function returned, when the local `dir` no longer exists (set -u -> unbound).
     trap "rm -rf '$dir'" RETURN
+    if [[ $REDESIGNED_POLICY -eq 1 ]]; then
+        python3 "$HARNESS_CAPTURE" isolate-workspace "$dir"
+    fi
     mkdir -p "$dir/src"
     render_template "$dir/src/Src.csproj"
     cp "$PERMISSIVE_CANARY" "$dir/src/canary.calr"
@@ -456,6 +484,13 @@ arm_canary() {
     local seen
     seen="$(grep -o 'error Calor[0-9]*\|warning Calor[0-9]*' <<<"$out" | sort | uniq -c | tr -s ' \n' ' ' || true)"
     case "$expect" in
+        policy-permissive)
+            if [[ $rc -ne 0 ]] || grep -q 'error Calor' <<<"$out"; then
+                echo "INVALID: permissive policy canary did not build (exit $rc): $seen" >&2
+                return 1
+            fi
+            ARM_CANARY_STATUS="permissive-ok"
+            ;;
         permissive)
             if [[ $rc -ne 0 ]] || grep -q 'error Calor0410' <<<"$out" || ! grep -q 'warning Calor0410' <<<"$out"; then
                 echo "INVALID: pre-rows control arm — the arm's Calor.Tasks build does not honor <CalorPermissiveEffects> (canary build exit $rc; expected a successful build carrying 'warning Calor0410', got: $seen). The arm would run STRICT; refusing before spend (roadmap §4.1)." >&2
@@ -505,6 +540,8 @@ check_pins() {
             fi
             ARM_CANARY_STATUS="skipped"
             echo "arm canary SKIPPED (CALOR_P0_SKIP_ARM_CANARY=1, null-agent run into $OUT_DIR); result.json records armCanary=skipped" >&2
+        elif [[ "$CONTROL_ARM_KIND" == "permissive" ]]; then
+            arm_canary policy-permissive || exit 3
         elif [[ "$CONTROL_ARM_KIND" == "pre-rows" ]]; then
             arm_canary permissive || exit 3
         else
@@ -1156,9 +1193,14 @@ extract_metrics() {
     # laundering), so `finalBuild.ok` and `heldoutFinal.failedTests` are archived
     # BESIDE it and are what ppw-analyze.py reads.
     local final_pass=0 final_fail=$HELDOUT_TEST_COUNT final_build_ok=0
+    local heldout_logger=()
+    if [[ "$ARM_CONFIG_KEY" == "calor-permissive" || "$ARM_CONFIG_KEY" == "calor-strict" ]]; then
+        # The redesigned instrument verifies named PASS as well as FAIL outcomes.
+        heldout_logger=(--logger "console;verbosity=normal")
+    fi
     if CALOR_P0_SHIM_OFF=1 dotnet build "$ws/src/Src.csproj" --nologo -v q > "$ws_out/.src_final.txt" 2>&1; then
         final_build_ok=1
-        if CALOR_P0_SHIM_OFF=1 dotnet test "$ws_out/heldout/HeldOut.csproj" --nologo -v q > "$ws_out/.ho_final.txt" 2>&1; then
+        if CALOR_P0_SHIM_OFF=1 dotnet test "$ws_out/heldout/HeldOut.csproj" --nologo -v q ${heldout_logger[@]+"${heldout_logger[@]}"} > "$ws_out/.ho_final.txt" 2>&1; then
             final_fail=0
             final_pass=$(grep -oE 'Passed:[[:space:]]+[0-9]+' "$ws_out/.ho_final.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
         else
@@ -1326,6 +1368,7 @@ extract_metrics() {
         --arg arm_repo_root "$ARM_REPO_ROOT" \
         --argjson turns "$turns" --argjson agent_builds "$agent_builds" \
         --argjson compiler_hash "$compiler_hash" --argjson build_state "$build_state" \
+        --arg product_compiler_hash "$ARM_CANARY_COMPILER_HASH" \
         --arg arm_config_key "$ARM_CONFIG_KEY" --arg control_arm_kind "$CONTROL_ARM_KIND" \
         --argjson permissive "$PERMISSIVE_EFFECTS" --arg fixture "$FIXTURE_DIR" \
         --arg template_source "$TEMPLATE_SOURCE" --arg arm_canary "$ARM_CANARY_STATUS" \
@@ -1340,6 +1383,7 @@ extract_metrics() {
           mcpWrites:$mcp_writes, defect:$defect,
           calorDll:$calor_dll, armRepoRoot:$arm_repo_root, editMechanism:$edit_mech,
           compilerHash:$compiler_hash, buildState:$build_state,
+          productCompilerHash:$product_compiler_hash,
           armConfigKey:$arm_config_key,
           controlArmKind:(if $control_arm_kind == "" then null else $control_arm_kind end),
           permissiveEffects:$permissive, fixture:$fixture, templateSource:$template_source,
@@ -1369,6 +1413,7 @@ write_invalid_result() {
         --arg arm_config_key "$ARM_CONFIG_KEY" --arg control_arm_kind "$CONTROL_ARM_KIND" \
         --argjson permissive "$PERMISSIVE_EFFECTS" --arg fixture "$FIXTURE_DIR" \
         --arg template_source "$TEMPLATE_SOURCE" --arg arm_canary "$ARM_CANARY_STATUS" \
+        --arg product_compiler_hash "$ARM_CANARY_COMPILER_HASH" \
         --arg reference "$REFERENCE_DIR" --arg reference_source "$REFERENCE_SOURCE" \
         --argjson has_transcript "$([[ -s "$ws_out/transcript.jsonl" ]] && echo true || echo false)" \
         '{pair:$pair, arm:$arm, run:$run, taskSuccess:false,
@@ -1379,6 +1424,7 @@ write_invalid_result() {
           invalid:true, defect:null,
           calorDll:$calor_dll, armRepoRoot:$arm_repo_root, editMechanism:$edit_mech,
           compilerHash:null, buildState:{compilerHash:null, source:"invalid", archivedFrom:"none", file:null},
+          productCompilerHash:$product_compiler_hash,
           armConfigKey:$arm_config_key,
           controlArmKind:(if $control_arm_kind == "" then null else $control_arm_kind end),
           permissiveEffects:$permissive, fixture:$fixture, templateSource:$template_source,
@@ -1436,8 +1482,15 @@ for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
         WS="$(cd "$WS" && pwd -P)"
         SHIM_DIR="$WS_OUT/.shim"
 
+        if [[ $REDESIGNED_POLICY -eq 1 ]]; then
+            python3 "$HARNESS_CAPTURE" isolate-workspace "$WS"
+            python3 "$HARNESS_CAPTURE" isolate-workspace "$WS_OUT"
+        fi
         materialize "$WS" "$WS_OUT"
         write_shim "$WS" "$WS_OUT" "$SHIM_DIR" "$run"
+        if [[ $REDESIGNED_POLICY -eq 1 ]]; then
+            python3 "$HARNESS_CAPTURE" policy-snapshot "$WS" > "$WS_OUT/policy-before.json"
+        fi
         run_agent "$WS" "$WS_OUT" "$SHIM_DIR"
 
         # #1094: the agent's declared-done build state, before anything
@@ -1447,7 +1500,8 @@ for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
         # Declared-done archival runs immediately after the agent stops —
         # before the final build below can rewrite anything — and its failure
         # is run-invalidating (A-1.3 item 4, #826 M2).
-        if reason="$(archive_final_src "$WS" "$WS_OUT")" \
+        if reason="$(policy_changed "$WS" "$WS_OUT")" \
+           || reason="$(archive_final_src "$WS" "$WS_OUT")" \
            || reason="$(detect_invalid_run "$WS_OUT" "$AGENT_RC")"; then
             printf '%s attempt=%d agent_rc=%d: %s\n' \
                 "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$attempt" "$AGENT_RC" "$reason" \

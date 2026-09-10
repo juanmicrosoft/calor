@@ -1,0 +1,84 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="bcfc3f38-a0aa-4ae0-8e17-252d1155e130" name="@Juans-MacBook-Pro 2026-09-09 23:22:23" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-09T23:22:23.5988290-04:00" queuing="2026-09-09T23:22:23.5988290-04:00" start="2026-09-09T23:22:23.2991290-04:00" finish="2026-09-09T23:22:23.6009750-04:00" />
+  <TestSettings name="default" id="daf5afe3-323d-42f4-8294-bb8e630bfd49">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-09_23_22_23" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="d049c98c-b1f2-47a7-8f9e-4d4757333d0a" testId="6bf88aa5-561e-3643-37a4-4103a25ded53" testName="FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 101, second: 5, expected: 10105)" computerName="Juans-MacBook-Pro" duration="00:00:00.0001800" startTime="2026-09-09T23:22:23.5592960-04:00" endTime="2026-09-09T23:22:23.5592960-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d049c98c-b1f2-47a7-8f9e-4d4757333d0a">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 10105
+Actual:   0</Message>
+          <StackTrace>   at FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(Int32 first, Int32 second, Int32 expected) in &lt;work&gt;/C-003-frame-fingerprint/starter/A/heldOut/Suite/HeldOutTests.cs:line 17
+   at InvokeStub_FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="b73ad9d7-07d2-45dc-8101-c926ed832d1c" testId="61852d10-b218-5600-d41e-e4a5b735d20c" testName="FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 1, second: 2, expected: 103)" computerName="Juans-MacBook-Pro" duration="00:00:00.0034698" startTime="2026-09-09T23:22:23.5580050-04:00" endTime="2026-09-09T23:22:23.5580120-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b73ad9d7-07d2-45dc-8101-c926ed832d1c">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 103
+Actual:   0</Message>
+          <StackTrace>   at FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(Int32 first, Int32 second, Int32 expected) in &lt;work&gt;/C-003-frame-fingerprint/starter/A/heldOut/Suite/HeldOutTests.cs:line 17
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 101, second: 5, expected: 10105)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-003-frame-fingerprint/starter/a/heldout/bin/debug/net10.0/runtimetests.dll" id="6bf88aa5-561e-3643-37a4-4103a25ded53">
+      <Execution id="d049c98c-b1f2-47a7-8f9e-4d4757333d0a" />
+      <TestMethod codeBase="&lt;work&gt;/C-003-frame-fingerprint/starter/A/heldOut/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintHeldOutTests" name="Fingerprint_PreservesJournal" />
+    </UnitTest>
+    <UnitTest name="FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 1, second: 2, expected: 103)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-003-frame-fingerprint/starter/a/heldout/bin/debug/net10.0/runtimetests.dll" id="61852d10-b218-5600-d41e-e4a5b735d20c">
+      <Execution id="b73ad9d7-07d2-45dc-8101-c926ed832d1c" />
+      <TestMethod codeBase="&lt;work&gt;/C-003-frame-fingerprint/starter/A/heldOut/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="FrameFingerprintHeldOutTests" name="Fingerprint_PreservesJournal" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="6bf88aa5-561e-3643-37a4-4103a25ded53" executionId="d049c98c-b1f2-47a7-8f9e-4d4757333d0a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="61852d10-b218-5600-d41e-e4a5b735d20c" executionId="b73ad9d7-07d2-45dc-8101-c926ed832d1c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="2" executed="2" passed="0" failed="2" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.4.1+b9eacec401 (64-bit .NET 10.0.11)
+[xUnit.net 00:00:00.02]   Discovering: RuntimeTests
+[xUnit.net 00:00:00.04]   Discovered:  RuntimeTests
+[xUnit.net 00:00:00.04]   Starting:    RuntimeTests
+[xUnit.net 00:00:00.06]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.06]       Expected: 103
+[xUnit.net 00:00:00.06]       Actual:   0
+[xUnit.net 00:00:00.06]       Stack Trace:
+[xUnit.net 00:00:00.06]         &lt;work&gt;/C-003-frame-fingerprint/starter/A/heldOut/Suite/HeldOutTests.cs(17,0): at FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(Int32 first, Int32 second, Int32 expected)
+[xUnit.net 00:00:00.06]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+[xUnit.net 00:00:00.06]            at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.06]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.06]       Expected: 10105
+[xUnit.net 00:00:00.06]       Actual:   0
+[xUnit.net 00:00:00.06]       Stack Trace:
+[xUnit.net 00:00:00.06]         &lt;work&gt;/C-003-frame-fingerprint/starter/A/heldOut/Suite/HeldOutTests.cs(17,0): at FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(Int32 first, Int32 second, Int32 expected)
+[xUnit.net 00:00:00.06]            at InvokeStub_FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(Object, Span`1)
+[xUnit.net 00:00:00.06]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.06]   Finished:    RuntimeTests
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T23:22:23.5572060-04:00">
+        <Text>[xUnit.net 00:00:00.06]     FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 1, second: 2, expected: 103) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T23:22:23.5594360-04:00">
+        <Text>[xUnit.net 00:00:00.06]     FrameFingerprintHeldOutTests.Fingerprint_PreservesJournal(first: 101, second: 5, expected: 10105) [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

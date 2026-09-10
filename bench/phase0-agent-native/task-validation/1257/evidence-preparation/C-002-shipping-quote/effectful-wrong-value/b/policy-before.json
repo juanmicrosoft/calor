@@ -1,0 +1,16 @@
+{
+  "policy": {
+    "CalorEnforceEffects": true,
+    "CalorPermissiveEffects": false
+  },
+  "configurationSha256": {
+    "Directory.Build.props": "17284cb74605517cbec8a8153505da71a685b28694b67b5ef80608cd79b1c0ea",
+    "Directory.Packages.props": "a927bac7a1b524f48ffd80dc82ab3014d84b8894c59d82e58263a37e582f3e40",
+    "Directory.Build.targets": "17284cb74605517cbec8a8153505da71a685b28694b67b5ef80608cd79b1c0ea",
+    "src/.ppw-source-assembly.json": "158941c70db1290282df850d6a37ccd9ea41116475db6bd03c3c06e3fdff1831",
+    "src/Src.csproj": "868d692fe6cd3c64b4ca0dfa3b181518631c5a44bffbfe7cbe3b21ff95e10509"
+  },
+  "immutableSourcesSha256": {
+    "dependency.calr.inc": "cd60039223841d0c21c9f93925795477400043b97b814c2b73abe159351c7f6f"
+  }
+}

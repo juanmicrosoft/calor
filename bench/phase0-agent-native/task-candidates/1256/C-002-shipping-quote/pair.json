@@ -1,0 +1,60 @@
+{
+  "id": "C-002-shipping-quote",
+  "category": "PP-W-rows",
+  "authoringStatus": "unregistered-candidate",
+  "registeredShape": 7,
+  "shapeName": "direct invocation of a this-qualified rowed field",
+  "compilerCommit": "514f538024df990af86054af25975b756ba42ab1",
+  "spec": "spec.md",
+  "sourceAssembly": {
+    "parts": ["dependency.calr.inc", "task.calr.inc"]
+  },
+  "arms": {
+    "calor-permissive": {
+      "armId": "a",
+      "fixture": "starter-a",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": true,
+        "controlArmKind": "permissive",
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    },
+    "calor-strict": {
+      "armId": "b",
+      "fixture": "starter-b",
+      "config": {
+        "enforceEffects": true,
+        "permissiveEffects": false,
+        "contractMode": "debug",
+        "z3Required": true
+      }
+    }
+  },
+  "seeded": {
+    "laundering": {
+      "a": "seeded/laundering-a",
+      "b": "seeded/laundering-b"
+    },
+    "honest": {
+      "a": "seeded/honest-a",
+      "b": "seeded/honest-b"
+    }
+  },
+  "tests": {
+    "path": "tests",
+    "runner": "dotnet-test",
+    "count": 2,
+    "heldOut": true,
+    "shim": "tests/shims/TestShim.calor.cs",
+    "effectObservingTests": ["Cheapest_PreservesJournal"],
+    "effectFailureSignature": "HELDOUT_EFFECT:state-change"
+  },
+  "shapeRealizedIndicator": {
+    "sourceRegex": "§C\\{this\\.quote\\}",
+    "measuredOn": "the archived editable task.calr.inc, not the dependency field declaration",
+    "note": "Both calls realize the same row-7 shape, not two independent shapes. Laundering is positive; starter and honest are negative."
+  },
+  "note": "Same registered shape and unknown-call policy contrast as C-001, with two quotes and a changing numeric ordering. This is workflow variation, not mechanism diversity. No study task count, model, runsPerArm, budget, freeze, or collection authorization is asserted."
+}

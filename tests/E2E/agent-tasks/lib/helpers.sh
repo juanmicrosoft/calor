@@ -295,6 +295,11 @@ init_calor() {
 
 This is a Calor project. Write code in `.calr` files.
 
+Blocks use indentation only (two spaces per level). Do not write structural
+closing tags. Only call argument lists and block lambdas use `§/C` and `§/LAM`.
+Complete declaration examples below are compiled by `calor self-check docs` in CI;
+`calor-fragment` fences are schemas or snippets with explicitly external dependencies.
+
 **Tip:** If you encounter unfamiliar Calor syntax, use these MCP tools:
 - `calor_syntax_help` — get syntax reference for a feature (e.g., "events", "pattern-matching", "async")
 - `calor_syntax_lookup` — look up Calor equivalent for any C# construct (e.g., "switch expression", "event handler")
@@ -303,8 +308,8 @@ This is a Calor project. Write code in `.calr` files.
 
 | Syntax | Purpose | C# Equivalent |
 |--------|---------|---------------|
-| `§M{id:Name}...§/M{id}` | Module | `namespace` |
-| `§F{id:Name:pub}...§/F{id}` | Function | `static method` |
+| `§M{id:Name}` | Module | `namespace` |
+| `§F{id:Name:pub}` | Function | `static method` |
 | `§I{type:name}` | Input parameter | method parameter |
 | `§O{type}` | Output/return type | return type |
 | `§R expr` | Return | `return expr;` |
@@ -312,29 +317,29 @@ This is a Calor project. Write code in `.calr` files.
 | `§E{cw,fs:w}` | Effects (comma-separated, ONE line) | — |
 | `§B{type:name} value` | Bind variable | `type name = value;` |
 | `§ASSIGN name expr` | Assignment | `name = expr;` |
-| `§IF{id} cond → action` / `§EL` / `§/I{id}` | Conditional | `if/else` |
-| `§L{id:i:start:end:step}...§/L{id}` | For loop | `for` |
-| `§WH{id} cond...§/WH{id}` | While loop | `while` |
-| `§R §W{id} expr §K val → result §K _ → default §/W{id}` | Switch expression | `switch` |
-| `§CL{id:Name:pub}...§/CL{id}` | Class | `class` |
-| `§MT{id:Name:pub}...§/MT{id}` | Method | instance method |
-| `§AF{id:Name:pub} §O{Task<T>}...§/AF{id}` | Async function | `async Task<T>` |
-| `§AMT{id:Name:pub}...§/AMT{id}` | Async method (in class) | `async` method |
+| `§IF{id} cond → action` / `§EL` | Conditional | `if/else` |
+| `§L{id:i:start:end:step}` | For loop | `for` |
+| `§WH{id} cond` | While loop | `while` |
+| `§R §W{id} expr` with indented `§K` arms | Switch expression | `switch` |
+| `§CL{id:Name:pub}` | Class | `class` |
+| `§MT{id:Name:pub}` | Method | instance method |
+| `§AF{id:Name:pub} §O{Task<T>}` | Async function | `async Task<T>` |
+| `§AMT{id:Name:pub}` | Async method (in class) | `async` method |
 | `§AWAIT §C{Method} §/C` | Await call | `await Method()` |
 | `§C{Method} §A arg §/C` | Method call | `Method(arg)` |
-| `§LIST{name:type}§/LIST{name}` | Create list | `new List<T>()` |
+| `§LIST{name:type}` | Create list | `new List<T>()` |
 | `§PUSH{name} val` | Add to list | `.Add(val)` |
-| `§DICT{name:K:V}§/DICT{name}` | Create dictionary | `new Dictionary<K,V>()` |
+| `§DICT{name:K:V}` | Create dictionary | `new Dictionary<K,V>()` |
 | `§PUT{name} key val` | Add to dictionary | `[key] = val` |
-| `§EACH{id:var} coll...§/EACH{id}` | Foreach | `foreach` |
-| `§EACHKV{id:k:v} dict...§/EACHKV{id}` | Foreach key-value | `foreach (var (k,v))` |
+| `§EACH{id:var} coll` | Foreach | `foreach` |
+| `§EACHKV{id:k:v} dict` | Foreach key-value | `foreach (var (k,v))` |
 | `§CNT{name}` | Count | `.Count` |
 | `§SM value` / `§NN` | Some/None | `Some(v)` / `None` |
 | `§OK value` / `§ERR msg` | Ok/Error | `Ok(v)` / `Err(msg)` |
 | `§EVT{id:Name:pub:Type}` | Event | `event Type Name` |
 | `§SUB event handler` | Subscribe | `event += handler` |
 | `§LAM{id:param:type} expr §/LAM{id}` | Lambda (use inside §B) | `(param) => expr` |
-| `§DEL{id:Name}...§/DEL{id}` | Delegate | `delegate` |
+| `§DEL{id:Name}` | Delegate | `delegate` |
 | `§P value` | Print | `Console.WriteLine` |
 | `(+ a b)`, `(== a b)`, `(? c t f)` | Expressions (prefix) | `a + b`, `a == b`, `c ? t : f` |
 
@@ -361,7 +366,7 @@ Find what the function promises about its result:
 
 The contracts become your specification. **If you can't satisfy a postcondition, your implementation is wrong.**
 
-```calor
+```calor-fragment
 // FIRST: Write the contracts
 §F{f001:MyFunction:pub}
   §I{i32:n}
@@ -370,7 +375,6 @@ The contracts become your specification. **If you can't satisfy a postcondition,
   §S (>= result 0)     // Output guarantee from requirement
   // THEN: Implement logic that satisfies the contracts
   §R ...
-§/F{f001}
 ```
 
 ### Common Contract Patterns
@@ -397,7 +401,7 @@ Use contracts to verify your implementation:
 - **If contracts conflict** → The requirement has contradictions
 
 ### Function Syntax
-```
+```calor-fragment
 §F{id:Name:pub}
   §I{type:name}      // Input parameter
   §O{type}           // Output/return type
@@ -405,7 +409,6 @@ Use contracts to verify your implementation:
   §S (condition)     // Postcondition (ensures)
   §E{effects}        // Effects declaration
   §R expression      // Return
-§/F{id}
 ```
 
 ### Type Mappings
@@ -448,16 +451,15 @@ Example with effects:
   §O{void}
   §E{cw}
   §C{Console.WriteLine}
-    §A x
+  §A x
   §/C
-§/F{f001}
 ```
 
 ### Method Calls
 External method calls AND internal function calls use §C (call) sections:
 ```
 §C{Console.WriteLine}
-  §A "Hello"
+§A "Hello"
 §/C
 ```
 
@@ -465,9 +467,9 @@ External method calls AND internal function calls use §C (call) sections:
 When calling a function inside an expression (e.g., in a ternary or return), you MUST use §C{...} syntax:
 ```
 §R (? §C{ValidateIndex}
-    §A index
-    §A length
-  §/C index (- 0 1))
+§A index
+§A length
+§/C index (- 0 1))
 ```
 
 WRONG (will not compile):
@@ -476,6 +478,19 @@ WRONG (will not compile):
 ```
 
 Function names are NOT operators - always use §C{FunctionName} with §A arguments.
+
+Calls in bindings and returns also accept multi-line arguments. Indent each
+`§A` beneath the statement; nested calls indent their arguments another level:
+```
+§F{f004:ClampScore:pub} (i32:score) -> i32
+  §E{}
+  §B{value:i32} §C{Math.Clamp}
+    §A[value] score
+    §A[min] 0
+    §A[max] 100
+  §/C
+  §R value
+```
 
 ### Examples
 
@@ -486,7 +501,6 @@ Function names are NOT operators - always use §C{FunctionName} with §A argumen
   §O{i32}
   §Q (>= x 0)
   §R x
-§/F{f003}
 ```
 
 **Function with postcondition:**
@@ -496,7 +510,6 @@ Function names are NOT operators - always use §C{FunctionName} with §A argumen
   §O{i32}
   §S (>= result 0)
   §R (? (< x 0) (- 0 x) x)
-§/F{f003}
 ```
 
 **Function with effects (console output):**
@@ -506,9 +519,8 @@ Function names are NOT operators - always use §C{FunctionName} with §A argumen
   §O{void}
   §E{cw}
   §C{Console.WriteLine}
-    §A x
+  §A x
   §/C
-§/F{f003}
 ```
 
 **Nested ternary (if-else-if):**
@@ -529,10 +541,9 @@ Example:
 §F{f001:TryDouble:pub}
   §I{i32:x}
   §O{Option<i32>}
+  §E{alloc}
   §IF{if1} (> x 0) → §R §SM (* x 2)
   §EL → §R §NN
-  §/I{if1}
-§/F{f001}
 ```
 
 **Option with char parsing (TryParseDigit pattern):**
@@ -540,12 +551,11 @@ Example:
 §F{f001:TryParseDigit:pub}
   §I{char:c}
   §O{Option<i32>}
+  §E{alloc}
   §IF{if1} (and (>= c '0') (<= c '9'))
     §R §SM (- c '0')
   §EL
     §R §NN
-  §/I{if1}
-§/F{f001}
 ```
 
 ### Result Type (for success/error returns)
@@ -561,10 +571,9 @@ Example:
   §I{i32:a}
   §I{i32:b}
   §O{Result<i32,str>}
+  §E{alloc}
   §IF{if1} (!= b 0) → §R §OK (/ a b)
   §EL → §R §ERR "Division by zero"
-  §/I{if1}
-§/F{f001}
 ```
 
 ### Control Flow
@@ -574,7 +583,6 @@ Example:
 §IF{id} condition → action
 §EI condition → action
 §EL → action
-§/I{id}
 ```
 
 **Block syntax (multiple statements per branch):**
@@ -586,7 +594,6 @@ Example:
   statement3
 §EL
   statement4
-§/I{id}
 ```
 
 **Example - Arrow syntax (Classify function):**
@@ -597,8 +604,6 @@ Example:
   §IF{if1} (< n 0) → §R "negative"
   §EI (== n 0) → §R "zero"
   §EL → §R "positive"
-  §/I{if1}
-§/F{f001}
 ```
 
 **Example - Arrow syntax (Max function):**
@@ -609,8 +614,6 @@ Example:
   §O{i32}
   §IF{if1} (>= a b) → §R a
   §EL → §R b
-  §/I{if1}
-§/F{f001}
 ```
 
 **PREFER arrow syntax** `→` (or `->`) for simple conditionals with single return statements.
@@ -629,9 +632,7 @@ Example:
     §ASSIGN grade "C"
   §EL
     §ASSIGN grade "F"
-  §/I{if1}
   §R grade
-§/F{f001}
 ```
 
 ### While Loops
@@ -640,7 +641,6 @@ Example:
 ```
 §WH{id} condition
   ...body...
-§/WH{id}
 ```
 
 **Example - Countdown:**
@@ -651,16 +651,14 @@ Example:
   §B{i32:count} 5
   §WH{wh1} (> count 0)
     §C{Console.WriteLine}
-      §A count
+    §A count
     §/C
     §ASSIGN count (- count 1)
-  §/WH{wh1}
-§/F{f001}
 ```
 
 Key while loop syntax:
 - `§WH{id} condition` — begin while loop with unique id and boolean condition
-- `§/WH{id}` — end while loop (id MUST match opening tag)
+- Dedent to end the while-loop body.
 - Use `§B` before the loop to declare the loop variable
 - Use `§ASSIGN` inside the loop body to update the variable
 
@@ -669,7 +667,6 @@ Key while loop syntax:
 **List - create empty, add values, iterate:**
 ```
 §LIST{nums:i32}         // Create EMPTY List<int> named nums
-§/LIST{nums}            // Close list (empty)
 §PUSH{nums} 10          // Add 10 to list
 §PUSH{nums} 20          // Add 20 to list
 §PUSH{nums} 30          // Add 30 to list
@@ -678,24 +675,21 @@ Key while loop syntax:
 
 §EACH{e1:n} nums        // Foreach n in nums
   ...body...
-§/EACH{e1}              // Close foreach
 ```
 
 **Complete function with list iteration:**
 ```
 §F{f001:SumList:pub}
   §O{i32}
-  §LIST{nums:i32}
-  §/LIST{nums}
+  §E{alloc,mut}
+  §B{nums:List<i32>} §NEW{List<i32>}
   §PUSH{nums} 10
   §PUSH{nums} 20
   §PUSH{nums} 30
   §B{i32:sum} 0
   §EACH{e1:n} nums
     §ASSIGN sum (+ sum n)
-  §/EACH{e1}
   §R sum
-§/F{f001}
 ```
 
 **Function returning collection count:**
@@ -703,20 +697,17 @@ Key while loop syntax:
 §F{f001:GetListLength:pub}
   §I{i32:n}
   §O{i32}
+  §E{alloc,mut}
   §Q (>= n 0)
-  §LIST{nums:i32}
-  §/LIST{nums}
+  §B{nums:List<i32>} §NEW{List<i32>}
   §L{for1:i:1:n:1}
     §PUSH{nums} i
-  §/L{for1}
   §R §CNT{nums}
-§/F{f001}
 ```
 
 **Dictionary - create, add entries, iterate:**
 ```
 §DICT{scores:str:i32}   // Create Dictionary<string, int>
-§/DICT{scores}          // Close (empty)
 §PUT{scores} "alice" 95 // Add key-value pair
 §PUT{scores} "bob" 87   // Add another pair
 §HAS{scores} "alice"    // Check if key exists
@@ -724,7 +715,6 @@ Key while loop syntax:
 §EACHKV{e1:k:v} scores  // Foreach key-value
   §P k
   §P v
-§/EACHKV{e1}            // Close foreach
 ```
 
 **Function taking a Dictionary parameter and iterating it:**
@@ -736,14 +726,11 @@ Key while loop syntax:
   §EACHKV{e1:k:v} scores
     §P k
     §P v
-  §/EACHKV{e1}
-§/F{f001}
 ```
 
 **HashSet - create, add values:**
 ```
 §HSET{unique:i32}       // Create HashSet<int>
-§/HSET{unique}          // Close (empty)
 §ADD{unique} 1          // Add to set (use §ADD for sets)
 §ADD{unique} 2          // Add another value
 §ADD{unique} 2          // Duplicates ignored
@@ -758,17 +745,15 @@ Key while loop syntax:
 §AF{af1:GetDataAsync:pub}
   §O{Task<i32>}
   §R 42
-§/AF{af1}
 ```
 
 **Async function with await:**
-```
+```calor-fragment
 §AF{af1:ProcessAsync:pub}
   §O{Task<i32>}
   §E{net:r}
   §B{i32:data} §AWAIT §C{FetchDataAsync} §/C
   §R (* data 2)
-§/AF{af1}
 ```
 
 Key points:
@@ -778,27 +763,24 @@ Key points:
 - `§E{net:r}` declares network read effect
 
 **ConfigureAwait(false) for library code:**
-```
+```calor-fragment
 §AF{af1:BackgroundProcessAsync:pub}
   §O{Task<i32>}
   §E{net:r}
   §B{i32:result} §AWAIT{false} §C{SlowOperationAsync} §/C
   §R result
-§/AF{af1}
 ```
 
 Use `§AWAIT{false}` to add ConfigureAwait(false) for library code.
 
 **Async method in a class:**
-```
+```calor-fragment
 §CL{cl1:DataService:pub}
   §AMT{amt1:LoadAsync:pub}
     §O{Task<i32>}
     §E{net:rw}
     §B{i32:data} §AWAIT §C{HttpClient.GetAsync} §/C
     §R 100
-  §/AMT{amt1}
-§/CL{cl1}
 ```
 
 Use `§AMT{` for async method in class (not `§AF{` or `§MT{`).
@@ -817,8 +799,6 @@ Use `§R §W{id} target` to switch and return the result. Cases use `→` (arrow
     §K 404 → "Not Found"
     §K 500 → "Server Error"
     §K _ → "Unknown"
-  §/W{sw1}
-§/F{f001}
 ```
 
 **Complete function with switch (DayName example):**
@@ -835,8 +815,6 @@ Use `§R §W{id} target` to switch and return the result. Cases use `→` (arrow
     §K 6 → 200
     §K 7 → 200
     §K _ → 0
-  §/W{sw1}
-§/F{f001}
 ```
 
 **Switch statement (block syntax with explicit §R):**
@@ -849,7 +827,6 @@ Use `§W{id} target` without `§R` prefix. Each case uses block form:
     §R "one"
   §K _
     §R "other"
-§/W{sw1}
 ```
 
 Key switch syntax:
@@ -858,7 +835,7 @@ Key switch syntax:
 - `§K value → result` - case with arrow (NO `§R` — arrow implies return)
 - `§K value` (block) - case start, followed by statements on next lines
 - `§K _` - wildcard/default case (MUST have space before `_`)
-- `§/W{id}` - close switch
+- Dedent to end the switch.
 
 **Relational patterns with §PREL:**
 ```
@@ -870,8 +847,6 @@ Key switch syntax:
     §K §PREL{gte} 80 → "B"
     §K §PREL{gte} 70 → "C"
     §K _ → "F"
-  §/W{sw1}
-§/F{f001}
 ```
 
 Relational operators: `gte` (>=), `gt` (>), `lte` (<=), `lt` (<)
@@ -886,8 +861,6 @@ Relational operators: `gte` (>=), `gt` (>), `lte` (<=), `lt` (<)
     §K §VAR{n} §WHEN (< n 0) → "negative"
     §K 0 → "zero"
     §K _ → "normal"
-  §/W{sw1}
-§/F{f001}
 ```
 
 **Boolean result switch (IsSingleDigit example):**
@@ -907,8 +880,6 @@ Relational operators: `gte` (>=), `gt` (>), `lte` (<=), `lt` (<)
     §K 8 → true
     §K 9 → true
     §K _ → false
-  §/W{sw1}
-§/F{f001}
 ```
 
 ### Events
@@ -920,9 +891,8 @@ Relational operators: `gte` (>=), `gt` (>), `lte` (<=), `lt` (<)
   §MT{mt1:Subscribe:pub}
     §I{EventHandler:handler}
     §O{void}
+    §E{mut}
     §SUB OnDataReceived handler
-  §/MT{mt1}
-§/CL{cl1}
 ```
 
 Event syntax:
@@ -939,7 +909,6 @@ Event syntax:
   §O{i32}
   §B{Func<i32,i32>:doubler} (n) → (* n 2)
   §R §C{doubler} §A x §/C
-§/F{f001}
 ```
 
 Key lambda syntax:
@@ -953,10 +922,9 @@ Key lambda syntax:
   §I{i32:x}
   §O{i32}
   §B{Func<i32,i32>:process} §LAM{lam1:n:i32}
-    (? (> n 0) (* n 2) 0)
+  (? (> n 0) (* n 2) 0)
   §/LAM{lam1}
   §R §C{process} §A x §/C
-§/F{f001}
 ```
 
 Block lambda syntax:
@@ -970,10 +938,9 @@ Block lambda syntax:
   §I{i32:x}
   §I{i32:y}
   §O{i32}
-§/DEL{del1}
 ```
 
-Delegate syntax: `§DEL{id:Name}...§/DEL{id}`
+Delegate syntax: `§DEL{id:Name}` with an indented signature.
 
 ### Variable Binding and Assignment
 
@@ -987,7 +954,6 @@ Delegate syntax: `§DEL{id:Name}...§/DEL{id}`
   §ASSIGN acc (+ acc n)   // Assign again
   §ASSIGN acc (+ acc n)   // And again
   §R acc
-§/F{f001}
 ```
 
 Key syntax:
@@ -997,20 +963,17 @@ Key syntax:
 ### Interfaces
 
 **Interface definition:**
-```
+```calor-fragment
 §IFACE{i001:IRepository}
   §MT{m001:GetById}
     §I{i32:id}
     §O{Option<Entity>}
-  §/MT{m001}
   §MT{m002:Save}
     §I{Entity:entity}
     §O{void}
-  §/MT{m002}
-§/IFACE{i001}
 ```
 
-Interface syntax: `§IFACE{id:Name}...§/IFACE{id}`
+Interface syntax: `§IFACE{id:Name}` with indented method signatures.
 - Methods have signatures only (no body, no `§R`)
 - Use `§MT{id:Name}` for method signatures (no visibility needed in interface)
 
@@ -1024,24 +987,19 @@ Interface syntax: `§IFACE{id:Name}...§/IFACE{id}`
     §I{i32:b}
     §O{i32}
     §R (+ a b)
-  §/MT{mt1}
-§/CL{cl1}
 ```
 
 **Generic class with type parameter:**
 ```
 §CL{cl1:Container:pub}<T>
-  §FLD{_value:T:priv}
+  §FLD{T:_value:priv}
   §MT{mt1:Get:pub}
     §O{T}
     §R _value
-  §/MT{mt1}
   §MT{mt2:Set:pub}
     §I{T:value}
     §O{void}
     §ASSIGN _value value
-  §/MT{mt2}
-§/CL{cl1}
 ```
 
 **Generic class with type constraint:**
@@ -1052,9 +1010,8 @@ Interface syntax: `§IFACE{id:Name}...§/IFACE{id}`
   §MT{mt1:Add:pub}
     §I{T:item}
     §O{void}
+    §E{mut}
     §C{_items.Add} §A item §/C
-  §/MT{mt1}
-§/CL{cl1}
 ```
 
 Type constraint syntax: `§WHERE T : constraint`
@@ -1072,12 +1029,8 @@ Type constraint syntax: `§WHERE T : constraint`
   §PROP{p001:Price:f64:pub}
     §GET
       §R _price
-    §/GET
     §SET
       §ASSIGN _price value
-    §/SET
-  §/PROP{p001}
-§/CL{cl1}
 ```
 
 **Auto-property (simple getter/setter):**
@@ -1085,12 +1038,10 @@ Type constraint syntax: `§WHERE T : constraint`
 §CL{cl1:Person:pub}
   §PROP{p001:Name:str:pub}
     §GET
-    §SET
-  §/PROP{p001}
-§/CL{cl1}
+      §SET
 ```
 
-Property syntax: `§PROP{id:Name:type:visibility}...§/PROP{id}`
+Property syntax: `§PROP{id:Name:type:visibility}` with indented accessors.
 
 ### Constructors
 
@@ -1104,15 +1055,12 @@ Property syntax: `§PROP{id:Name:type:visibility}...§/PROP{id}`
     §I{i32:age}
     §ASSIGN _name name
     §ASSIGN _age age
-  §/CTOR{ctor1}
   §MT{mt1:GetName:pub}
     §O{str}
     §R _name
-  §/MT{mt1}
-§/CL{cl1}
 ```
 
-Constructor syntax: `§CTOR{id:visibility}...§/CTOR{id}`
+Constructor syntax: `§CTOR{id:visibility}` with an indented body.
 
 ### Multiple Postconditions (Strengthened Contracts)
 
@@ -1125,7 +1073,6 @@ When fully specifying behavior, use multiple §S postconditions:
   §S (-> (>= x 0) (== result x))
   §S (-> (< x 0) (== result (- 0 x)))
   §R (? (< x 0) (- 0 x) x)
-§/F{f001}
 ```
 
 ### File System Effects
@@ -1156,13 +1103,12 @@ When fully specifying behavior, use multiple §S postconditions:
   §O{void}
   §E{cw,fs:w}
   §C{Console.WriteLine}
-    §A message
+  §A message
   §/C
   §C{File.AppendAllText}
-    §A path
-    §A message
+  §A path
+  §A message
   §/C
-§/F{f001}
 ```
 
 ### StringBuilder Operations
@@ -1174,12 +1120,12 @@ StringBuilder uses **functional-style calls** (NOT method calls like `§C{sb.App
 §F{f001:BuildGreeting:pub}
   §I{str:name}
   §O{str}
+  §E{alloc,mut}
   §B{StringBuilder:sb} (sb-new)
   (sb-append sb "Hello, ")
   (sb-append sb name)
   (sb-append sb "!")
   §R (sb-tostring sb)
-§/F{f001}
 ```
 
 StringBuilder functions (Lisp-style, NOT method calls):
@@ -1195,7 +1141,7 @@ Use `[type]` for array types:
 ```
 §I{[i32]:arr}           // Integer array parameter
 §I{[str]:names}         // String array parameter
-§I{[[i32]]:matrix}      // Nested array (2D)
+§I{[[i32]]:matrix}      // Jagged array parameter
 ```
 
 ### Quantifiers (for contracts)
@@ -1204,29 +1150,27 @@ Use `[type]` for array types:
 ```
 §F{f001:AllPositive:pub}
   §I{[i32]:arr}
+  §I{i32:n}
   §O{bool}
-  §S (-> result (forall ((i i32)) (> arr{i} 0)))
+  §Q (== n (len arr))
+  §S (-> result (forall ((i i32)) (-> (&& (>= i 0) (< i n)) (> arr{i} 0))))
   §B{bool:allPos} true
   §L{for1:i:0:(- (len arr) 1):1}
     §IF{if1} (<= arr{i} 0) → §ASSIGN allPos false
-    §/I{if1}
-  §/L{for1}
   §R allPos
-§/F{f001}
 ```
 
 **Exists quantifier - has negative element:**
 ```
 §F{f001:HasNegative:pub}
   §I{[i32]:arr}
+  §I{i32:n}
   §O{bool}
-  §S (== result (exists ((i i32)) (< arr{i} 0)))
+  §Q (== n (len arr))
+  §S (== result (exists ((i i32)) (&& (&& (>= i 0) (< i n)) (< arr{i} 0))))
   §L{for1:i:0:(- (len arr) 1):1}
     §IF{if1} (< arr{i} 0) → §R true
-    §/I{if1}
-  §/L{for1}
   §R false
-§/F{f001}
 ```
 
 Key quantifier syntax:
@@ -1235,6 +1179,32 @@ Key quantifier syntax:
 - `(-> condition consequence)` - implication (if condition then consequence)
 - `arr{i}` - array element access at index i
 - `(len arr)` - array length
+- Quantified runtime checks need finite bounds; `n` is checked against the array length.
+
+### Character Contracts and Literals
+
+Character predicates are boolean expressions in contracts. This digit conversion
+requires a digit and returns its offset from `'0'`:
+
+```
+§F{f001:DigitValue:pub}
+  §I{char:c}
+  §O{i32}
+  §E{}
+  §Q (is-digit c)
+  §R (- c '0')
+```
+
+Single quotes produce `char`, not `str`; character arithmetic promotes to `i32`.
+Use double quotes for strings and C# escapes such as `'\n'`, `'\''`, and `'\u0041'`.
+
+```
+§F{f001:Offset:pub}
+  §I{char:c}
+  §O{i32}
+  §E{}
+  §R (- c '0')
+```
 
 CALOR_REFERENCE
 

@@ -1,0 +1,24 @@
+§M{m001:QuotaAdapter}
+  §CL{c001:Telemetry:pub}
+    §FLD{i32:Requests:pub:stat} INT:0
+
+  §F{f001:Calculate:pub} (i32:requested) -> i32
+    §E{}
+    §IF{if001} (< requested INT:0)
+      §R INT:0
+    §IF{if002} (> requested INT:10)
+      §R INT:50
+    §R (* requested INT:5)
+
+  §F{f002:Lookup:pub} (i32:requested) -> i32
+    §E{mut}
+    §ASSIGN Telemetry.Requests (+ Telemetry.Requests INT:1)
+    §R §C{Calculate} §A requested §/C
+
+  §CL{c002:QuotaService:pub}
+    §FLD{Func<i32,i32>:lookup:pri} §E{mut}
+    §CTOR{ctor001:pub} ()
+      §ASSIGN lookup QuotaAdapterModule.Lookup
+    §MT{mt001:Preview:pub} (i32:requested) -> i32
+      §E{}
+      §R §C{this.lookup} §A requested §/C

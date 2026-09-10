@@ -1,0 +1,40 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="820f2312-17f0-4dfe-a530-a660055627bd" name="@Juans-MacBook-Pro 2026-09-09 23:22:04" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-09T23:22:04.4257450-04:00" queuing="2026-09-09T23:22:04.4257450-04:00" start="2026-09-09T23:22:04.1179600-04:00" finish="2026-09-09T23:22:04.4278890-04:00" />
+  <TestSettings name="default" id="8d7686fa-094d-49f1-b51a-a945431e5bc8">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-09_23_22_04" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="6f79cd77-70c4-4139-8764-034b31727f7e" testId="da022ad5-8962-3f7b-2979-7c9fe6c073c0" testName="QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 1, expected: 5)" computerName="Juans-MacBook-Pro" duration="00:00:00.0037694" startTime="2026-09-09T23:22:04.3858250-04:00" endTime="2026-09-09T23:22:04.3858310-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="6f79cd77-70c4-4139-8764-034b31727f7e" />
+    <UnitTestResult executionId="2fe34bf6-f7d0-4a43-8fef-da58148b2c4a" testId="60d59482-19f7-d814-14d3-842e64ebe42d" testName="QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 7, expected: 35)" computerName="Juans-MacBook-Pro" duration="00:00:00.0001797" startTime="2026-09-09T23:22:04.3868430-04:00" endTime="2026-09-09T23:22:04.3868430-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2fe34bf6-f7d0-4a43-8fef-da58148b2c4a" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 1, expected: 5)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-001-quota-adapter/honest/b/heldout/bin/debug/net10.0/runtimetests.dll" id="da022ad5-8962-3f7b-2979-7c9fe6c073c0">
+      <Execution id="6f79cd77-70c4-4139-8764-034b31727f7e" />
+      <TestMethod codeBase="&lt;work&gt;/C-001-quota-adapter/honest/B/heldOut/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterHeldOutTests" name="Preview_PreservesRequestCounter" />
+    </UnitTest>
+    <UnitTest name="QuotaAdapterHeldOutTests.Preview_PreservesRequestCounter(requested: 7, expected: 35)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-001-quota-adapter/honest/b/heldout/bin/debug/net10.0/runtimetests.dll" id="60d59482-19f7-d814-14d3-842e64ebe42d">
+      <Execution id="2fe34bf6-f7d0-4a43-8fef-da58148b2c4a" />
+      <TestMethod codeBase="&lt;work&gt;/C-001-quota-adapter/honest/B/heldOut/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="QuotaAdapterHeldOutTests" name="Preview_PreservesRequestCounter" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="da022ad5-8962-3f7b-2979-7c9fe6c073c0" executionId="6f79cd77-70c4-4139-8764-034b31727f7e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="60d59482-19f7-d814-14d3-842e64ebe42d" executionId="2fe34bf6-f7d0-4a43-8fef-da58148b2c4a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="2" executed="2" passed="2" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.4.1+b9eacec401 (64-bit .NET 10.0.11)
+[xUnit.net 00:00:00.02]   Discovering: RuntimeTests
+[xUnit.net 00:00:00.04]   Discovered:  RuntimeTests
+[xUnit.net 00:00:00.04]   Starting:    RuntimeTests
+[xUnit.net 00:00:00.06]   Finished:    RuntimeTests
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

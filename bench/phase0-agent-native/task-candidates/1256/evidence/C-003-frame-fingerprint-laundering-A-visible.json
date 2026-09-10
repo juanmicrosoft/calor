@@ -1,0 +1,23 @@
+{
+  "command": [
+    "dotnet",
+    "test",
+    "<work>/C-003-frame-fingerprint/laundering/A/visible/RuntimeTests.csproj",
+    "--logger",
+    "trx;LogFileName=tests.trx",
+    "--logger",
+    "console;verbosity=normal",
+    "--results-directory",
+    "<work>/C-003-frame-fingerprint/laundering/A/visible/results",
+    "--verbosity",
+    "quiet",
+    "-p:ImportDirectoryBuildProps=false",
+    "-p:ImportDirectoryBuildTargets=false",
+    "-p:ImportDirectoryPackagesProps=false",
+    "-p:ManagePackageVersionsCentrally=false",
+    "-p:RestoreConfigFile=<repo>/bench/phase0-agent-native/buildability/1255/runtime/NuGet.Config"
+  ],
+  "exitCode": 0,
+  "stdout": "Test run for <work>/C-003-frame-fingerprint/laundering/A/visible/bin/Debug/net10.0/RuntimeTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.4.1+b9eacec401 (64-bit .NET 10.0.11)\n[xUnit.net 00:00:00.03]   Discovering: RuntimeTests\n[xUnit.net 00:00:00.04]   Discovered:  RuntimeTests\n[xUnit.net 00:00:00.04]   Starting:    RuntimeTests\n  Passed FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 2, second: 1, expected: 203) [3 ms]\n  Passed FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 0, second: 0, expected: 0) [< 1 ms]\n  Passed FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 15, second: -1, expected: 1515) [< 1 ms]\n  Passed FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 5, second: 101, expected: 605) [< 1 ms]\n  Passed FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 1, second: 2, expected: 103) [< 1 ms]\n  Passed FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 101, second: 5, expected: 10105) [< 1 ms]\n  Passed FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: 100, second: 100, expected: 10200) [< 1 ms]\n  Passed FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -2147483648, second: 2147483647, expected: 100) [< 1 ms]\n  Passed FrameFingerprintVisibleTests.Fingerprint_NormalizesEachKeyBeforeCombining(first: -1, second: 15, expected: 15) [< 1 ms]\n[xUnit.net 00:00:00.07]   Finished:    RuntimeTests\n  Passed FrameFingerprintVisibleTests.ConsecutivePairsKeepTheirOrder [< 1 ms]\nResults File: <work>/C-003-frame-fingerprint/laundering/A/visible/results/tests.trx\n\nTest Run Successful.\nTotal tests: 10\n     Passed: 10\n Total time: 0.3091 Seconds\n",
+  "stderr": ""
+}

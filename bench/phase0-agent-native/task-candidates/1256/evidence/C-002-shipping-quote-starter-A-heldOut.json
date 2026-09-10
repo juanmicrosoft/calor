@@ -1,0 +1,23 @@
+{
+  "command": [
+    "dotnet",
+    "test",
+    "<work>/C-002-shipping-quote/starter/A/heldOut/RuntimeTests.csproj",
+    "--logger",
+    "trx;LogFileName=tests.trx",
+    "--logger",
+    "console;verbosity=normal",
+    "--results-directory",
+    "<work>/C-002-shipping-quote/starter/A/heldOut/results",
+    "--verbosity",
+    "quiet",
+    "-p:ImportDirectoryBuildProps=false",
+    "-p:ImportDirectoryBuildTargets=false",
+    "-p:ImportDirectoryPackagesProps=false",
+    "-p:ManagePackageVersionsCentrally=false",
+    "-p:RestoreConfigFile=<repo>/bench/phase0-agent-native/buildability/1255/runtime/NuGet.Config"
+  ],
+  "exitCode": 1,
+  "stdout": "Test run for <work>/C-002-shipping-quote/starter/A/heldOut/bin/Debug/net10.0/RuntimeTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.4.1+b9eacec401 (64-bit .NET 10.0.11)\n[xUnit.net 00:00:00.02]   Discovering: RuntimeTests\n[xUnit.net 00:00:00.04]   Discovered:  RuntimeTests\n[xUnit.net 00:00:00.04]   Starting:    RuntimeTests\n[xUnit.net 00:00:00.06]       Assert.Equal() Failure: Values differ\n[xUnit.net 00:00:00.06]       Expected: 8\n[xUnit.net 00:00:00.06]       Actual:   0\n[xUnit.net 00:00:00.06]       Stack Trace:\n[xUnit.net 00:00:00.06]         <work>/C-002-shipping-quote/starter/A/heldOut/Suite/HeldOutTests.cs(17,0): at ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(Int32 weight, Int32 expected)\n[xUnit.net 00:00:00.06]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)\n[xUnit.net 00:00:00.06]            at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)\n[xUnit.net 00:00:00.06]       Assert.Equal() Failure: Values differ\n[xUnit.net 00:00:00.06]       Expected: 38\n[xUnit.net 00:00:00.06]       Actual:   0\n[xUnit.net 00:00:00.06]       Stack Trace:\n[xUnit.net 00:00:00.06]         <work>/C-002-shipping-quote/starter/A/heldOut/Suite/HeldOutTests.cs(17,0): at ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(Int32 weight, Int32 expected)\n[xUnit.net 00:00:00.06]            at InvokeStub_ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(Object, Span`1)\n[xUnit.net 00:00:00.06]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)\n[xUnit.net 00:00:00.06]   Finished:    RuntimeTests\n  Failed ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 1, expected: 8) [3 ms]\n  Error Message:\n   Assert.Equal() Failure: Values differ\nExpected: 8\nActual:   0\n  Stack Trace:\n     at ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(Int32 weight, Int32 expected) in <work>/C-002-shipping-quote/starter/A/heldOut/Suite/HeldOutTests.cs:line 17\n   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)\n   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)\n  Failed ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 13, expected: 38) [< 1 ms]\n  Error Message:\n   Assert.Equal() Failure: Values differ\nExpected: 38\nActual:   0\n  Stack Trace:\n     at ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(Int32 weight, Int32 expected) in <work>/C-002-shipping-quote/starter/A/heldOut/Suite/HeldOutTests.cs:line 17\n   at InvokeStub_ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(Object, Span`1)\n   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)\nResults File: <work>/C-002-shipping-quote/starter/A/heldOut/results/tests.trx\n\nTotal tests: 2\n     Failed: 2\n Total time: 0.2815 Seconds\n",
+  "stderr": "[xUnit.net 00:00:00.06]     ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 1, expected: 8) [FAIL]\n[xUnit.net 00:00:00.06]     ShippingQuoteHeldOutTests.Cheapest_PreservesJournal(weight: 13, expected: 38) [FAIL]\nTest Run Failed.\n"
+}

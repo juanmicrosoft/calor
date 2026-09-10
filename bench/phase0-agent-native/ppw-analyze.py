@@ -881,6 +881,9 @@ def analyze(epoch_dir, dry_run=False, starter_compiles=None, pairs_root=None,
         raise SystemExit("ERROR: %s not found — not an epoch directory" % pins_path)
     with open(pins_path, encoding="utf-8") as fh:
         pins = json.load(fh)
+    if pins.get("schemaVersion") == 2 or pins.get("kind") == "pp-w-rows-redesign":
+        raise SystemExit("ERROR: redesigned epochs require --epoch-id and --stage; "
+                         "they cannot enter historical A-1.12 analysis, even under --dry-run")
     epoch_name = pins.get("epochId") or os.path.basename(os.path.abspath(epoch_dir))
 
     if not dry_run and (pins.get("kind") != KIND or epoch_name != EPOCH_ID):
@@ -1759,6 +1762,8 @@ def underpowered_from_sizing(dry_epoch_dir):
 
 
 def build_ledger(analysis=None, pairs_root=None, underpowered=None, sized_by=None):
+    if analysis is not None and (analysis.get("schemaVersion") == 2 or analysis.get("stage")):
+        raise SystemExit("ERROR: stage records cannot replace the historical A-1.12 benefit ledger")
     if analysis is not None and analysis.get("dryRun"):
         raise SystemExit("ERROR: refusing to record a DRY RUN in the ledger. A dry run sizes N "
                          "and never adjudicates (A:81); only the registered epoch %s may reach "
@@ -1936,6 +1941,10 @@ def serialize(obj):
 
 # ---------------------------------------------------------------------------
 def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if "--epoch-id" in argv or any(arg.startswith("--epoch-id=") for arg in argv):
+        instrument = _load("ppw_instrument", "ppw-instrument.py")
+        return instrument.main(["analyze"] + argv)
     parser = argparse.ArgumentParser(
         prog="ppw-analyze.py",
         description=__doc__,

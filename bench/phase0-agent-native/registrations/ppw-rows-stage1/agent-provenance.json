@@ -1,0 +1,16 @@
+{
+  "kind": "unfunded-agent-provenance-observation",
+  "command": [
+    "claude",
+    "--version"
+  ],
+  "exitCode": 0,
+  "stdout": "2.1.266 (Claude Code)\n",
+  "stderr": "",
+  "platform": "Darwin",
+  "architecture": "arm64",
+  "resolvedExecutableSha256": "553d1b9e9e7068b275c0a783c7e139ff6503096f286e674c8c919379fb0eca62",
+  "hashScope": "local executable only; not provider weights, plugins, credentials, or global settings",
+  "prospectiveModelPin": "claude-opus-4-8",
+  "modelInvoked": false
+}

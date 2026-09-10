@@ -1,0 +1,225 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="d154ca27-59dc-4475-b7f6-680b922179ef" name="@Juans-MacBook-Pro 2026-09-09 23:22:09" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-09T23:22:09.4587760-04:00" queuing="2026-09-09T23:22:09.4587760-04:00" start="2026-09-09T23:22:09.1586670-04:00" finish="2026-09-09T23:22:09.4611470-04:00" />
+  <TestSettings name="default" id="80172c8f-acbc-4534-9d58-6633917cce50">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-09_23_22_09" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="27a22858-7ce4-464b-8e8c-3bc4a3eb0f4e" testId="89b32183-cea9-5714-7e33-fcdad85414fa" testName="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 8, expected: 28)" computerName="Juans-MacBook-Pro" duration="00:00:00.0001004" startTime="2026-09-09T23:22:09.4170080-04:00" endTime="2026-09-09T23:22:09.4170080-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="27a22858-7ce4-464b-8e8c-3bc4a3eb0f4e">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 28
+Actual:   0</Message>
+          <StackTrace>   at ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Int32 weight, Int32 expected) in &lt;work&gt;/C-002-shipping-quote/starter/B/visible/Suite/VisibleTests.cs:line 19
+   at InvokeStub_ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="4dea133e-4ebc-48f9-b5c2-7d8d3e378a05" testId="fbc243b4-53ad-d7f4-763f-186ba1b3980e" testName="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 13, expected: 38)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000154" startTime="2026-09-09T23:22:09.4175330-04:00" endTime="2026-09-09T23:22:09.4175330-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="4dea133e-4ebc-48f9-b5c2-7d8d3e378a05">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 38
+Actual:   0</Message>
+          <StackTrace>   at ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Int32 weight, Int32 expected) in &lt;work&gt;/C-002-shipping-quote/starter/B/visible/Suite/VisibleTests.cs:line 19
+   at InvokeStub_ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="42e0575e-908a-4f7d-9ba1-4fee28d2a792" testId="c3a17925-f288-09ca-e4c6-e185d3384ed1" testName="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 7, expected: 26)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000946" startTime="2026-09-09T23:22:09.4165590-04:00" endTime="2026-09-09T23:22:09.4165590-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="42e0575e-908a-4f7d-9ba1-4fee28d2a792">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 26
+Actual:   0</Message>
+          <StackTrace>   at ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Int32 weight, Int32 expected) in &lt;work&gt;/C-002-shipping-quote/starter/B/visible/Suite/VisibleTests.cs:line 19
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="665931b9-c8a9-4478-ad40-4b1daf885253" testId="5292ee19-8f78-3d32-d7c0-9ca13c41b6a3" testName="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 100, expected: 212)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000143" startTime="2026-09-09T23:22:09.4180490-04:00" endTime="2026-09-09T23:22:09.4180490-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="665931b9-c8a9-4478-ad40-4b1daf885253">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 212
+Actual:   0</Message>
+          <StackTrace>   at ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Int32 weight, Int32 expected) in &lt;work&gt;/C-002-shipping-quote/starter/B/visible/Suite/VisibleTests.cs:line 19
+   at InvokeStub_ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="8aee3bba-c533-43a2-921a-8a7cac6b67a3" testId="8a584614-3a9f-80eb-1045-3d2cd6d2ff74" testName="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 5, expected: 20)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000151" startTime="2026-09-09T23:22:09.4178920-04:00" endTime="2026-09-09T23:22:09.4178920-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8aee3bba-c533-43a2-921a-8a7cac6b67a3">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 20
+Actual:   0</Message>
+          <StackTrace>   at ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Int32 weight, Int32 expected) in &lt;work&gt;/C-002-shipping-quote/starter/B/visible/Suite/VisibleTests.cs:line 19
+   at InvokeStub_ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="558929ab-1c06-4c2d-a994-04f5250c7744" testId="fc0c4079-b04c-23a1-9c5b-a0b3ab9ead07" testName="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 0, expected: 0)" computerName="Juans-MacBook-Pro" duration="00:00:00.0002394" startTime="2026-09-09T23:22:09.4176930-04:00" endTime="2026-09-09T23:22:09.4176930-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="558929ab-1c06-4c2d-a994-04f5250c7744" />
+    <UnitTestResult executionId="f162a06d-80ac-4457-85a6-0b0648425aa1" testId="ae4782a5-4841-74b0-0318-a5ad6ed1f6df" testName="ShippingQuoteVisibleTests.ConsecutiveRequestsReturnTheirPrices" computerName="Juans-MacBook-Pro" duration="00:00:00.0035569" startTime="2026-09-09T23:22:09.4154070-04:00" endTime="2026-09-09T23:22:09.4154130-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f162a06d-80ac-4457-85a6-0b0648425aa1">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 20
+Actual:   0</Message>
+          <StackTrace>   at ShippingQuoteVisibleTests.ConsecutiveRequestsReturnTheirPrices() in &lt;work&gt;/C-002-shipping-quote/starter/B/visible/Suite/VisibleTests.cs:line 26
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="eae105c1-1f85-4747-924f-26268ad925ab" testId="befce9d5-fe31-42f6-675a-49edf329ea4a" testName="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 1, expected: 8)" computerName="Juans-MacBook-Pro" duration="00:00:00.0000142" startTime="2026-09-09T23:22:09.4182040-04:00" endTime="2026-09-09T23:22:09.4182040-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="eae105c1-1f85-4747-924f-26268ad925ab">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ
+Expected: 8
+Actual:   0</Message>
+          <StackTrace>   at ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Int32 weight, Int32 expected) in &lt;work&gt;/C-002-shipping-quote/starter/B/visible/Suite/VisibleTests.cs:line 19
+   at InvokeStub_ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 7, expected: 26)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-002-shipping-quote/starter/b/visible/bin/debug/net10.0/runtimetests.dll" id="c3a17925-f288-09ca-e4c6-e185d3384ed1">
+      <Execution id="42e0575e-908a-4f7d-9ba1-4fee28d2a792" />
+      <TestMethod codeBase="&lt;work&gt;/C-002-shipping-quote/starter/B/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteVisibleTests" name="Cheapest_ReturnsExpectedPrice" />
+    </UnitTest>
+    <UnitTest name="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 100, expected: 212)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-002-shipping-quote/starter/b/visible/bin/debug/net10.0/runtimetests.dll" id="5292ee19-8f78-3d32-d7c0-9ca13c41b6a3">
+      <Execution id="665931b9-c8a9-4478-ad40-4b1daf885253" />
+      <TestMethod codeBase="&lt;work&gt;/C-002-shipping-quote/starter/B/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteVisibleTests" name="Cheapest_ReturnsExpectedPrice" />
+    </UnitTest>
+    <UnitTest name="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 0, expected: 0)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-002-shipping-quote/starter/b/visible/bin/debug/net10.0/runtimetests.dll" id="fc0c4079-b04c-23a1-9c5b-a0b3ab9ead07">
+      <Execution id="558929ab-1c06-4c2d-a994-04f5250c7744" />
+      <TestMethod codeBase="&lt;work&gt;/C-002-shipping-quote/starter/B/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteVisibleTests" name="Cheapest_ReturnsExpectedPrice" />
+    </UnitTest>
+    <UnitTest name="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 1, expected: 8)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-002-shipping-quote/starter/b/visible/bin/debug/net10.0/runtimetests.dll" id="befce9d5-fe31-42f6-675a-49edf329ea4a">
+      <Execution id="eae105c1-1f85-4747-924f-26268ad925ab" />
+      <TestMethod codeBase="&lt;work&gt;/C-002-shipping-quote/starter/B/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteVisibleTests" name="Cheapest_ReturnsExpectedPrice" />
+    </UnitTest>
+    <UnitTest name="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 8, expected: 28)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-002-shipping-quote/starter/b/visible/bin/debug/net10.0/runtimetests.dll" id="89b32183-cea9-5714-7e33-fcdad85414fa">
+      <Execution id="27a22858-7ce4-464b-8e8c-3bc4a3eb0f4e" />
+      <TestMethod codeBase="&lt;work&gt;/C-002-shipping-quote/starter/B/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteVisibleTests" name="Cheapest_ReturnsExpectedPrice" />
+    </UnitTest>
+    <UnitTest name="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 5, expected: 20)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-002-shipping-quote/starter/b/visible/bin/debug/net10.0/runtimetests.dll" id="8a584614-3a9f-80eb-1045-3d2cd6d2ff74">
+      <Execution id="8aee3bba-c533-43a2-921a-8a7cac6b67a3" />
+      <TestMethod codeBase="&lt;work&gt;/C-002-shipping-quote/starter/B/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteVisibleTests" name="Cheapest_ReturnsExpectedPrice" />
+    </UnitTest>
+    <UnitTest name="ShippingQuoteVisibleTests.ConsecutiveRequestsReturnTheirPrices" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-002-shipping-quote/starter/b/visible/bin/debug/net10.0/runtimetests.dll" id="ae4782a5-4841-74b0-0318-a5ad6ed1f6df">
+      <Execution id="f162a06d-80ac-4457-85a6-0b0648425aa1" />
+      <TestMethod codeBase="&lt;work&gt;/C-002-shipping-quote/starter/B/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteVisibleTests" name="ConsecutiveRequestsReturnTheirPrices" />
+    </UnitTest>
+    <UnitTest name="ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 13, expected: 38)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.taskset-work/compatible-1/c-002-shipping-quote/starter/b/visible/bin/debug/net10.0/runtimetests.dll" id="fbc243b4-53ad-d7f4-763f-186ba1b3980e">
+      <Execution id="4dea133e-4ebc-48f9-b5c2-7d8d3e378a05" />
+      <TestMethod codeBase="&lt;work&gt;/C-002-shipping-quote/starter/B/visible/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="ShippingQuoteVisibleTests" name="Cheapest_ReturnsExpectedPrice" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="89b32183-cea9-5714-7e33-fcdad85414fa" executionId="27a22858-7ce4-464b-8e8c-3bc4a3eb0f4e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="fbc243b4-53ad-d7f4-763f-186ba1b3980e" executionId="4dea133e-4ebc-48f9-b5c2-7d8d3e378a05" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c3a17925-f288-09ca-e4c6-e185d3384ed1" executionId="42e0575e-908a-4f7d-9ba1-4fee28d2a792" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5292ee19-8f78-3d32-d7c0-9ca13c41b6a3" executionId="665931b9-c8a9-4478-ad40-4b1daf885253" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="8a584614-3a9f-80eb-1045-3d2cd6d2ff74" executionId="8aee3bba-c533-43a2-921a-8a7cac6b67a3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="fc0c4079-b04c-23a1-9c5b-a0b3ab9ead07" executionId="558929ab-1c06-4c2d-a994-04f5250c7744" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ae4782a5-4841-74b0-0318-a5ad6ed1f6df" executionId="f162a06d-80ac-4457-85a6-0b0648425aa1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="befce9d5-fe31-42f6-675a-49edf329ea4a" executionId="eae105c1-1f85-4747-924f-26268ad925ab" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="8" executed="8" passed="1" failed="7" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.4.1+b9eacec401 (64-bit .NET 10.0.11)
+[xUnit.net 00:00:00.02]   Discovering: RuntimeTests
+[xUnit.net 00:00:00.04]   Discovered:  RuntimeTests
+[xUnit.net 00:00:00.04]   Starting:    RuntimeTests
+[xUnit.net 00:00:00.06]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.06]       Expected: 20
+[xUnit.net 00:00:00.06]       Actual:   0
+[xUnit.net 00:00:00.06]       Stack Trace:
+[xUnit.net 00:00:00.06]         &lt;work&gt;/C-002-shipping-quote/starter/B/visible/Suite/VisibleTests.cs(26,0): at ShippingQuoteVisibleTests.ConsecutiveRequestsReturnTheirPrices()
+[xUnit.net 00:00:00.06]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+[xUnit.net 00:00:00.06]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.06]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.06]       Expected: 26
+[xUnit.net 00:00:00.06]       Actual:   0
+[xUnit.net 00:00:00.06]       Stack Trace:
+[xUnit.net 00:00:00.06]         &lt;work&gt;/C-002-shipping-quote/starter/B/visible/Suite/VisibleTests.cs(19,0): at ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Int32 weight, Int32 expected)
+[xUnit.net 00:00:00.06]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+[xUnit.net 00:00:00.06]            at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.06]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.06]       Expected: 28
+[xUnit.net 00:00:00.06]       Actual:   0
+[xUnit.net 00:00:00.06]       Stack Trace:
+[xUnit.net 00:00:00.06]         &lt;work&gt;/C-002-shipping-quote/starter/B/visible/Suite/VisibleTests.cs(19,0): at ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Int32 weight, Int32 expected)
+[xUnit.net 00:00:00.06]            at InvokeStub_ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Object, Span`1)
+[xUnit.net 00:00:00.06]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.06]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.06]       Expected: 38
+[xUnit.net 00:00:00.06]       Actual:   0
+[xUnit.net 00:00:00.06]       Stack Trace:
+[xUnit.net 00:00:00.06]         &lt;work&gt;/C-002-shipping-quote/starter/B/visible/Suite/VisibleTests.cs(19,0): at ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Int32 weight, Int32 expected)
+[xUnit.net 00:00:00.06]            at InvokeStub_ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Object, Span`1)
+[xUnit.net 00:00:00.06]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.06]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.06]       Expected: 20
+[xUnit.net 00:00:00.06]       Actual:   0
+[xUnit.net 00:00:00.06]       Stack Trace:
+[xUnit.net 00:00:00.06]         &lt;work&gt;/C-002-shipping-quote/starter/B/visible/Suite/VisibleTests.cs(19,0): at ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Int32 weight, Int32 expected)
+[xUnit.net 00:00:00.06]            at InvokeStub_ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Object, Span`1)
+[xUnit.net 00:00:00.06]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.06]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.06]       Expected: 212
+[xUnit.net 00:00:00.06]       Actual:   0
+[xUnit.net 00:00:00.06]       Stack Trace:
+[xUnit.net 00:00:00.06]         &lt;work&gt;/C-002-shipping-quote/starter/B/visible/Suite/VisibleTests.cs(19,0): at ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Int32 weight, Int32 expected)
+[xUnit.net 00:00:00.06]            at InvokeStub_ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Object, Span`1)
+[xUnit.net 00:00:00.06]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.06]       Assert.Equal() Failure: Values differ
+[xUnit.net 00:00:00.06]       Expected: 8
+[xUnit.net 00:00:00.06]       Actual:   0
+[xUnit.net 00:00:00.06]       Stack Trace:
+[xUnit.net 00:00:00.06]         &lt;work&gt;/C-002-shipping-quote/starter/B/visible/Suite/VisibleTests.cs(19,0): at ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Int32 weight, Int32 expected)
+[xUnit.net 00:00:00.06]            at InvokeStub_ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(Object, Span`1)
+[xUnit.net 00:00:00.06]            at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.06]   Finished:    RuntimeTests
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T23:22:09.4145590-04:00">
+        <Text>[xUnit.net 00:00:00.06]     ShippingQuoteVisibleTests.ConsecutiveRequestsReturnTheirPrices [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T23:22:09.4166290-04:00">
+        <Text>[xUnit.net 00:00:00.06]     ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 7, expected: 26) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T23:22:09.4168840-04:00">
+        <Text>[xUnit.net 00:00:00.06]     ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 8, expected: 28) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T23:22:09.4172620-04:00">
+        <Text>[xUnit.net 00:00:00.06]     ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 13, expected: 38) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T23:22:09.4181830-04:00">
+        <Text>[xUnit.net 00:00:00.06]     ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 5, expected: 20) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T23:22:09.4184420-04:00">
+        <Text>[xUnit.net 00:00:00.06]     ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 100, expected: 212) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T23:22:09.4184910-04:00">
+        <Text>[xUnit.net 00:00:00.06]     ShippingQuoteVisibleTests.Cheapest_ReturnsExpectedPrice(weight: 1, expected: 8) [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>
