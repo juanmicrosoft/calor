@@ -8,10 +8,11 @@
       "heldoutPassed": 4,
       "invalid": false,
       "nullAgent": true,
-      "observations": 2,
+      "observations": 3,
       "providerRequests": 0,
       "routeCalls": [
         "register",
+        "observe",
         "observe",
         "observe",
         "seal",
@@ -42,7 +43,19 @@
       "task": "C-001-quota-adapter",
       "taskSuccess": true,
       "upstreamAttempts": 0,
-      "variant": "clean"
+      "variant": "clean",
+      "visibleSmoke": {
+        "exitCode": 0,
+        "frameworkCounts": {
+          "Failed": 0,
+          "Passed": 8,
+          "Total": 8
+        },
+        "hiddenOutputLeaked": false,
+        "materializedSmokeProject": true,
+        "productionShim": true,
+        "usesPreviousSuccessfulAssembly": false
+      }
     },
     {
       "arm": "calor-strict",
@@ -52,10 +65,11 @@
       "heldoutPassed": 4,
       "invalid": false,
       "nullAgent": true,
-      "observations": 2,
+      "observations": 3,
       "providerRequests": 0,
       "routeCalls": [
         "register",
+        "observe",
         "observe",
         "observe",
         "seal",
@@ -86,7 +100,19 @@
       "task": "C-001-quota-adapter",
       "taskSuccess": true,
       "upstreamAttempts": 0,
-      "variant": "clean"
+      "variant": "clean",
+      "visibleSmoke": {
+        "exitCode": 0,
+        "frameworkCounts": {
+          "Failed": 0,
+          "Passed": 8,
+          "Total": 8
+        },
+        "hiddenOutputLeaked": false,
+        "materializedSmokeProject": true,
+        "productionShim": true,
+        "usesPreviousSuccessfulAssembly": false
+      }
     },
     {
       "arm": "calor-permissive",
@@ -96,10 +122,11 @@
       "heldoutPassed": 2,
       "invalid": false,
       "nullAgent": true,
-      "observations": 2,
+      "observations": 3,
       "providerRequests": 0,
       "routeCalls": [
         "register",
+        "observe",
         "observe",
         "observe",
         "seal",
@@ -130,7 +157,19 @@
       "task": "C-001-quota-adapter",
       "taskSuccess": false,
       "upstreamAttempts": 0,
-      "variant": "laundering"
+      "variant": "laundering",
+      "visibleSmoke": {
+        "exitCode": 0,
+        "frameworkCounts": {
+          "Failed": 0,
+          "Passed": 8,
+          "Total": 8
+        },
+        "hiddenOutputLeaked": false,
+        "materializedSmokeProject": true,
+        "productionShim": true,
+        "usesPreviousSuccessfulAssembly": false
+      }
     },
     {
       "arm": "calor-strict",
@@ -140,10 +179,11 @@
       "heldoutPassed": 0,
       "invalid": false,
       "nullAgent": true,
-      "observations": 2,
+      "observations": 3,
       "providerRequests": 0,
       "routeCalls": [
         "register",
+        "observe",
         "observe",
         "observe",
         "seal",
@@ -174,7 +214,19 @@
       "task": "C-001-quota-adapter",
       "taskSuccess": false,
       "upstreamAttempts": 0,
-      "variant": "laundering"
+      "variant": "laundering",
+      "visibleSmoke": {
+        "exitCode": 1,
+        "frameworkCounts": {
+          "Failed": 5,
+          "Passed": 3,
+          "Total": 8
+        },
+        "hiddenOutputLeaked": false,
+        "materializedSmokeProject": true,
+        "productionShim": true,
+        "usesPreviousSuccessfulAssembly": true
+      }
     },
     {
       "arm": "calor-permissive",
@@ -184,10 +236,11 @@
       "heldoutPassed": 0,
       "invalid": false,
       "nullAgent": true,
-      "observations": 2,
+      "observations": 3,
       "providerRequests": 0,
       "routeCalls": [
         "register",
+        "observe",
         "observe",
         "observe",
         "seal",
@@ -218,7 +271,19 @@
       "task": "C-001-quota-adapter",
       "taskSuccess": false,
       "upstreamAttempts": 0,
-      "variant": "effectful-wrong-value"
+      "variant": "effectful-wrong-value",
+      "visibleSmoke": {
+        "exitCode": 1,
+        "frameworkCounts": {
+          "Failed": 5,
+          "Passed": 3,
+          "Total": 8
+        },
+        "hiddenOutputLeaked": false,
+        "materializedSmokeProject": true,
+        "productionShim": true,
+        "usesPreviousSuccessfulAssembly": false
+      }
     },
     {
       "arm": "calor-strict",
@@ -228,10 +293,11 @@
       "heldoutPassed": 0,
       "invalid": false,
       "nullAgent": true,
-      "observations": 2,
+      "observations": 3,
       "providerRequests": 0,
       "routeCalls": [
         "register",
+        "observe",
         "observe",
         "observe",
         "seal",
@@ -262,7 +328,19 @@
       "task": "C-001-quota-adapter",
       "taskSuccess": false,
       "upstreamAttempts": 0,
-      "variant": "effectful-wrong-value"
+      "variant": "effectful-wrong-value",
+      "visibleSmoke": {
+        "exitCode": 1,
+        "frameworkCounts": {
+          "Failed": 5,
+          "Passed": 3,
+          "Total": 8
+        },
+        "hiddenOutputLeaked": false,
+        "materializedSmokeProject": true,
+        "productionShim": true,
+        "usesPreviousSuccessfulAssembly": true
+      }
     },
     {
       "arm": "calor-permissive",
@@ -272,10 +350,11 @@
       "heldoutPassed": 4,
       "invalid": false,
       "nullAgent": true,
-      "observations": 2,
+      "observations": 3,
       "providerRequests": 0,
       "routeCalls": [
         "register",
+        "observe",
         "observe",
         "observe",
         "seal",
@@ -306,7 +385,19 @@
       "task": "C-002-shipping-quote",
       "taskSuccess": true,
       "upstreamAttempts": 0,
-      "variant": "clean"
+      "variant": "clean",
+      "visibleSmoke": {
+        "exitCode": 0,
+        "frameworkCounts": {
+          "Failed": 0,
+          "Passed": 8,
+          "Total": 8
+        },
+        "hiddenOutputLeaked": false,
+        "materializedSmokeProject": true,
+        "productionShim": true,
+        "usesPreviousSuccessfulAssembly": false
+      }
     },
     {
       "arm": "calor-strict",
@@ -316,10 +407,11 @@
       "heldoutPassed": 4,
       "invalid": false,
       "nullAgent": true,
-      "observations": 2,
+      "observations": 3,
       "providerRequests": 0,
       "routeCalls": [
         "register",
+        "observe",
         "observe",
         "observe",
         "seal",
@@ -350,7 +442,19 @@
       "task": "C-002-shipping-quote",
       "taskSuccess": true,
       "upstreamAttempts": 0,
-      "variant": "clean"
+      "variant": "clean",
+      "visibleSmoke": {
+        "exitCode": 0,
+        "frameworkCounts": {
+          "Failed": 0,
+          "Passed": 8,
+          "Total": 8
+        },
+        "hiddenOutputLeaked": false,
+        "materializedSmokeProject": true,
+        "productionShim": true,
+        "usesPreviousSuccessfulAssembly": false
+      }
     },
     {
       "arm": "calor-permissive",
@@ -360,10 +464,11 @@
       "heldoutPassed": 2,
       "invalid": false,
       "nullAgent": true,
-      "observations": 2,
+      "observations": 3,
       "providerRequests": 0,
       "routeCalls": [
         "register",
+        "observe",
         "observe",
         "observe",
         "seal",
@@ -394,7 +499,19 @@
       "task": "C-002-shipping-quote",
       "taskSuccess": false,
       "upstreamAttempts": 0,
-      "variant": "laundering"
+      "variant": "laundering",
+      "visibleSmoke": {
+        "exitCode": 0,
+        "frameworkCounts": {
+          "Failed": 0,
+          "Passed": 8,
+          "Total": 8
+        },
+        "hiddenOutputLeaked": false,
+        "materializedSmokeProject": true,
+        "productionShim": true,
+        "usesPreviousSuccessfulAssembly": false
+      }
     },
     {
       "arm": "calor-strict",
@@ -404,10 +521,11 @@
       "heldoutPassed": 0,
       "invalid": false,
       "nullAgent": true,
-      "observations": 2,
+      "observations": 3,
       "providerRequests": 0,
       "routeCalls": [
         "register",
+        "observe",
         "observe",
         "observe",
         "seal",
@@ -438,7 +556,19 @@
       "task": "C-002-shipping-quote",
       "taskSuccess": false,
       "upstreamAttempts": 0,
-      "variant": "laundering"
+      "variant": "laundering",
+      "visibleSmoke": {
+        "exitCode": 1,
+        "frameworkCounts": {
+          "Failed": 7,
+          "Passed": 1,
+          "Total": 8
+        },
+        "hiddenOutputLeaked": false,
+        "materializedSmokeProject": true,
+        "productionShim": true,
+        "usesPreviousSuccessfulAssembly": true
+      }
     },
     {
       "arm": "calor-permissive",
@@ -448,10 +578,11 @@
       "heldoutPassed": 0,
       "invalid": false,
       "nullAgent": true,
-      "observations": 2,
+      "observations": 3,
       "providerRequests": 0,
       "routeCalls": [
         "register",
+        "observe",
         "observe",
         "observe",
         "seal",
@@ -482,7 +613,19 @@
       "task": "C-002-shipping-quote",
       "taskSuccess": false,
       "upstreamAttempts": 0,
-      "variant": "effectful-wrong-value"
+      "variant": "effectful-wrong-value",
+      "visibleSmoke": {
+        "exitCode": 1,
+        "frameworkCounts": {
+          "Failed": 7,
+          "Passed": 1,
+          "Total": 8
+        },
+        "hiddenOutputLeaked": false,
+        "materializedSmokeProject": true,
+        "productionShim": true,
+        "usesPreviousSuccessfulAssembly": false
+      }
     },
     {
       "arm": "calor-strict",
@@ -492,10 +635,11 @@
       "heldoutPassed": 0,
       "invalid": false,
       "nullAgent": true,
-      "observations": 2,
+      "observations": 3,
       "providerRequests": 0,
       "routeCalls": [
         "register",
+        "observe",
         "observe",
         "observe",
         "seal",
@@ -526,7 +670,19 @@
       "task": "C-002-shipping-quote",
       "taskSuccess": false,
       "upstreamAttempts": 0,
-      "variant": "effectful-wrong-value"
+      "variant": "effectful-wrong-value",
+      "visibleSmoke": {
+        "exitCode": 1,
+        "frameworkCounts": {
+          "Failed": 7,
+          "Passed": 1,
+          "Total": 8
+        },
+        "hiddenOutputLeaked": false,
+        "materializedSmokeProject": true,
+        "productionShim": true,
+        "usesPreviousSuccessfulAssembly": true
+      }
     },
     {
       "arm": "calor-permissive",
@@ -536,10 +692,11 @@
       "heldoutPassed": 4,
       "invalid": false,
       "nullAgent": true,
-      "observations": 2,
+      "observations": 3,
       "providerRequests": 0,
       "routeCalls": [
         "register",
+        "observe",
         "observe",
         "observe",
         "seal",
@@ -570,7 +727,19 @@
       "task": "C-003-frame-fingerprint",
       "taskSuccess": true,
       "upstreamAttempts": 0,
-      "variant": "clean"
+      "variant": "clean",
+      "visibleSmoke": {
+        "exitCode": 0,
+        "frameworkCounts": {
+          "Failed": 0,
+          "Passed": 10,
+          "Total": 10
+        },
+        "hiddenOutputLeaked": false,
+        "materializedSmokeProject": true,
+        "productionShim": true,
+        "usesPreviousSuccessfulAssembly": false
+      }
     },
     {
       "arm": "calor-strict",
@@ -580,10 +749,11 @@
       "heldoutPassed": 4,
       "invalid": false,
       "nullAgent": true,
-      "observations": 2,
+      "observations": 3,
       "providerRequests": 0,
       "routeCalls": [
         "register",
+        "observe",
         "observe",
         "observe",
         "seal",
@@ -614,7 +784,19 @@
       "task": "C-003-frame-fingerprint",
       "taskSuccess": true,
       "upstreamAttempts": 0,
-      "variant": "clean"
+      "variant": "clean",
+      "visibleSmoke": {
+        "exitCode": 0,
+        "frameworkCounts": {
+          "Failed": 0,
+          "Passed": 10,
+          "Total": 10
+        },
+        "hiddenOutputLeaked": false,
+        "materializedSmokeProject": true,
+        "productionShim": true,
+        "usesPreviousSuccessfulAssembly": false
+      }
     },
     {
       "arm": "calor-permissive",
@@ -624,10 +806,11 @@
       "heldoutPassed": 2,
       "invalid": false,
       "nullAgent": true,
-      "observations": 2,
+      "observations": 3,
       "providerRequests": 0,
       "routeCalls": [
         "register",
+        "observe",
         "observe",
         "observe",
         "seal",
@@ -658,7 +841,19 @@
       "task": "C-003-frame-fingerprint",
       "taskSuccess": false,
       "upstreamAttempts": 0,
-      "variant": "laundering"
+      "variant": "laundering",
+      "visibleSmoke": {
+        "exitCode": 0,
+        "frameworkCounts": {
+          "Failed": 0,
+          "Passed": 10,
+          "Total": 10
+        },
+        "hiddenOutputLeaked": false,
+        "materializedSmokeProject": true,
+        "productionShim": true,
+        "usesPreviousSuccessfulAssembly": false
+      }
     },
     {
       "arm": "calor-strict",
@@ -668,10 +863,11 @@
       "heldoutPassed": 0,
       "invalid": false,
       "nullAgent": true,
-      "observations": 2,
+      "observations": 3,
       "providerRequests": 0,
       "routeCalls": [
         "register",
+        "observe",
         "observe",
         "observe",
         "seal",
@@ -702,7 +898,19 @@
       "task": "C-003-frame-fingerprint",
       "taskSuccess": false,
       "upstreamAttempts": 0,
-      "variant": "laundering"
+      "variant": "laundering",
+      "visibleSmoke": {
+        "exitCode": 1,
+        "frameworkCounts": {
+          "Failed": 9,
+          "Passed": 1,
+          "Total": 10
+        },
+        "hiddenOutputLeaked": false,
+        "materializedSmokeProject": true,
+        "productionShim": true,
+        "usesPreviousSuccessfulAssembly": true
+      }
     },
     {
       "arm": "calor-permissive",
@@ -712,10 +920,11 @@
       "heldoutPassed": 0,
       "invalid": false,
       "nullAgent": true,
-      "observations": 2,
+      "observations": 3,
       "providerRequests": 0,
       "routeCalls": [
         "register",
+        "observe",
         "observe",
         "observe",
         "seal",
@@ -746,7 +955,19 @@
       "task": "C-003-frame-fingerprint",
       "taskSuccess": false,
       "upstreamAttempts": 0,
-      "variant": "effectful-wrong-value"
+      "variant": "effectful-wrong-value",
+      "visibleSmoke": {
+        "exitCode": 1,
+        "frameworkCounts": {
+          "Failed": 9,
+          "Passed": 1,
+          "Total": 10
+        },
+        "hiddenOutputLeaked": false,
+        "materializedSmokeProject": true,
+        "productionShim": true,
+        "usesPreviousSuccessfulAssembly": false
+      }
     },
     {
       "arm": "calor-strict",
@@ -756,10 +977,11 @@
       "heldoutPassed": 0,
       "invalid": false,
       "nullAgent": true,
-      "observations": 2,
+      "observations": 3,
       "providerRequests": 0,
       "routeCalls": [
         "register",
+        "observe",
         "observe",
         "observe",
         "seal",
@@ -790,7 +1012,19 @@
       "task": "C-003-frame-fingerprint",
       "taskSuccess": false,
       "upstreamAttempts": 0,
-      "variant": "effectful-wrong-value"
+      "variant": "effectful-wrong-value",
+      "visibleSmoke": {
+        "exitCode": 1,
+        "frameworkCounts": {
+          "Failed": 9,
+          "Passed": 1,
+          "Total": 10
+        },
+        "hiddenOutputLeaked": false,
+        "materializedSmokeProject": true,
+        "productionShim": true,
+        "usesPreviousSuccessfulAssembly": true
+      }
     }
   ],
   "client": {
@@ -845,7 +1079,7 @@
       "probeCaught": false
     },
     "observations": 1,
-    "policySha256": "da571d1582cf83520374470cd1f4b72611fd8d7ee4dd5af7002889fbf734147a",
+    "policySha256": "e4a2b2bebd4445304cb74d626bc3881f1ec8c136d767a4d6e54a133b87b99585",
     "providerRequests": 0,
     "routeCalls": [
       "register",

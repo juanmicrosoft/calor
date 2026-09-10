@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -93,6 +94,9 @@ class RecordingObserver(observer_module.RunObserver):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.route_calls = []
+        self.on_edited_build = None
+        self.visible_smoke = None
+        self.first_visible_assembly_sha = None
 
     def register(self, value):
         self.route_calls.append("register")
@@ -100,7 +104,16 @@ class RecordingObserver(observer_module.RunObserver):
 
     def observe(self, value):
         self.route_calls.append("observe")
-        return super().observe(value)
+        previous_iteration = self.iteration
+        result = super().observe(value)
+        assembly = self.workspace / "src/bin/Debug/net10.0/Src.dll"
+        if self.iteration == 0 and self.first_visible_assembly_sha is None and assembly.is_file():
+            self.first_visible_assembly_sha = sha256(assembly)
+        if (value["command"] == "build" and self.iteration > previous_iteration
+                and self.on_edited_build is not None and self.visible_smoke is None):
+            self.visible_smoke = {}
+            self.visible_smoke = self.on_edited_build()
+        return result
 
     def seal(self):
         self.route_calls.append("seal")
@@ -270,10 +283,53 @@ class FrozenGatewayControlTests(unittest.TestCase):
             "source-inspection.err",
             "source-inspection.json",
             "result.json",
+            "visible-smoke.stdout",
+            "visible-smoke.stderr",
         ):
             source = run_directory / name
             if source.is_file():
                 shutil.copy2(source, destination / name)
+
+    def run_materialized_visible_test(self, observer, gateway, archive, protected):
+        workspace = observer.workspace
+        shim = workspace / ".ppw-shim/dotnet"
+        project = workspace / "smoke/Smoke.csproj"
+        self.assertTrue(shim.is_file() and project.is_file())
+        environment = isolation.client_environment(workspace, gateway.base_url)
+        environment.update(
+            NUGET_PACKAGES=self.test_runtime["packages"],
+            PPW_XUNIT_RUNTIME=self.test_runtime["manifest"],
+            PPW_OBSERVER_URL=gateway.observer_url,
+            PATH=os.pathsep.join((str(BENCH / "gateway-tools"), str(shim.parent),
+                                  os.environ["PATH"])),
+        )
+        policy = isolation.sandbox_policy(
+            workspace, archive, protected, gateway.port, observer.model_hidden_roots)
+        result = command(
+            ["/usr/bin/sandbox-exec", "-p", policy, shim, "test", project,
+             "--nologo", "-v", "q", "--logger", "console;verbosity=normal"],
+            cwd=workspace / "src", env=environment, timeout=240)
+        (observer.output / "visible-smoke.stdout").write_text(result.stdout, encoding="utf-8")
+        (observer.output / "visible-smoke.stderr").write_text(result.stderr, encoding="utf-8")
+        text = result.stdout + result.stderr
+        summaries = [line for line in text.splitlines()
+                     if all(label in line for label in ("Passed:", "Failed:", "Total:"))]
+        self.assertLessEqual(len(summaries), 1, text)
+        counts = ({name: int(re.search(name + r":\s*(\d+)", summaries[0]).group(1))
+                   for name in ("Passed", "Failed", "Total")} if summaries else None)
+        source_assembly = workspace / "src/bin/Debug/net10.0/Src.dll"
+        return {
+            "exitCode": result.returncode,
+            "frameworkCounts": counts,
+            "productionShim": True,
+            "materializedSmokeProject": True,
+            "hiddenOutputLeaked": "HeldOutTests" in text or observer_module.RESULT_PREFIX in text,
+            "usesPreviousSuccessfulAssembly": (
+                observer.first_visible_assembly_sha is not None
+                and source_assembly.is_file()
+                and sha256(source_assembly) == observer.first_visible_assembly_sha
+            ),
+        }
 
     def run_case(self, temporary, task_name, variant, arm):
         case_id = "-".join((task_name, variant, arm))
@@ -370,6 +426,8 @@ class FrozenGatewayControlTests(unittest.TestCase):
                     "probeHiddenFiles": [str(hidden_test), str(seeded_file)],
                     "executionRuntime": self.execution_runtime,
                 })
+                observer.on_edited_build = lambda: self.run_materialized_visible_test(
+                    observer, gateway, archive, protected)
                 runner = [
                     sys.executable,
                     BENCH / "ppw-gateway-client.py",
@@ -453,6 +511,7 @@ class FrozenGatewayControlTests(unittest.TestCase):
             "providerRequests": len(ledger_snapshot["requests"]),
             "upstreamAttempts": len(upstream_attempts),
             "ledgerState": ledger_snapshot["state"],
+            "visibleSmoke": observer.visible_smoke,
         }
 
     def materialize_parity(self, task, pair, workspace, output):
@@ -747,6 +806,24 @@ class FrozenGatewayControlTests(unittest.TestCase):
         build_ok = result.get("finalBuild", {}).get("ok")
         passed = result.get("heldoutPassed")
         success = result.get("taskSuccess")
+        smoke = case.get("visibleSmoke") or {}
+        counts = smoke.get("frameworkCounts")
+        if (smoke.get("productionShim") is not True
+                or smoke.get("materializedSmokeProject") is not True
+                or smoke.get("hiddenOutputLeaked") is not False):
+            failures.append(label + ": actual visible test path is missing or leaks held-out output")
+        expected_total = 10 if case["task"] == "C-003-frame-fingerprint" else 8
+        if counts is None or counts.get("Total") != expected_total:
+            failures.append(label + ": visible xUnit cases did not execute")
+        elif build_ok and case["variant"] in ("clean", "laundering"):
+            if smoke.get("exitCode") != 0 or counts.get("Passed") != expected_total:
+                failures.append(label + ": numerically correct visible tests failed")
+        elif smoke.get("exitCode") != 1 or counts.get("Failed", 0) == 0:
+            failures.append(label + ": visible negative control did not fail")
+        # The unchanged Smoke.csproj references the last built Src.dll. A failed
+        # edit can leave that DLL; the observer's fresh final build is authority.
+        if not build_ok and smoke.get("usesPreviousSuccessfulAssembly") is not True:
+            failures.append(label + ": failed-build visible assembly provenance differs")
         if case["variant"] == "clean":
             if not (build_ok is True and passed == 4 and success is True):
                 failures.append(label + ": clean control did not build and pass 4/4 held-out tests")
@@ -784,6 +861,7 @@ class FrozenGatewayControlTests(unittest.TestCase):
             ),
             "providerRequests": case["providerRequests"],
             "upstreamAttempts": case["upstreamAttempts"],
+            "visibleSmoke": case.get("visibleSmoke"),
         }
 
     def test_frozen_null_agent_gateway_control_matrix(self):

@@ -229,8 +229,23 @@ reported decision remains `SYNTHETIC_ONLY`.
 compiler, source-fragment assembly, visible shim and private observer against all
 18 null-agent controls. Six honest cases pass four held-out tests; six permissive
 effect controls build and fail held-out tests; six strict effect controls fail
-compilation. Every case reaches registration, two observations, sealing, source
-inspection and final grading without a model or provider request. The opt-in
+compilation. Every case reaches registration, both build observations, sealing, source
+inspection and final grading without a model or provider request. The expanded
+fixture also invokes the actual materialized `Smoke.csproj` through the
+production `dotnet` shim inside the final client policy, not a stand-in shim.
+All 18 cases execute their 8/8/10 visible xUnit cases and record a third, `test`
+observation; correct numeric controls pass and incorrect numeric controls fail.
+Neither held-out test output nor the private framework receipt appears in
+visible output.
+
+The unchanged smoke project references the last successfully built `Src.dll`.
+After a strict compilation failure, visible tests can therefore execute that
+older starter assembly. The regression records this byte identity explicitly;
+it does not mistake those tests for a successful new build. Authoritative final
+grading still builds a fresh private snapshot and preserves the strict
+nonbuilding outcome.
+
+The opt-in
 `PPW_RUN_FROZEN_GATEWAY_CONTROLS=1` run requires macOS and the retained product;
 other environments skip it explicitly. Earlier whole-run evidence is preserved
 in separate `pre-boundary-1406` records, not presented as proof of the new policy.
