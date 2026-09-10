@@ -1,0 +1,9 @@
+{
+  "command": [
+    "python3",
+    "<compiler-root>/scripts/verify-z3-assets.py"
+  ],
+  "exitCode": 0,
+  "stdout": "Verified Z3 managed and native assets against committed size/hash pins.\n",
+  "stderr": ""
+}

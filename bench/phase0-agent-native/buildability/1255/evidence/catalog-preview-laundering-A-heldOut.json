@@ -1,0 +1,16 @@
+{
+  "command": [
+    "dotnet",
+    "test",
+    "<work>/catalog-preview/laundering/A/heldOut/RuntimeTests.csproj",
+    "--logger",
+    "trx;LogFileName=tests.trx",
+    "--results-directory",
+    "<work>/catalog-preview/laundering/A/heldOut/results",
+    "--verbosity",
+    "quiet"
+  ],
+  "exitCode": 1,
+  "stdout": "Test run for <work>/catalog-preview/laundering/A/heldOut/bin/Debug/net10.0/RuntimeTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\nResults File: <work>/catalog-preview/laundering/A/heldOut/results/tests.trx\n\nFailed!  - Failed:     2, Passed:     0, Skipped:     0, Total:     2, Duration: 6 ms - RuntimeTests.dll (net10.0)\n",
+  "stderr": "[xUnit.net 00:00:00.06]     HeldOutTests.Preview_HasNoConsoleWrites(input: 1) [FAIL]\n[xUnit.net 00:00:00.06]     HeldOutTests.Preview_HasNoConsoleWrites(input: 7) [FAIL]\n"
+}

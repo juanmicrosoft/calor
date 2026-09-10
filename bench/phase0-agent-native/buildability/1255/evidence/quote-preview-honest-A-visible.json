@@ -1,0 +1,16 @@
+{
+  "command": [
+    "dotnet",
+    "test",
+    "<work>/quote-preview/honest/A/visible/RuntimeTests.csproj",
+    "--logger",
+    "trx;LogFileName=tests.trx",
+    "--results-directory",
+    "<work>/quote-preview/honest/A/visible/results",
+    "--verbosity",
+    "quiet"
+  ],
+  "exitCode": 0,
+  "stdout": "Test run for <work>/quote-preview/honest/A/visible/bin/Debug/net10.0/RuntimeTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\nResults File: <work>/quote-preview/honest/A/visible/results/tests.trx\n\nPassed!  - Failed:     0, Passed:     5, Skipped:     0, Total:     5, Duration: 3 ms - RuntimeTests.dll (net10.0)\n",
+  "stderr": ""
+}

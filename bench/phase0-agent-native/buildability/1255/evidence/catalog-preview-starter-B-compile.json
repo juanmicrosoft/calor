@@ -1,0 +1,14 @@
+{
+  "command": [
+    "dotnet",
+    "<compiler-root>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+    "-i",
+    "<work>/catalog-preview/starter/B/Candidate.calr",
+    "-o",
+    "<work>/catalog-preview/starter/B/Candidate.g.cs",
+    "--no-telemetry"
+  ],
+  "exitCode": 0,
+  "stdout": "Compilation successful: <work>/catalog-preview/starter/B/Candidate.g.cs\n",
+  "stderr": "<work>/catalog-preview/starter/B/Candidate.calr(20,25): warning Calor0425: 'Formatter' is function-typed with no effect row, so its effects are Unknown. Add \u00a7E{\u2026} on the same line as the type to state what callers may pass, or compile with --permissive-effects. Invoking a value whose row is Unknown charges Unknown to 'Catalog..ctor'.\n"
+}
