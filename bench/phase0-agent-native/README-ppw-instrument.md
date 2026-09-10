@@ -35,7 +35,7 @@ or decide any new stage's sample size.
 
 Each replacement starter slot records `task`, `arm` (`A`/`B`), task-root-relative
 `path`, and Git `blobSha`. The required order is registered task order, then A/B,
-then sorted `.calr` paths. SHA-256 still covers the entire task inventory;
+then sorted `.calr`/`.calr.inc` paths. SHA-256 still covers the entire task inventory;
 git-blob pins provide the separate starter-registration identity. Missing,
 edited, duplicated or mismatched slots fail admission and analysis.
 **No actual replacement table is supplied here.** The only new tables are
@@ -113,6 +113,45 @@ Each task's `arms` uses those same two keys, with `fixture: starter-a` or
 `starter-b`. Both configs retain effect enforcement, debug contracts and Z3.
 Only A has `permissiveEffects: true, controlArmKind: "permissive"`; B has
 `permissiveEffects: false` and no control kind. `pre-rows` is historical only.
+
+### Separate dependency and editable fragments
+
+Tasks that need a dependency separate from the edit surface can declare:
+
+```json
+{
+  "sourceAssembly": {
+    "parts": ["dependency.calr.inc", "task.calr.inc"],
+    "editableParts": ["task.calr.inc"]
+  }
+}
+```
+
+Both starters and both clean seeds contain those named fragments. Parts are
+unique flat `.calr.inc` filenames, each ending with a newline. Order is
+explicit; `editableParts` must be a nonempty proper subset. Unlisted compiled
+sources are rejected. Clean seeds must preserve the immutable dependency bytes.
+This declaration describes source assembly, not a stage registration.
+
+The generated project composes exact fragment bytes into
+`src/obj/ppw-source/Program.calr` immediately before `CompileCalorFiles`. It
+does not paste dependency rows into the editable fragment. Every compilation
+rechecks immutable hashes and replaces a stale or edited generated input.
+Only the generated file enters `CalorCompile`; default source globs are not
+left active. Dependencies are integrity-protected, **not hidden or sandboxed**:
+they and generated build files remain readable. Whether that exposure meets
+R1 is a separate methods decision, not an engineering approval.
+
+The agent prompt names the editable fragments. Changing an immutable part,
+adding another compiled source, or changing assembly/build configuration
+invalidates the attempted run without replacement. Its original fragments,
+including an altered dependency, are still archived before the workspace
+is removed. Source hashes track fragment edits, excluding generated outputs.
+Shape indicators inspect **only editable fragments**, never dependency rows.
+Final fragments are checked against the frozen immutable inputs during
+analysis. This interface currently supports raw editing, not MCP fragment
+operations. It introduces no task count, shape-diversity threshold or sizing
+decision.
 
 `registration.json` must include:
 
@@ -204,3 +243,21 @@ supersession pin tables, nested/cross-linked epoch data, stage promotion and
 CLI option overrides. It also protects the lifecycle test pair's complementary
 `epochRun` checks and expected skip counts. These tests cannot close #1271's
 remaining obligation to re-pin the actual task set after its freeze and review.
+
+`tests/test_ppw_source_assembly.py` exercises exact composition, immutable
+inputs, source-inventory violations, generated-file tampering, fragment
+capture and editable-only shape scoring. A synthetic shell→capture→pilot-ledger
+test verifies that fragment edits are journaled. Real MSBuild exercises the
+generated target; an available local Calor.Tasks product additionally builds
+the preserved #1255 quota-adapter starter and honest completion through the
+actual generated project. That last check validates compilation plumbing,
+not a newly registered v0.18 experiment.
+
+The assembler was also checked locally with the exact v0.18.0 release-commit
+Debug DLL (`514f538024df990af86054af25975b756ba42ab1`). For the preserved #1255
+quota-adapter input, assembled starter and honest completion compiled under
+both policies. The assembled laundering completion compiled without diagnostics
+under permissive policy and failed under strict policy (`Calor0410`, `Calor0411`).
+All six invocations used the same unchanged DLL and left the editable fragment
+untouched. This reproduces an existing compiler control, not an agent-effect
+measurement, task qualification, or task-count decision.

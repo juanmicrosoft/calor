@@ -65,7 +65,8 @@ def check_supersession(registration, tasks_root):
         counts["legB"] += int(pair["legB"])
         for arm in ("A", "B"):
             fixture = directory / ("starter-" + arm.lower())
-            sources = sorted(fixture.rglob("*.calr"))
+            sources = sorted(path for path in fixture.rglob("*")
+                             if path.is_file() and str(path).endswith((".calr", ".calr.inc")))
             require(sources, "missing starter source for %s/%s" % (task, arm))
             for source in sources:
                 require(not source.is_symlink() and source.resolve().is_relative_to(root),

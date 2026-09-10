@@ -162,6 +162,7 @@ def validate_tasks(root, registration):
     for path, sha in expected.items():
         require(digest(local(root, path)) == sha, "frozen artifact changed: %s" % path)
     capture = helper("harness-capture.py")
+    assembly = helper("ppw-source-assembly.py")
     for task in registration["tasks"]:
         directory = root / task
         pair = load(directory / "pair.json")
@@ -193,9 +194,13 @@ def validate_tasks(root, registration):
         require(isinstance(indicator, str) and indicator, "shape indicator required")
         regex = re.compile(indicator)
         for arm in ("a", "b"):
-            starter = list((directory / ("starter-" + arm)).glob("*.calr"))
+            fixture = directory / ("starter-" + arm)
+            starter = assembly.source_paths(pair, fixture, editable_only=True)
             clean = local(directory, pair["seeded"]["clean"][arm])
-            clean_sources = list(clean.glob("*.calr"))
+            clean_sources = assembly.source_paths(pair, clean, editable_only=True)
+            if assembly.definition(pair):
+                immutable = assembly.check_fragments(pair, fixture)
+                assembly.check_fragments(pair, clean, immutable)
             require(starter and clean_sources, "starter and clean seed sources required")
             require(not any(regex.search(p.read_text()) for p in starter),
                     "shape indicator matches its starter")
@@ -228,6 +233,7 @@ def analyze(epochs_root, epoch_id, stage):
               for path in (epoch / "runs").rglob("result.json")}
     require(actual == expected, "run inventory differs from registered cells; pooling or missing runs")
     capture = helper("harness-capture.py")
+    assembly = helper("ppw-source-assembly.py")
     token_usage = helper("token-usage.py")
     cells = []
     for task in pins["suite"]:
@@ -292,7 +298,12 @@ def analyze(epochs_root, epoch_id, stage):
                 cell["validRuns"] += 1
                 cell["censoredRuns"] += int(record["censored"])
                 cell["didNotBuildAtDeclaredDone"] += int(not built)
-                sources = list((run_dir / "final-src").rglob("*.calr"))
+                final_source = run_dir / "final-src"
+                if assembly.definition(pair):
+                    frozen_source = epoch / "tasks" / task / ("starter-" + arm.lower())
+                    immutable = assembly.check_fragments(pair, frozen_source)
+                    assembly.check_fragments(pair, final_source, immutable)
+                sources = assembly.source_paths(pair, final_source, editable_only=True)
                 require(sources, "missing final sources for shape indicator")
                 cell["shapeRealized"] += int(any(regex.search(p.read_text()) for p in sources))
                 if built:
@@ -383,6 +394,7 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
     require(command(["claude", "--version"]) == selected["agentVersion"], "agent version differs from registration")
     shared = product(compiler_root, registration["compilerCommit"])
     harness_files = ("run-pair.sh", "harness-capture.py", "ppw-instrument.py", "ppw-registration.py",
+                     "ppw-source-assembly.py",
                      "token-usage.py", "token-usage.sh", "telemetry-helpers.py", "ppw-pins.schema.json",
                      "templates/calor-arm/CalorArm.csproj.template",
                      "templates/calor-arm/policy-canary.calr.txt")

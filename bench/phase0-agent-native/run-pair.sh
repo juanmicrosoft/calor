@@ -41,6 +41,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # W1: the ONE reader of transcript.jsonl / .calor-build-state.json / the arm
 # config pin (shared with run-bundle.sh and the python tests).
 HARNESS_CAPTURE="$SCRIPT_DIR/harness-capture.py"
+SOURCE_ASSEMBLY="$SCRIPT_DIR/ppw-source-assembly.py"
 
 # ---------------------------------------------------------------------------
 # Invalid-run detection (gates doc §0.2): invalid, crashed, or API-errored
@@ -103,14 +104,14 @@ archive_final_src() {
     local ws="$1" ws_out="$2"
     rm -rf "$ws_out/final-src"
     mkdir -p "$ws_out/final-src"
-    ( cd "$ws/src" && find . -type f \( -name '*.calr' -o -name '*.cs' \) \
+    ( cd "$ws/src" && find . -type f \( -name '*.calr' -o -name '*.cs' -o -name "${SOURCE_FRAGMENT_GLOB:-*.calr}" \) \
         -not -path '*/obj/*' -not -path '*/bin/*' -print0 \
       | while IFS= read -r -d '' f; do
             mkdir -p "$ws_out/final-src/$(dirname "$f")"
             cp "$f" "$ws_out/final-src/$f"
         done )
     local src_count arch_count
-    src_count=$(find "$ws/src" -type f \( -name '*.calr' -o -name '*.cs' \) \
+    src_count=$(find "$ws/src" -type f \( -name '*.calr' -o -name '*.cs' -o -name "${SOURCE_FRAGMENT_GLOB:-*.calr}" \) \
         -not -path '*/obj/*' -not -path '*/bin/*' | wc -l | tr -d ' ')
     arch_count=$(find "$ws_out/final-src" -type f | wc -l | tr -d ' ')
     if [[ "$arch_count" != "$src_count" ]]; then
@@ -288,6 +289,14 @@ if [[ -n "$ARM_LABEL_OVERRIDE" ]]; then
 fi
 PAIR_DIR="$(cd "$PAIR_DIR" && pwd)"
 PAIR_ID="$(jq -r .id "$PAIR_DIR/pair.json")"
+SOURCE_FRAGMENT_GLOB="*.calr"
+SOURCE_ASSEMBLY_ENABLED=0
+if jq -e 'has("sourceAssembly")' "$PAIR_DIR/pair.json" >/dev/null; then
+    [[ $REDESIGNED_POLICY -eq 1 ]] || { echo "sourceAssembly requires a redesigned policy arm" >&2; exit 3; }
+    [[ "$EDIT_MECHANISM" == "raw" ]] || { echo "sourceAssembly currently requires raw fragment editing" >&2; exit 3; }
+    SOURCE_FRAGMENT_GLOB="*.calr.inc"
+    SOURCE_ASSEMBLY_ENABLED=1
+fi
 # Arm config resolution (W1): the admission verdict is applied by check_pins
 # below (exit 3 on rejection, the pre-0.16 behaviour for a pin violation);
 # the fixture / controlArmKind / permissive fields are needed by materialize
@@ -397,8 +406,8 @@ render_template() {  # <dest csproj path>
 
 policy_changed() {  # <workspace> <run output>; return 0 means invalid
     [[ $REDESIGNED_POLICY -eq 1 ]] || return 1
-    if ! python3 "$HARNESS_CAPTURE" policy-snapshot "$1" > "$2/policy-after.json"; then
-        echo "generated workspace policy is unreadable"
+    if ! python3 "$HARNESS_CAPTURE" policy-snapshot "$1" > "$2/policy-after.json" 2> "$2/policy-after.err"; then
+        echo "generated workspace policy is unreadable: $(cat "$2/policy-after.err")"
         return 0
     fi
     if ! cmp -s "$2/policy-before.json" "$2/policy-after.json"; then
@@ -616,6 +625,9 @@ materialize() {
         # template exactly as archived (pre-verify-gate), not main's. The
         # pre-rows exception is documented at render_template.
         render_template "$ws/src/Src.csproj"
+        if [[ $SOURCE_ASSEMBLY_ENABLED -eq 1 ]]; then
+            python3 "$SOURCE_ASSEMBLY" setup "$PAIR_DIR/pair.json" "$ws/src"
+        fi
     else
         cat > "$ws/src/Src.csproj" <<'EOF'
 <Project Sdk="Microsoft.NET.Sdk">
@@ -807,7 +819,7 @@ EOF
     # first observed build always compares against "none" and journals a
     # phantom edited:true iteration even when the agent has changed nothing.
     local base_hash
-    base_hash=$(find "$ws/src" -type f \( -name '*.cs' -o -name '*.calr' \) -not -path '*/obj/*' -not -path '*/bin/*' -exec shasum {} + 2>/dev/null | shasum | cut -d' ' -f1)
+    base_hash=$(find "$ws/src" -type f \( -name '*.cs' -o -name '*.calr' -o -name "$SOURCE_FRAGMENT_GLOB" \) -not -path '*/obj/*' -not -path '*/bin/*' -exec shasum {} + 2>/dev/null | shasum | cut -d' ' -f1)
     echo "$base_hash" > "$ws_out/.lasthash"
     # Iteration counter (v2 telemetry): 1-based ordinal among edited
     # invocations, persisted next to .lasthash so the shim can resume it.
@@ -880,7 +892,7 @@ case "\${1:-}" in
     # bin/obj are excluded: generated outputs (e.g. the calor arm's obj/calor/
     # *.g.cs) would otherwise flip the hash on the first build and journal a
     # phantom edited:true iteration with zero agent edits
-    hash=\$(find "$ws/src" -type f \\( -name '*.cs' -o -name '*.calr' \\) -not -path '*/obj/*' -not -path '*/bin/*' -exec shasum {} + 2>/dev/null | shasum | cut -d' ' -f1)
+    hash=\$(find "$ws/src" -type f \\( -name '*.cs' -o -name '*.calr' -o -name "$SOURCE_FRAGMENT_GLOB" \\) -not -path '*/obj/*' -not -path '*/bin/*' -exec shasum {} + 2>/dev/null | shasum | cut -d' ' -f1)
     prev=\$(cat "$ws_out/.lasthash" 2>/dev/null || echo none)
     edited=\$([[ "\$hash" != "\$prev" ]] && echo true || echo false)
     echo "\$hash" > "$ws_out/.lasthash"
@@ -1054,6 +1066,9 @@ run_agent() {
         test_rule="You may write your own scratch tests anywhere under the workspace (they are not graded; only the sources in src/ are). Do not modify the project file or the provided smoke tests under the smoke directory."
     fi
     prompt="You are working in $ws/src. Read $ws/spec.md and complete the task it describes — implementing missing operations and/or modifying existing behavior as specified — in the existing source files, following the conventions already present. The iteration budget is $ITERATION_BUDGET build/test cycles. Build with 'dotnet build' from $ws/src to check your work. $test_rule Stop when the spec is fully satisfied and the project builds cleanly (the starter already builds, so a clean build alone does not mean you are done)."
+    if [[ $SOURCE_ASSEMBLY_ENABLED -eq 1 ]]; then
+        prompt+=$'\n\n'"Edit only these source fragments: $(jq -r '.sourceAssembly.editableParts | join(", ")' "$PAIR_DIR/pair.json"). The other fragments are immutable dependencies. The build assembles Program.calr under obj/; do not edit or copy generated source into the editable fragments, and do not add other compiled sources."
+    fi
     if [[ -n "$EXEMPLAR_FILE" ]]; then
         prompt+=$'\n\n'"$(cat "$EXEMPLAR_FILE")"
     fi
@@ -1500,8 +1515,12 @@ for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
         # Declared-done archival runs immediately after the agent stops —
         # before the final build below can rewrite anything — and its failure
         # is run-invalidating (A-1.3 item 4, #826 M2).
+        archive_reason=""
+        if reason="$(archive_final_src "$WS" "$WS_OUT")"; then
+            archive_reason="$reason"
+        fi
         if reason="$(policy_changed "$WS" "$WS_OUT")" \
-           || reason="$(archive_final_src "$WS" "$WS_OUT")" \
+           || { [[ -n "$archive_reason" ]] && reason="$archive_reason"; } \
            || reason="$(detect_invalid_run "$WS_OUT" "$AGENT_RC")"; then
             printf '%s attempt=%d agent_rc=%d: %s\n' \
                 "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$attempt" "$AGENT_RC" "$reason" \

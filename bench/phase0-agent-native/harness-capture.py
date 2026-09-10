@@ -98,6 +98,7 @@ Python 3.9 compatible; standard library only.
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -422,7 +423,14 @@ def policy_snapshot(workspace):
                 raise ValueError("symlinked workspace configuration: %s" % relative)
             if path.is_file():
                 files[str(relative)] = hashlib.sha256(path.read_bytes()).hexdigest()
-    return {"policy": values, "configurationSha256": files}
+    snapshot = {"policy": values, "configurationSha256": files}
+    if (root / "src" / ".ppw-source-assembly.json").exists():
+        spec = importlib.util.spec_from_file_location(
+            "ppw_source_assembly", Path(__file__).with_name("ppw-source-assembly.py"))
+        assembly = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(assembly)
+        snapshot["immutableSourcesSha256"] = assembly.workspace_snapshot(root / "src")
+    return snapshot
 
 
 def isolate_workspace(workspace):

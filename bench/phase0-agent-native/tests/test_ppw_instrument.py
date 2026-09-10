@@ -273,13 +273,19 @@ class InstrumentTests(unittest.TestCase):
         prior_calls = len(calls.read_text().splitlines()) if calls.exists() else 0
         fake_dotnet = executable / "dotnet"
         fake_dotnet.write_text("""#!/usr/bin/env python3
-import json, pathlib, sys
+import json, pathlib, shlex, subprocess, sys, xml.etree.ElementTree as ET
 if "--help" in sys.argv:
     sys.exit(0)
 project = pathlib.Path.cwd() / "Src.csproj"
 if "build" in sys.argv:
     if not project.exists():
         project = pathlib.Path(next(a for a in sys.argv if a.endswith(".csproj")))
+    assembly = ET.parse(project).find(".//Target[@Name='_PpwAssembleSources']/Exec")
+    if assembly is not None:
+        result = subprocess.run(shlex.split(assembly.attrib["Command"]), capture_output=True, text=True)
+        if result.returncode:
+            print(result.stderr)
+            sys.exit(result.returncode)
     state = project.parent / "obj/calor/.calor-build-state.json"
     state.parent.mkdir(parents=True, exist_ok=True)
     state.write_text(json.dumps({"compilerHash": "d"*64, "optionsHash": str(project.parent)}))
@@ -293,11 +299,18 @@ if "test" in sys.argv:
 """)
         fake_agent = executable / "claude"
         fake_agent.write_text("""#!/usr/bin/env python3
-import json, os, pathlib
+import json, os, pathlib, subprocess
 with open(os.environ["SYNTHETIC_CALLS"], "a") as f: f.write("attempt\\n")
 if os.environ["SYNTHETIC_BEHAVIOR"] == "policy-change":
     p=pathlib.Path("Src.csproj")
     p.write_text(p.read_text().replace("<CalorPermissiveEffects>false", "<CalorPermissiveEffects>true"))
+if os.environ["SYNTHETIC_BEHAVIOR"] == "fragment-edit":
+    pathlib.Path("task.calr.inc").write_text("this.lookup\\n")
+    subprocess.run(["dotnet", "build"], capture_output=True, text=True, check=True)
+if os.environ["SYNTHETIC_BEHAVIOR"] == "dependency-edit":
+    pathlib.Path("dependency.calr.inc").write_text("changed dependency\\n")
+if os.environ["SYNTHETIC_BEHAVIOR"] == "extra-source":
+    pathlib.Path("Bypass.cs").write_text("// unregistered source\\n")
 print(json.dumps({"type":"assistant","message":{"id":"synthetic","content":[]}}))
 print(json.dumps({"type":"result","result":"API error" if os.environ["SYNTHETIC_BEHAVIOR"] == "api-error" else "synthetic done",
                   "usage":{"output_tokens":1},"modelUsage":{"SYNTHETIC":{"outputTokens":100}}}))
