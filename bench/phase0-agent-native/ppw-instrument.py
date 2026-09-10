@@ -14,6 +14,7 @@ import math
 import os
 from pathlib import Path
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -463,14 +464,25 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
     spending = helper("ppw-spending.py")
     admission = spending.admit(
         registration, selected, authorization, registration_path.parent, epoch_id, stage)
+    gateway_mode = admission.get("mechanism") == spending.GATEWAY
+    gateway_module = helper("ppw-budget-gateway.py") if gateway_mode else None
     require(not command(["git", "-C", str(REPO), "status", "--porcelain",
                          "--", str(BENCH)]), "harness checkout is dirty")
     require(os.environ.get("CLAUDE_MODEL") == selected["modelPin"], "CLAUDE_MODEL differs from registration")
-    require(command(["claude", "--version"]) == selected["agentVersion"], "agent version differs from registration")
+    client_command = admission["clientExecutable"] if gateway_mode else "claude"
+    require(command([client_command, "--version"],
+                    env=dict(os.environ, DISABLE_AUTOUPDATER="1")) == selected["agentVersion"],
+            "agent version differs from registration")
     shared = product(compiler_root, registration["compilerCommit"])
     harness_hashes = admission["harnessArtifacts"]
     harness_files = tuple(harness_hashes)
-    require(spending.artifact_manifest() == harness_hashes, "registered harness changed after admission")
+    require(spending.artifact_manifest(admission.get("mechanism", spending.CONTROL)) == harness_hashes,
+            "registered harness changed after admission")
+    runtime = Path(compiler_root) / "src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll"
+    if gateway_mode:
+        require(runtime.is_file() and digest(runtime) == admission["runtimeSha256"],
+                "gateway requires the frozen prebuilt runtime, never a rebuilt product")
+        helper("ppw-source-inspection.py").prepare(shared["calorDll"])
     epoch = local(epochs_root, epoch_id)
     require(not epoch.exists(), "epoch already exists; use a reviewed new epoch id, never overwrite")
     # Canaries run outside the epoch and before any agent invocation.
@@ -484,6 +496,8 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
         for definition in ARMS.values():
             argv = pair_command(Path(tasks_root) / registration["tasks"][0], definition,
                                 shared, work, 0) + ["--canary-only"]
+            if gateway_mode:
+                argv += ["--ppw-gateway-client", admission["clientExecutable"]]
             evidence = json.loads(command(argv, env=env))
             require(evidence.get("armCanary") ==
                     ("permissive-ok" if definition["policy"] == "permissive" else "strict-ok"),
@@ -494,8 +508,17 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
         require(product(compiler_root, registration["compilerCommit"]) ==
                 {k: v for k, v in shared.items() if k != "compilerHash"},
                 "compiler product changed during preflight")
-        ledger = spending.Ledger(admission["ledgerPath"])
-        ledger.initialize(admission)
+        if gateway_mode:
+            ledger = gateway_module.budget.RequestLedger(admission["ledgerPath"])
+            ledger.initialize({
+                "stage": stage, "epochId": epoch_id, "priceSha256": admission["priceSha256"],
+                "authorizationSha256": admission["authorizationSha256"],
+                "protocolSha256": admission["protocolSha256"], "planSha256": admission["planSha256"],
+                "harnessArtifacts": harness_hashes,
+            }, admission["ceilingUnits"])
+        else:
+            ledger = spending.Ledger(admission["ledgerPath"])
+            ledger.initialize(admission)
         owner = ledger.start()
         epoch.mkdir(parents=True)
         shutil.copy2(registration_path, epoch / "registration.json")
@@ -505,6 +528,14 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                      epoch / "spending-authorization.json")
         shutil.copy2(local(registration_path.parent, selected["spendingPlan"]["path"]),
                      epoch / "spending-plan.json")
+        if gateway_mode:
+            proofs = [selected[name] for name in
+                      ("spendAuthorization", "stageRegistration", "modelRegistration",
+                       "instrumentAmendment", "spendingPlan")]
+            for proof in proofs:
+                destination = local(epoch, proof["path"])
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(local(registration_path.parent, proof["path"]), destination)
         pins = {"schemaVersion": 2, "kind": KIND, "epochId": epoch_id, "stage": stage,
                 "dataKind": "empirical", "mode": "live", "lifecycle": "collecting",
                 "harnessCommit": command(["git", "-C", str(REPO), "rev-parse", "HEAD"]),
@@ -523,11 +554,41 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                             {k: v for k, v in shared.items() if k != "compilerHash"},
                             "shared compiler drift before run")
                     slot = "%s/%s/%d" % (task, definition["label"], run)
+                    run_directory = epoch / "runs" / task / definition["label"] / ("run-%d" % run)
+                    if gateway_mode:
+                        require(digest(runtime) == admission["runtimeSha256"], "runtime drift before run")
+                        run_directory.mkdir(parents=True)
+                        protected = Path(admission["ledgerPath"]).parent
+                        context_path = protected / ("invocation-" + secrets.token_hex(16) + ".json")
+                        try:
+                            with gateway_module.Gateway(ledger, owner, slot) as gateway:
+                                descriptor = os.open(context_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                                with os.fdopen(descriptor, "w") as stream:
+                                    json.dump({
+                                        "kind": spending.GATEWAY, "protectedRoot": str(protected),
+                                        "gatewayPid": os.getpid(), "baseUrl": gateway.base_url,
+                                        "clientExecutable": admission["clientExecutable"],
+                                        "shellExecutable": admission["shellExecutable"],
+                                        "shellSha256": admission["shellSha256"],
+                                    }, stream)
+                                argv = [sys.executable, str(BENCH / "ppw-gateway-client.py"),
+                                        "--context", str(context_path), "--workspace", str(work),
+                                        "--output", str(run_directory), "--"]
+                                argv += pair_command(epoch / "tasks" / task, definition, shared,
+                                                     epoch / "runs", run - 1)
+                                argv += ["--ppw-gateway-client", admission["clientExecutable"]]
+                                command(argv, env=env)
+                        finally:
+                            context_path.unlink(missing_ok=True)
+                        require(ledger.snapshot()["state"] == "collecting",
+                                "pilot incomplete: " + ledger.snapshot()["state"])
+                        require(digest(runtime) == admission["runtimeSha256"], "runtime drift after run")
+                        stamp_run(run_directory / "result.json", pins)
+                        continue
                     ticket = ledger.reserve(owner, slot)
                     ticket_path = epoch / "spend-tickets" / task / definition["label"] / ("run-%d.json" % run)
                     ticket_path.parent.mkdir(parents=True, exist_ok=True)
                     write_new(ticket_path, ticket)
-                    run_directory = epoch / "runs" / task / definition["label"] / ("run-%d" % run)
                     exit_code = -1
                     try:
                         command(pair_command(epoch / "tasks" / task, definition, shared,
@@ -561,7 +622,8 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
         record_stage(epochs_root, epoch_id, stage)
     except BaseException:
         if ledger is not None and owner is not None:
-            ledger.stop(owner, "interrupted-or-incomplete-collection")
+            ledger.stop(owner, "INCOMPLETE_INTERRUPTED" if gateway_mode
+                        else "interrupted-or-incomplete-collection")
             if epoch.is_dir() and not (epoch / "collection-outcome.json").exists():
                 write_new(epoch / "collection-outcome.json", {
                     "kind": "pp-w-incomplete-collection", "epochId": epoch_id, "stage": stage,

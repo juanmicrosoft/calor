@@ -4,14 +4,17 @@ import argparse
 from contextlib import contextmanager
 from decimal import Decimal, InvalidOperation, ROUND_CEILING
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import secrets
 import sqlite3
+import subprocess
 import sys
 
 SCALE = 1_000_000
 CONTROL = "claude-code-max-budget-usd"
+GATEWAY = "pp-w-request-gateway-v1"
 ROOT = Path(__file__).resolve().parent
 COLLECTION_ARTIFACTS = (
     "run-pair.sh", "harness-capture.py", "ppw-instrument.py", "ppw-registration.py",
@@ -19,6 +22,11 @@ COLLECTION_ARTIFACTS = (
     "source-inspection/Program.cs", "source-inspection/PpwSourceInspector.csproj",
     "token-usage.py", "token-usage.sh", "telemetry-helpers.py", "ppw-pins.schema.json",
     "templates/calor-arm/CalorArm.csproj.template", "templates/calor-arm/policy-canary.calr.txt",
+)
+GATEWAY_ARTIFACTS = COLLECTION_ARTIFACTS + (
+    "ppw-gateway-budget.py", "ppw-budget-gateway.py", "ppw-gateway-client.py",
+    "gateway-tools/python3",
+    "templates/calor-arm/CalorArm.Gateway.csproj.template",
 )
 
 
@@ -35,8 +43,32 @@ def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def artifact_manifest():
-    return {name: digest(ROOT / name) for name in COLLECTION_ARTIFACTS}
+def artifact_manifest(mechanism=CONTROL):
+    require(mechanism in (CONTROL, GATEWAY), "unknown collector mechanism")
+    return {name: digest(ROOT / name) for name in
+            (GATEWAY_ARTIFACTS if mechanism == GATEWAY else COLLECTION_ARTIFACTS)}
+
+
+def module(filename):
+    spec = importlib.util.spec_from_file_location(filename.replace("-", "_"), ROOT / filename)
+    result = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(result)
+    return result
+
+
+def gateway_ledger_location(binding):
+    require(isinstance(binding, dict) and binding.get("anchor") == "git-common-dir"
+            and binding.get("relativePath") == "ppw-budget/epic1254-pilot.sqlite3",
+            "fixed project-wide pilot ledger binding required")
+    result = subprocess.run(["git", "-C", str(ROOT.parent.parent), "rev-parse", "--git-common-dir"],
+                            text=True, capture_output=True, check=True)
+    common = Path(result.stdout.strip())
+    if not common.is_absolute():
+        common = ROOT.parent.parent / common
+    common = common.resolve(strict=True)
+    require(hashlib.sha256(str(common).encode()).hexdigest() == binding.get("anchorSha256"),
+            "another clone/state root cannot reset the authorized pilot budget")
+    return common / binding["relativePath"]
 
 
 def pinned_document(directory, proof, name):
@@ -109,7 +141,9 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
     require(isinstance(amendment, dict) and amendment.get("schemaVersion") == 1
             and amendment.get("kind") == "pp-w-prospective-spending-instrument-amendment"
             and amendment.get("stage") == "pilot", "prospective instrument amendment required")
-    harness = artifact_manifest()
+    control = plan.get("clientControl", {})
+    require(isinstance(control, dict), "client control must be explicit")
+    harness = artifact_manifest(control.get("kind", CONTROL))
     require(amendment.get("replacementHarnessArtifacts") == harness,
             "instrument source differs from the prospectively registered artifact manifest")
     require(plan.get("protocolSha256") == protocol_identity(registration, selected, stage, epoch_id),
@@ -119,12 +153,6 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
             "spending plan ceiling differs from the supplied authorization")
     require(plan.get("costBasis") == "both-list-price-study-cost-and-actual-spend",
             "subscription usage does not exempt study cost from the ceiling")
-    ledger = plan.get("ledgerPath")
-    require(isinstance(ledger, str) and Path(ledger).is_absolute(),
-            "one pinned absolute shared ledger path is required across output roots")
-    require(ledger == authorization.get("spendingLedgerPath"),
-            "the authorization must bind the same shared ledger; alternate plans cannot reset spending")
-    Ledger(ledger)
     slots = [
         {"id": "%s/%s/%d" % (task, arm, run), "task": task, "arm": arm, "run": run}
         for run in range(1, selected["runsPerArm"] + 1)
@@ -132,8 +160,36 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
     ]
     require(type(plan.get("plannedInvocations")) is int and plan["plannedInvocations"] == len(slots),
             "full unchanged registered slot inventory is required, not a budget-sized subset")
-    control = plan.get("clientControl", {})
-    require(isinstance(control, dict), "client control must be explicit")
+    if control.get("kind") == GATEWAY:
+        policy = module("ppw-gateway-budget.py")
+        isolation = module("ppw-gateway-client.py")
+        require(selected["modelPin"] == policy.MODEL
+                and selected["agentVersion"] == isolation.CLIENT_VERSION, "gateway model/client differs")
+        _, prices = pinned_document(directory, control.get("priceContract", {}), "priceContract")
+        require(prices == policy.price_contract(), "price contract differs from implemented bounds")
+        require(control.get("isolation") == isolation.ISOLATION, "unsupported gateway isolation")
+        require(plan.get("ledgerBinding") == authorization.get("ledgerBinding"),
+                "authorization and plan must bind the same non-resettable ledger")
+        isolation.validate_platform()
+        client = isolation.validate_client(control.get("clientExecutable"))
+        shell = isolation.validate_shell(control.get("shellExecutable"), control.get("shellSha256"))
+        ledger = gateway_ledger_location(plan["ledgerBinding"])
+        policy.RequestLedger(ledger)
+        return {
+            "mechanism": GATEWAY, "epochId": epoch_id, "stage": stage, "ceilingUnits": ceiling,
+            "authorizationSha256": selected["spendAuthorization"]["sha256"],
+            "protocolSha256": plan["protocolSha256"], "planSha256": digest(path),
+            "ledgerPath": str(ledger), "costBasis": plan["costBasis"], "harnessArtifacts": harness,
+            "clientExecutable": str(client), "priceSha256": policy.price_identity(),
+            "shellExecutable": str(shell), "shellSha256": control["shellSha256"],
+            "runtimeSha256": control.get("runtimeSha256"), "slots": slots,
+        }
+    ledger = plan.get("ledgerPath")
+    require(isinstance(ledger, str) and Path(ledger).is_absolute(),
+            "one pinned absolute shared ledger path is required across output roots")
+    require(ledger == authorization.get("spendingLedgerPath"),
+            "the authorization must bind the same shared ledger; alternate plans cannot reset spending")
+    Ledger(ledger)
     maximum = verified_upper_bound(control)
     require(maximum is not None,
             "--max-budget-usd is a locally estimated threshold; no trustworthy upper bound "

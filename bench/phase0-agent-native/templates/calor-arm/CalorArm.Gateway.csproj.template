@@ -1,0 +1,23 @@
+<!-- Gateway isolation keeps the frozen product read-only. Consume its exact
+     prebuilt runtime and Tasks DLLs rather than rebuilding project references. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseSharedCompilation>false</UseSharedCompilation>
+    <CalorTasksAssembly>__REPO_ROOT__/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll</CalorTasksAssembly>
+    <CalorOutputDirectory>$(MSBuildThisFileDirectory)obj/calor/</CalorOutputDirectory>
+    <CalorEnforceEffects>true</CalorEnforceEffects>
+    <CalorPermissiveEffects>__CALOR_PERMISSIVE_EFFECTS__</CalorPermissiveEffects>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Calor.Runtime">
+      <HintPath>__REPO_ROOT__/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <CalorCompile Include="**/*.calr" />
+  </ItemGroup>
+  <Import Project="__REPO_ROOT__/src/Calor.Sdk/Sdk/Sdk.targets" />
+</Project>

@@ -5,6 +5,7 @@ import fcntl
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -31,8 +32,12 @@ def prepare(compiler):
         compiler.read_bytes() + (TOOL / "Program.cs").read_bytes()
         + (TOOL / "PpwSourceInspector.csproj").read_bytes()).hexdigest()
     cache = TOOL / "cache" / fingerprint
-    cache.mkdir(parents=True, exist_ok=True)
     binary = cache / "bin/ppw-source-inspector.dll"
+    if os.environ.get("PPW_INSPECTOR_READONLY") == "1":
+        if not binary.is_file() or sha(binary.parent / "calor.dll") != sha(compiler):
+            raise ValueError("isolated source inspection requires the prebuilt pinned inspector")
+        return binary
+    cache.mkdir(parents=True, exist_ok=True)
     with (cache / "build.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         if not binary.is_file():

@@ -179,6 +179,7 @@ EXEMPLAR_FILE=""
 EDIT_MECHANISM="raw"
 CALOR_DLL_OVERRIDE=""
 PPW_SPEND_TICKET=""
+PPW_GATEWAY_CLIENT=""
 ARM_REPO_ROOT=""
 ARM_LABEL_OVERRIDE=""
 # W1 / roadmap §4.1: which `arms.<key>` entry of pair.json this invocation
@@ -209,6 +210,8 @@ while [[ $# -gt 0 ]]; do
         --calor-dll) CALOR_DLL_OVERRIDE="$2"; shift 2 ;;
         --ppw-spend-ticket) [[ -z "$PPW_SPEND_TICKET" ]] || { echo "Duplicate spending ticket" >&2; exit 2; }
                             PPW_SPEND_TICKET="$2"; shift 2 ;;
+        --ppw-gateway-client) [[ -z "$PPW_GATEWAY_CLIENT" ]] || { echo "Duplicate gateway client" >&2; exit 2; }
+                              PPW_GATEWAY_CLIENT="$2"; shift 2 ;;
         --arm-repo-root) ARM_REPO_ROOT="$2"; shift 2 ;;
         --run-offset) RUN_OFFSET="$2"; shift 2 ;;
         --arm-label) ARM_LABEL_OVERRIDE="$2"; shift 2 ;;
@@ -227,6 +230,12 @@ fi
 if [[ -n "$PPW_SPEND_TICKET" ]]; then
     [[ $REDESIGNED_POLICY -eq 1 && $NULL_AGENT -eq 0 && $CANARY_ONLY -eq 0 && "$RUNS" == "1" ]] \
         || { echo "PP-W spending tickets require exactly one non-null redesigned run" >&2; exit 2; }
+fi
+if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
+    [[ $REDESIGNED_POLICY -eq 1 && "$RUNS" == "1" && -z "$PPW_SPEND_TICKET" ]] \
+        || { echo "Request gateway requires one redesigned run and no per-run spending ticket" >&2; exit 2; }
+    [[ $CANARY_ONLY -eq 1 || "${PPW_GATEWAY_ACTIVE:-}" == "1" ]] \
+        || { echo "Request gateway requires the isolated collector launcher" >&2; exit 2; }
 fi
 
 # Per-arm PRODUCT checkout (guarantees plan G5, A-1.3 epoch): --calor-dll pins
@@ -404,6 +413,10 @@ TEMPLATE_PATH="$ARM_REPO_ROOT/bench/phase0-agent-native/templates/calor-arm/Calo
 if [[ "$CONTROL_ARM_KIND" == "pre-rows" || "$ARM_CONFIG_KEY" == "calor-permissive" || "$ARM_CONFIG_KEY" == "calor-strict" ]]; then
     TEMPLATE_SOURCE="harness"
     TEMPLATE_PATH="$SCRIPT_DIR/templates/calor-arm/CalorArm.csproj.template"
+fi
+if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
+    TEMPLATE_SOURCE="harness-gateway"
+    TEMPLATE_PATH="$SCRIPT_DIR/templates/calor-arm/CalorArm.Gateway.csproj.template"
 fi
 render_template() {  # <dest csproj path>
     sed -e "s|__REPO_ROOT__|$ARM_REPO_ROOT|g" \
@@ -1171,6 +1184,10 @@ run_agent() {
     # (A-1.9.1) which already includes subagent tokens. pipefail (set at the
     # top) makes rc claude's exit when it fails, not tee's or jq's.
     local claude_args=(--print --verbose --output-format stream-json --forward-subagent-text --dangerously-skip-permissions)
+    local client_command="claude"
+    if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
+        client_command="$PPW_GATEWAY_CLIENT"
+    fi
     if [[ -n "$PPW_SPEND_TICKET" ]]; then
         local client_help budget_limit
         client_help="$(claude --help)" \
@@ -1188,7 +1205,7 @@ run_agent() {
     if [[ -n "$timeout_bin" ]]; then
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
             "$timeout_bin" -k 10 "$TIMEOUT_SECS" \
-            claude "${claude_args[@]}" ${model_args[@]+"${model_args[@]}"} ${mcp_args[@]+"${mcp_args[@]}"} \
+            "$client_command" "${claude_args[@]}" ${model_args[@]+"${model_args[@]}"} ${mcp_args[@]+"${mcp_args[@]}"} \
             "$prompt" 2> "$ws_out/agent.err" \
             | tee "$ws_out/transcript.jsonl" | jq -c 'select(.type? == "result")' > "$ws_out/agent.json" ) || rc=$?
     else
@@ -1203,7 +1220,7 @@ run_agent() {
         # pattern kill — logging every step to stderr.
         set -m
         ( cd "$ws/src" && PATH="$shim_dir:$PATH" \
-            claude "${claude_args[@]}" ${model_args[@]+"${model_args[@]}"} ${mcp_args[@]+"${mcp_args[@]}"} \
+            "$client_command" "${claude_args[@]}" ${model_args[@]+"${model_args[@]}"} ${mcp_args[@]+"${mcp_args[@]}"} \
             "$prompt" 2> "$ws_out/agent.err" \
             | tee "$ws_out/transcript.jsonl" | jq -c 'select(.type? == "result")' > "$ws_out/agent.json" ) &
         local agent_pid=$!
@@ -1211,7 +1228,13 @@ run_agent() {
         while kill -0 "$agent_pid" 2>/dev/null; do
             if (( SECONDS >= deadline )); then
                 echo "watchdog: agent exceeded ${TIMEOUT_SECS}s; killing pid $agent_pid and descendants" >&2
-                kill_agent_tree "$agent_pid" "$ws" "$ws_out"
+                if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
+                    kill -TERM -- "-$agent_pid" 2>/dev/null || true
+                    sleep 10
+                    kill -KILL -- "-$agent_pid" 2>/dev/null || true
+                else
+                    kill_agent_tree "$agent_pid" "$ws" "$ws_out"
+                fi
                 break
             fi
             sleep 5
@@ -1220,7 +1243,7 @@ run_agent() {
         set +m
     fi
     AGENT_RC=$rc
-    if [[ -n "$PPW_SPEND_TICKET" ]]; then
+    if [[ -n "$PPW_SPEND_TICKET" || -n "$PPW_GATEWAY_CLIENT" ]]; then
         jq -n --argjson code "$rc" '{exitCode:$code}' > "$ws_out/client-invocation.json"
     fi
     if [[ $rc -ne 0 ]]; then echo "agent exit: $rc" >> "$ws_out/agent.err"; fi
