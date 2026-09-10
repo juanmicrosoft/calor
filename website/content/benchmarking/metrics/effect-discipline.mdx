@@ -78,7 +78,7 @@ not a financial model, memoization proof, or measured benchmark result.
 ## Inspect the runner without collection
 
 From a repository checkout with its documented
-[build prerequisites](/docs/contributing/), run:
+[build prerequisites, including Z3 bootstrap](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/README.md#building-from-source), run:
 
 ```bash
 dotnet run --project tests/Calor.Evaluation -- effect-discipline --provider mock --dry-run --sample 1
