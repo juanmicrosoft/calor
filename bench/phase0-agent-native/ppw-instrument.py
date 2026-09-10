@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -412,6 +413,35 @@ def product(root, commit):
             "calorDll": str(dll), "calorSha256": digest(dll), "calorTasksSha256": digest(tasks)}
 
 
+def validate_collection_authorization(registration, selected, directory, epoch_id, stage, confirm_paid):
+    require(registration.get("collectionAuthorized") is True,
+            "registration does not authorize collection")
+    require(registration.get("fundingStatus") == "approved",
+            "registration funding is not approved")
+    proofs = {}
+    for name in ("spendAuthorization", "stageRegistration", "modelRegistration"):
+        artifact = selected.get(name, {})
+        path = local(directory, artifact.get("path"))
+        require(path.is_file() and digest(path) == artifact.get("sha256"),
+                "%s evidence is missing or changed" % name)
+        proofs[name] = path
+    authorization = load(proofs["spendAuthorization"])
+    require(authorization.get("kind") == "pp-w-rows-spending-authorization",
+            "structured spending authorization required")
+    require(authorization.get("epochId") == epoch_id and authorization.get("stage") == stage,
+            "spending authorization is for another epoch or stage")
+    ceiling = authorization.get("spendingCeilingUsd")
+    require((type(ceiling) is int and ceiling > 0)
+            or (type(ceiling) is float and math.isfinite(ceiling) and ceiling > 0),
+            "spending authorization requires an explicit positive finite ceiling")
+    require(authorization.get("nullResultAccepted") is True,
+            "separate null-result acceptance is required")
+    for name in ("approvedBy", "approvalReference"):
+        require(isinstance(authorization.get(name), str) and authorization[name].strip(),
+                "spending authorization requires %s" % name)
+    require(confirm_paid, "paid collection requires --confirm-paid-epoch and written authorization")
+
+
 def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_id, stage,
               confirm_paid=False):
     """Collection driver. There is deliberately no compiler-per-arm argument."""
@@ -421,13 +451,8 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
     registration = load(registration_path)
     selected = validate_registration(registration, stage, epoch_id)
     validate_tasks(tasks_root, registration)
-    # A written, reviewed task supersession is not spending or stage-registration approval.
-    for name in ("spendAuthorization", "stageRegistration", "modelRegistration"):
-        artifact = selected.get(name, {})
-        path = local(registration_path.parent, artifact.get("path"))
-        require(path.is_file() and digest(path) == artifact.get("sha256"),
-                "%s evidence is missing or changed" % name)
-    require(confirm_paid, "paid collection requires --confirm-paid-epoch and written authorization")
+    validate_collection_authorization(
+        registration, selected, registration_path.parent, epoch_id, stage, confirm_paid)
     require(selected.get("modelPin") and selected.get("agentVersion"),
             "model/agent pin must be registered before collection")
     require(not command(["git", "-C", str(REPO), "status", "--porcelain",

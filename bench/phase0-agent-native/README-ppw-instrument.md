@@ -312,6 +312,17 @@ CLAUDE_MODEL=<registered-model> bash bench/phase0-agent-native/run-ppw-epoch.sh 
 **Do not execute this now.** No monetary ceiling or null-result acceptance
 was approved by #1264. The command requires supplied authorization evidence,
 but the tool cannot judge whether prose constitutes valid maintainer approval.
+Collection also requires the stage registration's `collectionAuthorized: true`
+and `fundingStatus: approved`; an unfunded registration cannot be activated by
+adding an opaque file reference or passing the CLI confirmation flag.
+The hashed spending artifact must be a nonempty JSON object with
+`kind: pp-w-rows-spending-authorization`, the matching `epochId` and `stage`,
+an explicitly supplied positive finite `spendingCeilingUsd`,
+`nullResultAccepted: true`, and nonempty `approvedBy` and `approvalReference`.
+These are structural admission checks, not proof that a claimed approval is
+authentic or a per-call billing cap. A genuine maintainer ceiling and separate
+null-result acceptance under #1259 are still required; no artifact here
+supplies them.
 Build the one shared Release compiler/Tasks/runtime product first. The runner
 verifies its release commit, checkout cleanliness, hashes, both canaries,
 model and agent version before invoking any agent. Product drift is checked

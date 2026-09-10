@@ -300,7 +300,7 @@ class InstrumentTests(unittest.TestCase):
             legacy.build_ledger(self.analyze())
 
     def test_runner_refuses_missing_authorization_before_creating_epoch(self):
-        with self.assertRaisesRegex(ValueError, "artifact path"):
+        with self.assertRaisesRegex(ValueError, "registration does not authorize collection"):
             instrument.run_epoch(self.epoch / "registration.json", self.epoch / "tasks",
                                  self.root / "compiler", self.root, "synthetic-pilot", "pilot")
 
