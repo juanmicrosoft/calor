@@ -33,12 +33,23 @@ forwarding implementation. Native stdout/stderr and request bodies stay in
 memory; the JSON report contains only sanitized capability/shape data and local
 control results. This tests native compatibility, not a complete isolation proof.
 
-The real frozen-task null-agent exercise additionally exposed two test-host
-requirements not covered by a console application: explicitly provisioning the
-existing NuGet cache, and VSTest's attempted loopback listener. With package
-resolution restored, VSTest currently aborts at `SocketServer.Start` /
-`TcpListener.Bind` under the network policy. Hosted-test execution is not yet
-claimed operational; arbitrary loopback access is not an acceptable workaround.
+The real frozen-task null-agent exercise exposed VSTest's attempted loopback
+listener. Gateway mode instead runs the same xUnit v2 discovery/execution engine
+in-process, using the utility bundled by the already registered adapter 2.8.2
+and the unchanged xUnit 2.9.2 test framework. Both policy arms pass the quota
+task's four held-out cases under the unchanged network policy. The launcher
+explicitly supplies the existing read-only NuGet cache; it does not install
+packages or add a loopback exception.
+
+`ppw-test-host.py --prepare` builds the host before isolation and produces its
+runtime/dependency manifest. The spending plan pins that actual manifest.
+Gateway-mode visible and hidden `dotnet test` calls use this host. It retains
+xUnit theories, async execution, fixtures and configuration, but not VSTest's
+separate testhost, data collectors, TRX output or crash recovery. Unsupported
+test CLI options/loggers fail explicitly rather than being silently ignored.
+Named results are emitted only after complete execution; discovery/cleanup
+errors have no success-shaped summary. Historical non-gateway execution still
+uses VSTest unchanged.
 
 ## One request must mean one model iteration
 

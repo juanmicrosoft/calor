@@ -33,6 +33,7 @@ class CollectionTests(unittest.TestCase):
         self.spending = instrument.helper("ppw-spending.py")
         self.isolation = instrument.helper("ppw-gateway-client.py")
         self.inspection = instrument.helper("ppw-source-inspection.py")
+        self.test_host = instrument.helper("ppw-test-host.py")
         self.registration = instrument.load(self.seed / "registration.json")
         self.selected = self.registration["stages"]["pilot"]
         self.selected.update(modelPin=budget.MODEL, agentVersion=self.isolation.CLIENT_VERSION)
@@ -59,6 +60,7 @@ class CollectionTests(unittest.TestCase):
             "shellExecutable": str(self.root / "SYNTHETIC-shell-not-executable"),
             "shellSha256": "e" * 64, "priceSha256": budget.price_identity(),
             "runtimeSha256": instrument.digest(runtime),
+            "testHost": {"kind": "SYNTHETIC-nonexecutable-test-runtime"},
         }
         self.launched = []
         self.failure = None
@@ -159,6 +161,7 @@ class CollectionTests(unittest.TestCase):
         modules = {
             "ppw-spending.py": self.spending, "ppw-budget-gateway.py": gateway,
             "ppw-gateway-client.py": self.isolation, "ppw-source-inspection.py": self.inspection,
+            "ppw-test-host.py": self.test_host,
         }
         def synthetic_pins(pins, registration, stage, epoch_id):
             pins["dataKind"] = "synthetic"
@@ -170,6 +173,7 @@ class CollectionTests(unittest.TestCase):
                              return_value={"kind": "SYNTHETIC-not-an-approval"}), \
                 patch.object(self.spending, "admit", return_value=self.admission), \
                 patch.object(self.inspection, "prepare"), \
+                patch.object(self.test_host, "validate_runtime"), \
                 patch.object(instrument, "product", side_effect=lambda *_: dict(self.product)), \
                 patch.object(instrument, "command", side_effect=self.command), \
                 patch.object(instrument, "validate_pins", side_effect=synthetic_pins), \

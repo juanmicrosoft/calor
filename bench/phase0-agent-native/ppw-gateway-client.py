@@ -2,6 +2,7 @@
 """Isolate the entire pinned runner under a process-local kernel policy, never global settings."""
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -242,6 +243,13 @@ def launch(context_path, workspace, output, arguments):
     evidence.update(clientSha256=CLIENT_SHA256, policySha256=hashlib.sha256(policy.encode()).hexdigest())
     write_isolation_evidence(context_path, evidence)
     environment = client_environment(workspace, context["baseUrl"])
+    spec = importlib.util.spec_from_file_location("ppw_xunit_runtime",
+                                                 runner.parent / "ppw-test-host.py")
+    test_host = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(test_host)
+    test_host.validate_runtime(context["testHost"])
+    environment.update(NUGET_PACKAGES=context["testHost"]["packages"],
+                       PPW_XUNIT_RUNTIME=context["testHost"]["manifest"])
     # exec keeps the existing runner's timeout/process-tree ownership intact.
     os.execve("/usr/bin/sandbox-exec",
               ["/usr/bin/sandbox-exec", "-p", policy, str(shell), "--noprofile", "--norc"] + arguments,

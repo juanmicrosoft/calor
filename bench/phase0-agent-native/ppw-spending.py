@@ -27,6 +27,7 @@ GATEWAY_ARTIFACTS = COLLECTION_ARTIFACTS + (
     "ppw-gateway-budget.py", "ppw-budget-gateway.py", "ppw-gateway-client.py",
     "gateway-tools/python3",
     "templates/calor-arm/CalorArm.Gateway.csproj.template",
+    "ppw-test-host.py", "test-host/Program.cs", "test-host/PpwXunitHost.csproj",
 )
 
 
@@ -183,6 +184,7 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
             "clientExecutable": str(client), "priceSha256": policy.price_identity(),
             "shellExecutable": str(shell), "shellSha256": control["shellSha256"],
             "runtimeSha256": control.get("runtimeSha256"), "slots": slots,
+            "testHost": control.get("testHost"),
         }
     ledger = plan.get("ledgerPath")
     require(isinstance(ledger, str) and Path(ledger).is_absolute(),

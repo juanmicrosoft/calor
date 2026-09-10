@@ -484,6 +484,7 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
         require(runtime.is_file() and digest(runtime) == admission["runtimeSha256"],
                 "gateway requires the frozen prebuilt runtime, never a rebuilt product")
         helper("ppw-source-inspection.py").prepare(shared["calorDll"])
+        helper("ppw-test-host.py").validate_runtime(admission["testHost"])
     epoch = local(epochs_root, epoch_id)
     require(not epoch.exists(), "epoch already exists; use a reviewed new epoch id, never overwrite")
     # Canaries run outside the epoch and before any agent invocation.
@@ -572,6 +573,7 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                                         "clientExecutable": admission["clientExecutable"],
                                         "shellExecutable": admission["shellExecutable"],
                                         "shellSha256": admission["shellSha256"],
+                                        "testHost": admission["testHost"],
                                     }, stream)
                                 argv = [sys.executable, str(BENCH / "ppw-gateway-client.py"),
                                         "--context", str(context_path), "--workspace", str(work),

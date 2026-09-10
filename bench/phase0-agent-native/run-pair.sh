@@ -867,7 +867,14 @@ write_shim() {
     cat > "$shim_dir/dotnet" <<EOF
 #!/usr/bin/env bash
 set -uo pipefail
-if [[ "\${CALOR_P0_SHIM_OFF:-0}" == "1" ]]; then exec "$real_dotnet" "\$@"; fi
+run_dotnet() {
+  if [[ -n "$PPW_GATEWAY_CLIENT" && "\${1:-}" == "test" ]]; then
+    PPW_REAL_DOTNET="$real_dotnet" python3 "$SCRIPT_DIR/ppw-test-host.py" "\$@"
+  else
+    "$real_dotnet" "\$@"
+  fi
+}
+if [[ "\${CALOR_P0_SHIM_OFF:-0}" == "1" ]]; then run_dotnet "\$@"; exit \$?; fi
 
 # Portable millisecond clock: BSD date has no %N (the harness runs on macOS
 # AND Linux), so prefer perl/python3 and degrade to whole seconds last.
@@ -886,7 +893,7 @@ now_ms() {
 arm="$ARM_LABEL"
 ts_iso="\$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 t0=\$(now_ms)
-"$real_dotnet" "\$@"; rc=\$?
+run_dotnet "\$@"; rc=\$?
 # feedback_latency_ms is stamped HERE — the moment the agent-visible dotnet
 # returns. Everything below (silent src rebuild, held-out suite, envelope
 # capture, id attribution) is harness observation the agent never sees in this
@@ -938,7 +945,7 @@ case "\${1:-}" in
     # Fresh, decoupled src build; only if it succeeds is the dll current and
     # the held-out result meaningful (non-compiling state = all failing)
     if CALOR_P0_SHIM_OFF=1 "$real_dotnet" build "$ws/src/Src.csproj" --nologo -v q > "$ws_out/.src_build.txt" 2>&1; then
-      if CALOR_P0_SHIM_OFF=1 "$real_dotnet" test "$ws_out/heldout/HeldOut.csproj" --nologo -v q > "$ws_out/.ho_last.txt" 2>&1; then
+      if CALOR_P0_SHIM_OFF=1 run_dotnet test "$ws_out/heldout/HeldOut.csproj" --nologo -v q > "$ws_out/.ho_last.txt" 2>&1; then
         ho_fail=0
         ho_pass=\$(grep -oE 'Passed:[[:space:]]+[0-9]+' "$ws_out/.ho_last.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
       else
@@ -1259,6 +1266,14 @@ run_agent() {
 # ---------------------------------------------------------------------------
 # Metrics extraction (gates doc §2) -> result.json
 # ---------------------------------------------------------------------------
+run_tests() {
+    if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
+        PPW_REAL_DOTNET="$(command -v dotnet)" python3 "$SCRIPT_DIR/ppw-test-host.py" test "$@"
+    else
+        dotnet test "$@"
+    fi
+}
+
 extract_metrics() {
     local ws="$1" ws_out="$2" run_idx="$3"
     local journal="$ws_out/journal.jsonl"
@@ -1278,7 +1293,7 @@ extract_metrics() {
     fi
     if CALOR_P0_SHIM_OFF=1 dotnet build "$ws/src/Src.csproj" --nologo -v q > "$ws_out/.src_final.txt" 2>&1; then
         final_build_ok=1
-        if CALOR_P0_SHIM_OFF=1 dotnet test "$ws_out/heldout/HeldOut.csproj" --nologo -v q ${heldout_logger[@]+"${heldout_logger[@]}"} > "$ws_out/.ho_final.txt" 2>&1; then
+        if CALOR_P0_SHIM_OFF=1 run_tests "$ws_out/heldout/HeldOut.csproj" --nologo -v q ${heldout_logger[@]+"${heldout_logger[@]}"} > "$ws_out/.ho_final.txt" 2>&1; then
             final_fail=0
             final_pass=$(grep -oE 'Passed:[[:space:]]+[0-9]+' "$ws_out/.ho_final.txt" | grep -oE '[0-9]+' | head -1 || echo 0)
         else
@@ -1373,7 +1388,7 @@ extract_metrics() {
         # explicit "Passed: 1" summary line — because exit codes are
         # unreliable (zero-match filters and failed builds can exit 0).
         if [[ $final_build_ok -eq 1 && -d "$ws_out/probe" ]]; then
-            CALOR_P0_SHIM_OFF=1 DOTNET_CLI_UI_LANGUAGE=en dotnet test \
+            CALOR_P0_SHIM_OFF=1 DOTNET_CLI_UI_LANGUAGE=en run_tests \
                 "$ws_out/probe/Probe.csproj" --nologo \
                 > "$ws_out/.probe_final.txt" 2>&1 || true
             if grep -qE 'Passed:[[:space:]]+1\b' "$ws_out/.probe_final.txt" \
