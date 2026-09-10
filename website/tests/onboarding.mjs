@@ -65,6 +65,13 @@ try {
   run(workflowCommands[0]);
   assert.equal(run(workflowCommands[1]), 'Hello again!');
   console.log('Published How It Works compile/run/revise workflow passed.');
+
+  const effects = await readFile('content/benchmarking/metrics/effect-discipline.mdx', 'utf8');
+  const priceSource = effects.match(/```calor\n([\s\S]*?)```/)?.[1];
+  assert.ok(priceSource, 'Missing complete Effect Discipline example');
+  await writeFile(path.join(cwd, 'Price.calr'), priceSource);
+  assert.equal(run(blocks(effects)[0]), '60');
+  console.log('Published Effect Discipline explicit-input program passed.');
 } finally {
   await rm(workspace, { recursive: true, force: true });
 }

@@ -4,219 +4,87 @@ section: "benchmarking"
 order: 9
 ---
 
-# Effect Discipline Benchmark
+# Effect Discipline Runner
 
-The Effect Discipline benchmark measures how well code prevents **real-world bugs** caused by hidden side effects.
+**Reader question:** What tasks does this runner execute, and what does its
+score establish?
 
-This is a separate outcome-based runner and is **not included** in the historical
-eight-metric dashboard or its 1.32x composite. Any estimation-mode result
-describes the calculator's signals, not an observed production incident rate.
+This outcome-based runner is separate from the historical eight-metric
+dashboard and the [deferred PP-W-rows agent study](/docs/benchmarking/effect-rows-study/).
+It supplies neither that study's results nor a measure of
+production incident prevention. Estimation-mode calculator signals are not
+executed task results.
 
-The [proposed PP-W-rows study](/docs/benchmarking/effect-rows-study/) is a
-different agent experiment, currently deferred. This runner does not supply
-its pilot or confirmatory results.
 The [recorded outcome](/docs/benchmarking/results/#redesigned-pp-w-rows-deferred)
 is deferral without redesigned collection, not a zero-effect result.
 
----
+## Tasks and execution
 
-## Fair Outcome-Based Scoring
+| Task category | Illustrative scenario, not a sourced incident |
+|:--------------|:---------------------------------------------|
+| Flaky-test prevention | A report reads the current time instead of receiving it as an input. |
+| Security boundaries | A parser makes an unexpected network request. |
+| Side-effect transparency | A string utility also writes a log. |
+| Cache safety | A price function reads a changing exchange rate. |
 
-This benchmark uses **outcome-based scoring** to ensure fair comparison between Calor and C#:
+The [runner](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/tests/Calor.Evaluation/LlmTasks/EffectDisciplineBenchmarkRunner.cs)
+generates or retrieves cached code for each language, compiles it, and
+executes the task's test cases. Optional C# analyzers and pattern warnings
+provide additional diagnostics. Tests observe only their encoded behaviors,
+not every possible hidden effect.
 
-| Scoring Principle | Description |
-|:------------------|:------------|
-| **Tests Pass = Full Score** | If all tests pass, both languages score 1.0 |
-| **No Syntax Bias** | No bonus for `§E{}` or `[Pure]` - only outcomes matter |
-| **Equal Opportunity** | Both languages CAN achieve determinism with good practices |
+## Scoring rule
 
----
+The [scorer](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/tests/Calor.Evaluation/LlmTasks/EffectDisciplineScorer.cs)
+uses **50% test-pass fraction + 50% all-tests-pass indicator**. Compilation
+failure scores zero; no tests also scores zero. The indicator is one only
+when a nonempty test set all passes. Both terms derive from the same tests:
+the field called “bug prevention” is not an independent determinism proof.
+Effect annotations and `[Pure]` earn no bonus; maintainability and pattern
+warnings do not enter the score.
 
-## Why This Matters
+Equal scores when both languages pass are a consequence of that rule, not
+an observed tie. A passing sample does not prove purity or general cache safety.
+See [effect coverage and verification limits](/docs/guides/verification-guarantees/).
 
-These are actual bugs that have caused production incidents:
+## Run an explicit-input example
 
-| Bug Type | Real-World Impact | How Often |
-|:---------|:------------------|:----------|
-| **Flaky Tests** | Random CI failures, wasted developer time | Daily |
-| **Security Violations** | Data leaks, compliance failures | Critical |
-| **Hidden Side Effects** | "Why did this happen?" debugging | Common |
-| **Cache Bugs** | Wrong results, hard to reproduce | Subtle |
+With [.NET 10 and Calor installed](/docs/getting-started/installation/), save
+this complete illustrative program as `Price.calr` in an empty directory:
 
----
-
-## The Four Categories
-
-### 1. Flaky Test Prevention
-
-**Real Bug:** Tests pass locally but fail in CI because they use `DateTime.Now`.
-
+```calor
+§M{m001:PriceExample}
+  §F{f001:Main:pub} () -> void
+    §E{cw}
+    §B{unitPrice:i32} 10
+    §B{quantity:i32} 3
+    §B{rate:i32} 2
+    §P (* (* unitPrice quantity) rate)
 ```
-// BAD: Non-deterministic
-public string GenerateReport(string title) {
-    return $"Report: {title} (Generated: {DateTime.Now})";
-}
-
-// GOOD: Deterministic
-public string GenerateReport(string title, long timestamp) {
-    return $"Report: {title} (Generated: {timestamp})";
-}
-```
-
-**How Both Languages Prevent It:**
-- **Calor**: Effect signature prevents time effects at compile time
-- **C#**: Pass dependencies as parameters (DI pattern), use `ITimeProvider`
-
----
-
-### 2. Security Boundaries
-
-**Real Bug:** A config file parser secretly phones home to validate licenses.
-
-```
-// BAD: Hidden network call
-public Config ParseConfig(string json) {
-    ValidateLicenseOnline(); // SECURITY VIOLATION
-    return JsonParse(json);
-}
-
-// GOOD: Offline only
-public Config ParseConfig(string json) {
-    return JsonParse(json);
-}
-```
-
-**How Both Languages Prevent It:**
-- **Calor**: Effect signature prevents network effects
-- **C#**: Interface boundaries for I/O, code review
-
----
-
-### 3. Side Effect Transparency
-
-**Real Bug:** A "utility" function writes to a log file, causing disk space issues.
-
-```
-// BAD: Hidden logging
-public string Sanitize(string input) {
-    Logger.Log($"Sanitizing: {input}"); // SIDE EFFECT
-    return input.Replace("<", "");
-}
-
-// GOOD: Pure function
-public string Sanitize(string input) {
-    return input.Replace("<", "");
-}
-```
-
-**How Both Languages Prevent It:**
-- **Calor**: Pure functions cannot have I/O effects
-- **C#**: `[Pure]` attribute, static methods with no dependencies
-
----
-
-### 4. Cache Safety
-
-**Real Bug:** Memoized function returns stale exchange rates because it secretly fetched live data.
-
-```
-// BAD: Not actually cacheable
-[Memoized]
-public decimal CalculatePrice(decimal base, int qty) {
-    var rate = FetchExchangeRate(); // BREAKS MEMOIZATION
-    return base * qty * rate;
-}
-
-// GOOD: Safe to memoize
-[Memoized]
-public decimal CalculatePrice(decimal base, int qty, decimal rate) {
-    return base * qty * rate;
-}
-```
-
-**How Both Languages Prevent It:**
-- **Calor**: Pure functions are safe to memoize by definition
-- **C#**: Careful parameter design, all inputs explicit
-
----
-
-## Scoring Methodology
-
-| Component | Weight | What It Measures |
-|:----------|:-------|:-----------------|
-| **Functional Correctness** | 50% | Do all tests pass? |
-| **Bug Prevention** | 50% | Does the code produce deterministic results? |
-
-### Outcome-Based Bug Prevention
-
-Both languages achieve the same score when tests pass:
-
-- **Tests Pass** = Bug Prevention 1.0 for BOTH languages
-- **Tests Fail** = Bug Prevention 0.0
-
-No bonus for:
-- Calor effect annotations (`§E{}`)
-- C# `[Pure]` attributes
-- Any syntax-based patterns
-
-**What matters is the OUTCOME, not the mechanism.**
-
----
-
-## Expected Results
-
-| Category | Result | Analysis |
-|:---------|:-------|:---------|
-| Flaky Test Prevention | Tie (1.0x) | Both solve with good practices |
-| Security Boundaries | Tie (1.0x) | Both can use interface boundaries |
-| Side Effect Transparency | Tie (1.0x) | Both can write pure functions |
-| Cache Safety | Tie (1.0x) | Both can design deterministic APIs |
-| **Overall** | **Tie (1.0x)** | **Fair outcome-based comparison** |
-
-### Why Equal?
-
-- Both languages CAN write deterministic, side-effect-free code
-- The benchmark tests OUTCOMES (do tests pass?), not mechanisms
-- Calor's advantage is enforcement (compile-time errors), but both can achieve the same results
-
----
-
-## Non-Determinism Warnings
-
-While scoring is outcome-based, the benchmark detects and warns about patterns that could cause issues:
-
-| Pattern | Warning |
-|:--------|:--------|
-| `DateTime.Now/UtcNow` | Time-dependent code detected |
-| `new Random()` | Unseeded random detected |
-| `Guid.NewGuid()` | Non-deterministic GUID usage |
-| `HttpClient`, `WebRequest` | Network call detected |
-| `File.Read/Write` | File I/O detected |
-| `Console.Write` | Console output detected |
-
-These are informational only and do not affect scores.
-
----
-
-## Running the Benchmark
 
 ```bash
-# Run all effect discipline tasks
-dotnet run --project tests/Calor.Evaluation -- effect-discipline
-
-# Run specific category
-dotnet run --project tests/Calor.Evaluation -- effect-discipline \
-  --category flaky-test-prevention
-
-# Sample 10 tasks
-dotnet run --project tests/Calor.Evaluation -- effect-discipline \
-  --sample 10 --verbose
+calor run Price.calr
 ```
 
----
+Expected output:
 
-## Learn More
+```text
+60
+```
 
-- [Safety Benchmark](/docs/benchmarking/metrics/safety/) - Contract enforcement
-- [Correctness Benchmark](/docs/benchmarking/metrics/correctness/) - Edge case handling
-- [Methodology](/docs/benchmarking/methodology/) - How benchmarks work
+The rate is explicit rather than fetched. This is an arithmetic example,
+not a financial model, memoization proof, or measured benchmark result.
+
+## Inspect the runner without collection
+
+From a repository checkout with its documented
+[build prerequisites](/docs/contributing/), run:
+
+```bash
+dotnet run --project tests/Calor.Evaluation -- effect-discipline --provider mock --dry-run --sample 1
+```
+
+The terminal ends with `Dry run - no API calls made`. This preview neither
+generates code nor records an empirical result. Removing these safeguards can
+invoke a paid provider; this page authorizes no collection. Study decisions
+remain on the [evidence status page](/docs/benchmarking/evidence-status/).
