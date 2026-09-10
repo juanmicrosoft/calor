@@ -35,6 +35,8 @@ public class ArrowConditionalRuntimeTests
 
     [Theory]
     [InlineData("§IF{if1} (< i 0) → §R\n")]
+    [InlineData("§IF{if1} (&&\n        (< i 0)\n        (> i -10)) → §R\n")]
+    [InlineData("§IF{if1} (< i 0) → §R\n      §EI (&&\n        (> i 9)\n        (< i 20)) → §R\n")]
     [InlineData("§IF{if1} (< i 0) → §R\n      §EI (> i 9) → §R\n")]
     [InlineData("§IF{if1} (< i 0) → §R\n      §EL → §C{trace.Add} §A i §/C\n")]
     [InlineData("§IF{if1} (< i 0) → §R\n      §EL\n        §C{trace.Add} §A i §/C\n")]

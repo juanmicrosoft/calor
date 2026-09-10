@@ -5605,10 +5605,10 @@ public sealed class Parser
                 var ownsDedent = true;
                 if (Check(TokenKind.Arrow))
                 {
-                    Advance();
+                    var arrowToken = Advance();
                     // An inline statement creates no indentation level. Its next
                     // dedent belongs to the enclosing loop, branch, or function.
-                    ownsDedent = Current.Span.Line > clauseToken.Span.Line
+                    ownsDedent = Current.Span.Line > arrowToken.Span.Line
                         && Current.Span.Column > clauseToken.Span.Column;
                     var statement = ParseStatement();
                     if (statement != null)
