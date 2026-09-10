@@ -125,8 +125,55 @@ class PilotAuthorization250Tests(unittest.TestCase):
                 for nested in value:
                     check(nested)
 
-        for name in ("authorization.json", "billing-evidence.json", "feasibility.json"):
+        for name in ("authorization.json", "billing-evidence.json", "feasibility.json",
+                     "post-1378-assessment.json"):
             check(load(ROOT / name))
+
+    def test_post_guard_assessment_binds_actual_amendment_and_preserved_initial_decision(self):
+        assessment = load(ROOT / "post-1378-assessment.json")
+        self.assertEqual("80e2d77579750e48d58088d4474ba5d3c35014c6",
+                         assessment["assessedAgainstCommit"])
+        self.assertEqual(digest(ROOT / "authorization.json"), assessment["authorizationSha256"])
+        self.assertEqual(digest(ROOT / "feasibility.json"), assessment["priorAssessmentSha256"])
+        self.assertTrue(assessment["priorAssessmentPreserved"])
+        preserved = assessment["preservedGoverningRecord"]
+        current = (BENCH.parents[1] / preserved["path"]).read_bytes()
+        self.assertEqual(preserved["sha256"],
+                         hashlib.sha256(current[:preserved["prefixByteCount"]]).hexdigest())
+        self.assertTrue(current[preserved["prefixByteCount"]:].startswith(b"\n## 12."))
+        runtime = assessment["runtimeGuard"]
+        self.assertEqual(assessment["assessedAgainstCommit"], runtime["mergeCommit"])
+        for name in ("amendment", "analysisRegistration"):
+            self.assertEqual(digest(BENCH / runtime[name]["path"]), runtime[name]["sha256"])
+        amendment = load(BENCH / runtime["amendment"]["path"])
+        self.assertFalse(amendment["collectionAuthorized"])
+        self.assertFalse(amendment["analysisArithmeticChanged"])
+        for path, sha in amendment["preservedArtifacts"].items():
+            self.assertEqual(digest(BENCH / path), sha, path)
+        for path, sha in amendment["replacementHarnessArtifacts"].items():
+            self.assertEqual(digest(BENCH / path), sha, path)
+
+    def test_post_guard_unknown_bound_does_not_activate_or_invent_a_scientific_result(self):
+        assessment = load(ROOT / "post-1378-assessment.json")
+        self.assertEqual("BUDGET_NOT_RUN", assessment["status"])
+        self.assertEqual("UNKNOWN", assessment["runtimeGuard"]["verifiedMaximumLiability"])
+        self.assertFalse(assessment["runtimeGuard"]["actualProviderBoundEstablished"])
+        self.assertFalse(assessment["runtimeGuard"]["syntheticAccountingTestsAreProviderEvidence"])
+        self.assertTrue(assessment["financialAuthorizationGranted"])
+        self.assertEqual(("pilot-only", 250), (assessment["scope"], assessment["authorizedTotalUsd"]))
+        self.assertEqual((74, 3, 444), (assessment["runsPerTaskPerArm"],
+                                     assessment["taskCount"], assessment["scheduledSlots"]))
+        for field in ("collectionOperationallyAdmitted", "fullPilotWithinCeilingEstablished",
+                      "costImpossibilityProven", "newGrantOrBudgetReset", "ledgerPathSelected",
+                      "operationalPinsActivated", "registeredProtocolChanged", "notBuildableClaimed",
+                      "stage2Authorized", "stage2UnderpoweredCarriedApplied", "m0Rearmed",
+                      "releaseAuthorized"):
+            self.assertFalse(assessment[field], field)
+        for field in ("perInvocationLimitUsd", "scientificVerdict", "stage1Estimands",
+                      "stage2N", "stage2Delta"):
+            self.assertIsNone(assessment[field], field)
+        self.assertEqual(0, assessment["newExperimentalCalls"])
+        self.assertEqual([1254, 1267, 1262], assessment["remainingOpenIssues"])
 
     def test_existing_epoch_inputs_stay_unarmed_and_have_no_collection_results(self):
         pilot = BENCH / "epochs/w-rows-pilot-001"
