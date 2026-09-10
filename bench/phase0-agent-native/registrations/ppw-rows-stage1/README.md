@@ -1,4 +1,4 @@
-# Unfunded prospective stage-1 method
+# Prospective stage-1 method (originally unfunded)
 
 This is the machine-readable companion to
 [redesign §9](../../../../docs/plans/2026-09-05-ppw-rows-fixture-redesign.md#9-unfunded-prospective-stage-1-registration-1261).
@@ -48,6 +48,12 @@ counts recomputed from one completed epoch. It is an explicit analysis step,
 not an automatic collection-side invocation. Its new analysis-code manifest
 does not change existing collection pins, thresholds or the frozen method.
 
-No spending ceiling or separate null-result acceptance has been recorded.
-#1259 blocks every paid run. Stage-2 Δ/N and its outcome are deliberately
-absent; they require actual pilot data and separate registration.
+The original registration was unfunded. The subsequent actual
+[pilot-only $250 authorization](authorization-250/README.md) records the user's
+new ceiling, stopping-rule acceptance and negative/null-publication acceptance.
+It preserves the unselected source-quote placeholder and uses the explicitly
+conservative pilot-only interpretation. The original method/model/pin bytes
+remain dated preregistration evidence, not the current financial decision.
+Collection stays unarmed pending trustworthy #1378 enforcement, coherent
+prospective pins and a defensible plan for all 444 unchanged slots within the
+ceiling. Stage-2 Δ/N, funding and outcomes remain absent.

@@ -1,8 +1,17 @@
 # Prospective pilot pins (#1265)
 
-**Unfunded, unrun input registration.** These files bind the pilot to the
+**Original unfunded, unrun input registration.** These files bind the pilot to the
 deliberate model/client/size decisions in the frozen redesign §9. They contain
 no agent outcomes, run directories, stage ledger, or spending authorization.
+
+**Later financial decision:** the user has now supplied a
+[pilot-only $250 total authorization](../../registrations/ppw-rows-stage1/authorization-250/README.md)
+and accepted registered stopping rules and negative/null publication. The
+original pin/registration bytes below remain unarmed historical inputs.
+No spending artifact is bound into this collector registration: trustworthy
+enforcement, coherent prospective execution pins and full-pilot budget
+feasibility still gate activation. Financial approval is not absent, but
+operational collection admission is.
 
 | Pin | Registered value |
 |---|---|

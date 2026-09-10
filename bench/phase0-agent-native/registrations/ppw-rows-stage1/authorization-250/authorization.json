@@ -1,0 +1,49 @@
+{
+  "activationScope": "Conditional authorization of this narrower pilot; historical M0 disposition remains unchanged.",
+  "approvalReference": "https://github.com/juanmicrosoft/calor/issues/1259#issuecomment-5618103570",
+  "approvedBy": "User; authorization relayed by coordinating parent in the CLI conversation",
+  "authorizationStatus": "USER_APPROVED_WITH_CONDITIONS",
+  "ceilingMeaning": "Total across all chargeable redesigned pilot activity, including failed/interrupted/retried/in-flight calls; not per arm/task/run/invocation.",
+  "collectionOperationallyAdmitted": false,
+  "conditions": [
+    "Never exceed $250 total.",
+    "Do not weaken the registered protocol to fit the ceiling.",
+    "Trustworthy independently reviewed enforcement and supported cost accounting are required before experimental calls (#1378).",
+    "The complete unchanged registered pilot must have a defensible feasible execution plan within the ceiling.",
+    "Any execution-code or pin change requires a coherent explicitly reviewed prospective update.",
+    "Do not shrink N, change model/client/stops, starve per-run budgets into invalid scientific negatives, or treat a Max subscription as zero study cost."
+  ],
+  "currency": "USD",
+  "epochId": "w-rows-pilot-001",
+  "experimentalModelInvoked": false,
+  "financialAuthorizationGranted": true,
+  "kind": "pp-w-rows-spending-authorization",
+  "methodRegistration": {
+    "path": "registrations/ppw-rows-stage1/registration.json",
+    "sha256": "5db51f1b1451ed0b5d1596faebb50f8576d3b29413970e31422cc243905b5001"
+  },
+  "notAStudyResult": true,
+  "nullResultAccepted": true,
+  "preservedProtocol": {
+    "baseCommit": "204c5f0acb6b991b9dcfdf978597a220b12d095c",
+    "path": "docs/plans/2026-09-05-ppw-rows-fixture-redesign.md",
+    "prefixByteCount": 33632,
+    "sha256": "cfacac182f1eea92e4348d47228cfd36756a087e056579d658ef2c437848f9a1"
+  },
+  "registeredStoppingRulesAccepted": true,
+  "schemaVersion": 1,
+  "scope": "pilot-only",
+  "scopeInterpretation": "The original bracketed scope placeholder was unselected; use the narrower pilot-only scope, as the coordinating parent told the user.",
+  "source": {
+    "exactQuote": "I authorize the redesigned PP-W-rows [pilot only / entire two-stage study], with a total spending ceiling of $250. I accept the registered stopping rules and publication of negative or null results. Do not exceed this ceiling or weaken the protocol to finish within it.",
+    "placeholderSelectedInOriginalQuote": false,
+    "provenance": "New user authorization quoted by the coordinating parent; the receipt time is the handoff time, not a claimed original issuance timestamp.",
+    "quoteFile": "source-quote.txt",
+    "quoteFileSha256": "4d2e0e6dea2d07b94dbd22f79b76e4c2f59e67b3f1acc0cde55d8af6379244ea",
+    "relayReceivedAt": "2026-09-10T07:39:21.359-04:00"
+  },
+  "spendingCeilingUsd": 250,
+  "stage": "pilot",
+  "stage2Authorized": false,
+  "stage2BudgetUsd": null
+}
