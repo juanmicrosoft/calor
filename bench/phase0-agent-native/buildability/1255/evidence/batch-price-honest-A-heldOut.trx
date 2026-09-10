@@ -1,0 +1,40 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="8594051d-6e95-4255-8f53-c47a6716c447" name="@Juans-MacBook-Pro 2026-09-09 21:24:36" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-09T21:24:36.4754550-04:00" queuing="2026-09-09T21:24:36.4754550-04:00" start="2026-09-09T21:24:36.1785560-04:00" finish="2026-09-09T21:24:36.4775190-04:00" />
+  <TestSettings name="default" id="75234588-ddc0-40da-931a-7d8e3e71cc33">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-09_21_24_36" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="8fa5aa8c-fc38-495c-940f-53da47d9fcd7" testId="7dd95004-23fc-5cae-b58d-83cd2c212827" testName="HeldOutTests.Preview_HasNoConsoleWrites(input: 1)" computerName="Juans-MacBook-Pro" duration="00:00:00.0046977" startTime="2026-09-09T21:24:36.4324720-04:00" endTime="2026-09-09T21:24:36.4324780-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8fa5aa8c-fc38-495c-940f-53da47d9fcd7" />
+    <UnitTestResult executionId="94eb8f64-dc67-474a-8232-eb15944aa727" testId="e86b3dfb-3758-fad4-b355-a2b7ec893f0b" testName="HeldOutTests.Preview_HasNoConsoleWrites(input: 7)" computerName="Juans-MacBook-Pro" duration="00:00:00.0001636" startTime="2026-09-09T21:24:36.4335430-04:00" endTime="2026-09-09T21:24:36.4335430-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="94eb8f64-dc67-474a-8232-eb15944aa727" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="HeldOutTests.Preview_HasNoConsoleWrites(input: 7)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-7/batch-price/honest/a/heldout/bin/debug/net10.0/runtimetests.dll" id="e86b3dfb-3758-fad4-b355-a2b7ec893f0b">
+      <Execution id="94eb8f64-dc67-474a-8232-eb15944aa727" />
+      <TestMethod codeBase="&lt;work&gt;/batch-price/honest/A/heldOut/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="HeldOutTests" name="Preview_HasNoConsoleWrites" />
+    </UnitTest>
+    <UnitTest name="HeldOutTests.Preview_HasNoConsoleWrites(input: 1)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-7/batch-price/honest/a/heldout/bin/debug/net10.0/runtimetests.dll" id="7dd95004-23fc-5cae-b58d-83cd2c212827">
+      <Execution id="8fa5aa8c-fc38-495c-940f-53da47d9fcd7" />
+      <TestMethod codeBase="&lt;work&gt;/batch-price/honest/A/heldOut/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="HeldOutTests" name="Preview_HasNoConsoleWrites" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="7dd95004-23fc-5cae-b58d-83cd2c212827" executionId="8fa5aa8c-fc38-495c-940f-53da47d9fcd7" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e86b3dfb-3758-fad4-b355-a2b7ec893f0b" executionId="94eb8f64-dc67-474a-8232-eb15944aa727" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="2" executed="2" passed="2" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.4.1+b9eacec401 (64-bit .NET 10.0.11)
+[xUnit.net 00:00:00.02]   Discovering: RuntimeTests
+[xUnit.net 00:00:00.04]   Discovered:  RuntimeTests
+[xUnit.net 00:00:00.04]   Starting:    RuntimeTests
+[xUnit.net 00:00:00.06]   Finished:    RuntimeTests
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

@@ -1,0 +1,88 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="448279a3-3495-42c0-b474-6254d1d1bd9c" name="@Juans-MacBook-Pro 2026-09-09 21:24:14" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-09T21:24:14.0783410-04:00" queuing="2026-09-09T21:24:14.0783410-04:00" start="2026-09-09T21:24:13.7684430-04:00" finish="2026-09-09T21:24:14.0806070-04:00" />
+  <TestSettings name="default" id="0cbafcda-a0b7-4d5d-93a0-712b66d7e583">
+    <Deployment runDeploymentRoot="_Juans-MacBook-Pro_2026-09-09_21_24_14" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="553b525e-f8e5-471a-b689-e822aabc0ac5" testId="7dd95004-23fc-5cae-b58d-83cd2c212827" testName="HeldOutTests.Preview_HasNoConsoleWrites(input: 1)" computerName="Juans-MacBook-Pro" duration="00:00:00.0050085" startTime="2026-09-09T21:24:14.0354890-04:00" endTime="2026-09-09T21:24:14.0354950-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="553b525e-f8e5-471a-b689-e822aabc0ac5">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Strings differ
+Expected: ""
+Actual:   "attempt\n"
+           ↑ (pos 0)</Message>
+          <StackTrace>   at HeldOutTests.Preview_HasNoConsoleWrites(Int32 input) in &lt;work&gt;/retry-budget/laundering/A/heldOut/Tests.cs:line 27
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="4c178989-1260-4759-a2ee-45e4c01d2085" testId="e86b3dfb-3758-fad4-b355-a2b7ec893f0b" testName="HeldOutTests.Preview_HasNoConsoleWrites(input: 7)" computerName="Juans-MacBook-Pro" duration="00:00:00.0001652" startTime="2026-09-09T21:24:14.0367140-04:00" endTime="2026-09-09T21:24:14.0367140-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="4c178989-1260-4759-a2ee-45e4c01d2085">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Strings differ
+Expected: ""
+Actual:   "attempt\n"
+           ↑ (pos 0)</Message>
+          <StackTrace>   at HeldOutTests.Preview_HasNoConsoleWrites(Int32 input) in &lt;work&gt;/retry-budget/laundering/A/heldOut/Tests.cs:line 27
+   at InvokeStub_HeldOutTests.Preview_HasNoConsoleWrites(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="HeldOutTests.Preview_HasNoConsoleWrites(input: 7)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-7/retry-budget/laundering/a/heldout/bin/debug/net10.0/runtimetests.dll" id="e86b3dfb-3758-fad4-b355-a2b7ec893f0b">
+      <Execution id="4c178989-1260-4759-a2ee-45e4c01d2085" />
+      <TestMethod codeBase="&lt;work&gt;/retry-budget/laundering/A/heldOut/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="HeldOutTests" name="Preview_HasNoConsoleWrites" />
+    </UnitTest>
+    <UnitTest name="HeldOutTests.Preview_HasNoConsoleWrites(input: 1)" storage="/users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/ppw/.buildability-work/observed-7/retry-budget/laundering/a/heldout/bin/debug/net10.0/runtimetests.dll" id="7dd95004-23fc-5cae-b58d-83cd2c212827">
+      <Execution id="553b525e-f8e5-471a-b689-e822aabc0ac5" />
+      <TestMethod codeBase="&lt;work&gt;/retry-budget/laundering/A/heldOut/bin/Debug/net10.0/RuntimeTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="HeldOutTests" name="Preview_HasNoConsoleWrites" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="7dd95004-23fc-5cae-b58d-83cd2c212827" executionId="553b525e-f8e5-471a-b689-e822aabc0ac5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e86b3dfb-3758-fad4-b355-a2b7ec893f0b" executionId="4c178989-1260-4759-a2ee-45e4c01d2085" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="2" executed="2" passed="0" failed="2" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.4.1+b9eacec401 (64-bit .NET 10.0.11)
+[xUnit.net 00:00:00.03]   Discovering: RuntimeTests
+[xUnit.net 00:00:00.04]   Discovered:  RuntimeTests
+[xUnit.net 00:00:00.04]   Starting:    RuntimeTests
+[xUnit.net 00:00:00.07]       Assert.Equal() Failure: Strings differ
+[xUnit.net 00:00:00.07]       Expected: ""
+[xUnit.net 00:00:00.07]       Actual:   "attempt\n"
+[xUnit.net 00:00:00.07]                  ↑ (pos 0)
+[xUnit.net 00:00:00.07]       Stack Trace:
+[xUnit.net 00:00:00.07]         &lt;work&gt;/retry-budget/laundering/A/heldOut/Tests.cs(27,0): at HeldOutTests.Preview_HasNoConsoleWrites(Int32 input)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+[xUnit.net 00:00:00.07]       Assert.Equal() Failure: Strings differ
+[xUnit.net 00:00:00.07]       Expected: ""
+[xUnit.net 00:00:00.07]       Actual:   "attempt\n"
+[xUnit.net 00:00:00.07]                  ↑ (pos 0)
+[xUnit.net 00:00:00.07]       Stack Trace:
+[xUnit.net 00:00:00.07]         &lt;work&gt;/retry-budget/laundering/A/heldOut/Tests.cs(27,0): at HeldOutTests.Preview_HasNoConsoleWrites(Int32 input)
+[xUnit.net 00:00:00.07]            at InvokeStub_HeldOutTests.Preview_HasNoConsoleWrites(Object, Span`1)
+[xUnit.net 00:00:00.07]            at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:00.07]   Finished:    RuntimeTests
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T21:24:14.0346680-04:00">
+        <Text>[xUnit.net 00:00:00.07]     HeldOutTests.Preview_HasNoConsoleWrites(input: 1) [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="Juans-MacBook-Pro" outcome="Error" timestamp="2026-09-09T21:24:14.0366820-04:00">
+        <Text>[xUnit.net 00:00:00.07]     HeldOutTests.Preview_HasNoConsoleWrites(input: 7) [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

@@ -1,0 +1,23 @@
+{
+  "command": [
+    "dotnet",
+    "test",
+    "<work>/quota-lookup/laundering/A/visible/RuntimeTests.csproj",
+    "--logger",
+    "trx;LogFileName=tests.trx",
+    "--logger",
+    "console;verbosity=normal",
+    "--results-directory",
+    "<work>/quota-lookup/laundering/A/visible/results",
+    "--verbosity",
+    "quiet",
+    "-p:ImportDirectoryBuildProps=false",
+    "-p:ImportDirectoryBuildTargets=false",
+    "-p:ImportDirectoryPackagesProps=false",
+    "-p:ManagePackageVersionsCentrally=false",
+    "-p:RestoreConfigFile=<repo>/bench/phase0-agent-native/buildability/1255/runtime/NuGet.Config"
+  ],
+  "exitCode": 0,
+  "stdout": "Test run for <work>/quota-lookup/laundering/A/visible/bin/Debug/net10.0/RuntimeTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.4.1+b9eacec401 (64-bit .NET 10.0.11)\n[xUnit.net 00:00:00.02]   Discovering: RuntimeTests\n[xUnit.net 00:00:00.04]   Discovered:  RuntimeTests\n[xUnit.net 00:00:00.04]   Starting:    RuntimeTests\nlookup\nlookup\nlookup\nlookup\nlookup\nlookup\n[xUnit.net 00:00:00.06]   Finished:    RuntimeTests\n  Passed VisibleTests.Preview_ReturnsExpectedValue(input: 0) [3 ms]\n  Passed VisibleTests.Preview_ReturnsExpectedValue(input: 5) [< 1 ms]\n  Passed VisibleTests.Preview_ReturnsExpectedValue(input: 13) [< 1 ms]\n  Passed VisibleTests.Preview_ReturnsExpectedValue(input: 1) [< 1 ms]\n  Passed VisibleTests.Preview_CanBeRepeated [< 1 ms]\nResults File: <work>/quota-lookup/laundering/A/visible/results/tests.trx\n\nTest Run Successful.\nTotal tests: 5\n     Passed: 5\n Total time: 0.2897 Seconds\n",
+  "stderr": ""
+}
