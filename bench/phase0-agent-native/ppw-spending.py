@@ -31,6 +31,21 @@ GATEWAY_ARTIFACTS = COLLECTION_ARTIFACTS + (
     "ppw-test-host.py", "test-host/Program.cs", "test-host/PpwXunitHost.csproj",
     "ppw-gateway-registration.py",
 )
+FORECAST_EVIDENCE = {
+    "script": {
+        "path": "gateway-forecast/project_cost.py",
+        "sha256": "1d6168e248dc9a0cf59e5514098363c98a9a1e34b024a85f85c2e7f368435af6",
+    },
+    "proposal": {
+        "path": "gateway-forecast/forecast-proposed.json",
+        "sha256": "fe1ddf0cf9995694190acd548e7659e8aee506310438499b5a0fd3bb3718720b",
+    },
+    "review": {
+        "path": "gateway-forecast/forecast-review.json",
+        "sha256": "a0a649b6159fddf38287c4a184facc79bbd98cd25c5ac1862080137a21176d13",
+    },
+}
+FORECAST_REVIEW = "https://github.com/juanmicrosoft/calor/pull/1431#issuecomment-5624531673"
 
 
 def require(condition, message):
@@ -74,7 +89,7 @@ def gateway_ledger_location(binding):
     return common / binding["relativePath"]
 
 
-def pinned_document(directory, proof, name):
+def pinned_file(directory, proof, name):
     require(isinstance(proof, dict), "pinned %s reference required" % name)
     relative = proof.get("path")
     require(isinstance(relative, str) and relative and not Path(relative).is_absolute()
@@ -83,6 +98,11 @@ def pinned_document(directory, proof, name):
     require(not any(p.is_symlink() for p in (path, *path.parents))
             and path.is_file() and digest(path) == proof.get("sha256"),
             "%s is missing, linked, or changed" % name)
+    return path
+
+
+def pinned_document(directory, proof, name):
+    path = pinned_file(directory, proof, name)
     return path, json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -130,7 +150,7 @@ def verified_upper_bound(control):
     return None
 
 
-def validate_forecast(plan, ceiling, slot_count):
+def validate_forecast(plan, ceiling, slot_count, directory):
     forecast = plan.get("forecast", {})
     require(isinstance(forecast, dict) and forecast.get("status") == "registered"
             and type(forecast.get("plannedInvocations")) is int
@@ -139,8 +159,29 @@ def validate_forecast(plan, ceiling, slot_count):
             and forecast["experimentalObservations"] == 0
             and isinstance(forecast.get("method"), str) and forecast["method"].strip(),
             "the independent, prospective full-pilot cost forecast is not registered")
-    require(0 < units(forecast.get("estimatedFullPilotUsd")) <= ceiling,
-            "the prospective full-pilot point forecast does not fit the authorized ceiling")
+    registration = plan.get("forecastRegistration")
+    require(registration == {
+        "from": "proposed", "to": "registered",
+        "reviewReference": FORECAST_REVIEW, "artifacts": FORECAST_EVIDENCE,
+    }, "forecast requires the exact independently reviewed evidence and status transition")
+    paths = {name: pinned_file(directory, proof, "forecast " + name)
+             for name, proof in FORECAST_EVIDENCE.items()}
+    proposal = json.loads(paths["proposal"].read_text(encoding="utf-8"))
+    review = json.loads(paths["review"].read_text(encoding="utf-8"))
+    require(proposal.get("kind") == "pp-w-prospective-cost-forecast"
+            and proposal.get("forecast", {}).get("status") == "proposed"
+            and review.get("kind") == "pp-w-independent-cost-forecast-review"
+            and review.get("decision") == "approved-as-prospective-historical-traffic-planning-baseline"
+            and review.get("reviewedArtifacts") == {
+                name: {"path": Path(proof["path"]).name, "sha256": proof["sha256"]}
+                for name, proof in FORECAST_EVIDENCE.items() if name != "review"
+            }, "forecast method review does not approve this exact proposal and generator")
+    require(forecast == dict(proposal["forecast"], status="registered"),
+            "registered forecast changed the reviewed estimate, method or limitations")
+    require(units(forecast["ceilingUsd"]) == ceiling
+            and 0 < units(forecast["estimatedFullPilotUsd"]) <= ceiling,
+            "the reviewed historical-traffic planning baseline does not fit the authorized ceiling")
+    return {name: dict(proof) for name, proof in FORECAST_EVIDENCE.items()}
 
 
 def admit(registration, selected, authorization, directory, epoch_id, stage):
@@ -177,7 +218,7 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
     require(type(plan.get("plannedInvocations")) is int and plan["plannedInvocations"] == len(slots),
             "full unchanged registered slot inventory is required, not a budget-sized subset")
     if control.get("kind") == GATEWAY:
-        validate_forecast(plan, ceiling, len(slots))
+        forecast_evidence = validate_forecast(plan, ceiling, len(slots), directory)
         policy = module("ppw-gateway-budget.py")
         isolation = module("ppw-gateway-client.py")
         require(selected["modelPin"] == policy.MODEL
@@ -206,6 +247,7 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
             "testHost": control.get("testHost"),
             "sourceInspector": control.get("sourceInspector"),
             "executionRuntime": control.get("executionRuntime"),
+            "forecastEvidence": forecast_evidence,
         }
     ledger = plan.get("ledgerPath")
     require(isinstance(ledger, str) and Path(ledger).is_absolute(),

@@ -90,8 +90,14 @@ preserves attempted, interrupted and unstarted slots. Such a collection has
 zeros, analyze the observed prefix as the pilot, apply a scientific stopping
 verdict, or call it a null. `UNDERPOWERED-CARRIED` remains a stage-2 disposition.
 
-The fixed 444-slot plan still needs a defensible prospective forecast. A safe
-aggregate controller does not promise that all 444 slots will fit. Stage 2
+The fixed 444-slot plan binds the independently reviewed historical-traffic
+forecast, its unchanged proposal and generator, and its scoped review. Only
+the operational plan transitions the proposal to registered status; its method,
+estimate, limitations and non-guarantee remain unchanged. Neither a small
+number nor a self-asserted approval can replace these exact proofs. Both live
+admission and read-only archive analysis verify the same evidence.
+
+A safe aggregate controller does not promise that all 444 slots will fit. Stage 2
 requires the actual pilot, prospective power/sample-size registration and
 affordability within the remaining shared ceiling. Neither this amendment nor
 the financial increase activates stage 2 or a release.

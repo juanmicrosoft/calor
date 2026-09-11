@@ -35,7 +35,12 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
             path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(registration_helper.ROOT / proof["path"], path)
         plan = analysis.load(self.inputs / self.selected["spendingPlan"]["path"])
+        for proof in self.spending.FORECAST_EVIDENCE.values():
+            destination = self.inputs / proof["path"]
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(registration_helper.ROOT / proof["path"], destination)
         self.admission.update(
+            forecastEvidence=self.spending.FORECAST_EVIDENCE,
             sourceInspector=plan["clientControl"]["sourceInspector"],
             epochId=self.epoch_id, ceilingUnits=self.spending.units(plan["ceilingUsd"]),
             authorizationSha256=self.selected["spendAuthorization"]["sha256"],
@@ -66,6 +71,9 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
         self.assertEqual("request-reserving-gateway-1406", projection["id"])
         self.assertEqual("SYNTHETIC_ONLY", report["decision"]["status"])
         self.assertFalse(report["empirical"])
+        self.spending.validate_forecast(
+            analysis.load(self.epoch / self.selected["spendingPlan"]["path"]),
+            self.admission["ceilingUnits"], 444, self.epoch)
         self.assertEqual(before, report["provenance"]["epochInventory"])
         for estimate in report["estimands"].values():
             self.assertEqual({"numerator": 1, "denominator": 2}, estimate["exactEstimate"])

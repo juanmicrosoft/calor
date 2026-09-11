@@ -285,16 +285,22 @@ class AdmissionTests(Fixture):
         save(prices, budget.price_contract())
         binding = {"anchor": "git-common-dir", "relativePath": "ppw-budget/epic1254-pilot.sqlite3",
                    "anchorSha256": "f" * 64}
-        authorization = {"spendingCeilingUsd": 500, "ledgerBinding": binding}
+        authorization = {"spendingCeilingUsd": 1000, "ledgerBinding": binding}
+        for proof in spending.FORECAST_EVIDENCE.values():
+            destination = self.root / proof["path"]
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(BENCH / "registrations/ppw-rows-stage1" / proof["path"], destination)
+        proposal = json.loads((self.root / spending.FORECAST_EVIDENCE["proposal"]["path"]).read_text())
         plan = {
             "schemaVersion": 1, "kind": "pp-w-pilot-spending-plan", "epochId": "SYNTHETIC-pilot",
             "stage": "pilot", "authorizationSha256": selected["spendAuthorization"]["sha256"],
             "protocolSha256": spending.protocol_identity(registration, selected, "pilot", "SYNTHETIC-pilot"),
-            "ceilingUsd": 500, "costBasis": "both-list-price-study-cost-and-actual-spend",
+            "ceilingUsd": 1000, "costBasis": "both-list-price-study-cost-and-actual-spend",
             "plannedInvocations": 444, "ledgerBinding": binding,
-            "forecast": {"status": "registered", "plannedInvocations": 444,
-                         "experimentalObservations": 0, "estimatedFullPilotUsd": 400,
-                         "method": "SYNTHETIC deterministic test fixture; not empirical cost evidence"},
+            "forecast": dict(proposal["forecast"], status="registered"),
+            "forecastRegistration": {"from": "proposed", "to": "registered",
+                                     "reviewReference": spending.FORECAST_REVIEW,
+                                     "artifacts": spending.FORECAST_EVIDENCE},
             "clientControl": {
                 "kind": spending.GATEWAY, "isolation": isolation.ISOLATION,
                 "priceContract": {"path": prices.name, "sha256": spending.digest(prices)},
@@ -333,7 +339,8 @@ class AdmissionTests(Fixture):
         admission = self.check(values)
         self.assertEqual(444, len(admission["slots"]))
         self.assertEqual(444, len({slot["id"] for slot in admission["slots"]}))
-        self.assertEqual(500_000_000, admission["ceilingUnits"])
+        self.assertEqual(1_000_000_000, admission["ceilingUnits"])
+        self.assertEqual(values[0].FORECAST_EVIDENCE, admission["forecastEvidence"])
         self.assertEqual(budget.KIND, admission["mechanism"])
         self.assertGreater(budget.admit_request(body())["maximumMicroUsd"] * 444,
                            admission["ceilingUnits"])

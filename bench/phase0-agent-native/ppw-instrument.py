@@ -561,11 +561,14 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
             if operational_profile:
                 proofs.append(selected["executionProfile"])
                 proofs.append(selected["sourceInspectionEvidence"])
+            proofs.extend(admission["forecastEvidence"].values())
             for proof in proofs:
                 destination = local(epoch, proof["path"])
                 require(not destination.exists(), "operational proof would overwrite an epoch artifact")
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(local(registration_path.parent, proof["path"]), destination)
+                require(digest(destination) == proof["sha256"],
+                        "operational proof changed during archival")
         pins = {"schemaVersion": 2, "kind": KIND, "epochId": epoch_id, "stage": stage,
                 "dataKind": "empirical", "mode": "live", "lifecycle": "collecting",
                 "harnessCommit": command(["git", "-C", str(REPO), "rev-parse", "HEAD"]),

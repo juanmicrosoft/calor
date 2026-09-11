@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "kind": "pp-w-independent-cost-forecast-review",
+  "decision": "approved-as-prospective-historical-traffic-planning-baseline",
+  "reviewer": {
+    "type": "independent AI methods reviewer",
+    "model": "gpt-6-astra",
+    "humanSignoff": false
+  },
+  "reviewedArtifacts": {
+    "script": {
+      "path": "project_cost.py",
+      "sha256": "1d6168e248dc9a0cf59e5514098363c98a9a1e34b024a85f85c2e7f368435af6"
+    },
+    "proposal": {
+      "path": "forecast-proposed.json",
+      "sha256": "fe1ddf0cf9995694190acd548e7659e8aee506310438499b5a0fd3bb3718720b"
+    }
+  },
+  "independentFindings": [
+    "The script reproduces the proposed JSON byte-for-byte.",
+    "All 18 unique envelopes, their hashes, six cells with three runs each, and per-envelope/model cost reconciliations match.",
+    "The 444-slot historical-traffic projection rounds upward to $900.36 and leaves $99.64 baseline arithmetic headroom under the $1,000 ceiling.",
+    "The two sensitivity calculations correctly round upward to $990.40 and $1,125.45.",
+    "The disclosed historical-traffic assumption is defensible for prospective planning without crediting unmeasured savings for smaller redesigned tasks."
+  ],
+  "limitations": [
+    "Approval is limited to the exact reviewed script and proposal; it does not establish runtime, pricing, isolation or collection readiness.",
+    "The estimate is not an established redesigned-task mean, predictive interval or completion guarantee.",
+    "Approximately 11.1 percent additional dollar-weighted traffic exhausts the baseline arithmetic margin.",
+    "The 1.1 pricing sensitivity leaves $9.60 before outstanding-reservation and unknown-liability effects.",
+    "The forecast covers the pilot, not demonstrated affordability of a confirmatory stage.",
+    "Incomplete-budget collection remains non-adjudicable and does not authorize sample replacement or reduction."
+  ],
+  "registrationRequirement": "Preserve the exact proposed artifact, bind this scoped independent review, and record the explicit proposed-to-registered status transition in the operational spending-plan lineage.",
+  "numericGateInterpretation": "Estimated cost not exceeding the ceiling is a prospective operational consistency check, not a frozen scientific threshold or a substitute for independent review."
+}

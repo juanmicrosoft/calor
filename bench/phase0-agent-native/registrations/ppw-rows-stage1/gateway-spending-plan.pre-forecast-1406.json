@@ -134,64 +134,8 @@
   "costBasis": "both-list-price-study-cost-and-actual-spend",
   "epochId": "w-rows-pilot-gateway-001",
   "forecast": {
-    "baselineHeadroomUsd": "99.64",
-    "budgetExhaustion": "Stop before an unaffordable request. Preserve all attempted, interrupted and unstarted slots. Record INCOMPLETE_BUDGET, not a pilot null, completed fixed-allocation estimate or scientific stopping verdict. No replacements or sample-size reduction.",
-    "ceilingUsd": "1000.00",
-    "completionGuaranteed": false,
-    "estimatedFullPilotUsd": "900.36",
     "experimentalObservations": 0,
-    "limitations": [
-      "The historical client is 2.1.252; the redesigned client remains pinned to 2.1.266.",
-      "The old tasks and two older compiler products differ from the three redesigned tasks and shared v0.18.0 compiler.",
-      "The redesigned tasks have smaller specs and source, but continuation, reasoning and retry costs are unmeasured.",
-      "A prepared first-request token count cannot establish the cost of all later requests.",
-      "The calibration includes observed auxiliary-model costs, but does not bound future retries, helpers or retained unknown liabilities.",
-      "Outstanding worst-case reservations and retained unknown liabilities can stop collection before charged usage reaches the ceiling.",
-      "Provider pricing and supported request classes must match the independently reviewed gateway price contract.",
-      "The old dry-001 zero-cost invalid/censored starts are not treated as cheap completed runs."
-    ],
-    "method": "Historical-traffic planning baseline: 74 times the sum of six historical task/arm cell means, each based on three cost-bearing dry-002 runs. The historical sample is not pooled with the redesigned pilot. No cost reduction is credited for smaller redesigned tasks. This is a conditional planning estimate, not an established new-task mean, provider quote, predictive interval, or completion guarantee.",
-    "numericalInterruptionProbability": null,
-    "plannedInvocations": 444,
-    "scope": "The 444-slot pilot draws from one total experiment ceiling; no per-stage reset.",
-    "sensitivities": [
-      {
-        "fullPilotUsd": "990.40",
-        "interpretation": "Pricing sensitivity only; not an assertion of actual residency settings.",
-        "name": "same historical traffic with 1.1 pricing multiplier"
-      },
-      {
-        "fullPilotUsd": "1125.45",
-        "interpretation": "Illustrative stress scenario, not a predicted frequency or upper bound.",
-        "name": "25 percent more dollar-weighted traffic"
-      }
-    ],
-    "stage2": "No automatic collection. Use actual pilot evidence for prospective effect-size, sample-size and affordability decisions. Any eligible stage must use only the remaining balance of the same $1,000 ceiling; do not pool pilot observations.",
-    "status": "registered"
-  },
-  "forecastOperationalCaveats": [
-    "The review approves only the historical-traffic planning baseline, not runtime, pricing, isolation or collection.",
-    "Missing provider speed/geography evidence selects the implemented conservative 2x/1.1x multipliers; the 1.1 scenario does not cover both unknown modifiers.",
-    "Outstanding request reservations and retained unknown liabilities can exhaust usable headroom before realized charges reach the ceiling."
-  ],
-  "forecastRegistration": {
-    "artifacts": {
-      "proposal": {
-        "path": "gateway-forecast/forecast-proposed.json",
-        "sha256": "fe1ddf0cf9995694190acd548e7659e8aee506310438499b5a0fd3bb3718720b"
-      },
-      "review": {
-        "path": "gateway-forecast/forecast-review.json",
-        "sha256": "a0a649b6159fddf38287c4a184facc79bbd98cd25c5ac1862080137a21176d13"
-      },
-      "script": {
-        "path": "gateway-forecast/project_cost.py",
-        "sha256": "1d6168e248dc9a0cf59e5514098363c98a9a1e34b024a85f85c2e7f368435af6"
-      }
-    },
-    "from": "proposed",
-    "reviewReference": "https://github.com/juanmicrosoft/calor/pull/1431#issuecomment-5624531673",
-    "to": "registered"
+    "status": "awaiting-independent-parent-forecast"
   },
   "kind": "pp-w-pilot-spending-plan",
   "ledgerBinding": {
@@ -202,11 +146,7 @@
   "ordering": "run ordinal, frozen task list, A then B",
   "perRunBudgetUsd": null,
   "plannedInvocations": 444,
-  "protocolSha256": "fea9de6680df407aacda8adb5720ab86c5edaca9ae87f0e10b3724dea6c5f10f",
+  "protocolSha256": "72a7b8724678d9f0208db30dc6ac7bf137e1d3f9c7dca997f89d796454124ed5",
   "schemaVersion": 1,
-  "stage": "pilot",
-  "supersedes": {
-    "path": "gateway-spending-plan.pre-forecast-1406.json",
-    "sha256": "33115e0dd724e01878a9eee4a26f9408838034b0339d95a430ef979955d8fc4f"
-  }
+  "stage": "pilot"
 }

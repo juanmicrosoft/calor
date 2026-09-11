@@ -73,6 +73,7 @@ class CollectionTests(unittest.TestCase):
             "testHost": {"kind": "SYNTHETIC-nonexecutable-test-runtime"},
             "sourceInspector": inspector,
             "executionRuntime": {"kind": "SYNTHETIC-local-runtime-double"},
+            "forecastEvidence": {},
         }
         self.launched = []
         self.failure = None

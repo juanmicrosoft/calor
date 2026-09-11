@@ -61,6 +61,9 @@ def resolve_profile(path):
         selected[name] = profile[name]
     selected["executionProfile"] = {"path": Path(path).name, "sha256": spending.digest(path)}
     _, plan = spending.pinned_document(Path(path).parent, profile["spendingPlan"], "spendingPlan")
+    spending.validate_forecast(plan, spending.units(plan["ceilingUsd"]),
+                               len(registration["tasks"]) * selected["runsPerArm"] * 2,
+                               Path(path).parent)
     source_inspector = plan.get("clientControl", {}).get("sourceInspector")
     require(isinstance(source_inspector, dict), "source-inspector runtime binding is required")
     selected["sourceInspector"] = source_inspector
@@ -160,8 +163,7 @@ def validate_archive(epoch, pins, selected):
     initial = budget.decode((epoch / "spending-initial.json").read_bytes())
     final = budget.decode((epoch / "spending-final.json").read_bytes())
     ceiling = spending.units(authorization["spendingCeilingUsd"])
-    if pins["dataKind"] == "empirical":
-        spending.validate_forecast(plan, ceiling, len(slots))
+    spending.validate_forecast(plan, ceiling, len(slots), epoch)
     for snapshot in (initial, final):
         require(snapshot.get("kind") == budget.KIND and snapshot.get("binding") == expected_binding
                 and type(snapshot.get("ceilingMicroUsd")) is int

@@ -38,6 +38,10 @@ class GatewayArchiveTests(unittest.TestCase):
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(cls.gateway.ROOT / proof["path"], destination)
         cls.plan = analysis.load(cls.epoch / cls.selected["spendingPlan"]["path"])
+        for proof in cls.spending.FORECAST_EVIDENCE.values():
+            destination = cls.epoch / proof["path"]
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(cls.gateway.ROOT / proof["path"], destination)
         slots = ["%s/%s/%d" % (task, arm, run)
                  for run in range(1, 75) for task in cls.pins["suite"]
                  for arm in ("calor-permissive", "calor-strict")]
@@ -175,11 +179,17 @@ class GatewayArchiveTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing, linked, or changed"):
             self.gateway.validate_archive(self.epoch, self.pins, selected)
 
-    def test_pending_real_forecast_does_not_admit_empirical_input(self):
-        if self.plan["forecast"]["status"] == "registered":
-            self.skipTest("the coordinating parent's real forecast has been registered")
-        with self.assertRaisesRegex(ValueError, "cost forecast is not registered"):
-            self.validate(dict(self.pins, dataKind="empirical"))
+    def test_archived_forecast_evidence_cannot_be_replaced_by_canonical_files(self):
+        for proof in self.spending.FORECAST_EVIDENCE.values():
+            path = self.epoch / proof["path"]
+            original = path.read_bytes()
+            try:
+                path.unlink()
+                with self.subTest(path=proof["path"]), self.assertRaisesRegex(
+                        ValueError, "forecast .* is missing, linked, or changed"):
+                    self.validate()
+            finally:
+                path.write_bytes(original)
 
 
 if __name__ == "__main__":

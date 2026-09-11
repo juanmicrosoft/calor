@@ -10,8 +10,11 @@ canaries exist. Independent no-forward diagnostic-client transport and protected
 control probes succeeded. The author-run shared registered-argument probe also
 reached the gateway with two authenticated Opus 4.8 requests; their actual body
 and capability sets pass the request-price contract. The server forwarded zero
-requests. Remaining independent IPC/socket review, the parent-owned full-pilot
-forecast and final review are still pending. The additive 25-artifact execution
+requests. Actual visible and held-out controls passed under final containment.
+The independent historical-traffic forecast and scoped AI methods review are
+bound to the plan. The profile becomes operative on independently reviewed
+merge; collection still requires the explicit operator invocation below.
+The additive 25-artifact execution
 profile and 250-to-500-to-1000 financial lineage do not create a live ledger,
 epoch or scientific outcome. Credential and model availability are not blockers.
 
@@ -259,13 +262,24 @@ eleven-file pins, inactive fifteen-file projection and dated assessment remain
 unchanged. Complete empirical archives have a real admission path; incomplete
 accounting, mismatched proof files or any missing slot are refused.
 
-The checked-in spending plan currently names the outstanding parent-owned
-forecast explicitly. Admission refuses that pending forecast before creating
-an epoch or ledger. This is not an unknown price bound: the per-request bound is
-implemented and positive. The forecast must describe all 444 slots, its
-no-charge method and point cost estimate; it must not claim guaranteed completion.
+The spending plan preserves the immutable proposed forecast, its generator and
+the independent AI methods review under `gateway-forecast/`. Only the plan's
+projection changes `proposed` to `registered`; the entire reviewed estimate,
+method and limitations otherwise match exactly. Admission and archived analysis
+require the exact three reviewed artifact hashes, not a nonblank method and a
+small number. The collector copies these proofs into each archive, and analysis
+does not execute the generator or fall back to canonical files when a proof is
+missing. The preceding pending plan is preserved as an explicit supersession.
 
-After the real forecast and final independent review are registered and merged,
+The historical 18-run traffic scenario scales to $900.36 for 444 slots, leaving
+$99.64 under the $1,000 shared experiment ceiling. Its 1.1 pricing sensitivity
+is $990.40, and 25% more traffic costs $1,125.45. These are conditional planning
+scenarios, not a new-task mean, probability or completion guarantee. Missing
+speed/geography evidence uses the implemented conservative 2x/1.1x settlement
+multipliers; outstanding reservations and unknown liabilities further reduce
+available headroom. No cheaper traffic is assumed for the redesigned tasks.
+
+After final independent implementation review and merge,
 the invocation is:
 
 ```bash
