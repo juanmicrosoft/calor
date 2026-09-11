@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 import uuid
 
-from ppw_pilot_epoch import BENCH, analysis, build
+from ppw_pilot_epoch import BENCH, analysis, build, synthetic_current_analysis_manifest
 
 
 class PilotAdjudicationTests(unittest.TestCase):
@@ -27,6 +27,23 @@ class PilotAdjudicationTests(unittest.TestCase):
         cls.method = analysis.load(BENCH / analysis.METHOD)
         cls.instrument = analysis.module("pilot_test_instrument", "ppw-instrument.py")
         cls.baseline = cls.instrument.analyze(cls.epochs, cls.epoch.name, "pilot")
+        cls.manifest = synthetic_current_analysis_manifest(analysis, cls.root)
+        manifest_patch = patch.object(analysis, "MANIFEST", cls.manifest)
+        manifest_patch.start()
+        cls.addClassCleanup(manifest_patch.stop)
+
+    @classmethod
+    def synthetic_cli(cls):
+        # Test-only module bootstrap; the production CLI has no manifest override.
+        bootstrap = (
+            "import importlib.util; from pathlib import Path; "
+            f"spec=importlib.util.spec_from_file_location('SYNTHETIC_cli',"
+            f"{str(BENCH / 'ppw-pilot-adjudicate.py')!r}); "
+            "module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module); "
+            f"module.MANIFEST=Path({str(cls.manifest)!r}); "
+            "raise SystemExit(module.main())"
+        )
+        return [sys.executable, "-B", "-c", bootstrap]
 
     def report(self):
         return copy.deepcopy(self.baseline)
@@ -297,9 +314,9 @@ class PilotAdjudicationTests(unittest.TestCase):
         before = analysis.inventory(self.epoch, self.instrument)
         output = self.root / "synthetic-adjudication.json"
         self.addCleanup(lambda: output.unlink(missing_ok=True))
-        command = [sys.executable, str(BENCH / "ppw-pilot-adjudicate.py"),
-                   "--epoch-id", self.epoch.name, "--stage", "pilot",
-                   "--epochs-root", str(self.epochs), "--out", str(output)]
+        command = self.synthetic_cli() + [
+            "--epoch-id", self.epoch.name, "--stage", "pilot",
+            "--epochs-root", str(self.epochs), "--out", str(output)]
         result = subprocess.run(command, capture_output=True, text=True)
         self.assertEqual(0, result.returncode, result.stderr)
         report = json.loads(output.read_text())
@@ -311,7 +328,7 @@ class PilotAdjudicationTests(unittest.TestCase):
         self.assertIn("never overwrite", again.stderr)
 
     def test_cli_rejects_confirmation_multiple_ids_unrun_inputs_and_epoch_writes(self):
-        command = [sys.executable, str(BENCH / "ppw-pilot-adjudicate.py")]
+        command = self.synthetic_cli()
         for arguments, reason in (
             (["--epoch-id", self.epoch.name, "--stage", "confirmatory"], "invalid choice"),
             (["--epoch-id", self.epoch.name, "--stage", "pilot", "--epoch-id", "other"], "exactly once"),
@@ -327,6 +344,14 @@ class PilotAdjudicationTests(unittest.TestCase):
                 self.assertEqual(2, result.returncode, result.stderr)
                 self.assertIn(reason, result.stderr)
         self.assertFalse((self.epoch / "forbidden.json").exists())
+
+    def test_production_cli_still_refuses_the_unreviewed_current_source(self):
+        result = subprocess.run(
+            [sys.executable, "-B", str(BENCH / "ppw-pilot-adjudicate.py"),
+             "--epoch-id", self.epoch.name, "--stage", "pilot", "--epochs-root", str(self.epochs)],
+            capture_output=True, text=True)
+        self.assertEqual(2, result.returncode)
+        self.assertIn("analysis artifact changed: ppw-budget-gateway.py", result.stderr)
 
     def test_epoch_changes_during_analysis_fail_closed(self):
         original = analysis.inventory

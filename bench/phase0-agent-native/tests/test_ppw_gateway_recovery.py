@@ -279,10 +279,18 @@ class ZeroRequestRecoveryTests(RecoveryFixture):
                 operator.canonical_inputs()
             modules.assert_called_once_with("ppw-pilot-adjudicate.py")
 
-    def test_native_startup_evidence_requires_actual_tools_and_current_source(self):
+    def test_historical_startup_refuses_changed_source_and_synthetic_shape_stays_checked(self):
         registration = load("startup_evidence_validation", BENCH / "ppw-gateway-registration.py")
-        evidence = json.loads((BENCH / "registrations/ppw-rows-stage1/gateway-evidence/"
-                              "gateway-native-startup-1434-evidence.json").read_text())
+        historical = json.loads((BENCH / "registrations/ppw-rows-stage1/gateway-evidence/"
+                                 "gateway-native-startup-1434-evidence.json").read_text())
+        with self.assertRaisesRegex(ValueError, "binds different execution or test source"):
+            registration.validate_native_startup(historical)
+        # SYNTHETIC in-memory validator control, not a new native observation.
+        evidence = copy.deepcopy(historical)
+        evidence["sourceHashes"] = {
+            name: digest(BENCH / name) for name in registration.STARTUP_SOURCE_FILES
+        }
+        evidence["testSha256"] = digest(BENCH / "tests/test_ppw_gateway_native_startup.py")
         registration.validate_native_startup(evidence)
         for mutate in (
             lambda value: value.update(outcome="failed"),

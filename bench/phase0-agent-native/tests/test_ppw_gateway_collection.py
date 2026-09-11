@@ -326,7 +326,20 @@ class CollectionTests(unittest.TestCase):
             b"SYNTHETIC OPAQUE INVALID PLACEHOLDER; NOT AN OUTCOME")
         inventory = recovery.archive_inventory(failed_archive)
         ledger_sha = instrument.digest(self.admission["ledgerPath"])
-        recovery_sha = self.admission["authorizationSha256"]
+        recovery_authority = {
+            "kind": "SYNTHETIC-test-owned-recovery-authorization",
+            "oldEpochId": old["epochId"],
+            "oldBinding": old,
+            "targetEpochId": target["epochId"],
+            "targetBinding": target,
+            "failedLedgerSha256": ledger_sha,
+            "failedArchiveInventorySha256": inventory["sha256"],
+            "preservedAttemptedSlots": [full_slots[0]],
+            "backupName": "SYNTHETIC-failed.sqlite3",
+        }
+        recovery_authority_path = self.inputs / "SYNTHETIC-recoveryAuthorization.json"
+        save(recovery_authority_path, recovery_authority)
+        recovery_sha = instrument.digest(recovery_authority_path)
         proof = recovery.prove_zero_request_recovery(
             self.admission["ledgerPath"], failed_archive, protected,
             protected / "SYNTHETIC-failed.sqlite3",
@@ -344,7 +357,7 @@ class CollectionTests(unittest.TestCase):
             confirmed_proof_sha256=proof["proofSha256"])
         documents = {
             "recoveryEvidence": {"kind": "SYNTHETIC recovery evidence"},
-            "recoveryAuthorization": {"kind": "SYNTHETIC recovery authorization"},
+            "recoveryAuthorization": recovery_authority,
             "inspectionProof": proof,
             "failedArchiveInventory": inventory,
             "failedOperationalSnapshot": failed,

@@ -116,6 +116,98 @@ def decode(raw):
         raise Refusal("invalid JSON") from error
 
 
+PROVIDER_FAILURE_KIND = "pp-w-provider-failure-v1"
+PROVIDER_REFUSALS = {
+    "invalid JSON": "PROVIDER_JSON_INVALID",
+    "duplicate JSON key": "PROVIDER_JSON_DUPLICATE",
+    "nonfinite JSON": "PROVIDER_JSON_NONFINITE",
+    "invalid provider message": "PROVIDER_MESSAGE_SCHEMA",
+    "unexpected server-side response content": "PROVIDER_CONTENT_SCHEMA",
+    "oversized provider receipt": "PROVIDER_RECEIPT_OVERSIZED",
+    "response model differs": "USAGE_MODEL",
+    "missing or unadmitted terminal reason": "USAGE_TERMINAL_REASON",
+    "missing provider usage": "USAGE_MISSING",
+    "invalid token count or limit": "USAGE_TOKEN_COUNT",
+    "output exceeds requested bound": "USAGE_OUTPUT_BOUND",
+    "provider input exceeds context bound": "USAGE_INPUT_BOUND",
+    "unknown provider service tier": "USAGE_SERVICE_TIER",
+    "provider service tier differs from the admitted request": "USAGE_SERVICE_TIER_MISMATCH",
+    "unknown provider geography": "USAGE_GEOGRAPHY",
+    "unknown provider speed": "USAGE_SPEED",
+    "unknown provider usage component": "USAGE_COMPONENT",
+    "unexpected fallback credit": "USAGE_FALLBACK_CREDIT",
+    "multiple or ambiguous server iterations": "USAGE_ITERATIONS",
+    "unknown server iteration fields": "USAGE_ITERATION_SCHEMA",
+    "server iteration differs from the single admitted model turn": "USAGE_ITERATION_MISMATCH",
+    "unknown output token category": "USAGE_OUTPUT_CATEGORY",
+    "thinking tokens exceed the inclusive output total": "USAGE_THINKING_BOUND",
+    "unknown server operation counter": "USAGE_SERVER_COUNTER",
+    "unexpected server operation": "USAGE_SERVER_OPERATION",
+    "unknown cache categories": "USAGE_CACHE_SCHEMA",
+    "cache counters disagree": "USAGE_CACHE_MISMATCH",
+    "request liability bound contradicted": "USAGE_LIABILITY_BOUND",
+    "oversized provider event": "SSE_EVENT_OVERSIZED",
+    "invalid provider event": "SSE_EVENT_SCHEMA",
+    "event after message stop": "SSE_AFTER_STOP",
+    "duplicate provider message": "SSE_DUPLICATE_MESSAGE",
+    "nonempty initial provider content": "SSE_INITIAL_CONTENT",
+    "invalid terminal delta order": "SSE_DELTA_ORDER",
+    "unadmitted message delta": "SSE_DELTA_SCHEMA",
+    "missing final output usage": "SSE_FINAL_OUTPUT_MISSING",
+    "conflicting terminal reasons": "SSE_TERMINAL_CONFLICT",
+    "message stop without complete usage": "SSE_STOP_WITHOUT_USAGE",
+    "content outside message": "SSE_CONTENT_ORDER",
+    "unknown or error provider event": "SSE_UNADMITTED_EVENT",
+    "missing usage event": "SSE_USAGE_MISSING",
+    "decreasing provider usage": "SSE_USAGE_DECREASED",
+    "truncated or ambiguous provider stream": "SSE_INCOMPLETE",
+}
+PROVIDER_FAILURE_CODES = frozenset(PROVIDER_REFUSALS.values()) | {
+    "PROVIDER_SCHEMA", "PROVIDER_TLS_CERTIFICATE", "PROVIDER_TLS", "PROVIDER_TIMEOUT",
+    "PROVIDER_DNS", "PROVIDER_CONNECTION", "PROVIDER_HTTP_TRUNCATED", "PROVIDER_HTTP_PROTOCOL",
+    "PROVIDER_IO", "PROVIDER_DATA_SHAPE", "PROVIDER_UNEXPECTED_FAILURE",
+    "PROVIDER_HTTP_STATUS", "PROVIDER_CONTENT_TYPE", "PROVIDER_CONTENT_ENCODING",
+}
+PROVIDER_PHASES = {"connect", "send-request", "response-headers", "response-body",
+                   "receipt-validation", "upstream-close"}
+
+
+class ProviderFailure(Refusal):
+    def __init__(self, code):
+        require(code in PROVIDER_FAILURE_CODES, "unregistered provider diagnostic")
+        super().__init__(code)
+        self.code = code
+
+
+def provider_refusal_code(error):
+    if isinstance(error, ProviderFailure):
+        return error.code
+    # Never serialize arbitrary exception text, even if a new refusal is added.
+    return PROVIDER_REFUSALS.get(str(error), "PROVIDER_SCHEMA")
+
+
+def validate_provider_diagnostic(value):
+    require(isinstance(value, dict) and set(value) == {
+        "kind", "code", "phase", "httpStatus", "responseType", "streamState",
+    }, "invalid provider diagnostic fields")
+    require(value["kind"] == PROVIDER_FAILURE_KIND
+            and isinstance(value["code"], str) and value["code"] in PROVIDER_FAILURE_CODES
+            and isinstance(value["phase"], str) and value["phase"] in PROVIDER_PHASES,
+            "unregistered provider diagnostic")
+    status = value["httpStatus"]
+    require(status is None or type(status) is int and 100 <= status <= 999,
+            "invalid provider diagnostic status")
+    require(isinstance(value["responseType"], str)
+            and value["responseType"] in ("unobserved", "absent", "sse", "json", "other"),
+            "invalid provider diagnostic content type")
+    state = value["streamState"]
+    require(state is None or isinstance(state, dict) and set(state) == {
+        "started", "terminalDeltaSeen", "stopped",
+    } and all(type(item) is bool for item in state.values()),
+            "invalid provider diagnostic stream state")
+    return value
+
+
 def source_identities():
     root = Path(__file__).resolve().parent
     return {name: digest(root / name) for name in TERMINAL_SOURCE_FILES}
@@ -679,7 +771,7 @@ class UsageStream:
             return
         self.buffer += data
         if len(self.buffer) > 8 * 1024 * 1024:
-            self.failure = "oversized provider event"
+            self.failure = PROVIDER_REFUSALS["oversized provider event"]
             return
         try:
             while b"\n\n" in self.buffer or b"\r\n\r\n" in self.buffer:
@@ -726,8 +818,10 @@ class UsageStream:
                         validate_response_content([event.get("content_block")])
                 else:
                     raise Refusal("unknown or error provider event")
-        except (Refusal, TypeError, KeyError, AttributeError):
-            self.failure = "incomplete or ambiguous provider stream"
+        except Refusal as error:
+            self.failure = provider_refusal_code(error)
+        except (TypeError, KeyError, AttributeError):
+            self.failure = "PROVIDER_DATA_SHAPE"
 
     def update_usage(self, usage):
         require(isinstance(usage, dict), "missing usage event")
@@ -737,7 +831,9 @@ class UsageStream:
             self.usage[name] = value
 
     def finish(self):
-        require(not self.failure and self.started and self.stopped and not self.buffer.strip(),
+        if self.failure:
+            raise ProviderFailure(self.failure)
+        require(self.started and self.stopped and not self.buffer.strip(),
                 "truncated or ambiguous provider stream")
         return reconciled_cost(self.request, self.model, self.usage, self.stop_reason)
 
@@ -869,7 +965,10 @@ class RequestLedger:
         require(not refused, "INCOMPLETE_BUDGET")
         return request_id
 
-    def settle(self, owner, request_id, cost=None, usage=None):
+    def settle(self, owner, request_id, cost=None, usage=None, diagnostic=None):
+        require(diagnostic is None or cost is None, "failure diagnostic cannot reconcile a charge")
+        if diagnostic is not None:
+            validate_provider_diagnostic(diagnostic)
         with self.transaction() as db:
             scope = db.execute("SELECT * FROM scope").fetchone()
             require(scope and scope["owner"] == owner, "settlement owner differs")
@@ -880,7 +979,8 @@ class RequestLedger:
                            (request_id,))
                 db.execute("UPDATE scope SET state=CASE WHEN state='INCOMPLETE_BUDGET' THEN state "
                            "ELSE 'INCOMPLETE_UNKNOWN_CHARGE' END")
-                self.event(db, "unknown-charge-retained", request_id, {})
+                self.event(db, "unknown-charge-retained", request_id,
+                           {} if diagnostic is None else {"diagnostic": diagnostic})
             else:
                 require(type(cost) is int and 0 <= cost <= row["reserved"], "invalid reconciliation")
                 require(isinstance(usage, dict), "provider usage evidence required")
@@ -901,7 +1001,8 @@ class RequestLedger:
             "WIRE_CONTENT_TYPE", "WIRE_API_VERSION", "WIRE_UNKNOWN_PROVIDER_HEADER",
             "WIRE_BROWSER_ACCESS_VALUE", "WIRE_CONTENT_LENGTH", "WIRE_HOP_CAPABILITY",
             "WIRE_ENDPOINT", "OBSERVER_OPERATION", "PRICE_REQUEST", "REQUEST_RESERVATION",
-        }, "unregistered nonsecret policy diagnostic")
+        } or reason == "INCOMPLETE_INTERRUPTED" and diagnostic == "CLIENT_DISCONNECTED",
+                "unregistered nonsecret policy diagnostic")
         with self.transaction() as db:
             row = db.execute("SELECT owner,state FROM scope").fetchone()
             require(row and row["owner"] == owner, "stop owner differs")

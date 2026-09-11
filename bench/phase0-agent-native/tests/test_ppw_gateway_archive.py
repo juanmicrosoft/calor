@@ -7,7 +7,9 @@ import unittest
 from unittest.mock import patch
 import uuid
 
-from ppw_pilot_epoch import BENCH, analysis, build, save
+from ppw_pilot_epoch import (
+    BENCH, analysis, build, save, synthetic_current_analysis_manifest,
+)
 from test_ppw_gateway import body, budget, usage
 
 
@@ -96,14 +98,18 @@ class GatewayArchiveTests(unittest.TestCase):
     def validate(self, pins=None):
         return self.gateway.validate_archive(self.epoch, pins or self.pins, self.selected)
 
-    def test_complete_actual_artifact_map_and_accounting_reach_registered_analyzer_readonly(self):
+    def test_synthetic_current_source_and_accounting_reach_registered_analyzer_readonly(self):
+        with self.assertRaisesRegex(ValueError, "analysis artifact changed: ppw-budget-gateway.py"):
+            analysis.validate_analysis_registration()
+        manifest = synthetic_current_analysis_manifest(analysis, self.root)
         original_is_file = Path.is_file
         def archive_only_is_file(path):
             if "/source-inspection/cache/" in path.as_posix():
                 raise AssertionError("archived analysis must not access collector runtime files")
             return original_is_file(path)
         with patch("subprocess.run", side_effect=AssertionError("analysis must not execute commands")), \
-                patch.object(Path, "is_file", archive_only_is_file):
+                patch.object(Path, "is_file", archive_only_is_file), \
+                patch.object(analysis, "MANIFEST", manifest):
             projection = self.validate()
             result = analysis.adjudicate(self.epochs, self.epoch.name)
         self.assertEqual(444, projection["requestCount"])
