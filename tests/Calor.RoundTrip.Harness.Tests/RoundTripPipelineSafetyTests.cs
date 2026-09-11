@@ -1550,7 +1550,8 @@ public sealed class RoundTripPipelineSafetyTests
                 {
                     FilePath = "Lib/Invalid.cs",
                     Status = FileStatus.Replaced,
-                    EmittedCSharp =
+                    Candidate = new CandidateEvidence { FileId = "ProjectSettings/Lib/Invalid.cs" },
+                    EmittedCSharp = $"#line 40 \"{sourcePath}\"\n" +
                         """
                         public static class Conditional
                         {
@@ -1579,6 +1580,9 @@ public sealed class RoundTripPipelineSafetyTests
 
             Assert.Equal(FileStatus.EmitCompilationError, results[0].Status);
             Assert.Equal(original, await File.ReadAllTextAsync(sourcePath));
+            Assert.Contains(results[0].Candidate!.Diagnostics, diagnostic =>
+                diagnostic.Code == "CS0029" && diagnostic.Path == "Lib/Invalid.cs"
+                && diagnostic.Line == 43 && diagnostic.Column > 0);
         }
         finally
         {

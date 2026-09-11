@@ -986,11 +986,7 @@ public sealed class RoundTripPipeline
                             cancellationToken);
                     }
                     candidate.Status = FileStatus.EmitCompilationError;
-                    candidate.Candidate?.Diagnostics.AddRange(
-                        build.Diagnostics.Where(diagnostic =>
-                            diagnostic.Path == candidate.FilePath
-                            || CandidateIsReferenced(candidate, diagnostic.Message)));
-                    candidate.Errors = build.Errors
+                    var attributedErrors = build.Errors
                         .Where(error =>
                             BuildErrorReferencesFile(
                                 validationDir,
@@ -1001,10 +997,12 @@ public sealed class RoundTripPipeline
                                 candidate.FilePath,
                                 error) ||
                             CandidateIsReferenced(candidate, error))
-                        .Take(10)
                         .ToList();
-                    if (candidate.Errors.Count == 0)
-                        candidate.Errors = build.Errors.Take(10).ToList();
+                    candidate.Errors = (attributedErrors.Count > 0 ? attributedErrors : build.Errors).Take(10).ToList();
+                    candidate.Candidate?.Diagnostics.AddRange(ReportGenerator.CaptureBuildDiagnostics(
+                        attributedErrors.Count > 0 ? attributedErrors : build.Errors,
+                        build.Phase, validationDir, workDir,
+                        attributedErrors.Count > 0 ? "file-or-referenced-symbol" : "isolated-subset"));
                 }
 
                 if (failed.Count == active.Count)
@@ -1040,6 +1038,7 @@ public sealed class RoundTripPipeline
                 noIncremental: true,
                 disableBuildServers: true,
                 phase: phase,
+                reportedSourceRoot: sourceWorkDir,
                 candidateFiles: phase == "project-original-validation"
                     ? [] : candidates.Select(candidate => candidate.FilePath).ToList());
             if (!rootBuild.Succeeded)
@@ -1113,7 +1112,7 @@ public sealed class RoundTripPipeline
                 WorkingDirectory = validationDir,
                 Stdout = stdout,
                 Stderr = stderr,
-                Diagnostics = ReportGenerator.CaptureBuildDiagnostics(errors, phase, validationDir),
+                Diagnostics = ReportGenerator.CaptureBuildDiagnostics(errors, phase, validationDir, sourceWorkDir),
                 CandidateFiles = phase == "project-original-validation"
                     ? [] : candidates.Select(candidate => candidate.FilePath).ToList(),
                 Errors = errors.Count > 0 || exitCode == 0
@@ -1959,7 +1958,8 @@ public sealed class RoundTripPipeline
         bool noIncremental = false,
         bool disableBuildServers = false,
         string phase = "build",
-        IReadOnlyList<string>? candidateFiles = null)
+        IReadOnlyList<string>? candidateFiles = null,
+        string? reportedSourceRoot = null)
     {
         // Relative target (see RunTestsAsync) — absolute /var-symlink paths break
         // MSBuild path identity on macOS.
@@ -1995,7 +1995,7 @@ public sealed class RoundTripPipeline
             Phase = phase,
             Command = $"{config.DotnetPath} {args}",
             WorkingDirectory = workDir,
-            Diagnostics = ReportGenerator.CaptureBuildDiagnostics(errors, phase, workDir),
+            Diagnostics = ReportGenerator.CaptureBuildDiagnostics(errors, phase, workDir, reportedSourceRoot),
             CandidateFiles = candidateFiles?.ToList() ?? [],
             Succeeded = exitCode == 0,
             ExitCode = exitCode,

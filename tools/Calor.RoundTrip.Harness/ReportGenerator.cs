@@ -683,7 +683,9 @@ public static class ReportGenerator
         });
     }
 
-    internal static List<DiagnosticEvidence> CaptureBuildDiagnostics(IEnumerable<string> errors, string phase, string workDir)
+    internal static List<DiagnosticEvidence> CaptureBuildDiagnostics(
+        IEnumerable<string> errors, string phase, string workDir, string? reportedSourceRoot = null,
+        string attribution = "direct")
     {
         var result = new List<DiagnosticEvidence>();
         foreach (var error in errors)
@@ -700,15 +702,29 @@ public static class ReportGenerator
                 // MSBuild output does not identify the emitting compiler/analyzer pass.
                 Producer = null,
                 SourceKind = "MSBuildReportedLocation",
-                Path = match.Success ? RelativePath(workDir, match.Groups["path"].Value) : null,
+                Path = match.Success ? DiagnosticPath(match.Groups["path"].Value) : null,
                 Line = Number("line"),
                 Column = Number("column"),
                 EndLine = Number("endLine"),
                 EndColumn = Number("endColumn"),
+                Attribution = attribution,
             }));
             int? Number(string name) => int.TryParse(match.Groups[name].Value, out var value) ? value : null;
         }
         return result;
+
+        string DiagnosticPath(string path)
+        {
+            var relative = RelativePath(workDir, path);
+            if (reportedSourceRoot is not null && Path.IsPathRooted(path)
+                && (relative == ".." || relative.StartsWith("../", StringComparison.Ordinal)))
+            {
+                var sourceRelative = RelativePath(reportedSourceRoot, path);
+                if (sourceRelative != ".." && !sourceRelative.StartsWith("../", StringComparison.Ordinal))
+                    return sourceRelative;
+            }
+            return relative;
+        }
     }
 
     internal static DiagnosticEvidence Identify(DiagnosticEvidence diagnostic)
