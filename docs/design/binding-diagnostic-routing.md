@@ -14,7 +14,9 @@ substitutes for a claimed human review.
 
 `BindingDiagnosticPolicy.Catalog` classifies18 Error-capable codes:8 existing
 `CompilationError` codes and10 `AnalysisOnly` codes. Every entry has a reason and
-owning issue. The source-site golden in
+owning issue. The policy stays in its original `Binding/Scope.cs` maintenance
+surface; no new product C# path or Calor-first allowlist exception is introduced.
+The source-site golden in
 `tests/TestData/Binding/BinderErrorEmissionCatalog.golden.json` records33 routes:
 18 compilation-error leaves,14 analysis-only leaves and one filtered forwarder.
 These are **emission-site counts**, not fixture counts or distinct-code counts.
@@ -65,7 +67,8 @@ patterns and unchecked mutation retain the N0 behavior and limitations.
 `DiagnosticBag` scopes provenance only during `Binder.Bind` and restores it after
 the call. Parser/TypeChecker diagnostics using the same code remain distinguishable.
 The original public four-argument `Report` signature is retained. Suggested-fix
-and ordinary representations both carry provenance.
+and ordinary representations both carry provenance. Code-action diagnostics use
+the same fix-aware converter rather than reconstructing a metadata-free diagnostic.
 
 ## Real callers, user-facing output and options
 

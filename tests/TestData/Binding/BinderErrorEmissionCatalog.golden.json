@@ -403,7 +403,7 @@
     "reason": "A failed best-effort member analysis is not a successful safety result or a new production gate."
   },
   {
-    "siteId": "src/Calor.Compiler/Binding/BindingDiagnosticPolicy.cs::BindingDiagnosticPolicy.PropagateCompilationErrors::DiagnosticBag.Add#01",
+    "siteId": "src/Calor.Compiler/Binding/Scope.cs::BindingDiagnosticPolicy.PropagateCompilationErrors::DiagnosticBag.Add#01",
     "member": "Calor.Compiler.Binding.BindingDiagnosticPolicy.PropagateCompilationErrors",
     "sink": "DiagnosticBag.Add",
     "helperPath": "BindingDiagnosticPolicy.PropagateCompilationErrors -> DiagnosticBag.Add",

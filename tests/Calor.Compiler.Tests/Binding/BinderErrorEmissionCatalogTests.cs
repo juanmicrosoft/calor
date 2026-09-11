@@ -335,6 +335,57 @@ public sealed class BinderErrorEmissionCatalogTests
     }
 
     [Fact]
+    public void ScannerCanary_RejectsInactiveHelperSource()
+    {
+        var scanner = BinderErrorEmissionScanner.ForSynthetic(
+            ("src/Calor.Compiler/Binding/Canary.cs", """
+                using Calor.Compiler.Diagnostics;
+                namespace Calor.Compiler.Binding;
+                internal class Canary { public void Probe(DiagnosticBag bag) => bag.Special(); }
+                """),
+            ("DiagnosticBag.cs", """
+                namespace Calor.Compiler.Diagnostics;
+                public sealed class DiagnosticBag
+                {
+                    public void Special()
+                    {
+                #if UNMEASURED
+                        ReportError(default, "Calor9999", "hidden");
+                #endif
+                    }
+                    public void ReportError(Calor.Compiler.Parsing.TextSpan span, string code, string message) { }
+                }
+                """));
+        Assert.Throws<InvalidOperationException>(() => scanner.Scan());
+    }
+
+    [Fact]
+    public void ScannerCanary_RejectsUnqualifiedReporterDelegateInHelperSource()
+    {
+        var scanner = BinderErrorEmissionScanner.ForSynthetic(
+            ("src/Calor.Compiler/Binding/Canary.cs", """
+                using Calor.Compiler.Diagnostics;
+                namespace Calor.Compiler.Binding;
+                internal class Canary { public void Probe(DiagnosticBag bag) => bag.Special(); }
+                """),
+            ("DiagnosticBag.cs", """
+                using System;
+                using Calor.Compiler.Parsing;
+                namespace Calor.Compiler.Diagnostics;
+                public sealed class DiagnosticBag
+                {
+                    public void Special()
+                    {
+                        Action<TextSpan, string, string> emit = ReportError;
+                        emit(default, "Calor9999", "hidden");
+                    }
+                    public void ReportError(TextSpan span, string code, string message) { }
+                }
+                """));
+        Assert.Throws<InvalidOperationException>(() => scanner.Scan());
+    }
+
+    [Fact]
     public void ScannerCanary_TreatsDefaultDiagnosticConstructorSeverityAsErrorCapable()
     {
         var scanner = BinderErrorEmissionScanner.ForSynthetic(
@@ -528,20 +579,28 @@ public sealed class BinderErrorEmissionCatalogTests
             var routes = new List<DiagnosticEmissionRoute>();
             var ordinals = new Dictionary<string, int>(StringComparer.Ordinal);
 
+            foreach (var tree in trees)
+            {
+                var model = compilation.GetSemanticModel(tree);
+                var root = tree.GetCompilationUnitRoot();
+                if (root.DescendantTrivia(descendIntoTrivia: true).Any(trivia => trivia.IsKind(SyntaxKind.DisabledTextTrivia)))
+                    throw new InvalidOperationException($"Inactive diagnostic source requires an explicitly reviewed scan configuration: {tree.FilePath}");
+                foreach (var reference in root.DescendantNodes().OfType<SimpleNameSyntax>())
+                {
+                    var expression = reference.Parent is MemberAccessExpressionSyntax member && member.Name == reference
+                        ? (ExpressionSyntax)member : reference;
+                    if (model.GetSymbolInfo(reference).Symbol is IMethodSymbol referenced
+                        && IsDiagnosticBagMethod(referenced)
+                        && expression.Parent is not InvocationExpressionSyntax)
+                        throw new InvalidOperationException($"Escaping DiagnosticBag method reference requires explicit analysis: {tree.FilePath}: {expression}");
+                }
+            }
+
             foreach (var tree in trees.Where(tree => _bindingSources.Any(source => source.Path == tree.FilePath)))
             {
                 var source = sourceByTree[tree];
                 var model = compilation.GetSemanticModel(tree);
                 var root = tree.GetCompilationUnitRoot();
-                if (root.DescendantTrivia(descendIntoTrivia: true).Any(trivia => trivia.IsKind(SyntaxKind.DisabledTextTrivia)))
-                    throw new InvalidOperationException($"Inactive binding source requires an explicitly reviewed scan configuration: {source.Path}");
-                foreach (var memberAccess in root.DescendantNodes().OfType<MemberAccessExpressionSyntax>())
-                {
-                    if (model.GetSymbolInfo(memberAccess).Symbol is IMethodSymbol referenced
-                        && IsDiagnosticBagMethod(referenced)
-                        && memberAccess.Parent is not InvocationExpressionSyntax)
-                        throw new InvalidOperationException($"Escaping DiagnosticBag method reference requires explicit analysis: {source.Path}: {memberAccess}");
-                }
                 var candidates = root.DescendantNodes()
                     .Where(node => node is InvocationExpressionSyntax or BaseObjectCreationExpressionSyntax)
                     .OrderBy(node => node.SpanStart)

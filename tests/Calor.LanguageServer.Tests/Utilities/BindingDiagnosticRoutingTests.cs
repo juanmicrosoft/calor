@@ -11,6 +11,48 @@ namespace Calor.LanguageServer.Tests.Utilities;
 
 public class BindingDiagnosticRoutingTests
 {
+    [Fact]
+    public async Task CodeActions_PreserveAnalysisOnlyProvenanceAsync()
+    {
+        const string source = """
+            §M{m1:Routing}
+              §F{f1:Helper:pub} () -> i32
+                §R 42
+              §F{f2:Main:pub} () -> i32
+                §B{x} Helper
+                §R x
+            """;
+        var uri = OmniSharp.Extensions.LanguageServer.Protocol.DocumentUri.From(
+            new Uri(Path.Combine(Path.GetTempPath(), "routing-action-" + Guid.NewGuid().ToString("N") + ".calr")));
+        var workspace = new WorkspaceState();
+        var document = workspace.GetOrCreate(uri, source);
+        try
+        {
+            await document.ReanalyzeAsync();
+            var handler = new LanguageServer.Handlers.CodeActionHandler(workspace);
+            var actions = await handler.Handle(new OmniSharp.Extensions.LanguageServer.Protocol.Models.CodeActionParams
+            {
+                TextDocument = new OmniSharp.Extensions.LanguageServer.Protocol.Models.TextDocumentIdentifier(uri),
+                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(0, 0, 20, 0),
+                Context = new OmniSharp.Extensions.LanguageServer.Protocol.Models.CodeActionContext
+                {
+                    Diagnostics = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Container<
+                        OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>()
+                }
+            }, CancellationToken.None);
+            Assert.NotNull(actions);
+            var diagnostic = Assert.Single(actions.SelectMany(action =>
+                action.CodeAction?.Diagnostics ?? []).Where(d => d.Code == DiagnosticCode.TypeMismatch));
+            Assert.Equal("calor (analysis only)", diagnostic.Source);
+            Assert.Equal(OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error, diagnostic.Severity);
+            Assert.NotNull(diagnostic.Data);
+        }
+        finally
+        {
+            workspace.Remove(uri);
+        }
+    }
+
     [Theory]
     [InlineData("§B{x:str} §C{System.Environment.GetEnvironmentVariable} §A \"ROUTING_UNSET\" §/C", "void", "Calor0272")]
     [InlineData("§R §C{System.Environment.GetEnvironmentVariable} §A \"ROUTING_UNSET\" §/C", "str", "Calor0273")]

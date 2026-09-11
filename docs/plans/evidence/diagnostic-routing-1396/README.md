@@ -3,7 +3,11 @@
 Measured production candidate:
 `b9770669506a13d30d4f0255d57786de46551ba8`, based on accepted N0 merge
 `7f2e495de2f8949cf27e5d6198c7980765b5fb6e`.
-Subsequent source-ratchet test and evidence changes do not relabel this candidate.
+Subsequent changes do not relabel this candidate. Review remediation later moves
+the identical policy definitions back into their original `Scope.cs` maintenance
+surface and preserves binder provenance in code-action diagnostics. The latter
+is a real LanguageServer source change, covered by focused handler/editor tests;
+these earlier process outputs are not claimed as a new-head measurement.
 `surfaces.json` records actual SDK version, compiler binary hash, timestamp,
 source strings, argv, environment overrides, outputs and cache snapshots.
 
@@ -63,6 +67,11 @@ run, and does not replace N0's preserved Serilog/runtime/reference limitations.
 Targeted C# runs on this implementation included307 compiler/nullability/cache
 cases,111 task/cache/SDK-agreement cases,47 editor cases,92 retained soundness
 cases, and a later68-case focused pass after expanding the CLI combinations.
-The final source-scanner pass has11 cases. These overlapping runs are not summed
-as unique coverage. The existing test-quality and AST-infrastructure checks passed;
-their manifests needed no regeneration. Final review and CI are recorded on the PR.
+The first review-head source-scanner pass had11 cases; helper-source canaries
+added two during review remediation. These overlapping runs are not summed as
+unique coverage. Initial static test-quality/AST checks passed, but actual full CI
+correctly rejected stale exact-count pins (compiler8736 vs8668, editor491 vs486,
+tasks127 vs124) and the unnecessary new product C# path. Remediation keeps policy
+in the existing file and updates exact counts, including the two additional
+compiler canaries and one code-action case, to8738/492/127. Skip expectations and
+gate implementations are unchanged. Final review and CI are recorded on the PR.

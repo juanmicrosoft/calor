@@ -72,13 +72,7 @@ public sealed class CodeActionHandler : CodeActionHandlerBase
                 Kind = CodeActionKind.QuickFix,
                 Diagnostics = new Container<LspDiagnostic>(
                     DiagnosticConverter.ToLspDiagnostic(
-                        new Calor.Compiler.Diagnostics.Diagnostic(
-                            diagnostic.Code,
-                            diagnostic.Message,
-                            diagnostic.Span,
-                            diagnostic.Severity,
-                            diagnostic.FilePath),
-                        snapshot.Source)),
+                        diagnostic, snapshot.Source)),
                 Edit = workspaceEdit,
                 IsPreferred = true
             };
