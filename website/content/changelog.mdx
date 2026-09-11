@@ -10,6 +10,54 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-11
+
+This product-only release fixes cache correctness and makes diagnostic and
+conversion evidence easier to interpret. It does not activate the planned
+nullability checks or require completion of the paused PP-W-rows experiment.
+
+### Fixed
+
+- **Cached compilation respects effective type-checking settings.** A result
+  produced with type checking disabled cannot bypass a later default
+  invocation. Root and watch cache identities include the effective settings;
+  old policy-blind cache entries are invalidated.
+- **Editor diagnostics distinguish analysis-only findings from build blockers.**
+  Binder provenance survives ordinary diagnostics and code actions. Existing
+  compilation errors still reject programs under supported type/effect opt-outs.
+- **Legacy-semantics guidance no longer promises an unavailable mode.**
+  Unsupported major versions still fail with `Calor0701`. The hint calls for
+  manual migration and distinguishes binder diagnostics from CLI rejection.
+  Corrected historical notes make clear that legacy `Info` mode is unavailable.
+- **Releases no longer start paid model benchmarks.** Paid evaluation and agent
+  refactoring require explicit manual opt-in. Automatic benchmark runs use
+  30 deterministic repetitions; they do not resume the paused experiment.
+
+### Added
+
+- **An executable binder diagnostic catalog.** Error-capable reporting sites
+  have explicit routing and ownership. Structured receiving shapes prepare
+  for later activation without enabling all uses of a diagnostic code.
+- **Structured round-trip failure evidence.** Reports retain diagnostic codes,
+  source spans, original inputs, candidate identity, and later recovery outcomes.
+  Fixed paired test attempts remain visible, and a later pass cannot erase an
+  earlier failure. Comparisons and classification records remain unadjudicated
+  until reviewed; successful fallback C# is not nullability acceptance.
+
+### Known limits
+
+`Calor0272`, `Calor0273`, and `Calor0274` remain analysis-only binder findings.
+Nullable-reference typing, safe-consumption repairs, call mapping, and staged
+enforcement are unfinished 0.22 work, not features claimed by this release.
+Existing D3/D12/D14 safeguards and runtime guards remain unchanged.
+
+The PP-W-rows experiment is **paused**, not complete. Two invalid/censored
+attempts are preserved; neither the pilot nor confirmation has completed.
+This release supplies no effect-row benefit or null result and does not
+authorize collection or apply the pending accounting amendment. The separate
+[research handoff](https://github.com/juanmicrosoft/calor/issues/1254#issuecomment-5637070487)
+records the remaining work.
+
 ### Correction - 2026-09-11: nullability diagnostics are not CLI enforcement
 
 The v0.14.0-v0.14.2 entries below overstated nullability enforcement.
@@ -28,11 +76,14 @@ The original release text is retained below with dated annotations.
 The promised legacy `Info` mode is not available. The current compiler refuses
 older semantics majors with `Calor0701`; changing the declaration alone is
 not a migration. Its hint now calls for manual migration and distinguishes
-binder diagnostics from CLI rejection. This changes neither version
-compatibility nor diagnostic routing, and adds no migration tool.
+binder diagnostics from CLI rejection. The hint correction changes neither
+version compatibility nor which binder diagnostics block compilation, and
+adds no migration tool.
 
-[The bounded 0.22 plan (#1082)](https://github.com/juanmicrosoft/calor/issues/1082)
-is planned, not shipped. It covers specified initialization, return, and
+Full nullability enforcement in
+[the bounded 0.22 plan (#1082)](https://github.com/juanmicrosoft/calor/issues/1082)
+is planned, not shipped; this release contains routing groundwork only.
+The plan covers specified initialization, return, and
 resolved method-input boundaries, not every assignment or possible null value.
 The D3/D12/D14 safeguards, which demote conditional proofs and retain their
 runtime guards, remain in place.

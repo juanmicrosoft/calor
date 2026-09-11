@@ -12,7 +12,9 @@ const metricPages = ['comprehension', 'correctness', 'edit-precision', 'error-de
   'generation-accuracy', 'information-density', 'refactoring-stability', 'token-economics'];
 const verificationPages = ['philosophy/static-verification', 'syntax-reference/contracts',
   'cli/compile', 'cli/verify', 'benchmarking/metrics/contract-verification'];
-const currentRelease = '0.20.0';
+const currentRelease = '0.21.0';
+const pauseHandoff = 'https://github.com/juanmicrosoft/calor/issues/1254#issuecomment-5637070487';
+const pauseCheckpoint = 'https://github.com/juanmicrosoft/calor/pull/1438#issuecomment-5637787747';
 const execFileAsync = promisify(execFile);
 const calorParseCount = data.programs.filter(program => program.calorSuccess).length;
 const cSharpParseCount = data.programs.filter(program => program.cSharpSuccess).length;
@@ -53,7 +55,7 @@ test('nullability correction distinguishes binder diagnostics from CLI rejection
   }
 });
 
-test('effect-rows financial approval remains separate from collection admission and results', async ({ page }) => {
+test('paused effect-rows attempts and unknown charges stay separate from historical unrun evidence', async ({ page }) => {
   const ledger = JSON.parse(await readFile('../bench/phase0-agent-native/effect-rows-benefit-ledger.json', 'utf8'));
   expect(ledger.epochRun).toBe(false);
   expect(ledger.verdict).toBe('UNDERPOWERED');
@@ -65,37 +67,53 @@ test('effect-rows financial approval remains separate from collection admission 
     await page.goto(`${base}/docs/${path}/`);
     await page.locator('article a[href$="/docs/benchmarking/results/#redesigned-pp-w-rows-deferred"]').click();
     await expect(page.getByRole('heading', {
-      name: 'Redesigned PP-W-rows: approved pilot budget, collection on hold',
+      name: 'Redesigned PP-W-rows: paused, not complete',
     })).toBeInViewport();
-    for (const text of ['USD250 total, pilot only', 'Operational collection is not admitted',
-      'BUDGET_NOT_RUN', 'not a cost lower bound', 'It does not fund stage 2',
+    for (const text of ['paused by the user', 'two consumed invalid/censored attempts',
+      '442 untouched scheduled identities', 'single total experiment ceiling is USD1,000',
+      'USD25.52 each', 'USD51.04 total', 'not measured spend or reconciled charges',
+      'unknown', 'not been applied', 'There is no permission to resume',
+      'Earlier decision, 2026-09-10', 'superseded ceiling', 'earlier pre-execution hold',
       'negative or null results', 'UNADJUDICATED', 'administrative stop']) {
       await expect(page.locator('article')).toContainText(text);
     }
     await expect(page.locator('article')).toContainText('Local buildability passed on 2026-09-10');
     await expect(page.locator('article')).toContainText('not an agent observation');
-    await expect(page.locator('article')).toContainText('No redesigned agent collection or benefit result exists');
+    await expect(page.locator('article')).toContainText('Neither the pilot nor confirmation has completed');
+    await expect(page.locator('article')).not.toContainText('No redesigned agent collection or benefit result exists');
     await expect(page.locator('article')).not.toContainText('No candidate has established');
     await expect(page.locator('article')).not.toContainText('There is no new sample size, budget');
     await expect(page.getByRole('link', { name: 'reviewed gate closure', exact: true }))
       .toHaveAttribute('href', 'https://github.com/juanmicrosoft/calor/pull/1348');
-    await expect(page.getByRole('link', { name: 'authorization receipt', exact: true }))
+    await expect(page.getByRole('link', { name: 'historical authorization receipt', exact: true }))
       .toHaveAttribute('href', 'https://github.com/juanmicrosoft/calor/pull/1387');
+    await expect(page.getByRole('link', { name: 'central pause handoff', exact: true }))
+      .toHaveAttribute('href', pauseHandoff);
+    await expect(page.getByRole('link', { name: 'paused draft checkpoint', exact: true }))
+      .toHaveAttribute('href', pauseCheckpoint);
     await expect(page.getByRole('link', { name: 'recorded user decision', exact: true }))
       .toHaveAttribute('href', 'https://github.com/juanmicrosoft/calor/issues/1259#issuecomment-5618103570');
     await expect(page.locator('article')).toContainText('Null means uncollected');
+    await expect(page.locator('article')).toContainText('It is not the record of the two consumed redesigned attempts');
     await expect(page.locator('article')).toContainText('two cost-eligible task pairs (12 runs)');
   }
   await page.goto(`${base}/docs/benchmarking/evidence-status/`);
   for (const text of ['Local buildability passed on 2026-09-10', 'not an agent observation',
-    'No redesigned agent collection or benefit result exists', 'UNADJUDICATED', 'administrative stop',
-    'USD250 total, pilot only', 'Operational collection is not admitted', 'BUDGET_NOT_RUN']) {
+    'two consumed invalid/censored attempts', '442 untouched scheduled identities',
+    'USD1,000', 'USD51.04 total', 'not been applied', 'There is no permission to resume',
+    'UNADJUDICATED', 'administrative stop', 'superseded ceiling', 'earlier pre-execution hold']) {
     await expect(page.locator('article')).toContainText(text);
   }
   await expect(page.getByRole('link', { name: 'reviewed gate closure', exact: true }))
     .toHaveAttribute('href', 'https://github.com/juanmicrosoft/calor/pull/1348');
-  await expect(page.getByRole('link', { name: 'authorization receipt', exact: true }))
+  await expect(page.getByRole('link', { name: 'historical authorization receipt', exact: true }))
     .toHaveAttribute('href', 'https://github.com/juanmicrosoft/calor/pull/1387');
+  await expect(page.getByRole('link', { name: 'central pause handoff', exact: true }))
+    .toHaveAttribute('href', pauseHandoff);
+  await page.goto(`${base}/docs/benchmarking/results/#redesigned-pp-w-rows-approved-pilot-budget-collection-on-hold`);
+  await expect(page.getByRole('heading', {
+    name: 'Redesigned PP-W-rows: paused, not complete',
+  })).toBeInViewport();
 });
 
 test('effect-rows methodology separates registration, tooling, observations and approval', async ({ page }) => {
@@ -110,19 +128,49 @@ test('effect-rows methodology separates registration, tooling, observations and 
     await page.goto(`${base}/docs/${path}/`);
     await page.locator('article a[href$="/docs/benchmarking/effect-rows-study/"]').first().click();
     await expect(page).toHaveURL(/\/effect-rows-study\/$/);
-    for (const text of ['UNADJUDICATED', 'administrative stop', 'No redesigned confirmatory result',
+    for (const text of ['UNADJUDICATED', 'administrative stop', 'paused by the user',
       'below 50%', 'UNDERPOWERED-CARRIED', 'Tooling is not collection evidence',
       'Local buildability passed on 2026-09-10', 'not an agent observation',
-      'No redesigned agent collection or benefit result exists',
-      'USD250 total, pilot-only', 'collection not admitted', 'BUDGET_NOT_RUN']) {
+      'two consumed invalid/censored attempts', '442 untouched scheduled identities',
+      'USD1,000', 'USD51.04', 'Actual charges are unknown',
+      'permanent-retention exception has not been applied', 'no permission to resume',
+      'superseded ceiling', 'earlier pre-execution hold']) {
       await expect(page.locator('article')).toContainText(text);
     }
     await expect(page.getByRole('link', { name: 'reviewed gate closure', exact: true }))
       .toHaveAttribute('href', 'https://github.com/juanmicrosoft/calor/pull/1348');
-    await expect(page.getByRole('link', { name: 'authorization receipt', exact: true }))
+    await expect(page.getByRole('link', { name: 'historical authorization receipt', exact: true }))
       .toHaveAttribute('href', 'https://github.com/juanmicrosoft/calor/pull/1387');
+    await expect(page.getByRole('link', { name: 'central pause handoff', exact: true }))
+      .toHaveAttribute('href', pauseHandoff);
+    await expect(page.locator('article')).not.toContainText('No redesigned agent collection or benefit result exists');
   }
 });
+
+for (const width of [1366, 390]) {
+  test(`product release header and notes stay separate from unfinished research at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.route('https://**/*', route => route.abort());
+    const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
+    await page.goto(`${base}/`);
+    const pill = page.locator('header').getByText(`v${currentRelease}`, { exact: true });
+    await expect(pill).toHaveAttribute('title', `Docs describe compiler v${currentRelease}`);
+    if (width >= 640) await expect(pill).toBeVisible();
+    await expect(page.getByText(
+      'Cache correctness, clear diagnostic scope, and conversion failure evidence.', { exact: true },
+    )).toBeVisible();
+    await page.getByRole('link', { name: "See what's new", exact: true }).click();
+    await expect(page).toHaveURL(/\/docs\/changelog\/$/);
+    await expect(page.getByRole('heading', { name: `[${currentRelease}] - 2026-09-11`, exact: true })).toBeVisible();
+    const article = page.locator('article');
+    for (const text of ['remain analysis-only binder findings', 'unfinished 0.22 work',
+      'D3/D12/D14 safeguards and runtime guards remain unchanged',
+      'neither the pilot nor confirmation has completed',
+      'does not authorize collection or apply the pending accounting amendment']) {
+      await expect(article).toContainText(text);
+    }
+  });
+}
 
 test('task-first workflow keeps an account-free path and bounded provider guidance', async ({ page }) => {
   await page.route('https://**/*', route => route.abort());
@@ -144,7 +192,8 @@ test('current version and explicitly historical result provenance cannot silentl
   await expect(readFile('public/data/dashboard.html', 'utf8')).rejects.toThrow();
   await expect(readFile('public/data/dashboard.json', 'utf8')).rejects.toThrow();
   const generatedResults = await readFile('../docs/benchmarking/results.md', 'utf8');
-  expect(generatedResults).toContain(`source \`${data.commit}\``);
+  expect(generatedResults).toContain('Generated from website/public/data/benchmark-results.json');
+  expect(generatedResults).toContain(`${data.timestamp.slice(0, 10)} from source \`${data.commit}\``);
   expect(generatedResults).toContain(`${data.summary.statisticalRunCount} repetitions`);
   expect(generatedResults).toContain(
     `**Legacy composite direction-normalized ratio:** ${data.summary.overallAdvantage.toFixed(2)}x`,
@@ -153,6 +202,12 @@ test('current version and explicitly historical result provenance cannot silentl
   expect(generatedResults).toContain(`Roslyn syntax parser accepted: ${cSharpParseCount}`);
   expect(generatedResults).toContain('Lower-is-better metrics invert their raw score ratio');
   expect(generatedResults).toContain('source pairs are not all behaviorally equivalent');
+  expect(generatedResults).toContain('not independent program samples');
+  expect(generatedResults.replace(/\s+/g, ' ')).toContain(
+    'do not establish a language, coding-agent productivity, correctness, or safety advantage',
+  );
+  expect(generatedResults).toContain('## Metric Ratios');
+  expect(generatedResults).not.toContain('## Detailed Results by Benchmark');
   expect(generatedResults).not.toMatch(
     /Overall Advantage|Winner|Where (?:Calor|C#) Wins|AI coding agent effectiveness/,
   );
@@ -290,7 +345,7 @@ test('research milestones stay distinct from software releases', async () => {
   expect(normalizedRootCurrentSection).toContain(
     `Programs Tested**: ${data.summary.programCount}; Calor parser accepted ${calorParseCount}; Roslyn syntax parser accepted ${cSharpParseCount}`,
   );
-  expect(rootCurrentSection).toContain(`Recorded source**: \`${provenance.sourceCommit}\``);
+  expect(rootCurrentSection).toMatch(new RegExp(`Recorded [Ss]ource\\*\\*: \`${provenance.sourceCommit}\``));
   expect(rootCurrentSection).toContain(`declares version ${provenance.sourceDeclaredVersion}`);
   for (const metric of ['Comprehension', 'ErrorDetection', 'TokenEconomics', 'InformationDensity'] as const) {
     const result = data.metrics[metric];
@@ -299,12 +354,10 @@ test('research milestones stay distinct from software releases', async () => {
     );
   }
   expect(normalizedRootCurrentSection).toContain('repeat deterministic observations over a fixed corpus');
-  expect(normalizedRootCurrentSection).toContain('do not establish independent sampling uncertainty');
-  expect(normalizedRootCurrentSection).toContain(
-    'Each metric is direction-normalized so a value above 1 favors Calor',
-  );
-  expect(normalizedRootCurrentSection).toContain('source pairs are not all behaviorally equivalent');
-  expect(normalizedRootCurrentSection).toContain(
+  expect(normalizedRootCurrentSection).toMatch(/not independent samples|do not establish independent sampling uncertainty/);
+  expect(normalizedRootCurrentSection).toMatch(/Each metric is direction-normalized so (?:a value|values) above 1 favor(?:s)? Calor/);
+  expect(normalizedRootCurrentSection).toMatch(/source pairs are not all behaviorally equivalent/i);
+  expect(normalizedRootCurrentSection.toLowerCase()).toContain(
     'no measured language, agent-productivity, correctness, or safety advantage',
   );
   expect(rootCurrentSection).not.toContain('Overall Advantage');
@@ -482,9 +535,17 @@ test('benchmark methodology distinguishes artifacts, failed runs and proposals',
     },
     {
       label: 'Redesigned PP-W-rows protocol',
-      text: ['2026-09-08', 'No pilot or confirmatory runs', 'Local buildability subsequently passed',
-        '2026-09-10', 'No agent-benefit result', 'USD250 total ceiling', 'BUDGET_NOT_RUN'],
+      text: ['2026-09-08', 'Registered method, not collected observations', 'Local buildability subsequently passed',
+        '2026-09-10', 'No agent-benefit result', 'later attempts are tracked separately'],
       href: 'https://github.com/juanmicrosoft/calor/blob/16880d006db760d7b47d829fd4282b033c3158a0/docs/plans/2026-09-05-ppw-rows-fixture-redesign.md',
+    },
+    {
+      label: 'Paused redesigned PP-W-rows study',
+      text: ['2026-09-11', 'Two consumed invalid/censored attempts', '442 untouched identities out of 444',
+        'USD1,000 total ceiling', 'USD51.04 total', 'actual charges are unknown',
+        'not measured spend', 'exception not applied', 'No permission to resume',
+        'Neither pilot nor confirmation completed', 'no benefit or null result'],
+      href: pauseHandoff,
     },
   ];
   for (const item of inventory) {
@@ -629,7 +690,7 @@ test('readers can distinguish runtime modes, optional proofs and historical meas
   const note = page.getByRole('note', { name: 'Benchmark provenance' });
   await expect(note).toContainText(provenance.sourceCommit);
   await expect(note).toContainText(`v${provenance.sourceDeclaredVersion}`);
-  await expect(note).toContainText('not independently recorded');
+  await expect(note).toContainText('not an independently attested measurement binary');
   await expect(page.getByRole('heading', { name: 'Static Benchmark Snapshot' })).toBeVisible();
   await expect(note).toContainText('not an agent-productivity measurement');
   await expect(note).toContainText('not all behaviorally equivalent');
