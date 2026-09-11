@@ -38,8 +38,9 @@ JSON. A missing or failed attempt is not a valid zero-test denominator.
 Existing #948 flake allowances remain visible in the **legacy fidelity**
 fields for reader compatibility. Strict evidence comparisons do not use that
 allowlist. Any failed/incomplete attempt, including an allowlisted failure,
-blocks evidence acceptance until explicitly investigated and adjudicated.
-It is never waived by a later pass. Original `baseline`/`round_trip` summaries
+adds an evidence failure and blocks the CLI/JSON top-level gate, even if the
+legacy first-attempt comparison says Pass. No later pass waives that failure.
+An incomplete input inventory also blocks the gate. Original `baseline`/`round_trip` summaries
 describe attempt **one**, not a pooled or best result.
 
 Every invocation writes a uniquely named `<project>-<run-id>-attempt.json`

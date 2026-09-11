@@ -72,7 +72,7 @@
       "path": "tests/Calor.RoundTrip.Harness.Tests/Calor.RoundTrip.Harness.Tests.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 285,
+      "expectedTotal": 289,
       "expectedSkipped": 0
     },
     {

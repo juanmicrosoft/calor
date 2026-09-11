@@ -2059,7 +2059,9 @@ public sealed class RoundTripPipeline
             return comparison;
         }
 
-        if (baseline.UsedConsoleFallback || roundTrip.UsedConsoleFallback)
+        if (baseline.UsedConsoleFallback || roundTrip.UsedConsoleFallback
+            || baseline.Results.Concat(roundTrip.Results).Any(result =>
+                result.Outcome is not ("Passed" or "Failed" or "Skipped" or "NotExecuted")))
         {
             comparison.Status = ComparisonStatus.Incomplete;
             return comparison;
