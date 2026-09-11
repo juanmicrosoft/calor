@@ -380,6 +380,8 @@ public sealed class BoundCallStatement : BoundStatement
     public IReadOnlyList<string>? ResolvedParameterTypes { get; }
     /// <summary>Selected metadata formal index for each source-order argument; -1 is unmapped.</summary>
     public IReadOnlyList<int>? ArgumentParameterIndices { get; init; }
+    /// <summary>Actual native selections, including each conditional alternative's own argument map.</summary>
+    public IReadOnlyList<ResolvedOverloadMatch> SelectedOverloadMatches { get; init; } = [];
     public override IEnumerable<BoundNode> ChildNodes => Arguments;
 
     public BoundCallStatement(
@@ -825,6 +827,8 @@ public class BoundCallExpression : BoundExpression
     public IReadOnlyList<string>? ResolvedParameterTypes { get; }
     /// <inheritdoc cref="BoundCallStatement.ArgumentParameterIndices"/>
     public IReadOnlyList<int>? ArgumentParameterIndices { get; init; }
+    /// <inheritdoc cref="BoundCallStatement.SelectedOverloadMatches"/>
+    public IReadOnlyList<ResolvedOverloadMatch> SelectedOverloadMatches { get; init; } = [];
 
     public BoundCallExpression(
         TextSpan span,

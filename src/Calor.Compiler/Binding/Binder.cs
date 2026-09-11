@@ -1422,7 +1422,8 @@ public sealed class Binder
                 .ToArray(),
             receiver)
         {
-            ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count)
+            ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count),
+            SelectedOverloadMatches = resolution.Matches
         };
     }
 
@@ -3449,7 +3450,8 @@ public sealed class Binder
             annotatedReturnType: annotatedReturn,
             receiver: receiver)
         {
-            ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count)
+            ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count),
+            SelectedOverloadMatches = resolution.Matches
         };
     }
 

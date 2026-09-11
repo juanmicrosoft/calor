@@ -50,7 +50,7 @@ change. #1397's independently developed275 must be reconciled if it merges.
 
 ## Executable controls
 
-The64 new compiler cases and2 editor cases use existing runners and maintenance
+The76 new compiler cases and2 editor cases use existing runners and maintenance
 files; no benchmark framework, product C# path exemption or test tool was added.
 
 | Control | Evidence |
@@ -65,7 +65,8 @@ files; no benchmark framework, product C# path exemption or test tool was added.
 | Evaluation order | Original C# → Calor → public compilation → emitted assembly execution; four mixed/reordered statement/expression cases retain trace12 |
 | Existing behavior | Native overload, metadata shape/context, nullability predicate and routing/source-catalog suites |
 | Exact taint identities | Eight real binding/taint cases plus four `--analyze` CLI cases preserve `System.IO.File` sink recognition for tainted inputs and reject false alarms on constants; nullable reference syntax is not part of the overload identity |
-| Named taint roles | Eight statement/expression and direct/native-wrapper cases distinguish a tainted path from a tainted encoding; actual selected BCL formal indices drive sink selection and summary construction without reordering executable inputs |
+| Named taint roles | Twelve statement/expression and direct/native-wrapper cases distinguish a tainted path from a tainted encoding; both inner BCL and outer native named calls retain formal roles |
+| Native summary application | Four real-source return-flow cases and four actual `Scope.ResolveOverload` conditional-alternative controls; each selected function's map, not the first alternative's map, drives sink and return substitution |
 
 The initial117-case selection passed. Six new source controls then reproduced
 five failures before implementation: missing statement checks, wrongly accused
@@ -103,10 +104,23 @@ correct signature, taint rules still indexed source-order arguments as formal
 positions. A reordered `File.ReadAllText(encoding: user_input, path: "safe.txt")`
 incorrectly flagged the encoding as a path. Bound calls now retain the actual
 metadata argument-to-formal indices, and the existing sink selector and summary
-builder consume those indices. A null map retains existing unresolved/native
-behavior; no new mapping is guessed. The original CLI false positive and its
+builder consume those indices. The original CLI false positive and its
 correction are retained, including the separate unchanged0200 TypeChecker warning
 for the externally resolved encoding type. Taint rules themselves are unchanged.
+
+A fresh integration review of `d6ac62` found that the outer native wrapper still
+applied summary formal indices directly to source-order arguments. The previous
+test matrix reordered the inner BCL call but left the outer wrapper positional;
+it did not cover this counterexample. The actual CLI false positive was retained
+before repair. Both bound call forms now retain `SelectedOverloadMatches` directly
+from native resolution. Summary sinks and return flows consume the map belonging
+to the specific selected function, including conditional alternatives with
+different formal orders. Direct configured sinks use the same selector. Mapping
+selects supplied arguments in source order; omitted arguments are not synthesized.
+Legacy/unresolved calls with no retained map keep their prior positional fallback.
+The correction adds twelve cases and does not change taint rules. Earlier
+no-finding reviews do not waive this later finding; fresh final-head reviews and
+CI are required again.
 
 ## Explicit limits and acceptance gap
 

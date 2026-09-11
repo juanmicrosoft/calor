@@ -749,15 +749,14 @@ public sealed class TaintAnalysis
         if (summaries.Length > 0)
         {
             return summaries.SelectMany(summary =>
-                summary.ReturnFlows.SelectMany(flow =>
-                    flow.Origin.ParameterIndex is { } index && index < arguments.Count
-                        ? EvaluateExpression(arguments[index], state)
+                summary.Summary.ReturnFlows.SelectMany(flow =>
+                    flow.Origin.ParameterIndex is { } index
+                        ? SelectParameterArguments(call, arguments, [index], summary.Function.Id)
+                            .SelectMany(argument => EvaluateExpression(argument, state))
                             .Select(argument => argument.WithSummaryFlow(flow, call.DisplayName, location))
                         : flow.Origin.Source is { }
                             ? [flow.WithSummaryReturn(call.DisplayName, location)]
-                            : Array.Empty<TaintFlow>())
-                    .Where(flow => flow.Origin.ParameterIndex == null
-                        || flow.Origin.ParameterIndex < arguments.Count));
+                            : Array.Empty<TaintFlow>()));
         }
 
         if (_options.StrictExternalCalls && call.ResolvedSymbols.Count == 0)
@@ -771,13 +770,12 @@ public sealed class TaintAnalysis
         return argumentFlows;
     }
 
-    private IEnumerable<TaintFunctionSummary> GetSummaries(TaintCallDescriptor call) =>
-        call.ResolvedSymbols
-            .Where(symbol => !symbol.Id.IsNone)
-            .Select(symbol => _summaries.TryGetValue(symbol.Id, out var summary) ? summary : null)
-            .Where(summary => summary != null)
-            .Cast<TaintFunctionSummary>()
-            .Distinct();
+    private IEnumerable<(FunctionSymbol Function, TaintFunctionSummary Summary)> GetSummaries(TaintCallDescriptor call)
+    {
+        foreach (var symbol in call.ResolvedSymbols.Where(symbol => !symbol.Id.IsNone).DistinctBy(symbol => symbol.Id))
+            if (_summaries.TryGetValue(symbol.Id, out var summary))
+                yield return (symbol, summary);
+    }
 
     private TaintSource? IdentifySource(TaintCallDescriptor call)
     {
@@ -894,15 +892,13 @@ public sealed class TaintAnalysis
                 state);
         }
 
-        foreach (var summary in GetSummaries(call))
+        foreach (var (function, summary) in GetSummaries(call))
         {
             foreach (var summarySink in summary.ParameterSinks)
             {
-                if (summarySink.ParameterIndex >= arguments.Count)
-                    continue;
                 RecordSinkFlows(
                     summarySink.Sink,
-                    [arguments[summarySink.ParameterIndex]],
+                    SelectParameterArguments(call, arguments, [summarySink.ParameterIndex], function.Id),
                     summarySink.Target,
                     summarySink.Location,
                     state,
@@ -965,12 +961,31 @@ public sealed class TaintAnalysis
     {
         if (sink.ArgumentIndices == null)
             return arguments;
+        return SelectParameterArguments(call, arguments, sink.ArgumentIndices, sink.Identity.FunctionSymbolId);
+    }
+
+    private static IReadOnlyList<BoundExpression> SelectParameterArguments(
+        TaintCallDescriptor call,
+        IReadOnlyList<BoundExpression> arguments,
+        IReadOnlyList<int> parameterIndices,
+        SymbolId? functionId = null)
+    {
+        if (call.SelectedOverloadMatches is { Count: > 0 } matches)
+        {
+            return matches.Where(match => functionId == null || match.Function.Id == functionId)
+                .SelectMany(match => match.Arguments)
+                .Where(mapping => parameterIndices.Contains(mapping.ParameterIndex))
+                .Select(mapping => mapping.ArgumentIndex)
+                .Where(index => index >= 0 && index < arguments.Count)
+                .Distinct().Order()
+                .Select(index => arguments[index]).ToArray();
+        }
         if (call.ArgumentParameterIndices is { } mappings)
         {
             return arguments.Where((_, index) =>
-                index < mappings.Count && sink.ArgumentIndices.Contains(mappings[index])).ToArray();
+                index < mappings.Count && parameterIndices.Contains(mappings[index])).ToArray();
         }
-        return sink.GetArgumentIndices(arguments.Count)
+        return parameterIndices
             .Where(index => index >= 0 && index < arguments.Count)
             .Select(index => arguments[index])
             .ToArray();
@@ -1164,7 +1179,8 @@ public sealed class TaintAnalysis
         IReadOnlyList<string>? ResolvedParameterTypes,
         FunctionSymbol? ResolvedSymbol,
         IReadOnlyList<FunctionSymbol> ResolvedSymbols,
-        IReadOnlyList<int>? ArgumentParameterIndices = null)
+        IReadOnlyList<int>? ArgumentParameterIndices = null,
+        IReadOnlyList<ResolvedOverloadMatch>? SelectedOverloadMatches = null)
     {
         public bool HasResolvedIdentity =>
             ResolvedSymbol != null
@@ -1181,7 +1197,8 @@ public sealed class TaintAnalysis
             call.ResolvedParameterTypes,
             call.ResolvedSymbol,
             call.ResolvedSymbols,
-            call.ArgumentParameterIndices);
+            call.ArgumentParameterIndices,
+            call.SelectedOverloadMatches);
 
         public static TaintCallDescriptor From(BoundCallStatement call) => new(
             call.Target,
@@ -1190,7 +1207,8 @@ public sealed class TaintAnalysis
             call.ResolvedParameterTypes,
             call.ResolvedSymbol,
             call.ResolvedSymbols,
-            call.ArgumentParameterIndices);
+            call.ArgumentParameterIndices,
+            call.SelectedOverloadMatches);
     }
 
     [Flags]

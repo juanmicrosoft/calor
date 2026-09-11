@@ -74,27 +74,33 @@ public sealed class TaintAnalysisCfgTests
         """;
 
     [Theory]
-    [InlineData(false, false, false)]
-    [InlineData(false, false, true)]
-    [InlineData(false, true, false)]
-    [InlineData(false, true, true)]
-    [InlineData(true, false, false)]
-    [InlineData(true, false, true)]
-    [InlineData(true, true, false)]
-    [InlineData(true, true, true)]
+    [InlineData(false, false, false, false)]
+    [InlineData(false, false, true, false)]
+    [InlineData(false, true, false, false)]
+    [InlineData(false, true, true, false)]
+    [InlineData(true, false, false, false)]
+    [InlineData(true, false, true, false)]
+    [InlineData(true, true, false, false)]
+    [InlineData(true, true, true, false)]
+    [InlineData(false, false, true, true)]
+    [InlineData(false, true, true, true)]
+    [InlineData(true, false, true, true)]
+    [InlineData(true, true, true, true)]
     public void N3_NamedBclSink_UsesActualFormalRolesInDirectAndSummaryFlows(
-        bool expression, bool taintedPath, bool wrapper)
+        bool expression, bool taintedPath, bool wrapper, bool namedWrapper)
     {
         var parameters = taintedPath ? "System.Text.Encoding:encoding, string:user_input" : "System.Text.Encoding:user_input";
         var encoding = taintedPath ? "encoding" : "user_input";
         var path = taintedPath ? "user_input" : "STR:\"safe.txt\"";
         var bcl = $"{(expression ? "§B{ignored} " : "")}§C{{System.IO.File.ReadAllText}} §A[encoding] {(wrapper ? "encoding" : encoding)} §A[path] {(wrapper ? "path" : path)} §/C";
+        var wrapperArguments = namedWrapper ? $"§A[path] {path} §A[encoding] {encoding}" : $"§A {encoding} §A {path}";
         var source = wrapper ? $$"""
             §M{m1:NamedSummary}
-              §F{helper:Wrapper:pub} (System.Text.Encoding:encoding, string:path) -> void
+              §F{helper:Wrapper:pub} (System.Text.Encoding:encoding, string:path) -> string
                 {{bcl}}
+                §R STR:"done"
               §F{caller:Run:pub} ({{parameters}}) -> void
-                §C{Wrapper} §A {{encoding}} §A {{path}} §/C
+                {{(expression ? "§B{result} " : "")}}§C{Wrapper} {{wrapperArguments}} §/C
             """ : $$"""
             §M{m1:NamedDirect}
               §F{caller:Run:pub} ({{parameters}}) -> void
@@ -111,9 +117,104 @@ public sealed class TaintAnalysisCfgTests
             ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundBindStatement>(statement).Initializer).ArgumentParameterIndices
             : Assert.IsType<BoundCallStatement>(statement).ArgumentParameterIndices;
         Assert.Equal(new[] { 1, 0 }, mappings);
+        if (wrapper)
+        {
+            var wrapperStatement = bound.Functions[1].Body[0];
+            var selected = expression
+                ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundBindStatement>(wrapperStatement).Initializer).SelectedOverloadMatches
+                : Assert.IsType<BoundCallStatement>(wrapperStatement).SelectedOverloadMatches;
+            var match = Assert.Single(selected);
+            Assert.Equal(bound.Functions[0].SymbolId, match.Function.Id);
+            Assert.Equal(namedWrapper ? new[] { 1, 0 } : new[] { 0, 1 },
+                match.Arguments.Select(argument => argument.ParameterIndex));
+        }
         var diagnostics = new DiagnosticBag();
         new TaintAnalysisRunner(diagnostics).Analyze(bound);
         Assert.Equal(taintedPath, diagnostics.Any(diagnostic => diagnostic.Code == DiagnosticCode.PathTraversal));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void N3_NativeReturnSummary_UsesSelectedArgumentRoles(bool named, bool taintedReturn)
+    {
+        var keep = taintedReturn ? "user_input" : "STR:\"safe.txt\"";
+        var drop = taintedReturn ? "STR:\"unused\"" : "user_input";
+        var arguments = named ? $"§A[keep] {keep} §A[drop] {drop}" : $"§A {drop} §A {keep}";
+        var source = $$"""
+            §M{m1:NamedReturnSummary}
+              §F{helper:Choose:pub} (string:drop, string:keep) -> string
+                §R keep
+              §F{caller:Run:pub} (string:user_input) -> void
+                §B{result} §C{Choose} {{arguments}} §/C
+                §C{System.IO.File.Delete} §A result §/C
+            """;
+        var parsing = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, parsing).TokenizeAllForParser(), parsing).Parse();
+        Assert.False(parsing.HasErrors, string.Join("\n", parsing));
+        var binding = new DiagnosticBag();
+        var bound = new Binder(binding).Bind(module);
+        Assert.DoesNotContain(binding, diagnostic => BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        var call = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundBindStatement>(bound.Functions[1].Body[0]).Initializer);
+        var match = Assert.Single(call.SelectedOverloadMatches);
+        Assert.Equal(bound.Functions[0].SymbolId, match.Function.Id);
+        Assert.Equal(named ? new[] { 1, 0 } : new[] { 0, 1 },
+            match.Arguments.Select(argument => argument.ParameterIndex));
+        var diagnostics = new DiagnosticBag();
+        new TaintAnalysisRunner(diagnostics).Analyze(bound);
+        Assert.Equal(taintedReturn, diagnostics.Any(diagnostic => diagnostic.Code == DiagnosticCode.PathTraversal));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void N3_AlternativeSummaries_UseEachSelectedFunctionsOwnMapping(bool returnSummary, bool taintedKeep)
+    {
+        var scope = new Scope();
+        var alternatives = Enumerable.Range(0, 2).Select(index =>
+        {
+            var keep = Variable("keep", "STRING", $"param:keep:{index}", true);
+            var drop = Variable("drop", "STRING", $"param:drop:{index}", true);
+            var symbol = new FunctionSymbol(new SymbolId($"fn:alternative:{index}"), "Choose",
+                returnSummary ? "STRING" : "VOID", index == 0 ? [drop, keep] : [keep, drop],
+                conditionalAlternative: new ConditionalAlternative("branches", index));
+            Assert.True(scope.DeclareOverload(symbol));
+            return new BoundFunction(Span(10 + index), symbol,
+                returnSummary
+                    ? [new BoundReturnStatement(Span(20 + index), Reference(keep, 30 + index))]
+                    : [Call("db.execute", Reference(keep, 30 + index), 20 + index)], new Scope());
+        }).ToArray();
+        var resolution = scope.ResolveOverload("Choose", ["STRING", "STRING"], ["keep", "drop"]);
+        Assert.Equal(OverloadResolutionKind.Resolved, resolution.Kind);
+        Assert.Equal(2, resolution.Matches.Count);
+        Assert.Equal(new[] { 1, 0 }, resolution.Matches[0].Arguments.Select(argument => argument.ParameterIndex));
+        Assert.Equal(new[] { 0, 1 }, resolution.Matches[1].Arguments.Select(argument => argument.ParameterIndex));
+        var input = Variable("user_input", "STRING", "param:caller", true);
+        BoundExpression[] arguments = taintedKeep
+            ? [Reference(input, 40), new BoundStringLiteral(Span(41), "safe")]
+            : [new BoundStringLiteral(Span(40), "safe"), Reference(input, 41)];
+        var result = Variable("result", "STRING", "local:result");
+        var caller = Function("Run", "fn:caller", [input], returnSummary
+            ? [
+                new BoundBindStatement(Span(42), result,
+                    new BoundCallExpression(Span(43), "Choose", arguments, "STRING",
+                        resolvedSymbols: resolution.Functions, argumentNames: ["keep", "drop"])
+                    { SelectedOverloadMatches = resolution.Matches }),
+                Call("db.execute", Reference(result, 44), 45)
+            ]
+            : [
+                new BoundCallStatement(Span(43), "Choose", arguments,
+                    resolvedSymbols: resolution.Functions, argumentNames: ["keep", "drop"])
+                { SelectedOverloadMatches = resolution.Matches }
+            ]);
+        var diagnostics = new DiagnosticBag();
+        new TaintAnalysisRunner(diagnostics).Analyze(Module([.. alternatives, caller]));
+        Assert.Equal(taintedKeep, diagnostics.Any(diagnostic => diagnostic.Code == DiagnosticCode.SqlInjection));
     }
 
     [Fact]
