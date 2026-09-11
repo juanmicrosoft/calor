@@ -27,7 +27,7 @@ public sealed class RoundTripPipelineSafetyTests
                 + "System.Environment.GetEnvironmentVariable(\"CALOR_E1_UNSET\") ?? \"fallback\"; }");
             await File.WriteAllTextAsync(Path.Combine(root, "Lib", "Skip.g.cs"),
                 "public class ExcludedEvidence { }");
-            var report = new RoundTripReport { ProjectName = "Evidence" };
+            var report = new RoundTripReport { ProjectName = "Evidence", StartedAt = DateTimeOffset.UtcNow };
             var config = new RoundTripConfig
             {
                 ProjectName = "Evidence", OriginalProjectPath = root,
@@ -49,7 +49,7 @@ public sealed class RoundTripPipelineSafetyTests
             Assert.Contains("System.Environment.GetEnvironmentVariable",
                 nullable.Candidate.ConvertedCalor!.Substring(finding.Start!.Value, finding.Length!.Value));
             Assert.Equal(ReportGenerator.Hash(nullable.Candidate.ConvertedCalor), finding.SourceSha256);
-            var missingReport = new RoundTripReport { ProjectName = "MissingEvidence" };
+            var missingReport = new RoundTripReport { ProjectName = "MissingEvidence", StartedAt = DateTimeOffset.UtcNow };
             var missingResults = await new RoundTripPipeline().ConvertAndReplaceAsync(
                 missingRoot, config with { OriginalProjectPath = missingRoot, ProjectName = "MissingEvidence" }, missingReport);
             var missing = Assert.Single(missingResults);
@@ -144,7 +144,7 @@ public sealed class RoundTripPipelineSafetyTests
             work = pipeline.PrepareWorkingCopy(config);
             try
             {
-                var report = new RoundTripReport { ProjectName = config.ProjectName };
+                var report = new RoundTripReport { ProjectName = config.ProjectName, StartedAt = DateTimeOffset.UtcNow };
                 var files = await pipeline.ConvertAndReplaceAsync(work, config, report);
                 var file = Assert.Single(files);
                 Assert.Equal(FileStatus.Replaced, file.Status);
@@ -215,11 +215,13 @@ public sealed class RoundTripPipelineSafetyTests
         if (output is null)
             return;
         report.FileResults = results;
+        report.CalorVersion = typeof(Calor.Compiler.Program).Assembly.GetName().Version?.ToString() ?? "";
         await RoundTripPipeline.CaptureProvenanceAsync(config, report.Evidence!, CancellationToken.None);
         report.Evidence!.Limitations.Add("Controlled fixture captured via existing ConvertAndReplaceAsync/RecoverBuildAsync APIs, "
             + "not a full project test run. Runtime assertions are in the paired xUnit/TRX evidence. "
             + "The recovery control deliberately injects a missing C# symbol after conversion; it is not a natural corpus regression.");
         report.Fidelity = ProjectFidelity.Compute(report);
+        report.FinishedAt = DateTimeOffset.UtcNow;
         Directory.CreateDirectory(output);
         await File.WriteAllTextAsync(Path.Combine(output, $"{name}.json"), ReportGenerator.GenerateJson(report));
     }
