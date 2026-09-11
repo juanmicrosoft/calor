@@ -1,0 +1,550 @@
+{
+  "schemaVersion": 1,
+  "kind": "pp-w-historical-two-request-financial-bound-ai-review",
+  "reviewRecordedAt": "2026-09-11T11:52:14.277852+00:00",
+  "timestampBasis": "Actual UTC system time obtained when recording this review; not a backdated collection or approval timestamp.",
+  "reviewer": {
+    "kind": "AI",
+    "independentHistoricalAudit": true,
+    "humanReview": false,
+    "operatorApproval": false
+  },
+  "verdict": "APPROVE",
+  "verdictScope": {
+    "description": "Historical ex-ante upper bound of USD 51.04 for exactly the two enumerated reservations made by the executed 0b87d52b92c07e0377f4948102f467b890107df5 instrument, within the original plan's documented first-party Anthropic Messages-request usage scope and stated trusted-execution assumptions.",
+    "historicalBoundOnly": true,
+    "actualChargeKnown": false,
+    "actualChargeUsd": null,
+    "invoiceVerified": false,
+    "usageReconciled": false,
+    "reservationReleaseApproved": false,
+    "newImplementationReviewed": false,
+    "newImplementationApproved": false,
+    "resumptionApproved": false,
+    "recoveryApproved": false,
+    "operatorExecutionApproved": false,
+    "stage2Approved": false,
+    "additionalFundsApproved": false,
+    "scientificChangesApproved": false,
+    "futureAutomaticWriteoffsApproved": false
+  },
+  "authorization": {
+    "commentUrl": "https://github.com/juanmicrosoft/calor/issues/1436#issuecomment-5633881736",
+    "publicReadUrl": "https://api.github.com/repos/juanmicrosoft/calor/issues/comments/5633881736",
+    "verifiedThroughUnauthenticatedPublicRead": true,
+    "scope": "New explicit user authority for a reviewed, one-time, two-request permanent-retention amendment, conditional on sound financial bounds. It does not establish actual usage, authorize refunds or extra funds, change scientific rules, authorize future automatic exceptions, or itself approve the implementation or current operator execution.",
+    "artifactPermission": "Subsequent explicit permission permits this review artifact only; no repository, source, ledger, or historical archive mutation."
+  },
+  "historicalIdentities": {
+    "executedWorktree": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/instrument",
+    "benchRelativeToWorktree": "bench/phase0-agent-native",
+    "executedCommit": "0b87d52b92c07e0377f4948102f467b890107df5",
+    "epochId": "w-rows-pilot-gateway-002",
+    "canonicalLedger": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/.git/ppw-budget/epic1254-pilot.sqlite3",
+    "canonicalLedgerSha256": "464acefd37b96620aeab69c025cbb11703ca038d91eaa0d3d514af3d3c8a8990",
+    "backupLedger": "/Users/juanrivera/sources/repos/juanmicrosoft/calor/.git/ppw-budget/epic1254-pilot.failed-1432.sqlite3",
+    "backupLedgerSha256": "0f32e092fbd760f7273405b4feda7e107b1a5630c9d98668b90d84a323048295",
+    "canonicalPriceIdentitySha256": "582a71eeb22ad7604759d7441f719615def5a04a5ca2cecece8a2c9e1f45eb3e",
+    "priceDocumentFileSha256": "47d4fb49b74fcc7ceda777db8a3317fe8b69b146c9c7cfe282edd572f7dd3e65",
+    "priceDocumentEqualsImplementedContract": true,
+    "planSha256": "f4bfa29abc4cab698fd2d612177b506a1dcc6d7a7c55f16fdee293ec4a58efbd",
+    "historicalAuthorizationSha256": "756ab420af2c8e9e9038ccfa68568d0223e0895575cd0bef3f02639b82c5a3e7",
+    "protocolSha256": "5773c9ed60f37fabc2ff405ed352c3b8ac3285f8bc829e76746f02d27f58287b",
+    "sourceSha256": {
+      "ppw-gateway-budget.py": "e210373664b8d0f4b505028e1531bc2284f2443bbaf80ad0f64e8f6b14cd5e6e",
+      "ppw-budget-gateway.py": "a7904a71e98c6838ad393eed0c642936753426229fa3509c3a92672b42002de8",
+      "ppw-gateway-client.py": "5af515fd0e305bebfd497f0d33ff17825ecb2e8f2317cae327cbc05c45a92586",
+      "run-pair.sh": "80cd8a0a32997836c225c7ddabc465eaeab0b1356a6aff7017b0e56c62a9dedc"
+    },
+    "attemptStartSha256": "ea3c35cf9d81fb2c9b1fbd738a29006aa25dac79ed960250ccffa73f137b881f",
+    "allLedgerBoundHarnessArtifactsMatched": 30,
+    "archivedPinsMatchExecutedCommit": true,
+    "archivedFinancialBindingRequestsAndEventsMatchCanonicalLedger": true,
+    "archivedProfilePlanAuthorizationAndAmendmentMatchRegistrationCopies": true,
+    "sharedGitCommonDirectoryLedgerAnchorMatched": true,
+    "laterDiagnosticFixUsedAsHistoricalEvidence": false
+  },
+  "historicalLedgerState": {
+    "state": "INCOMPLETE_UNKNOWN_CHARGE",
+    "currency": "USD",
+    "ceilingMicroUsd": 1000000000,
+    "ceilingUsd": "1000.00",
+    "requestCount": 2,
+    "unknownRequestCount": 2,
+    "reconciledRequestCount": 0,
+    "reservedInflightRowCount": 0,
+    "reconciledMicroUsd": 0,
+    "retainedUnreconciledMicroUsd": 51040000,
+    "retainedUnreconciledUsd": "51.04",
+    "arithmeticHeadroomMicroUsd": 948960000,
+    "arithmeticHeadroomUsd": "948.96",
+    "headroomIsVerifiedAccountCredit": false,
+    "zeroReconciledDoesNotMeanZeroActualCost": true,
+    "databaseReadMode": "SQLite URI mode=ro&immutable=1; no mutable RequestLedger methods invoked.",
+    "ledgerAndBackupHashesUnchangedAtAuditEnd": true,
+    "backupRequestCount": 0,
+    "backupState": "INCOMPLETE_POLICY",
+    "priorRecovery": {
+      "eventId": 4,
+      "kind": "zero-request-recovery",
+      "appliedOnce": true,
+      "preservedSlot": "C-001-quota-adapter/calor-permissive/1",
+      "applicableToTheseTwoRequests": false
+    }
+  },
+  "requests": [
+    {
+      "id": "8d7fa7bf4a31f28ba7f7e8f6802781e8b6d8238fb38d3219",
+      "slot": "C-001-quota-adapter/calor-strict/1",
+      "model": "claude-opus-4-8",
+      "maxTokens": 64000,
+      "stream": true,
+      "serviceTier": "auto",
+      "priceSha256": "582a71eeb22ad7604759d7441f719615def5a04a5ca2cecece8a2c9e1f45eb3e",
+      "reservedMicroUsd": 25520000,
+      "retainedChargeColumnMicroUsd": 25520000,
+      "retainedUpperBoundUsd": "25.52",
+      "state": "unknown",
+      "reason": "unreconciled-provider-charge",
+      "usage": null,
+      "actualChargeUsd": null,
+      "reservationEventId": 6,
+      "unknownRetentionEventId": 8,
+      "unknownRetentionEventDetail": {}
+    },
+    {
+      "id": "a24d9933f2d62c0c904eefdb81d9b592b4e36d30a7e577b3",
+      "slot": "C-001-quota-adapter/calor-strict/1",
+      "model": "claude-opus-4-8",
+      "maxTokens": 64000,
+      "stream": true,
+      "serviceTier": "auto",
+      "priceSha256": "582a71eeb22ad7604759d7441f719615def5a04a5ca2cecece8a2c9e1f45eb3e",
+      "reservedMicroUsd": 25520000,
+      "retainedChargeColumnMicroUsd": 25520000,
+      "retainedUpperBoundUsd": "25.52",
+      "state": "unknown",
+      "reason": "unreconciled-provider-charge",
+      "usage": null,
+      "actualChargeUsd": null,
+      "reservationEventId": 7,
+      "unknownRetentionEventId": 9,
+      "unknownRetentionEventDetail": {}
+    }
+  ],
+  "independentCalculation": {
+    "modelContextUpperTokens": 1000000,
+    "modelOutputUpperTokens": 128000,
+    "actualReservedRequestOutputUpperTokens": 64000,
+    "baseRatesUsdPerMillion": {
+      "input": "5.00",
+      "cacheWrite5m": "6.25",
+      "cacheWrite1h": "10.00",
+      "cacheRead": "0.50",
+      "output": "25.00"
+    },
+    "fastMultiplier": "2",
+    "geographyMaximumMultiplier": "1.1",
+    "maximumInputCategoryRateUsdPerMillion": "22.00",
+    "maximumOutputRateUsdPerMillion": "55.00",
+    "inputPartition": "input_tokens + cache_creation_input_tokens + cache_read_input_tokens <= 1000000",
+    "cachePartitionExplanation": "Cache reads and writes partition the prompt rather than providing separate million-token allowances. For mixed TTLs, billing is read A, one-hour write B-A, five-minute write C-B; cache_creation breakdown is a subdivision, not an additional charge.",
+    "thinkingExplanation": "Full generated thinking, including hidden thinking, is included in billed output and max_tokens. Preserved prior thinking is input; filtered-out thinking is billed as input only when actually shown to Claude. Thinking details are not added again to output totals.",
+    "perRequestFormulaUsd": "(1000000 * 22 / 1000000) + (64000 * 55 / 1000000) = 22.00 + 3.52 = 25.52",
+    "implementedIntegerFormulaMicroUsd": "((input_tokens * 20 + output_tokens * 50) * 11 + 9) // 10",
+    "rounding": "Upward integer-microdollar rounding; no floating-point financial arithmetic.",
+    "perRequestUpperMicroUsd": 25520000,
+    "twoRequestUpperMicroUsd": 51040000,
+    "twoRequestUpperUsd": "51.04",
+    "sharedCeilingHeadroomFormulaUsd": "1000.00 - 51.04 = 948.96",
+    "longContextPremium": "No additional long-context premium for the admitted model under the cited first-party pricing.",
+    "serviceTierBasis": "auto may use existing Priority Tier capacity or standard capacity. This Messages adapter does not purchase capacity; the reviewed scope uses published token-category rates, not unrelated account commitments.",
+    "bodyLimitBytes": 33554432,
+    "bodyLimitIsNotTokenizerProof": true,
+    "proofBasis": "Provider context and inclusive output contracts, combined with pre-forward operation restrictions and one upstream iteration; not merely addition of stored maxima or retrospective receipt validation."
+  },
+  "admittedOperationAnalysis": {
+    "endpoint": "POST https://api.anthropic.com/v1/messages",
+    "allowedQueries": [
+      "",
+      "beta=true"
+    ],
+    "oneUpstreamPostPerReservation": true,
+    "upstreamRetries": false,
+    "redirectFollowing": false,
+    "fixedUpstreamAndTlsVerification": true,
+    "durableReservationBeforeUpstreamConnection": true,
+    "unknownFieldsAndCapabilitiesRefusedRatherThanStripped": true,
+    "requestFields": [
+      "model",
+      "max_tokens",
+      "messages",
+      "system",
+      "stream",
+      "tools",
+      "tool_choice",
+      "thinking",
+      "output_config",
+      "output_format",
+      "temperature",
+      "top_p",
+      "top_k",
+      "stop_sequences",
+      "metadata",
+      "cache_control",
+      "service_tier",
+      "inference_geo",
+      "speed",
+      "context_management"
+    ],
+    "clientToolTypes": [
+      "custom",
+      "bash_20250124",
+      "text_editor_20250124",
+      "text_editor_20250429",
+      "text_editor_20250728",
+      "memory_20250818"
+    ],
+    "allowedContextEdits": [
+      "clear_thinking_20251015",
+      "clear_tool_uses_20250919"
+    ],
+    "contentAndTokenOverhead": "System prompts, tool definitions, tool-use arguments/results, images, documents, retained thinking and format/effort prompt overhead fall within the documented input/output categories. Sampling controls and metadata introduce no separately documented billable operation.",
+    "opaqueDataIsNotAnOperationControl": "Tool inputs and JSON schemas may contain arbitrary data; admission does not reinterpret those data as top-level provider controls.",
+    "excludedOperations": [
+      "Server-side compaction and its beta capability",
+      "Server-side fallback and its beta capabilities",
+      "Advisor tool definitions and advisor-model operations, despite allowing the advertisement header",
+      "Server web search and web fetch",
+      "Server code execution, containers and MCP operations",
+      "Other unadmitted server tools or billable capabilities",
+      "Alternate models and Message Batches",
+      "Extended-output beta",
+      "Remote URL and file content sources"
+    ],
+    "contextClearing": "Admitted clearing edits act before the prompt reaches the model and may invalidate cache prefixes; they do not enable the excluded summary-generating compaction iteration.",
+    "furtherClientTraffic": "Any helper, retry, continuation or local-tool-result follow-up requires another gateway reservation. Native message envelopes are not the unit of financial deduplication.",
+    "unsupportedOrUnboundedDocumentedPricedOperationFoundWithinAdmittedSurface": false
+  },
+  "firstPartySources": [
+    {
+      "url": "https://platform.claude.com/docs/en/models/opus-4-8/overview",
+      "supports": "Exact model ID, one-million-token context, 128000 output limit and base prices."
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "supports": "Input/output/cache rates, fast-mode stacking, 1.1 US-geography multiplier, long-context pricing and client/server tool pricing distinction."
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/build-with-claude/context-windows",
+      "supports": "All input/cache categories count toward the context window; tools, images and documents are included; overlong inputs are rejected."
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/build-with-claude/prompt-caching#tracking-cache-performance",
+      "supports": "Total input is the sum of uncached, cache-read and cache-creation categories."
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/build-with-claude/prompt-caching#mixing-different-ttls",
+      "supports": "Mixed-TTL billing partitions rather than duplicates the prompt."
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/build-with-claude/thinking",
+      "supports": "Full thinking counts toward billed output and max_tokens; preserved thinking is input; only thinking shown to Claude is billed as subsequent input."
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/api/messages/create",
+      "supports": "One next-message operation and the absolute max_tokens generation bound."
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/api/service-tiers",
+      "supports": "auto versus standard_only and use of existing Priority Tier capacity."
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/build-with-claude/context-editing",
+      "supports": "Clear-tool-use and clear-thinking edits occur before model processing and interact with cache invalidation."
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/build-with-claude/compaction",
+      "supports": "Compaction requires a specific strategy and beta and can generate another model iteration; those controls are excluded."
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback",
+      "supports": "Server fallback requires its own controls and beta; those controls are excluded."
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool",
+      "supports": "Advisor execution requires an advisor tool definition; the advertisement header alone does not enable it."
+    },
+    {
+      "url": "https://platform.claude.com/docs/en/build-with-claude/structured-outputs",
+      "supports": "JSON-schema output and strict tool use are constrained-decoding features rather than admitted server tool execution."
+    },
+    {
+      "url": "https://code.claude.com/docs/en/llm-gateway-protocol",
+      "supports": "Messages gateway routing, optional token counting, startup HEAD traffic, native capability headers and direct-egress compatibility caveats."
+    }
+  ],
+  "executedSourceCitations": {
+    "root": "bench/phase0-agent-native",
+    "commit": "0b87d52b92c07e0377f4948102f467b890107df5",
+    "citations": [
+      {
+        "path": "ppw-gateway-budget.py",
+        "lines": "426-429",
+        "symbols": [
+          "upper_cost"
+        ],
+        "finding": "Worst admitted cache/input plus requested output, with fast and geography modifiers and upward integer rounding."
+      },
+      {
+        "path": "ppw-gateway-budget.py",
+        "lines": "496-589",
+        "symbols": [
+          "validate_context_management",
+          "validate_request_content",
+          "admit_request"
+        ],
+        "finding": "Exact model/output and closed operation admission; nested content/cache and context-edit restrictions."
+      },
+      {
+        "path": "ppw-gateway-budget.py",
+        "lines": "598-661",
+        "symbols": [
+          "reconciled_cost"
+        ],
+        "finding": "Complete category validation, inclusive thinking details, single iteration, no server charges and conservative missing modifiers. This post-response check is not by itself an ex-ante bound."
+      },
+      {
+        "path": "ppw-gateway-budget.py",
+        "lines": "754-767,848-894",
+        "symbols": [
+          "RequestLedger.transaction",
+          "RequestLedger.reserve",
+          "RequestLedger.settle"
+        ],
+        "finding": "Serialized durable reservation, shared total exposure, recomputation of maximum, and full unknown-charge retention."
+      },
+      {
+        "path": "ppw-gateway-budget.py",
+        "lines": "964-1025",
+        "symbols": [
+          "RequestLedger.complete",
+          "RequestLedger.snapshot"
+        ],
+        "finding": "Old completion refuses any unreconciled request; snapshots sum retained charges. New narrowly authorized disposition needs separate review."
+      },
+      {
+        "path": "ppw-budget-gateway.py",
+        "lines": "34-71,139-277",
+        "symbols": [
+          "request_headers",
+          "priced_endpoint",
+          "provider_connection",
+          "Handler.do_POST"
+        ],
+        "finding": "Wire/body restrictions, fixed TLS destination, one POST after reservation, no redirects/retries, and receipt-failure retention without original diagnostic detail."
+      },
+      {
+        "path": "ppw-spending.py",
+        "lines": "78-118,267-330",
+        "symbols": [
+          "artifact_manifest",
+          "gateway_ledger_location",
+          "pinned_file",
+          "admit"
+        ],
+        "finding": "Source/price/authorization/runtime admission and fixed shared Git-common-directory ledger anchor."
+      },
+      {
+        "path": "ppw-gateway-client.py",
+        "lines": "278-339,452-483,602-663",
+        "symbols": [
+          "validate_runtime",
+          "sandbox_policy",
+          "read_isolation_evidence",
+          "probe",
+          "execute_client",
+          "launch"
+        ],
+        "finding": "Runtime validation, loopback-only model egress, protected-state restrictions, private probe evidence and mandatory sandbox launch."
+      },
+      {
+        "path": "run-pair.sh",
+        "lines": "37,1680-1690",
+        "symbols": [
+          "set -euo pipefail",
+          "mandatory gateway probe followed by attempt-start and run_agent"
+        ],
+        "finding": "Preserved source-bound attempt-start follows a successful mandatory kernel probe."
+      },
+      {
+        "path": "ppw-instrument.py",
+        "lines": "640-705,748-868",
+        "symbols": [
+          "gateway collection lifecycle"
+        ],
+        "finding": "Frozen runtime/source checks and protected gateway construction; final actual isolation archive is written only after accounting progression, while transient evidence is deleted in finally."
+      },
+      {
+        "path": "tests/test_ppw_gateway.py",
+        "lines": "128-300,656-714,715-938",
+        "symbols": [
+          "PriceTests",
+          "LedgerTests",
+          "TransportTests"
+        ],
+        "finding": "Existing pricing assertions and reviewed source tests for reservations, concurrency, retained unknowns and pre-forward rejection."
+      }
+    ]
+  },
+  "recordCitations": [
+    "registrations/ppw-rows-stage1/gateway-execution-profile-1434.json",
+    "registrations/ppw-rows-stage1/gateway-spending-plan-1434.json",
+    "registrations/ppw-rows-stage1/gateway-price-contract.json",
+    "registrations/ppw-rows-stage1/gateway-authorization-1434.json",
+    "registrations/ppw-rows-stage1/gateway-instrument-amendment-1434.json",
+    "registrations/ppw-rows-stage1/gateway-evidence/gateway-native-startup-1434-evidence.json",
+    "registrations/ppw-rows-stage1/gateway-evidence/gateway-native-wire-1434-evidence.json",
+    "epochs/w-rows-pilot-gateway-002/pins.json",
+    "epochs/w-rows-pilot-gateway-002/collection-outcome.json: spending projection only",
+    "epochs/w-rows-pilot-gateway-002/runs/C-001-quota-adapter/calor-strict/run-1/attempt-start.json",
+    "epochs/w-rows-pilot-gateway-002/runs/C-001-quota-adapter/calor-strict/run-1/client-invocation.json",
+    "session files/gateway-operator/preflight-1434-merged-head.json",
+    "session files/gateway-operator/instrument-readonly-diagnosis-002-44c76817.json"
+  ],
+  "assumptionsAndGaps": [
+    {
+      "kind": "trusted-execution-assumption",
+      "detail": "The identified trusted launcher and validator produced the protected records; the host/kernel enforced the stated sandbox and SQLite behavior; trusted external processes did not substitute execution or mutate evidence. Matching hashes are not remote attestation."
+    },
+    {
+      "kind": "missing-actual-final-isolation-artifact",
+      "path": "epochs/w-rows-pilot-gateway-002/runs/C-001-quota-adapter/calor-strict/run-1/gateway-isolation.json",
+      "present": false,
+      "detail": "The actual interrupted run lacks the final isolation archive. Source ordering and the source-bound attempt-start support successful prior probing, but an independently retained actual-run kernel transcript is unavailable. Synthetic startup evidence is not that historical transcript."
+    },
+    {
+      "kind": "provider-contract-assumption",
+      "detail": "The documented first-party model/context/output/category-pricing contracts apply to these admitted requests. The audit does not posit or insure against a provider violating its published contract."
+    },
+    {
+      "kind": "non-time-authenticated-pricing",
+      "detail": "Public documentation obtained during this audit corroborates the registered prices. No time-authenticated historical pricing archive or negotiated account terms were inspected; contemporaneous applicability of the cited registered rates is assumed."
+    },
+    {
+      "kind": "scope-exclusion",
+      "detail": "Unrelated subscription, existing capacity-commitment, tax or other account fees are outside the original documented request-usage scope. This is not an all-in invoice or account-balance bound."
+    },
+    {
+      "kind": "missing-request-and-response-records",
+      "detail": "Full historical request bodies, raw SSE and complete terminal provider usage were not retained. Exact actual cache/speed/geography choices, billed quantities, invoice cost and full provider-request/message mapping cannot be reconstructed."
+    },
+    {
+      "kind": "missing-original-failure-causes",
+      "detail": "Both unknown-retention event details are empty. Historical transport, stream parsing, response status/content type and final usage-validation causes cannot be distinguished from these records."
+    },
+    {
+      "kind": "identity-and-counting-limitation",
+      "detail": "Two partial Native assistant envelopes share one provider message/request identity according to the supplied metadata-only evidence. They are not two additional complete requests and do not justify deduplicating the two distinct ledger reservations."
+    },
+    {
+      "kind": "activity-and-scientific-limitations",
+      "detail": "No absence of model activity or transient source edits is established. Unchanged sealed starters cannot establish no transient edits. Both historical attempts remain invalid/missing as applicable; this financial review produces no scientific outcome."
+    },
+    {
+      "kind": "quiescence-limitation",
+      "detail": "Zero reserved/inflight ledger rows is an accounting observation, not an independent process-level quiescence certification or operator readiness determination."
+    },
+    {
+      "kind": "validation-limitation",
+      "detail": "Only pure existing pricing assertions and a synthetic receipt-schema reproduction were executed. Filesystem, transport, concurrency and isolation tests were read but not rerun under the read-only audit authorization."
+    }
+  ],
+  "whyUnknownUsageDoesNotDefeatThisExAnteBound": "Under the stated trusted-execution and provider-contract assumptions, admission excludes extra billable server operations and fixes the model/output bounds before the durable reservation and upstream POST. Every possible admitted input/cache partition and inclusive output count is bounded by the calculation. Complete provider usage is necessary to reconcile or release funds, but not to retain the maximum permanently. The unknown actual charge remains unknown.",
+  "readinessConstraint": {
+    "kind": "confirmed-frozen-reconciler-schema-incompatibility",
+    "field": "inference_geo",
+    "observedPartialNativeMetadataValue": "not_available",
+    "metadataEvidence": "session files/gateway-operator/instrument-readonly-diagnosis-002-44c76817.json",
+    "source": "ppw-gateway-budget.py:612",
+    "syntheticReproduction": {
+      "inMemoryOnly": true,
+      "otherwiseAdmittedCompleteSyntheticReceipt": true,
+      "refusal": "unknown provider geography",
+      "networkConnections": 0,
+      "ledgerWrites": 0,
+      "reconcilesHistoricalUsage": false
+    },
+    "provesOriginalFailureCause": false,
+    "provesValueReachedHistoricalFinalRawReceipt": false,
+    "pricingSemanticsEstablishedForSentinel": false,
+    "requiredBeforeProspectiveUse": "Independently justify any sentinel handling and test fail-closed behavior. Do not map not_available to global, infer a discount, accept partial usage or claim either historical failure cause. Prospective code/readiness approval remains separate."
+  },
+  "newImplementationConditions": [
+    {
+      "id": "exact-two-record-exception",
+      "requirement": "Bind exactly the two enumerated request identities, original ledger/source/price identities, amounts, unknown states and null usage.",
+      "requiredTests": "Reject substituted IDs, altered amounts or receipts, stale or wrong ledger identity, extra unknowns and inflight requests."
+    },
+    {
+      "id": "append-only-truthful-disposition",
+      "requirement": "Preserve original request rows and events. Represent a permanent retained-but-unreconciled exception distinctly from complete provider usage or ordinary invalid terminal completion.",
+      "requiredTests": "Original rows/events remain identical; no invented usage, invoice charge, settlement or ordinary-invalid laundering."
+    },
+    {
+      "id": "permanent-exactly-once-exposure",
+      "requirement": "Count USD 51.04 exactly once in the shared ceiling through admission, snapshots, recovery, completion, analysis and later affordability. It never becomes refundable or available.",
+      "requiredTests": "No zeroing, release, omission, double-count, debt reset or later receipt-based refund of this permanent-retention component."
+    },
+    {
+      "id": "same-global-ceiling",
+      "requirement": "Keep one experiment-wide USD 1000 ceiling with the same non-resettable ledger identity.",
+      "requiredTests": "Reject new-epoch, clone, arm, task, run or stage allowance resets and any additional-funds inference."
+    },
+    {
+      "id": "one-time-atomic-transition",
+      "requirement": "Use a distinct evidence-backed, one-time disposition. Parent/operator execution follows separate financial, methods and exact-source approval plus merge.",
+      "requiredTests": "Reject replay, stale proof, changed source, wrong ledger and concurrent application; failed transitions are atomic and preserve exposure."
+    },
+    {
+      "id": "future-unknowns-still-halt",
+      "requirement": "Only these two historical identities are exempted from the old all-reconciled gate. Every other future unknown or inflight uncertainty must halt collection.",
+      "requiredTests": "A third unknown, incomplete stream, unsupported usage category, interruption, unexplained accounting failure or inflight request cannot inherit the exception or permit completion/resume."
+    },
+    {
+      "id": "preserve-consumed-population",
+      "requirement": "Preserve C001-A1 and C001-B1 as consumed attempts. Resume only the 442 untouched slots, beginning C002-A1, within the fixed 444-slot population.",
+      "requiredTests": "No replacements, replayed attempts, imputation, population resizing or changes to scientific eligibility, weighting or stopping rules."
+    },
+    {
+      "id": "truthful-reporting",
+      "requirement": "Keep actual cost explicitly unknown, historical reconciled amount zero and permanent retained exposure USD 51.04. Do not manufacture valid scientific completion from financial disposition.",
+      "requiredTests": "All reports and downstream affordability calculations distinguish retained liability, reconciled charge and arithmetic headroom."
+    },
+    {
+      "id": "reservation-boundaries-and-concurrency",
+      "requirement": "Every new reservation includes the retained amount and existing liabilities in atomic shared-ceiling admission before upstream activity.",
+      "requiredTests": "Exact boundary and concurrent-reservation cases cannot exceed USD 1000; insufficient funds cause durable refusal before upstream connection."
+    }
+  ],
+  "validation": {
+    "existingPurePriceTestMethodsPassed": 12,
+    "executionMethod": "Called existing PriceTests methods directly without their filesystem fixture lifecycle, with Python -B. The ledger-using price test was excluded.",
+    "syntheticSentinelRefusalReproduced": true,
+    "implementedBoundRecomputed": true,
+    "priceDocumentEqualityVerified": true,
+    "fullSuiteRun": false,
+    "mutableLedgerMethodsInvoked": false,
+    "sourceEdits": false,
+    "ledgerMutations": false,
+    "historicalArchiveMutations": false,
+    "recoveryCalls": false,
+    "paidInferenceCalls": false,
+    "authenticatedAccountCalls": false,
+    "credentialInspection": false,
+    "modelTextOrToolArgumentsInspected": false,
+    "hypothesisOutcomesInspected": false,
+    "externalPosting": false
+  },
+  "nextStep": "Remain available for a separate financial-implementation review of the actual amendment's exact final head. This historical-only approval must not be substituted for that review or parent/operator permission."
+}

@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "kind": "pp-w-independent-methods-registration-draft-review",
+  "reviewRecordedAt": "2026-09-11T13:10:11Z",
+  "timestampBasis": "Actual UTC system time obtained during this review; not a historical collection or authorization timestamp.",
+  "reviewer": {
+    "kind": "AI",
+    "role": "Delegated independent methods and registration reviewer",
+    "independentOfAmendmentImplementation": true,
+    "humanReview": false,
+    "operator": false
+  },
+  "verdict": "REQUEST_CHANGES",
+  "verdictScope": {
+    "description": "Draft methods description and selected prospective registration semantics only. The core one-time accounting exception described is consistent with the new user authority, but the review-authority contract and current-budget planning projection require changes.",
+    "fullSourceReviewPerformed": false,
+    "generatedOperationalRecordsReviewed": false,
+    "generatedOperationalRecordsApproved": false,
+    "newImplementationApproved": false,
+    "financialBoundApprovedByThisReviewer": false,
+    "newFinancialImplementationApproved": false,
+    "quiescenceEstablished": false,
+    "runtimeReadinessEstablished": false,
+    "dispositionProofApproved": false,
+    "recoveryApproved": false,
+    "operatorExecutionApproved": false,
+    "scientificRuleChangesApproved": false,
+    "additionalFundsApproved": false,
+    "stage2Approved": false,
+    "releaseApproved": false
+  },
+  "authorityConsidered": {
+    "reference": "https://github.com/juanmicrosoft/calor/issues/1436#issuecomment-5633881736",
+    "authorizedAt": "2026-09-11T07:39:10.192-04:00",
+    "quote": "I authorize permanently retaining the full $51.04 against the existing $1,000 ceiling, while leaving the actual cost explicitly unknown. Preserve both consumed attempts. Implement and independently review this accounting amendment, and resume only the 442 untouched slots if the review confirms the financial bound is sound. Keep the scientific rules unchanged; future accounting failures must still halt collection.",
+    "interpretation": "Authority to implement and independently review a one-time exception; not a human methods review or approval of pending implementation, records or operations."
+  },
+  "reviewedDraft": {
+    "worktree": "files/worktrees/disposition-1436",
+    "branch": "fix/1436-retained-liability-disposition",
+    "baseHead": "080ed5a7482612130fa7572dfebe0f3c58a87ea2",
+    "changesCommittedAtReview": false,
+    "documents": [
+      {
+        "path": "bench/phase0-agent-native/README-ppw-gateway.md",
+        "sha256": "d139651150c6b5e66c22941214fe6b7cf6dea7a7419ea472fd607e925707c473",
+        "reviewedLines": [[473, 610]]
+      },
+      {
+        "path": "bench/phase0-agent-native/ppw-gateway-disposition-registration.py",
+        "sha256": "7cbdacf18eed76a423b761b5bff81c03f05c617b255822354b82821f7d478056",
+        "reviewedLines": [[25, 167], [222, 278], [416, 566], [650, 740], [859, 927], [928, 1025]],
+        "scope": "Selected review-contract, plan-generation, original-attempt, wrapper and archive-consumer semantics; not a full implementation review."
+      },
+      {
+        "path": "bench/phase0-agent-native/registrations/ppw-rows-stage1/gateway-spending-plan-1434.json",
+        "sha256": "f4bfa29abc4cab698fd2d612177b506a1dcc6d7a7c55f16fdee293ec4a58efbd",
+        "scope": "Only the carried-forward forecast and forecast-registration fields."
+      }
+    ]
+  },
+  "historicalFinancialReviewDependency": {
+    "path": "files/gateway-operator/historical-bound-review-1436.json",
+    "sha256": "a387cc8f7376eb48295f63ac87d3c38d85985ac2fc565c96c9982a4f86f4d1a5",
+    "kind": "pp-w-historical-two-request-financial-bound-ai-review",
+    "scope": "The other independent reviewer approves the historical ex-ante USD 51.04 bound only, with stated trusted-execution/provider-contract assumptions and missing-evidence limitations.",
+    "actualChargeKnown": false,
+    "usageReconciled": false,
+    "newImplementationApproved": false,
+    "operatorExecutionApproved": false,
+    "historicalFinalIsolationArtifactAvailable": false,
+    "thisReviewRepeatsFinancialAudit": false
+  },
+  "consistentMethodSemantics": [
+    "Only the two exact historical unknown reservations may receive the newly authorized accounting exception; USD 51.04 remains permanently unavailable within the same USD 1000 ceiling.",
+    "Actual historical cost and usage remain unknown. Original request rows, null usage and events are preserved rather than rewritten as reconciled charges.",
+    "Future unknown, interrupted, unpriced, policy, isolation, integrity and unexplained-liability failures remain halting.",
+    "A1 and B1 remain consumed. B1 retains its original raw invalid/censored/API-marker evidence and receives a distinct historical protected-failure accounting disposition, not ordinary invalid-terminal recoding.",
+    "The actual 001 and 002 archives remain immutable. Explicit wrappers preserve original file, source, epoch and missing-field provenance.",
+    "Only the 442 untouched identities beginning C002-A1 may continue, within the original 444-slot, three-task, two-arm, 74-per-cell population and ordering.",
+    "Scientific eligibility, fixed cell weights, precision arithmetic, unknown-outcome rules and point stops remain unchanged; no replacements, prefix adjudication or stage-2 permission follow.",
+    "Legitimate all-invalid terminal accounting may be operationally complete but scientifically UNIDENTIFIED. Known runtime failure remains a reason to hold, not deliberately consume the remaining identities.",
+    "Prospective response-schema compatibility does not establish a historical failure cause, complete historical usage or permission to release the permanently retained amount."
+  ],
+  "findings": [
+    {
+      "id": "M1",
+      "severity": "blocking-registration-contract",
+      "title": "The review interface cannot consume the genuine historical audit verbatim or distinguish the relevant approval subjects.",
+      "evidence": [
+        "REVIEW_FIELDS and _review_value require an exact compact pp-w-retained-liability-review shape with verdict APPROVE and only nonempty reference/scope strings.",
+        "The actual immutable historical audit has kind pp-w-historical-two-request-financial-bound-ai-review and explicit historical-only, humanReview=false, newImplementationApproved=false and operatorExecutionApproved=false scope.",
+        "A direct static schema comparison confirms the actual historical artifact does not satisfy the draft contract.",
+        "build_documents requires approved bound/method records before constructing the proposed records, while validate_archive reuses the same review validator. The selected interface does not distinguish this draft-description review from later review of actual generated records or new financial implementation."
+      ],
+      "sourceReferences": [
+        "ppw-gateway-disposition-registration.py:62-66",
+        "ppw-gateway-disposition-registration.py:146-166",
+        "ppw-gateway-disposition-registration.py:436-437",
+        "ppw-gateway-disposition-registration.py:650-727",
+        "ppw-gateway-disposition-registration.py:949-974"
+      ],
+      "requiredChange": "Preserve and validate the genuine historical audit verbatim at its pinned hash, or use a typed index that resolves and verifies that unchanged artifact without broadening its scope. Distinguish draft-description, historical-bound and final record/new-code approval subjects. Allow honest proposed-record review without converting a pending or description-only review into an unqualified registration approval. Final activation/operation must depend on the required exact-subject approvals; this artifact is not such an approval."
+    },
+    {
+      "id": "M2",
+      "severity": "registration-planning-correction",
+      "title": "The prospective plan inherits pre-disposition headroom without a separate current-budget projection.",
+      "evidence": [
+        "build_documents deep-copies the old plan and adds the USD 51.04 disposition but leaves its forecast unchanged.",
+        "The copied forecast remains status registered with estimatedFullPilotUsd 900.36 and baselineHeadroomUsd 99.64.",
+        "USD 51.04 is now permanently unavailable. The historical forecast must remain historical evidence, not be presented as already accounting for this new permanent encumbrance."
+      ],
+      "sourceReferences": [
+        "ppw-gateway-disposition-registration.py:538-562",
+        "ppw-gateway-disposition-registration.py:985-986",
+        "gateway-spending-plan-1434.json:forecast",
+        "README-ppw-gateway.md:attempt-and-analysis-lineage"
+      ],
+      "requiredChange": "Keep the immutable original forecast/proposal/review intact, but add an explicit current-budget planning projection that binds the permanent encumbrance and the historical planning reference. No sample-size reduction or new-task cheapness assumption is needed. If the unchanged full-444 USD 900.36 reference is conservatively used for remaining work, combined planned exposure is USD 951.40 and planning headroom is USD 48.60, not USD 99.64. Clearly distinguish this conditional illustration from actual usage or a completion guarantee; do not silently replace the registered forecast artifact.",
+      "conditionalArithmeticNotObservations": {
+        "permanentEncumbranceUsd": "51.04",
+        "arithmeticBudgetRemainingBeforeNewRequestsUsd": "948.96",
+        "unchangedHistoricalReferenceUsd": "900.36",
+        "conservativeCombinedPlanningReferenceUsd": "951.40",
+        "planningHeadroomUsd": "48.60",
+        "pricingSensitivityPlusEncumbranceUsd": "1041.44",
+        "trafficStressPlusEncumbranceUsd": "1176.49",
+        "completionGuarantee": false,
+        "newTaskMeanEstablished": false,
+        "newForecastApprovedByThisArtifact": false
+      }
+    }
+  ],
+  "clarificationsAndPendingGates": [
+    "State directly that this changes the predecessor's all-reconciled financial terminal/completion requirement for exactly two historical rows. Only the scientific rules, not the financial admission rule, remain unchanged.",
+    "A current process census is not a retained historical descendant-termination receipt. Final source/financial review must assess the concrete quiescence, stale-authority fencing and immutable-history protections; no retrospective PID or isolation proof may be fabricated.",
+    "The missing actual final isolation artifact and the historical auditor's trusted-host/source-ordering assumptions must remain explicit.",
+    "Fresh native/wire evidence, actual generated records/proof, final exact-head source review, new financial-implementation review and separate parent/operator action remain pending and outside this verdict."
+  ],
+  "reviewActions": {
+    "readOnlySourceAndDocumentInspection": true,
+    "staticReviewSchemaComparison": true,
+    "conditionalArithmeticOnly": true,
+    "registrationGeneratorExecuted": false,
+    "actualLedgerOrArchiveReadForThisReview": false,
+    "ledgerOrArchiveMutation": false,
+    "repositoryEdits": false,
+    "nativeOrProviderCalls": false,
+    "hypothesisOutcomesInspected": false,
+    "newOperationalRecordsGenerated": false,
+    "sessionReviewArtifactCreatedUnderExplicitPermission": true
+  },
+  "nextReview": "Review the corrected exact source/document versions and, separately, the actual proposed registration/proof records when available. Material changes require a new or delta review; this draft verdict cannot be reused as final approval."
+}

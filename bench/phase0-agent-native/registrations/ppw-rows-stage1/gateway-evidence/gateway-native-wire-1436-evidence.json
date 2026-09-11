@@ -1,0 +1,168 @@
+{
+  "clientExitCode": 1,
+  "clientFlags": [
+    "--print",
+    "--verbose",
+    "--output-format",
+    "stream-json",
+    "--forward-subagent-text",
+    "--dangerously-skip-permissions"
+  ],
+  "clientSha256": "553d1b9e9e7068b275c0a783c7e139ff6503096f286e674c8c919379fb0eca62",
+  "clientVersion": "2.1.266 (Claude Code)",
+  "completeIsolationProof": false,
+  "experimentalObservations": 0,
+  "generatedAt": "2026-09-11T15:54:31.829196+00:00",
+  "kernelEvidence": {
+    "kernelProbe": {
+      "authoritativeRead": false,
+      "authoritativeWrite": false,
+      "delegatedPreferencesWrite": false,
+      "gateway": true,
+      "hardlinkWrite": false,
+      "hiddenTestRead": false,
+      "otherPort": false,
+      "outsideSignal": false,
+      "readableSourceHardlinkWrite": false,
+      "readableSourceRead": true,
+      "samePortIpv6": false,
+      "seededSolutionRead": false,
+      "stateRead": false,
+      "stateWrite": false,
+      "symlinkWrite": false,
+      "unixSocket": false,
+      "workspaceWrite": true
+    },
+    "kind": "macos-seatbelt-request-gateway-v1",
+    "modelInvoked": false
+  },
+  "kind": "pp-w-engineering-no-forward-native-probe",
+  "model": "claude-opus-4-8",
+  "observations": [
+    {
+      "betaCapabilities": [
+        "advisor-tool-2026-03-01",
+        "claude-code-20250219",
+        "context-management-2025-06-27",
+        "effort-2025-11-24",
+        "interleaved-thinking-2025-05-14",
+        "mid-conversation-system-2026-04-07",
+        "mid-conversation-tool-changes-2026-07-01",
+        "oauth-2025-04-20",
+        "prompt-caching-scope-2026-01-05",
+        "structured-outputs-2025-12-15",
+        "thinking-token-count-2026-05-13"
+      ],
+      "bodyKeys": [
+        "max_tokens",
+        "messages",
+        "metadata",
+        "model",
+        "output_config",
+        "stream",
+        "system",
+        "thinking",
+        "tools"
+      ],
+      "contextEditKeys": [],
+      "contextEditTypes": [],
+      "contextManagementKeys": [],
+      "credentialHeaderPresent": true,
+      "maxTokens": 64000,
+      "messagesPath": true,
+      "model": "claude-opus-4-8",
+      "outputConfigKeys": [
+        "effort",
+        "format"
+      ],
+      "priceContractAccepted": true,
+      "stream": true,
+      "thinkingKeys": [
+        "type"
+      ],
+      "toolFieldSets": [],
+      "toolTypes": [],
+      "unclassifiedBetaCount": 0,
+      "wireContractAccepted": true
+    },
+    {
+      "betaCapabilities": [
+        "advisor-tool-2026-03-01",
+        "claude-code-20250219",
+        "context-management-2025-06-27",
+        "effort-2025-11-24",
+        "extended-cache-ttl-2025-04-11",
+        "interleaved-thinking-2025-05-14",
+        "mid-conversation-system-2026-04-07",
+        "mid-conversation-tool-changes-2026-07-01",
+        "oauth-2025-04-20",
+        "prompt-caching-scope-2026-01-05",
+        "thinking-token-count-2026-05-13"
+      ],
+      "bodyKeys": [
+        "context_management",
+        "max_tokens",
+        "messages",
+        "metadata",
+        "model",
+        "output_config",
+        "stream",
+        "system",
+        "thinking",
+        "tools"
+      ],
+      "contextEditKeys": [
+        [
+          "keep",
+          "type"
+        ]
+      ],
+      "contextEditTypes": [
+        "clear_thinking_20251015"
+      ],
+      "contextManagementKeys": [
+        "edits"
+      ],
+      "credentialHeaderPresent": true,
+      "maxTokens": 64000,
+      "messagesPath": true,
+      "model": "claude-opus-4-8",
+      "outputConfigKeys": [
+        "effort"
+      ],
+      "priceContractAccepted": true,
+      "stream": true,
+      "thinkingKeys": [
+        "type"
+      ],
+      "toolFieldSets": [
+        [
+          "description",
+          "input_schema",
+          "name"
+        ]
+      ],
+      "toolTypes": [
+        "custom"
+      ],
+      "unclassifiedBetaCount": 0,
+      "wireContractAccepted": true
+    }
+  ],
+  "priceContract": {
+    "path": "gateway-prices-1436.json",
+    "sha256": "4ba4402b8444936bbbdd33941742dd11cc793d03a23dbc60fec5b1fd232a5ef8"
+  },
+  "recognizedProbeError": true,
+  "sourceHashes": {
+    "ppw-budget-gateway.py": "27abee7b704585dada3a25a6ef0ab4ccefd964035732844e7eeaa123cfe21aab",
+    "ppw-gateway-budget.py": "f6226e98b282043ed70ffc0768ebc9260b754550ac8d06a99e814dede0b46116",
+    "ppw-gateway-client.py": "5af515fd0e305bebfd497f0d33ff17825ecb2e8f2317cae327cbc05c45a92586",
+    "probe-ppw-gateway.py": "3d789e0c498f054890a3f968b16cc8870544d90ef2dc61bd0829b944f5a1ba99",
+    "run-pair.sh": "80cd8a0a32997836c225c7ddabc465eaeab0b1356a6aff7017b0e56c62a9dedc"
+  },
+  "success": true,
+  "timedOut": false,
+  "toolShellSha256": "6ba6319962b59831740a56aa5f65e91d6467c72997f5d0a18be1ba1a6d8d378b",
+  "upstreamRequests": 0
+}
