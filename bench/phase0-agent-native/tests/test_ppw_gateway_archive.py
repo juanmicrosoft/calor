@@ -43,6 +43,11 @@ class GatewayArchiveTests(unittest.TestCase):
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(cls.gateway.ROOT / proof["path"], destination)
         cls.plan = analysis.load(cls.epoch / cls.selected["spendingPlan"]["path"])
+        _, historical_prices = cls.spending.pinned_document(
+            cls.gateway.ROOT, cls.plan["clientControl"]["priceContract"], "priceContract")
+        price_fixture = patch.object(budget, "price_contract", return_value=historical_prices)
+        price_fixture.start()
+        cls.addClassCleanup(price_fixture.stop)
         for proof in cls.spending.FORECAST_EVIDENCE.values():
             destination = cls.epoch / proof["path"]
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -151,6 +156,16 @@ class GatewayArchiveTests(unittest.TestCase):
     def test_rewritten_charge_does_not_reconcile(self):
         self.mutate("spending-final.json", lambda value: value["requests"][0].update(charge=0))
         with self.assertRaisesRegex(ValueError, "incorrectly reconciled"):
+            self.validate()
+
+    def test_prospective_unknown_geography_is_not_reinterpreted_as_historical_usage(self):
+        def replace_geography(value):
+            row = value["requests"][0]
+            receipt = json.loads(row["usage"])
+            receipt["usage"]["inference_geo"] = "not_available"
+            row["usage"] = budget.canonical(receipt)
+        self.mutate("spending-final.json", replace_geography)
+        with self.assertRaisesRegex(ValueError, "historical price contract"):
             self.validate()
 
     def test_missing_usage_and_duplicate_request_fail_closed(self):

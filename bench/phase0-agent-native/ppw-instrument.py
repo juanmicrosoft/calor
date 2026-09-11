@@ -251,8 +251,17 @@ def analyze(epochs_root, epoch_id, stage):
     validate_tasks(epoch / "tasks", registration)
     require(pins["lifecycle"] in ("collected", "archived"),
             "epoch has not completed collection: %s" % pins["lifecycle"])
-    require(not [p for p in epoch.rglob("pins.json") if p != epoch / "pins.json"],
-            "nested epoch/pooling is forbidden")
+    nested_pins = {p for p in epoch.rglob("pins.json") if p != epoch / "pins.json"}
+    historical_epochs = selected.get("historicalSourceEpochIds", [])
+    allowed_historical_pins = {
+        epoch / "admission/historical" / source_epoch / "pins.json"
+        for source_epoch in historical_epochs
+    }
+    require((not nested_pins and not historical_epochs)
+            or (len(historical_epochs) == 2
+                and len(set(historical_epochs)) == 2
+                and nested_pins == allowed_historical_pins),
+            "nested epoch/pooling is forbidden outside the two registered historical copies")
     expected = {
         "%s/%s/run-%d/result.json" % (task, definition["label"], run)
         for task in pins["suite"] for definition in ARMS.values()
@@ -533,6 +542,85 @@ def preserve_recovered_attempt(epoch, pins, admission, failed_inventory, inspect
     })
 
 
+def preserve_disposition_attempts(epoch, pins, admission):
+    """Copy both immutable predecessor archives and write two explicit wrappers."""
+    disposition = admission["disposition"]
+    authorization = disposition["authorizationValue"]
+    evidence_reference = disposition["evidence"]
+    archives = (
+        Path(disposition["originalArchive"]),
+        Path(disposition["failedArchive"]),
+    )
+    historical_root = epoch / "admission/historical"
+    for index, source in enumerate(archives):
+        attempt = authorization["preservedAttempts"][index]
+        archive = authorization["predecessorArchives"][index]
+        require(source.resolve().name == attempt["epochId"]
+                and source.resolve().name == archive["epochId"],
+                "historical archive path names another epoch")
+        destination = historical_root / attempt["epochId"]
+        require(not destination.exists(), "historical archive copy would overwrite evidence")
+        shutil.copytree(source, destination, copy_function=shutil.copy2)
+        copied = helper("ppw-gateway-disposition.py").archive_inventory(destination)
+        require(copied["sha256"] == archive["inventorySha256"]
+                and copied["fileCount"] == archive["fileCount"]
+                and copied["byteCount"] == archive["byteCount"],
+                "historical archive changed while creating the portable copy")
+        task, arm, run_text = attempt["slot"].split("/")
+        run = int(run_text)
+        wrapper = epoch / "runs" / task / arm / ("run-%d" % run)
+        wrapper.mkdir(parents=True)
+        (wrapper / "invalid.txt").write_text(
+            "Historical consumed attempt retained by the registered #1436 disposition; "
+            "invalid, censored, and never replaceable.\n",
+            encoding="utf-8")
+        write_new(wrapper / "result.json", {
+            "recordKind": "pp-w-historical-disposition-wrapper-v1",
+            "epochId": pins["epochId"], "stage": pins["stage"], "dataKind": pins["dataKind"],
+            "pair": task, "arm": arm, "run": run, "nullAgent": False,
+            "compilerCommit": pins["compiler"]["commit"],
+            "productCompilerHash": pins["compiler"]["compilerHash"],
+            "armRepoRoot": pins["compiler"]["repoRoot"], "armConfigKey": arm,
+            "permissiveEffects": arm == "calor-permissive",
+            "controlArmKind": "permissive" if arm == "calor-permissive" else None,
+            "editMechanism": "raw", "invalid": True, "censored": True,
+            "historicalDisposition": {
+                "kind": authorization["kind"],
+                "sourceEpochId": attempt["epochId"],
+                "slot": attempt["slot"],
+                "classification": attempt["classification"],
+                "replacementPermitted": False,
+                "dispositionReference": evidence_reference,
+                "originalArchive": {
+                    "relativeRoot": "admission/historical/" + attempt["epochId"],
+                    "originalPathIdentitySha256": archive["pathSha256"],
+                    "inventorySha256": archive["inventorySha256"],
+                    "fileCount": archive["fileCount"],
+                    "byteCount": archive["byteCount"],
+                },
+                "originalRun": {
+                    "rawRecordPath": attempt["rawRecordPath"],
+                    "rawRecordSha256": attempt["rawRecordSha256"],
+                    "clientInvocationPath": attempt["clientInvocationPath"],
+                    "clientInvocationSha256": attempt["clientInvocationSha256"],
+                    "invalidReasonPath": attempt["invalidReasonPath"],
+                    "invalidReasonSha256": attempt["invalidReasonSha256"],
+                    "attemptStartPath": attempt["attemptStartPath"],
+                    "attemptStartSha256": attempt["attemptStartSha256"],
+                },
+                "originalProfile": {
+                    "pinsPath": archive["pinsPath"],
+                    "pinsSha256": archive["pinsSha256"],
+                    "sourceHashes": attempt["sourceHashes"],
+                },
+                "wrapperSourceHashes": {
+                    name: pins["harnessArtifacts"][name]
+                    for name in ("run-pair.sh", "ppw-gateway-budget.py", "ppw-instrument.py")
+                },
+            },
+        })
+
+
 def require_gateway_collecting(ledger, budget_module):
     snapshot = ledger.snapshot()
     if snapshot["state"] != "collecting":
@@ -578,9 +666,25 @@ def validate_collection_authorization(registration, selected, directory, epoch_i
                 "%s evidence is missing or changed" % name)
         proofs[name] = path
     authorization = load(proofs["spendAuthorization"])
+    if authorization.get("kind") == "pp-w-historical-liability-disposition-v1":
+        disposition = helper("ppw-gateway-disposition.py")
+        disposition.validate_authorization(authorization)
+        registration = helper("ppw-gateway-disposition-registration.py")
+        require(digest(registration.OLD_AUTHORIZATION)
+                == registration.EXPECTED_OLD_AUTHORIZATION_SHA256,
+                "historical funding/null-result authorization changed")
+        funding = load(registration.OLD_AUTHORIZATION)
+        authorization = dict(funding)
+        authorization.update(
+            kind=disposition.DISPOSITION_KIND,
+            epochId=epoch_id,
+            stage=stage,
+            dispositionAuthorization=load(proofs["spendAuthorization"]),
+        )
     require(authorization.get("kind") in {
         "pp-w-rows-spending-authorization", "pp-w-zero-request-recovery-authorization",
         "pp-w-terminal-semantics-recovery-authorization",
+        "pp-w-historical-liability-disposition-v1",
     },
             "structured spending authorization required")
     require(authorization.get("epochId") == epoch_id and authorization.get("stage") == stage,
@@ -641,7 +745,11 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
     if gateway_mode:
         require(runtime.is_file() and digest(runtime) == admission["runtimeSha256"],
                 "gateway requires the frozen prebuilt runtime, never a rebuilt product")
-        inspection_runtime = inspection.prepare(shared["calorDll"])
+        if "disposition" in admission:
+            inspection_runtime = admission["sourceInspector"]
+            inspection.validate_runtime(inspection_runtime, shared["calorDll"])
+        else:
+            inspection_runtime = inspection.prepare(shared["calorDll"])
         require(inspection_runtime == admission["sourceInspector"],
                 "prospective source-inspector rebuild differs from the registered runtime")
         for certificate in registration["sourceInspections"].values():
@@ -690,7 +798,11 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
         else:
             ledger = spending.Ledger(admission["ledgerPath"])
             ledger.initialize(admission)
-        owner = ledger.start()
+        if gateway_mode and "disposition" in admission:
+            owner = ledger.start(expected_disposition_proof=load(local(
+                registration_path.parent, selected["dispositionProof"]["path"])))
+        else:
+            owner = ledger.start()
         epoch.mkdir(parents=True)
         if operational_profile:
             write_new(epoch / "registration.json", registration)
@@ -713,6 +825,13 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                 proofs.extend(selected[name] for name in (
                     "recoveryEvidence", "recoveryAuthorization", "inspectionProof",
                     "failedArchiveInventory", "failedOperationalSnapshot",
+                ))
+            if "dispositionEvidence" in selected:
+                proofs.extend(selected[name] for name in (
+                    "dispositionEvidence", "dispositionAuthorization", "dispositionProof",
+                    "originalArchiveInventory", "failedArchiveInventory", "stoppedSnapshot",
+                    "priceContract", "financialBoundReview", "methodsReview",
+                    "transportEvidence", "nativeStartupEvidence",
                 ))
             proofs.extend(admission["forecastEvidence"].values())
             copied_proofs = {}
@@ -743,6 +862,8 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                 epoch, pins, admission,
                 load(local(epoch, selected["failedArchiveInventory"]["path"])),
                 load(local(epoch, selected["inspectionProof"]["path"])))
+        if gateway_mode and "disposition" in admission:
+            preserve_disposition_attempts(epoch, pins, admission)
         for run in range(1, selected["runsPerArm"] + 1):
             for task in registration["tasks"]:
                 for definition in ARMS.values():
@@ -752,7 +873,11 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                             {k: v for k, v in shared.items() if k != "compilerHash"},
                             "shared compiler drift before run")
                     slot = "%s/%s/%d" % (task, definition["label"], run)
-                    if slot in admission.get("recovery", {}).get("preservedAttemptedSlots", ()):
+                    preserved = (
+                        admission.get("disposition", admission.get("recovery", {}))
+                        .get("preservedAttemptedSlots", ())
+                    )
+                    if slot in preserved:
                         continue
                     run_directory = epoch / "runs" / task / definition["label"] / ("run-%d" % run)
                     if gateway_mode:

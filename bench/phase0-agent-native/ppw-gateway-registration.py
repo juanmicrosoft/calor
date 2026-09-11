@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Resolve the additive gateway profile and audit archived request accounting without execution."""
+import hashlib
 import importlib.util
 import json
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -12,6 +13,7 @@ PRE_TERMINAL_PROFILE = ROOT / "gateway-execution-profile-1432.json"
 PRE_TERMINAL_EVIDENCE = ROOT / "gateway-recovery-evidence-1432.json"
 RECOVERY_PROFILE = ROOT / "gateway-execution-profile-1434.json"
 RECOVERY_EVIDENCE = ROOT / "gateway-recovery-evidence-1434.json"
+DISPOSITION_PROFILE = ROOT / "gateway-execution-profile-1436.json"
 BASELINE = "epochs/w-rows-pilot-001/registration.json"
 BASELINE_SHA256 = "b506c9ec65469640b6135708c7f1e9adbce7dcd318f6ca51e1b305156041484c"
 PRE_TERMINAL_PROFILE_PROOF = {
@@ -319,8 +321,10 @@ def load_recovery_evidence(path=RECOVERY_EVIDENCE):
 
 
 def resolve_collection_profile(path):
-    """Resolve only the reviewed #1434 terminal profile accepted for a new collector."""
+    """Resolve only the active reviewed terminal/disposition collection profile."""
     path = Path(path)
+    if path.resolve() == DISPOSITION_PROFILE.resolve():
+        return helper("ppw-gateway-disposition-registration.py").resolve_collection_profile(path)
     require(path.resolve() == RECOVERY_PROFILE.resolve(),
             "collection requires the canonical reviewed #1434 terminal profile")
     require(RECOVERY_PROFILE.is_file() and RECOVERY_EVIDENCE.is_file(),
@@ -355,6 +359,9 @@ def archive_proof(epoch, proof, expected):
 
 
 def validate_archive(epoch, pins, selected):
+    if "dispositionEvidence" in selected:
+        return helper("ppw-gateway-disposition-registration.py").validate_archive(
+            epoch, pins, selected)
     spending = helper("ppw-spending.py")
     budget = helper("ppw-gateway-budget.py")
     isolation = helper("ppw-gateway-client.py")
@@ -416,7 +423,19 @@ def validate_archive(epoch, pins, selected):
     require(registration["sourceInspections"] == proofs["sourceInspectionEvidence"]["tasks"],
             "archived source-inspection certificates differ from their selected proof")
     _, prices = spending.pinned_document(ROOT, plan["clientControl"]["priceContract"], "priceContract")
-    require(prices == budget.price_contract(), "gateway prices differ from implemented accounting")
+    price_identity = hashlib.sha256(budget.canonical(prices).encode()).hexdigest()
+    historical_prices = dict(budget.price_contract())
+    historical_prices.pop("dataResidencyPolicy", None)
+    historical_prices["sources"] = [
+        source for source in historical_prices["sources"]
+        if source != "https://platform.claude.com/docs/en/manage-claude/data-residency"]
+    historical_price = price_identity == (
+        "582a71eeb22ad7604759d7441f719615def5a04a5ca2cecece8a2c9e1f45eb3e")
+    # The historical rates and request bounds are identical, but its response
+    # policy did not admit the prospective unknown-geography sentinel.
+    require(prices == budget.price_contract()
+            or (historical_price and prices == historical_prices),
+            "gateway prices differ from implemented accounting")
     require(plan["protocolSha256"] == spending.protocol_identity(
         registration, selected, "pilot", pins["epochId"]), "gateway protocol binding differs")
     require(plan["authorizationSha256"] == selected["spendAuthorization"]["sha256"]
@@ -431,7 +450,7 @@ def validate_archive(epoch, pins, selected):
              for arm in ("calor-permissive", "calor-strict")]
     require(len(slots) == plan["plannedInvocations"] == 444, "the full pilot inventory is required")
     expected_binding = {
-        "stage": "pilot", "epochId": pins["epochId"], "priceSha256": budget.price_identity(),
+        "stage": "pilot", "epochId": pins["epochId"], "priceSha256": price_identity,
         "authorizationSha256": selected["spendAuthorization"]["sha256"],
         "protocolSha256": plan["protocolSha256"], "planSha256": selected["spendingPlan"]["sha256"],
         "harnessArtifacts": pins["harnessArtifacts"], "plannedSlots": slots,
@@ -571,9 +590,13 @@ def validate_archive(epoch, pins, selected):
             "messages": [{"role": "user", "content": "ARCHIVE_SCHEMA_ONLY_NO_INFERENCE"}],
             "stream": request["stream"], "service_tier": request["serviceTier"],
         }), ",".join(request["betaCapabilities"]) or None)
+        expected_request["priceSha256"] = price_identity
         require(request == expected_request and row["reserved"] == request["maximumMicroUsd"],
                 "request reservation differs from implemented liability")
         receipt = budget.decode(row["usage"])
+        require(not historical_price
+                or receipt["usage"].get("inference_geo") in (None, "global", "us"),
+                "usage geography was not admitted by the historical price contract")
         cost, verified = budget.reconciled_cost(
             request, receipt["model"], receipt["usage"], receipt["stopReason"])
         require(receipt == verified and type(row["charge"]) is int and row["charge"] == cost

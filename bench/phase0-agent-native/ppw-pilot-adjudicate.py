@@ -25,6 +25,9 @@ PRE_RECOVERY_MANIFEST = "registrations/ppw-rows-stage1/analysis-registration.pre
 PRE_TERMINAL_MANIFEST = (
     "registrations/ppw-rows-stage1/analysis-registration.pre-terminal-1434.json"
 )
+PRE_DISPOSITION_MANIFEST = (
+    "registrations/ppw-rows-stage1/analysis-registration.pre-disposition-1436.json"
+)
 GATEWAY_PROFILE = "registrations/ppw-rows-stage1/gateway-execution-profile.json"
 PRE_RECOVERY_PROFILE = (
     "registrations/ppw-rows-stage1/gateway-execution-profile.pre-recovery-1432.json"
@@ -34,6 +37,12 @@ RECOVERY_EVIDENCE = "registrations/ppw-rows-stage1/gateway-recovery-evidence-143
 TERMINAL_PROFILE = "registrations/ppw-rows-stage1/gateway-execution-profile-1434.json"
 TERMINAL_EVIDENCE = "registrations/ppw-rows-stage1/gateway-recovery-evidence-1434.json"
 TERMINAL_AMENDMENT = "registrations/ppw-rows-stage1/gateway-instrument-amendment-1434.json"
+DISPOSITION_PROFILE = (
+    "registrations/ppw-rows-stage1/gateway-execution-profile-1436.json"
+)
+DISPOSITION_EVIDENCE = (
+    "registrations/ppw-rows-stage1/gateway-disposition-evidence-1436.json"
+)
 ARTIFACTS = (
     "ppw-pilot-adjudicate.py", "registrations/ppw-rows-stage1/precision.py",
     "ppw-instrument.py", "ppw-registration.py", "ppw-source-assembly.py",
@@ -100,6 +109,29 @@ TERMINAL_ARTIFACTS = (
     "registrations/ppw-rows-stage1/gateway-evidence/gateway-native-wire-1434-evidence.json",
     "registrations/ppw-rows-stage1/gateway-evidence/gateway-native-startup-1434-evidence.json",
 )
+DISPOSITION_ARTIFACTS = (
+    PRE_DISPOSITION_MANIFEST,
+    "ppw-gateway-disposition.py",
+    "ppw-gateway-disposition-registration.py",
+    "ppw-gateway-dispose.py",
+    "ppw-gateway-register-disposition.py",
+    "tests/test_ppw_gateway_disposition.py",
+    "tests/test_ppw_gateway_disposition_registration.py",
+    DISPOSITION_PROFILE,
+    DISPOSITION_EVIDENCE,
+    "registrations/ppw-rows-stage1/gateway-liability-authorization-1436.json",
+    "registrations/ppw-rows-stage1/gateway-instrument-amendment-1436.json",
+    "registrations/ppw-rows-stage1/gateway-spending-plan-1436.json",
+    "registrations/ppw-rows-stage1/gateway-disposition-proof-1436.json",
+    "registrations/ppw-rows-stage1/gateway-prices-1436.json",
+    "registrations/ppw-rows-stage1/gateway-disposition-original-inventory-1436.json",
+    "registrations/ppw-rows-stage1/gateway-disposition-failed-inventory-1436.json",
+    "registrations/ppw-rows-stage1/gateway-disposition-stopped-snapshot-1436.json",
+    "registrations/ppw-rows-stage1/gateway-evidence/gateway-liability-bound-review-1436.json",
+    "registrations/ppw-rows-stage1/gateway-evidence/gateway-liability-methods-review-1436.json",
+    "registrations/ppw-rows-stage1/gateway-evidence/gateway-native-wire-1436-evidence.json",
+    "registrations/ppw-rows-stage1/gateway-evidence/gateway-native-startup-1436-evidence.json",
+)
 CELL_FIELDS = {
     "pair", "arm", "plannedRuns", "validRuns", "invalidRuns", "censoredRuns",
     "escapes", "shapeRealized", "didNotBuildAtDeclaredDone",
@@ -144,6 +176,9 @@ def analysis_artifacts(status):
         return ARTIFACTS + RECOVERY_ARTIFACTS + TERMINAL_BASE_ARTIFACTS
     if status == "terminal-semantics-registered":
         return ARTIFACTS + RECOVERY_ARTIFACTS + TERMINAL_BASE_ARTIFACTS + TERMINAL_ARTIFACTS
+    if status == "historical-liability-registered":
+        return (ARTIFACTS + RECOVERY_ARTIFACTS + TERMINAL_BASE_ARTIFACTS
+                + TERMINAL_ARTIFACTS + DISPOSITION_ARTIFACTS)
     raise ValueError("analysis registration has an unknown recovery state")
 
 
@@ -158,15 +193,31 @@ def validate_analysis_registration():
     require(set(expected) == set(artifact_names), "analysis artifact inventory differs")
     for relative, sha in expected.items():
         require(digest(BENCH / relative) == sha, "analysis artifact changed: " + relative)
+    disposition_status = recovery_status == "historical-liability-registered"
     terminal_status = recovery_status in {
         "pending-reviewed-terminal-evidence", "terminal-semantics-registered",
-    }
-    predecessor = PRE_TERMINAL_MANIFEST if terminal_status else PRE_RECOVERY_MANIFEST
+    } or disposition_status
+    predecessor = (
+        PRE_DISPOSITION_MANIFEST if disposition_status
+        else PRE_TERMINAL_MANIFEST if terminal_status else PRE_RECOVERY_MANIFEST
+    )
     require(manifest.get("supersedes") == {
         "path": predecessor, "sha256": expected[predecessor]},
         "prior analysis registration must be explicitly preserved")
     previous = load(BENCH / predecessor)
     pre_recovery = previous if not terminal_status else load(BENCH / PRE_RECOVERY_MANIFEST)
+    if disposition_status:
+        require(previous.get("recoveryStatus") == "terminal-semantics-registered"
+                and previous.get("collectionAuthorized") is False
+                and previous.get("gatewayExecutionProfile") == {
+                    "path": TERMINAL_PROFILE, "sha256": expected[TERMINAL_PROFILE]}
+                and previous.get("gatewayRecoveryEvidence") == {
+                    "path": TERMINAL_EVIDENCE, "sha256": expected[TERMINAL_EVIDENCE]}
+                and previous.get("supersedes") == {
+                    "path": PRE_TERMINAL_MANIFEST,
+                    "sha256": expected[PRE_TERMINAL_MANIFEST]},
+                "the preserved #1434 analysis registration lineage differs")
+        previous = load(BENCH / PRE_TERMINAL_MANIFEST)
     if terminal_status:
         require(previous.get("recoveryStatus") == "registered"
                 and previous.get("collectionAuthorized") is False
@@ -188,7 +239,8 @@ def validate_analysis_registration():
     require(manifest.get("collectionAuthorized") is False,
             "analysis registration cannot authorize collection")
     expected_profile = (
-        TERMINAL_PROFILE if recovery_status == "terminal-semantics-registered"
+        DISPOSITION_PROFILE if disposition_status
+        else TERMINAL_PROFILE if recovery_status == "terminal-semantics-registered"
         else RECOVERY_PROFILE if recovery_status in {
             "registered", "pending-reviewed-terminal-evidence",
         } else GATEWAY_PROFILE
@@ -203,6 +255,14 @@ def validate_analysis_registration():
         require(manifest.get("gatewayRecoveryEvidence") == {
             "path": RECOVERY_EVIDENCE, "sha256": expected[RECOVERY_EVIDENCE]},
             "preserved #1433 recovery evidence is missing")
+    elif disposition_status:
+        require(manifest.get("gatewayDispositionEvidence") == {
+            "path": DISPOSITION_EVIDENCE, "sha256": expected[DISPOSITION_EVIDENCE]},
+            "registered #1436 disposition evidence is missing")
+        module(
+            "registered_gateway_disposition",
+            "ppw-gateway-disposition-registration.py",
+        ).resolve_collection_profile(BENCH / DISPOSITION_PROFILE)
     elif recovery_status == "terminal-semantics-registered":
         require(manifest.get("gatewayRecoveryEvidence") == {
             "path": TERMINAL_EVIDENCE, "sha256": expected[TERMINAL_EVIDENCE]}
@@ -323,7 +383,14 @@ def validate_scope(pins, registration, method, epoch_id, stage, epoch=None):
     frozen = load(BENCH / TASKS)
     if "executionProfile" in selected:
         gateway = module("gateway_source_certificates", "ppw-gateway-registration.py")
-        frozen["sourceInspections"] = gateway.resolve_profile(gateway.PROFILE)["sourceInspections"]
+        if "dispositionEvidence" in selected:
+            disposition = module(
+                "gateway_disposition_source_certificates",
+                "ppw-gateway-disposition-registration.py")
+            resolved = disposition.resolve_collection_profile(disposition.PROFILE)
+        else:
+            resolved = gateway.resolve_profile(gateway.PROFILE)
+        frozen["sourceInspections"] = resolved["sourceInspections"]
     for key in ("tasks", "artifacts", "sourceInspections", "compilerCommit",
                 "supersededPins", "replacementPins"):
         require(registration.get(key) == frozen[key], "frozen task registration differs: " + key)
@@ -477,7 +544,8 @@ def adjudicate(epochs_root, epoch_id, stage="pilot"):
     result = aggregate(report, pins, method)
     require(inventory(epoch, instrument) == before, "epoch changed during read-only analysis")
     require(validate_analysis_registration() == manifest, "analysis registration changed while reading")
-    return {
+    projection = execution_projection(pins, registration["stages"]["pilot"], epoch)
+    response = {
         "schemaVersion": 1, "kind": "pp-w-rows-stage1-adjudication",
         "epoch": epoch_id, "stage": stage, "dataKind": report["dataKind"],
         "empirical": report["empirical"], "collectionAuthorized": False,
@@ -490,14 +558,26 @@ def adjudicate(epochs_root, epoch_id, stage="pilot"):
             "analysisArtifacts": manifest["artifacts"],
             "collectionHarnessCommit": pins["harnessCommit"],
             "collectionHarnessArtifacts": pins["harnessArtifacts"],
-            "collectionExecutionProjection": execution_projection(
-                pins, registration["stages"]["pilot"], epoch),
+            "collectionExecutionProjection": projection,
             "modelPin": pins["modelPin"], "agentVersion": pins["agentVersion"],
             "compiler": pins["compiler"],
             "countsSource": "recomputed from this epoch's raw archive by ppw-instrument.analyze",
             "savedDescriptiveLedgerUsedAsAuthority": False,
         },
     }
+    if "permanentUnknownMicroUsd" in projection:
+        response["financialProjection"] = {
+            "ceilingMicroUsd": projection["ceilingMicroUsd"],
+            "permanentUnknownMicroUsd": projection["permanentUnknownMicroUsd"],
+            "actualCost": projection["actualCost"],
+            "historicalUnknownRequestCount":
+                projection["historicalUnknownRequestCount"],
+            "historicalUnknownRequestIds":
+                projection["historicalUnknownRequestIds"],
+            "liveUnknownRequestCount": projection["liveUnknownRequestCount"],
+            "futureUnknownPolicy": projection["futureUnknownPolicy"],
+        }
+    return response
 
 
 class SingleOption(argparse.Action):

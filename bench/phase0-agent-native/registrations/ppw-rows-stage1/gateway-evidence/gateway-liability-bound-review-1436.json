@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "kind": "pp-w-retained-liability-review",
+  "reviewType": "financial-bound",
+  "verdict": "APPROVE",
+  "authorizationReference": "https://github.com/juanmicrosoft/calor/issues/1436#issuecomment-5633881736",
+  "historicalLedgerSha256": "464acefd37b96620aeab69c025cbb11703ca038d91eaa0d3d514af3d3c8a8990",
+  "permanentLiabilityMicroUsd": 51040000,
+  "ceilingMicroUsd": 1000000000,
+  "reference": "https://github.com/juanmicrosoft/calor/issues/1436#issuecomment-5634068634",
+  "scope": "Normalized reference to the independent AI historical ex-ante two-request bound review, recorded 2026-09-11T11:52:14.277852+00:00. Historical bound only: not new-source, methods, recovery, operator-execution, reconciliation, refund, or stage-2 approval. The immutable original review artifact SHA-256 is a387cc8f7376eb48295f63ac87d3c38d85985ac2fc565c96c9982a4f86f4d1a5.",
+  "findings": [
+    "Each enumerated reservation is bounded by 1000000 combined input/cache tokens at USD22 per million plus 64000 output tokens at USD55 per million: USD25.52 each, USD51.04 total. This is not an actual charge or invoice estimate.",
+    "The audited local request identities are 8d7fa7bf4a31f28ba7f7e8f6802781e8b6d8238fb38d3219 and a24d9933f2d62c0c904eefdb81d9b592b4e36d30a7e577b3. Both remain unknown with no accepted usage; neither reservation may be released by this review.",
+    "The auditor examined executed source 0b87d52b92c07e0377f4948102f467b890107df5, its fixed upstream, single POST, pre-connect reservation, request-operation restrictions, all 30 bound harness hashes, archived bindings, and the unchanged ledger.",
+    "Scope assumes the trusted launcher, host and kernel and published request-level usage pricing, not unrelated account fees. There is no time-authenticated historical pricing archive and no retained final actual-run isolation transcript. Synthetic evidence does not replace missing actual evidence.",
+    "The final implementation, one-time proof, permanent retention, future halts and registered methods still require their separate independent reviews and operator decision."
+  ]
+}

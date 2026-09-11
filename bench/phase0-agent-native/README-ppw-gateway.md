@@ -346,7 +346,11 @@ The opt-in
 other environments skip it explicitly. Earlier whole-run evidence is preserved
 in separate `pre-boundary-1406` records, not presented as proof of the new policy.
 
-## #1432 failure, #1434 continuation and operational entrypoint
+## Historical #1432 failure and applied #1434 continuation
+
+The commands in this historical section describe the already-applied transition.
+They must not be reused for the later two-request halt; see the distinct #1436
+amendment below.
 
 The first `w-rows-pilot-gateway-001` launch reached the retained client but
 forwarded zero provider requests. It is still one attempted slot under the
@@ -465,3 +469,160 @@ This command is documentation, not evidence that collection ran. The fixed
 Git-common-directory ledger applies across worktrees/output roots and cannot be
 reset by selecting another path. The authorization is $1,000 total for the
 experiment, not an additional grant or a stage-2 allocation.
+
+## #1436 permanent historical liability amendment
+
+**Prospective engineering; not permission to apply or collect.** The operator
+applied #1434 once and launched `w-rows-pilot-gateway-002` using merged source
+`0b87d52b92c07e0377f4948102f467b890107df5`. That actual segment halted at
+`C-001-quota-adapter/calor-strict/1` with two unknown reservations. The original
+001 and actual 002 archives are immutable attempted-run evidence, not unexecuted
+proposals.
+
+The [explicit user grant](https://github.com/juanmicrosoft/calor/issues/1436#issuecomment-5633881736)
+at `2026-09-11T07:39:10.192-04:00` authorizes one narrowly scoped amendment:
+permanently retain both full upper bounds within the same $1,000 ceiling, keep
+actual cost unknown, preserve both consumed attempts, and resume only the 442
+untouched slots after independent approval. It does not authorize this engineering
+agent to apply the transition, start collection, make a paid probe, or release.
+
+| Historical local request | Permanent retained exposure |
+| --- | ---: |
+| `8d7fa7bf4a31f28ba7f7e8f6802781e8b6d8238fb38d3219` | $25.52 |
+| `a24d9933f2d62c0c904eefdb81d9b592b4e36d30a7e577b3` | $25.52 |
+
+The total **$51.04 remains permanently unavailable**, including after successful
+operational completion. It is neither verified spend nor a fabricated maximum
+debit. The historical rows remain `unknown`, with null usage, and original events
+1 through 9 remain unchanged. No provider receipt, usage reconciliation, refund,
+request deduplication, or financial reset is invented. Two native assistant
+events sharing one provider locator do not merge these two local reservations.
+The independent historical bound review does not establish actual charges or
+approve the new implementation.
+
+The distinct `historical-liability-disposition` event 10 binds the grant,
+the exact stopped ledger (`464acefd37b96620aeab69c025cbb11703ca038d91eaa0d3d514af3d3c8a8990`),
+the old backup (`0f32e092fbd760f7273405b4feda7e107b1a5630c9d98668b90d84a323048295`),
+both archive inventories and attempt records, executed source identities,
+prospective source/price/profile identities, and a fresh quiescence inspection.
+Its separately named protected backup preserves the pre-disposition ledger.
+The atomic operation appends the disposition and changes the scope binding to
+`w-rows-pilot-gateway-003`; it does not start collection. A later, separate
+collector start appends event 11.
+
+This exception recognizes only the two exact historical liabilities. Every live
+unknown, interrupted request, unpriced operation, policy/isolation refusal,
+integrity failure, or unexplained liability still halts. A malformed, replayed,
+rebound, or concurrent transition fails closed. The old zero-request recovery
+has already been used and is inapplicable. Quiescence evidence must be stated
+truthfully: a current process census is not a historical all-descendant receipt.
+Missing historical process evidence must not be fabricated.
+
+The current gate uses untruncated process arguments and same-user working-directory
+and mapped-executable metadata. A native process whose kernel start predates the
+immutable first collector start, and whose cwd/mapped files do not match protected
+experiment paths, is not a descendant of these later per-attempt client launches.
+This narrowly identifies pre-existing unrelated native sessions without killing
+them; ambiguous or later native processes still block the operation. It relies on
+the stated trusted-host/source and clock assumptions, not an invented historical
+PID receipt. Every operator apply repeats the checks.
+
+Collector startup compares the ledger's disposition with the exact registered
+proof. Its owner handle binds that proof and scope, so later rehashing does not
+silently change the running collector's authority. This is an integrity binding,
+not a provider receipt or a cryptographic signature from an independent reviewer.
+
+### Attempt and analysis lineage
+
+Original A1 remains historically accounted invalid. Actual B1 keeps the frozen
+runner's `invalid: true`, `censored: true`, null unavailable grading fields, and
+API-error-marker reason. It is not recoded as a no-journal crash or an ordinary
+zero-request invalid terminal. Only the explicit protected historical disposition
+accounts B1. Its two unknown requests remain financially visible.
+
+003 preserves contained copies of 001 and 002 evidence and creates two explicitly
+identified historical wrappers. It never re-stamps the original records with
+new source, inspection, usage, or lifecycle claims. Portable analysis verifies
+the copies and their hashes without requiring the original physical worktree.
+The old analysis registration is preserved by explicit supersession.
+
+Only the original suffix beginning `C-002-shipping-quote/calor-permissive/1` may
+run: **442 new identities plus two preserved identities equals 444**, with
+three tasks, two arms, and 74 runs per task/arm. Run ordinal, task order, and A/B
+order remain unchanged. There is no replacement, retry allocation, replenished
+cohort, or reduced-442 forecast invented to claim affordability.
+
+Terminal accounting is not model success or scientific eligibility. Progress
+separates accounted, valid-completed, invalid-terminal, request-bearing, and
+remaining-nonterminal counts. A nonterminal count alone does not establish that
+a slot is untouched. Final reports distinguish permanent historical unknown
+exposure from live unknowns and continue to report actual historical cost as null.
+They must never describe this as zero unknown usage or invoice-precise accounting.
+
+`ppw-gateway-progress.py` opens only SQLite `mode=ro` with `query_only=ON` and
+reports no task outcomes or credentials. It separates ordinary invalid terminals
+from B1's historical raw-invalid disposition. Its remaining count is explicitly
+nonterminal, not an assertion that every remaining identity is untouched:
+
+```bash
+python3 bench/phase0-agent-native/ppw-gateway-progress.py
+```
+
+It does not apply, reconcile, resume, adjudicate, or replenish anything. Native
+engineering readiness reuses the immutable prebuilt runtime locators with
+`PPW_INSPECTOR_READONLY=1`; it does not rebuild the historical caches.
+
+The frozen 74-per-cell planned counts, eligibility denominators, weights,
+unknown handling, and stopping rules are unchanged. Legitimate all-invalid
+accounting may complete operationally while both estimands are `UNIDENTIFIED`,
+with null estimates/half-widths and intervals `[0,1]`. It is not a scientific
+null, zero-rate finding, planned precision, or stage-2 permission. No arbitrary
+consecutive-invalid threshold is added, and known broken runtime readiness
+remains a reason to hold rather than deliberately consume untouched identities.
+
+### Prospective transport compatibility and operator gates
+
+The original transport/receipt cause remains unproven. The preserved partial
+native metadata demonstrated the `not_available` geography compatibility lead;
+the final HTTP 402 was the stopped gateway's secondary refusal. #1437's protected,
+privacy-minimized first-failure diagnostics remain in force.
+
+The new price profile treats only the exact `not_available` response sentinel
+like absent geography: retain the value and use the existing conservative US
+1.1 multiplier. It does not infer global residency or a cheaper rate. The
+[published residency contract](https://platform.claude.com/docs/en/manage-claude/data-residency)
+documents global/US and the 1.1 maximum across token categories; it does not
+document the sentinel's semantic origin. Arbitrary unfamiliar geography strings
+remain refused. Historical price profiles retain their original stricter response
+policy and are not retrospectively reinterpreted.
+
+The [provider SDK's terminal delta schema](https://github.com/anthropics/anthropic-sdk-python/blob/main/src/anthropic/types/raw_message_delta_event.py)
+declares nullable `container` and `stop_details`. Only absent/null values are
+admitted; non-null server execution/refusal detail and unknown controls still
+fail closed. Fresh guarded, no-forward native startup evidence must exercise
+these exact response shapes, the retained executable, real native Bash build/test
+tools, and unchanged containment. Synthetic readiness is not an empirical trial,
+a paid availability probe, or a complete historical provider receipt.
+
+Prospective registration generation requires genuine independent financial-bound
+and registered-methods records plus fresh source-bound wire and native evidence:
+
+```bash
+python3 bench/phase0-agent-native/ppw-gateway-register-disposition.py --contract
+python3 bench/phase0-agent-native/ppw-gateway-register-disposition.py --write
+```
+
+The distinct operator interface has no caller-selected ledger or archive:
+
+```bash
+python3 bench/phase0-agent-native/ppw-gateway-dispose.py inspect
+python3 bench/phase0-agent-native/ppw-gateway-dispose.py apply \
+  --confirmed-proof-sha256 <final-independently-reviewed-disposition-proof-sha256>
+```
+
+These commands are documentation, not an executed transition. Only the parent
+operator may apply the exact final reviewed proof once, after independent bound,
+methods and final-source approval, green CI, merge, and a fresh readiness check.
+The final handoff must name the exact merge, registered profile, proof, immutable
+predecessors, and 442-only collector command. No automatic stage-2 transition or
+fresh budget follows.

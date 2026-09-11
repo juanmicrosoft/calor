@@ -32,6 +32,9 @@ GATEWAY_ARTIFACTS = COLLECTION_ARTIFACTS + (
     "ppw-test-host.py", "test-host/Program.cs", "test-host/PpwXunitHost.csproj",
     "ppw-gateway-registration.py", "ppw-gateway-recovery.py", "ppw-gateway-recover.py",
     "ppw-gateway-register-recovery.py", "ppw-gateway-register-terminal.py",
+    "ppw-gateway-disposition.py", "ppw-gateway-disposition-registration.py",
+    "ppw-gateway-dispose.py", "ppw-gateway-register-disposition.py",
+    "ppw-gateway-progress.py",
 )
 PRE_TERMINAL_AMENDMENT = {
     "path": "gateway-instrument-amendment-1432.json",
@@ -331,7 +334,46 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
             "executionRuntime": control.get("executionRuntime"),
             "forecastEvidence": forecast_evidence,
         }
-        if "recoveryEvidence" in selected:
+        if "dispositionEvidence" in selected:
+            disposition_registration = module("ppw-gateway-disposition-registration.py")
+            evidence, documents = disposition_registration._load_evidence()
+            disposition_authorization = documents["authorization"]
+            target_binding = {
+                "stage": stage, "epochId": epoch_id, "priceSha256": policy.price_identity(),
+                "authorizationSha256": selected["spendAuthorization"]["sha256"],
+                "protocolSha256": plan["protocolSha256"], "planSha256": digest(path),
+                "harnessArtifacts": harness, "plannedSlots": [slot["id"] for slot in slots],
+            }
+            preserved = [
+                item["slot"] for item in disposition_authorization["preservedAttempts"]
+            ]
+            require(evidence.get("targetBinding", {}).get("binding") == target_binding
+                    and disposition_authorization["targetEpochId"] == epoch_id
+                    and disposition_authorization["targetHarnessArtifacts"] == harness
+                    and disposition_authorization["targetPriceSha256"] == policy.price_identity(),
+                    "disposition target binding differs from the admitted collector")
+            require(preserved == [slots[0]["id"], slots[1]["id"]],
+                    "only the exact two historical attempts may be retained")
+            result["slots"] = [slot for slot in slots if slot["id"] not in preserved]
+            result["plannedSlots"] = slots
+            result["disposition"] = {
+                "evidence": selected["dispositionEvidence"],
+                "authorization": selected["dispositionAuthorization"],
+                "inspectionProof": selected["dispositionProof"],
+                "originalArchiveInventory": selected["originalArchiveInventory"],
+                "failedArchiveInventory": selected["failedArchiveInventory"],
+                "stoppedSnapshot": selected["stoppedSnapshot"],
+                "authorizationValue": disposition_authorization,
+                "targetBinding": target_binding,
+                "preservedAttemptedSlots": preserved,
+                "originalArchive": str(disposition_registration.ORIGINAL_ARCHIVE),
+                "failedArchive": str(disposition_registration.FAILED_ARCHIVE),
+                "permanentUnknownMicroUsd":
+                    disposition_authorization["permanentlyRetainedMicroUsd"],
+                "actualCost": None,
+                "futureUnknownPolicy": disposition_authorization["futureUnknownPolicy"],
+            }
+        elif "recoveryEvidence" in selected:
             gateway_registration = module("ppw-gateway-registration.py")
             evidence, documents = gateway_registration.load_recovery_evidence()
             authorization_record = documents["recoveryAuthorization"]

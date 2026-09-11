@@ -51,11 +51,9 @@ class DiagnosticTests(fixtures.Fixture):
         connection.getresponse.return_value = response
         return connection
 
-    def test_observed_geography_category_is_a_control_not_a_historical_receipt(self):
+    def test_not_available_geography_is_retained_and_charged_at_us_maximum(self):
         for streaming in (False, True):
             with self.subTest(streaming=streaming):
-                # Only this enum is drawn from the technical observation; every count,
-                # content block and terminal event below is explicitly synthetic.
                 values = fixtures.usage(inference_geo="not_available")
                 chunks = fixtures.stream_bytes()
                 chunks[2] = fixtures.event({"type": "message_start", "message": fixtures.message(
@@ -69,10 +67,16 @@ class DiagnosticTests(fixtures.Fixture):
                     self.assertEqual(200, response.status)
                     response.read()
                     client.close()
-                diagnostic = self.failure(ledger, "USAGE_GEOGRAPHY", "receipt-validation",
-                                          200, "sse" if streaming else "json")
-                self.assertEqual({"started": True, "terminalDeltaSeen": True, "stopped": True}
-                                 if streaming else None, diagnostic["streamState"])
+                snapshot = ledger.snapshot()
+                self.assertEqual("collecting", snapshot["state"])
+                row = snapshot["requests"][0]
+                self.assertEqual("reconciled", row["state"])
+                receipt = budget.decode(row["usage"])
+                self.assertEqual("not_available", receipt["usage"]["inference_geo"])
+                us_values = dict(values, inference_geo="us")
+                expected = budget.reconciled_cost(
+                    budget.admit_request(fixtures.body()), budget.MODEL, us_values, "end_turn")[0]
+                self.assertEqual(expected, row["charge"])
                 self.assertEqual(1, len(observed))
 
     def test_tls_timeout_connection_and_protocol_errors_never_persist_exception_text(self):
@@ -221,6 +225,12 @@ class DiagnosticTests(fixtures.Fixture):
         mutations = (
             ({"type": "message_delta", "delta": {"stop_reason": "end_turn", PRIVATE: PRIVATE},
               "usage": {"output_tokens": 7}}, "SSE_DELTA_SCHEMA"),
+            ({"type": "message_delta",
+              "delta": {"stop_reason": "end_turn", "container": {"id": PRIVATE}},
+              "usage": {"output_tokens": 7}}, "SSE_DELTA_CONTAINER"),
+            ({"type": "message_delta",
+              "delta": {"stop_reason": "end_turn", "stop_details": {"type": PRIVATE}},
+              "usage": {"output_tokens": 7}}, "SSE_DELTA_STOP_DETAILS"),
             ({"type": "message_delta", "delta": {"stop_reason": "end_turn"},
               "usage": {"output_tokens": -1}}, "SSE_USAGE_DECREASED"),
             ({"type": PRIVATE, "secret": PRIVATE}, "SSE_UNADMITTED_EVENT"),
