@@ -106,7 +106,12 @@ public class VersioningTests
         Assert.Contains("1.0.0", diagnostic.Message);
         Assert.Contains("2.0.0", diagnostic.Message);
         Assert.Contains("issues/1084", diagnostic.Message);
-        Assert.Contains("declare §SEMVER{2.0.0} after reviewing nullability semantics (Calor0272/0273/0274)", diagnostic.Message);
+        Assert.Contains(SemanticsVersion.LegacyMajorMigrationHint, diagnostic.Message);
+        Assert.Contains("changing the version alone is not a migration", diagnostic.Message);
+        Assert.Contains("Legacy Info mode is not supported", diagnostic.Message);
+        Assert.Contains("Calor0272/0273/0274 are binder/editor diagnostics, not production CLI rejection gates", diagnostic.Message);
+        Assert.Contains("other passes may still reject the program", diagnostic.Message);
+        Assert.Contains("issues/1082 (planned nullability enforcement)", diagnostic.Message);
         Assert.Equal(2, diagnostic.Span.Line);
         Assert.Empty(result.GeneratedCode);
     }
@@ -119,7 +124,9 @@ public class VersioningTests
 
         var diagnostic = Assert.Single(result.Diagnostics.Errors);
         Assert.Equal(DiagnosticCode.SemanticsVersionIncompatible, diagnostic.Code);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Contains(SemanticsVersion.LegacyMajorMigrationHint, diagnostic.Message);
+        Assert.Empty(result.GeneratedCode);
     }
 
     /// <summary>A module declaring the compiler's own version compiles clean.</summary>

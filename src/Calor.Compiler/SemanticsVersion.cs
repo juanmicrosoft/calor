@@ -13,6 +13,8 @@ public static class SemanticsVersion
     /// Bumped 1 → 2 as the v0.14 nullability workstream precursor (task #14).
     /// Unblocks S5 severity flip: Calor0272/0273/0274 emit at Error when
     /// <c>SemanticsVersion.Major &gt;= 2</c> (or no <c>§SEMVER</c> directive).
+    /// Binder severity does not establish CLI rejection: BindingDiagnosticPolicy
+    /// excludes these three codes from compilation diagnostics.
     /// See <c>docs/plans/v0.14-nullability-enforcement-scoping.md</c> D7/F-3
     /// and <c>docs/plans/v0.14-metadata-binding-scoping.md</c> F-7.
     /// </remarks>
@@ -61,9 +63,12 @@ public static class SemanticsVersion
     /// pin the exact wording.
     /// </summary>
     public const string LegacyMajorMigrationHint =
-        "Files written for an older major (1.x, 0.x) are not silently reinterpreted; migrate the module and "
-        + "declare §SEMVER{2.0.0} after reviewing nullability semantics (Calor0272/0273/0274). "
-        + "See https://github.com/juanmicrosoft/calor/issues/1084.";
+        "Manually review and migrate the module to current semantics, then declare §SEMVER{2.0.0}; "
+        + "changing the version alone is not a migration. Legacy Info mode is not supported. "
+        + "Calor0272/0273/0274 are binder/editor diagnostics, not production CLI rejection gates; "
+        + "other passes may still reject the program. "
+        + "See https://github.com/juanmicrosoft/calor/issues/1084 (migration) and "
+        + "https://github.com/juanmicrosoft/calor/issues/1082 (planned nullability enforcement).";
 
     /// <summary>
     /// Validates a module's <c>§SEMVER{...}</c> directive against this compiler and
@@ -153,20 +158,19 @@ public static class SemanticsVersion
     /// Calor0273 (NullableReturnFromNonNullable), and Calor0274
     /// (NullableArgumentToNonNullableParameter): the three checks emit
     /// <see cref="DiagnosticSeverity.Error"/> once the effective SemVer.Major is at
-    /// or past 2, and <see cref="DiagnosticSeverity.Info"/> for legacy §SEMVER[1.0.0]
-    /// modules (Phase A behavior). Task #14 bumped <see cref="Major"/> to 2, so the
-    /// gate is open by default now; the parameter overload exists to receive a
-    /// per-module effective major once the <c>§SEMVER</c> directive is threaded
-    /// through the binder in a follow-up slice.
+    /// or past 2, and <see cref="DiagnosticSeverity.Info"/> for a caller-supplied
+    /// major below 2. The Info branch is a helper behavior, not a supported legacy
+    /// compilation mode: the parser refuses older major declarations. Binder emit
+    /// sites use the current compiler major, and BindingDiagnosticPolicy excludes
+    /// these diagnostics from production compilation errors.
     /// </summary>
     /// <remarks>
     /// See <c>docs/plans/v0.14-nullability-enforcement-scoping.md</c> D7 / F-3
     /// for the gate design and <c>docs/plans/v0.14-metadata-binding-scoping.md</c>
     /// F-7 for the SemVer coupling.
     /// </remarks>
-    /// <param name="effectiveMajor">The effective SemVer major of the module under
-    /// analysis (from a <c>§SEMVER</c> directive when present, otherwise
-    /// <see cref="Major"/>).</param>
+    /// <param name="effectiveMajor">The major supplied by the caller; this does not
+    /// change version compatibility or enable compilation of older-major modules.</param>
     /// <returns><see cref="DiagnosticSeverity.Error"/> when <paramref name="effectiveMajor"/>
     /// is at least 2, otherwise <see cref="DiagnosticSeverity.Info"/>.</returns>
     public static DiagnosticSeverity NullabilitySeverityFor(int effectiveMajor)
@@ -176,9 +180,8 @@ public static class SemanticsVersion
 
     /// <summary>
     /// Convenience overload of <see cref="NullabilitySeverityFor(int)"/> that reads
-    /// the current compiler's <see cref="Major"/>. Callers that have not yet been
-    /// wired to the per-module effective SemVer use this overload; the binder emit
-    /// sites for Calor0272/0273/0274 route through here today.
+    /// the current compiler's <see cref="Major"/>. The binder emit sites for
+    /// Calor0272/0273/0274 route through this overload.
     /// </summary>
     /// <returns>The severity for nullability diagnostics under the current
     /// compiler <see cref="Major"/>.</returns>

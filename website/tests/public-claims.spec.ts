@@ -17,6 +17,42 @@ const execFileAsync = promisify(execFile);
 const calorParseCount = data.programs.filter(program => program.calorSuccess).length;
 const cSharpParseCount = data.programs.filter(program => program.cSharpSuccess).length;
 
+test('nullability correction distinguishes binder diagnostics from CLI rejection and preserves history', async ({ page }) => {
+  const root = await readFile('../CHANGELOG.md', 'utf8');
+  const website = await readFile('content/changelog.mdx', 'utf8');
+  for (const source of [root, website]) {
+    expect(source).toContain('Correction - 2026-09-11: nullability diagnostics are not CLI enforcement');
+    for (const version of ['0.14.0', '0.14.1', '0.14.2']) {
+      const section = source.split(`## [${version}]`)[1]?.split('\n## [')[0] ?? '';
+      expect(section).toContain('Correction (2026-09-11)');
+      expect(section).toMatch(/[Oo]riginal text follows/);
+    }
+    expect(source).toContain('legacy');
+    expect(source).toContain('D3/D12/D14 safeguards');
+  }
+  await page.route('https://**/*', route => route.abort());
+  const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  await page.goto(`${base}/docs/changelog/`);
+  await expect(page.locator('article')).toContainText('Other compiler passes may independently reject the same program');
+  await page.getByRole('link', { name: 'source and release ancestry', exact: true }).click();
+  await expect(page.getByRole('heading', {
+    name: 'Diagnostic routing correction (2026-09-11)', exact: true,
+  })).toBeInViewport();
+  const article = page.locator('article');
+  for (const text of ['BindingDiagnosticPolicy', 'Calor0272', 'Calor0273', 'Calor0274',
+    'editor diagnostics can differ', 'planned, not shipped', 'D3/D12/D14 safeguards',
+    'not a shipped mode', 'changing the declaration to']) {
+    await expect(article).toContainText(text);
+  }
+  await expect(article).not.toContainText('Unreleased (next release)');
+  await expect(page.getByRole('link', { name: 'The bounded 0.22 plan (#1082)', exact: true }))
+    .toHaveAttribute('href', 'https://github.com/juanmicrosoft/calor/issues/1082');
+  for (const link of await article.locator('a[href^="/"]').evaluateAll(elements =>
+    [...new Set(elements.map(element => element.getAttribute('href')!))])) {
+    expect((await page.request.get(link)).status(), link).toBe(200);
+  }
+});
+
 test('effect-rows financial approval remains separate from collection admission and results', async ({ page }) => {
   const ledger = JSON.parse(await readFile('../bench/phase0-agent-native/effect-rows-benefit-ledger.json', 'utf8'));
   expect(ledger.epochRun).toBe(false);

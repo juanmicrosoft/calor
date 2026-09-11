@@ -10,6 +10,33 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+### Correction - 2026-09-11: nullability diagnostics are not CLI enforcement
+
+The v0.14.0-v0.14.2 entries below overstated nullability enforcement.
+`Calor0272` (binding initialization), `Calor0273` (return), and `Calor0274`
+(argument) can be emitted as binder/editor errors, but those diagnostics do
+not establish production CLI rejection. `Program.Compile` filters them out
+through `BindingDiagnosticPolicy`; the language server binds directly.
+Other compiler passes may independently reject the same program.
+
+This exclusion appears in the tagged v0.14.0-v0.14.2 sources and remains at
+the checked main revision `080ed5a7`. It is a longstanding routing gap, not a
+regression introduced by this correction. See the
+[source and release ancestry](/docs/semantics/versioning/#diagnostic-routing-correction-2026-09-11).
+The original release text is retained below with dated annotations.
+
+The promised legacy `Info` mode is not available. The current compiler refuses
+older semantics majors with `Calor0701`; changing the declaration alone is
+not a migration. Its hint now calls for manual migration and distinguishes
+binder diagnostics from CLI rejection. This changes neither version
+compatibility nor diagnostic routing, and adds no migration tool.
+
+[The bounded 0.22 plan (#1082)](https://github.com/juanmicrosoft/calor/issues/1082)
+is planned, not shipped. It covers specified initialization, return, and
+resolved method-input boundaries, not every assignment or possible null value.
+The D3/D12/D14 safeguards, which demote conditional proofs and retain their
+runtime guards, remain in place.
+
 ## [0.20.0] - 2026-09-10
 
 This release improves compiler fidelity for character literals and contextual
@@ -696,6 +723,10 @@ Small fix — `§NEW{Type}` constructor expressions now correctly reflect that `
 
 ## [0.14.2] - 2026-08-24
 
+> **Correction (2026-09-11):** The diagnostic additions below describe binder/editor
+> findings, not production CLI rejection by `Calor0272/0273/0274`. Other passes
+> may reject independently. See the dated correction above; original text follows.
+
 Threads Calor-native call-site annotations through the binder. Pure-Calor callees now behave symmetrically with BCL calls for the two 0.14 diagnostics that used to skip them: `Calor0274` on the argument side, and `BoundCallExpression.Type` picking up the declared return annotation. Downstream consumers see byte-identical `DisplayString` for pure-Calor calls; only the annotation channel changes.
 
 ### Added
@@ -704,6 +735,10 @@ Threads Calor-native call-site annotations through the binder. Pure-Calor callee
 - **`BoundCallExpression.Type` on pure-Calor calls carries the declared return-type annotation.** `-> ?string` / `-> ?Foo` surfaces as `Annotated`; `-> string` / `-> Foo` as `NotAnnotated`. Previously stayed `Oblivious`. BCL-resolved returns retain priority.
 
 ## [0.14.1] - 2026-08-24
+
+> **Correction (2026-09-11):** "Enforcement widens" below overstates the change:
+> binder checks widened, but `Calor0272/0273/0274` were excluded from production
+> CLI rejection. Other passes may reject independently. Original text follows.
 
 Widens the 0.14 nullability gate along two axes: whitelisted generic containers over `string`, and user-declared reference types. The core three diagnostics (`Calor0272`/`0273`/`0274`) fire symmetrically whenever a possibly-null value is funneled into a target that refuses null — now covering `Option<T>`, `List<T>`, `IEnumerable<T>` (and their read-only / interface siblings), and any `§CL`-declared class. Also fixes a header-pill stale-version follow-up and adds an on-demand `verify-release` CI workflow that installs the shipped tool from nuget.org and exercises Z3.
 
@@ -724,6 +759,12 @@ Widens the 0.14 nullability gate along two axes: whitelisted generic containers 
 - **Performance-test synthetic fixtures no longer misfire on nullability findings.** After the 0.14.0 severity flip promoted the three nullability codes to `Error`, the taint-analysis performance tests' blanket `HasErrors` assertion rejected the synthetic modules. Nullability findings on synthetic fixtures are now allowed through — the perf tests exercise timings, not nullability enforcement.
 
 ## [0.14.0] - 2026-08-23
+
+> **Correction (2026-09-11):** "Nullability enforcement" below describes binder
+> diagnostics, not production CLI rejection by these three codes. The promised
+> legacy `Info` mode was future work, not a shipped feature. Current compilers
+> refuse older majors with `Calor0701`. See the dated correction above.
+> Original text follows.
 
 Nullability enforcement lands for scalar `:string` values and their arrays. The binder now flags possibly-null values funneled into non-nullable `:string` targets at three sites: variable bindings (`Calor0272`), function returns (`Calor0273`), and call-site arguments (`Calor0274`). Severity is `Error` by default under the bumped `SemanticsVersion.Major = 2`; legacy modules keep `Info` once the module-level `§SEMVER` directive is threaded through.
 

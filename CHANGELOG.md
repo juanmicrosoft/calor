@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Correction - 2026-09-11: nullability diagnostics are not CLI enforcement
+
+The v0.14.0-v0.14.2 entries below overstated nullability enforcement.
+`Calor0272` (binding initialization), `Calor0273` (return), and `Calor0274`
+(argument) can be emitted as binder/editor errors, but those diagnostics do
+not establish production CLI rejection. `Program.Compile` filters them out
+through `BindingDiagnosticPolicy`; the language server binds directly.
+Other compiler passes may independently reject the same program.
+
+This exclusion appears in the tagged v0.14.0-v0.14.2 sources and remains at
+the checked main revision `080ed5a7`. It is a longstanding routing gap, not a
+regression introduced by this correction. See the
+[source and release ancestry](docs/semantics/versioning.md#diagnostic-routing-correction-2026-09-11).
+The original release text is retained below with dated annotations.
+
+The promised legacy `Info` mode is not available. The current compiler refuses
+older semantics majors with `Calor0701`; changing the declaration alone is
+not a migration. Its hint now calls for manual migration and distinguishes
+binder diagnostics from CLI rejection. This changes neither version
+compatibility nor diagnostic routing, and adds no migration tool.
+
+[The bounded 0.22 plan (#1082)](https://github.com/juanmicrosoft/calor/issues/1082)
+is planned, not shipped. It covers specified initialization, return, and
+resolved method-input boundaries, not every assignment or possible null value.
+The D3/D12/D14 safeguards, which demote conditional proofs and retain their
+runtime guards, remain in place.
+
 ## [0.20.0] - 2026-09-10
 
 ### Benchmark Results (Statistical: 30 runs)
@@ -1036,6 +1063,10 @@ These were the SHOULD tier of roadmap §4.2, whose own rule is "ship if they fit
 
 ## [0.14.2] - 2026-08-24
 
+> **Correction (2026-09-11):** The diagnostic additions below describe binder/editor
+> findings, not production CLI rejection by `Calor0272/0273/0274`. Other passes
+> may reject independently. See the dated correction above; original text follows.
+
 ### Benchmark Results (Statistical: 30 runs)
 - **Overall Advantage**: 1.32x (Calor leads)
 - **Categories**: Calor wins 7, C# wins 1
@@ -1073,6 +1104,10 @@ These were the SHOULD tier of roadmap §4.2, whose own rule is "ship if they fit
   precursors.
 
 ## [0.14.1] - 2026-08-24
+
+> **Correction (2026-09-11):** "Enforcement widens" below overstates the change:
+> binder checks widened, but `Calor0272/0273/0274` were excluded from production
+> CLI rejection. Other passes may reject independently. Original text follows.
 
 ### Benchmark Results (Statistical: 30 runs)
 - **Overall Advantage**: 1.32x (Calor leads)
@@ -1137,6 +1172,12 @@ These were the SHOULD tier of roadmap §4.2, whose own rule is "ship if they fit
   cannot cover from networks whose dotnet routes through a proxy.
 
 ## [0.14.0] - 2026-08-23
+
+> **Correction (2026-09-11):** "Nullability enforcement" below describes binder
+> diagnostics, not production CLI rejection by these three codes. The promised
+> legacy `Info` mode was future work, not a shipped feature. Current compilers
+> refuse older majors with `Calor0701`; `§SEMVER[1.0.0]` is invalid syntax.
+> See the dated correction above. Original text follows.
 
 ### Benchmark Results (Statistical: 30 runs)
 - **Overall Advantage**: 1.32x (Calor leads)
