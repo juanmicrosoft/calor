@@ -22,6 +22,11 @@ public class DictionaryInitializerSemanticsTests
     [InlineData("Dictionary<string, int> d = new(StringComparer.OrdinalIgnoreCase) { {\"A\", 2} }; return d[\"a\"].ToString();", "2", true)]
     [InlineData("var d = new System.Collections.Generic.Dictionary<int, int> { [1] = 2, [1] = 3 }; return d[1].ToString();", "3", true)]
     [InlineData("var d = new D { {1, 2}, {1, 3} }; return d[1].ToString();", "throws:ArgumentException", true)]
+    [InlineData("var d = new D { [1] = 2 }; return d.Count.ToString();", "1", true)]
+    [InlineData("var d = new D { [1] = 2 }; return string.Join(\",\", d.Keys);", "1", true)]
+    [InlineData("var d = new D { [1] = 2 }; return string.Join(\",\", d.Values);", "2", true)]
+    [InlineData("var d = new SD { [1] = 2 }; return d.Count.ToString();", "1", true)]
+    [InlineData("var d = new CD { [1] = 2 }; return d.Count.ToString();", "1", true)]
     [InlineData("var d = (object)new Dictionary<int, int> { {1, 2}, {1, 3} }; return d;", "throws:ArgumentException", true)]
     [InlineData("var d = false ? new Dictionary<int, int> { {1, 2}, {1, 3} } : new Dictionary<int, int>(); return d.Count.ToString();", "0", true, "conditional-expression-hoisting")]
     [InlineData("var d = new Dictionary<int, int>(new Dictionary<int, int> { {1, 2}, {1, 3} }); return d;", "throws:ArgumentException", true)]
@@ -33,14 +38,22 @@ public class DictionaryInitializerSemanticsTests
     }
 
     [Theory]
-    [InlineData("new Dictionary<int, int> { [1] = 2 }", "§B{Dict<i32, i32>:d}")]
-    [InlineData("new SortedDictionary<int, int> { [1] = 2 }", "§B{SortedDictionary<i32, i32>:d}")]
+    [InlineData("new Dictionary<int, int> { [1] = 2 }", "§B{System.Collections.Generic.Dictionary<i32, i32>:d}")]
+    [InlineData("new SortedDictionary<int, int> { [1] = 2 }", "§B{System.Collections.Generic.SortedDictionary<i32, i32>:d}")]
+    [InlineData("new D { [1] = 2 }", "§B{System.Collections.Generic.Dictionary<i32, i32>:d}")]
+    [InlineData("new SD { [1] = 2 }", "§B{System.Collections.Generic.SortedDictionary<i32, i32>:d}")]
+    [InlineData("new CD { [1] = 2 }", "§B{System.Collections.Concurrent.ConcurrentDictionary<i32, i32>:d}")]
+    [InlineData("new Dictionary<int, int?> { [1] = 2 }", "§B{d}")]
+    [InlineData("new Dictionary<dynamic, int> { [1] = 2 }", "§B{d}")]
     [InlineData("new Dictionary<(int, int), int> { [(1, 2)] = 3 }", "§B{d}")]
     [InlineData("(object)new Dictionary<int, int> { [1] = 2 }", "§B{d}")]
     public void PreservedDictionaryLocalType_IsBoundedAndSpellable(string initializer, string binding)
     {
         var conversion = new CSharpToCalorConverter().Convert($$"""
             using System.Collections.Generic;
+            using D = System.Collections.Generic.Dictionary<int, int>;
+            using SD = System.Collections.Generic.SortedDictionary<int, int>;
+            using CD = System.Collections.Concurrent.ConcurrentDictionary<int, int>;
             public class Migrated
             {
                 public object Probe()
@@ -121,6 +134,8 @@ public class DictionaryInitializerSemanticsTests
             using System.Collections.Generic;
             using System.Collections.Concurrent;
             using D = System.Collections.Generic.Dictionary<int, int>;
+            using SD = System.Collections.Generic.SortedDictionary<int, int>;
+            using CD = System.Collections.Concurrent.ConcurrentDictionary<int, int>;
             public class Migrated
             {
                 private static string Trace = "";

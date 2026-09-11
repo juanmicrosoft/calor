@@ -11901,22 +11901,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private static bool ContainsPreservedDictionaryInitializer(ExpressionSyntax expression) =>
         expression.DescendantNodesAndSelf()
             .OfType<BaseObjectCreationExpressionSyntax>()
-            .Any(creation => HasDictionaryInitializerOperations(creation.Initializer)
-                && creation switch
-                {
-                    ObjectCreationExpressionSyntax objectCreation => IsDictionaryType(GetCreatedTypeName(objectCreation.Type)),
-                    ImplicitObjectCreationExpressionSyntax => true,
-                    _ => false
-                });
-
-    private static string GetCreatedTypeName(TypeSyntax type) =>
-        type switch
-        {
-            GenericNameSyntax generic => generic.Identifier.ValueText,
-            QualifiedNameSyntax qualified => qualified.Right.Identifier.ValueText,
-            AliasQualifiedNameSyntax alias => alias.Name.Identifier.ValueText,
-            _ => type.ToString()
-        };
+            .Any(creation => HasDictionaryInitializerOperations(creation.Initializer));
 
     private static string? TryMapPreservedDictionaryLocalType(ITypeSymbol type)
     {
@@ -11930,11 +11915,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return null;
         }
 
+        var displayFormat = new SymbolDisplayFormat(
+            typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
+            genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
+            miscellaneousOptions: SymbolDisplayFormat.MinimallyQualifiedFormat.MiscellaneousOptions);
+        // Keep namespaces when only a using alias imports the dictionary or its arguments.
         // Permit the dictionary's own comma, not arbitrary unspellable nested type syntax.
         foreach (var argument in dictionary.TypeArguments)
         {
             var mappedArgument = TypeMapper.CSharpToCalor(
-                argument.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
+                argument.ToDisplayString(displayFormat));
             if (argument.TypeKind is TypeKind.Error or TypeKind.Dynamic
                 || argument.IsAnonymousType || argument.IsTupleType
                 || string.IsNullOrWhiteSpace(mappedArgument) || mappedArgument.Contains('?')
@@ -11945,7 +11935,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         var mapped = TypeMapper.CSharpToCalor(
-            type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
+            type.ToDisplayString(displayFormat));
         return string.IsNullOrWhiteSpace(mapped) || mapped.Contains('?') ? null : mapped;
     }
 
