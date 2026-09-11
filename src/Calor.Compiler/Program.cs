@@ -455,6 +455,7 @@ public class Program
             // output elsewhere, so it stays uncached. --no-cache is the explicit
             // off switch (and overrides --cache); --clear-cache deletes the state
             // file either way.
+            var enableTypeChecking = IsTypeCheckingEffectivelyEnabled(noTypeCheck, transpileOnly);
             CompilationDriver.DriverCacheSettings? buildCache = null;
             if (output == null)
             {
@@ -463,9 +464,10 @@ public class Program
                 {
                     buildCache = new CompilationDriver.DriverCacheSettings(
                         stateDirectory,
-                        BuildOptionsToken(strictApi, requireDocs, enforceEffects, strictEffects,
+                        BuildOptionsToken(strictApi, requireDocs, enforceEffects, enableTypeChecking, strictEffects,
                             permissiveEffects, contractMode, verify, verificationTimeout, analyze,
                             allFindings, strictBindInference, experimentalFlags,
+                            elideProvenGuards,
                             references.Select(reference =>
                                 $"{reference.FullName}:{Incremental.BuildStateCache.ComputeFileHash(reference.FullName)}")),
                         ClearFirst: clearCache,
@@ -496,7 +498,7 @@ public class Program
                         StrictApi = strictApi,
                         RequireDocs = requireDocs,
                         EnforceEffects = enforceEffects,
-                        EnableTypeChecking = !transpileOnly && !noTypeCheck && CompilationOptions.TypeCheckingDefault,
+                        EnableTypeChecking = enableTypeChecking,
                         UnsafeTranspileOnly = transpileOnly,
                         ReferencedAssemblyPaths = references
                             .Select(reference => reference.FullName)
@@ -610,9 +612,11 @@ public class Program
     /// Shared by the top-level compile command and <c>calor watch</c>.
     /// </summary>
     internal static string BuildOptionsToken(bool strictApi, bool requireDocs, bool enforceEffects,
+        bool enableTypeChecking,
         bool strictEffects, bool permissiveEffects, string contractMode, bool verify,
         int verificationTimeout, bool analyze, bool allFindings, bool strictBindInference,
         string[]? experimentalFlags,
+        bool elideProvenGuards = true,
         IEnumerable<string>? referenceDescriptors = null)
     {
         var experimental = experimentalFlags == null
@@ -622,12 +626,17 @@ public class Program
             ? ""
             : string.Join(",", referenceDescriptors.Order(StringComparer.Ordinal));
         return $"strictApi:{strictApi}|requireDocs:{requireDocs}|enforceEffects:{enforceEffects}" +
+               $"|enableTypeChecking:{enableTypeChecking}" +
                $"|strictEffects:{strictEffects}|permissiveEffects:{permissiveEffects}" +
                $"|contractMode:{contractMode.ToLowerInvariant()}|verify:{verify}" +
+               $"|elideProvenGuards:{elideProvenGuards}" +
                $"|verificationTimeout:{verificationTimeout}|analyze:{analyze}|allFindings:{allFindings}" +
                $"|strictBindInference:{strictBindInference}|experimental:{experimental}" +
                $"|references:{references}";
     }
+
+    internal static bool IsTypeCheckingEffectivelyEnabled(bool noTypeCheck, bool transpileOnly)
+        => !transpileOnly && !noTypeCheck && CompilationOptions.TypeCheckingDefault;
 
     private static void WriteHelp(TextWriter writer)
     {

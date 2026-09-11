@@ -376,6 +376,7 @@ public sealed class Binder
 
     public BoundModule Bind(ModuleNode module)
     {
+        using var diagnosticContext = _diagnostics.EnterBindingContext();
         _scope = new Scope();
         _functionSymbols.Clear();
         _classScopes.Clear();
@@ -1304,10 +1305,9 @@ public sealed class Binder
         // Annotated or Oblivious (per D3, Oblivious is treated conservatively
         // as possibly-null). Same TryBuildStringTarget filter — only scalar
         // STRING return types are in-scope for S3 (per D6); non-string
-        // returns silently pass. Severity is gated at S5 via
-        // SemanticsVersion.NullabilitySeverityFor: Error when Major>=2 (post
-        // task #14 bump), Info otherwise (legacy §SEMVER[1.0.0] modules once
-        // the SEMVER directive is threaded through the binder).
+        // returns silently pass. Current semantics produces binder Errors;
+        // BindingDiagnosticPolicy keeps these analysis-only. Unsupported
+        // major versions are rejected before binding, not compiled in Info mode.
         if (expr != null
             && _currentFunctionReturnType != null
             && TryBuildStringTarget(_currentFunctionReturnType, out var stringTarget)
@@ -1320,7 +1320,8 @@ public sealed class Binder
                 $"Return declares non-nullable {targetShapeLabel} but the returned value may be null " +
                 $"(source annotation: '{DescribeAnnotation(expr)}'). " +
                 $"Change the return type to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
-                SemanticsVersion.NullabilitySeverityFor());
+                SemanticsVersion.NullabilitySeverityFor(),
+                BindingDiagnosticContext.For(BindingReceivingBoundary.NativeReturn, stringTarget!));
         }
 
         return new BoundReturnStatement(ret.Span, expr);
@@ -1531,10 +1532,8 @@ public sealed class Binder
         //
         // S3b wired MetadataBinder into BindCallExpression so BCL-shaped calls
         // now carry real annotations on their BoundCallExpression.Type.
-        // Severity is gated at S5 via SemanticsVersion.NullabilitySeverityFor:
-        // Error when Major>=2 (post task #14 bump), Info otherwise (legacy
-        // §SEMVER[1.0.0] modules once the SEMVER directive is threaded
-        // through the binder).
+        // Current semantics produces binder Errors, kept analysis-only by
+        // BindingDiagnosticPolicy. Unsupported majors do not compile in Info mode.
         if (initializer != null
             && bind.TypeName != null
             && TryBuildStringTarget(bind.TypeName, out var stringTarget)
@@ -1547,7 +1546,8 @@ public sealed class Binder
                 $"Binding '{bind.Name}' declares non-nullable {targetShapeLabel} but its initializer " +
                 $"may be null (source annotation: '{DescribeAnnotation(initializer)}'). " +
                 $"Change the target to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
-                SemanticsVersion.NullabilitySeverityFor());
+                SemanticsVersion.NullabilitySeverityFor(),
+                BindingDiagnosticContext.For(BindingReceivingBoundary.Initializer, stringTarget!));
         }
 
         return new BoundBindStatement(bind.Span, variable, initializer);
@@ -3296,11 +3296,8 @@ public sealed class Binder
         // (mirrors S3b's System.*/Microsoft.* narrowing): the parameter-
         // side annotation flow requires a resolved Roslyn IMethodSymbol,
         // and non-BCL Calor callees do not yet carry annotated parameter
-        // BoundTypes. Severity is gated at S5 via
-        // SemanticsVersion.NullabilitySeverityFor: Error when Major>=2
-        // (post task #14 bump), Info otherwise (legacy §SEMVER[1.0.0]
-        // modules once the SEMVER directive is threaded through the
-        // binder).
+        // BoundTypes. Current semantics produces binder Errors, kept
+        // analysis-only by BindingDiagnosticPolicy.
         if (bclResolution is { } bcl)
         {
             var paramTypes = bcl.Parameters;
@@ -3322,7 +3319,8 @@ public sealed class Binder
                     $"Argument to parameter '{paramName}' declares non-nullable {targetShapeLabel} " +
                     $"but the value may be null (source annotation: '{DescribeAnnotation(args[i])}'). " +
                     $"Change the parameter type to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
-                    SemanticsVersion.NullabilitySeverityFor());
+                    SemanticsVersion.NullabilitySeverityFor(),
+                    BindingDiagnosticContext.For(BindingReceivingBoundary.MethodArgument, stringTarget));
             }
         }
         else if (resolution.Kind == OverloadResolutionKind.Resolved
@@ -3362,7 +3360,8 @@ public sealed class Binder
                     $"Argument to parameter '{paramName}' declares non-nullable {targetShapeLabel} " +
                     $"but the value may be null (source annotation: '{DescribeAnnotation(args[i])}'). " +
                     $"Change the parameter type to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
-                    SemanticsVersion.NullabilitySeverityFor());
+                    SemanticsVersion.NullabilitySeverityFor(),
+                    BindingDiagnosticContext.For(BindingReceivingBoundary.MethodArgument, stringTarget!));
             }
         }
 

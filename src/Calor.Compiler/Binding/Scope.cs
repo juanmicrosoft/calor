@@ -46,60 +46,6 @@ public readonly record struct SymbolId
         Uri.EscapeDataString(component ?? throw new ArgumentNullException(nameof(component)));
 }
 
-/// <summary>
-/// Defines which binder diagnostics are part of compilation semantics rather
-/// than optional analysis instrumentation.
-/// </summary>
-public static class BindingDiagnosticPolicy
-{
-    public static bool IsCompilationError(Diagnostics.Diagnostic diagnostic)
-    {
-        ArgumentNullException.ThrowIfNull(diagnostic);
-
-        if (!diagnostic.IsError)
-            return false;
-
-        return diagnostic.Code is
-            Diagnostics.DiagnosticCode.DuplicateDefinition
-            or Diagnostics.DiagnosticCode.DuplicateFunctionSignature
-            or Diagnostics.DiagnosticCode.AmbiguousOverload
-            or Diagnostics.DiagnosticCode.NoMatchingOverload
-            or Diagnostics.DiagnosticCode.BindRequiresTypeOrInitializer
-            or Diagnostics.DiagnosticCode.InstanceMemberInStaticContext
-            // v0.15 E2 slice b — the binder's half of the effect-row rules.
-            // Calor0405 (a row on a position that is not function-typed, §3.5)
-            // and Calor0404 (an effect variable no enclosing declaration binds,
-            // §7.3) are declaration-shape errors, not analysis instrumentation:
-            // the program is ill-formed, so they must reach the author the way
-            // the parser's half of Calor0405 already does. Neither can fire on a
-            // program with no rows in it, and the committed corpus has none.
-            or Diagnostics.DiagnosticCode.EffectRowMisplaced
-            or Diagnostics.DiagnosticCode.EffectVariableScope;
-    }
-
-    public static void PropagateCompilationErrors(
-        IEnumerable<Diagnostics.Diagnostic> source,
-        Diagnostics.DiagnosticBag destination)
-    {
-        ArgumentNullException.ThrowIfNull(source);
-        ArgumentNullException.ThrowIfNull(destination);
-
-        foreach (var diagnostic in source.Where(IsCompilationError))
-        {
-            if (destination.Any(existing =>
-                    existing.Code == diagnostic.Code
-                    && existing.Span == diagnostic.Span
-                    && existing.Message == diagnostic.Message
-                    && existing.Severity == diagnostic.Severity))
-            {
-                continue;
-            }
-
-            destination.Add(diagnostic);
-        }
-    }
-}
-
 public static class SymbolSourceIdentity
 {
     public static string Canonicalize(string? sourceIdentity)

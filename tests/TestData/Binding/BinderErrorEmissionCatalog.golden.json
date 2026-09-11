@@ -1,0 +1,431 @@
+[
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindBindStatement::DiagnosticBag.Report#01",
+    "member": "Calor.Compiler.Binding.Binder.BindBindStatement",
+    "sink": "DiagnosticBag.Report",
+    "helperPath": "DiagnosticBag.Report",
+    "possibleCodes": [
+      "Calor0272"
+    ],
+    "severity": "Dynamic",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1385,
+    "reason": "Nullability activation requires explicit receiving shape and its staged prerequisites."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindBindStatement::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.BindBindStatement",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0250"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "A missing binding type/value is already a compilation error."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindBindStatement::DiagnosticBag.ReportError#02",
+    "member": "Calor.Compiler.Binding.Binder.BindBindStatement",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0260"
+    ],
+    "severity": "Error",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1396,
+    "reason": "General mutable/rebind validation is outside the nullability receiving-boundary activation."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindBindStatement::DiagnosticBag.ReportError#03",
+    "member": "Calor.Compiler.Binding.Binder.BindBindStatement",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0256"
+    ],
+    "severity": "Error",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1396,
+    "reason": "General rebind type checks retain their current analysis-only disposition."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindBindStatement::DiagnosticBag.ReportError#04",
+    "member": "Calor.Compiler.Binding.Binder.BindBindStatement",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0250"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "A missing binding type/value is already a compilation error."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindBindStatement::DiagnosticBag.ReportError#05",
+    "member": "Calor.Compiler.Binding.Binder.BindBindStatement",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0201"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Duplicate declarations are already compilation errors."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindCallExpression::DiagnosticBag.Report#01",
+    "member": "Calor.Compiler.Binding.Binder.BindCallExpression",
+    "sink": "DiagnosticBag.Report",
+    "helperPath": "DiagnosticBag.Report",
+    "possibleCodes": [
+      "Calor0274"
+    ],
+    "severity": "Dynamic",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1385,
+    "reason": "Nullability activation requires explicit receiving shape and its staged prerequisites."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindCallExpression::DiagnosticBag.Report#02",
+    "member": "Calor.Compiler.Binding.Binder.BindCallExpression",
+    "sink": "DiagnosticBag.Report",
+    "helperPath": "DiagnosticBag.Report",
+    "possibleCodes": [
+      "Calor0274"
+    ],
+    "severity": "Dynamic",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1385,
+    "reason": "Nullability activation requires explicit receiving shape and its staged prerequisites."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindForStatement::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.BindForStatement",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0201"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Duplicate declarations are already compilation errors."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindLambdaExpression::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.BindLambdaExpression",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0201"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Duplicate declarations are already compilation errors."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindNewExpression::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.BindNewExpression",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0113"
+    ],
+    "severity": "Error",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1396,
+    "reason": "Parser owns the user-facing missing-type error; binder recovery is not a new activation."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindParameters::DiagnosticBag.ReportDuplicateDefinitionWithFix#01",
+    "member": "Calor.Compiler.Binding.Binder.BindParameters",
+    "sink": "DiagnosticBag.ReportDuplicateDefinitionWithFix",
+    "helperPath": "DiagnosticBag.ReportDuplicateDefinitionWithFix -> DiagnosticBag.ReportErrorWithFix",
+    "possibleCodes": [
+      "Calor0201"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Duplicate declarations are already compilation errors."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindQuantifier::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.BindQuantifier",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0201"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Duplicate declarations are already compilation errors."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindReferenceExpression::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.BindReferenceExpression",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0200"
+    ],
+    "severity": "Error",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1396,
+    "reason": "Incomplete binding/resolution can report false positives; preserve the current analysis-only exception."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindReferenceExpression::DiagnosticBag.ReportError#02",
+    "member": "Calor.Compiler.Binding.Binder.BindReferenceExpression",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0200"
+    ],
+    "severity": "Error",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1396,
+    "reason": "Incomplete binding/resolution can report false positives; preserve the current analysis-only exception."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindReferenceExpression::DiagnosticBag.ReportError#03",
+    "member": "Calor.Compiler.Binding.Binder.BindReferenceExpression",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0261"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Illegal static-context member access is already a compilation error."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindReferenceExpression::DiagnosticBag.ReportErrorWithFix#01",
+    "member": "Calor.Compiler.Binding.Binder.BindReferenceExpression",
+    "sink": "DiagnosticBag.ReportErrorWithFix",
+    "helperPath": "DiagnosticBag.ReportErrorWithFix",
+    "possibleCodes": [
+      "Calor0200"
+    ],
+    "severity": "Error",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1396,
+    "reason": "Incomplete binding/resolution can report false positives; preserve the current analysis-only exception."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindReferenceExpression::DiagnosticBag.ReportNotAVariableWithFix#01/leaf#01",
+    "member": "Calor.Compiler.Binding.Binder.BindReferenceExpression",
+    "sink": "DiagnosticBag.ReportNotAVariableWithFix",
+    "helperPath": "DiagnosticBag.ReportNotAVariableWithFix -> DiagnosticBag.ReportErrorWithFix",
+    "possibleCodes": [
+      "Calor0202"
+    ],
+    "severity": "Error",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1397,
+    "reason": "Binder variable-use recovery is not full production type checking; cross-pass ownership must remain explicit."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindReferenceExpression::DiagnosticBag.ReportNotAVariableWithFix#01/leaf#02",
+    "member": "Calor.Compiler.Binding.Binder.BindReferenceExpression",
+    "sink": "DiagnosticBag.ReportNotAVariableWithFix",
+    "helperPath": "DiagnosticBag.ReportNotAVariableWithFix -> DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0202"
+    ],
+    "severity": "Error",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1397,
+    "reason": "Binder variable-use recovery is not full production type checking; cross-pass ownership must remain explicit."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindReturnStatement::DiagnosticBag.Report#01",
+    "member": "Calor.Compiler.Binding.Binder.BindReturnStatement",
+    "sink": "DiagnosticBag.Report",
+    "helperPath": "DiagnosticBag.Report",
+    "possibleCodes": [
+      "Calor0273"
+    ],
+    "severity": "Dynamic",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1385,
+    "reason": "Nullability activation requires explicit receiving shape and its staged prerequisites."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindRow::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.BindRow",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0404"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Unbound effect-row variables are already enforced."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.DeclareParameters::DiagnosticBag.ReportDuplicateDefinitionWithFix#01",
+    "member": "Calor.Compiler.Binding.Binder.DeclareParameters",
+    "sink": "DiagnosticBag.ReportDuplicateDefinitionWithFix",
+    "helperPath": "DiagnosticBag.ReportDuplicateDefinitionWithFix -> DiagnosticBag.ReportErrorWithFix",
+    "possibleCodes": [
+      "Calor0201"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Duplicate declarations are already compilation errors."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.DeclarePatternVariable::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.DeclarePatternVariable",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0201"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Duplicate declarations are already compilation errors."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.RegisterClassTree::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.RegisterClassTree",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0201"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Duplicate declarations are already compilation errors."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.RegisterClassTree::DiagnosticBag.ReportError#02",
+    "member": "Calor.Compiler.Binding.Binder.RegisterClassTree",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0201"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Duplicate declarations are already compilation errors."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.ReportDuplicateSignature::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.ReportDuplicateSignature",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0206"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Duplicate callable signatures are already compilation errors."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.ReportRowOnNonFunctionType::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.ReportRowOnNonFunctionType",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0405"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Effect-row declaration placement is already enforced."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.ResolveCall::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.ResolveCall",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0208"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Failed internal overload selection is already a compilation error."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.ResolveCall::DiagnosticBag.ReportError#02",
+    "member": "Calor.Compiler.Binding.Binder.ResolveCall",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0207"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Ambiguous internal overload selection is already a compilation error."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.ResolveCallReceiver::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.ResolveCallReceiver",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0261"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1396,
+    "reason": "Illegal static-context member access is already a compilation error."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.TryBindMember::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.TryBindMember",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0932"
+    ],
+    "severity": "Error",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1396,
+    "reason": "A failed best-effort member analysis is not a successful safety result or a new production gate."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/BindingDiagnosticPolicy.cs::BindingDiagnosticPolicy.PropagateCompilationErrors::DiagnosticBag.Add#01",
+    "member": "Calor.Compiler.Binding.BindingDiagnosticPolicy.PropagateCompilationErrors",
+    "sink": "DiagnosticBag.Add",
+    "helperPath": "BindingDiagnosticPolicy.PropagateCompilationErrors -> DiagnosticBag.Add",
+    "possibleCodes": [
+      "<forwarded-binding-compilation-errors>"
+    ],
+    "severity": "Forwarded",
+    "disposition": "CompilationErrorForwarder",
+    "owningIssue": 1396,
+    "reason": "User-facing propagation forwards only diagnostics accepted by BindingDiagnosticPolicy.IsCompilationError and de-duplicates them."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Metadata/MetadataBinder.cs::Metadata.MetadataBinderResult.ToDiagnostics::Diagnostic..ctor#01",
+    "member": "Calor.Compiler.Binding.Metadata.MetadataBinderResult.ToDiagnostics",
+    "sink": "Diagnostic..ctor",
+    "helperPath": "Diagnostic..ctor",
+    "possibleCodes": [
+      "Calor0270"
+    ],
+    "severity": "Dynamic",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1396,
+    "reason": "MetadataBinderResult.ToDiagnostics accepts caller-selected severity; it is internal measurement/resolution evidence, not production enforcement."
+  }
+]

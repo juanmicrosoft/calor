@@ -1410,6 +1410,8 @@ public sealed class Diagnostic
     /// </summary>
     public Verification.ProofOutcome? Verification { get; init; }
 
+    public Binding.BindingDiagnosticContext? BindingContext { get; init; }
+
     public Diagnostic(
         string code,
         string message,
@@ -1471,6 +1473,7 @@ public sealed class DiagnosticWithFix
     public DiagnosticSeverity Severity { get; }
     public string? FilePath { get; }
     public SuggestedFix Fix { get; }
+    public Binding.BindingDiagnosticContext? BindingContext { get; init; }
 
     public DiagnosticWithFix(
         string code,
