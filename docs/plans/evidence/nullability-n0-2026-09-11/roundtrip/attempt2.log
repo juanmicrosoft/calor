@@ -1,0 +1,136 @@
+
+============================================================
+  Round-Trip Verification: Synthetic
+============================================================
+
+Phase 1/5: Creating working copy of Synthetic...
+  Working directory: <REPO>/.n0-evidence/tmp/calor-roundtrip/Synthetic/bf962040
+
+Phase 2/5: Running baseline tests...
+  Baseline: 52/52 passed, 0 failed, 0 skipped
+
+Phase 3/5: Converting library source files...
+  Found 5 C# files to convert (0 excluded by pattern)
+ 5/5
+  Replaced: 5
+  Converted: 5/5 files replaced
+
+Phase 4/5: Building modified project...
+  Build: Success
+
+Phase 5/5: Running round-trip tests...
+  Round-trip: 52/52 passed, 0 failed
+
+Fidelity: coverage 100.0% (5 native + 0 with-losses of 5; 0 reverted, 0 failed)
+
+PASS Synthetic: Pass
+   Baseline: 52/52 passing
+   Round-trip: 52/52 passing
+   Regressions: 0
+   Files converted: 5/5
+   Coverage: 100.0% (5 native, 0 with-losses, 0 reverted, 0 failed of 5)
+   Interop blocks: 0; distinct gaps: 0
+   Report: <REPO>/.n0-evidence/roundtrip-attempt2/Synthetic-roundtrip.md
+
+============================================================
+  Round-Trip Verification: Synthetic2
+============================================================
+
+Phase 1/5: Creating working copy of Synthetic2...
+  Working directory: <REPO>/.n0-evidence/tmp/calor-roundtrip/Synthetic2/d8ed55a2
+
+Phase 2/5: Running baseline tests...
+  Baseline: 20/20 passed, 0 failed, 0 skipped
+
+Phase 3/5: Converting library source files...
+  Found 1 C# files to convert (0 excluded by pattern)
+ 1/1
+  Replaced: 1
+  Converted: 1/1 files replaced
+
+Phase 4/5: Building modified project...
+  Build: Success
+
+Phase 5/5: Running round-trip tests...
+  Round-trip: 20/20 passed, 0 failed
+
+Fidelity: coverage 100.0% (1 native + 0 with-losses of 1; 0 reverted, 0 failed)
+
+PASS Synthetic2: Pass
+   Baseline: 20/20 passing
+   Round-trip: 20/20 passing
+   Regressions: 0
+   Files converted: 1/1
+   Coverage: 100.0% (1 native, 0 with-losses, 0 reverted, 0 failed of 1)
+   Interop blocks: 0; distinct gaps: 0
+   Report: <REPO>/.n0-evidence/roundtrip-attempt2/Synthetic2-roundtrip.md
+
+============================================================
+  Round-Trip Verification: MediatR
+============================================================
+
+Phase 1/5: Creating working copy of MediatR...
+  Working directory: <REPO>/.n0-evidence/tmp/calor-roundtrip/MediatR/77d24159
+
+Phase 2/5: Running baseline tests...
+  Baseline: 155/157 passed, 0 failed, 2 skipped
+
+Phase 3/5: Converting library source files...
+  Found 32 C# files to convert (0 excluded by pattern)
+ 10/32 20/32 30/32 32/32
+  Project validation rejected 1 candidate(s): src/MediatR/INotificationHandler.cs
+  Project validation rejected 5 candidate(s): src/MediatR/Internal/HandlersOrderer.cs, src/MediatR/Mediator.cs, src/MediatR/MicrosoftExtensionsDI/MediatrServiceConfiguration.cs, src/MediatR/Registration/ServiceRegistrar.cs, src/MediatR/Wrappers/NotificationHandlerWrapper.cs
+  Replaced: 24
+  EmitCompilationError: 6
+  CompileError: 2
+  Converted: 24/32 files replaced
+
+Phase 4/5: Building modified project...
+  Build: Success
+
+Phase 5/5: Running round-trip tests...
+  Round-trip: 155/157 passed, 0 failed
+
+Fidelity: coverage 75.0% (18 native + 6 with-losses of 32; 0 reverted, 8 failed)
+
+PASS MediatR: Pass
+   Baseline: 155/157 passing
+   Round-trip: 155/157 passing
+   Regressions: 0
+   Files converted: 24/32
+   Coverage: 75.0% (18 native, 6 with-losses, 0 reverted, 8 failed of 32)
+   Interop blocks: 11; distinct gaps: 0
+   Report: <REPO>/.n0-evidence/roundtrip-attempt2/MediatR-roundtrip.md
+
+============================================================
+  Round-Trip Verification: Serilog
+============================================================
+
+Phase 1/5: Creating working copy of Serilog...
+  Working directory: <REPO>/.n0-evidence/tmp/calor-roundtrip/Serilog/41b4d038
+
+Phase 2/5: Running baseline tests...
+  WARNING: baseline build failed (the vendored subject does not build clean here)
+  Baseline: 0/0 passed, 0 failed, 0 skipped
+
+Phase 3/5: Converting library source files...
+  Found 106 C# files to convert (6 excluded by pattern)
+Unhandled exception. System.InvalidOperationException: Could not restore parse-context graph '<REPO>/.n0-evidence/tmp/calor-roundtrip/Serilog/41b4d038/test/Serilog.Tests/Serilog.Tests.csproj': <REPO>/.n0-evidence/tmp/calor-roundtrip/Serilog/41b4d038/src/Serilog/Serilog.csproj : error NU1301: Unable to load the service index for source https://api.nuget.org/v3/index.json. [<REPO>/.n0-evidence/tmp/calor-roundtrip/Serilog/41b4d038/test/Serilog.Tests/Serilog.Tests.csproj]
+<REPO>/.n0-evidence/tmp/calor-roundtrip/Serilog/41b4d038/src/Serilog/Serilog.csproj : error NU1301:   The SSL connection could not be established, see inner exception. [<REPO>/.n0-evidence/tmp/calor-roundtrip/Serilog/41b4d038/test/Serilog.Tests/Serilog.Tests.csproj]
+<REPO>/.n0-evidence/tmp/calor-roundtrip/Serilog/41b4d038/src/Serilog/Serilog.csproj : error NU1301:   Unable to read data from the transport connection: Socket is not connected. [<REPO>/.n0-evidence/tmp/calor-roundtrip/Serilog/41b4d038/test/Serilog.Tests/Serilog.Tests.csproj]
+<REPO>/.n0-evidence/tmp/calor-roundtrip/Serilog/41b4d038/src/Serilog/Serilog.csproj : error NU1301:   Socket is not connected [<REPO>/.n0-evidence/tmp/calor-roundtrip/Serilog/41b4d038/test/Serilog.Tests/Serilog.Tests.csproj]
+<REPO>/.n0-evidence/tmp/calor-roundtrip/Serilog/41b4d038/test/Serilog.Tests/Serilog.Tests.csproj : error NU1301: Unable to load the service index for source https://api.nuget.org/v3/index.json.
+<REPO>/.n0-evidence/tmp/calor-roundtrip/Serilog/41b4d038/test/Serilog.Tests/Serilog.Tests.csproj : error NU1301:   The SSL connection could not be established, see inner exception.
+<REPO>/.n0-evidence/tmp/calor-roundtrip/Serilog/41b4d038/test/Serilog.Tests/Serilog.Tests.csproj : error NU1301:   Unable to read data from the transport connection: Socket is not connected.
+<REPO>/.n0-evidence/tmp/calor-roundtrip/Serilog/41b4d038/test/Serilog.Tests/Serilog.Tests.csproj : error NU1301:   Socket is not connected
+<REPO>/.n0-evidence/tmp/calor-roundtrip/Serilog/41b4d038/test/Serilog.Tests/Serilog.Tests.csproj : error NU1301: Unable to load the service index for source https://api.nuget.org/v3/index.json.
+<REPO>/.n0-evidence/tmp/calor-roundtrip/Serilog/41b4d038/test/Serilog.Tests/Serilog.Tests.csproj : error NU1301:   The SSL connection could not be established, see inner exception.
+<REPO>/.n0-evidence/tmp/calor-roundtrip/Serilog/41b4d038/test/Serilog.Tests/Serilog.Tests.csproj : error NU1301:   Unable to read data from the transport connection: Socket is not connected.
+<REPO>/.n0-evidence/tmp/calor-roundtrip/Serilog/41b4d038/test/Serilog.Tests/Serilog.Tests.csproj : error NU1301:   Socket is not connected
+   at Calor.RoundTrip.Harness.ProjectParseContextResolver.RestoreParseContextGraphAsync(String workDir, String project, IReadOnlyDictionary`2 globalProperties, RoundTripConfig config, CancellationToken cancellationToken) in <REPO>/tools/Calor.RoundTrip.Harness/ProjectParseContextResolver.cs:line 597
+   at Calor.RoundTrip.Harness.ProjectParseContextResolver.ResolveAsync(String workDir, RoundTripConfig config, IReadOnlyCollection`1 candidateFiles, CancellationToken cancellationToken) in <REPO>/tools/Calor.RoundTrip.Harness/ProjectParseContextResolver.cs:line 190
+   at Calor.RoundTrip.Harness.RoundTripPipeline.ConvertAndReplaceAsync(String workDir, RoundTripConfig config, RoundTripReport report, CancellationToken cancellationToken) in <REPO>/tools/Calor.RoundTrip.Harness/RoundTripPipeline.cs:line 344
+   at Calor.RoundTrip.Harness.RoundTripPipeline.RunAsync(RoundTripConfig config, CancellationToken cancellationToken) in <REPO>/tools/Calor.RoundTrip.Harness/RoundTripPipeline.cs:line 63
+   at Program.<<Main>$>g__RunCommand|0_0(String[] runArgs) in <REPO>/tools/Calor.RoundTrip.Harness/Program.cs:line 148
+   at Program.<Main>$(String[] args) in <REPO>/tools/Calor.RoundTrip.Harness/Program.cs:line 23
+   at Program.<Main>(String[] args)

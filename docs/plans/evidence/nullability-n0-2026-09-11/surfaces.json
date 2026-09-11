@@ -1,0 +1,1397 @@
+{
+  "commands": [
+    {
+      "id": "run-bind-bcl-nullable-default",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-bind-bcl-nullable-default",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-6e694014465a4ebcacf29d63245ce348/src/CalorSrc.csproj (in 25 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-6e694014465a4ebcacf29d63245ce348/tests/CalorTests.csproj (in 99 ms).\n<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable/Input.calr(4,24): warning CS8600: Converting null literal or possible null value to non-nullable type. [<REPO>/.n0-evidence/tmp/calor-test-6e694014465a4ebcacf29d63245ce348/src/CalorSrc.csproj]\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-6e694014465a4ebcacf29d63245ce348/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-6e694014465a4ebcacf29d63245ce348/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-6e694014465a4ebcacf29d63245ce348/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 1 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-bind-bcl-nullable-verify",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable",
+        "--timeout",
+        "120",
+        "--verify"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-bind-bcl-nullable-verify",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable",
+        "--timeout",
+        "120",
+        "--verify"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-afa3f5b6037a437cac5a07bc06756d52/src/CalorSrc.csproj (in 33 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-afa3f5b6037a437cac5a07bc06756d52/tests/CalorTests.csproj (in 117 ms).\n<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable/Input.calr(4,24): warning CS8600: Converting null literal or possible null value to non-nullable type. [<REPO>/.n0-evidence/tmp/calor-test-afa3f5b6037a437cac5a07bc06756d52/src/CalorSrc.csproj]\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-afa3f5b6037a437cac5a07bc06756d52/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-afa3f5b6037a437cac5a07bc06756d52/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-afa3f5b6037a437cac5a07bc06756d52/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 2 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-bind-bcl-nullable-env",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-bind-bcl-nullable-env",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-295ad83d16eb4f8a89eba19f7500304b/src/CalorSrc.csproj (in 25 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-295ad83d16eb4f8a89eba19f7500304b/tests/CalorTests.csproj (in 103 ms).\n<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable/Input.calr(4,24): warning CS8600: Converting null literal or possible null value to non-nullable type. [<REPO>/.n0-evidence/tmp/calor-test-295ad83d16eb4f8a89eba19f7500304b/src/CalorSrc.csproj]\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-295ad83d16eb4f8a89eba19f7500304b/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-295ad83d16eb4f8a89eba19f7500304b/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-295ad83d16eb4f8a89eba19f7500304b/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 1 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-bind-bcl-nullable-permissive",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable",
+        "--timeout",
+        "120",
+        "--permissive"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-bind-bcl-nullable-permissive",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable",
+        "--timeout",
+        "120",
+        "--permissive"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-dcf942a3373a479d9b9d7fb62ec0d045/src/CalorSrc.csproj (in 24 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-dcf942a3373a479d9b9d7fb62ec0d045/tests/CalorTests.csproj (in 97 ms).\n<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable/Input.calr(4,24): warning CS8600: Converting null literal or possible null value to non-nullable type. [<REPO>/.n0-evidence/tmp/calor-test-dcf942a3373a479d9b9d7fb62ec0d045/src/CalorSrc.csproj]\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-dcf942a3373a479d9b9d7fb62ec0d045/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-dcf942a3373a479d9b9d7fb62ec0d045/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-dcf942a3373a479d9b9d7fb62ec0d045/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 2 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-bind-bcl-nullable-combined",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable",
+        "--timeout",
+        "120",
+        "--verify",
+        "--permissive"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-bind-bcl-nullable-combined",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable",
+        "--timeout",
+        "120",
+        "--verify",
+        "--permissive"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-d4016d360f284ec8b17fa1ae6525b97c/src/CalorSrc.csproj (in 26 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-d4016d360f284ec8b17fa1ae6525b97c/tests/CalorTests.csproj (in 102 ms).\n<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable/Input.calr(4,24): warning CS8600: Converting null literal or possible null value to non-nullable type. [<REPO>/.n0-evidence/tmp/calor-test-d4016d360f284ec8b17fa1ae6525b97c/src/CalorSrc.csproj]\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-d4016d360f284ec8b17fa1ae6525b97c/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-d4016d360f284ec8b17fa1ae6525b97c/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-d4016d360f284ec8b17fa1ae6525b97c/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 1 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "verify-bind-bcl-nullable-default",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "verify",
+        "<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable/Input.calr",
+        "--format",
+        "json",
+        "--no-cache",
+        "--no-telemetry"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"command\": \"verify\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  },\n  \"data\": {\n    \"verifiedAt\": \"2026-09-11T17:00:24.49031Z\",\n    \"files\": [\n      {\n        \"fileName\": \"Input.calr\",\n        \"filePath\": \"<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable/Input.calr\",\n        \"summary\": {\n          \"proven\": 0,\n          \"unproven\": 0,\n          \"disproven\": 0,\n          \"unsupported\": 0,\n          \"skipped\": 0,\n          \"refuted\": 0,\n          \"assumed\": 0,\n          \"unknown\": 0,\n          \"timeout\": 0,\n          \"unavailable\": 0\n        },\n        \"functions\": []\n      }\n    ],\n    \"summary\": {\n      \"proven\": 0,\n      \"refuted\": 0,\n      \"assumed\": 0,\n      \"unknown\": 0,\n      \"timeout\": 0,\n      \"unsupported\": 0,\n      \"unavailable\": 0\n    }\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "id": "verify-bind-bcl-nullable-env",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "verify",
+        "<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable/Input.calr",
+        "--format",
+        "json",
+        "--no-cache",
+        "--no-telemetry"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"command\": \"verify\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  },\n  \"data\": {\n    \"verifiedAt\": \"2026-09-11T17:00:25.20057Z\",\n    \"files\": [\n      {\n        \"fileName\": \"Input.calr\",\n        \"filePath\": \"<REPO>/.n0-evidence/tmp/execution/bind-bcl-nullable/Input.calr\",\n        \"summary\": {\n          \"proven\": 0,\n          \"unproven\": 0,\n          \"disproven\": 0,\n          \"unsupported\": 0,\n          \"skipped\": 0,\n          \"refuted\": 0,\n          \"assumed\": 0,\n          \"unknown\": 0,\n          \"timeout\": 0,\n          \"unavailable\": 0\n        },\n        \"functions\": []\n      }\n    ],\n    \"summary\": {\n      \"proven\": 0,\n      \"refuted\": 0,\n      \"assumed\": 0,\n      \"unknown\": 0,\n      \"timeout\": 0,\n      \"unsupported\": 0,\n      \"unavailable\": 0\n    }\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-return-bcl-nullable-default",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-return-bcl-nullable-default",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-1d9e2154d531461691258cd95c58a1c4/src/CalorSrc.csproj (in 26 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-1d9e2154d531461691258cd95c58a1c4/tests/CalorTests.csproj (in 103 ms).\n<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable/Input.calr(4,20): warning CS8603: Possible null reference return. [<REPO>/.n0-evidence/tmp/calor-test-1d9e2154d531461691258cd95c58a1c4/src/CalorSrc.csproj]\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-1d9e2154d531461691258cd95c58a1c4/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-1d9e2154d531461691258cd95c58a1c4/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-1d9e2154d531461691258cd95c58a1c4/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 12 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-return-bcl-nullable-verify",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable",
+        "--timeout",
+        "120",
+        "--verify"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-return-bcl-nullable-verify",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable",
+        "--timeout",
+        "120",
+        "--verify"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-a47de2cae9ae47c19d071c1f4a69d4e1/src/CalorSrc.csproj (in 25 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-a47de2cae9ae47c19d071c1f4a69d4e1/tests/CalorTests.csproj (in 98 ms).\n<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable/Input.calr(4,20): warning CS8603: Possible null reference return. [<REPO>/.n0-evidence/tmp/calor-test-a47de2cae9ae47c19d071c1f4a69d4e1/src/CalorSrc.csproj]\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-a47de2cae9ae47c19d071c1f4a69d4e1/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-a47de2cae9ae47c19d071c1f4a69d4e1/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-a47de2cae9ae47c19d071c1f4a69d4e1/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 1 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-return-bcl-nullable-env",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-return-bcl-nullable-env",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-691e1edec0d24b188dd6a2ef25782910/src/CalorSrc.csproj (in 25 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-691e1edec0d24b188dd6a2ef25782910/tests/CalorTests.csproj (in 98 ms).\n<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable/Input.calr(4,20): warning CS8603: Possible null reference return. [<REPO>/.n0-evidence/tmp/calor-test-691e1edec0d24b188dd6a2ef25782910/src/CalorSrc.csproj]\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-691e1edec0d24b188dd6a2ef25782910/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-691e1edec0d24b188dd6a2ef25782910/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-691e1edec0d24b188dd6a2ef25782910/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 2 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-return-bcl-nullable-permissive",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable",
+        "--timeout",
+        "120",
+        "--permissive"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-return-bcl-nullable-permissive",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable",
+        "--timeout",
+        "120",
+        "--permissive"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-38746f48d0ec4f219635ee2392b6e4ca/src/CalorSrc.csproj (in 24 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-38746f48d0ec4f219635ee2392b6e4ca/tests/CalorTests.csproj (in 95 ms).\n<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable/Input.calr(4,20): warning CS8603: Possible null reference return. [<REPO>/.n0-evidence/tmp/calor-test-38746f48d0ec4f219635ee2392b6e4ca/src/CalorSrc.csproj]\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-38746f48d0ec4f219635ee2392b6e4ca/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-38746f48d0ec4f219635ee2392b6e4ca/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-38746f48d0ec4f219635ee2392b6e4ca/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 1 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-return-bcl-nullable-combined",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable",
+        "--timeout",
+        "120",
+        "--verify",
+        "--permissive"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-return-bcl-nullable-combined",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable",
+        "--timeout",
+        "120",
+        "--verify",
+        "--permissive"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-0d8d1a5fc6984220b74e5f84349809de/src/CalorSrc.csproj (in 24 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-0d8d1a5fc6984220b74e5f84349809de/tests/CalorTests.csproj (in 95 ms).\n<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable/Input.calr(4,20): warning CS8603: Possible null reference return. [<REPO>/.n0-evidence/tmp/calor-test-0d8d1a5fc6984220b74e5f84349809de/src/CalorSrc.csproj]\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-0d8d1a5fc6984220b74e5f84349809de/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-0d8d1a5fc6984220b74e5f84349809de/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-0d8d1a5fc6984220b74e5f84349809de/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 2 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "verify-return-bcl-nullable-default",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "verify",
+        "<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable/Input.calr",
+        "--format",
+        "json",
+        "--no-cache",
+        "--no-telemetry"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"command\": \"verify\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  },\n  \"data\": {\n    \"verifiedAt\": \"2026-09-11T17:00:52.126338Z\",\n    \"files\": [\n      {\n        \"fileName\": \"Input.calr\",\n        \"filePath\": \"<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable/Input.calr\",\n        \"summary\": {\n          \"proven\": 0,\n          \"unproven\": 0,\n          \"disproven\": 0,\n          \"unsupported\": 0,\n          \"skipped\": 0,\n          \"refuted\": 0,\n          \"assumed\": 0,\n          \"unknown\": 0,\n          \"timeout\": 0,\n          \"unavailable\": 0\n        },\n        \"functions\": []\n      }\n    ],\n    \"summary\": {\n      \"proven\": 0,\n      \"refuted\": 0,\n      \"assumed\": 0,\n      \"unknown\": 0,\n      \"timeout\": 0,\n      \"unsupported\": 0,\n      \"unavailable\": 0\n    }\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "id": "verify-return-bcl-nullable-env",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "verify",
+        "<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable/Input.calr",
+        "--format",
+        "json",
+        "--no-cache",
+        "--no-telemetry"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"command\": \"verify\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  },\n  \"data\": {\n    \"verifiedAt\": \"2026-09-11T17:00:52.790877Z\",\n    \"files\": [\n      {\n        \"fileName\": \"Input.calr\",\n        \"filePath\": \"<REPO>/.n0-evidence/tmp/execution/return-bcl-nullable/Input.calr\",\n        \"summary\": {\n          \"proven\": 0,\n          \"unproven\": 0,\n          \"disproven\": 0,\n          \"unsupported\": 0,\n          \"skipped\": 0,\n          \"refuted\": 0,\n          \"assumed\": 0,\n          \"unknown\": 0,\n          \"timeout\": 0,\n          \"unavailable\": 0\n        },\n        \"functions\": []\n      }\n    ],\n    \"summary\": {\n      \"proven\": 0,\n      \"refuted\": 0,\n      \"assumed\": 0,\n      \"unknown\": 0,\n      \"timeout\": 0,\n      \"unsupported\": 0,\n      \"unavailable\": 0\n    }\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-argument-bcl-expression-default",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-argument-bcl-expression-default",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-61798e2807eb4280ac1f33183440e96e/src/CalorSrc.csproj (in 25 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-61798e2807eb4280ac1f33183440e96e/tests/CalorTests.csproj (in 96 ms).\n<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression/Input.calr(4,39): warning CS8604: Possible null reference argument for parameter 's' in 'int int.Parse(string s)'. [<REPO>/.n0-evidence/tmp/calor-test-61798e2807eb4280ac1f33183440e96e/src/CalorSrc.csproj]\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-61798e2807eb4280ac1f33183440e96e/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-61798e2807eb4280ac1f33183440e96e/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-61798e2807eb4280ac1f33183440e96e/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 2 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-argument-bcl-expression-verify",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression",
+        "--timeout",
+        "120",
+        "--verify"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-argument-bcl-expression-verify",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression",
+        "--timeout",
+        "120",
+        "--verify"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-b2848d356f1a451b906a312fa3dc69b3/src/CalorSrc.csproj (in 25 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-b2848d356f1a451b906a312fa3dc69b3/tests/CalorTests.csproj (in 105 ms).\n<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression/Input.calr(4,39): warning CS8604: Possible null reference argument for parameter 's' in 'int int.Parse(string s)'. [<REPO>/.n0-evidence/tmp/calor-test-b2848d356f1a451b906a312fa3dc69b3/src/CalorSrc.csproj]\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-b2848d356f1a451b906a312fa3dc69b3/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-b2848d356f1a451b906a312fa3dc69b3/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-b2848d356f1a451b906a312fa3dc69b3/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 1 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-argument-bcl-expression-env",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-argument-bcl-expression-env",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-b0fa88d961d34c07b27b6702bed63e64/src/CalorSrc.csproj (in 25 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-b0fa88d961d34c07b27b6702bed63e64/tests/CalorTests.csproj (in 105 ms).\n<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression/Input.calr(4,39): warning CS8604: Possible null reference argument for parameter 's' in 'int int.Parse(string s)'. [<REPO>/.n0-evidence/tmp/calor-test-b0fa88d961d34c07b27b6702bed63e64/src/CalorSrc.csproj]\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-b0fa88d961d34c07b27b6702bed63e64/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-b0fa88d961d34c07b27b6702bed63e64/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-b0fa88d961d34c07b27b6702bed63e64/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 1 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-argument-bcl-expression-permissive",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression",
+        "--timeout",
+        "120",
+        "--permissive"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-argument-bcl-expression-permissive",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression",
+        "--timeout",
+        "120",
+        "--permissive"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-d907ea2a8b484790935534d7c68276e7/src/CalorSrc.csproj (in 26 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-d907ea2a8b484790935534d7c68276e7/tests/CalorTests.csproj (in 102 ms).\n<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression/Input.calr(4,39): warning CS8604: Possible null reference argument for parameter 's' in 'int int.Parse(string s)'. [<REPO>/.n0-evidence/tmp/calor-test-d907ea2a8b484790935534d7c68276e7/src/CalorSrc.csproj]\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-d907ea2a8b484790935534d7c68276e7/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-d907ea2a8b484790935534d7c68276e7/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-d907ea2a8b484790935534d7c68276e7/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 2 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-argument-bcl-expression-combined",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression",
+        "--timeout",
+        "120",
+        "--verify",
+        "--permissive"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-argument-bcl-expression-combined",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression",
+        "--timeout",
+        "120",
+        "--verify",
+        "--permissive"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-99ac302c9c7f47169e7e455ca54794a6/src/CalorSrc.csproj (in 27 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-99ac302c9c7f47169e7e455ca54794a6/tests/CalorTests.csproj (in 104 ms).\n<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression/Input.calr(4,39): warning CS8604: Possible null reference argument for parameter 's' in 'int int.Parse(string s)'. [<REPO>/.n0-evidence/tmp/calor-test-99ac302c9c7f47169e7e455ca54794a6/src/CalorSrc.csproj]\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-99ac302c9c7f47169e7e455ca54794a6/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-99ac302c9c7f47169e7e455ca54794a6/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-99ac302c9c7f47169e7e455ca54794a6/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 1 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "verify-argument-bcl-expression-default",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "verify",
+        "<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression/Input.calr",
+        "--format",
+        "json",
+        "--no-cache",
+        "--no-telemetry"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"command\": \"verify\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  },\n  \"data\": {\n    \"verifiedAt\": \"2026-09-11T17:01:23.264067Z\",\n    \"files\": [\n      {\n        \"fileName\": \"Input.calr\",\n        \"filePath\": \"<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression/Input.calr\",\n        \"summary\": {\n          \"proven\": 0,\n          \"unproven\": 0,\n          \"disproven\": 0,\n          \"unsupported\": 0,\n          \"skipped\": 0,\n          \"refuted\": 0,\n          \"assumed\": 0,\n          \"unknown\": 0,\n          \"timeout\": 0,\n          \"unavailable\": 0\n        },\n        \"functions\": []\n      }\n    ],\n    \"summary\": {\n      \"proven\": 0,\n      \"refuted\": 0,\n      \"assumed\": 0,\n      \"unknown\": 0,\n      \"timeout\": 0,\n      \"unsupported\": 0,\n      \"unavailable\": 0\n    }\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "id": "verify-argument-bcl-expression-env",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "verify",
+        "<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression/Input.calr",
+        "--format",
+        "json",
+        "--no-cache",
+        "--no-telemetry"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"command\": \"verify\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  },\n  \"data\": {\n    \"verifiedAt\": \"2026-09-11T17:01:24.048855Z\",\n    \"files\": [\n      {\n        \"fileName\": \"Input.calr\",\n        \"filePath\": \"<REPO>/.n0-evidence/tmp/execution/argument-bcl-expression/Input.calr\",\n        \"summary\": {\n          \"proven\": 0,\n          \"unproven\": 0,\n          \"disproven\": 0,\n          \"unsupported\": 0,\n          \"skipped\": 0,\n          \"refuted\": 0,\n          \"assumed\": 0,\n          \"unknown\": 0,\n          \"timeout\": 0,\n          \"unavailable\": 0\n        },\n        \"functions\": []\n      }\n    ],\n    \"summary\": {\n      \"proven\": 0,\n      \"refuted\": 0,\n      \"assumed\": 0,\n      \"unknown\": 0,\n      \"timeout\": 0,\n      \"unsupported\": 0,\n      \"unavailable\": 0\n    }\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-bind-literal-default",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/bind-literal",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-bind-literal-default",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/bind-literal",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-61a047a86b614b3c834cde2972fbd607/src/CalorSrc.csproj (in 29 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-61a047a86b614b3c834cde2972fbd607/tests/CalorTests.csproj (in 114 ms).\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-61a047a86b614b3c834cde2972fbd607/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-61a047a86b614b3c834cde2972fbd607/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-61a047a86b614b3c834cde2972fbd607/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 3 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-bind-literal-verify",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/bind-literal",
+        "--timeout",
+        "120",
+        "--verify"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-bind-literal-verify",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/bind-literal",
+        "--timeout",
+        "120",
+        "--verify"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-6e80b4824cc54820be42acc89ee1e811/src/CalorSrc.csproj (in 35 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-6e80b4824cc54820be42acc89ee1e811/tests/CalorTests.csproj (in 141 ms).\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-6e80b4824cc54820be42acc89ee1e811/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-6e80b4824cc54820be42acc89ee1e811/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-6e80b4824cc54820be42acc89ee1e811/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 2 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-bind-literal-env",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/bind-literal",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-bind-literal-env",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/bind-literal",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-774c20425ee949d6afa0335e519e6957/src/CalorSrc.csproj (in 27 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-774c20425ee949d6afa0335e519e6957/tests/CalorTests.csproj (in 102 ms).\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-774c20425ee949d6afa0335e519e6957/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-774c20425ee949d6afa0335e519e6957/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-774c20425ee949d6afa0335e519e6957/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 2 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-bind-literal-permissive",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/bind-literal",
+        "--timeout",
+        "120",
+        "--permissive"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-bind-literal-permissive",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/bind-literal",
+        "--timeout",
+        "120",
+        "--permissive"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-99bfabdbf19548a8b1403b596163533e/src/CalorSrc.csproj (in 27 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-99bfabdbf19548a8b1403b596163533e/tests/CalorTests.csproj (in 110 ms).\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-99bfabdbf19548a8b1403b596163533e/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-99bfabdbf19548a8b1403b596163533e/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-99bfabdbf19548a8b1403b596163533e/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 2 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-bind-literal-combined",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/bind-literal",
+        "--timeout",
+        "120",
+        "--verify",
+        "--permissive"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "id": "test-bind-literal-combined",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/bind-literal",
+        "--timeout",
+        "120",
+        "--verify",
+        "--permissive"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "  Determining projects to restore...\n  Restored <REPO>/.n0-evidence/tmp/calor-test-98033394eb6245f2b193d347f63ca9f5/src/CalorSrc.csproj (in 26 ms).\n  Restored <REPO>/.n0-evidence/tmp/calor-test-98033394eb6245f2b193d347f63ca9f5/tests/CalorTests.csproj (in 101 ms).\n  CalorSrc -> <REPO>/.n0-evidence/tmp/calor-test-98033394eb6245f2b193d347f63ca9f5/src/bin/Debug/net10.0/CalorSrc.dll\n  CalorTests -> <REPO>/.n0-evidence/tmp/calor-test-98033394eb6245f2b193d347f63ca9f5/tests/bin/Debug/net10.0/CalorTests.dll\nTest run for <REPO>/.n0-evidence/tmp/calor-test-98033394eb6245f2b193d347f63ca9f5/tests/bin/Debug/net10.0/CalorTests.dll (.NETCoreApp,Version=v10.0)\nA total of 1 test files matched the specified pattern.\n\nPassed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 3 ms - CalorTests.dll (net10.0)\n",
+      "stderr": ""
+    },
+    {
+      "id": "verify-bind-literal-default",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "verify",
+        "<REPO>/.n0-evidence/tmp/execution/bind-literal/Input.calr",
+        "--format",
+        "json",
+        "--no-cache",
+        "--no-telemetry"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"command\": \"verify\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  },\n  \"data\": {\n    \"verifiedAt\": \"2026-09-11T17:01:56.108247Z\",\n    \"files\": [\n      {\n        \"fileName\": \"Input.calr\",\n        \"filePath\": \"<REPO>/.n0-evidence/tmp/execution/bind-literal/Input.calr\",\n        \"summary\": {\n          \"proven\": 0,\n          \"unproven\": 0,\n          \"disproven\": 0,\n          \"unsupported\": 0,\n          \"skipped\": 0,\n          \"refuted\": 0,\n          \"assumed\": 0,\n          \"unknown\": 0,\n          \"timeout\": 0,\n          \"unavailable\": 0\n        },\n        \"functions\": []\n      }\n    ],\n    \"summary\": {\n      \"proven\": 0,\n      \"refuted\": 0,\n      \"assumed\": 0,\n      \"unknown\": 0,\n      \"timeout\": 0,\n      \"unsupported\": 0,\n      \"unavailable\": 0\n    }\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "id": "verify-bind-literal-env",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "verify",
+        "<REPO>/.n0-evidence/tmp/execution/bind-literal/Input.calr",
+        "--format",
+        "json",
+        "--no-cache",
+        "--no-telemetry"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"command\": \"verify\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  },\n  \"data\": {\n    \"verifiedAt\": \"2026-09-11T17:01:56.640983Z\",\n    \"files\": [\n      {\n        \"fileName\": \"Input.calr\",\n        \"filePath\": \"<REPO>/.n0-evidence/tmp/execution/bind-literal/Input.calr\",\n        \"summary\": {\n          \"proven\": 0,\n          \"unproven\": 0,\n          \"disproven\": 0,\n          \"unsupported\": 0,\n          \"skipped\": 0,\n          \"refuted\": 0,\n          \"assumed\": 0,\n          \"unknown\": 0,\n          \"timeout\": 0,\n          \"unavailable\": 0\n        },\n        \"functions\": []\n      }\n    ],\n    \"summary\": {\n      \"proven\": 0,\n      \"refuted\": 0,\n      \"assumed\": 0,\n      \"unknown\": 0,\n      \"timeout\": 0,\n      \"unsupported\": 0,\n      \"unavailable\": 0\n    }\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "id": "run-active-duplicate-default",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/active-duplicate",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {},
+      "exit": 1,
+      "stdout": "",
+      "stderr": "<REPO>/.n0-evidence/tmp/execution/active-duplicate/Input.calr(5,3): error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Aexecution%2Factive-duplicate%2FInput.calr/module/m1/function/ast%3Af1'.\n"
+    },
+    {
+      "id": "test-active-duplicate-default",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/active-duplicate",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {},
+      "exit": 1,
+      "stdout": "",
+      "stderr": "<REPO>/.n0-evidence/tmp/execution/active-duplicate/Input.calr(5,3): error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Aexecution%2Factive-duplicate%2FInput.calr/module/m1/function/ast%3Af1'.\n"
+    },
+    {
+      "id": "run-active-duplicate-verify",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/active-duplicate",
+        "--timeout",
+        "120",
+        "--verify"
+      ],
+      "environmentOverrides": {},
+      "exit": 1,
+      "stdout": "",
+      "stderr": "<REPO>/.n0-evidence/tmp/execution/active-duplicate/Input.calr(5,3): error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Aexecution%2Factive-duplicate%2FInput.calr/module/m1/function/ast%3Af1'.\n"
+    },
+    {
+      "id": "test-active-duplicate-verify",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/active-duplicate",
+        "--timeout",
+        "120",
+        "--verify"
+      ],
+      "environmentOverrides": {},
+      "exit": 1,
+      "stdout": "",
+      "stderr": "<REPO>/.n0-evidence/tmp/execution/active-duplicate/Input.calr(5,3): error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Aexecution%2Factive-duplicate%2FInput.calr/module/m1/function/ast%3Af1'.\n"
+    },
+    {
+      "id": "run-active-duplicate-env",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/active-duplicate",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 1,
+      "stdout": "",
+      "stderr": "<REPO>/.n0-evidence/tmp/execution/active-duplicate/Input.calr(5,3): error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Aexecution%2Factive-duplicate%2FInput.calr/module/m1/function/ast%3Af1'.\n"
+    },
+    {
+      "id": "test-active-duplicate-env",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/active-duplicate",
+        "--timeout",
+        "120"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 1,
+      "stdout": "",
+      "stderr": "<REPO>/.n0-evidence/tmp/execution/active-duplicate/Input.calr(5,3): error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Aexecution%2Factive-duplicate%2FInput.calr/module/m1/function/ast%3Af1'.\n"
+    },
+    {
+      "id": "run-active-duplicate-permissive",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/active-duplicate",
+        "--timeout",
+        "120",
+        "--permissive"
+      ],
+      "environmentOverrides": {},
+      "exit": 1,
+      "stdout": "",
+      "stderr": "<REPO>/.n0-evidence/tmp/execution/active-duplicate/Input.calr(5,3): error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Aexecution%2Factive-duplicate%2FInput.calr/module/m1/function/ast%3Af1'.\n"
+    },
+    {
+      "id": "test-active-duplicate-permissive",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/active-duplicate",
+        "--timeout",
+        "120",
+        "--permissive"
+      ],
+      "environmentOverrides": {},
+      "exit": 1,
+      "stdout": "",
+      "stderr": "<REPO>/.n0-evidence/tmp/execution/active-duplicate/Input.calr(5,3): error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Aexecution%2Factive-duplicate%2FInput.calr/module/m1/function/ast%3Af1'.\n"
+    },
+    {
+      "id": "run-active-duplicate-combined",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "run",
+        "<REPO>/.n0-evidence/tmp/execution/active-duplicate",
+        "--timeout",
+        "120",
+        "--verify",
+        "--permissive"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 1,
+      "stdout": "",
+      "stderr": "<REPO>/.n0-evidence/tmp/execution/active-duplicate/Input.calr(5,3): error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Aexecution%2Factive-duplicate%2FInput.calr/module/m1/function/ast%3Af1'.\n"
+    },
+    {
+      "id": "test-active-duplicate-combined",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "test",
+        "<REPO>/.n0-evidence/tmp/execution/active-duplicate",
+        "--timeout",
+        "120",
+        "--verify",
+        "--permissive"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 1,
+      "stdout": "",
+      "stderr": "<REPO>/.n0-evidence/tmp/execution/active-duplicate/Input.calr(5,3): error Calor0206: Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Aexecution%2Factive-duplicate%2FInput.calr/module/m1/function/ast%3Af1'.\n"
+    },
+    {
+      "id": "verify-active-duplicate-default",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "verify",
+        "<REPO>/.n0-evidence/tmp/execution/active-duplicate/Input.calr",
+        "--format",
+        "json",
+        "--no-cache",
+        "--no-telemetry"
+      ],
+      "environmentOverrides": {},
+      "exit": 1,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"command\": \"verify\",\n  \"diagnostics\": [\n    {\n      \"code\": \"Calor0206\",\n      \"message\": \"Duplicate signature \\u0027Probe()\\u0027. Conflicts with \\u0027calor://source/workspace%3Aexecution%2Factive-duplicate%2FInput.calr/module/m1/function/ast%3Af1\\u0027.\",\n      \"severity\": \"error\",\n      \"location\": {\n        \"file\": \"<REPO>/.n0-evidence/tmp/execution/active-duplicate/Input.calr\",\n        \"line\": 5,\n        \"column\": 3,\n        \"length\": 51\n      },\n      \"declarationId\": \"f2\"\n    }\n  ],\n  \"summary\": {\n    \"total\": 1,\n    \"errors\": 1,\n    \"warnings\": 0,\n    \"info\": 0\n  },\n  \"data\": {\n    \"verifiedAt\": \"2026-09-11T17:01:58.00436Z\",\n    \"files\": [\n      {\n        \"fileName\": \"Input.calr\",\n        \"filePath\": \"<REPO>/.n0-evidence/tmp/execution/active-duplicate/Input.calr\",\n        \"summary\": {\n          \"proven\": 0,\n          \"unproven\": 0,\n          \"disproven\": 0,\n          \"unsupported\": 0,\n          \"skipped\": 0,\n          \"refuted\": 0,\n          \"assumed\": 0,\n          \"unknown\": 0,\n          \"timeout\": 0,\n          \"unavailable\": 0\n        },\n        \"functions\": []\n      }\n    ],\n    \"summary\": {\n      \"proven\": 0,\n      \"refuted\": 0,\n      \"assumed\": 0,\n      \"unknown\": 0,\n      \"timeout\": 0,\n      \"unsupported\": 0,\n      \"unavailable\": 0\n    }\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "id": "verify-active-duplicate-env",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "verify",
+        "<REPO>/.n0-evidence/tmp/execution/active-duplicate/Input.calr",
+        "--format",
+        "json",
+        "--no-cache",
+        "--no-telemetry"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "exit": 1,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"command\": \"verify\",\n  \"diagnostics\": [\n    {\n      \"code\": \"Calor0206\",\n      \"message\": \"Duplicate signature \\u0027Probe()\\u0027. Conflicts with \\u0027calor://source/workspace%3Aexecution%2Factive-duplicate%2FInput.calr/module/m1/function/ast%3Af1\\u0027.\",\n      \"severity\": \"error\",\n      \"location\": {\n        \"file\": \"<REPO>/.n0-evidence/tmp/execution/active-duplicate/Input.calr\",\n        \"line\": 5,\n        \"column\": 3,\n        \"length\": 51\n      },\n      \"declarationId\": \"f2\"\n    }\n  ],\n  \"summary\": {\n    \"total\": 1,\n    \"errors\": 1,\n    \"warnings\": 0,\n    \"info\": 0\n  },\n  \"data\": {\n    \"verifiedAt\": \"2026-09-11T17:01:58.140304Z\",\n    \"files\": [\n      {\n        \"fileName\": \"Input.calr\",\n        \"filePath\": \"<REPO>/.n0-evidence/tmp/execution/active-duplicate/Input.calr\",\n        \"summary\": {\n          \"proven\": 0,\n          \"unproven\": 0,\n          \"disproven\": 0,\n          \"unsupported\": 0,\n          \"skipped\": 0,\n          \"refuted\": 0,\n          \"assumed\": 0,\n          \"unknown\": 0,\n          \"timeout\": 0,\n          \"unavailable\": 0\n        },\n        \"functions\": []\n      }\n    ],\n    \"summary\": {\n      \"proven\": 0,\n      \"refuted\": 0,\n      \"assumed\": 0,\n      \"unknown\": 0,\n      \"timeout\": 0,\n      \"unsupported\": 0,\n      \"unavailable\": 0\n    }\n  }\n}\n",
+      "stderr": ""
+    },
+    {
+      "id": "cache-0-bind-bcl-nullable",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "-i",
+        "<REPO>/.n0-evidence/tmp/cli-cache/Input.calr",
+        "-o",
+        "<REPO>/.n0-evidence/tmp/cli-cache/Input.g.cs",
+        "--cache",
+        "--format",
+        "json",
+        "--verbose",
+        "--no-telemetry"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  }\n}\n",
+      "stderr": "Compiling: <REPO>/.n0-evidence/tmp/cli-cache/Input.calr\nLexer produced 39 tokens\nParsing completed successfully\nType checking completed\nSemantic binding completed\nEffect enforcement completed\nContract inheritance checking completed\nContract semantic verification completed\nContract simplification completed\nCode generation completed successfully\nOutput written to: <REPO>/.n0-evidence/tmp/cli-cache/Input.g.cs\nCompilation successful: <REPO>/.n0-evidence/tmp/cli-cache/Input.g.cs\n"
+    },
+    {
+      "id": "cache-1-bind-bcl-nullable",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "-i",
+        "<REPO>/.n0-evidence/tmp/cli-cache/Input.calr",
+        "-o",
+        "<REPO>/.n0-evidence/tmp/cli-cache/Input.g.cs",
+        "--cache",
+        "--format",
+        "json",
+        "--verbose",
+        "--no-telemetry"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  }\n}\n",
+      "stderr": "Compiling: <REPO>/.n0-evidence/tmp/cli-cache/Input.calr\nLexer produced 39 tokens\nParsing completed successfully\nType checking completed\nSemantic binding completed\nEffect enforcement completed\nContract inheritance checking completed\nContract semantic verification completed\nContract simplification completed\nCode generation completed successfully\nOutput written to: <REPO>/.n0-evidence/tmp/cli-cache/Input.g.cs\nCompilation successful: <REPO>/.n0-evidence/tmp/cli-cache/Input.g.cs\n"
+    },
+    {
+      "id": "cache-2-bind-bcl-nullable",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "-i",
+        "<REPO>/.n0-evidence/tmp/cli-cache/Input.calr",
+        "-o",
+        "<REPO>/.n0-evidence/tmp/cli-cache/Input.g.cs",
+        "--cache",
+        "--format",
+        "json",
+        "--verbose",
+        "--no-telemetry",
+        "--no-type-check"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  }\n}\n",
+      "stderr": "Compiling: <REPO>/.n0-evidence/tmp/cli-cache/Input.calr\nLexer produced 39 tokens\nParsing completed successfully\nSemantic binding completed\nEffect enforcement completed\nContract inheritance checking completed\nContract semantic verification completed\nContract simplification completed\nCode generation completed successfully\nOutput written to: <REPO>/.n0-evidence/tmp/cli-cache/Input.g.cs\nCompilation successful: <REPO>/.n0-evidence/tmp/cli-cache/Input.g.cs\n"
+    },
+    {
+      "id": "cache-3-active-duplicate",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "-i",
+        "<REPO>/.n0-evidence/tmp/cli-cache/Input.calr",
+        "-o",
+        "<REPO>/.n0-evidence/tmp/cli-cache/Input.g.cs",
+        "--cache",
+        "--format",
+        "json",
+        "--verbose",
+        "--no-telemetry",
+        "--no-type-check"
+      ],
+      "environmentOverrides": {},
+      "exit": 1,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"diagnostics\": [\n    {\n      \"code\": \"Calor0206\",\n      \"message\": \"Duplicate signature \\u0027Probe()\\u0027. Conflicts with \\u0027calor://source/workspace%3Acli-cache%2FInput.calr/module/m1/function/ast%3Af1\\u0027.\",\n      \"severity\": \"error\",\n      \"location\": {\n        \"file\": \"<REPO>/.n0-evidence/tmp/cli-cache/Input.calr\",\n        \"line\": 5,\n        \"column\": 3,\n        \"length\": 49\n      },\n      \"declarationId\": \"f2\"\n    }\n  ],\n  \"summary\": {\n    \"total\": 1,\n    \"errors\": 1,\n    \"warnings\": 0,\n    \"info\": 0\n  }\n}\n",
+      "stderr": "Compiling: <REPO>/.n0-evidence/tmp/cli-cache/Input.calr\nLexer produced 45 tokens\nParsing completed successfully\nSemantic binding completed\n"
+    },
+    {
+      "id": "cache-4-active-duplicate",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "-i",
+        "<REPO>/.n0-evidence/tmp/cli-cache/Input.calr",
+        "-o",
+        "<REPO>/.n0-evidence/tmp/cli-cache/Input.g.cs",
+        "--cache",
+        "--format",
+        "json",
+        "--verbose",
+        "--no-telemetry",
+        "--transpile-only"
+      ],
+      "environmentOverrides": {},
+      "exit": 1,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"diagnostics\": [\n    {\n      \"code\": \"Calor0206\",\n      \"message\": \"Duplicate signature \\u0027Probe()\\u0027. Conflicts with \\u0027calor://source/workspace%3Acli-cache%2FInput.calr/module/m1/function/ast%3Af1\\u0027.\",\n      \"severity\": \"error\",\n      \"location\": {\n        \"file\": \"<REPO>/.n0-evidence/tmp/cli-cache/Input.calr\",\n        \"line\": 5,\n        \"column\": 3,\n        \"length\": 49\n      },\n      \"declarationId\": \"f2\"\n    }\n  ],\n  \"summary\": {\n    \"total\": 1,\n    \"errors\": 1,\n    \"warnings\": 0,\n    \"info\": 0\n  }\n}\n",
+      "stderr": "warning: --transpile-only is unsafe; generated C# is not type-checked or Roslyn-validated and will not be cached.\nCompiling: <REPO>/.n0-evidence/tmp/cli-cache/Input.calr\nLexer produced 45 tokens\nParsing completed successfully\nSemantic binding completed\n"
+    },
+    {
+      "id": "cache-5-bind-literal",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "-i",
+        "<REPO>/.n0-evidence/tmp/cli-cache/Input.calr",
+        "-o",
+        "<REPO>/.n0-evidence/tmp/cli-cache/Input.g.cs",
+        "--cache",
+        "--format",
+        "json",
+        "--verbose",
+        "--no-telemetry"
+      ],
+      "environmentOverrides": {},
+      "exit": 0,
+      "stdout": "{\n  \"version\": \"2.0\",\n  \"diagnostics\": [],\n  \"summary\": {\n    \"total\": 0,\n    \"errors\": 0,\n    \"warnings\": 0,\n    \"info\": 0\n  }\n}\n",
+      "stderr": "Compiling: <REPO>/.n0-evidence/tmp/cli-cache/Input.calr\nLexer produced 34 tokens\nParsing completed successfully\nType checking completed\nSemantic binding completed\nEffect enforcement completed\nContract inheritance checking completed\nContract semantic verification completed\nContract simplification completed\nCode generation completed successfully\nOutput written to: <REPO>/.n0-evidence/tmp/cli-cache/Input.g.cs\nCompilation successful: <REPO>/.n0-evidence/tmp/cli-cache/Input.g.cs\n"
+    }
+  ],
+  "watch": [
+    {
+      "mode": "default",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "watch",
+        "<REPO>/.n0-evidence/tmp/watch/default/Input.calr",
+        "--format",
+        "json",
+        "--debounce-ms",
+        "50",
+        "--no-telemetry"
+      ],
+      "environmentOverrides": {},
+      "responsiveWhileRunning": true,
+      "observations": [
+        {
+          "case": "bind-bcl-nullable",
+          "envelope": {
+            "version": "2.0",
+            "diagnostics": [],
+            "summary": {
+              "total": 0,
+              "errors": 0,
+              "warnings": 0,
+              "info": 0
+            }
+          }
+        },
+        {
+          "case": "bind-literal",
+          "envelope": {
+            "version": "2.0",
+            "diagnostics": [],
+            "summary": {
+              "total": 0,
+              "errors": 0,
+              "warnings": 0,
+              "info": 0
+            }
+          }
+        },
+        {
+          "case": "active-duplicate",
+          "envelope": {
+            "version": "2.0",
+            "diagnostics": [
+              {
+                "code": "Calor0206",
+                "message": "Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Awatch%2Fdefault%2FInput.calr/module/m1/function/ast%3Af1'.",
+                "severity": "error",
+                "location": {
+                  "file": "<REPO>/.n0-evidence/tmp/watch/default/Input.calr",
+                  "line": 5,
+                  "column": 3,
+                  "length": 49
+                },
+                "declarationId": "f2"
+              }
+            ],
+            "summary": {
+              "total": 1,
+              "errors": 1,
+              "warnings": 0,
+              "info": 0
+            }
+          }
+        },
+        {
+          "case": "bind-literal",
+          "envelope": {
+            "version": "2.0",
+            "diagnostics": [],
+            "summary": {
+              "total": 0,
+              "errors": 0,
+              "warnings": 0,
+              "info": 0
+            }
+          }
+        }
+      ],
+      "termination": "measurement sends SIGINT after fourth envelope",
+      "processExitAfterMeasurement": 0
+    },
+    {
+      "mode": "env",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "watch",
+        "<REPO>/.n0-evidence/tmp/watch/env/Input.calr",
+        "--format",
+        "json",
+        "--debounce-ms",
+        "50",
+        "--no-telemetry"
+      ],
+      "environmentOverrides": {
+        "CALOR_NO_TYPE_CHECK": "1"
+      },
+      "responsiveWhileRunning": true,
+      "observations": [
+        {
+          "case": "bind-bcl-nullable",
+          "envelope": {
+            "version": "2.0",
+            "diagnostics": [],
+            "summary": {
+              "total": 0,
+              "errors": 0,
+              "warnings": 0,
+              "info": 0
+            }
+          }
+        },
+        {
+          "case": "bind-literal",
+          "envelope": {
+            "version": "2.0",
+            "diagnostics": [],
+            "summary": {
+              "total": 0,
+              "errors": 0,
+              "warnings": 0,
+              "info": 0
+            }
+          }
+        },
+        {
+          "case": "active-duplicate",
+          "envelope": {
+            "version": "2.0",
+            "diagnostics": [
+              {
+                "code": "Calor0206",
+                "message": "Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Awatch%2Fenv%2FInput.calr/module/m1/function/ast%3Af1'.",
+                "severity": "error",
+                "location": {
+                  "file": "<REPO>/.n0-evidence/tmp/watch/env/Input.calr",
+                  "line": 5,
+                  "column": 3,
+                  "length": 49
+                },
+                "declarationId": "f2"
+              }
+            ],
+            "summary": {
+              "total": 1,
+              "errors": 1,
+              "warnings": 0,
+              "info": 0
+            }
+          }
+        },
+        {
+          "case": "bind-literal",
+          "envelope": {
+            "version": "2.0",
+            "diagnostics": [],
+            "summary": {
+              "total": 0,
+              "errors": 0,
+              "warnings": 0,
+              "info": 0
+            }
+          }
+        }
+      ],
+      "termination": "measurement sends SIGINT after fourth envelope",
+      "processExitAfterMeasurement": 0
+    },
+    {
+      "mode": "permissive",
+      "command": [
+        "dotnet",
+        "<REPO>/src/Calor.Compiler/bin/Debug/net10.0/calor.dll",
+        "watch",
+        "<REPO>/.n0-evidence/tmp/watch/permissive/Input.calr",
+        "--format",
+        "json",
+        "--debounce-ms",
+        "50",
+        "--no-telemetry",
+        "--permissive-effects"
+      ],
+      "environmentOverrides": {},
+      "responsiveWhileRunning": true,
+      "observations": [
+        {
+          "case": "bind-bcl-nullable",
+          "envelope": {
+            "version": "2.0",
+            "diagnostics": [],
+            "summary": {
+              "total": 0,
+              "errors": 0,
+              "warnings": 0,
+              "info": 0
+            }
+          }
+        },
+        {
+          "case": "bind-literal",
+          "envelope": {
+            "version": "2.0",
+            "diagnostics": [],
+            "summary": {
+              "total": 0,
+              "errors": 0,
+              "warnings": 0,
+              "info": 0
+            }
+          }
+        },
+        {
+          "case": "active-duplicate",
+          "envelope": {
+            "version": "2.0",
+            "diagnostics": [
+              {
+                "code": "Calor0206",
+                "message": "Duplicate signature 'Probe()'. Conflicts with 'calor://source/workspace%3Awatch%2Fpermissive%2FInput.calr/module/m1/function/ast%3Af1'.",
+                "severity": "error",
+                "location": {
+                  "file": "<REPO>/.n0-evidence/tmp/watch/permissive/Input.calr",
+                  "line": 5,
+                  "column": 3,
+                  "length": 49
+                },
+                "declarationId": "f2"
+              }
+            ],
+            "summary": {
+              "total": 1,
+              "errors": 1,
+              "warnings": 0,
+              "info": 0
+            }
+          }
+        },
+        {
+          "case": "bind-literal",
+          "envelope": {
+            "version": "2.0",
+            "diagnostics": [],
+            "summary": {
+              "total": 0,
+              "errors": 0,
+              "warnings": 0,
+              "info": 0
+            }
+          }
+        }
+      ],
+      "termination": "measurement sends SIGINT after fourth envelope",
+      "processExitAfterMeasurement": 0
+    }
+  ]
+}

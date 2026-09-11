@@ -1,0 +1,39 @@
+
+============================================================
+  Round-Trip Verification: FluentValidation
+============================================================
+
+Phase 1/5: Creating working copy of FluentValidation...
+  Working directory: <REPO>/.n0-evidence/tmp/calor-roundtrip/FluentValidation/838e77ba
+
+Phase 2/5: Running baseline tests...
+  Baseline: 865/866 passed, 0 failed, 1 skipped
+
+Phase 3/5: Converting library source files...
+  Found 139 C# files to convert (0 excluded by pattern)
+ 10/139 20/139 30/139 40/139 50/139 60/139 70/139 80/139 90/139 100/139 110/139 120/139 130/139 139/139
+  Project validation rejected 8 candidate(s): src/FluentValidation/IValidationRule.cs, src/FluentValidation/Internal/MemberNameValidatorSelector.cs, src/FluentValidation/Internal/PropertyRule.cs, src/FluentValidation/Internal/RuleComponent.cs, src/FluentValidation/Internal/RuleComponentForNullableStruct.cs, src/FluentValidation/Internal/TrackingCollection.cs, src/FluentValidation/Internal/ValidationStrategy.cs, src/FluentValidation/Validators/EmailValidator.cs
+  Project validation rejected 1 candidate(s): src/FluentValidation/Internal/IncludeRule.cs
+  Project validation rejected 11 candidate(s): src/FluentValidation/Internal/AccessorCache.cs, src/FluentValidation/Internal/ConditionBuilder.cs, src/FluentValidation/Internal/DefaultValidatorSelector.cs, src/FluentValidation/Internal/RulesetValidatorSelector.cs, src/FluentValidation/Resources/LanguageManager.cs, src/FluentValidation/Results/ValidationResult.cs, src/FluentValidation/TestHelper/TestValidationResult.cs, src/FluentValidation/ValidatorDescriptor.cs, src/FluentValidation/Validators/ChildValidatorAdaptor.cs, src/FluentValidation/Validators/CreditCardValidator.cs, src/FluentValidation/Validators/LengthValidator.cs
+  Replaced: 96
+  CompileError: 20
+  EmitCompilationError: 20
+  EmitSyntaxError: 3
+  Converted: 96/139 files replaced
+
+Phase 4/5: Building modified project...
+  Build: Success
+
+Phase 5/5: Running round-trip tests...
+  Round-trip: 865/866 passed, 0 failed
+
+Fidelity: coverage 69.1% (92 native + 4 with-losses of 139; 0 reverted, 43 failed)
+
+PASS FluentValidation: Pass
+   Baseline: 865/866 passing
+   Round-trip: 865/866 passing
+   Regressions: 0
+   Files converted: 96/139
+   Coverage: 69.1% (92 native, 4 with-losses, 0 reverted, 43 failed of 139)
+   Interop blocks: 30; distinct gaps: 1
+   Report: <REPO>/.n0-evidence/roundtrip-fluent/FluentValidation-roundtrip.md

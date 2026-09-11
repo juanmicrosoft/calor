@@ -1,0 +1,24 @@
+Description:
+  Compile Calor sources and run tests against them (no project file required)
+
+Usage:
+  calor test <path> [options]
+
+Arguments:
+  <path>  A .calr file, or a directory containing .calr files (with an optional tests/ subdirectory of *.cs xUnit tests; bin/, obj/ and reference/ subdirectories are excluded)
+
+Options:
+  --permissive                                    Relax effect enforcement: unknown calls assumed pure, forbidden effects (including cross-module violations) demoted to warnings
+  --keep-temp                                     Preserve the materialized temp project and print its path
+  -v, --verbose                                   Show compilation details and stream build output live
+  --enforce-effects                               Enforce effect declarations (default: true; pass 'false' to opt out) [default: True]
+  --verify                                        Enable static contract verification with Z3 SMT solver
+  --keep-proven-guards, --no-elide-proven-guards  Keep every runtime contract guard even when Z3 proves the contract (opts out of the v0.15 default elision; only matters with --verify)
+  --contract-mode <contract-mode>                 Contract enforcement mode: off, debug, or release (default: debug) [default: debug]
+  --timeout <timeout>                             Timeout in seconds for each child process (build/run/test; default: 600) [default: 600]
+  --no-telemetry                                  Force-disable anonymous usage telemetry (telemetry is OPT-IN and off by default; it activates only when CALOR_TELEMETRY=1 is set — see docs/telemetry.md)
+  --telemetry-preview                             Print schema-approved telemetry payloads locally to stderr without network transmission
+  -?, -h, --help                                  Show help and usage information
+
+
+

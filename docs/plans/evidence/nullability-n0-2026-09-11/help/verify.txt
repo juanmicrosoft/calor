@@ -1,0 +1,23 @@
+Description:
+  Verify contracts in Calor files using Z3 SMT solver
+
+Usage:
+  calor verify <files>... [options]
+
+Arguments:
+  <files>  The Calor source file(s) to verify
+
+Options:
+  -f, --format <format>                Output format: text or json [default: text]
+  -o, --output <output>                Output file (stdout if not specified)
+  -v, --verbose                        Enable verbose output with detailed verification info
+  -t, --timeout <timeout>              Z3 solver timeout per contract in milliseconds (default: 5000) [default: 5000]
+  --no-cache                           Disable verification result caching
+  --clear-cache                        Clear verification cache before verifying
+  --weakening-check <weakening-check>  M-G4 mode (gates doc Annex A-1.3): with exactly two input files (frozen, final), mechanically decide whether the named declaration's §Q/§S conjunction was weakened — prints a JSON verdict, exit 0
+  --no-telemetry                       Force-disable anonymous usage telemetry (telemetry is OPT-IN and off by default; it activates only when CALOR_TELEMETRY=1 is set — see docs/telemetry.md)
+  --telemetry-preview                  Print schema-approved telemetry payloads locally to stderr without network transmission
+  -?, -h, --help                       Show help and usage information
+
+
+

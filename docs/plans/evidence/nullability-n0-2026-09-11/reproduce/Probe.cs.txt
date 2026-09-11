@@ -1,0 +1,439 @@
+using System.Collections.Immutable;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Calor.Compiler;
+using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
+using Calor.Compiler.Binding.BoundTypes;
+using Calor.Compiler.CodeGen;
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Effects;
+using Calor.Compiler.Migration;
+using Calor.Compiler.Parsing;
+using Calor.Compiler.TypeChecking;
+using Calor.Compiler.Verification.Z3.Cache;
+using Calor.LanguageServer.State;
+using Calor.LanguageServer.Utilities;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using CompilerProgram = Calor.Compiler.Program;
+using Binder = Calor.Compiler.Binding.Binder;
+using CompilationOptions = Calor.Compiler.CompilationOptions;
+using NullAnnotation = Calor.Compiler.Binding.BoundTypes.NullableAnnotation;
+
+var root = Path.GetFullPath(args[0]);
+var output = Path.GetFullPath(args[1]);
+Directory.CreateDirectory(output);
+Environment.SetEnvironmentVariable("CALOR_N0_UNSET", null);
+Environment.SetEnvironmentVariable("CALOR_NO_TYPE_CHECK", null);
+var fixtures = new List<(string Id, string Members)>
+{
+    ("bind-bcl-nullable", "§F{f1:Probe:pub} () -> void\n  §E{env}\n  §B{x:str} §C{System.Environment.GetEnvironmentVariable} §A \"CALOR_N0_UNSET\" §/C"),
+    ("bind-bcl-nullable-target", "§F{f1:Probe:pub} () -> void\n  §E{env}\n  §B{x:?str} §C{System.Environment.GetEnvironmentVariable} §A \"CALOR_N0_UNSET\" §/C"),
+    ("bind-literal", "§F{f1:Probe:pub} () -> str\n  §E{}\n  §B{x:str} \"safe\"\n  §R x"),
+    ("bind-literal-nullable-target", "§F{f1:Probe:pub} () -> void\n  §E{}\n  §B{x:?str} \"safe\""),
+    ("bind-literal-nullable-string-alias", "§F{f1:Probe:pub} () -> void\n  §E{}\n  §B{x:?string} \"safe\""),
+    ("bind-option-to-string", "§F{f1:Probe:pub} () -> void\n  §E{}\n  §B{x:str} §SM \"safe\""),
+    ("bind-unqualified-bcl", "§F{f1:Probe:pub} () -> void\n  §E{env}\n  §B{x:str} §C{Environment.GetEnvironmentVariable} §A \"CALOR_N0_UNSET\" §/C"),
+    ("bind-inferred-local", "§F{f1:Probe:pub} () -> void\n  §E{env}\n  §B{x} §C{System.Environment.GetEnvironmentVariable} §A \"CALOR_N0_UNSET\" §/C\n  §B{y:str} x"),
+    ("return-bcl-nullable", "§F{f1:Probe:pub} () -> str\n  §E{env}\n  §R §C{System.Environment.GetEnvironmentVariable} §A \"CALOR_N0_UNSET\" §/C"),
+    ("return-literal", "§F{f1:Probe:pub} () -> str\n  §E{}\n  §R \"safe\""),
+    ("argument-bcl-expression", "§F{f1:Probe:pub} () -> i32\n  §E{env}\n  §R §C{System.Int32.Parse} §A §C{System.Environment.GetEnvironmentVariable} §A \"CALOR_N0_UNSET\" §/C §/C"),
+    ("argument-bcl-literal", "§F{f1:Probe:pub} () -> i32\n  §E{}\n  §R §C{System.Int32.Parse} §A \"7\" §/C"),
+    ("argument-bcl-statement", "§F{f1:Probe:pub} () -> void\n  §E{env}\n  §C{System.Int32.Parse} §A §C{System.Environment.GetEnvironmentVariable} §A \"CALOR_N0_UNSET\" §/C §/C"),
+    ("argument-native-string", "§F{f1:Take:pub} (str:x) -> str\n  §E{}\n  §R x\n§F{f2:Probe:pub} () -> str\n  §E{env}\n  §R §C{Take} §A §C{System.Environment.GetEnvironmentVariable} §A \"CALOR_N0_UNSET\" §/C §/C"),
+    ("argument-native-nominal", "§CL{c1:Bar:pub}\n  §MT{m1:Take:pub} (Bar:a) -> Bar\n    §R a\n  §MT{m2:Probe:pub} (?Bar:x) -> Bar\n    §R §C{this.Take} §A x §/C"),
+    ("argument-native-nominal-safe", "§CL{c1:Bar:pub}\n  §MT{m1:Take:pub} (Bar:a) -> Bar\n    §R a\n  §MT{m2:Probe:pub} (Bar:x) -> Bar\n    §R §C{this.Take} §A x §/C"),
+    ("inline-nullable-parameter", "§F{f1:Probe:pub} (?str:x) -> str\n  §E{}\n  §R x"),
+    ("inline-nullable-string-parameter", "§F{f1:Probe:pub} (?string:x) -> string\n  §E{}\n  §R x"),
+    ("option-some-to-reference", "§F{f1:Probe:pub} () -> void\n  §E{}\n  §B{x:?str} §SM \"safe\""),
+    ("option-none-to-reference", "§F{f1:Probe:pub} () -> void\n  §E{}\n  §B{x:?str} §NN"),
+    ("option-explicit", "§F{f1:Probe:pub} () -> Option<str>\n  §E{}\n  §R §SM \"safe\""),
+    ("option-return-as-reference", "§F{f1:Probe:pub} () -> str\n  §E{}\n  §R §SM \"safe\""),
+    ("coalesce-fallback", "§F{f1:Probe:pub} (?str:x) -> str\n  §E{}\n  §R (?? x \"fallback\")"),
+    ("coalesce-throw", "§F{f1:Probe:pub} (?str:x) -> str\n  §E{alloc,throw}\n  §R (?? x §TH §NEW{ArgumentNullException} §/NEW)"),
+    ("unchecked-assignment", "§F{f1:Probe:pub} () -> str\n  §E{env}\n  §B{~x:str} \"safe\"\n  §ASSIGN x §C{System.Environment.GetEnvironmentVariable} §A \"CALOR_N0_UNSET\" §/C\n  §R x"),
+    ("directory-parent", "§F{f1:Probe:pub} () -> void\n  §E{fs:r}\n  §B{x:System.IO.DirectoryInfo} §C{System.IO.Directory.GetParent} §A \"/\" §/C"),
+    ("directory-current-safe", "§F{f1:Probe:pub} () -> void\n  §E{fs:r}\n  §B{x:str} §C{System.IO.Directory.GetCurrentDirectory} §/C"),
+    ("array-nullable-element", "§F{f1:Probe:pub}\n  §I{[?string]:values}\n  §O{void}\n  §E{}\n  §B{x:[string]} values"),
+    ("array-bcl-safe", "§F{f1:Probe:pub} () -> void\n  §E{env}\n  §B{x:str[]} §C{System.Environment.GetCommandLineArgs} §/C"),
+    ("generic-nullable-element", "§F{f1:Probe:pub} (List<?str>:values) -> void\n  §E{}\n  §B{x:List<str>} values"),
+    ("nominal-new-local", "§CL{c1:Foo:pub}\n  §FLD{i32:Value:pub}\n§F{f1:Probe:pub} () -> Foo\n  §E{alloc}\n  §B{x} §NEW{Foo} §/NEW\n  §R x"),
+    ("native-named-reordered", "§CL{c1:Bar:pub}\n  §MT{m1:Take:pub} (Bar:first,?Bar:second) -> i32\n    §E{}\n    §R 1\n  §MT{m2:Probe:pub} (?Bar:x) -> i32\n    §E{alloc}\n    §R §C{this.Take} §A[second] x §A[first] §NEW{Bar} §/NEW §/C"),
+    ("active-duplicate", "§F{f1:Probe:pub} () -> str\n  §E{}\n  §R \"one\"\n§F{f2:Probe:pub} () -> str\n  §E{}\n  §R \"two\""),
+};
+var conversions = new Dictionary<string, object>();
+AddConverted("coalesce-default-null", """
+    #nullable enable
+    namespace N0;
+    public static class N0Module
+    {
+        public static string Probe(string? x) => x ?? default(string);
+    }
+    """);
+AddConverted("typed-pattern", """
+    #nullable enable
+    namespace N0;
+    public static class N0Module
+    {
+        public static string Probe(string? x)
+        {
+            if (x is string text) return text;
+            return "fallback";
+        }
+    }
+    """);
+AddConverted("nullable-disabled-literal", """
+    #nullable disable
+    namespace N0;
+    public static class N0Module
+    {
+        public static string Probe() => "literal";
+    }
+    """);
+AddConverted("nullable-disabled-new", """
+    #nullable disable
+    namespace N0;
+    public class Item { public int Value; }
+    public static class N0Module
+    {
+        public static Item Probe() => new Item();
+    }
+    """);
+
+void AddConverted(string id, string csharp)
+{
+    var conversion = new CSharpToCalorConverter(new ConversionOptions { ModuleName = "N0" }).Convert(csharp, "N0.cs");
+    if (!conversion.Success || string.IsNullOrWhiteSpace(conversion.CalorSource))
+        throw new InvalidOperationException(id + " fixture conversion failed: " +
+            string.Join("; ", conversion.Issues.Select(issue => issue.Message)));
+    conversions.Add(id, new
+    {
+        csharp,
+        conversion.Success,
+        issues = conversion.Issues.Select(issue => issue.Message).ToArray(),
+        losses = conversion.Losses.Select(loss => new { kind = loss.Kind.ToString(), loss.Feature, loss.Line, loss.Description }).ToArray()
+    });
+    fixtures.Add((id, conversion.CalorSource));
+}
+foreach (var version in new[] { "2.0.0", "1.0.0", "3.0.0" })
+    fixtures.Add(("semver-" + version, "§SEMVER{" + version + "}\n§F{f1:Probe:pub} () -> str\n  §E{env}\n  §R §C{System.Environment.GetEnvironmentVariable} §A \"CALOR_N0_UNSET\" §/C"));
+
+var rows = new List<object>();
+foreach (var fixture in fixtures)
+{
+    var source = fixture.Members.StartsWith("§M", StringComparison.Ordinal)
+        ? fixture.Members
+        : "§M{m1:N0}\n" + Indent(fixture.Members) + "\n";
+    var path = Path.Combine(output, fixture.Id + ".calr");
+    File.WriteAllText(path, source);
+    var parseBag = new DiagnosticBag();
+    var ast = Parse(source, parseBag);
+    var typeBag = new DiagnosticBag();
+    if (!parseBag.HasErrors)
+        new TypeChecker(typeBag).Check(Parse(source, new DiagnosticBag()));
+    var bindBag = new DiagnosticBag();
+    var bound = parseBag.HasErrors ? null : new Binder(bindBag, path).Bind(Parse(source, new DiagnosticBag()));
+    using var document = new DocumentState(new Uri(path), source);
+    await document.ReanalyzeAsync();
+    var lsp = document.Diagnostics.Select(d =>
+    {
+        var converted = DiagnosticConverter.ToLspDiagnostic(d, source);
+        return new
+        {
+            code = JsonSerializer.Deserialize<JsonElement>(Newtonsoft.Json.JsonConvert.SerializeObject(converted.Code)).ToString(),
+            severity = converted.Severity.ToString(),
+            start = new { converted.Range.Start.Line, converted.Range.Start.Character },
+            end = new { converted.Range.End.Line, converted.Range.End.Character },
+            d.Message
+        };
+    }).ToArray();
+    var modes = new List<object>();
+    string? defaultGenerated = null;
+    foreach (var mode in new[] { "default", "verify", "no-type-check", "env-no-type-check", "transpile-only", "permissive-effects", "verify-no-type-check" })
+    {
+        Environment.SetEnvironmentVariable("CALOR_NO_TYPE_CHECK", mode == "env-no-type-check" ? "1" : null);
+        using var writer = new StringWriter();
+        var options = new CompilationOptions
+        {
+            EnableTypeChecking = mode is not ("no-type-check" or "verify-no-type-check") && CompilationOptions.TypeCheckingDefault,
+            VerifyContracts = mode.StartsWith("verify", StringComparison.Ordinal),
+            VerificationCacheOptions = VerificationCacheOptions.Disabled,
+            UnsafeTranspileOnly = mode == "transpile-only",
+            UnknownCallPolicy = mode == "permissive-effects" ? UnknownCallPolicy.Permissive : UnknownCallPolicy.Strict,
+            Verbose = true,
+            StatusWriter = writer
+        };
+        var result = CompilerProgram.Compile(source, path, options);
+        if (mode == "default")
+            defaultGenerated = result.GeneratedCode;
+        modes.Add(new
+        {
+            mode,
+            options.EnableTypeChecking,
+            options.VerifyContracts,
+            options.UnsafeTranspileOnly,
+            unknownCallPolicy = options.UnknownCallPolicy.ToString(),
+            result.HasErrors,
+            diagnostics = Diagnostics(result.Diagnostics),
+            phases = writer.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries),
+            generatedSha256 = Hash(result.GeneratedCode),
+            generatedLength = result.GeneratedCode.Length
+        });
+    }
+    rows.Add(new
+    {
+        fixture.Id,
+        source,
+        sourceSha256 = Hash(source),
+        parse = Diagnostics(parseBag),
+        independentAnalysisRan = !parseBag.HasErrors,
+        typeChecker = Diagnostics(typeBag),
+        binder = Diagnostics(bindBag),
+        boundTypes = (bound is null ? Enumerable.Empty<BoundNode>() : Walk(bound)).OfType<BoundExpression>().Select(e => new
+        {
+            node = e.GetType().Name,
+            callTarget = (e as BoundCallExpression)?.Target,
+            span = Span(e.Span),
+            type = TypeInfo(e.Type)
+        }).ToArray(),
+        symbols = (bound?.SymbolsById.Values.OfType<VariableSymbol>() ?? []).Select(s => new
+        {
+            s.Name, s.IsParameter, s.TypeName
+        }).ToArray(),
+        lsp,
+        modes,
+        defaultGenerated,
+        runtime = RunGenerated(defaultGenerated, fixture.Id)
+    });
+}
+
+var metadata = CaptureMetadata();
+var resultDocument = new
+{
+    capturedAtUtc = DateTimeOffset.UtcNow,
+    framework = RuntimeInformation.FrameworkDescription,
+    architecture = RuntimeInformation.ProcessArchitecture.ToString(),
+    compilerAssemblyVersion = typeof(CompilerProgram).Assembly.GetName().Version?.ToString(),
+    compilerInformationalVersion = typeof(CompilerProgram).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
+    compilerBinarySha256 = FileHash(typeof(CompilerProgram).Assembly.Location),
+    roslynVersion = typeof(CSharpCompilation).Assembly.GetName().Version?.ToString(),
+    metadata,
+    conversions,
+    rows
+};
+File.WriteAllText(Path.Combine(output, "api-lsp-baseline.json"),
+    JsonSerializer.Serialize(resultDocument, new JsonSerializerOptions { WriteIndented = true }) + "\n");
+Console.WriteLine($"Captured {rows.Count} source fixtures to {output}");
+
+using (var context = new CompilationContext { SharedEffectResolver = new EffectResolver() })
+using (var document = new DocumentState(new Uri(Path.Combine(output, "reuse.calr")), "", 0))
+{
+    var reuse = new List<object>();
+    var version = 0;
+    foreach (var id in new[] { "bind-bcl-nullable", "bind-literal", "active-duplicate", "return-bcl-nullable", "bind-literal" })
+    {
+        var source = File.ReadAllText(Path.Combine(output, id + ".calr"));
+        var simple = CompilerProgram.Compile(source, id + ".calr");
+        var shared = CompilerProgram.Compile(source, id + ".calr", new CompilationOptions
+        {
+            Context = context, VerificationCacheOptions = VerificationCacheOptions.Disabled
+        });
+        var update = await document.UpdateAsync(source, ++version);
+        reuse.Add(new
+        {
+            id, version, update.Accepted,
+            simple = new { simple.HasErrors, diagnostics = Diagnostics(simple.Diagnostics) },
+            shared = new { shared.HasErrors, diagnostics = Diagnostics(shared.Diagnostics) },
+            lsp = Diagnostics(update.Snapshot.Diagnostics)
+        });
+    }
+    File.WriteAllText(Path.Combine(output, "reuse.json"),
+        JsonSerializer.Serialize(reuse, new JsonSerializerOptions { WriteIndented = true }) + "\n");
+}
+
+if (args.Length > 2)
+{
+    using var corpusOutput = File.CreateText(Path.Combine(output, "standalone-corpus.jsonl"));
+    foreach (var relativePath in File.ReadAllLines(args[2]))
+    {
+        var source = File.ReadAllText(Path.Combine(root, relativePath));
+        var phase = "parse";
+        object row;
+        try
+        {
+            var parse = new DiagnosticBag();
+            Parse(source, parse);
+            var type = new DiagnosticBag();
+            var binder = new DiagnosticBag();
+            BoundModule? bound = null;
+            if (!parse.HasErrors)
+            {
+                phase = "type-checker";
+                new TypeChecker(type).Check(Parse(source, new DiagnosticBag()));
+                phase = "binder";
+                bound = new Binder(binder, relativePath).Bind(Parse(source, new DiagnosticBag()));
+            }
+            phase = "Program.Compile";
+            var compiled = CompilerProgram.Compile(source, relativePath, new CompilationOptions
+            {
+                VerificationCacheOptions = VerificationCacheOptions.Disabled
+            });
+            row = new
+            {
+                path = relativePath, sourceSha256 = Hash(source), status = "completed",
+                parse = Diagnostics(parse), typeChecker = Diagnostics(type), binder = Diagnostics(binder),
+                api = Diagnostics(compiled.Diagnostics), compiled.HasErrors,
+                boundTypeKinds = (bound is null ? Enumerable.Empty<BoundNode>() : Walk(bound))
+                    .OfType<BoundExpression>().GroupBy(e => e.Type.GetType().Name)
+                    .ToDictionary(g => g.Key, g => g.Count()),
+                generatedSha256 = Hash(compiled.GeneratedCode),
+                independentAnalysisRan = !parse.HasErrors
+            };
+        }
+        catch (Exception exception)
+        {
+            row = new
+            {
+                path = relativePath, sourceSha256 = Hash(source), status = "crashed", phase,
+                exception = exception.ToString()
+            };
+            Console.Error.WriteLine($"Corpus observation crashed: {relativePath} ({phase}): {exception}");
+        }
+        corpusOutput.WriteLine(JsonSerializer.Serialize(row));
+        corpusOutput.Flush();
+    }
+}
+
+static string Indent(string text) => string.Join("\n", text.Split('\n').Select(line => "  " + line));
+static ModuleNode Parse(string source, DiagnosticBag bag) => new Parser(
+    new Lexer(source, bag).TokenizeAllForParser(), bag).Parse();
+static object[] Diagnostics(IEnumerable<Calor.Compiler.Diagnostics.Diagnostic> bag) => bag.Select(d => (object)new
+{
+    code = d.Code,
+    severity = d.Severity.ToString(),
+    span = Span(d.Span),
+    d.Message,
+    compilationError = BindingDiagnosticPolicy.IsCompilationError(d)
+}).ToArray();
+static object Span(TextSpan span) => new { span.Start, span.Length, span.Line, span.Column };
+static string Hash(string text) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
+static string FileHash(string path) => Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path)));
+static object? RunGenerated(string? code, string id)
+{
+    var invocations = id switch
+    {
+        "coalesce-fallback" or "coalesce-throw" or "coalesce-default-null" or "typed-pattern" => new object?[][] { [null], ["present"] },
+        "unchecked-assignment" or "return-literal" or "argument-bcl-literal"
+            or "nullable-disabled-literal" or "nullable-disabled-new" => new object?[][] { [] },
+        _ => null
+    };
+    if (invocations is null || string.IsNullOrWhiteSpace(code))
+        return null;
+    var compilation = CSharpCompilation.Create("N0_" + Guid.NewGuid().ToString("N"),
+        [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + code)],
+        GeneratedCSharpCompiler.References,
+        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    using var stream = new MemoryStream();
+    var emitted = compilation.Emit(stream);
+    if (!emitted.Success)
+        return new { compilerErrors = emitted.Diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).Select(d => d.ToString()).ToArray() };
+    var assembly = Assembly.Load(stream.ToArray());
+    var method = assembly.GetType("N0.N0Module", throwOnError: true)!.GetMethod("Probe")
+        ?? throw new InvalidOperationException("Probe method missing from generated assembly");
+    return invocations.Select(arguments =>
+    {
+        try
+        {
+            var value = method.Invoke(null, arguments);
+            return (object)new { arguments, value, isNull = value is null, exception = (string?)null };
+        }
+        catch (TargetInvocationException exception) when (exception.InnerException is ArgumentNullException)
+        {
+            return new { arguments, value = (object?)null, isNull = false, exception = exception.InnerException.GetType().FullName };
+        }
+    }).ToArray();
+}
+static IEnumerable<BoundNode> Walk(BoundNode root)
+{
+    var pending = new Stack<BoundNode>();
+    pending.Push(root);
+    while (pending.TryPop(out var node))
+    {
+        yield return node;
+        foreach (var child in node.ChildNodes.Reverse())
+            pending.Push(child);
+    }
+}
+static object TypeInfo(BoundType type) => new
+{
+    kind = type.GetType().Name,
+    type.DisplayString,
+    type.FullyQualifiedName,
+    annotation = type switch
+    {
+        NominalBoundType n => n.NullableAnnotation.ToString(),
+        ArrayBoundType a => a.NullableAnnotation.ToString(),
+        GenericInstantiationBoundType g => g.NullableAnnotation.ToString(),
+        _ => null
+    },
+    declaration = (type as NominalBoundType)?.Declaration?.Name,
+    roslynIdentity = (type as NominalBoundType)?.RoslynSymbol?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+    roslynKind = (type as NominalBoundType)?.RoslynSymbol?.TypeKind.ToString(),
+    elements = type switch
+    {
+        ArrayBoundType a => new[] { TypeInfo(a.ElementType) },
+        GenericInstantiationBoundType g => g.TypeArguments.Select(TypeInfo).ToArray(),
+        FunctionBoundType f => f.ParameterTypes.Append(f.ReturnType).Select(TypeInfo).ToArray(),
+        _ => Array.Empty<object>()
+    },
+    unresolvedReason = (type as UnresolvedBoundType)?.Reason
+};
+static object CaptureMetadata()
+{
+    var assembly = typeof(Binder).Assembly;
+    var contextType = assembly.GetType("Calor.Compiler.Binding.Metadata.MetadataContext", throwOnError: true)!;
+    using var context = (IDisposable)(contextType.GetMethod("Create")!.Invoke(null, null)
+        ?? throw new InvalidOperationException("MetadataContext.Create returned null"));
+    var host = (CSharpCompilation)(contextType.GetProperty("HostCompilationForBinder", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(context)
+        ?? throw new InvalidOperationException("MetadataContext host missing"));
+    var binderType = assembly.GetType("Calor.Compiler.Binding.Metadata.MetadataBinder", throwOnError: true)!;
+    var argumentType = assembly.GetType("Calor.Compiler.Binding.Metadata.MetadataArgument", throwOnError: true)!;
+    var metadataBinder = Activator.CreateInstance(binderType, context)
+        ?? throw new InvalidOperationException("MetadataBinder construction failed");
+    var stringType = host.GetSpecialType(SpecialType.System_String);
+    var arguments = Array.CreateInstance(argumentType, 1);
+    arguments.SetValue(Activator.CreateInstance(argumentType, stringType, RefKind.None), 0);
+    var receiver = host.GetTypeByMetadataName("System.IO.Directory")
+        ?? throw new InvalidOperationException("Directory metadata missing");
+    var resolved = binderType.GetMethod("ResolveCall")!.Invoke(metadataBinder, [receiver, "GetParent", arguments])
+        ?? throw new InvalidOperationException("Directory.GetParent resolution missing");
+    var symbol = resolved.GetType().GetProperty("Symbol")!.GetValue(resolved) as IMethodSymbol
+        ?? throw new InvalidOperationException("Directory.GetParent did not resolve to a method");
+    var declarationReference = host.GetMetadataReference(symbol.ContainingAssembly) as PortableExecutableReference
+        ?? throw new InvalidOperationException("Resolved declaring assembly reference missing");
+    return new
+    {
+        nullableContext = host.Options.NullableContextOptions.ToString(),
+        directoryParent = resolved.GetType().GetProperties().ToDictionary(p => p.Name,
+            p => p.GetValue(resolved)?.ToString()),
+        directoryParentDetails = new
+        {
+            returnType = symbol.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            annotation = symbol.ReturnNullableAnnotation.ToString(),
+            declaringAssembly = symbol.ContainingAssembly.Identity.ToString(),
+            path = declarationReference.FilePath,
+            sha256 = FileHash(declarationReference.FilePath!)
+        },
+        references = host.References.OfType<PortableExecutableReference>()
+            .OrderBy(r => r.FilePath, StringComparer.Ordinal).Select(r => new
+            {
+                path = r.FilePath,
+                sha256 = FileHash(r.FilePath ?? throw new InvalidOperationException("Reference path missing")),
+                identity = (host.GetAssemblyOrModuleSymbol(r) as IAssemblySymbol)?.Identity.ToString()
+            }).ToArray()
+    };
+}
