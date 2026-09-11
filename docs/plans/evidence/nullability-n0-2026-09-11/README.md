@@ -42,7 +42,8 @@ unreached FluentValidation leg and Serilog restore crashes. No recovery,
 interop, skipped-test or failed-file count is silently folded into "native."
 `tests.json` records every selected existing test name/outcome and TRX counters.
 
-Absolute owned-worktree paths are replaced with `<REPO>`. Framework paths and
+Absolute owned-worktree paths are replaced with `<REPO>`; help captures have
+trailing empty lines trimmed. Framework paths and
 assembly hashes are the actual host inputs. Source/generated hashes were
 captured before presentation normalization; `#line` paths affect emitted bytes.
 Timestamps, host references and compiler binary hashes are environment-specific.
@@ -75,6 +76,10 @@ python3 .n0-evidence/probe/surfaces.py "$PWD"
 dotnet build src/Calor.Tasks --nologo
 python3 .n0-evidence/probe/msbuild.py "$PWD"
 ```
+
+`dotnet run` builds the referenced Compiler and LanguageServer projects before
+the Python CLI drivers run. The probe itself clears `CALOR_N0_UNSET` before
+executing runtime cases; an inherited value cannot change those observations.
 
 Before running generated execution/MSBuild/harness projects, create the same
 neutral scratch-ancestor files in `.n0-evidence/tmp`: `Directory.Build.props`

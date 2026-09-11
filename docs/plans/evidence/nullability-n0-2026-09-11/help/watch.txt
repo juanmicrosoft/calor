@@ -23,6 +23,3 @@ Options:
   --no-telemetry                   Force-disable anonymous usage telemetry (telemetry is OPT-IN and off by default; it activates only when CALOR_TELEMETRY=1 is set — see docs/telemetry.md)
   --telemetry-preview              Print schema-approved telemetry payloads locally to stderr without network transmission
   -?, -h, --help                   Show help and usage information
-
-
-

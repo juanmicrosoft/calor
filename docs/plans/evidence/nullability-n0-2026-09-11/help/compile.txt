@@ -65,4 +65,3 @@ Commands:
   run <path>                     Compile and execute a Calor program (no project file required)
   test <path>                    Compile Calor sources and run tests against them (no project file required)
   watch <paths>                  Watch Calor sources and recompile incrementally on change (compile-only)
-
