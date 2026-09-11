@@ -2,8 +2,9 @@ Independent final-head review of juanmicrosoft/calor PR1443, issue1397.
 
 The invocation supplies your exact head and lens. Verify that head and a clean
 tracked worktree before and after reviewing. Base is
-be488238d3aac374995174aa47526c7f3d09fd51; production measurement is
-b2c435610c3aa34accc0f28f66d5eca834d7a129. Worktree:
+be488238d3aac374995174aa47526c7f3d09fd51; latest source is
+1edc709e25028175be970d704c16eba3af8a5ce1. Product ledgers were generated at
+b2c435610c3aa34accc0f28f66d5eca834d7a129 and assert unchanged at1edc709e. Worktree:
 /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/typing-1397
 
 Read LIVE1397/1082, PR1443, the COMPLETE actual base-to-head diff, the evidence
@@ -62,6 +63,17 @@ Historical failures are retained, not dismissed:
   remains separate. Count is pure; Dictionary/SortedDictionary Keys/Values
   allocate. SortedDictionary has no blanket default or method purity. Existing
   ConcurrentDictionary manifest is reused. Unknowns must not become safe.
+-3bdb8e40 final reviews disagreed: integration03177048 BLOCK on a real dictionary
+  alias initializer (new D) losing type before its semantic guard; compatibility
+  c14ac50d ACCEPT. All36CIgreen at3b did NOT override this reproduced blocker.
+-1edc709e removes only the syntactic name filter, retaining initializer syntax
+  and semantic actual-BCL/spellability gates. Eight alias runtime/typing cases
+  reproduced the failure, two nullable/dynamic exclusions remained green. An
+  alias-only ConcurrentDictionary case then exposed missing namespace import
+  caused by minimally qualified emitted types. Qualified Roslyn type/argument
+  display fixes that actual error without adding imports to the fixture. All46
+  dictionary cases now pass. Independently challenge alias semantics, namespace
+  retention, guards and the full prior diff; do not only review the small delta.
 
 Current product data:0425 remains117 diagnostics/47modules/326enforced,38
 propagated-bind exclusions.0411 sites297/551/7932 inside unchanged12/61/115
@@ -74,6 +86,10 @@ Formatter11-05 already failed baseCLI1002/CS0246; now fails earlier0411/0410.
 No safety denominator reduction or improved-general-resolution claim.
 Both affected product index entries pinb2c43561; all other/frozen entries unchanged.
 Normal merge commit is required to preserve the indexed production ancestor.
+The generic null-conditional Dict receiver d?.Keys can still report0411 rather
+than resolving alloc; this disclosed fail-closed broader receiver limitation is
+not repaired or counted resolved. Dictionary's pre-existing default manifest
+purity is unchanged; SortedDictionary has no new default.
 
 The ordinary nullable nominal member-read still fails0411/0410. Its effect-off
 typing probe is not an ordinary safe/resolved control, nor evidence that the same
@@ -88,7 +104,7 @@ concurrently or overwrite prior artifacts. Avoid external artifacts layout
 unless explicitly arranging and documenting its metadata prerequisite. Your own
 scratch only under session files/t1-b2-integration-probes or
 files/t1-b2-compatibility-probes according to lens. No new test framework.
-Author's latest results:579compiler,11LSP,105tasks,282productenforcement,
+Author's latest results:589compiler,11LSP,105tasks,282productenforcement,
 156conversion; no skips. The README gives exact selectors; independently run
 useful tests/counterexamples rather than echoing results. Do not relabel the
 earlier63-case external-profile result as current.

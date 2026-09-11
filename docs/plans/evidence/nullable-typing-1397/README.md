@@ -358,3 +358,49 @@ evidence.
 indexed production measurement commit `b2c43561` remains an ancestor and resolves
 in a fresh main checkout. The repository permits merge commits. This is a
 provenance requirement, not authorization to merge before delegated adjudication.
+
+## Alias review finding and final source checkpoint
+
+The actual reviews of `3bdb8e40c6a3a2eca9bcfde7e98a01a2e43c0cfa` disagreed:
+integration context `03177048-087f-4db5-9712-3c46ab9246f0` (GPT-5.5) **blocked**
+on `using D = System.Collections.Generic.Dictionary<int,int>; var d = new D ...;
+return d.Count.ToString();`. Compatibility context
+`c14ac50d-191b-49b0-8615-e59134c40f95` (Claude Opus4.8) accepted the bounded
+contract. All36 CI checks subsequently passed at that head, but the reproduced
+review finding still blocked acceptance; green CI did not override it.
+
+Source remediation is `1edc709e25028175be970d704c16eba3af8a5ce1`.
+The syntactic dictionary-name filter prevented aliases from reaching the
+semantic BCL/result-shape guard. Removing only that name filter retains the
+initializer-operation and semantic/spellability gates. Five actual runtime
+alias cases and three type-identity cases reproduced the defect (eight failed
+of46 dictionary cases). Two additional nullable-value/dynamic argument controls
+continued to exclude those shapes.
+
+After that fix, the ConcurrentDictionary alias-only control exposed a second
+coupled defect: a minimally qualified emitted type requires an ordinary namespace
+import that an alias does not supply. The bounded helper now emits namespace-
+qualified dictionary and argument types using Roslyn's display format, while
+retaining nullable modifiers for exclusion checks. The test does not add the
+missing import to hide the failure. No general alias resolver, generic-inference
+policy, new manifest entry or nullable activation was added.
+
+At1edc709e the expanded compiler selection passes589/589, including all46
+dictionary cases and unchanged product corpus/stamp assertions. LSP11/11,
+MSBuild/cache105/105, product enforcement282/282 and conversion156/156 pass after
+rebuild, no skips. Compiler TRX SHA-256:
+`29d3772c0834f6a9fa96591246437877c89533eb3292c1f029ec943d8dc803cf`.
+Compiler manifest is now8802; the other totals and all skip pins are unchanged.
+The product data measured atb2c43561 remain unchanged under the normal assertions;
+they are not restamped or relabeled as newly generated at1edc709e.
+
+The compatibility reviewer also reproduced an unresolved generic null-conditional
+receiver (`d?.Keys` with a `Dict` receiver), which reports0411 instead of resolving
+the allocating getter. This fails closed, is not counted resolved/safe, and
+remains a disclosed broader receiver/member limitation. The alias repair does
+not claim to fix it. Dictionary's pre-existing blanket default manifest coverage
+also remains unchanged; no such default was added for SortedDictionary.
+
+Fresh reviews must cover this final source and its exact evidence head. Prior
+approvals and the36-green3bdb8e40 CI result do not approve or validate the later
+head. The b2c43561 ancestry/normal-merge requirement still applies.
