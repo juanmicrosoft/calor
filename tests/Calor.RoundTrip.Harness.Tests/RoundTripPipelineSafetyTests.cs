@@ -124,7 +124,8 @@ public sealed class RoundTripPipelineSafetyTests
     [Fact]
     public async Task Evidence_ActualBuildRecoveryPreservesOriginalCandidateDiagnostics()
     {
-        var root = CreateProject("public static class Seed { public static int Read() => 1; }");
+        var root = CreateProject("public static class Seed { public static string Read() => "
+            + "System.Environment.GetEnvironmentVariable(\"CALOR_E1_UNSET\"); }");
         try
         {
             await File.WriteAllTextAsync(Path.Combine(root, "Safety.csproj"),
@@ -149,16 +150,19 @@ public sealed class RoundTripPipelineSafetyTests
                 Assert.Equal(FileStatus.Replaced, file.Status);
                 var candidateId = file.Candidate!.CandidateId;
                 var diagnostics = file.Candidate.Diagnostics.ToArray();
+                var analysisDiagnostics = file.Candidate.AnalysisDiagnostics.ToArray();
+                Assert.Contains(analysisDiagnostics, diagnostic => diagnostic.Code == "Calor0273");
                 var originalHash = file.Candidate.InputSha256;
                 // Deliberately injected recovery control, not claimed as a natural converter regression.
                 await File.WriteAllTextAsync(Path.Combine(work, file.FilePath),
-                    "public static class Seed { public static int Read() => MissingRecoverySymbol; }");
+                    "public static class Seed { public static string Read() => MissingRecoverySymbol; }");
                 Assert.Equal(1, await pipeline.RecoverBuildAsync(work, config, files));
                 Assert.Equal(FileStatus.Reverted, file.Status);
                 Assert.Equal(FileStatus.Replaced, file.Candidate.StatusBeforeRecovery);
                 Assert.Equal("Accepted", file.Candidate.CompilationOutcome);
                 Assert.Equal(candidateId, file.Candidate.CandidateId);
                 Assert.Equal(diagnostics, file.Candidate.Diagnostics);
+                Assert.Equal(analysisDiagnostics, file.Candidate.AnalysisDiagnostics);
                 Assert.Equal(originalHash, ReportGenerator.HashFile(Path.Combine(work, file.FilePath)));
                 Assert.Contains(Assert.Single(file.Recovery).Diagnostics,
                     diagnostic => diagnostic.Code == "CS0103" && diagnostic.Path == "Lib/Invalid.cs"
