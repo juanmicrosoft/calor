@@ -74,7 +74,10 @@ class ProspectiveModelPinsTests(unittest.TestCase):
         self.assertNotEqual(self.pins["compiler"]["compilerHash"], self.pins["compiler"]["calorSha256"])
         amendment = load(METHOD / "spending-instrument-amendment.json")
         self.assertEqual(self.pins["harnessArtifacts"], amendment["supersededHarnessArtifacts"])
-        for filename, sha in amendment["replacementHarnessArtifacts"].items():
+        gateway = load(METHOD / "gateway-instrument-amendment.json")
+        self.assertEqual(amendment["replacementHarnessArtifacts"], gateway["supersededHarnessArtifacts"])
+        self.assertEqual(digest(METHOD / "spending-instrument-amendment.json"), gateway["supersedes"]["sha256"])
+        for filename, sha in gateway["replacementHarnessArtifacts"].items():
             self.assertEqual(digest(BENCH / filename), sha)
 
     def test_spending_amendment_preserves_historical_inputs_without_activating_collection(self):
@@ -86,7 +89,11 @@ class ProspectiveModelPinsTests(unittest.TestCase):
         for relative, sha in amendment["preservedArtifacts"].items():
             self.assertEqual(digest(BENCH / relative), sha, relative)
         spending = self.instrument.helper("ppw-spending.py")
-        self.assertEqual(spending.artifact_manifest(), amendment["replacementHarnessArtifacts"])
+        gateway = load(METHOD / "gateway-instrument-amendment.json")
+        self.assertEqual(amendment["replacementHarnessArtifacts"], gateway["supersededHarnessArtifacts"])
+        self.assertEqual(spending.artifact_manifest(spending.GATEWAY), gateway["replacementHarnessArtifacts"])
+        self.assertEqual(15, len(amendment["replacementHarnessArtifacts"]))
+        self.assertEqual(25, len(gateway["replacementHarnessArtifacts"]))
         analysis = load(METHOD / "analysis-registration.json")
         for reference in ("supersedes", "instrumentAmendment"):
             proof = analysis[reference]

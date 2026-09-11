@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import unittest
+from unittest.mock import patch
 import uuid
 
 from ppw_redesign_epoch import BENCH, instrument
@@ -147,6 +148,57 @@ class NativeSourceInspectionTests(unittest.TestCase):
             env=dict(os.environ, TMPDIR=str(self.root)))
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertEqual(inspection.sha(self.compiler), inspection.sha(output / "calor.dll"))
+
+    def test_prepopulated_cache_is_compared_with_a_fresh_trusted_build(self):
+        tool = self.root / "source-inspection"
+        tool.mkdir()
+        for name in inspection.SOURCE_FILES:
+            shutil.copy2(inspection.TOOL / name, tool / name)
+        fingerprint = inspection.hashlib.sha256(json.dumps({
+            "builder": 4, "compiler": inspection.sha(self.compiler),
+            "sources": {name: inspection.sha(tool / name) for name in inspection.SOURCE_FILES},
+        }, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        binary = tool / "cache" / fingerprint / "bin/ppw-source-inspector.dll"
+        binary.parent.mkdir(parents=True)
+        binary.write_bytes(b"SYNTHETIC substituted assembly")
+        shutil.copy2(self.compiler, binary.parent / "calor.dll")
+        with patch.object(inspection, "TOOL", tool), \
+                self.assertRaisesRegex(ValueError, "prepopulated source inspector cache"):
+            inspection.prepare(self.compiler)
+
+    def test_runtime_dependencies_and_report_identity_are_exact(self):
+        runtime = inspection.prepare(self.compiler)
+        directories = inspection.control_directories(self.pair, self.task)
+        report = inspection.inspect(self.pair, directories, self.compiler, runtime)
+        inspection.validate_controls(
+            report, self.pair, self.task, inspection.sha(self.compiler), runtime)
+        altered = dict(report, inspectorSha256="f" * 64)
+        with self.assertRaisesRegex(ValueError, "registered inspector runtime"):
+            inspection.validate_controls(
+                altered, self.pair, self.task, inspection.sha(self.compiler), runtime)
+
+        copied = self.root / "runtime"
+        shutil.copytree(Path(runtime["binary"]).parent, copied / "bin")
+        copied_runtime = dict(runtime, binary=str(copied / "bin/ppw-source-inspector.dll"),
+                              manifest=str(copied / "runtime.json"))
+        unsigned = {name: value for name, value in copied_runtime.items()
+                    if name != "runtimeSha256"}
+        copied_runtime["runtimeSha256"] = inspection.hashlib.sha256(json.dumps(
+            unsigned, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        (copied / "runtime.json").write_text(json.dumps(copied_runtime, sort_keys=True) + "\n")
+        inspection.validate_runtime(copied_runtime, self.compiler)
+        nested_name = next(name for name in runtime["files"] if "/" in name)
+        nested = copied / "bin" / nested_name
+        original = nested.read_bytes()
+        nested.write_bytes(original + b"altered")
+        with self.assertRaisesRegex(ValueError, "dependency bytes changed"):
+            inspection.validate_runtime(copied_runtime, self.compiler)
+        nested.write_bytes(original)
+        inspection.validate_runtime(copied_runtime, self.compiler)
+        dependency = copied / "bin/calor.dll"
+        dependency.write_bytes(dependency.read_bytes() + b"altered")
+        with self.assertRaisesRegex(ValueError, "dependency bytes changed"):
+            inspection.validate_runtime(copied_runtime, self.compiler)
 
 
 if __name__ == "__main__":

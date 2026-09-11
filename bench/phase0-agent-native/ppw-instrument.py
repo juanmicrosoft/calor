@@ -14,6 +14,7 @@ import math
 import os
 from pathlib import Path
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -157,6 +158,10 @@ def validate_pins(pins, registration, stage, epoch_id):
     require(all(value.get("compilerSha256") == compiler["calorSha256"]
                 for value in registration["sourceInspections"].values()),
             "source-inspection compiler differs from the shared compiler")
+    source_inspector = selected.get("sourceInspector")
+    if source_inspector is not None:
+        require(source_inspector.get("compilerSha256") == compiler["calorSha256"],
+                "registered source-inspector runtime uses another compiler")
     require(pins.get("dataKind") in ("empirical", "synthetic"), "dataKind must be explicit")
     require(pins.get("mode") == "live", "null-agent plumbing is not an analysable collection")
     require(pins.get("harnessCommit") and pins.get("modelPin") and pins.get("agentVersion"),
@@ -240,6 +245,7 @@ def analyze(epochs_root, epoch_id, stage):
     pins = load(epoch / "pins.json")
     registration = load(epoch / "registration.json")
     validate_pins(pins, registration, stage, epoch_id)
+    selected = registration["stages"][stage]
     require(digest(epoch / "registration.json") == pins.get("registrationSha256"),
             "registration hash differs from pins")
     validate_tasks(epoch / "tasks", registration)
@@ -334,7 +340,7 @@ def analyze(epochs_root, epoch_id, stage):
                 source_report = load(run_dir / "source-inspection.json")
                 starter = epoch / "tasks" / task / ("starter-" + arm.lower())
                 inspection.validate(source_report, pair, {"baseline": starter, "final": final_source},
-                                    pins["compiler"]["calorSha256"])
+                                    pins["compiler"]["calorSha256"], selected.get("sourceInspector"))
                 baseline = inspection.observation(source_report, "baseline")
                 frozen = inspection.observation(registration["sourceInspections"][task],
                                                 "starter-" + arm.lower())
@@ -454,6 +460,9 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
     identifier(epoch_id)
     registration_path = Path(registration_path).resolve()
     registration = load(registration_path)
+    operational_profile = registration.get("kind") == "pp-w-request-gateway-execution-profile"
+    if operational_profile:
+        registration = helper("ppw-gateway-registration.py").resolve_profile(registration_path)
     selected = validate_registration(registration, stage, epoch_id)
     validate_tasks(tasks_root, registration)
     authorization = validate_collection_authorization(
@@ -463,14 +472,39 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
     spending = helper("ppw-spending.py")
     admission = spending.admit(
         registration, selected, authorization, registration_path.parent, epoch_id, stage)
+    gateway_mode = admission.get("mechanism") == spending.GATEWAY
+    gateway_module = helper("ppw-budget-gateway.py") if gateway_mode else None
+    isolation = helper("ppw-gateway-client.py") if gateway_mode else None
     require(not command(["git", "-C", str(REPO), "status", "--porcelain",
                          "--", str(BENCH)]), "harness checkout is dirty")
     require(os.environ.get("CLAUDE_MODEL") == selected["modelPin"], "CLAUDE_MODEL differs from registration")
-    require(command(["claude", "--version"]) == selected["agentVersion"], "agent version differs from registration")
-    shared = product(compiler_root, registration["compilerCommit"])
     harness_hashes = admission["harnessArtifacts"]
     harness_files = tuple(harness_hashes)
-    require(spending.artifact_manifest() == harness_hashes, "registered harness changed after admission")
+    require(spending.artifact_manifest(admission.get("mechanism", spending.CONTROL)) == harness_hashes,
+            "registered harness changed after admission")
+    repository_read_denials = []
+    if gateway_mode:
+        repository_read_denials = isolation.discover_sensitive_roots(
+            (REPO, Path(compiler_root).resolve()))
+    client_command = admission["clientExecutable"] if gateway_mode else "claude"
+    require(command([client_command, "--version"],
+                    env=dict(os.environ, DISABLE_AUTOUPDATER="1")) == selected["agentVersion"],
+            "agent version differs from registration")
+    shared = product(compiler_root, registration["compilerCommit"])
+    runtime = Path(compiler_root) / "src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll"
+    if gateway_mode:
+        require(runtime.is_file() and digest(runtime) == admission["runtimeSha256"],
+                "gateway requires the frozen prebuilt runtime, never a rebuilt product")
+        inspection_runtime = helper("ppw-source-inspection.py").prepare(shared["calorDll"])
+        require(inspection_runtime == admission["sourceInspector"],
+                "prospective source-inspector rebuild differs from the registered runtime")
+        for certificate in registration["sourceInspections"].values():
+            require(certificate.get("inspectorSha256")
+                    == inspection_runtime["files"]["ppw-source-inspector.dll"]
+                    and certificate.get("inspectorRuntimeSha256")
+                    == inspection_runtime["runtimeSha256"],
+                    "gateway source-inspection certificate differs from the registered runtime")
+        helper("ppw-test-host.py").validate_runtime(admission["testHost"])
     epoch = local(epochs_root, epoch_id)
     require(not epoch.exists(), "epoch already exists; use a reviewed new epoch id, never overwrite")
     # Canaries run outside the epoch and before any agent invocation.
@@ -484,6 +518,8 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
         for definition in ARMS.values():
             argv = pair_command(Path(tasks_root) / registration["tasks"][0], definition,
                                 shared, work, 0) + ["--canary-only"]
+            if gateway_mode:
+                argv += ["--ppw-gateway-client", admission["clientExecutable"]]
             evidence = json.loads(command(argv, env=env))
             require(evidence.get("armCanary") ==
                     ("permissive-ok" if definition["policy"] == "permissive" else "strict-ok"),
@@ -494,17 +530,45 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
         require(product(compiler_root, registration["compilerCommit"]) ==
                 {k: v for k, v in shared.items() if k != "compilerHash"},
                 "compiler product changed during preflight")
-        ledger = spending.Ledger(admission["ledgerPath"])
-        ledger.initialize(admission)
+        if gateway_mode:
+            ledger = gateway_module.budget.RequestLedger(admission["ledgerPath"])
+            ledger.initialize({
+                "stage": stage, "epochId": epoch_id, "priceSha256": admission["priceSha256"],
+                "authorizationSha256": admission["authorizationSha256"],
+                "protocolSha256": admission["protocolSha256"], "planSha256": admission["planSha256"],
+                "harnessArtifacts": harness_hashes,
+                "plannedSlots": [slot["id"] for slot in admission["slots"]],
+            }, admission["ceilingUnits"])
+        else:
+            ledger = spending.Ledger(admission["ledgerPath"])
+            ledger.initialize(admission)
         owner = ledger.start()
         epoch.mkdir(parents=True)
-        shutil.copy2(registration_path, epoch / "registration.json")
+        if operational_profile:
+            write_new(epoch / "registration.json", registration)
+        else:
+            shutil.copy2(registration_path, epoch / "registration.json")
         shutil.copytree(tasks_root, epoch / "tasks")
         write_new(epoch / "spending-initial.json", ledger.snapshot())
         shutil.copy2(local(registration_path.parent, selected["spendAuthorization"]["path"]),
                      epoch / "spending-authorization.json")
         shutil.copy2(local(registration_path.parent, selected["spendingPlan"]["path"]),
                      epoch / "spending-plan.json")
+        if gateway_mode:
+            proofs = [selected[name] for name in
+                      ("spendAuthorization", "stageRegistration", "modelRegistration",
+                       "instrumentAmendment", "spendingPlan")]
+            if operational_profile:
+                proofs.append(selected["executionProfile"])
+                proofs.append(selected["sourceInspectionEvidence"])
+            proofs.extend(admission["forecastEvidence"].values())
+            for proof in proofs:
+                destination = local(epoch, proof["path"])
+                require(not destination.exists(), "operational proof would overwrite an epoch artifact")
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(local(registration_path.parent, proof["path"]), destination)
+                require(digest(destination) == proof["sha256"],
+                        "operational proof changed during archival")
         pins = {"schemaVersion": 2, "kind": KIND, "epochId": epoch_id, "stage": stage,
                 "dataKind": "empirical", "mode": "live", "lifecycle": "collecting",
                 "harnessCommit": command(["git", "-C", str(REPO), "rev-parse", "HEAD"]),
@@ -523,11 +587,80 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                             {k: v for k, v in shared.items() if k != "compilerHash"},
                             "shared compiler drift before run")
                     slot = "%s/%s/%d" % (task, definition["label"], run)
+                    run_directory = epoch / "runs" / task / definition["label"] / ("run-%d" % run)
+                    if gateway_mode:
+                        require(digest(runtime) == admission["runtimeSha256"], "runtime drift before run")
+                        run_directory.mkdir(parents=True)
+                        protected = Path(admission["ledgerPath"]).parent
+                        context_path = protected / ("invocation-" + secrets.token_hex(16) + ".json")
+                        try:
+                            pair = load(epoch / "tasks" / task / "pair.json")
+                            original_task = Path(tasks_root).resolve() / task
+                            hidden_test = next((original_task / "tests").glob("*.cs"))
+                            seeded_paths = [value for group in pair.get("seeded", {}).values()
+                                            if isinstance(group, dict) for value in group.values()
+                                            if isinstance(value, str)]
+                            require(seeded_paths, "a seeded solution is required for isolation probing")
+                            seeded_root = original_task / seeded_paths[0]
+                            seeded_file = next(path for path in seeded_root.rglob("*") if path.is_file())
+                            hidden_roots = [
+                                Path(tasks_root).resolve(), epoch,
+                                *(Path(path) for path in repository_read_denials),
+                            ]
+                            hidden_roots = list(dict.fromkeys(path.resolve() for path in hidden_roots))
+                            observer_module = helper("ppw-run-observer.py")
+                            observer = observer_module.RunObserver(
+                                work_root=work, output=run_directory, hidden_roots=hidden_roots,
+                                protected_root=protected, arm="calor",
+                                fragment_glob="*.calr.inc" if "sourceAssembly" in pair else "*.calr",
+                                heldout_count=pair["tests"]["count"], compiler=shared["calorDll"],
+                                permissive=definition["policy"] == "permissive",
+                                test_runtime=admission["testHost"],
+                                execution_runtime=admission["executionRuntime"])
+                            hidden_roots = list(observer.model_hidden_roots)
+                            with gateway_module.Gateway(ledger, owner, slot, observer=observer) as gateway:
+                                descriptor = os.open(context_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                                with os.fdopen(descriptor, "w") as stream:
+                                    json.dump({
+                                        "kind": spending.GATEWAY, "protectedRoot": str(protected),
+                                        "gatewayPid": os.getpid(), "baseUrl": gateway.base_url,
+                                        "clientExecutable": admission["clientExecutable"],
+                                        "shellExecutable": admission["shellExecutable"],
+                                        "shellSha256": admission["shellSha256"],
+                                        "testHost": admission["testHost"],
+                                        "observerUrl": gateway.observer_url,
+                                        "observerControlUrl": gateway.observer_control_url,
+                                        "hiddenRoots": [str(path) for path in hidden_roots],
+                                        "repositoryReadDenyRoots": repository_read_denials,
+                                        "probeHiddenFiles": [str(hidden_test), str(seeded_file)],
+                                        "executionRuntime": admission["executionRuntime"],
+                                    }, stream)
+                                argv = [sys.executable, str(BENCH / "ppw-gateway-client.py"),
+                                        "--context", str(context_path), "--workspace", str(work),
+                                        "--output", str(epoch), "--"]
+                                argv += pair_command(epoch / "tasks" / task, definition, shared,
+                                                     epoch / "runs", run - 1)
+                                argv += ["--ppw-gateway-client", admission["clientExecutable"]]
+                                argv += ["--ppw-source-inspector-runtime",
+                                         admission["sourceInspector"]["manifest"]]
+                                command(argv, env=env)
+                            evidence = isolation.read_isolation_evidence(context_path, work, epoch)
+                            client_exit = load(run_directory / "client-invocation.json").get("exitCode")
+                            ledger.complete_slot(owner, slot, evidence, client_exit)
+                            write_new(run_directory / "gateway-isolation.json", evidence)
+                        finally:
+                            context_path.unlink(missing_ok=True)
+                            isolation.isolation_evidence_path(context_path).unlink(missing_ok=True)
+                        require(ledger.snapshot()["state"] == "collecting",
+                                "pilot incomplete: " + ledger.snapshot()["state"])
+                        require(digest(runtime) == admission["runtimeSha256"], "runtime drift after run")
+                        isolation.validate_runtime(admission["executionRuntime"])
+                        stamp_run(run_directory / "result.json", pins)
+                        continue
                     ticket = ledger.reserve(owner, slot)
                     ticket_path = epoch / "spend-tickets" / task / definition["label"] / ("run-%d.json" % run)
                     ticket_path.parent.mkdir(parents=True, exist_ok=True)
                     write_new(ticket_path, ticket)
-                    run_directory = epoch / "runs" / task / definition["label"] / ("run-%d" % run)
                     exit_code = -1
                     try:
                         command(pair_command(epoch / "tasks" / task, definition, shared,
@@ -561,7 +694,8 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
         record_stage(epochs_root, epoch_id, stage)
     except BaseException:
         if ledger is not None and owner is not None:
-            ledger.stop(owner, "interrupted-or-incomplete-collection")
+            ledger.stop(owner, "INCOMPLETE_INTERRUPTED" if gateway_mode
+                        else "interrupted-or-incomplete-collection")
             if epoch.is_dir() and not (epoch / "collection-outcome.json").exists():
                 write_new(epoch / "collection-outcome.json", {
                     "kind": "pp-w-incomplete-collection", "epochId": epoch_id, "stage": stage,

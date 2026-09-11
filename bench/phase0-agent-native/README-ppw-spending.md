@@ -1,5 +1,10 @@
 # PP-W pilot spending enforcement (#1378)
 
+This document records the estimate-only adapter and its original authorization
+boundary. The prospective request-level adapter is documented separately in
+[Request-reserving PP-W gateway (#1406)](README-ppw-gateway.md); it does not rewrite
+the historical receipts or imply that experimental collection has begun.
+
 The user supplied a **$250 total ceiling** and accepted the registered stopping
 rules and publication of negative/null results. The unresolved scope placeholder
 is interpreted narrowly: **pilot only**, not stage 2. Formal approval and

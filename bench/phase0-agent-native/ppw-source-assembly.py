@@ -98,13 +98,15 @@ def setup(pair, source):
     target = ET.SubElement(project.getroot(), "Target", Name="_PpwAssembleSources",
                            BeforeTargets="CompileCalorFiles")
     command = " ".join(shlex.quote(str(arg)) for arg in
-                       (sys.executable, Path(__file__).resolve(), "compose", manifest.resolve()))
+                       (sys.executable, Path(__file__).resolve(), "compose",
+                        "$(MSBuildThisFileDirectory)" + MANIFEST))
     ET.SubElement(target, "Exec", Command=command)
     reset = ET.SubElement(project.getroot(), "Target", Name="_PpwResetSdkSources",
                           BeforeTargets="GenerateGlobalUsings;CoreGenerateAssemblyInfo;"
                                         "GenerateTargetFrameworkMonikerAttribute")
     command = " ".join(shlex.quote(str(arg)) for arg in
-                       (sys.executable, Path(__file__).resolve(), "reset-sdk", root.resolve()))
+                       (sys.executable, Path(__file__).resolve(), "reset-sdk",
+                        "$(MSBuildThisFileDirectory)"))
     command += " " + " ".join('"' + path + '"' for path in SDK_OUTPUTS)
     ET.SubElement(reset, "Exec", Command=command)
     authoritative = ET.SubElement(project.getroot(), "Target", Name="AddCalorGeneratedFilesToCompile",

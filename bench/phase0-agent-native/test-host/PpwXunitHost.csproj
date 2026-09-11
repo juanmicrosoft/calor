@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>ppw-xunit-host</AssemblyName>
+    <UseAppHost>false</UseAppHost>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblySearchPaths>{HintPathFromItem};{TargetFrameworkDirectory};{RawFileName}</AssemblySearchPaths>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Reference Include="xunit.runner.utility.netcoreapp10">
+      <HintPath>$(XunitAdapterRoot)/xunit.runner.utility.netcoreapp10.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="xunit.abstractions">
+      <HintPath>$(XunitAdapterRoot)/xunit.abstractions.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+  <Target Name="RequireExistingPinnedAdapter" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="!Exists('$(XunitAdapterRoot)/xunit.runner.utility.netcoreapp10.dll')"
+           Text="The existing xunit.runner.visualstudio 2.8.2 bundled utility is required." />
+    <Error Condition="!Exists('$(XunitAdapterRoot)/xunit.abstractions.dll')"
+           Text="The existing xunit.runner.visualstudio 2.8.2 bundled abstractions are required." />
+  </Target>
+</Project>

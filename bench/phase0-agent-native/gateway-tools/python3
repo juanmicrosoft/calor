@@ -1,0 +1,3 @@
+#!/bin/sh
+: "${PPW_PYTHON_EXECUTABLE:?isolated Python interpreter not supplied}"
+exec "$PPW_PYTHON_EXECUTABLE" "$@"

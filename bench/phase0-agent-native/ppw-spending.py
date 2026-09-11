@@ -4,14 +4,17 @@ import argparse
 from contextlib import contextmanager
 from decimal import Decimal, InvalidOperation, ROUND_CEILING
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import secrets
 import sqlite3
+import subprocess
 import sys
 
 SCALE = 1_000_000
 CONTROL = "claude-code-max-budget-usd"
+GATEWAY = "pp-w-request-gateway-v1"
 ROOT = Path(__file__).resolve().parent
 COLLECTION_ARTIFACTS = (
     "run-pair.sh", "harness-capture.py", "ppw-instrument.py", "ppw-registration.py",
@@ -20,6 +23,29 @@ COLLECTION_ARTIFACTS = (
     "token-usage.py", "token-usage.sh", "telemetry-helpers.py", "ppw-pins.schema.json",
     "templates/calor-arm/CalorArm.csproj.template", "templates/calor-arm/policy-canary.calr.txt",
 )
+GATEWAY_ARTIFACTS = COLLECTION_ARTIFACTS + (
+    "ppw-gateway-budget.py", "ppw-budget-gateway.py", "ppw-gateway-client.py",
+    "ppw-run-observer.py",
+    "gateway-tools/python3",
+    "templates/calor-arm/CalorArm.Gateway.csproj.template",
+    "ppw-test-host.py", "test-host/Program.cs", "test-host/PpwXunitHost.csproj",
+    "ppw-gateway-registration.py",
+)
+FORECAST_EVIDENCE = {
+    "script": {
+        "path": "gateway-forecast/project_cost.py",
+        "sha256": "1d6168e248dc9a0cf59e5514098363c98a9a1e34b024a85f85c2e7f368435af6",
+    },
+    "proposal": {
+        "path": "gateway-forecast/forecast-proposed.json",
+        "sha256": "fe1ddf0cf9995694190acd548e7659e8aee506310438499b5a0fd3bb3718720b",
+    },
+    "review": {
+        "path": "gateway-forecast/forecast-review.json",
+        "sha256": "a0a649b6159fddf38287c4a184facc79bbd98cd25c5ac1862080137a21176d13",
+    },
+}
+FORECAST_REVIEW = "https://github.com/juanmicrosoft/calor/pull/1431#issuecomment-5624531673"
 
 
 def require(condition, message):
@@ -35,11 +61,35 @@ def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def artifact_manifest():
-    return {name: digest(ROOT / name) for name in COLLECTION_ARTIFACTS}
+def artifact_manifest(mechanism=CONTROL):
+    require(mechanism in (CONTROL, GATEWAY), "unknown collector mechanism")
+    return {name: digest(ROOT / name) for name in
+            (GATEWAY_ARTIFACTS if mechanism == GATEWAY else COLLECTION_ARTIFACTS)}
 
 
-def pinned_document(directory, proof, name):
+def module(filename):
+    spec = importlib.util.spec_from_file_location(filename.replace("-", "_"), ROOT / filename)
+    result = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(result)
+    return result
+
+
+def gateway_ledger_location(binding):
+    require(isinstance(binding, dict) and binding.get("anchor") == "git-common-dir"
+            and binding.get("relativePath") == "ppw-budget/epic1254-pilot.sqlite3",
+            "fixed project-wide pilot ledger binding required")
+    result = subprocess.run(["git", "-C", str(ROOT.parent.parent), "rev-parse", "--git-common-dir"],
+                            text=True, capture_output=True, check=True)
+    common = Path(result.stdout.strip())
+    if not common.is_absolute():
+        common = ROOT.parent.parent / common
+    common = common.resolve(strict=True)
+    require(hashlib.sha256(str(common).encode()).hexdigest() == binding.get("anchorSha256"),
+            "another clone/state root cannot reset the authorized pilot budget")
+    return common / binding["relativePath"]
+
+
+def pinned_file(directory, proof, name):
     require(isinstance(proof, dict), "pinned %s reference required" % name)
     relative = proof.get("path")
     require(isinstance(relative, str) and relative and not Path(relative).is_absolute()
@@ -48,6 +98,11 @@ def pinned_document(directory, proof, name):
     require(not any(p.is_symlink() for p in (path, *path.parents))
             and path.is_file() and digest(path) == proof.get("sha256"),
             "%s is missing, linked, or changed" % name)
+    return path
+
+
+def pinned_document(directory, proof, name):
+    path = pinned_file(directory, proof, name)
     return path, json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -95,6 +150,40 @@ def verified_upper_bound(control):
     return None
 
 
+def validate_forecast(plan, ceiling, slot_count, directory):
+    forecast = plan.get("forecast", {})
+    require(isinstance(forecast, dict) and forecast.get("status") == "registered"
+            and type(forecast.get("plannedInvocations")) is int
+            and forecast["plannedInvocations"] == slot_count
+            and type(forecast.get("experimentalObservations")) is int
+            and forecast["experimentalObservations"] == 0
+            and isinstance(forecast.get("method"), str) and forecast["method"].strip(),
+            "the independent, prospective full-pilot cost forecast is not registered")
+    registration = plan.get("forecastRegistration")
+    require(registration == {
+        "from": "proposed", "to": "registered",
+        "reviewReference": FORECAST_REVIEW, "artifacts": FORECAST_EVIDENCE,
+    }, "forecast requires the exact independently reviewed evidence and status transition")
+    paths = {name: pinned_file(directory, proof, "forecast " + name)
+             for name, proof in FORECAST_EVIDENCE.items()}
+    proposal = json.loads(paths["proposal"].read_text(encoding="utf-8"))
+    review = json.loads(paths["review"].read_text(encoding="utf-8"))
+    require(proposal.get("kind") == "pp-w-prospective-cost-forecast"
+            and proposal.get("forecast", {}).get("status") == "proposed"
+            and review.get("kind") == "pp-w-independent-cost-forecast-review"
+            and review.get("decision") == "approved-as-prospective-historical-traffic-planning-baseline"
+            and review.get("reviewedArtifacts") == {
+                name: {"path": Path(proof["path"]).name, "sha256": proof["sha256"]}
+                for name, proof in FORECAST_EVIDENCE.items() if name != "review"
+            }, "forecast method review does not approve this exact proposal and generator")
+    require(forecast == dict(proposal["forecast"], status="registered"),
+            "registered forecast changed the reviewed estimate, method or limitations")
+    require(units(forecast["ceilingUsd"]) == ceiling
+            and 0 < units(forecast["estimatedFullPilotUsd"]) <= ceiling,
+            "the reviewed historical-traffic planning baseline does not fit the authorized ceiling")
+    return {name: dict(proof) for name, proof in FORECAST_EVIDENCE.items()}
+
+
 def admit(registration, selected, authorization, directory, epoch_id, stage):
     require(stage == "pilot", "this implementation admits pilot-only scope, not stage 2")
     path, plan = pinned_document(directory, selected.get("spendingPlan", {}), "spendingPlan")
@@ -109,7 +198,9 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
     require(isinstance(amendment, dict) and amendment.get("schemaVersion") == 1
             and amendment.get("kind") == "pp-w-prospective-spending-instrument-amendment"
             and amendment.get("stage") == "pilot", "prospective instrument amendment required")
-    harness = artifact_manifest()
+    control = plan.get("clientControl", {})
+    require(isinstance(control, dict), "client control must be explicit")
+    harness = artifact_manifest(control.get("kind", CONTROL))
     require(amendment.get("replacementHarnessArtifacts") == harness,
             "instrument source differs from the prospectively registered artifact manifest")
     require(plan.get("protocolSha256") == protocol_identity(registration, selected, stage, epoch_id),
@@ -119,12 +210,6 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
             "spending plan ceiling differs from the supplied authorization")
     require(plan.get("costBasis") == "both-list-price-study-cost-and-actual-spend",
             "subscription usage does not exempt study cost from the ceiling")
-    ledger = plan.get("ledgerPath")
-    require(isinstance(ledger, str) and Path(ledger).is_absolute(),
-            "one pinned absolute shared ledger path is required across output roots")
-    require(ledger == authorization.get("spendingLedgerPath"),
-            "the authorization must bind the same shared ledger; alternate plans cannot reset spending")
-    Ledger(ledger)
     slots = [
         {"id": "%s/%s/%d" % (task, arm, run), "task": task, "arm": arm, "run": run}
         for run in range(1, selected["runsPerArm"] + 1)
@@ -132,8 +217,44 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
     ]
     require(type(plan.get("plannedInvocations")) is int and plan["plannedInvocations"] == len(slots),
             "full unchanged registered slot inventory is required, not a budget-sized subset")
-    control = plan.get("clientControl", {})
-    require(isinstance(control, dict), "client control must be explicit")
+    if control.get("kind") == GATEWAY:
+        forecast_evidence = validate_forecast(plan, ceiling, len(slots), directory)
+        policy = module("ppw-gateway-budget.py")
+        isolation = module("ppw-gateway-client.py")
+        require(selected["modelPin"] == policy.MODEL
+                and selected["agentVersion"] == isolation.CLIENT_VERSION, "gateway model/client differs")
+        _, prices = pinned_document(directory, control.get("priceContract", {}), "priceContract")
+        require(prices == policy.price_contract(), "price contract differs from implemented bounds")
+        require(control.get("isolation") == isolation.ISOLATION, "unsupported gateway isolation")
+        require(plan.get("ledgerBinding") == authorization.get("ledgerBinding"),
+                "authorization and plan must bind the same non-resettable ledger")
+        isolation.validate_platform()
+        client = isolation.validate_client(control.get("clientExecutable"))
+        shell = isolation.validate_shell(control.get("shellExecutable"), control.get("shellSha256"))
+        isolation.validate_runtime(control.get("executionRuntime"))
+        source_inspector = module("ppw-source-inspection.py")
+        source_inspector.validate_runtime(control.get("sourceInspector"))
+        ledger = gateway_ledger_location(plan["ledgerBinding"])
+        policy.RequestLedger(ledger)
+        return {
+            "mechanism": GATEWAY, "epochId": epoch_id, "stage": stage, "ceilingUnits": ceiling,
+            "authorizationSha256": selected["spendAuthorization"]["sha256"],
+            "protocolSha256": plan["protocolSha256"], "planSha256": digest(path),
+            "ledgerPath": str(ledger), "costBasis": plan["costBasis"], "harnessArtifacts": harness,
+            "clientExecutable": str(client), "priceSha256": policy.price_identity(),
+            "shellExecutable": str(shell), "shellSha256": control["shellSha256"],
+            "runtimeSha256": control.get("runtimeSha256"), "slots": slots,
+            "testHost": control.get("testHost"),
+            "sourceInspector": control.get("sourceInspector"),
+            "executionRuntime": control.get("executionRuntime"),
+            "forecastEvidence": forecast_evidence,
+        }
+    ledger = plan.get("ledgerPath")
+    require(isinstance(ledger, str) and Path(ledger).is_absolute(),
+            "one pinned absolute shared ledger path is required across output roots")
+    require(ledger == authorization.get("spendingLedgerPath"),
+            "the authorization must bind the same shared ledger; alternate plans cannot reset spending")
+    Ledger(ledger)
     maximum = verified_upper_bound(control)
     require(maximum is not None,
             "--max-budget-usd is a locally estimated threshold; no trustworthy upper bound "

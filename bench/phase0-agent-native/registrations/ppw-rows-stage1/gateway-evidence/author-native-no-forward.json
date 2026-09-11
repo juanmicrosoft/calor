@@ -1,0 +1,159 @@
+{
+  "kind": "pp-w-engineering-no-forward-native-probe",
+  "clientSha256": "553d1b9e9e7068b275c0a783c7e139ff6503096f286e674c8c919379fb0eca62",
+  "clientVersion": "2.1.266 (Claude Code)",
+  "clientFlags": [
+    "--print",
+    "--verbose",
+    "--output-format",
+    "stream-json",
+    "--forward-subagent-text",
+    "--dangerously-skip-permissions"
+  ],
+  "model": "claude-opus-4-8",
+  "clientExitCode": 1,
+  "timedOut": false,
+  "recognizedProbeError": true,
+  "observations": [
+    {
+      "bodyKeys": [
+        "max_tokens",
+        "messages",
+        "metadata",
+        "model",
+        "output_config",
+        "stream",
+        "system",
+        "thinking",
+        "tools"
+      ],
+      "model": "claude-opus-4-8",
+      "maxTokens": 64000,
+      "stream": true,
+      "betaCapabilities": [
+        "advisor-tool-2026-03-01",
+        "claude-code-20250219",
+        "context-management-2025-06-27",
+        "effort-2025-11-24",
+        "interleaved-thinking-2025-05-14",
+        "mid-conversation-system-2026-04-07",
+        "mid-conversation-tool-changes-2026-07-01",
+        "oauth-2025-04-20",
+        "prompt-caching-scope-2026-01-05",
+        "structured-outputs-2025-12-15",
+        "thinking-token-count-2026-05-13"
+      ],
+      "unclassifiedBetaCount": 0,
+      "thinkingKeys": [
+        "type"
+      ],
+      "outputConfigKeys": [
+        "effort",
+        "format"
+      ],
+      "contextManagementKeys": [],
+      "contextEditKeys": [],
+      "contextEditTypes": [],
+      "toolFieldSets": [],
+      "toolTypes": [],
+      "priceContractAccepted": true,
+      "messagesPath": true,
+      "credentialHeaderPresent": true
+    },
+    {
+      "bodyKeys": [
+        "context_management",
+        "max_tokens",
+        "messages",
+        "metadata",
+        "model",
+        "output_config",
+        "stream",
+        "system",
+        "thinking",
+        "tools"
+      ],
+      "model": "claude-opus-4-8",
+      "maxTokens": 64000,
+      "stream": true,
+      "betaCapabilities": [
+        "advisor-tool-2026-03-01",
+        "claude-code-20250219",
+        "context-management-2025-06-27",
+        "effort-2025-11-24",
+        "extended-cache-ttl-2025-04-11",
+        "interleaved-thinking-2025-05-14",
+        "mid-conversation-system-2026-04-07",
+        "mid-conversation-tool-changes-2026-07-01",
+        "oauth-2025-04-20",
+        "prompt-caching-scope-2026-01-05",
+        "thinking-token-count-2026-05-13"
+      ],
+      "unclassifiedBetaCount": 0,
+      "thinkingKeys": [
+        "type"
+      ],
+      "outputConfigKeys": [
+        "effort"
+      ],
+      "contextManagementKeys": [
+        "edits"
+      ],
+      "contextEditKeys": [
+        [
+          "keep",
+          "type"
+        ]
+      ],
+      "contextEditTypes": [
+        "clear_thinking_20251015"
+      ],
+      "toolFieldSets": [
+        [
+          "description",
+          "input_schema",
+          "name"
+        ]
+      ],
+      "toolTypes": [
+        "custom"
+      ],
+      "priceContractAccepted": true,
+      "messagesPath": true,
+      "credentialHeaderPresent": true
+    }
+  ],
+  "kernelEvidence": {
+    "kind": "macos-seatbelt-request-gateway-v1",
+    "kernelProbe": {
+      "gateway": true,
+      "otherPort": false,
+      "samePortIpv6": false,
+      "stateWrite": false,
+      "stateRead": false,
+      "workspaceWrite": true,
+      "authoritativeWrite": false,
+      "authoritativeRead": false,
+      "hiddenTestRead": false,
+      "seededSolutionRead": false,
+      "outsideSignal": false,
+      "hardlinkWrite": false,
+      "symlinkWrite": false,
+      "unixSocket": false,
+      "delegatedPreferencesWrite": false,
+      "readableSourceRead": true,
+      "readableSourceHardlinkWrite": false
+    },
+    "modelInvoked": false
+  },
+  "upstreamRequests": 0,
+  "experimentalObservations": 0,
+  "sourceHashes": {
+    "probe-ppw-gateway.py": "ff0f6e72c753572e95daad891c87974c393eaa8fc65096a1596dfc5f2faba4fe",
+    "ppw-gateway-client.py": "12fe9fbc9005130f5e936b91f128bcf96037e258710ea8b86e0bef9ec8d57b41",
+    "run-pair.sh": "77b1b99c763ce14a341a62d0adc895a2b76b3f7d3a1062faa3cf485f5154212f",
+    "ppw-gateway-budget.py": "999af1d9b55a6bcc1dec1a4f8a92c0108830d4473582f1c01122bf48e4628ce1"
+  },
+  "completeIsolationProof": false,
+  "success": true
+}
