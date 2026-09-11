@@ -170,7 +170,7 @@ Initial immutable-head reviews at `4d86f257`:
   requested/registry model `claude-opus-4.8`: **no blocking finding in its
   initial scope**, with final measurements/re-review still required.
 
-Final resumed review requests/results, exact final SHA and prompts are
+Final review requests/results, exact final SHA and prompts are
 recorded durably on PR #1442 after this artifact commit. Reviewers cannot
 introspect their underlying model build. Separate AI contexts are not
 human or statistical independence. The implementation author does not

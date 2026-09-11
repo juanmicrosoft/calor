@@ -323,9 +323,9 @@
     },
     {
       "artifact": "README.md",
-      "sha256": "798ff17c8f98c16dd7da495c0b89652e424d0047ad9782116afa9f5e0daa2852",
-      "uncompressed_sha256": "798ff17c8f98c16dd7da495c0b89652e424d0047ad9782116afa9f5e0daa2852",
-      "uncompressed_bytes": 11106
+      "sha256": "4776bf915b873eaf2b81cace578ad3eeeac50d51eed07c478d657e2c5474826b",
+      "uncompressed_sha256": "4776bf915b873eaf2b81cace578ad3eeeac50d51eed07c478d657e2c5474826b",
+      "uncompressed_bytes": 11098
     },
     {
       "artifact": "summary.json",
