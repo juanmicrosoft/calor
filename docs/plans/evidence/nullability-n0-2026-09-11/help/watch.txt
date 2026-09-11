@@ -1,0 +1,25 @@
+Description:
+  Watch Calor sources and recompile incrementally on change (compile-only)
+
+Usage:
+  calor watch <paths>... [options]
+
+Arguments:
+  <paths>  .calr files and/or directories to watch (directories are scanned recursively; bin/, obj/ and reference/ subdirectories are excluded)
+
+Options:
+  -f, --format <json|text>         Diagnostic output format per rebuild: text (stderr) or json (NDJSON on stdout: one compact document per line, one line per rebuild) [default: text]
+  -v, --verbose                    Enable verbose output
+  --no-cache                       Disable the incremental build cache (every rebuild recompiles all files)
+  --clear-cache                    Clear .calor-build-state.json before the initial compile
+  --strict-api                     Enable strict API mode
+  --require-docs                   Require documentation on public functions and types
+  --enforce-effects                Enforce effect declarations (default: true as of v0.11) [default: True]
+  --no-enforce-effects             Disable effect enforcement (opt out of the v0.11 default-on behavior) [default: False]
+  --strict-effects                 Promote unknown external call warnings (Calor0411) to errors [default: False]
+  --permissive-effects             Permissive effect mode (unknown calls assumed pure, violations demoted to warnings) [default: False]
+  --contract-mode <contract-mode>  Contract enforcement mode: off, debug, or release [default: debug]
+  --debounce-ms <debounce-ms>      Quiet period in milliseconds before a change burst triggers a rebuild [default: 200]
+  --no-telemetry                   Force-disable anonymous usage telemetry (telemetry is OPT-IN and off by default; it activates only when CALOR_TELEMETRY=1 is set — see docs/telemetry.md)
+  --telemetry-preview              Print schema-approved telemetry payloads locally to stderr without network transmission
+  -?, -h, --help                   Show help and usage information

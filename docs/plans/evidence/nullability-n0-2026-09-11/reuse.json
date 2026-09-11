@@ -1,0 +1,137 @@
+[
+  {
+    "id": "bind-bcl-nullable",
+    "version": 1,
+    "Accepted": true,
+    "simple": {
+      "HasErrors": false,
+      "diagnostics": []
+    },
+    "shared": {
+      "HasErrors": false,
+      "diagnostics": []
+    },
+    "lsp": [
+      {
+        "code": "Calor0272",
+        "severity": "Error",
+        "span": {
+          "Start": 66,
+          "Length": 69,
+          "Line": 4,
+          "Column": 15
+        },
+        "Message": "Binding \u0027x\u0027 declares non-nullable \u0027string\u0027 but its initializer may be null (source annotation: \u0027Annotated\u0027). Change the target to \u0027?string\u0027 or add an explicit non-null check at the interop boundary.",
+        "compilationError": false
+      }
+    ]
+  },
+  {
+    "id": "bind-literal",
+    "version": 2,
+    "Accepted": true,
+    "simple": {
+      "HasErrors": false,
+      "diagnostics": []
+    },
+    "shared": {
+      "HasErrors": false,
+      "diagnostics": []
+    },
+    "lsp": []
+  },
+  {
+    "id": "active-duplicate",
+    "version": 3,
+    "Accepted": true,
+    "simple": {
+      "HasErrors": true,
+      "diagnostics": [
+        {
+          "code": "Calor0206",
+          "severity": "Error",
+          "span": {
+            "Start": 63,
+            "Length": 49,
+            "Line": 5,
+            "Column": 3
+          },
+          "Message": "Duplicate signature \u0027Probe()\u0027. Conflicts with \u0027calor://source/active-duplicate.calr/module/m1/function/ast%3Af1\u0027.",
+          "compilationError": true
+        }
+      ]
+    },
+    "shared": {
+      "HasErrors": true,
+      "diagnostics": [
+        {
+          "code": "Calor0206",
+          "severity": "Error",
+          "span": {
+            "Start": 63,
+            "Length": 49,
+            "Line": 5,
+            "Column": 3
+          },
+          "Message": "Duplicate signature \u0027Probe()\u0027. Conflicts with \u0027calor://source/active-duplicate.calr/module/m1/function/ast%3Af1\u0027.",
+          "compilationError": true
+        }
+      ]
+    },
+    "lsp": [
+      {
+        "code": "Calor0206",
+        "severity": "Error",
+        "span": {
+          "Start": 63,
+          "Length": 49,
+          "Line": 5,
+          "Column": 3
+        },
+        "Message": "Duplicate signature \u0027Probe()\u0027. Conflicts with \u0027calor://source/workspace%3A.n0-evidence%2Fcases%2Freuse.calr/module/m1/function/ast%3Af1\u0027.",
+        "compilationError": true
+      }
+    ]
+  },
+  {
+    "id": "return-bcl-nullable",
+    "version": 4,
+    "Accepted": true,
+    "simple": {
+      "HasErrors": false,
+      "diagnostics": []
+    },
+    "shared": {
+      "HasErrors": false,
+      "diagnostics": []
+    },
+    "lsp": [
+      {
+        "code": "Calor0273",
+        "severity": "Error",
+        "span": {
+          "Start": 58,
+          "Length": 69,
+          "Line": 4,
+          "Column": 8
+        },
+        "Message": "Return declares non-nullable \u0027string\u0027 but the returned value may be null (source annotation: \u0027Annotated\u0027). Change the return type to \u0027?string\u0027 or add an explicit non-null check at the interop boundary.",
+        "compilationError": false
+      }
+    ]
+  },
+  {
+    "id": "bind-literal",
+    "version": 5,
+    "Accepted": true,
+    "simple": {
+      "HasErrors": false,
+      "diagnostics": []
+    },
+    "shared": {
+      "HasErrors": false,
+      "diagnostics": []
+    },
+    "lsp": []
+  }
+]

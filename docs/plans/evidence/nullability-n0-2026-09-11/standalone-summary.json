@@ -1,0 +1,83 @@
+[
+  {
+    "scope": "samples/",
+    "files": 11,
+    "crashed": 0,
+    "parseErrorFiles": 0,
+    "typeCheckerErrorFiles": 0,
+    "apiErrorFiles": 0,
+    "apiErrorDiagnostics": {},
+    "rawNullabilityFiles": [],
+    "apiErrorPaths": [],
+    "safetyClassification": "unclassified; no-diagnostic and nominal OBJECT/Oblivious are not proof of safe references"
+  },
+  {
+    "scope": "benchmarks/",
+    "files": 7,
+    "crashed": 0,
+    "parseErrorFiles": 6,
+    "typeCheckerErrorFiles": 0,
+    "apiErrorFiles": 7,
+    "apiErrorDiagnostics": {
+      "Calor0102": 11,
+      "Calor0255": 2,
+      "Calor0006": 1,
+      "Calor0100": 9
+    },
+    "rawNullabilityFiles": [],
+    "apiErrorPaths": [
+      "benchmarks/arithmetic/div-by-zero.calr",
+      "benchmarks/arithmetic/overflow.calr",
+      "benchmarks/loops/bounds-violation.calr",
+      "benchmarks/null-safety/null-deref.calr",
+      "benchmarks/security/command-injection.calr",
+      "benchmarks/security/path-traversal.calr",
+      "benchmarks/security/sql-injection.calr"
+    ],
+    "safetyClassification": "unclassified; no-diagnostic and nominal OBJECT/Oblivious are not proof of safe references"
+  },
+  {
+    "scope": "tests/TestData/Benchmarks/",
+    "files": 226,
+    "crashed": 0,
+    "parseErrorFiles": 0,
+    "typeCheckerErrorFiles": 0,
+    "apiErrorFiles": 26,
+    "apiErrorDiagnostics": {
+      "Calor1002": 42,
+      "Calor0410": 13
+    },
+    "rawNullabilityFiles": [
+      "tests/TestData/Benchmarks/DesignPatterns/TemplateMethod.calr"
+    ],
+    "apiErrorPaths": [
+      "tests/TestData/Benchmarks/DataStructures/HashMap.calr",
+      "tests/TestData/Benchmarks/DesignPatterns/Adapter.calr",
+      "tests/TestData/Benchmarks/DesignPatterns/Factory.calr",
+      "tests/TestData/Benchmarks/DesignPatterns/TemplateMethod.calr",
+      "tests/TestData/Benchmarks/DesignPatterns/Visitor.calr",
+      "tests/TestData/Benchmarks/DomainProblems/CurrencyConverter.calr",
+      "tests/TestData/Benchmarks/DomainProblems/ScoreBoard.calr",
+      "tests/TestData/Benchmarks/DomainProblems/TaxCalculator.calr",
+      "tests/TestData/Benchmarks/DomainProblems/UnitConverter.calr",
+      "tests/TestData/Benchmarks/DomainProblems/VotingSystem.calr",
+      "tests/TestData/Benchmarks/EffectSoundness/ComposedEffects.calr",
+      "tests/TestData/Benchmarks/EffectSoundness/DatabaseEffect.calr",
+      "tests/TestData/Benchmarks/EffectSoundness/FileEffects.calr",
+      "tests/TestData/Benchmarks/EffectSoundness/NetworkEffect.calr",
+      "tests/TestData/Benchmarks/ErrorDetection/NullDeref_buggy.calr",
+      "tests/TestData/Benchmarks/InteropEffectCoverage/PureFunctions.calr",
+      "tests/TestData/Benchmarks/OOPGenerics/Composition.calr",
+      "tests/TestData/Benchmarks/OOPGenerics/InterfaceImpl.calr",
+      "tests/TestData/Benchmarks/OOPGenerics/Polymorphism.calr",
+      "tests/TestData/Benchmarks/TokenEconomics/AreaOfCircle.calr",
+      "tests/TestData/Benchmarks/TokenEconomics/Average.calr",
+      "tests/TestData/Benchmarks/TokenEconomics/CelsiusToKelvin.calr",
+      "tests/TestData/Benchmarks/TokenEconomics/CompoundInterest.calr",
+      "tests/TestData/Benchmarks/TokenEconomics/Power.calr",
+      "tests/TestData/Benchmarks/TokenEconomics/TemperatureConverter.calr",
+      "tests/TestData/Benchmarks/TokenEconomics/TemperatureRange.calr"
+    ],
+    "safetyClassification": "unclassified; no-diagnostic and nominal OBJECT/Oblivious are not proof of safe references"
+  }
+]

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Calor.Nullability.N0Probe</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Calor.Compiler/Calor.Compiler.csproj" />
+    <ProjectReference Include="../../src/Calor.LanguageServer/Calor.LanguageServer.csproj" />
+  </ItemGroup>
+</Project>

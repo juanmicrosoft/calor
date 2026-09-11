@@ -1,0 +1,3 @@
+ 71b3c60cb5a16e02cb7957e478ec3fb6b983a73c bench/corpus/FluentValidation (12.1.1)
+ fb309026775ef953a64fb5339d074426c1ad2c37 bench/corpus/MediatR (v12.4.1)
+ 0597ddfbd4ec594d9c42edd745fe728a2198bad9 bench/corpus/serilog (v1.5.14-1088-g0597ddfb)
