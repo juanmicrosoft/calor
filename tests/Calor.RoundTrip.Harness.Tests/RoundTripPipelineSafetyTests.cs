@@ -7,6 +7,226 @@ namespace Calor.RoundTrip.Harness.Tests;
 public sealed class RoundTripPipelineSafetyTests
 {
     [Fact]
+    public async Task Evidence_RealConversionRetainsNullableAnalysisResolutionErrorAndSafeControl()
+    {
+        const string nullableSource = """
+            public static class NullableEvidence
+            {
+                public static string Read() => System.Environment.GetEnvironmentVariable("CALOR_E1_UNSET");
+            }
+            """;
+        var root = CreateProject(nullableSource);
+        var missingRoot = CreateProject(
+            "public static class MissingEvidence { public static MissingEvidenceType Read() => null; }");
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "Lib", "Safe.cs"),
+                "public static class SafeEvidence { public static string Read() => \"safe\"; }");
+            await File.WriteAllTextAsync(Path.Combine(root, "Lib", "Migrated.cs"),
+                "public static class MigratedEvidence { public static string Read() => "
+                + "System.Environment.GetEnvironmentVariable(\"CALOR_E1_UNSET\") ?? \"fallback\"; }");
+            await File.WriteAllTextAsync(Path.Combine(root, "Lib", "Skip.g.cs"),
+                "public class ExcludedEvidence { }");
+            var report = new RoundTripReport { ProjectName = "Evidence", StartedAt = DateTimeOffset.UtcNow };
+            var config = new RoundTripConfig
+            {
+                ProjectName = "Evidence", OriginalProjectPath = root,
+                LibrarySourceRelativePath = "Lib", SolutionOrProjectFile = "absent.csproj",
+                LooseDirectoryMode = true, CaptureBindingAnalysis = true,
+            };
+            var results = await new RoundTripPipeline().ConvertAndReplaceAsync(root, config, report);
+            var nullable = results.Single(file => file.FilePath == "Lib/Invalid.cs");
+            Assert.Equal(FileStatus.Replaced, nullable.Status);
+            Assert.Equal("Accepted", nullable.Candidate!.CompilationOutcome);
+            Assert.DoesNotContain(nullable.Candidate.Diagnostics,
+                diagnostic => diagnostic.Code is "Calor0272" or "Calor0273" or "Calor0274");
+            var finding = Assert.Single(nullable.Candidate.AnalysisDiagnostics,
+                diagnostic => diagnostic.Code == "Calor0273");
+            Assert.Equal("AnalysisOnly", finding.BindingDisposition);
+            Assert.Equal("shadow-bind", finding.Phase);
+            Assert.Equal("ConvertedCalor", finding.SourceKind);
+            Assert.Equal("Lib/Invalid.cs", finding.Path);
+            Assert.Contains("System.Environment.GetEnvironmentVariable",
+                nullable.Candidate.ConvertedCalor!.Substring(finding.Start!.Value, finding.Length!.Value));
+            Assert.Equal(ReportGenerator.Hash(nullable.Candidate.ConvertedCalor), finding.SourceSha256);
+            var missingReport = new RoundTripReport { ProjectName = "MissingEvidence", StartedAt = DateTimeOffset.UtcNow };
+            var missingResults = await new RoundTripPipeline().ConvertAndReplaceAsync(
+                missingRoot, config with { OriginalProjectPath = missingRoot, ProjectName = "MissingEvidence" }, missingReport);
+            var missing = Assert.Single(missingResults);
+            Assert.Equal(FileStatus.EmitCompilationError, missing.Status);
+            Assert.Contains(missing.Candidate!.Diagnostics, diagnostic =>
+                diagnostic.Code == "CS0246" && diagnostic.Line > 0 && diagnostic.Column > 0);
+            var safe = results.Single(file => file.FilePath == "Lib/Safe.cs");
+            var migrated = results.Single(file => file.FilePath == "Lib/Migrated.cs");
+            Assert.Equal(FileStatus.Replaced, safe.Status);
+            Assert.Equal(FileStatus.Replaced, migrated.Status);
+            Assert.DoesNotContain(safe.Candidate!.AnalysisDiagnostics,
+                diagnostic => diagnostic.Code is "Calor0272" or "Calor0273" or "Calor0274");
+            var assembly = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
+                $"EvidenceRuntime_{Guid.NewGuid():N}",
+                new[] { nullable, safe, migrated }.Select(file =>
+                    Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(file.EmittedCSharp!)),
+                Calor.Compiler.CodeGen.GeneratedCSharpCompiler.References,
+                new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
+            using var stream = new MemoryStream();
+            var emitted = assembly.Emit(stream);
+            Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
+            var loaded = System.Reflection.Assembly.Load(stream.ToArray());
+            object? Read(string type) => loaded.GetTypes().Single(item => item.Name == type).GetMethod("Read")!.Invoke(null, null);
+            var observations = new Dictionary<string, object?> { ["literal"] = Read("SafeEvidence") };
+            Assert.Equal("safe", observations["literal"]);
+            var prior = Environment.GetEnvironmentVariable("CALOR_E1_UNSET");
+            try
+            {
+                Environment.SetEnvironmentVariable("CALOR_E1_UNSET", null);
+                observations["nullable-absent"] = Read("NullableEvidence");
+                observations["explicit-fallback-absent"] = Read("MigratedEvidence");
+                Assert.Null(observations["nullable-absent"]);
+                Assert.Equal("fallback", observations["explicit-fallback-absent"]);
+                Environment.SetEnvironmentVariable("CALOR_E1_UNSET", "present");
+                observations["nullable-present"] = Read("NullableEvidence");
+                observations["explicit-fallback-present"] = Read("MigratedEvidence");
+                Assert.Equal("present", observations["nullable-present"]);
+                Assert.Equal("present", observations["explicit-fallback-present"]);
+            }
+            finally { Environment.SetEnvironmentVariable("CALOR_E1_UNSET", prior); }
+            Assert.Equal(4, report.Evidence!.Inputs.Count);
+            Assert.Single(report.Evidence.Inputs, input => input.Excluded);
+            Assert.All(results, file => Assert.Equal("Unassessed", file.Candidate!.SemanticResolution));
+            var coverage = ConversionCoverage.Compute(results, report.ExcludedFileCount);
+            Assert.Equal(4, coverage.TotalConvertibleFiles);
+            Assert.Equal(0, coverage.FailedConversion);
+            Assert.Equal(1, coverage.ExcludedFiles);
+            Assert.Equal(1, ConversionCoverage.Compute(missingResults, 0).FailedConversion);
+            await ExportEvidenceAsync("converted-controls", report, config, results);
+            await ExportEvidenceAsync("baseline-type-failure", missingReport,
+                config with { OriginalProjectPath = missingRoot, ProjectName = "MissingEvidence" }, missingResults);
+            var output = Environment.GetEnvironmentVariable("CALOR_ROUNDTRIP_TEST_EVIDENCE_OUTPUT");
+            if (output is not null)
+                await File.WriteAllTextAsync(Path.Combine(output, "runtime-observations.json"),
+                    System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        test = nameof(Evidence_RealConversionRetainsNullableAnalysisResolutionErrorAndSafeControl),
+                        report.Evidence.Provenance.RepositoryRevision,
+                        report.Evidence.Provenance.Compiler,
+                        observations,
+                        assembly_sha256 = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(stream.ToArray())),
+                        migration = "Explicit, manually authored ?? \"fallback\"; not a converter insertion or activation.",
+                    }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+            Directory.Delete(missingRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Evidence_ActualBuildRecoveryPreservesOriginalCandidateDiagnostics()
+    {
+        var root = CreateProject("public static class Seed { public static string Read() => "
+            + "System.Environment.GetEnvironmentVariable(\"CALOR_E1_UNSET\"); }");
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "Safety.csproj"),
+                "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework>"
+                + "<EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup>"
+                + "<ItemGroup><Compile Include=\"Lib/*.cs\" /></ItemGroup></Project>");
+            var work = Path.Combine(root, "work");
+            var config = new RoundTripConfig
+            {
+                ProjectName = "RecoveryEvidence", OriginalProjectPath = root, WorkingDirectory = work,
+                LibrarySourceRelativePath = "Lib", SolutionOrProjectFile = "Safety.csproj", CaptureBindingAnalysis = true,
+            };
+            // Keep the working copy beside the original, not nested inside the directory being copied.
+            config = config with { WorkingDirectory = root + "-work" };
+            var pipeline = new RoundTripPipeline();
+            work = pipeline.PrepareWorkingCopy(config);
+            try
+            {
+                var report = new RoundTripReport { ProjectName = config.ProjectName, StartedAt = DateTimeOffset.UtcNow };
+                var files = await pipeline.ConvertAndReplaceAsync(work, config, report);
+                var file = Assert.Single(files);
+                Assert.Equal(FileStatus.Replaced, file.Status);
+                var candidateId = file.Candidate!.CandidateId;
+                var diagnostics = file.Candidate.Diagnostics.ToArray();
+                var analysisDiagnostics = file.Candidate.AnalysisDiagnostics.ToArray();
+                Assert.Contains(analysisDiagnostics, diagnostic => diagnostic.Code == "Calor0273");
+                var originalHash = file.Candidate.InputSha256;
+                // Deliberately injected recovery control, not claimed as a natural converter regression.
+                await File.WriteAllTextAsync(Path.Combine(work, file.FilePath),
+                    "public static class Seed { public static string Read() => MissingRecoverySymbol; }");
+                Assert.Equal(1, await pipeline.RecoverBuildAsync(work, config, files));
+                Assert.Equal(FileStatus.Reverted, file.Status);
+                Assert.Equal(FileStatus.Replaced, file.Candidate.StatusBeforeRecovery);
+                Assert.Equal("Accepted", file.Candidate.CompilationOutcome);
+                Assert.Equal(candidateId, file.Candidate.CandidateId);
+                Assert.Equal(diagnostics, file.Candidate.Diagnostics);
+                Assert.Equal(analysisDiagnostics, file.Candidate.AnalysisDiagnostics);
+                Assert.Equal(originalHash, ReportGenerator.HashFile(Path.Combine(work, file.FilePath)));
+                Assert.Contains(Assert.Single(file.Recovery).Diagnostics,
+                    diagnostic => diagnostic.Code == "CS0103" && diagnostic.Path == "Lib/Invalid.cs"
+                        && diagnostic.Line == 1 && diagnostic.Column > 0);
+                Assert.Equal(1, ConversionCoverage.Compute(files, 0).Reverted);
+                Assert.Equal(0, ConversionCoverage.Compute(files, 0).ConvertedNative);
+                await ExportEvidenceAsync("injected-recovery-control", report, config, files);
+            }
+            finally { Directory.Delete(work, recursive: true); }
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
+    public async Task Evidence_InfrastructureFailureStillReturnsOriginalInputInventory()
+    {
+        var root = CreateProject("public class InputEvidence { }");
+        try
+        {
+            var report = await new RoundTripPipeline().RunAsync(new RoundTripConfig
+            {
+                ProjectName = "UnavailableTool", OriginalProjectPath = root,
+                LibrarySourceRelativePath = "Lib", SolutionOrProjectFile = "absent.csproj",
+                DotnetPath = Path.Combine(root, "missing-dotnet"),
+            });
+            Assert.True(report.Inconclusive);
+            Assert.True(report.Evidence!.InventoryComplete);
+            var file = Assert.Single(report.FileResults);
+            Assert.Equal(FileStatus.NotAttempted, file.Status);
+            Assert.False(file.Candidate!.Attempted);
+            Assert.NotNull(Assert.Single(report.Evidence.Inputs).Sha256);
+            Assert.Null(report.Baseline);
+            Assert.Null(report.RoundTripTests);
+            Assert.NotEmpty(report.Evidence.Failures);
+            Assert.Contains("not_attempted", ReportGenerator.GenerateJson(report));
+            var output = Environment.GetEnvironmentVariable("CALOR_ROUNDTRIP_TEST_EVIDENCE_OUTPUT");
+            if (output is not null)
+            {
+                Directory.CreateDirectory(output);
+                await File.WriteAllTextAsync(Path.Combine(output, "infrastructure-failure.json"), ReportGenerator.GenerateJson(report));
+            }
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    private static async Task ExportEvidenceAsync(string name, RoundTripReport report,
+        RoundTripConfig config, List<FileConversionResult> results)
+    {
+        var output = Environment.GetEnvironmentVariable("CALOR_ROUNDTRIP_TEST_EVIDENCE_OUTPUT");
+        if (output is null)
+            return;
+        report.FileResults = results;
+        report.CalorVersion = typeof(Calor.Compiler.Program).Assembly.GetName().Version?.ToString() ?? "";
+        await RoundTripPipeline.CaptureProvenanceAsync(config, report.Evidence!, CancellationToken.None);
+        report.Evidence!.Limitations.Add("Controlled fixture captured via existing ConvertAndReplaceAsync/RecoverBuildAsync APIs, "
+            + "not a full project test run. Runtime assertions are in the paired xUnit/TRX evidence. "
+            + "The recovery control deliberately injects a missing C# symbol after conversion; it is not a natural corpus regression.");
+        report.Fidelity = ProjectFidelity.Compute(report);
+        report.FinishedAt = DateTimeOffset.UtcNow;
+        Directory.CreateDirectory(output);
+        await File.WriteAllTextAsync(Path.Combine(output, $"{name}.json"), ReportGenerator.GenerateJson(report));
+    }
+
+    [Fact]
     public async Task HarnessConversion_UsesExplicitSelectedModeAndEvaluatedSymbols()
     {
         var root = CreateProject(
@@ -1330,7 +1550,8 @@ public sealed class RoundTripPipelineSafetyTests
                 {
                     FilePath = "Lib/Invalid.cs",
                     Status = FileStatus.Replaced,
-                    EmittedCSharp =
+                    Candidate = new CandidateEvidence { FileId = "ProjectSettings/Lib/Invalid.cs" },
+                    EmittedCSharp = $"#line 40 \"{sourcePath}\"\n" +
                         """
                         public static class Conditional
                         {
@@ -1359,6 +1580,9 @@ public sealed class RoundTripPipelineSafetyTests
 
             Assert.Equal(FileStatus.EmitCompilationError, results[0].Status);
             Assert.Equal(original, await File.ReadAllTextAsync(sourcePath));
+            Assert.Contains(results[0].Candidate!.Diagnostics, diagnostic =>
+                diagnostic.Code == "CS0029" && diagnostic.Path == "Lib/Invalid.cs"
+                && diagnostic.Line == 43 && diagnostic.Column > 0);
         }
         finally
         {

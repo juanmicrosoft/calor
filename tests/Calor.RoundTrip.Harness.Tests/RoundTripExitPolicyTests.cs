@@ -4,6 +4,38 @@ namespace Calor.RoundTrip.Harness.Tests;
 
 public class RoundTripExitPolicyTests
 {
+    [Theory]
+    [InlineData(ComparisonStatus.MajorRegressions, 1)]
+    [InlineData(ComparisonStatus.Incomplete, -1)]
+    public void LaterDeclaredAttemptFailure_BlocksEvenWhenFirstAttemptPasses(ComparisonStatus status, int exitCode)
+    {
+        var report = PassingReport();
+        report.Evidence = new RunEvidence
+        {
+            InventoryComplete = true,
+            DeclaredTestAttemptsPerLeg = 2,
+            Failures = ["Subject-test attempt 2 is not clean on both legs."],
+            TestAttempts =
+            [
+                new() { Leg = "baseline", Attempt = 1, Result = Run() },
+                new() { Leg = "baseline", Attempt = 2, Result = Run() },
+                new() { Leg = "candidate", Attempt = 1, Result = Run() },
+                new()
+                {
+                    Leg = "candidate", Attempt = 2,
+                    Result = new TestRunResult { ExitCode = exitCode, Failed = 1 },
+                    Comparison = new TestComparison { Status = status },
+                },
+            ],
+        };
+        Assert.Equal(ComparisonStatus.Pass, report.Comparison!.Status);
+        Assert.True(RoundTripExitPolicy.IsFailure(report));
+        Assert.Contains(RoundTripExitPolicy.GetFailureReasons(report), reason => reason.Contains("attempt 2"));
+        using var json = System.Text.Json.JsonDocument.Parse(ReportGenerator.GenerateJson(report));
+        Assert.Equal("fail", json.RootElement.GetProperty("verdict").GetString());
+        Assert.Contains("attempt 2", ReportGenerator.GenerateMarkdown(report));
+    }
+
     [Fact]
     public void TypeInvalidRoundTripBuild_IsBlockingEvenWithoutRecordedRegressions()
     {

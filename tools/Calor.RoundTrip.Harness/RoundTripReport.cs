@@ -25,6 +25,7 @@ public sealed class RoundTripReport
     public TestRunResult? Baseline { get; set; }
     public BuildResult? BaselineBuildResult { get; set; }
     public List<FileConversionResult> FileResults { get; set; } = [];
+    public RunEvidence? Evidence { get; set; }
 
     /// <summary>Count of candidate .cs files skipped by exclude patterns. Exclusions remain in the coverage denominator.</summary>
     public int ExcludedFileCount { get; set; }
@@ -60,6 +61,8 @@ public sealed class RoundTripReport
 public sealed class FileConversionResult
 {
     public required string FilePath { get; init; }
+    public CandidateEvidence? Candidate { get; set; }
+    public List<RecoveryEvidence> Recovery { get; set; } = [];
     public FileStatus Status { get; set; }
     public bool ConversionSuccess { get; set; }
     public double ConversionRate { get; set; }
@@ -164,6 +167,12 @@ public sealed record FileContextDetail
     public List<string> DefinedSymbols { get; init; } = [];
     public List<string> Provenance { get; init; } = [];
     public List<FileBuildStateDetail> BuildStates { get; init; } = [];
+    public Dictionary<string, string> CompilationProperties { get; init; } = [];
+    public List<ReferenceEvidence> References { get; init; } = [];
+    public List<string> CompileInputHashes { get; init; } = [];
+    public List<string> AdditionalInputHashes { get; init; } = [];
+    public List<string> AnalyzerConfigHashes { get; init; } = [];
+    public List<ReferenceEvidence> Analyzers { get; init; } = [];
 }
 
 public sealed record FileBuildStateDetail
@@ -203,10 +212,16 @@ public enum FileStatus
     /// a coverage FAILURE: it stays in the denominator and never counts as converted.
     /// </summary>
     Reverted,
+    NotAttempted,
 }
 
 public sealed class BuildResult
 {
+    public string Phase { get; init; } = "unspecified";
+    public string? Command { get; init; }
+    public string? WorkingDirectory { get; init; }
+    public List<DiagnosticEvidence> Diagnostics { get; init; } = [];
+    public List<string> CandidateFiles { get; init; } = [];
     public bool Succeeded { get; init; }
     public int ExitCode { get; init; }
     public string Stdout { get; init; } = "";
@@ -216,6 +231,8 @@ public sealed class BuildResult
 
 public sealed class TestRunResult
 {
+    public string? Command { get; init; }
+    public string? WorkingDirectory { get; init; }
     public int ExitCode { get; init; }
     public int TotalTests { get; init; }
     public int Passed { get; init; }
@@ -268,9 +285,128 @@ public sealed class TestResult
     /// name (the display name carries theory data-row identity). Two tests with the
     /// same display name in different assemblies/classes never collide.
     /// </summary>
-    [JsonIgnore]
     public string Identity =>
         $"{Project}::{Assembly}::{ExecutorUri}::{FullyQualifiedName}::{TestCaseId}::{TestName}";
+}
+
+/// <summary>
+/// Additive evidence schema. Legacy fidelity is not nullability acceptance.
+/// IDs use original input identity, never the recovered C# file's current contents.
+/// </summary>
+public sealed class RunEvidence
+{
+    public int SchemaVersion { get; init; } = 1;
+    public string RunId { get; init; } = Guid.NewGuid().ToString("N");
+    public string Acceptance { get; init; } = "Unadjudicated";
+    public RunProvenance Provenance { get; set; } = new();
+    public bool InventoryComplete { get; set; }
+    public List<InputEvidence> Inputs { get; set; } = [];
+    public List<BuildResult> BuildAttempts { get; set; } = [];
+    public List<TestAttemptEvidence> TestAttempts { get; set; } = [];
+    public List<string> Failures { get; set; } = [];
+    public List<string> Limitations { get; set; } = [];
+    public int DeclaredTestAttemptsPerLeg { get; set; } = 1;
+    public string RetryRule { get; init; } =
+        "Fixed full-suite attempts per leg, declared before baseline; no early stop on green. "
+        + "Compare paired attempts and retain every test identity/outcome. Any failed, missing, "
+        + "skipped-extra or incomplete attempt blocks evidence acceptance, including legacy allowlisted flakes.";
+}
+
+public sealed class RunProvenance
+{
+    public string? RepositoryRevision { get; set; }
+    public string? RepositoryDiffSha256 { get; set; }
+    public string? CorpusRevision { get; set; }
+    public string? CorpusDiffSha256 { get; set; }
+    public string? DotnetInfo { get; set; }
+    public string? Host { get; set; }
+    public ReferenceEvidence? Compiler { get; set; }
+    public ReferenceEvidence? Harness { get; set; }
+    public ReferenceEvidence? Roslyn { get; set; }
+    public Dictionary<string, string?> Environment { get; set; } = [];
+    public Dictionary<string, System.Text.Json.JsonElement> HarnessOptions { get; set; } = [];
+    public List<ReferenceEvidence> GeneratedValidationReferencePool { get; set; } = [];
+}
+
+public sealed class InputEvidence
+{
+    public required string FileId { get; init; }
+    public required string Path { get; init; }
+    public string? Sha256 { get; init; }
+    public bool Excluded { get; init; }
+    public string? ReadError { get; init; }
+}
+
+public sealed class CandidateEvidence
+{
+    public required string FileId { get; init; }
+    public string? InputSha256 { get; init; }
+    public string? CandidateId { get; set; }
+    public bool Attempted { get; set; }
+    public string ContextResolution { get; set; } = "NotAttempted";
+    public string SemanticResolution { get; set; } = "Unassessed";
+    public string CompilationOutcome { get; set; } = "NotReached";
+    public FileStatus? StatusBeforeRecovery { get; set; }
+    public string? ConvertedCalor { get; set; }
+    public string? ConvertedCalorSha256 { get; set; }
+    public string? EmittedCSharpSha256 { get; set; }
+    public string? AnalysisOutcome { get; set; }
+    public Dictionary<string, System.Text.Json.JsonElement> CompilerOptions { get; set; } = [];
+    public Dictionary<string, System.Text.Json.JsonElement> ConversionOptions { get; set; } = [];
+    public List<DiagnosticEvidence> Diagnostics { get; set; } = [];
+    public List<DiagnosticEvidence> AnalysisDiagnostics { get; set; } = [];
+    public List<string> Errors { get; set; } = [];
+}
+
+public sealed class DiagnosticEvidence
+{
+    public string Id { get; set; } = "";
+    public string? Code { get; init; }
+    public required string Severity { get; init; }
+    public required string Message { get; init; }
+    public required string Phase { get; init; }
+    public string? Producer { get; init; }
+    public required string SourceKind { get; init; }
+    public string? Path { get; init; }
+    public string? SourceSha256 { get; init; }
+    public int? Start { get; init; }
+    public int? Length { get; init; }
+    public int? Line { get; init; }
+    public int? Column { get; init; }
+    public int? EndLine { get; init; }
+    public int? EndColumn { get; init; }
+    public string Attribution { get; init; } = "direct";
+    public string? BindingBoundary { get; init; }
+    public string? BindingShape { get; init; }
+    public string? BindingDisposition { get; init; }
+}
+
+public sealed class ReferenceEvidence
+{
+    public required string Path { get; init; }
+    public string? Identity { get; init; }
+    public string? Sha256 { get; init; }
+    public string? InformationalVersion { get; init; }
+    public string? Error { get; init; }
+    public List<string> Aliases { get; init; } = [];
+    public Dictionary<string, string> Properties { get; init; } = [];
+}
+
+public sealed class RecoveryEvidence
+{
+    public required string Phase { get; init; }
+    public int Attempt { get; init; }
+    public required string Outcome { get; init; }
+    public List<DiagnosticEvidence> Diagnostics { get; init; } = [];
+    public List<string> Errors { get; init; } = [];
+}
+
+public sealed class TestAttemptEvidence
+{
+    public required string Leg { get; init; }
+    public int Attempt { get; init; }
+    public required TestRunResult Result { get; init; }
+    public TestComparison? Comparison { get; set; }
 }
 
 public sealed class TestComparison

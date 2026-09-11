@@ -1,6 +1,9 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Reflection;
+using System.Security.Cryptography;
+using Calor.Compiler.Binding;
 
 namespace Calor.RoundTrip.Harness;
 
@@ -27,6 +30,15 @@ public static class ReportGenerator
         sb.AppendLine($"**Date:** {report.StartedAt:yyyy-MM-dd}");
         sb.AppendLine($"**Duration:** {report.Duration.TotalSeconds:F1}s");
         sb.AppendLine($"**Verdict:** {verdict}");
+        if (report.Evidence is { } evidence)
+        {
+            sb.AppendLine($"**Nullability acceptance:** {evidence.Acceptance} (not the legacy fidelity verdict)");
+            sb.AppendLine($"**Evidence run:** `{evidence.RunId}`; inventory complete: {evidence.InventoryComplete}");
+            sb.AppendLine($"**Subject-test retry rule:** {evidence.RetryRule}");
+            sb.AppendLine($"**Declared attempts per leg:** {evidence.DeclaredTestAttemptsPerLeg}");
+            foreach (var limitation in evidence.Limitations.Concat(evidence.Failures))
+                sb.AppendLine($"- {limitation}");
+        }
         sb.AppendLine();
         var gateFailures = RoundTripExitPolicy.GetFailureReasons(report);
         if (gateFailures.Count > 0)
@@ -151,11 +163,14 @@ public static class ReportGenerator
             {
                 FileStatus.Replaced => "Replaced",
                 FileStatus.ConversionFailed => "Conv. Failed",
+                FileStatus.ConversionTimedOut => "Conv. Timed Out",
                 FileStatus.EmitSyntaxError => "Emit Error",
+                FileStatus.EmitCompilationError => "Emit Compilation Error",
                 FileStatus.CompileError => "Compile Error",
                 FileStatus.Crashed => "Crashed",
                 FileStatus.Excluded => "Excluded",
                 FileStatus.Reverted => "REVERTED",
+                FileStatus.NotAttempted => "Not Attempted",
                 _ => "Unknown",
             };
             var errors = file.Errors.Count > 0 ? file.Errors.First().Truncate(80) : "-";
@@ -164,6 +179,26 @@ public static class ReportGenerator
         }
 
         sb.AppendLine();
+        if (report.FileResults.Any(file => file.Candidate is not null))
+        {
+            sb.AppendLine("## Candidate diagnostics (retained before recovery)");
+            sb.AppendLine();
+            sb.AppendLine("Coordinates are one-based UTF-16 line/column; offsets are zero-based UTF-16. "
+                + "ConvertedCalor coordinates do not address the original C# despite a shared path. "
+                + "Analysis rows are independent observations, not production rejection or proof of resolution.");
+            sb.AppendLine();
+            sb.AppendLine("| File | Phase | Source | Code | Severity | Line:column | Binding disposition |");
+            sb.AppendLine("|---|---|---|---|---|---|---|");
+            foreach (var file in report.FileResults)
+            foreach (var diagnostic in (file.Candidate?.Diagnostics ?? [])
+                .Concat(file.Candidate?.AnalysisDiagnostics ?? []))
+            {
+                sb.AppendLine($"| {file.FilePath} | {diagnostic.Phase} | {diagnostic.SourceKind} | "
+                    + $"{diagnostic.Code ?? "(not supplied)"} | {diagnostic.Severity} | "
+                    + $"{diagnostic.Line}:{diagnostic.Column} | {diagnostic.BindingDisposition ?? "-"} |");
+            }
+            sb.AppendLine();
+        }
 
         // Regression analysis
         if (report.Comparison is { Regressions.Count: > 0 })
@@ -275,6 +310,7 @@ public static class ReportGenerator
     {
         var summary = new
         {
+            report_schema_version = 2,
             project = report.ProjectName,
             calor_version = report.CalorVersion,
             timestamp = report.StartedAt.ToString("o"),
@@ -283,6 +319,22 @@ public static class ReportGenerator
                 ? "inconclusive"
                 : RoundTripExitPolicy.IsFailure(report) ? "fail" : "pass",
             gate_failures = RoundTripExitPolicy.GetFailureReasons(report),
+            evidence = report.Evidence,
+            evidence_counts = report.Evidence is null ? null : new
+            {
+                inventory = report.Evidence.Inputs.Count,
+                attempted = report.FileResults.Count(f => f.Candidate?.Attempted == true),
+                context_resolved = report.FileResults.Count(f => f.Candidate?.ContextResolution == "Resolved"),
+                semantic_resolved = report.FileResults.Count(f => f.Candidate?.SemanticResolution == "Resolved"),
+                semantic_unassessed = report.FileResults.Count(f => f.Candidate?.SemanticResolution == "Unassessed"),
+                compilation_accepted = report.FileResults.Count(f => f.Candidate?.CompilationOutcome == "Accepted"),
+                compilation_rejected = report.FileResults.Count(f => f.Candidate?.CompilationOutcome == "Rejected"),
+                compilation_not_reached = report.FileResults.Count(f => f.Candidate?.CompilationOutcome == "NotReached"),
+                skipped = report.Evidence.Inputs.Count(i => i.Excluded),
+                not_attempted = report.FileResults.Count(f => f.Candidate?.Attempted == false),
+                crashed = report.FileResults.Count(f => f.Status == FileStatus.Crashed),
+                reverted = report.FileResults.Count(f => f.Status == FileStatus.Reverted),
+            },
             // When inconclusive, no coverage fraction is trustworthy — see below (fidelity is nulled).
             inconclusive = report.Inconclusive,
             inconclusive_reason = report.InconclusiveReason,
@@ -322,6 +374,7 @@ public static class ReportGenerator
                 emit_compilation_error = report.FileResults.Count(f => f.Status == FileStatus.EmitCompilationError),
                 compile_error = report.FileResults.Count(f => f.Status == FileStatus.CompileError),
                 crashed = report.FileResults.Count(f => f.Status == FileStatus.Crashed),
+                not_attempted = report.FileResults.Count(f => f.Status == FileStatus.NotAttempted),
                 excluded_by_pattern = report.ExcludedFileCount,
             },
             avg_conversion_rate = report.FileResults.Count > 0
@@ -401,12 +454,293 @@ public static class ReportGenerator
                     // alone; previously these lived in-model only and the record said only "how
                     // many" files failed, never "why".
                     errors = f.Errors,
+                    candidate = f.Candidate,
+                    recovery = f.Recovery,
                 })
                 .ToList(),
         };
 
         return JsonSerializer.Serialize(summary, JsonOptions);
     }
+
+    public static string GenerateClassificationTemplate(RoundTripReport report)
+    {
+        var entries = report.FileResults.SelectMany(file =>
+        {
+            var ids = (file.Candidate?.Diagnostics ?? [])
+                .Concat(file.Candidate?.AnalysisDiagnostics ?? [])
+                .Concat(file.Recovery.SelectMany(recovery => recovery.Diagnostics))
+                .Select(diagnostic => diagnostic.Id)
+                .Distinct(StringComparer.Ordinal)
+                .Cast<string?>()
+                .Prepend(null);
+            return ids.Select(id => new
+            {
+                file_id = file.Candidate?.FileId,
+                input_sha256 = file.Candidate?.InputSha256,
+                candidate_id = file.Candidate?.CandidateId,
+                path = file.FilePath,
+                diagnostic_id = id,
+                classification = "unresolved",
+                reviewer = (string?)null,
+                rationale = (string?)null,
+                migration_evidence = (string?)null,
+            });
+        }).Concat((report.Evidence?.Inputs ?? []).Where(input => input.Excluded).Select(input => new
+        {
+            file_id = (string?)input.FileId,
+            input_sha256 = input.Sha256,
+            candidate_id = (string?)null,
+            path = input.Path,
+            diagnostic_id = (string?)null,
+            classification = "unresolved",
+            reviewer = (string?)null,
+            rationale = (string?)"Excluded by configured pattern; no candidate attempted.",
+            migration_evidence = (string?)null,
+        })).ToList();
+        return JsonSerializer.Serialize(new
+        {
+            schema_version = 1,
+            run_id = report.Evidence?.RunId,
+            acceptance = "Unadjudicated",
+            entries,
+        }, JsonOptions);
+    }
+
+    /// <summary>Join immutable inputs, not final recovered file contents; preserve both sides for adjudication.</summary>
+    public static string CompareEvidence(string baselineJson, string candidateJson)
+    {
+        using var baseline = JsonDocument.Parse(baselineJson);
+        using var candidate = JsonDocument.Parse(candidateJson);
+        var left = baseline.RootElement;
+        var right = candidate.RootElement;
+        if (!left.TryGetProperty("evidence", out var leftEvidence)
+            || !right.TryGetProperty("evidence", out var rightEvidence)
+            || leftEvidence.ValueKind != JsonValueKind.Object || rightEvidence.ValueKind != JsonValueKind.Object)
+            throw new InvalidOperationException("Both reports require structured evidence; legacy counts cannot supply missing provenance.");
+        if (left.GetProperty("project").GetString() != right.GetProperty("project").GetString())
+            throw new InvalidOperationException("Cannot compare different project identities.");
+        var leftInputs = Index(leftEvidence.GetProperty("Inputs"), "FileId");
+        var rightInputs = Index(rightEvidence.GetProperty("Inputs"), "FileId");
+        var leftFiles = Files(left);
+        var rightFiles = Files(right);
+        return JsonSerializer.Serialize(new
+        {
+            comparison_schema_version = 1,
+            acceptance = "Unadjudicated",
+            baseline_run_id = leftEvidence.GetProperty("RunId").GetString(),
+            candidate_run_id = rightEvidence.GetProperty("RunId").GetString(),
+            same_retry_rule = leftEvidence.GetProperty("RetryRule").GetString() == rightEvidence.GetProperty("RetryRule").GetString()
+                && leftEvidence.GetProperty("DeclaredTestAttemptsPerLeg").GetInt32()
+                    == rightEvidence.GetProperty("DeclaredTestAttemptsPerLeg").GetInt32(),
+            baseline_provenance = leftEvidence.GetProperty("Provenance"),
+            candidate_provenance = rightEvidence.GetProperty("Provenance"),
+            baseline_test_attempts = leftEvidence.GetProperty("TestAttempts"),
+            candidate_test_attempts = rightEvidence.GetProperty("TestAttempts"),
+            baseline_failures = leftEvidence.GetProperty("Failures"),
+            candidate_failures = rightEvidence.GetProperty("Failures"),
+            rows = leftInputs.Keys.Union(rightInputs.Keys, StringComparer.Ordinal).OrderBy(id => id, StringComparer.Ordinal)
+                .Select(id => new
+                {
+                    file_id = id,
+                    same_input = leftInputs.TryGetValue(id, out var a) && rightInputs.TryGetValue(id, out var b)
+                        && a.TryGetProperty("Sha256", out var ah) && b.TryGetProperty("Sha256", out var bh)
+                        && ah.GetString() is { } hash && hash == bh.GetString(),
+                    baseline_input = Get(leftInputs, id),
+                    candidate_input = Get(rightInputs, id),
+                    baseline_file = Get(leftFiles, id),
+                    candidate_file = Get(rightFiles, id),
+                }).ToList(),
+        }, JsonOptions);
+
+        static Dictionary<string, JsonElement> Index(JsonElement array, string key) =>
+            array.EnumerateArray().ToDictionary(item => item.GetProperty(key).GetString()!, item => item, StringComparer.Ordinal);
+        static Dictionary<string, JsonElement> Files(JsonElement report) =>
+            report.GetProperty("file_detail").EnumerateArray()
+                .Where(file => file.TryGetProperty("candidate", out var item) && item.ValueKind == JsonValueKind.Object)
+                .ToDictionary(file => file.GetProperty("candidate").GetProperty("FileId").GetString()!, file => file, StringComparer.Ordinal);
+        static JsonElement? Get(Dictionary<string, JsonElement> items, string id) =>
+            items.TryGetValue(id, out var item) ? item : null;
+    }
+
+    internal static string Hash(string value) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+
+    internal static string HashFile(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexStringLower(SHA256.HashData(stream));
+    }
+
+    internal static ReferenceEvidence Fingerprint(string path, Assembly? assembly = null)
+    {
+        try
+        {
+            string? identity = null;
+            if (path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                identity = AssemblyName.GetAssemblyName(path).FullName;
+            return new ReferenceEvidence
+            {
+                Path = path,
+                Sha256 = HashFile(path),
+                Identity = identity,
+                InformationalVersion = assembly?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
+            };
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or BadImageFormatException or ArgumentException)
+        {
+            return new ReferenceEvidence { Path = path, Error = $"{ex.GetType().Name}: {ex.Message}" };
+        }
+    }
+
+    internal static Dictionary<string, JsonElement> SnapshotOptions(object options)
+        => options.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .Where(property => property.GetIndexParameters().Length == 0
+                && property.Name is not ("CancellationToken" or "StatusWriter" or "Context"
+                    or "VerificationResults" or "VerificationAnalysisResult" or "ObligationResults"))
+            .OrderBy(property => property.Name, StringComparer.Ordinal)
+            .ToDictionary(property => property.Name,
+                property => JsonSerializer.SerializeToElement(SnapshotValue(property.GetValue(options)), JsonOptions));
+
+    private static object? SnapshotValue(object? value) => value switch
+    {
+        Microsoft.CodeAnalysis.CSharp.CSharpParseOptions parse => new
+        {
+            parse.LanguageVersion, parse.SpecifiedLanguageVersion, parse.DocumentationMode,
+            parse.Kind, parse.Features, DefinedSymbols = parse.PreprocessorSymbolNames.ToList(),
+        },
+        Encoding encoding => encoding.WebName,
+        _ => value,
+    };
+
+    internal static DiagnosticEvidence CaptureDiagnostic(
+        Calor.Compiler.Diagnostics.Diagnostic diagnostic, string phase, string path, string source,
+        bool independentBinding = false)
+    {
+        var span = diagnostic.Span;
+        var endLine = span.Line;
+        var endColumn = span.Column;
+        var valid = span.Start >= 0 && span.Length >= 0 && span.End <= source.Length;
+        if (valid)
+        {
+            foreach (var character in source.AsSpan(span.Start, span.Length))
+            {
+                if (character == '\n') { endLine++; endColumn = 1; }
+                else endColumn++;
+            }
+        }
+        var binding = diagnostic.BindingContext;
+        var result = new DiagnosticEvidence
+        {
+            Code = diagnostic.Code,
+            Severity = diagnostic.Severity.ToString(),
+            Message = diagnostic.Message,
+            Phase = phase,
+            Producer = independentBinding || binding is not null ? "Binder" : null,
+            SourceKind = "ConvertedCalor",
+            Path = path,
+            SourceSha256 = Hash(source),
+            Start = span.Start,
+            Length = span.Length,
+            Line = span.Line,
+            Column = span.Column,
+            EndLine = valid ? endLine : null,
+            EndColumn = valid ? endColumn : null,
+            BindingBoundary = binding?.Boundary.ToString(),
+            BindingShape = binding?.Shape.ToString(),
+            BindingDisposition = binding is null && !independentBinding ? null
+                : BindingDiagnosticPolicy.Catalog.ContainsKey(diagnostic.Code)
+                    ? BindingDiagnosticPolicy.GetRule(diagnostic.Code, binding).Disposition.ToString()
+                    : "Uncataloged",
+        };
+        return Identify(result);
+    }
+
+    internal static DiagnosticEvidence CaptureRoslynDiagnostic(
+        Microsoft.CodeAnalysis.Diagnostic diagnostic, string phase, string workDir,
+        string attribution = "direct")
+    {
+        var location = diagnostic.Location;
+        var span = location.GetLineSpan();
+        var source = location.SourceTree?.GetText().ToString();
+        return Identify(new DiagnosticEvidence
+        {
+            Code = diagnostic.Id,
+            Severity = diagnostic.Severity.ToString(),
+            Message = diagnostic.GetMessage(System.Globalization.CultureInfo.InvariantCulture),
+            Phase = phase,
+            Producer = "Roslyn",
+            SourceKind = "EmittedCSharp",
+            Path = string.IsNullOrEmpty(span.Path) ? null : RelativePath(workDir, span.Path),
+            SourceSha256 = source is null ? null : Hash(source),
+            Start = location.IsInSource ? location.SourceSpan.Start : null,
+            Length = location.IsInSource ? location.SourceSpan.Length : null,
+            Line = location.IsInSource ? span.StartLinePosition.Line + 1 : null,
+            Column = location.IsInSource ? span.StartLinePosition.Character + 1 : null,
+            EndLine = location.IsInSource ? span.EndLinePosition.Line + 1 : null,
+            EndColumn = location.IsInSource ? span.EndLinePosition.Character + 1 : null,
+            Attribution = attribution,
+        });
+    }
+
+    internal static List<DiagnosticEvidence> CaptureBuildDiagnostics(
+        IEnumerable<string> errors, string phase, string workDir, string? reportedSourceRoot = null,
+        string attribution = "direct")
+    {
+        var result = new List<DiagnosticEvidence>();
+        foreach (var error in errors)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(error,
+                @"^(?<path>.+?)(?:\((?<line>\d+),(?<column>\d+)(?:,(?<endLine>\d+),(?<endColumn>\d+))?\))?:\s*(?<severity>error|warning)\s+(?<code>[\w]+\d+)\s*:\s*(?<message>.*)$",
+                System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+            result.Add(Identify(new DiagnosticEvidence
+            {
+                Code = match.Success ? match.Groups["code"].Value : null,
+                Severity = match.Success && match.Groups["severity"].Value == "warning" ? "Warning" : "Error",
+                Message = match.Success ? match.Groups["message"].Value : error,
+                Phase = phase,
+                // MSBuild output does not identify the emitting compiler/analyzer pass.
+                Producer = null,
+                SourceKind = "MSBuildReportedLocation",
+                Path = match.Success ? DiagnosticPath(match.Groups["path"].Value) : null,
+                Line = Number("line"),
+                Column = Number("column"),
+                EndLine = Number("endLine"),
+                EndColumn = Number("endColumn"),
+                Attribution = attribution,
+            }));
+            int? Number(string name) => int.TryParse(match.Groups[name].Value, out var value) ? value : null;
+        }
+        return result;
+
+        string DiagnosticPath(string path)
+        {
+            var relative = RelativePath(workDir, path);
+            if (reportedSourceRoot is not null && Path.IsPathRooted(path)
+                && (relative == ".." || relative.StartsWith("../", StringComparison.Ordinal)))
+            {
+                var sourceRelative = RelativePath(reportedSourceRoot, path);
+                if (sourceRelative != ".." && !sourceRelative.StartsWith("../", StringComparison.Ordinal))
+                    return sourceRelative;
+            }
+            return relative;
+        }
+    }
+
+    internal static DiagnosticEvidence Identify(DiagnosticEvidence diagnostic)
+    {
+        diagnostic.Id = Hash(JsonSerializer.Serialize(new
+        {
+            diagnostic.Phase, diagnostic.SourceKind, diagnostic.Path, diagnostic.SourceSha256,
+            diagnostic.Code, diagnostic.Severity, diagnostic.Start, diagnostic.Length,
+            diagnostic.Line, diagnostic.Column, diagnostic.Message, diagnostic.BindingBoundary,
+            diagnostic.BindingShape, diagnostic.Attribution,
+        }));
+        return diagnostic;
+    }
+
+    internal static string RelativePath(string root, string path) =>
+        (Path.IsPathRooted(path) ? Path.GetRelativePath(root, path) : path).Replace('\\', '/');
 
     private static string GetVerdict(RoundTripReport report)
     {

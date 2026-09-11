@@ -53,6 +53,17 @@ public class ComparisonTests
         Assert.Equal(3, result.RoundTripPassed);
     }
 
+    [Theory]
+    [InlineData("Unknown")]
+    [InlineData("Aborted")]
+    public void UnknownOrAbortedOutcomes_AreIncompleteEvenWhenBothLegsMatch(string outcome)
+    {
+        var baseline = MakeTestRun($"Test1:{outcome}");
+        var candidate = MakeTestRun($"Test1:{outcome}");
+        Assert.Equal(ComparisonStatus.Incomplete,
+            Compare(baseline, candidate, new BuildResult { Succeeded = true }).Status);
+    }
+
     [Fact]
     public void OneRegression_MinorRegressions()
     {

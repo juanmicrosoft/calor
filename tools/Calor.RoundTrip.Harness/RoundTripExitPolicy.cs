@@ -9,6 +9,12 @@ public static class RoundTripExitPolicy
     {
         ArgumentNullException.ThrowIfNull(report);
         var reasons = new List<string>();
+        if (report.Evidence is { } evidence)
+        {
+            reasons.AddRange(evidence.Failures.Select(failure => $"evidence: {failure}"));
+            if (!evidence.InventoryComplete)
+                reasons.Add("evidence input inventory is incomplete");
+        }
         if (report.Inconclusive)
             reasons.Add(report.InconclusiveReason ?? "run is inconclusive");
         if (report.BaselineBuildResult?.Succeeded != true)

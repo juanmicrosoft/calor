@@ -17,6 +17,8 @@ internal sealed record MultiContextConversionPlan(
 /// </summary>
 public sealed class RoundTripPipeline
 {
+    private RunEvidence? _evidence;
+
     /// <summary>
     /// Run the full round-trip pipeline for a target project.
     /// </summary>
@@ -24,6 +26,8 @@ public sealed class RoundTripPipeline
         RoundTripConfig config,
         CancellationToken cancellationToken = default)
     {
+        if (config.TestAttemptsPerLeg is < 1 or > 3)
+            throw new ArgumentOutOfRangeException(nameof(config), "TestAttemptsPerLeg must be between 1 and 3.");
         var report = new RoundTripReport
         {
             ProjectName = config.ProjectName,
@@ -31,8 +35,32 @@ public sealed class RoundTripPipeline
             StartedAt = DateTimeOffset.UtcNow,
             MinimumCoverageFraction = config.MinimumCoverageFraction,
             MinimumNativeFraction = config.MinimumNativeFraction,
+            Evidence = new RunEvidence { DeclaredTestAttemptsPerLeg = config.TestAttemptsPerLeg },
         };
+        _evidence = report.Evidence;
+        try
+        {
+            CaptureInventory(config.OriginalProjectPath, config, report);
+            await CaptureProvenanceAsync(config, report.Evidence, cancellationToken);
+            await RunCoreAsync(config, report, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            report.Inconclusive = true;
+            report.InconclusiveReason = $"{ex.GetType().Name}: {ex.Message}";
+            report.Evidence.Failures.Add(ex.ToString());
+            report.Comparison ??= new TestComparison { Status = ComparisonStatus.Incomplete };
+        }
+        finally
+        {
+            report.FinishedAt = DateTimeOffset.UtcNow;
+            _evidence = null;
+        }
+        return report;
+    }
 
+    private async Task RunCoreAsync(RoundTripConfig config, RoundTripReport report, CancellationToken cancellationToken)
+    {
         // Step 1: Snapshot
         Console.WriteLine($"Phase 1/5: Creating working copy of {config.ProjectName}...");
         var workDir = PrepareWorkingCopy(config, cancellationToken);
@@ -48,14 +76,11 @@ public sealed class RoundTripPipeline
         Console.WriteLine("\nPhase 2/5: Running baseline tests...");
         TrxParser.CleanTrxFiles(workDir);
         report.BaselineBuildResult = await BuildProjectAsync(
-            workDir, config, cancellationToken);
+            workDir, config, cancellationToken, phase: "baseline-build");
         if (!report.BaselineBuildResult.Succeeded)
             Console.WriteLine("  WARNING: baseline build failed (the vendored subject does not build clean here)");
-        report.Baseline = await RunTestsAsync(
-            workDir,
-            config,
-            noBuild: report.BaselineBuildResult.Succeeded,
-            cancellationToken);
+        report.Baseline = await RunTestAttemptsAsync(
+            workDir, config, "baseline", report.BaselineBuildResult.Succeeded, cancellationToken);
         Console.WriteLine($"  Baseline: {report.Baseline.Passed}/{report.Baseline.TotalTests} passed, {report.Baseline.Failed} failed, {report.Baseline.Skipped} skipped");
 
         // Step 3: Convert & Replace
@@ -68,7 +93,8 @@ public sealed class RoundTripPipeline
 
         // Step 4: Build (with recovery — revert files that cause build errors)
         Console.WriteLine("\nPhase 4/5: Building modified project...");
-        report.BuildResult = await BuildProjectAsync(workDir, config, cancellationToken);
+        report.BuildResult = await BuildProjectAsync(workDir, config, cancellationToken, phase: "candidate-build",
+            candidateFiles: report.FileResults.Where(file => file.Status == FileStatus.Replaced).Select(file => file.FilePath).ToList());
 
         if (!report.BuildResult.Succeeded)
         {
@@ -79,7 +105,8 @@ public sealed class RoundTripPipeline
             {
                 Console.WriteLine($"  Reverted {revertedCount} file(s), rebuilding...");
                 report.BuildResult = await BuildProjectAsync(
-                    workDir, config, cancellationToken);
+                    workDir, config, cancellationToken, phase: "post-recovery-build",
+                    candidateFiles: report.FileResults.Where(file => file.Status == FileStatus.Replaced).Select(file => file.FilePath).ToList());
             }
         }
 
@@ -103,8 +130,8 @@ public sealed class RoundTripPipeline
         {
             Console.WriteLine("\nPhase 5/5: Running round-trip tests...");
             TrxParser.CleanTrxFiles(workDir);
-            report.RoundTripTests = await RunTestsAsync(
-                workDir, config, cancellationToken: cancellationToken);
+            report.RoundTripTests = await RunTestAttemptsAsync(
+                workDir, config, "candidate", false, cancellationToken);
             Console.WriteLine($"  Round-trip: {report.RoundTripTests.Passed}/{report.RoundTripTests.TotalTests} passed, {report.RoundTripTests.Failed} failed");
         }
         else
@@ -114,6 +141,20 @@ public sealed class RoundTripPipeline
 
         // Compare
         report.Comparison = CompareTestResults(config, report.Baseline, report.RoundTripTests, report.BuildResult);
+        foreach (var attempt in report.Evidence!.TestAttempts.Where(attempt => attempt.Leg == "candidate"))
+        {
+            var baseline = report.Evidence.TestAttempts
+                .SingleOrDefault(item => item.Leg == "baseline" && item.Attempt == attempt.Attempt);
+            attempt.Comparison = CompareTestResults(
+                config with { ExpectedFlakyTestFullyQualifiedNames = [] },
+                baseline?.Result, attempt.Result, report.BuildResult);
+            if (attempt.Comparison.Status != ComparisonStatus.Pass
+                || attempt.Result.ExitCode != 0 || baseline?.Result.ExitCode != 0)
+                report.Evidence.Failures.Add($"Subject-test attempt {attempt.Attempt} is not clean on both legs; "
+                    + "legacy flake allowances do not waive evidence acceptance.");
+        }
+        if (report.Evidence.TestAttempts.Count(attempt => attempt.Leg == "candidate") != config.TestAttemptsPerLeg)
+            report.Evidence.Failures.Add("Not all declared candidate subject-test attempts were reached.");
 
         // Fidelity: separated verdict dimensions (coverage / build / tests)
         report.Fidelity = ProjectFidelity.Compute(report);
@@ -145,8 +186,118 @@ public sealed class RoundTripPipeline
                 cancellationToken);
         }
 
-        report.FinishedAt = DateTimeOffset.UtcNow;
-        return report;
+    }
+
+    private async Task<TestRunResult> RunTestAttemptsAsync(
+        string workDir, RoundTripConfig config, string leg, bool noBuild, CancellationToken cancellationToken)
+    {
+        TestRunResult? first = null;
+        for (var attempt = 1; attempt <= config.TestAttemptsPerLeg; attempt++)
+        {
+            TrxParser.CleanTrxFiles(workDir);
+            var result = await RunTestsAsync(workDir, config, noBuild, cancellationToken);
+            _evidence?.TestAttempts.Add(new TestAttemptEvidence { Leg = leg, Attempt = attempt, Result = result });
+            first ??= result;
+        }
+        return first!;
+    }
+
+    private static void CaptureInventory(string root, RoundTripConfig config, RoundTripReport report)
+    {
+        report.Evidence ??= new RunEvidence { DeclaredTestAttemptsPerLeg = config.TestAttemptsPerLeg };
+        if (report.Evidence.InventoryComplete)
+            return;
+        var library = Path.Combine(root, config.LibrarySourceRelativePath);
+        if (!Directory.Exists(library))
+            throw new DirectoryNotFoundException($"Library source directory not found: {library}");
+        report.Evidence.Provenance.Compiler ??= ReportGenerator.Fingerprint(
+            typeof(Compiler.Program).Assembly.Location, typeof(Compiler.Program).Assembly);
+        report.Evidence.Provenance.Harness ??= ReportGenerator.Fingerprint(
+            typeof(RoundTripPipeline).Assembly.Location, typeof(RoundTripPipeline).Assembly);
+        report.Evidence.Provenance.HarnessOptions = ReportGenerator.SnapshotOptions(config);
+        foreach (var path in Directory.EnumerateFiles(library, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !IsBuildOutputPath(path)).OrderBy(path => path, StringComparer.Ordinal))
+        {
+            var relative = ReportGenerator.RelativePath(root, path);
+            var fileId = $"{config.ProjectName}/{relative}";
+            string? hash = null;
+            string? readError = null;
+            try { hash = ReportGenerator.HashFile(path); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { readError = ex.ToString(); }
+            var excluded = ShouldExclude(path, config.ExcludePatterns);
+            report.Evidence.Inputs.Add(new InputEvidence
+            {
+                FileId = fileId, Path = relative, Sha256 = hash, Excluded = excluded, ReadError = readError,
+            });
+            if (!excluded)
+                report.FileResults.Add(new FileConversionResult
+                {
+                    FilePath = relative,
+                    Status = FileStatus.NotAttempted,
+                    Candidate = new CandidateEvidence { FileId = fileId, InputSha256 = hash },
+                });
+        }
+        report.ExcludedFileCount = report.Evidence.Inputs.Count(input => input.Excluded);
+        report.Evidence.InventoryComplete = true;
+    }
+
+    internal static async Task CaptureProvenanceAsync(
+        RoundTripConfig config, RunEvidence evidence, CancellationToken cancellationToken)
+    {
+        var compiler = typeof(Compiler.Program).Assembly;
+        var harness = typeof(RoundTripPipeline).Assembly;
+        var roslyn = typeof(Microsoft.CodeAnalysis.CSharp.CSharpCompilation).Assembly;
+        var provenance = evidence.Provenance;
+        provenance.Compiler = ReportGenerator.Fingerprint(compiler.Location, compiler);
+        provenance.Harness = ReportGenerator.Fingerprint(harness.Location, harness);
+        provenance.Roslyn = ReportGenerator.Fingerprint(roslyn.Location, roslyn);
+        provenance.Host = $"{System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}; "
+            + $"{System.Runtime.InteropServices.RuntimeInformation.OSDescription}; "
+            + System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture;
+        provenance.HarnessOptions = ReportGenerator.SnapshotOptions(config);
+        foreach (var key in new[] { "CALOR_NO_TYPE_CHECK", "DOTNET_ROLL_FORWARD", "DOTNET_ROOT",
+            "NuGetAudit", "RestoreSources", "TMPDIR", "MSBuildSDKsPath" })
+            provenance.Environment[key] = Environment.GetEnvironmentVariable(key);
+        provenance.GeneratedValidationReferencePool = GeneratedCSharpCompiler.References
+            .OfType<Microsoft.CodeAnalysis.PortableExecutableReference>()
+            .Where(reference => reference.FilePath is not null)
+            .OrderBy(reference => reference.FilePath, StringComparer.Ordinal)
+            .Select(reference => ReportGenerator.Fingerprint(reference.FilePath!)).ToList();
+        provenance.RepositoryRevision = await Git("rev-parse HEAD", AppContext.BaseDirectory);
+        var repositoryRoot = await Git("rev-parse --show-toplevel", AppContext.BaseDirectory);
+        provenance.RepositoryDiffSha256 = repositoryRoot is null ? null : await GitHash(repositoryRoot);
+        provenance.CorpusRevision = await Git("rev-parse HEAD", config.OriginalProjectPath);
+        provenance.CorpusDiffSha256 = await GitHash(config.OriginalProjectPath);
+        var info = await ProcessRunner.RunAsync(config.DotnetPath, "--info",
+            AppContext.BaseDirectory, TimeSpan.FromSeconds(30), cancellationToken: cancellationToken);
+        provenance.DotnetInfo = info.Stdout + info.Stderr;
+        if (info.ExitCode != 0)
+            evidence.Failures.Add($"dotnet --info failed with exit {info.ExitCode}.");
+        evidence.Limitations.Add("Program.Compile diagnostics expose Binder provenance only when BindingContext "
+            + "is present. Other producer passes are unavailable, not inferred from shared codes.");
+        evidence.Limitations.Add("Semantic resolution is unassessed; evaluated project context or absence of "
+            + "diagnostics does not prove every reference resolved or an accepted file is null-safe.");
+        evidence.Limitations.Add("GeneratedValidationReferencePool is the actual public reference pool, not a claim "
+            + "that every member was selected by the private lazy MetadataBinder. Project validation references "
+            + "are separately captured from evaluated compiler inputs.");
+        evidence.Limitations.Add("Calor0272/0273/0274 retain AnalysisOnly routing. Independent binding observations "
+            + "are shadow evidence, not a production nullability rejection or Stage A/B acceptance.");
+        evidence.Limitations.Add("Working-copy preparation omits .git, global.json, bin and obj. Compiler options "
+            + "are harness options (effects/contract enforcement off, generated validation deferred), not CLI defaults.");
+
+        async Task<string?> Git(string arguments, string directory)
+        {
+            var result = await ProcessRunner.RunAsync("git", arguments, directory,
+                TimeSpan.FromSeconds(30), cancellationToken: cancellationToken);
+            if (result.ExitCode == 0) return result.Stdout.Trim();
+            evidence.Failures.Add($"Provenance git {arguments} unavailable for {directory}: {result.Stderr}");
+            return null;
+        }
+        async Task<string?> GitHash(string directory)
+        {
+            var diff = await Git("diff --no-ext-diff --binary HEAD -- .", directory);
+            return diff is null ? null : ReportGenerator.Hash(diff);
+        }
     }
 
     internal string PrepareWorkingCopy(
@@ -258,6 +409,10 @@ public sealed class RoundTripPipeline
             return new TestRunResult
             {
                 ExitCode = exitCode == 0 ? -2 : exitCode,
+                Command = $"{config.DotnetPath} {args}",
+                WorkingDirectory = workDir,
+                Results = testResults,
+                TrxFiles = trxFiles.Select(f => Path.GetRelativePath(workDir, f)).ToList(),
                 ParseErrors = parseErrors,
                 Stdout = stdout,
                 Stderr = stderr,
@@ -267,12 +422,14 @@ public sealed class RoundTripPipeline
         // Fallback: if TRX parsing found no results, parse console output
         if (testResults.Count == 0)
         {
-            return ParseConsoleTestOutput(exitCode, stdout, stderr);
+            return ParseConsoleTestOutput(exitCode, stdout, stderr, $"{config.DotnetPath} {args}", workDir);
         }
 
         return new TestRunResult
         {
             ExitCode = exitCode,
+            Command = $"{config.DotnetPath} {args}",
+            WorkingDirectory = workDir,
             TotalTests = testResults.Count,
             Passed = testResults.Count(t => t.Outcome == "Passed"),
             Failed = testResults.Count(t => t.Outcome == "Failed"),
@@ -284,7 +441,8 @@ public sealed class RoundTripPipeline
         };
     }
 
-    private static TestRunResult ParseConsoleTestOutput(int exitCode, string stdout, string stderr)
+    private static TestRunResult ParseConsoleTestOutput(int exitCode, string stdout, string stderr,
+        string command, string workDir)
     {
         // Parse "Total tests: N" and "Passed: N" etc. from console output
         var combined = stdout + "\n" + stderr;
@@ -296,6 +454,8 @@ public sealed class RoundTripPipeline
         return new TestRunResult
         {
             ExitCode = exitCode,
+            Command = command,
+            WorkingDirectory = workDir,
             TotalTests = total,
             Passed = passed,
             Failed = failed,
@@ -322,7 +482,10 @@ public sealed class RoundTripPipeline
         RoundTripReport report,
         CancellationToken cancellationToken = default)
     {
+        CaptureInventory(workDir, config, report);
+        _evidence = report.Evidence;
         var results = new ConcurrentBag<FileConversionResult>();
+        var inventoryResults = report.FileResults.ToDictionary(file => file.FilePath, StringComparer.Ordinal);
         var libDir = Path.Combine(workDir, config.LibrarySourceRelativePath);
 
         if (!Directory.Exists(libDir))
@@ -374,11 +537,30 @@ public sealed class RoundTripPipeline
             },
             async (csFile, token) =>
         {
-            var relativePath = Path.GetRelativePath(workDir, csFile);
-            var result = new FileConversionResult { FilePath = relativePath };
+            var relativePath = ReportGenerator.RelativePath(workDir, csFile);
+            var result = inventoryResults[relativePath];
+            var candidate = result.Candidate!;
+            candidate.Attempted = true;
             config.FileConversionStarted?.Invoke(relativePath);
             void Complete()
             {
+                candidate.StatusBeforeRecovery = result.Status;
+                candidate.Errors = result.Errors.ToList();
+                candidate.CandidateId = ReportGenerator.Hash(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    candidate.FileId, candidate.InputSha256, candidate.ConvertedCalorSha256,
+                    candidate.CompilerOptions, candidate.ConversionOptions,
+                    Compiler = report.Evidence?.Provenance.Compiler?.Sha256,
+                    Contexts = result.ValidatedContexts.Select(context => new
+                    {
+                        context.Configuration, context.Platform, context.TargetFramework,
+                        context.CompilationProperties, context.DefinedSymbols,
+                        References = context.References.Select(reference => new
+                        {
+                            reference.Identity, reference.Sha256, reference.Aliases,
+                        }),
+                    }),
+                }));
                 results.Add(result);
                 var completed = Interlocked.Increment(
                     ref completedCount);
@@ -400,18 +582,22 @@ public sealed class RoundTripPipeline
                 {
                     case ResolvedProjectFileParseContext resolved:
                         observedContexts = [resolved.Context];
+                        candidate.ContextResolution = "Resolved";
                         break;
                     case AmbiguousProjectFileParseContext ambiguous:
                         observedContexts = ambiguous.Contexts;
+                        candidate.ContextResolution = "MultipleObserved";
                         break;
                     case MissingProjectFileParseContext missing
                         when !config.LooseDirectoryMode:
                         result.Status = FileStatus.ConversionFailed;
+                        candidate.ContextResolution = "Missing";
                         result.Errors = [missing.Diagnostic];
                         Complete();
                         return;
                     default:
                         observedContexts = [];
+                        candidate.ContextResolution = "LooseDirectory";
                         break;
                 }
                 var plan = CreateMultiContextConversionPlan(
@@ -432,11 +618,12 @@ public sealed class RoundTripPipeline
                     Complete();
                     return;
                 }
-                var converter = new CSharpToCalorConverter(
-                    CreateHarnessConversionOptions(
+                var conversionOptions = CreateHarnessConversionOptions(
                         config,
                         parseContext,
-                        plan.PreprocessorMode));
+                        plan.PreprocessorMode);
+                candidate.ConversionOptions = ReportGenerator.SnapshotOptions(conversionOptions);
+                var converter = new CSharpToCalorConverter(conversionOptions);
 
                 // Step 3a: Convert C# → Calor
                 using var conversionCancellation =
@@ -462,6 +649,22 @@ public sealed class RoundTripPipeline
                     conversionResult.Metadata.LanguageVersion;
                 result.DefinedSymbols =
                     conversionResult.Metadata.DefinedSymbols.ToList();
+                candidate.ConvertedCalor = conversionResult.CalorSource;
+                candidate.ConvertedCalorSha256 = conversionResult.CalorSource is null
+                    ? null : ReportGenerator.Hash(conversionResult.CalorSource);
+                candidate.Diagnostics.AddRange(conversionResult.Issues.Select(issue =>
+                    ReportGenerator.Identify(new DiagnosticEvidence
+                    {
+                        Severity = issue.Severity.ToString(),
+                        Message = issue.Message,
+                        Phase = "CSharpToCalorConverter.Convert",
+                        Producer = null,
+                        SourceKind = "OriginalCSharp",
+                        Path = relativePath,
+                        SourceSha256 = candidate.InputSha256,
+                        Line = issue.Line,
+                        Column = issue.Column,
+                    })));
 
                 // Consume the Slice-3 conversion loss ledger (#770): populate
                 // Gaps / InteropBlocks / loss counts from real conversion data.
@@ -477,20 +680,28 @@ public sealed class RoundTripPipeline
                         DeferGeneratedOutputValidation = true,
                         CancellationToken = token,
                     };
+                    candidate.CompilerOptions = ReportGenerator.SnapshotOptions(compileOptions);
                     var compileResult = Compiler.Program.Compile(
                         conversionResult.CalorSource, csFile, compileOptions);
+                    candidate.CompilationOutcome = compileResult.HasErrors ? "Rejected" : "Accepted";
+                    candidate.Diagnostics.AddRange(compileResult.Diagnostics.Select(diagnostic =>
+                        ReportGenerator.CaptureDiagnostic(diagnostic, "Program.Compile", relativePath,
+                            conversionResult.CalorSource)));
+                    if (config.CaptureBindingAnalysis)
+                        CaptureBindingAnalysis(candidate, conversionResult.CalorSource, csFile, relativePath);
                     token.ThrowIfCancellationRequested();
 
                     if (!compileResult.HasErrors && !string.IsNullOrWhiteSpace(compileResult.GeneratedCode))
                     {
                         // Step 3c: Post-process emitted C# for round-trip compatibility
                         var emitted = PostProcessEmittedCSharp(compileResult.GeneratedCode, originalSource);
+                        candidate.EmittedCSharpSha256 = ReportGenerator.Hash(emitted);
 
                         // Step 3d: Syntax-check now. All emitted files are compiled
                         // together with project sources/references below before any
                         // project file is replaced.
                         var syntaxErrors = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree
-                            .ParseText(emitted)
+                            .ParseText(emitted, path: csFile)
                             .GetDiagnostics()
                             .Where(diagnostic =>
                                 diagnostic.Severity ==
@@ -502,6 +713,8 @@ public sealed class RoundTripPipeline
                             result.Errors = syntaxErrors
                                 .Select(FormatDiagnostic)
                                 .ToList();
+                            candidate.Diagnostics.AddRange(syntaxErrors.Select(diagnostic =>
+                                ReportGenerator.CaptureRoslynDiagnostic(diagnostic, "emitted-syntax", workDir)));
                         }
                         else
                         {
@@ -539,6 +752,8 @@ public sealed class RoundTripPipeline
             catch (Exception ex)
             {
                 result.Status = FileStatus.Crashed;
+                candidate.CompilationOutcome = candidate.CompilationOutcome == "NotReached"
+                    ? "CrashedBeforeCompilation" : candidate.CompilationOutcome;
                 result.Errors = [ex.Message];
             }
 
@@ -566,6 +781,11 @@ public sealed class RoundTripPipeline
                 cancellationToken);
         }
 
+        foreach (var result in orderedResults)
+        {
+            result.Candidate!.StatusBeforeRecovery = result.Status;
+            result.Candidate.Errors = result.Errors.ToList();
+        }
         // Print status summary
         foreach (var group in orderedResults
             .GroupBy(r => r.Status)
@@ -575,6 +795,34 @@ public sealed class RoundTripPipeline
         }
 
         return orderedResults;
+    }
+
+    private static void CaptureBindingAnalysis(CandidateEvidence candidate, string source, string sourcePath, string relativePath)
+    {
+        try
+        {
+            var diagnostics = new Compiler.Diagnostics.DiagnosticBag();
+            diagnostics.SetFilePath(sourcePath);
+            var tokens = new Compiler.Parsing.Lexer(source, diagnostics).TokenizeAllForParser();
+            var module = new Compiler.Parsing.Parser(tokens, diagnostics).Parse();
+            candidate.AnalysisDiagnostics.AddRange(diagnostics.Select(diagnostic =>
+                ReportGenerator.CaptureDiagnostic(diagnostic, "shadow-reparse", relativePath, source)));
+            if (diagnostics.HasErrors)
+            {
+                candidate.AnalysisOutcome = "NotBound: reparse failed";
+                return;
+            }
+            var bindingDiagnostics = new Compiler.Diagnostics.DiagnosticBag();
+            bindingDiagnostics.SetFilePath(sourcePath);
+            new Compiler.Binding.Binder(bindingDiagnostics, sourcePath).Bind(module);
+            candidate.AnalysisDiagnostics.AddRange(bindingDiagnostics.Select(diagnostic =>
+                ReportGenerator.CaptureDiagnostic(diagnostic, "shadow-bind", relativePath, source, independentBinding: true)));
+            candidate.AnalysisOutcome = "Observed independently; production reachability not asserted";
+        }
+        catch (Exception ex)
+        {
+            candidate.AnalysisOutcome = $"Crashed: {ex.GetType().Name}: {ex.Message}";
+        }
     }
 
     internal async Task ValidateAndPublishProjectCandidatesAsync(
@@ -604,7 +852,7 @@ public sealed class RoundTripPipeline
                 workDir,
                 config,
                 candidates,
-                cancellationToken);
+                cancellationToken, phase: "project-original-validation");
             if (!originalBuild.Succeeded)
             {
                 throw new InvalidOperationException(
@@ -738,7 +986,7 @@ public sealed class RoundTripPipeline
                             cancellationToken);
                     }
                     candidate.Status = FileStatus.EmitCompilationError;
-                    candidate.Errors = build.Errors
+                    var attributedErrors = build.Errors
                         .Where(error =>
                             BuildErrorReferencesFile(
                                 validationDir,
@@ -749,10 +997,12 @@ public sealed class RoundTripPipeline
                                 candidate.FilePath,
                                 error) ||
                             CandidateIsReferenced(candidate, error))
-                        .Take(10)
                         .ToList();
-                    if (candidate.Errors.Count == 0)
-                        candidate.Errors = build.Errors.Take(10).ToList();
+                    candidate.Errors = (attributedErrors.Count > 0 ? attributedErrors : build.Errors).Take(10).ToList();
+                    candidate.Candidate?.Diagnostics.AddRange(ReportGenerator.CaptureBuildDiagnostics(
+                        attributedErrors.Count > 0 ? attributedErrors : build.Errors,
+                        build.Phase, validationDir, workDir,
+                        attributedErrors.Count > 0 ? "file-or-referenced-symbol" : "isolated-subset"));
                 }
 
                 if (failed.Count == active.Count)
@@ -776,7 +1026,8 @@ public sealed class RoundTripPipeline
         RoundTripConfig config,
         IReadOnlyCollection<FileConversionResult> candidates,
         CancellationToken cancellationToken,
-        bool includeRootBuild = true)
+        bool includeRootBuild = true,
+        string phase = "project-candidate-validation")
     {
         if (includeRootBuild)
         {
@@ -785,7 +1036,11 @@ public sealed class RoundTripPipeline
                 config,
                 cancellationToken,
                 noIncremental: true,
-                disableBuildServers: true);
+                disableBuildServers: true,
+                phase: phase,
+                reportedSourceRoot: sourceWorkDir,
+                candidateFiles: phase == "project-original-validation"
+                    ? [] : candidates.Select(candidate => candidate.FilePath).ToList());
             if (!rootBuild.Succeeded)
                 return rootBuild;
         }
@@ -843,18 +1098,24 @@ public sealed class RoundTripPipeline
                     validationDir,
                     config.BuildTimeout,
                     cancellationToken: cancellationToken);
-            if (exitCode == 0)
-                continue;
             var errors = (stdout + "\n" + stderr)
                 .Split('\n')
                 .Where(line => line.Contains(": error "))
                 .Select(line => line.Trim())
                 .ToList();
-            return new BuildResult
+            var result = new BuildResult
             {
-                Succeeded = false,
+                Succeeded = exitCode == 0,
                 ExitCode = exitCode,
-                Errors = errors.Count > 0
+                Phase = phase,
+                Command = $"{config.DotnetPath} {arguments}",
+                WorkingDirectory = validationDir,
+                Stdout = stdout,
+                Stderr = stderr,
+                Diagnostics = ReportGenerator.CaptureBuildDiagnostics(errors, phase, validationDir, sourceWorkDir),
+                CandidateFiles = phase == "project-original-validation"
+                    ? [] : candidates.Select(candidate => candidate.FilePath).ToList(),
+                Errors = errors.Count > 0 || exitCode == 0
                     ? errors
                     :
                     [
@@ -863,6 +1124,9 @@ public sealed class RoundTripPipeline
                         stderr.Trim()
                     ]
             };
+            _evidence?.BuildAttempts.Add(result);
+            if (!result.Succeeded)
+                return result;
         }
         return new BuildResult
         {
@@ -989,7 +1253,8 @@ public sealed class RoundTripPipeline
                 config,
                 subset.ToList(),
                 cancellationToken,
-                includeRootBuild: true);
+                includeRootBuild: true,
+                phase: "project-isolation");
             buildCache[cacheKey] = build.Succeeded;
             return build.Succeeded;
         }
@@ -1059,7 +1324,7 @@ public sealed class RoundTripPipeline
         var expectedPath = Path.GetFullPath(Path.Combine(workDir, relativePath))
             .Replace("/private/var/", "/var/");
         return string.Equals(
-            Path.GetFullPath(errorPath),
+            Path.GetFullPath(errorPath, workDir),
             expectedPath,
             StringComparison.OrdinalIgnoreCase);
     }
@@ -1107,6 +1372,15 @@ public sealed class RoundTripPipeline
                     ReferencePaths = referencePaths,
                 });
             cancellationToken.ThrowIfCancellationRequested();
+            foreach (var candidate in active)
+            {
+                var path = Path.GetFullPath(Path.Combine(workDir, candidate.FilePath));
+                candidate.Candidate?.Diagnostics.AddRange(validation.CompilationErrors
+                    .Where(diagnostic => string.Equals(diagnostic.Location.SourceTree?.FilePath, path,
+                        StringComparison.OrdinalIgnoreCase))
+                    .Select(diagnostic => ReportGenerator.CaptureRoslynDiagnostic(
+                        diagnostic, "generated-project-validation", workDir)));
+            }
 
             if (validation.CompilationSuccess)
             {
@@ -1148,6 +1422,9 @@ public sealed class RoundTripPipeline
                     {
                         candidate.Status = FileStatus.EmitCompilationError;
                         candidate.Errors = errors;
+                        candidate.Candidate?.Diagnostics.AddRange(validation.CompilationErrors
+                            .Select(diagnostic => ReportGenerator.CaptureRoslynDiagnostic(
+                                diagnostic, "generated-project-validation", workDir, "unattributed-project-failure")));
                     }
                     return;
                 }
@@ -1156,6 +1433,11 @@ public sealed class RoundTripPipeline
             foreach (var candidate in failed)
             {
                 var path = Path.GetFullPath(Path.Combine(workDir, candidate.FilePath));
+                if (!errorsByPath.ContainsKey(path))
+                    candidate.Candidate?.Diagnostics.AddRange(validation.CompilationErrors
+                        .Where(diagnostic => CandidateIsReferenced(candidate, diagnostic.GetMessage()))
+                        .Select(diagnostic => ReportGenerator.CaptureRoslynDiagnostic(
+                            diagnostic, "generated-project-validation", workDir, "referenced-symbol")));
                 candidate.Status = FileStatus.EmitCompilationError;
                 candidate.Errors = errorsByPath.TryGetValue(path, out var directErrors)
                     ? directErrors
@@ -1461,7 +1743,20 @@ public sealed class RoundTripPipeline
                     ProjectGraphPath =
                         state.ProjectGraphPath.ToList()
                 })
-                .ToList()
+                .ToList(),
+            CompilationProperties = new Dictionary<string, string>(context.CompilationProperties),
+            References = context.References.Select(reference => new ReferenceEvidence
+            {
+                Path = reference.Path,
+                Identity = ReportGenerator.Fingerprint(reference.Path).Identity,
+                Sha256 = reference.ContentHash,
+                Aliases = reference.Aliases.ToList(),
+                Properties = new Dictionary<string, string>(reference.Properties),
+            }).ToList(),
+            CompileInputHashes = context.CompileInputHashes.ToList(),
+            AdditionalInputHashes = context.AdditionalInputHashes.ToList(),
+            AnalyzerConfigHashes = context.AnalyzerConfigHashes.ToList(),
+            Analyzers = context.AnalyzerPaths.Select(path => ReportGenerator.Fingerprint(path)).ToList(),
         };
 
     private static string DescribeContext(
@@ -1490,7 +1785,8 @@ public sealed class RoundTripPipeline
         for (int attempt = 0; attempt < 5; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var buildResult = await BuildProjectAsync(workDir, config, cancellationToken);
+            var buildResult = await BuildProjectAsync(workDir, config, cancellationToken, phase: "build-recovery",
+                candidateFiles: fileResults.Where(file => file.Status == FileStatus.Replaced).Select(file => file.FilePath).ToList());
             if (buildResult.Succeeded) break;
 
             // Extract file paths from build error lines, KEEPING the diagnostics per file. The
@@ -1510,7 +1806,7 @@ public sealed class RoundTripPipeline
                     {
                         // macOS resolves /var → /private/var in build output
                         var normalized = filePath.Replace("/private/var/", "/var/");
-                        var relativePath = Path.GetRelativePath(workDir, normalized);
+                        var relativePath = ReportGenerator.RelativePath(workDir, Path.GetFullPath(normalized, workDir));
                         if (!relativePath.StartsWith(".."))
                         {
                             errorFiles.Add(relativePath);
@@ -1544,6 +1840,12 @@ public sealed class RoundTripPipeline
                 fileResult.Errors = errorsByFile.TryGetValue(relPath, out var attributed) && attributed.Count > 0
                     ? attributed
                     : [$"Reverted: build error in round-tripped output (recovery round {attempt + 1})"];
+                fileResult.Recovery.Add(new RecoveryEvidence
+                {
+                    Phase = "build-recovery", Attempt = attempt + 1, Outcome = "Reverted",
+                    Errors = fileResult.Errors.ToList(),
+                    Diagnostics = buildResult.Diagnostics.Where(diagnostic => diagnostic.Path == relPath).ToList(),
+                });
                 revertedThisRound++;
                 Console.WriteLine($"    Reverted: {relPath}");
             }
@@ -1654,7 +1956,10 @@ public sealed class RoundTripPipeline
         RoundTripConfig config,
         CancellationToken cancellationToken = default,
         bool noIncremental = false,
-        bool disableBuildServers = false)
+        bool disableBuildServers = false,
+        string phase = "build",
+        IReadOnlyList<string>? candidateFiles = null,
+        string? reportedSourceRoot = null)
     {
         // Relative target (see RunTestsAsync) — absolute /var-symlink paths break
         // MSBuild path identity on macOS.
@@ -1685,14 +1990,21 @@ public sealed class RoundTripPipeline
                 errors.Add(line.Trim());
         }
 
-        return new BuildResult
+        var result = new BuildResult
         {
+            Phase = phase,
+            Command = $"{config.DotnetPath} {args}",
+            WorkingDirectory = workDir,
+            Diagnostics = ReportGenerator.CaptureBuildDiagnostics(errors, phase, workDir, reportedSourceRoot),
+            CandidateFiles = candidateFiles?.ToList() ?? [],
             Succeeded = exitCode == 0,
             ExitCode = exitCode,
             Stdout = stdout,
             Stderr = stderr,
             Errors = errors,
         };
+        _evidence?.BuildAttempts.Add(result);
+        return result;
     }
 
     private static TestComparison CompareTestResults(
@@ -1747,7 +2059,9 @@ public sealed class RoundTripPipeline
             return comparison;
         }
 
-        if (baseline.UsedConsoleFallback || roundTrip.UsedConsoleFallback)
+        if (baseline.UsedConsoleFallback || roundTrip.UsedConsoleFallback
+            || baseline.Results.Concat(roundTrip.Results).Any(result =>
+                result.Outcome is not ("Passed" or "Failed" or "Skipped" or "NotExecuted")))
         {
             comparison.Status = ComparisonStatus.Incomplete;
             return comparison;
@@ -1874,6 +2188,10 @@ public sealed class RoundTripPipeline
             var bisectConfig = config with { TestFilter = null, EnableBisect = false };
             var result = await RunTestsAsync(
                 workDir, bisectConfig, cancellationToken: cancellationToken);
+            _evidence?.TestAttempts.Add(new TestAttemptEvidence
+            {
+                Leg = $"bisect:{file.FilePath}", Attempt = 1, Result = result,
+            });
 
             // Check if any previously-failing tests now pass
             var nowPassing = result.Results

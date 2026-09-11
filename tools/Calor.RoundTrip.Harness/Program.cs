@@ -21,6 +21,8 @@ switch (command)
 {
     case "run":
         return await RunCommand(cliArgs.Skip(1).ToArray());
+    case "compare-evidence":
+        return await CompareEvidenceCommand(cliArgs.Skip(1).ToArray());
     case "gen-tasks":
         return await GenTasksCommand(cliArgs.Skip(1).ToArray());
     case "mine":
@@ -44,6 +46,30 @@ switch (command)
         return 1;
 }
 
+async Task<int> CompareEvidenceCommand(string[] args)
+{
+    var baseline = GetOption(args, "--baseline");
+    var candidate = GetOption(args, "--candidate");
+    var output = GetOption(args, "--output");
+    if (baseline is null || candidate is null || output is null)
+    {
+        Console.Error.WriteLine("compare-evidence requires --baseline <report> --candidate <report> --output <file>.");
+        return 2;
+    }
+    try
+    {
+        var result = ReportGenerator.CompareEvidence(
+            await File.ReadAllTextAsync(baseline), await File.ReadAllTextAsync(candidate));
+        await File.WriteAllTextAsync(output, result);
+        return 0;
+    }
+    catch (Exception ex) when (ex is IOException or InvalidOperationException or System.Text.Json.JsonException or ArgumentException)
+    {
+        Console.Error.WriteLine($"Evidence comparison failed: {ex.Message}");
+        return 2;
+    }
+}
+
 async Task<int> RunCommand(string[] runArgs)
 {
     // Default to the vendored, SHA-pinned corpus (bench/corpus, D-W4.2). The former
@@ -62,6 +88,13 @@ async Task<int> RunCommand(string[] runArgs)
         : (TimeSpan?)null;
     var minimumCoverage = ParseFractionOption(runArgs, "--min-coverage");
     var minimumNative = ParseFractionOption(runArgs, "--min-native");
+    var attemptsOption = GetOption(runArgs, "--test-attempts");
+    var testAttempts = 1;
+    if (attemptsOption is not null && (!int.TryParse(attemptsOption, out testAttempts) || testAttempts is < 1 or > 3))
+    {
+        Console.Error.WriteLine("--test-attempts must be an integer from 1 to 3, fixed for both legs.");
+        return 2;
+    }
 
     // Resolve paths
     projectsDir = Path.GetFullPath(projectsDir.Replace("~", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
@@ -77,7 +110,7 @@ async Task<int> RunCommand(string[] runArgs)
     var optionsWithValues = new HashSet<string>
     {
         "--projects-dir", "--output", "--dotnet", "--build-timeout",
-        "--min-coverage", "--min-native"
+        "--min-coverage", "--min-native", "--test-attempts"
     };
     var projectNames = new List<string>();
     if (runAll)
@@ -122,6 +155,11 @@ async Task<int> RunCommand(string[] runArgs)
         // upstream-flake allowlist, once — see RunConfigOverrideTests) silently
         // changes what the gate enforces.
         config = config.WithRunOverrides(enableBisect, buildTimeout, minimumCoverage, minimumNative);
+        config = config with
+        {
+            CaptureBindingAnalysis = runArgs.Contains("--capture-binding-analysis"),
+            TestAttemptsPerLeg = testAttempts,
+        };
 
         Console.WriteLine();
         Console.WriteLine(new string('=', 60));
@@ -157,6 +195,10 @@ async Task<int> RunCommand(string[] runArgs)
         var jsonPath = Path.Combine(outputDir, $"{config.ProjectName}-roundtrip.json");
         await File.WriteAllTextAsync(mdPath, ReportGenerator.GenerateMarkdown(report));
         await File.WriteAllTextAsync(jsonPath, ReportGenerator.GenerateJson(report));
+        await File.WriteAllTextAsync(Path.Combine(outputDir, $"{config.ProjectName}-{report.Evidence?.RunId}-classifications.json"),
+            ReportGenerator.GenerateClassificationTemplate(report));
+        await File.WriteAllTextAsync(Path.Combine(outputDir, $"{config.ProjectName}-{report.Evidence?.RunId}-attempt.json"),
+            ReportGenerator.GenerateJson(report));
 
         // Print summary
         var gateFailures = RoundTripExitPolicy.GetFailureReasons(report);
@@ -345,7 +387,7 @@ async Task<int> FailureCensusCommand(string[] args)
             var status = fd.GetProperty("status").GetString() ?? "?";
             // The attempted-file cause census excludes configured source exclusions;
             // coverage reports disclose them separately as denominator failures.
-            if (status is "Replaced" or "Excluded") continue;
+            if (status is "Replaced" or "Excluded" or "NotAttempted") continue;
 
             var path = fd.GetProperty("path").GetString() ?? "?";
             var errors = fd.TryGetProperty("errors", out var errs) && errs.ValueKind == System.Text.Json.JsonValueKind.Array
@@ -880,6 +922,7 @@ static void PrintUsage()
         Usage:
           calor-roundtrip run <project> [options]        Run round-trip for a project
           calor-roundtrip run --all [options]             Run for all known projects
+          calor-roundtrip compare-evidence [options]      Join baseline/candidate evidence (not acceptance)
           calor-roundtrip gen-tasks <project...> [options] Generate real-scale task bundles (WS-W4 Slice C)
           calor-roundtrip gen-tasks --synthetic [options]  Generate against the in-repo synthetic subjects
           calor-roundtrip mine <project...> [options]     Report revert-bugfix supply per project (git-only, no build)
@@ -896,7 +939,14 @@ static void PrintUsage()
           --build-timeout <min>    Per-build timeout in minutes (default 15)
           --min-coverage <0..1>    Override the project's minimum total coverage
           --min-native <0..1>      Override the project's minimum native coverage
+          --capture-binding-analysis  Record independent analysis-only reparse/bind diagnostics
+          --test-attempts <1..3>   Fixed full-suite attempts on each leg (default 1, no retries)
           --bisect                 Enable regression bisection
+
+        Options (compare-evidence):
+          --baseline <report>     Baseline structured round-trip JSON
+          --candidate <report>    Candidate structured round-trip JSON
+          --output <file>         Comparison JSON, preserving both diagnostics and recovery
 
         Options (gen-tasks):
           --output <path>          Output directory for task bundles (default: task-bundles)
