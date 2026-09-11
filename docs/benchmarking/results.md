@@ -12,7 +12,7 @@ nav_order: 2
 
 This fixed-source artifact contains 217 paired programs
 and 8 deterministic metrics. It was recorded on
-2026-09-11 from source `be488238` with
+2026-09-11 from source `b1d23d7` with
 30 repetitions.
 
 **Legacy composite direction-normalized ratio:** 1.32x
