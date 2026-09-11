@@ -49,7 +49,7 @@ public class BindingDiagnosticPolicyTests
     [Fact]
     public void EveryCatalogEntry_HasAnExplicitDispositionReasonAndOwner()
     {
-        Assert.Equal(18, BindingDiagnosticPolicy.Catalog.Count);
+        Assert.Equal(19, BindingDiagnosticPolicy.Catalog.Count);
         foreach (var (code, rule) in BindingDiagnosticPolicy.Catalog)
         {
             Assert.Equal(code, rule.Code);
@@ -97,7 +97,9 @@ public class BindingDiagnosticPolicyTests
                 shared.Diagnostics.Select(d => (d.Code, d.Span, d.Severity)));
             Assert.Equal(source == duplicate, shared.HasErrors);
         }
-        const string early = "§M{m1:Routing}\n  §F{f1:Probe:pub} () -> void\n    §B{x:?str} \"safe\"\n";
+        // Nullable-to-nonnullable assignment retains its transitional typing rejection
+        // until #1385. The old nullable-literal false positive was repaired by #1397.
+        const string early = "§M{m1:Routing}\n  §F{f1:Probe:pub} () -> void\n    §B{x:?str} null\n    §B{y:str} x\n";
         var rejected = Program.Compile(early, "routing.calr", new CompilationOptions { Context = context });
         Assert.Contains(rejected.Diagnostics, d => d.Code == DiagnosticCode.TypeMismatch && d.IsError);
         Assert.All(rejected.Diagnostics, d => Assert.Null(d.BindingContext));

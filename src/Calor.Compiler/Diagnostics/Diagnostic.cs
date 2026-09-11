@@ -356,6 +356,9 @@ public static class DiagnosticCode
     /// </summary>
     public const string NullableArgumentToNonNullableParameter = "Calor0274";
 
+    /// <summary>A supported reference and a runtime Option value have incompatible representations.</summary>
+    public const string ReferenceOptionMismatch = "Calor0275";
+
     // Contract errors (Calor0300-0399)
     public const string InvalidPrecondition = "Calor0300";
     public const string InvalidPostcondition = "Calor0301";

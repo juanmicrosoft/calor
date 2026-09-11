@@ -777,15 +777,15 @@ public class EffectResolverTests
     }
 
     [Theory]
-    [InlineData("?i32", "Calor.Runtime.Option`1")]
-    [InlineData("?str", "Calor.Runtime.Option`1")]
+    [InlineData("?i32", "System.Nullable`1")]
+    [InlineData("?str", "System.String")]
     [InlineData("Option<i32>", "Calor.Runtime.Option`1")]
     [InlineData("i32!str", "Calor.Runtime.Result`2")]
     [InlineData("Result<i32,str>", "Calor.Runtime.Result`2")]
     [InlineData("Option", "Calor.Runtime.Option")]
     [InlineData("Result", "Calor.Runtime.Result")]
     [InlineData("Console", "System.Console")]
-    public void MapShortTypeName_ResolvesCalorOptionResultSurfaceTypes(string surface, string expected)
+    public void MapShortTypeName_DistinguishesNullableAndRuntimeOptionResultTypes(string surface, string expected)
     {
         Assert.Equal(expected, EffectEnforcementPass.MapShortTypeNameToFullName(surface));
     }
