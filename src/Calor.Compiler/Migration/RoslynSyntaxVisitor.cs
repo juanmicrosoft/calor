@@ -7535,6 +7535,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
             }
         }
+        else if (typeName == null
+            && _semanticModel != null
+            && variable.Initializer?.Value is { } initializerValue
+            && ContainsPreservedDictionaryInitializer(initializerValue)
+            && _semanticModel.GetDeclaredSymbol(variable) is ILocalSymbol local
+            && TryMapPreservedDictionaryLocalType(local.Type) is { } inferredDictionaryType)
+        {
+            typeName = inferredDictionaryType;
+        }
 
         // Track variable-to-type mapping for effect inference on instance calls
         if (_semanticModel != null)
@@ -11888,6 +11897,57 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private static bool IsDictionaryType(string typeName) =>
         typeName is "Dictionary" or "SortedDictionary" or "ConcurrentDictionary"
             or "FrozenDictionary" or "ImmutableDictionary" or "ImmutableSortedDictionary";
+
+    private static bool ContainsPreservedDictionaryInitializer(ExpressionSyntax expression) =>
+        expression.DescendantNodesAndSelf()
+            .OfType<BaseObjectCreationExpressionSyntax>()
+            .Any(creation => HasDictionaryInitializerOperations(creation.Initializer)
+                && creation switch
+                {
+                    ObjectCreationExpressionSyntax objectCreation => IsDictionaryType(GetCreatedTypeName(objectCreation.Type)),
+                    ImplicitObjectCreationExpressionSyntax => true,
+                    _ => false
+                });
+
+    private static string GetCreatedTypeName(TypeSyntax type) =>
+        type switch
+        {
+            GenericNameSyntax generic => generic.Identifier.ValueText,
+            QualifiedNameSyntax qualified => qualified.Right.Identifier.ValueText,
+            AliasQualifiedNameSyntax alias => alias.Name.Identifier.ValueText,
+            _ => type.ToString()
+        };
+
+    private static string? TryMapPreservedDictionaryLocalType(ITypeSymbol type)
+    {
+        if (type is not INamedTypeSymbol { Arity: 2 } dictionary
+            || dictionary.DeclaringSyntaxReferences.Length != 0
+            || (dictionary.OriginalDefinition.ContainingNamespace.ToDisplayString(),
+                dictionary.OriginalDefinition.MetadataName) is not
+                ("System.Collections.Generic", "Dictionary`2" or "SortedDictionary`2")
+                and not ("System.Collections.Concurrent", "ConcurrentDictionary`2"))
+        {
+            return null;
+        }
+
+        // Permit the dictionary's own comma, not arbitrary unspellable nested type syntax.
+        foreach (var argument in dictionary.TypeArguments)
+        {
+            var mappedArgument = TypeMapper.CSharpToCalor(
+                argument.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
+            if (argument.TypeKind is TypeKind.Error or TypeKind.Dynamic
+                || argument.IsAnonymousType || argument.IsTupleType
+                || string.IsNullOrWhiteSpace(mappedArgument) || mappedArgument.Contains('?')
+                || !IsSpellableInBindingHeader(mappedArgument))
+            {
+                return null;
+            }
+        }
+
+        var mapped = TypeMapper.CSharpToCalor(
+            type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat));
+        return string.IsNullOrWhiteSpace(mapped) || mapped.Contains('?') ? null : mapped;
+    }
 
     private static bool HasDictionaryInitializerOperations(InitializerExpressionSyntax? initializer) =>
         initializer?.Expressions.Any(expr =>

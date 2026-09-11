@@ -834,6 +834,10 @@ public static class TypeIdentity
                     "System.Collections.Generic.List`1",
                 "Dictionary" or "Dict" or "System.Collections.Generic.Dictionary" =>
                     "System.Collections.Generic.Dictionary`2",
+                "SortedDictionary" or "System.Collections.Generic.SortedDictionary" =>
+                    "System.Collections.Generic.SortedDictionary`2",
+                "ConcurrentDictionary" or "System.Collections.Concurrent.ConcurrentDictionary" =>
+                    "System.Collections.Concurrent.ConcurrentDictionary`2",
                 "HashSet" or "Set" or "System.Collections.Generic.HashSet" =>
                     "System.Collections.Generic.HashSet`1",
                 "Task" or "System.Threading.Tasks.Task" =>
@@ -871,6 +875,10 @@ public static class TypeIdentity
         "Dictionary" => "System.Collections.Generic.Dictionary`2",
         "Dict" => "System.Collections.Generic.Dictionary`2",
         "System.Collections.Generic.Dictionary" => "System.Collections.Generic.Dictionary`2",
+        "SortedDictionary" => "System.Collections.Generic.SortedDictionary`2",
+        "System.Collections.Generic.SortedDictionary" => "System.Collections.Generic.SortedDictionary`2",
+        "ConcurrentDictionary" => "System.Collections.Concurrent.ConcurrentDictionary`2",
+        "System.Collections.Concurrent.ConcurrentDictionary" => "System.Collections.Concurrent.ConcurrentDictionary`2",
         "HashSet" => "System.Collections.Generic.HashSet`1",
         "Set" => "System.Collections.Generic.HashSet`1",
         "System.Collections.Generic.HashSet" => "System.Collections.Generic.HashSet`1",
