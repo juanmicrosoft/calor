@@ -58,7 +58,7 @@ The opt-in does not disable unknown-route, source-count or canary assertions.
 | Case | Actual observation |
 |---|---|
 | `?str`, `?string`, `str?`, `string?`, `?System.String` literals and inline parameters | Default/type-off API and Calor AST round-trip compile; emitted CLR parameters/returns are `System.String`, not Option. Runtime returns `"value"`. |
-| Nullable `Environment.GetEnvironmentVariable` return | Default/type-off API compiles; actual missing-key runtime result is null. Bound BCL call retains Annotated. TypeChecker itself still does not infer BCL call results. |
+| Nullable `Environment.GetEnvironmentVariable` return | Default/type-off API compiles; actual missing-key runtime result is null. With the repository-scoped metadata manifest discoverable, the bound BCL call retains Annotated. TypeChecker itself still does not infer BCL call results. |
 | Declared `Foo` reference, nullable parameter/copy/constructor | Default/type-off and round-trip compile; emitted return/parameter type is `Foo`, and construction returns a non-null Foo instance. |
 | Explicit `Option<str>` Some/None | Both modes and round-trip retain `Option<string>` at runtime; Some unwraps to `"value"`, None remains absent. |
 | Reference/Option initialization and return mismatches | API rejects across typing/transpile combinations. Binder/LSP and type-off API retain active0275 and source spans. Default initializer typing may return0202 first. |
@@ -68,7 +68,7 @@ The opt-in does not disable unknown-route, source-count or canary assertions.
 | Nullable value and container controls | `?i32 = 42` remains rejected by the old incomplete TypeChecker behavior. Struct/enum nullable parameters retain unsupported-type warnings. C# mapping still distinguishes nullable values, nullable arrays and nullable elements; known value receivers map to `System.Nullable`, not Option. |
 | Array/generic controls | Existing incompatible element/payload assignments still fail0202. `[?str]` and `Option<?str>` retain their different CLR containers. No arbitrary payload policy is activated. |
 | Nullable concatenation and boxing | Two null strings concatenate to empty string; `"a"`/`"b"` produce `"ab"`. Boxing to `?object` returns the whole `Option<string>` value. |
-| Nullable nominal member read | **Not an ordinary safe compile:** existing member-effect resolution still reports0411/0410. With the existing effect opt-out, typing no longer invents a record-operation error and emitted C# returns0. The unknown receiver is not counted resolved/safe. |
+| Nullable nominal member read | **Not an ordinary safe compile at this candidate:** member-effect resolution reports0411/0410. With the existing effect opt-out, typing no longer invents a record-operation error and emitted C# returns0. This row did not measure pre-T1 effect diagnostics; it must not be cited as proving the same rejection existed before T1. The unknown receiver is not counted resolved/safe. |
 | Cache/mode boundaries | Root CLI covers explicit/environment type opt-outs and transpile on changed warm sources; MSBuild task covers three option combinations; editor diagnostics clear on a safe edit. Root/watch effective typing and elision keys have a direct regression independent of a temporary TypeChecker defect. |
 
 The replacement cache fixture was reproduced with the base binaries, before
@@ -140,3 +140,42 @@ reported as flakes or erased into a success denominator.
 #1398, #1380/#1381/#1384, #1382/#1383, #1400/#1401 and activation/adjudication
 gates retain their assigned scope. No new whole-corpus result, D3/D12/D14
 demotion lift, runtime-guard change or unchecked-mutation guarantee is claimed.
+
+## Initial review and remediation boundary
+
+The [initial independent reviews and actual CI failures](https://github.com/juanmicrosoft/calor/pull/1443#issuecomment-5640845446)
+apply to `19d1827440af52f913ad96b947770e7c601593c5`, not a later repaired head.
+Integration blocked; compatibility accepted subject to CI. Neither is a final
+approval of remediation. The complete original briefs are retained alongside
+this record; their invocation named that exact head and required the actual
+checked SHA, ACCEPT/BLOCK, reproduced findings, commands and honest gaps.
+
+An external `--artifacts-path` build lacked the repository-discovered metadata
+manifest. Its two annotation assertions failed, as did existing metadata-context
+tests with `FileNotFoundException`. Copying the original manifest into that
+scratch root, without changing source or rebuilding, made all42 T1 plus18 existing
+metadata-context cases pass. Both manifest copies hash to
+`b82830666f4bbb1b2e3e01b35d3df0dab94c04c5a3c94a276daa18f3584e4b4d`.
+This is an explicit reference-profile prerequisite, not evidence that arbitrary
+installed/default contexts resolve metadata. The new test checks that prerequisite
+directly; the Annotated assertion remains intact. No production metadata fallback
+or Oblivious policy was changed.
+
+The unknown receiver sentinel `?` must not map to the pure runtime Option manifest.
+Removing that accidental mapping exposed two known primary-receiver paths in
+Effects: `base` and null-conditional member chains. Remediation resolves those
+known types, retains pure fields, and charges resolved property getters. Runtime
+controls cover both paths, including null short-circuiting; an unresolved
+coalesced receiver still emits0411/0410 rather than borrowing Option purity.
+This does not implement general coalescing transfer, BCL static-member resolution,
+nullable activation or arbitrary nested generic inference.
+
+The product binder-corpus audit found three changed rows among364 unchanged
+source keys. `MessageFormatter.cs` loses two raw0273 diagnostics from mistakenly
+using the enclosing return contract inside lambdas (12 to10; propagated1
+unchanged). `AggregateSink.cs` and `DisposingAggregateSink.cs` retain their raw
+diagnostic sites/counts, with offsets shifted by four characters after converter
+effect-row output adds `mut`. All non-binding coverage coordinates and every
+propagated-error identity remain unchanged. The product source-coverage ratchet
+was regenerated with its existing opt-in; its eight tests pass. These measurements
+do not alter frozen research inputs, ledger464ace or N0/R1 evidence.

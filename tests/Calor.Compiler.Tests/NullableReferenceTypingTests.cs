@@ -1,6 +1,7 @@
 using System.Reflection;
 using Calor.Compiler.Binding;
 using Calor.Compiler.Binding.BoundTypes;
+using Calor.Compiler.Binding.Metadata;
 using Calor.Compiler.CodeGen;
 using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
@@ -51,6 +52,8 @@ public class NullableReferenceTypingTests
     [InlineData("?string")]
     public void NullableBclReturn_IsAReferenceAndRetainsNullAtRuntime(string spelling)
     {
+        // This annotation assertion uses the repository-scoped metadata profile, not its Oblivious fallback.
+        using var metadataContext = MetadataContext.Create();
         var key = "CALOR_T1_ABSENT_" + Guid.NewGuid().ToString("N");
         Assert.Null(Environment.GetEnvironmentVariable(key));
         var source = $$"""
@@ -427,8 +430,8 @@ public class NullableReferenceTypingTests
             """;
         foreach (var checking in new[] { true, false })
         {
-            // Existing member-effect resolution is independently incomplete here.
-            // Keep that rejection visible; the effect opt-out isolates the typing regression.
+            // This unresolved member-effect path is outside the supported typing assertion.
+            // Keep its current rejection visible; the effect opt-out isolates typing.
             var ordinary = Program.Compile(source, "nullable-typing.calr",
                 new CompilationOptions { EnableTypeChecking = checking });
             Assert.Contains(ordinary.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect);
@@ -443,6 +446,69 @@ public class NullableReferenceTypingTests
             Assert.Equal(0, method.Invoke(null, null));
         }
 
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PrimaryReceiverGetters_AreChargedInsteadOfBeingTreatedAsOptionMembers(bool conditional)
+    {
+        var source = $$"""
+            §M{m1:ReceiverTyping}
+              §U{System.Collections.Generic}
+              §CL{c1:Parent:pub}
+                §PROP{p1:Value:i32:pub}
+                  §GET
+                    §B{created:List<i32>} §NEW{List<i32>}
+                    §R INT:3
+              §CL{c2:Node:pub}
+                §FLD{i32:Value:pub}
+                §PROP{p2:Child:Node:pub}
+                  §GET
+                    §B{created:List<i32>} §NEW{List<i32>}
+                    §B{child:Node} §NEW{Node}
+                    §R child
+              §CL{c3:Derived:pub}
+                §EXT{Parent}
+                §MT{mt1:Read:pub} (Node:input) -> i32?
+                  §E{}
+                  §R {{(conditional ? "input?.Child .Value" : "§BASE.Value")}}
+            """;
+        var rejected = Program.Compile(source, "receiver-typing.calr",
+            new CompilationOptions { EnableTypeChecking = false });
+        Assert.True(rejected.Diagnostics.Errors.Any(d => d.Code == DiagnosticCode.ForbiddenEffect
+            && d.Message.Contains("Read", StringComparison.Ordinal)
+            && d.Message.Contains("alloc", StringComparison.Ordinal)),
+            string.Join(Environment.NewLine, rejected.Diagnostics) + Environment.NewLine + rejected.GeneratedCode);
+
+        var accepted = Compile(source.Replace("§E{}", "§E{alloc}", StringComparison.Ordinal), checking: false);
+        var assembly = Emit(accepted.GeneratedCode);
+        var derived = assembly.GetType("ReceiverTyping.Derived")!;
+        var node = assembly.GetType("ReceiverTyping.Node")!;
+        var method = derived.GetMethod("Read")!;
+        Assert.Equal(conditional ? 0 : 3,
+            method.Invoke(Activator.CreateInstance(derived), [Activator.CreateInstance(node)]));
+        Assert.Equal(conditional ? null : (object)3,
+            method.Invoke(Activator.CreateInstance(derived), [null]));
+    }
+
+    [Fact]
+    public void UnknownReceiverSentinel_DoesNotResolveToPureRuntimeOptionMembers()
+    {
+        Assert.Equal("?", TypeIdentity.MapShortTypeNameToFullName("?"));
+        const string source = """
+            §M{m1:ReceiverTyping}
+              §CL{c1:Node:pub}
+                §FLD{i32:Value:pub}
+              §F{f1:Probe:pub} (Node:input) -> i32
+                §E{}
+                §R (?? input input).Value
+            """;
+        var result = Program.Compile(source, "receiver-typing.calr",
+            new CompilationOptions { EnableTypeChecking = false });
+        Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.UnknownExternalCall
+            && d.Message.Contains("?.get_Value", StringComparison.Ordinal));
+        Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.ForbiddenEffect);
     }
 
     [Theory]
