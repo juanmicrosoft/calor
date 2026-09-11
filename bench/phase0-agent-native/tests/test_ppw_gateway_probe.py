@@ -48,13 +48,19 @@ class ProbeTests(unittest.TestCase):
         self.addCleanup(shutil.rmtree, root)
         with patch.dict(os.environ, {"PATH": "SYNTHETIC_PATH",
                                      "PPW_TRUSTED_OBSERVER_URL": "SYNTHETIC-secret"}, clear=True):
-            environment = probe.isolation.client_environment(root, "http://127.0.0.1:12345/SYNTHETIC")
+            environment = probe.isolation.client_environment(
+                root, "http://127.0.0.1:12345/SYNTHETIC", "/SYNTHETIC/pinned-bash")
         self.assertEqual("1", environment["DISABLE_AUTOUPDATER"])
         self.assertNotIn("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", environment)
         self.assertNotIn("ANTHROPIC_API_KEY", environment)
         self.assertNotIn("ANTHROPIC_AUTH_TOKEN", environment)
         self.assertNotIn("PPW_TRUSTED_OBSERVER_URL", environment)
         self.assertTrue(Path(environment["TMPDIR"]).is_relative_to(root))
+        self.assertEqual(environment["TMPDIR"], environment["CLAUDE_CODE_TMPDIR"])
+        self.assertEqual(str(Path(environment["TMPDIR"]) / "zsh"), environment["TMPPREFIX"])
+        self.assertEqual("/SYNTHETIC/pinned-bash", environment["CLAUDE_CODE_SHELL"])
+        self.assertEqual(environment["PATH"], environment["PPW_MODEL_TOOL_PATH"])
+        self.assertEqual(str(BENCH / "gateway-tools/bash-env.sh"), environment["BASH_ENV"])
         self.assertEqual(sys.executable, environment["PPW_PYTHON_EXECUTABLE"])
 
     def test_real_rejecting_endpoint_reports_only_nonsecret_shape_and_never_forwards(self):
@@ -75,6 +81,8 @@ class ProbeTests(unittest.TestCase):
         client = http.client.HTTPConnection("127.0.0.1", server.server_port)
         client.request("POST", "/" + server.capability + "/v1/messages?beta=true", json.dumps(body), {
             "Content-Type": "application/json", "Authorization": private,
+            "anthropic-version": "2023-06-01",
+            "anthropic-dangerous-direct-browser-access": "true",
             "anthropic-beta": "oauth-2025-04-20, context-management-2025-06-27," + private,
         })
         response = client.getresponse()
@@ -90,8 +98,27 @@ class ProbeTests(unittest.TestCase):
                          record["betaCapabilities"])
         self.assertEqual(1, record["unclassifiedBetaCount"])
         self.assertFalse(record["priceContractAccepted"])
+        self.assertTrue(record["wireContractAccepted"])
         self.assertNotIn(private, json.dumps(record))
         self.assertNotIn(server.capability, json.dumps(record))
+
+    def test_probe_uses_production_wire_contract_not_only_body_admission(self):
+        from email.message import Message
+        headers = Message()
+        for key, value in {
+            "Content-Type": "application/json", "Content-Length": "1",
+            "anthropic-version": "2023-06-01",
+            "anthropic-dangerous-direct-browser-access": "true",
+        }.items():
+            headers[key] = value
+        self.assertEqual((1, set()), probe.wire.request_headers(headers))
+        headers["anthropic-unpriced-feature"] = "SYNTHETIC_PRIVATE"
+        with self.assertRaisesRegex(probe.wire.WireRefusal, "WIRE_UNKNOWN_PROVIDER_HEADER"):
+            probe.wire.request_headers(headers)
+        del headers["anthropic-unpriced-feature"]
+        headers["anthropic-dangerous-direct-browser-access"] = "true"
+        with self.assertRaisesRegex(probe.wire.WireRefusal, "WIRE_DUPLICATE_HEADER"):
+            probe.wire.request_headers(headers)
 
 
 if __name__ == "__main__":

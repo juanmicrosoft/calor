@@ -338,6 +338,13 @@ Build the one shared Release compiler/Tasks/runtime product first. The runner
 verifies its release commit, checkout cleanliness, hashes, both canaries,
 model and agent version before invoking any agent. Product drift is checked
 before each run and after collection. Runs are interleaved A/B per task.
+The reviewed #1432 continuation admits one exception to benchmark-tree
+cleanliness: the exact registered untracked
+`epochs/w-rows-pilot-gateway-001` failed archive, after recomputing its complete
+opaque inventory. Tracked changes, another untracked file or epoch, and any
+archive byte change still refuse collection. Its first scheduled launch is
+materialized in the target archive as an invalid censored attempt and skipped
+by the live loop; no replacement is permitted.
 Nonempty `CALOR_P0_*` and `CALOR_LOOP_*` environment overrides are rejected
 at collection admission, including the historical timeout test hook. They
 cannot silently change frozen task timeouts or disable capture.

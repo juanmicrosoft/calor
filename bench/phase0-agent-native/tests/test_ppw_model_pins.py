@@ -77,8 +77,9 @@ class ProspectiveModelPinsTests(unittest.TestCase):
         gateway = load(METHOD / "gateway-instrument-amendment.json")
         self.assertEqual(amendment["replacementHarnessArtifacts"], gateway["supersededHarnessArtifacts"])
         self.assertEqual(digest(METHOD / "spending-instrument-amendment.json"), gateway["supersedes"]["sha256"])
+        historical_analysis = load(METHOD / "analysis-registration.pre-recovery-1432.json")
         for filename, sha in gateway["replacementHarnessArtifacts"].items():
-            self.assertEqual(digest(BENCH / filename), sha)
+            self.assertEqual(historical_analysis["artifacts"][filename], sha)
 
     def test_spending_amendment_preserves_historical_inputs_without_activating_collection(self):
         amendment = load(METHOD / "spending-instrument-amendment.json")
@@ -91,7 +92,13 @@ class ProspectiveModelPinsTests(unittest.TestCase):
         spending = self.instrument.helper("ppw-spending.py")
         gateway = load(METHOD / "gateway-instrument-amendment.json")
         self.assertEqual(amendment["replacementHarnessArtifacts"], gateway["supersededHarnessArtifacts"])
-        self.assertEqual(spending.artifact_manifest(spending.GATEWAY), gateway["replacementHarnessArtifacts"])
+        current = spending.artifact_manifest(spending.GATEWAY)
+        self.assertEqual(set(gateway["replacementHarnessArtifacts"]) | {
+            "ppw-gateway-recovery.py", "ppw-gateway-recover.py",
+            "ppw-gateway-register-recovery.py",
+            "gateway-tools/bash-env.sh",
+        }, set(current))
+        self.assertNotEqual(current, gateway["replacementHarnessArtifacts"])
         self.assertEqual(15, len(amendment["replacementHarnessArtifacts"]))
         self.assertEqual(25, len(gateway["replacementHarnessArtifacts"]))
         analysis = load(METHOD / "analysis-registration.json")

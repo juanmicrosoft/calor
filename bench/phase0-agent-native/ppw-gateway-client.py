@@ -44,6 +44,7 @@ BLOCKED_ENV = {
     "SSLKEYLOGFILE", "NODE_DEBUG", "NODE_DEBUG_NATIVE",
     "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
     "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "CLAUDE_CODE_SHELL", "CLAUDE_CODE_SHELL_PREFIX", "PPW_MODEL_TOOL_PATH",
 }
 SENSITIVE_BENCH_NAMES = (
     "tasks", "task-candidates", "task-validation",
@@ -488,7 +489,7 @@ def registered_client_flags():
             "--forward-subagent-text", "--dangerously-skip-permissions"]
 
 
-def client_environment(workspace, base_url):
+def client_environment(workspace, base_url, shell_executable=None):
     workspace = canonical_path(workspace)
     temporary = workspace / ".ppw-client-tmp"
     temporary.mkdir(exist_ok=True)
@@ -496,12 +497,19 @@ def client_environment(workspace, base_url):
     dotnet_home.mkdir(exist_ok=True)
     inherited = {name: value for name, value in os.environ.items()
                  if not name.startswith("PPW_TRUSTED_")}
-    return dict(inherited, ANTHROPIC_BASE_URL=base_url, DISABLE_AUTOUPDATER="1",
-                TMPDIR=str(temporary), DOTNET_CLI_HOME=str(dotnet_home),
+    environment = dict(inherited, ANTHROPIC_BASE_URL=base_url, DISABLE_AUTOUPDATER="1",
+                TMPDIR=str(temporary), CLAUDE_CODE_TMPDIR=str(temporary),
+                TMPPREFIX=str(temporary / "zsh"),
+                DOTNET_CLI_HOME=str(dotnet_home),
                 DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER="1", MSBUILDDISABLENODEREUSE="1",
                 GIT_OPTIONAL_LOCKS="0", PPW_INSPECTOR_READONLY="1", PPW_GATEWAY_ACTIVE="1",
                 PPW_PYTHON_EXECUTABLE=sys.executable,
                 PATH=str(Path(__file__).resolve().parent / "gateway-tools") + os.pathsep + os.environ["PATH"])
+    if shell_executable is not None:
+        environment["CLAUDE_CODE_SHELL"] = str(shell_executable)
+        environment["BASH_ENV"] = str(Path(__file__).resolve().parent / "gateway-tools/bash-env.sh")
+        environment["PPW_MODEL_TOOL_PATH"] = environment["PATH"]
+    return environment
 
 
 def load_context(context_path):
@@ -613,7 +621,7 @@ def execute_client(context_path, workspace, authoritative, arguments):
     endpoint = urlsplit(context["baseUrl"])
     policy = sandbox_policy(
         workspace, authoritative, protected, endpoint.port, context_hidden_roots(context))
-    environment = client_environment(workspace, context["baseUrl"])
+    environment = client_environment(workspace, context["baseUrl"], context["shellExecutable"])
     environment.update(NUGET_PACKAGES=context["testHost"]["packages"],
                        PPW_XUNIT_RUNTIME=context["testHost"]["manifest"],
                        PPW_OBSERVER_URL=context["observerUrl"])

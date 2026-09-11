@@ -522,6 +522,40 @@ class TransportTests(Fixture):
         self.assertNotIn(b"SYNTHETIC-credential", ledger.path.read_bytes())
         self.assertNotIn(b"SYNTHETIC ENGINEERING", ledger.path.read_bytes())
 
+    def test_native_sdk_browser_header_passes_exactly_without_admitting_other_headers(self):
+        factory, observed, _ = self.provider()
+        ledger, owner = self.ledger()
+        with gateway.Gateway(ledger, owner, "SYNTHETIC-slot", factory) as proxy:
+            client, response = self.send(
+                proxy, body(), headers={"anthropic-dangerous-direct-browser-access": "true"})
+            self.assertEqual(200, response.status)
+            response.read()
+            client.close()
+        self.assertEqual("true", observed[0][1]["anthropic-dangerous-direct-browser-access"])
+        for extra, code in (
+            ({"anthropic-dangerous-direct-browser-access": "false"}, "WIRE_BROWSER_ACCESS_VALUE"),
+            ({"anthropic-dangerous-direct-browser-access": "true",
+              "anthropic-unpriced-feature": "SYNTHETIC_PRIVATE"}, "WIRE_UNKNOWN_PROVIDER_HEADER"),
+            ({"anthropic-dangerous-direct-browser-access": "true",
+              "Connection": "anthropic-dangerous-direct-browser-access"}, "WIRE_HOP_CAPABILITY"),
+        ):
+            rejected, rejected_owner = self.ledger()
+            calls = []
+            def never_connect():
+                calls.append(True)
+                raise AssertionError("wire refusal must precede upstream")
+            with gateway.Gateway(rejected, rejected_owner, "SYNTHETIC-slot", never_connect) as proxy:
+                client, response = self.send(proxy, body(), headers=extra)
+                self.assertEqual(400, response.status)
+                self.assertIn(code, response.read().decode())
+                client.close()
+            self.assertEqual([], calls)
+            snapshot = rejected.snapshot()
+            self.assertEqual([], snapshot["requests"])
+            self.assertEqual({"reason": "INCOMPLETE_POLICY", "diagnostic": code},
+                             budget.decode(snapshot["events"][-1]["detail"]))
+            self.assertNotIn(b"SYNTHETIC_PRIVATE", rejected.path.read_bytes())
+
     def test_stream_relay_delivers_ping_before_completion_and_preserves_all_bytes(self):
         factory, observed, release = self.provider(streaming=True, pause=True)
         ledger, owner = self.ledger()

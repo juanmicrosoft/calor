@@ -1,0 +1,46 @@
+{
+  "allowedDataKinds": [
+    "synthetic",
+    "empirical"
+  ],
+  "baselineRegistration": {
+    "path": "epochs/w-rows-pilot-001/registration.json",
+    "sha256": "b506c9ec65469640b6135708c7f1e9adbce7dcd318f6ca51e1b305156041484c"
+  },
+  "createsEpochOrLedger": false,
+  "effectiveOn": "independently reviewed merge of the #1406 implementation PR",
+  "epochId": "w-rows-pilot-gateway-001",
+  "id": "request-reserving-gateway-1406",
+  "instrumentAmendment": {
+    "path": "gateway-instrument-amendment.json",
+    "sha256": "42d58640b45a214e285bb7fffe63da2af16f4712fa06cd71bb883b05958c6d7b"
+  },
+  "kind": "pp-w-request-gateway-execution-profile",
+  "modelRegistration": {
+    "path": "model-registration.json",
+    "sha256": "60ebedeb63d6507f13b10f21dd7650c505d2f86358508d151e650fabbc06bf27"
+  },
+  "schemaVersion": 1,
+  "sourceInspectionEvidence": {
+    "path": "gateway-source-inspections.json",
+    "sha256": "9e443d86d0f1e7b9f926d03427e0f9aaaeee23c81a76796681fadc9c862a356d"
+  },
+  "spendAuthorization": {
+    "path": "gateway-authorization.json",
+    "sha256": "9eb64e3b11bbfad69a932c4075ba10cea39d1d21de2e860d3b2eefaacb9a3050"
+  },
+  "spendingPlan": {
+    "path": "gateway-spending-plan.json",
+    "sha256": "8847c46ec5e07fd1e34c26261bb5ca0ef30372e63ecba111dbadf64834c7e882"
+  },
+  "stage": "pilot",
+  "stage2Authorized": false,
+  "stageRegistration": {
+    "path": "gateway-admission/stage1-method.json",
+    "sha256": "5db51f1b1451ed0b5d1596faebb50f8576d3b29413970e31422cc243905b5001"
+  },
+  "transportEvidence": {
+    "path": "gateway-evidence/author-native-no-forward.json",
+    "sha256": "101fdea9e9899dfa03cd1cb13578624cf6f89ea1de48ef06fe745ef3e320cd69"
+  }
+}

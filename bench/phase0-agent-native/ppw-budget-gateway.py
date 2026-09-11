@@ -22,6 +22,47 @@ MAX_BODY = 32 * 1024 * 1024
 MAX_RECEIPT = 8 * 1024 * 1024
 HOP_HEADERS = {"connection", "proxy-connection", "proxy-authorization", "proxy-authenticate",
                "transfer-encoding", "te", "trailer", "upgrade", "keep-alive", "host", "content-length"}
+PROVIDER_HEADERS = {"anthropic-version", "anthropic-beta", "anthropic-dangerous-direct-browser-access"}
+
+
+class WireRefusal(budget.Refusal):
+    def __init__(self, code):
+        super().__init__(code)
+        self.code = code
+
+
+def request_headers(headers):
+    """The same nonsecret wire contract is used by the gateway and native probe."""
+    def check(condition, code):
+        if not condition:
+            raise WireRefusal(code)
+
+    for name in PROVIDER_HEADERS | {"content-length", "content-type", "authorization", "x-api-key"}:
+        check(len(headers.get_all(name, [])) <= 1, "WIRE_DUPLICATE_HEADER")
+    check(headers.get("Transfer-Encoding") is None, "WIRE_TRANSFER_ENCODING")
+    check(headers.get("Content-Encoding") is None, "WIRE_CONTENT_ENCODING")
+    check(headers.get_content_type() == "application/json", "WIRE_CONTENT_TYPE")
+    check(headers.get("anthropic-version") == "2023-06-01", "WIRE_API_VERSION")
+    check(all(name.lower() in PROVIDER_HEADERS for name in headers
+              if name.lower().startswith(("anthropic-", "x-anthropic-"))),
+          "WIRE_UNKNOWN_PROVIDER_HEADER")
+    # SDK browser-access opt-in, not a model, billing or server-operation control.
+    check(headers.get("anthropic-dangerous-direct-browser-access") in (None, "true"),
+          "WIRE_BROWSER_ACCESS_VALUE")
+    try:
+        length = int(headers.get("Content-Length", "-1"))
+    except ValueError as error:
+        raise WireRefusal("WIRE_CONTENT_LENGTH") from error
+    check(0 < length <= MAX_BODY, "WIRE_CONTENT_LENGTH")
+    connection_tokens = {part.strip().lower() for part in headers.get("Connection", "").split(",")
+                         if part.strip()}
+    check(not connection_tokens.intersection(PROVIDER_HEADERS | {"authorization", "x-api-key"}),
+          "WIRE_HOP_CAPABILITY")
+    return length, connection_tokens
+
+
+def priced_endpoint(path, query):
+    return path == "/v1/messages" and query in ("", "beta=true")
 
 
 def provider_connection():
@@ -106,7 +147,7 @@ class Handler(BaseHTTPRequestHandler):
                 or (role == "observer" and path in
                     ("/ppw/register", "/ppw/seal", "/ppw/final", "/ppw/source-inspection"))):
             if gateway.observer is None or query:
-                gateway.fail("INCOMPLETE_POLICY")
+                gateway.fail("INCOMPLETE_POLICY", "OBSERVER_OPERATION")
                 self.reply(400, "observer operation is unavailable")
                 return
             try:
@@ -137,47 +178,34 @@ class Handler(BaseHTTPRequestHandler):
                 self.close_connection = True
             except (budget.Refusal, ValueError, OSError, KeyError, TypeError,
                     subprocess.SubprocessError):
-                gateway.fail("INCOMPLETE_POLICY")
+                gateway.fail("INCOMPLETE_POLICY", "OBSERVER_OPERATION")
                 self.reply(400, "observer operation failed")
             return
         if role != "client":
-            gateway.fail("INCOMPLETE_POLICY")
+            gateway.fail("INCOMPLETE_POLICY", "OBSERVER_OPERATION")
             self.reply(400, "unsupported observer operation")
             return
         if path == "/v1/messages/count_tokens":
             self.reply(404, "optional token counting is unavailable; never a financial bound")
             return
-        if path != "/v1/messages" or query not in ("", "beta=true"):
-            gateway.fail("INCOMPLETE_POLICY")
+        if not priced_endpoint(path, query):
+            gateway.fail("INCOMPLETE_POLICY", "WIRE_ENDPOINT")
             self.reply(400, "unpriced gateway endpoint")
             return
         try:
             budget.require(gateway.active, "gateway slot is closed")
-            for name in ("content-length", "content-type", "anthropic-version", "anthropic-beta",
-                         "authorization", "x-api-key"):
-                budget.require(len(self.headers.get_all(name, [])) <= 1, "ambiguous request header")
-            budget.require(self.headers.get("Transfer-Encoding") is None, "chunked requests unsupported")
-            budget.require(self.headers.get("Content-Encoding") is None, "encoded requests unsupported")
-            budget.require(self.headers.get_content_type() == "application/json", "JSON body required")
-            budget.require(self.headers.get("anthropic-version") == "2023-06-01",
-                           "unregistered API version")
-            budget.require(all(name.lower() in ("anthropic-version", "anthropic-beta")
-                               for name in self.headers
-                               if name.lower().startswith(("anthropic-", "x-anthropic-"))),
-                           "unregistered provider capability header")
-            length = int(self.headers.get("Content-Length", "-1"))
-            budget.require(0 < length <= MAX_BODY, "invalid request body length")
+            length, connection_tokens = request_headers(self.headers)
             self.connection.settimeout(30)
             raw = self.rfile.read(length)
             budget.require(len(raw) == length, "truncated request body")
             request = budget.admit_request(raw, self.headers.get("anthropic-beta"))
-            connection_tokens = {p.strip().lower() for p in self.headers.get("Connection", "").split(",")}
-            budget.require(not connection_tokens.intersection(
-                {"authorization", "x-api-key", "anthropic-version", "anthropic-beta"}),
-                "capability headers cannot be hop-by-hop")
+        except WireRefusal as error:
+            gateway.fail("INCOMPLETE_POLICY", error.code)
+            self.reply(400, "request wire contract refused: " + error.code)
+            return
         except (budget.Refusal, ValueError, TimeoutError, OSError):
-            gateway.fail("INCOMPLETE_POLICY")
-            self.reply(400, "request is outside the registered price contract")
+            gateway.fail("INCOMPLETE_POLICY", "PRICE_REQUEST")
+            self.reply(400, "request price contract refused: PRICE_REQUEST")
             return
 
         request_id = None
@@ -281,8 +309,8 @@ class Gateway:
         self.thread.start()
         return self
 
-    def fail(self, reason):
-        self.ledger.stop(self.owner, reason)
+    def fail(self, reason, diagnostic=None):
+        self.ledger.stop(self.owner, reason, diagnostic=diagnostic)
 
     def close(self):
         self.active = False

@@ -28,7 +28,10 @@ class GatewayArchiveTests(unittest.TestCase):
         seed.rename(cls.epoch)
         cls.pins = analysis.load(cls.epoch / "pins.json")
         save(cls.epoch / "registration.json", cls.registration)
-        cls.pins.update(epochId=cls.epoch.name, harnessArtifacts=cls.spending.artifact_manifest(cls.spending.GATEWAY),
+        historical_amendment = analysis.load(
+            cls.gateway.ROOT / "gateway-instrument-amendment.json")
+        cls.pins.update(epochId=cls.epoch.name,
+                        harnessArtifacts=historical_amendment["replacementHarnessArtifacts"],
                         harnessCommit="f" * 40, registrationSha256=analysis.digest(cls.epoch / "registration.json"))
         save(cls.epoch / "pins.json", cls.pins)
         for name in ("spendAuthorization", "spendingPlan", "stageRegistration", "modelRegistration",

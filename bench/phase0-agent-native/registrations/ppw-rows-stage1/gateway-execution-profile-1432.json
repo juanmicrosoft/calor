@@ -1,0 +1,62 @@
+{
+  "allowedDataKinds": [
+    "synthetic",
+    "empirical"
+  ],
+  "baselineRegistration": {
+    "path": "epochs/w-rows-pilot-001/registration.json",
+    "sha256": "b506c9ec65469640b6135708c7f1e9adbce7dcd318f6ca51e1b305156041484c"
+  },
+  "createsEpochOrLedger": false,
+  "effectiveOn": "independently reviewed merge of the #1432 implementation PR",
+  "epochId": "w-rows-pilot-gateway-002",
+  "id": "request-reserving-gateway-recovery-1432",
+  "instrumentAmendment": {
+    "path": "gateway-instrument-amendment-1432.json",
+    "sha256": "3d45adad658c569ab84b34b3a9a91a35f4ca65a09e18ee77c327222b9f1a3f59"
+  },
+  "kind": "pp-w-request-gateway-execution-profile",
+  "modelRegistration": {
+    "path": "model-registration.json",
+    "sha256": "60ebedeb63d6507f13b10f21dd7650c505d2f86358508d151e650fabbc06bf27"
+  },
+  "nativeStartupEvidence": {
+    "path": "gateway-evidence/gateway-native-startup-1432-evidence.json",
+    "sha256": "00138025791bca2cbc47afd4e22adf19b673851c129fd372e27b2657fc3feed1"
+  },
+  "recovery": {
+    "automaticRecovery": false,
+    "continuationInvocations": 443,
+    "failedEpochId": "w-rows-pilot-gateway-001",
+    "preservedAttemptedSlots": [
+      "C-001-quota-adapter/calor-permissive/1"
+    ]
+  },
+  "schemaVersion": 1,
+  "sourceInspectionEvidence": {
+    "path": "gateway-source-inspections.json",
+    "sha256": "9e443d86d0f1e7b9f926d03427e0f9aaaeee23c81a76796681fadc9c862a356d"
+  },
+  "spendAuthorization": {
+    "path": "gateway-authorization-1432.json",
+    "sha256": "c4aa8608d478870922867f2fb892e14ca3efe442ea6fddca64643927f72e2b43"
+  },
+  "spendingPlan": {
+    "path": "gateway-spending-plan-1432.json",
+    "sha256": "ebea4e7db9b6ee1fa67a01b343dd182a9ebb49c673ab967b73750ffefa4b55c4"
+  },
+  "stage": "pilot",
+  "stage2Authorized": false,
+  "stageRegistration": {
+    "path": "gateway-admission/stage1-method.json",
+    "sha256": "5db51f1b1451ed0b5d1596faebb50f8576d3b29413970e31422cc243905b5001"
+  },
+  "supersedes": {
+    "path": "gateway-execution-profile.json",
+    "sha256": "8b6e1d2243cdb807a082e3da39b3b5333dc8062d2118395285924aa10ab38d2b"
+  },
+  "transportEvidence": {
+    "path": "gateway-evidence/gateway-native-wire-1432-evidence.json",
+    "sha256": "f1e95d6d7bda35f1e25c92352189fdc009c92fbf6c98db5619f72e2c270b9d48"
+  }
+}
