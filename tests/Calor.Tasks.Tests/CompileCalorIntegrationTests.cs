@@ -106,6 +106,31 @@ public class CompileCalorIntegrationTests : IDisposable
     }
 
     // Test 20: Full lifecycle: build → build (skip) → edit 1 → build (1 compiles) → clean → build (all)
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void ActiveBindingError_RejectsChangedWarmSourceDespiteOptOuts(bool typeOff, bool transpile)
+    {
+        var source = CreateSourceFile("Routing.calr", ValidCalorSource);
+        Assert.True(CreateTask(source).Execute());
+        File.WriteAllText(source, """
+            §M{m1:Routing}
+              §F{f1:Probe:pub} () -> i32
+                §R 1
+              §F{f2:Probe:pub} () -> i32
+                §R 2
+            """);
+        var task = CreateTask(source);
+        task.TypeCheck = !typeOff;
+        task.TranspileOnly = transpile;
+        task.EnforceEffects = false;
+        task.PermissiveEffects = true;
+        Assert.False(task.Execute());
+        Assert.Equal("Calor0206", Assert.Single(((TestBuildEngine)task.BuildEngine).ErrorCodes));
+        Assert.Empty(task.GeneratedFiles);
+    }
+
     [Fact]
     public void FullLifecycle_BuildSkipEditCleanBuild()
     {

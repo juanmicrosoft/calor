@@ -294,6 +294,7 @@ internal sealed class WatchSession
         // so they need no resolver entries.
         var declarationIds = _structuredOutput ? new Ids.DeclarationIdResolver() : null;
         var policy = _settings.PermissiveEffects ? UnknownCallPolicy.Permissive : UnknownCallPolicy.Strict;
+        var enableTypeChecking = CompilationOptions.TypeCheckingDefault;
 
         CompilationDriver.DriverCacheSettings? cache = null;
         if (!_settings.NoCache)
@@ -307,7 +308,8 @@ internal sealed class WatchSession
             cache = new CompilationDriver.DriverCacheSettings(
                 _stateDirectory,
                 Program.BuildOptionsToken(_settings.StrictApi, _settings.RequireDocs,
-                    _settings.EnforceEffects, _settings.StrictEffects, _settings.PermissiveEffects,
+                    _settings.EnforceEffects, enableTypeChecking,
+                    _settings.StrictEffects, _settings.PermissiveEffects,
                     _settings.ContractMode, verify: false, verificationTimeout: 0, analyze: false,
                     allFindings: false, strictBindInference: true, experimentalFlags: null),
                 ClearFirst: _clearCachePending,
@@ -327,6 +329,7 @@ internal sealed class WatchSession
                     StrictApi = _settings.StrictApi,
                     RequireDocs = _settings.RequireDocs,
                     EnforceEffects = _settings.EnforceEffects,
+                    EnableTypeChecking = enableTypeChecking,
                     StrictEffects = _settings.StrictEffects,
                     UnknownCallPolicy = policy,
                     ContractMode = CompilationDriver.ParseContractMode(_settings.ContractMode),

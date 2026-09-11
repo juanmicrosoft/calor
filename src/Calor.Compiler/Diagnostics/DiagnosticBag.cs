@@ -11,6 +11,19 @@ public sealed class DiagnosticBag : IEnumerable<Diagnostic>
     private readonly List<Diagnostic> _diagnostics = [];
     private readonly List<DiagnosticWithFix> _diagnosticsWithFixes = [];
     private string? _currentFilePath;
+    private Binding.BindingDiagnosticContext? _bindingContext;
+
+    internal IDisposable EnterBindingContext()
+    {
+        var scope = new BindingScope(this, _bindingContext);
+        _bindingContext = Binding.BindingDiagnosticContext.General;
+        return scope;
+    }
+
+    private sealed class BindingScope(DiagnosticBag bag, Binding.BindingDiagnosticContext? previous) : IDisposable
+    {
+        public void Dispose() => bag._bindingContext = previous;
+    }
 
     public int Count => _diagnostics.Count;
     public bool HasErrors => _diagnostics.Any(d => d.IsError);
@@ -38,8 +51,15 @@ public sealed class DiagnosticBag : IEnumerable<Diagnostic>
 
     public void Report(TextSpan span, string code, string message,
         DiagnosticSeverity severity = DiagnosticSeverity.Error)
+        => Report(span, code, message, severity, bindingContext: null);
+
+    public void Report(TextSpan span, string code, string message,
+        DiagnosticSeverity severity, Binding.BindingDiagnosticContext? bindingContext)
     {
-        _diagnostics.Add(new Diagnostic(code, message, span, severity, _currentFilePath));
+        _diagnostics.Add(new Diagnostic(code, message, span, severity, _currentFilePath)
+        {
+            BindingContext = bindingContext ?? _bindingContext
+        });
     }
 
     /// <summary>
@@ -60,7 +80,8 @@ public sealed class DiagnosticBag : IEnumerable<Diagnostic>
     {
         _diagnostics.Add(new Diagnostic(code, message, span, severity, _currentFilePath)
         {
-            Verification = outcome
+            Verification = outcome,
+            BindingContext = _bindingContext
         });
     }
 
@@ -157,9 +178,15 @@ public sealed class DiagnosticBag : IEnumerable<Diagnostic>
         DiagnosticSeverity severity = DiagnosticSeverity.Error)
     {
         // Add to regular diagnostics for normal display
-        _diagnostics.Add(new Diagnostic(code, message, span, severity, _currentFilePath));
+        _diagnostics.Add(new Diagnostic(code, message, span, severity, _currentFilePath)
+        {
+            BindingContext = _bindingContext
+        });
         // Also add to fix list for code actions
-        _diagnosticsWithFixes.Add(new DiagnosticWithFix(code, message, span, fix, severity, _currentFilePath));
+        _diagnosticsWithFixes.Add(new DiagnosticWithFix(code, message, span, fix, severity, _currentFilePath)
+        {
+            BindingContext = _bindingContext
+        });
     }
 
     /// <summary>

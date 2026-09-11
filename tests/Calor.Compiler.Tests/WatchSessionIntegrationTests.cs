@@ -95,6 +95,13 @@ public sealed class WatchSessionIntegrationTests : IDisposable
             + "    §R INT:" + answer.ToString(System.Globalization.CultureInfo.InvariantCulture) + "\n";
     }
 
+    private static string NullableLiteralTypeCheckerOnlyViolation() => """
+        §M{m001:N0}
+          §F{f001:Probe:pub} () -> void
+            §E{}
+            §B{x:?str} "safe"
+        """;
+
     private void WriteAllModules()
     {
         File.WriteAllText(Path.Combine(_root, "a.calr"), ModuleSource("m001", "ModA", "f001", 1));
@@ -271,5 +278,58 @@ public sealed class WatchSessionIntegrationTests : IDisposable
         Assert.Equal(2, results[2].Compiled);
         Assert.Equal(1, results[2].Skipped);
         Assert.All(results, r => Assert.False(r.AnyErrors));
+    }
+
+    [Fact]
+    public async Task ActiveBindingError_InChangedWarmSourceIsNotSkipped()
+    {
+        var source = Path.Combine(_root, "routing.calr");
+        var safe = ModuleSource("m1", "Routing", "f1", 1);
+        File.WriteAllText(source, safe);
+        var results = await RunScriptAsync(rebuildCount: 3, drive: (session, step) =>
+        {
+            File.WriteAllText(source, step == 1
+                ? safe + "  §F{f2:answer:pub} () -> i32\n    §R 2\n"
+                : safe);
+            session.InjectChange(source);
+        });
+        Assert.Equal(3, results.Count);
+        Assert.False(results[0].AnyErrors);
+        Assert.True(results[1].AnyErrors);
+        Assert.Equal(0, results[1].Skipped);
+        Assert.False(results[2].AnyErrors);
+    }
+
+    [Fact]
+    public async Task EnvironmentTypeCheckTransition_InvalidatesWarmCache()
+    {
+        var previous = Environment.GetEnvironmentVariable("CALOR_NO_TYPE_CHECK");
+        try
+        {
+            var source = Path.Combine(_root, "n0.calr");
+            File.WriteAllText(source, NullableLiteralTypeCheckerOnlyViolation());
+            Environment.SetEnvironmentVariable("CALOR_NO_TYPE_CHECK", "1");
+
+            var results = await RunScriptAsync(rebuildCount: 2, drive: (session, step) =>
+            {
+                Assert.Equal(1, step);
+                Environment.SetEnvironmentVariable("CALOR_NO_TYPE_CHECK", "0");
+                session.InjectChange(source);
+            });
+
+            Assert.Equal(2, results.Count);
+            Assert.Equal(1, results[0].Compiled);
+            Assert.Equal(0, results[0].Skipped);
+            Assert.False(results[0].AnyErrors);
+            // Failed files are not reported as successfully compiled, but they
+            // must be reprocessed rather than cache-skipped under the old policy.
+            Assert.Equal(0, results[1].Compiled);
+            Assert.Equal(0, results[1].Skipped);
+            Assert.True(results[1].AnyErrors);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("CALOR_NO_TYPE_CHECK", previous);
+        }
     }
 }

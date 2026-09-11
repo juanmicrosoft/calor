@@ -123,9 +123,12 @@ internal static class BuildStateCache
     // DisplayName replace CallerName). One cold rebuild on the first 0.15 build.
     // CurrentCompilerSemanticsVersion does NOT move: effect rows change no
     // emitted byte (G-CODEGEN, §12.2).
+    // compile-inputs-v4 (#1396) adds the effective type-checking setting and
+    // guard-elision policy to the CLI/watch options token; older caches were
+    // policy-blind and could replay success under a stricter compile.
     public const string CurrentFormatVersion = "4.0";
     public const string CurrentCompilerSemanticsVersion = "calor-compile-semantics-v1";
-    public const string CurrentOptionsSerializerVersion = "compile-inputs-v3";
+    public const string CurrentOptionsSerializerVersion = "compile-inputs-v4";
     private const string CacheFileName = ".calor-build-state.json";
     private const int MaxRetries = 3;
     private const int BaseRetryDelayMs = 50;

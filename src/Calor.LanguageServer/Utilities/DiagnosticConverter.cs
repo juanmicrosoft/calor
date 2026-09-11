@@ -1,4 +1,5 @@
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Binding;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using CalorDiagnostic = Calor.Compiler.Diagnostics.Diagnostic;
 using CalorSeverity = Calor.Compiler.Diagnostics.DiagnosticSeverity;
@@ -22,7 +23,7 @@ public static class DiagnosticConverter
             Range = PositionConverter.ToLspRange(diagnostic.Span, source),
             Severity = ToLspSeverity(diagnostic.Severity),
             Code = diagnostic.Code,
-            Source = "calor",
+            Source = BindingDiagnosticPolicy.IsAnalysisOnly(diagnostic) ? "calor (analysis only)" : "calor",
             Message = diagnostic.Message
         };
     }
@@ -37,7 +38,7 @@ public static class DiagnosticConverter
             Range = PositionConverter.ToLspRangeSingleLine(diagnostic.Span),
             Severity = ToLspSeverity(diagnostic.Severity),
             Code = diagnostic.Code,
-            Source = "calor",
+            Source = BindingDiagnosticPolicy.IsAnalysisOnly(diagnostic) ? "calor (analysis only)" : "calor",
             Message = diagnostic.Message
         };
     }
@@ -53,7 +54,10 @@ public static class DiagnosticConverter
             Range = PositionConverter.ToLspRange(diagnostic.Span, source),
             Severity = ToLspSeverity(diagnostic.Severity),
             Code = diagnostic.Code,
-            Source = "calor",
+            Source = diagnostic.IsError && diagnostic.BindingContext is not null
+                && BindingDiagnosticPolicy.GetRule(diagnostic.Code, diagnostic.BindingContext).Disposition
+                    == BindingDiagnosticDisposition.AnalysisOnly
+                ? "calor (analysis only)" : "calor",
             Message = diagnostic.Message,
             // Store fix description in data for code action handler
             Data = diagnostic.Fix.Description

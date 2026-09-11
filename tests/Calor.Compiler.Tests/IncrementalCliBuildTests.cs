@@ -470,6 +470,97 @@ public class IncrementalCliEndToEndTests : IDisposable
             "plain compile must not write build state without --cache");
     }
 
+    [Fact]
+    public void CacheFlag_WithExplicitOutput_StillDoesNotUseIncrementalBuildCache()
+    {
+        var source = Path.Combine(_tempDir, "explicit-output.calr");
+        var output = Path.Combine(_tempDir, "explicit-output.cs");
+        File.WriteAllText(source, """
+            §M{m001:ExplicitOutput}
+              §F{f001:Main:pub} () -> void
+                §E{cw}
+                §P "hello"
+            """);
+
+        for (var run = 0; run < 2; run++)
+        {
+            var result = CliTestHarness.RunCli(
+                _tempDir, "--input", source, "--output", output, "--cache");
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Compilation successful", result.StdOut);
+            Assert.DoesNotContain("Up-to-date (cached)", result.StdOut);
+        }
+
+        Assert.False(File.Exists(Path.Combine(_tempDir, ".calor-build-state.json")),
+            "explicit -o uses a redirected output and must stay outside the default-layout cache");
+    }
+
+    [Fact]
+    public void Cache_DoesNotReplayNoTypeCheckSuccessForDefaultOptOutDefaultSequence()
+    {
+        var source = WriteNullableLiteralTypeCheckerOnlyViolation();
+
+        var firstDefault = CliTestHarness.RunCli(
+            _tempDir,
+            new Dictionary<string, string> { ["CALOR_NO_TYPE_CHECK"] = "0" },
+            "--input", source, "--cache");
+        Assert.NotEqual(0, firstDefault.ExitCode);
+        Assert.Contains("Calor0202", firstDefault.StdOut + firstDefault.StdErr);
+        var stateAfterFailure = BuildStateCache.Load(_tempDir);
+        if (stateAfterFailure != null)
+            Assert.Empty(stateAfterFailure.Files);
+
+        var optedOut = CliTestHarness.RunCli(
+            _tempDir,
+            new Dictionary<string, string> { ["CALOR_NO_TYPE_CHECK"] = "0" },
+            "--input", source, "--cache", "--no-type-check");
+        Assert.True(optedOut.ExitCode == 0, optedOut.StdOut + optedOut.StdErr);
+        Assert.DoesNotContain("Calor0202", optedOut.StdOut + optedOut.StdErr);
+        Assert.Contains("Compilation successful", optedOut.StdOut);
+        Assert.True(File.Exists(Path.Combine(_tempDir, ".calor-build-state.json")));
+
+        var defaultCompile = CliTestHarness.RunCli(
+            _tempDir,
+            new Dictionary<string, string> { ["CALOR_NO_TYPE_CHECK"] = "0" },
+            "--input", source, "--cache");
+        Assert.NotEqual(0, defaultCompile.ExitCode);
+        Assert.Contains("Calor0202", defaultCompile.StdOut + defaultCompile.StdErr);
+        Assert.DoesNotContain("Up-to-date (cached)", defaultCompile.StdOut);
+    }
+
+    [Fact]
+    public void Cache_DoesNotReplayEnvironmentOptOutSuccessForDefaultCompile()
+    {
+        var source = WriteNullableLiteralTypeCheckerOnlyViolation();
+
+        var envOptOut = CliTestHarness.RunCli(
+            _tempDir,
+            new Dictionary<string, string> { ["CALOR_NO_TYPE_CHECK"] = "1" },
+            "--input", source, "--cache");
+        Assert.True(envOptOut.ExitCode == 0, envOptOut.StdOut + envOptOut.StdErr);
+        Assert.DoesNotContain("Calor0202", envOptOut.StdOut + envOptOut.StdErr);
+
+        var defaultCompile = CliTestHarness.RunCli(
+            _tempDir,
+            new Dictionary<string, string> { ["CALOR_NO_TYPE_CHECK"] = "0" },
+            "--input", source, "--cache");
+        Assert.NotEqual(0, defaultCompile.ExitCode);
+        Assert.Contains("Calor0202", defaultCompile.StdOut + defaultCompile.StdErr);
+        Assert.DoesNotContain("Up-to-date (cached)", defaultCompile.StdOut);
+    }
+
+    private string WriteNullableLiteralTypeCheckerOnlyViolation()
+    {
+        var path = Path.Combine(_tempDir, "nullable-literal.calr");
+        File.WriteAllText(path, """
+            §M{m001:N0}
+              §F{f001:Probe:pub} () -> void
+                §E{}
+                §B{x:?str} "safe"
+            """);
+        return path;
+    }
+
     /// <summary>
     /// Design-doc pin <b>P23</b> — <c>BuildStateCache</c>'s three version
     /// constants (<c>BuildStateCache.cs:121-123</c>), frozen with a value each.
@@ -486,8 +577,9 @@ public class IncrementalCliEndToEndTests : IDisposable
     /// shape changed — <c>EffectCallerSummary</c> is keyed by structural id
     /// (<c>CallerId</c> + <c>DisplayName</c> replaced <c>CallerName</c>, P26).
     /// One cold rebuild on the first 0.15 build is the mechanism's design.
-    /// <c>CurrentOptionsSerializerVersion</c> is untouched: no compile input
-    /// changed shape.</para>
+    /// <c>CurrentOptionsSerializerVersion</c> moved to <c>"compile-inputs-v4"</c>
+    /// because #1396 added the effective type-checking and guard-elision policy
+    /// inputs to the CLI/watch cache token.</para>
     ///
     /// <para>Discriminating revert: bump the semantics stamp and this fails,
     /// naming G-CODEGEN.</para>
@@ -500,7 +592,7 @@ public class IncrementalCliEndToEndTests : IDisposable
             "calor-compile-semantics-v1",
             Calor.Compiler.Incremental.BuildStateCache.CurrentCompilerSemanticsVersion);
         Assert.Equal(
-            "compile-inputs-v3",
+            "compile-inputs-v4",
             Calor.Compiler.Incremental.BuildStateCache.CurrentOptionsSerializerVersion);
     }
 
