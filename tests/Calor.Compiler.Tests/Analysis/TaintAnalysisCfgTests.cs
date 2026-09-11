@@ -73,6 +73,49 @@ public sealed class TaintAnalysisCfgTests
             {{(expression ? "§B{ignored} " : "")}}§C{System.IO.File.{{method}}} §A path {{(method == "WriteAllText" ? "§A STR:\"content\"" : "")}} §/C
         """;
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public void N3_NamedBclSink_UsesActualFormalRolesInDirectAndSummaryFlows(
+        bool expression, bool taintedPath, bool wrapper)
+    {
+        var parameters = taintedPath ? "System.Text.Encoding:encoding, string:user_input" : "System.Text.Encoding:user_input";
+        var encoding = taintedPath ? "encoding" : "user_input";
+        var path = taintedPath ? "user_input" : "STR:\"safe.txt\"";
+        var bcl = $"{(expression ? "§B{ignored} " : "")}§C{{System.IO.File.ReadAllText}} §A[encoding] {(wrapper ? "encoding" : encoding)} §A[path] {(wrapper ? "path" : path)} §/C";
+        var source = wrapper ? $$"""
+            §M{m1:NamedSummary}
+              §F{helper:Wrapper:pub} (System.Text.Encoding:encoding, string:path) -> void
+                {{bcl}}
+              §F{caller:Run:pub} ({{parameters}}) -> void
+                §C{Wrapper} §A {{encoding}} §A {{path}} §/C
+            """ : $$"""
+            §M{m1:NamedDirect}
+              §F{caller:Run:pub} ({{parameters}}) -> void
+                {{bcl}}
+            """;
+        var parsing = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, parsing).TokenizeAllForParser(), parsing).Parse();
+        Assert.False(parsing.HasErrors, string.Join("\n", parsing));
+        var binding = new DiagnosticBag();
+        var bound = new Binder(binding).Bind(module);
+        Assert.DoesNotContain(binding, diagnostic => BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        var statement = bound.Functions[0].Body[0];
+        var mappings = expression
+            ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundBindStatement>(statement).Initializer).ArgumentParameterIndices
+            : Assert.IsType<BoundCallStatement>(statement).ArgumentParameterIndices;
+        Assert.Equal(new[] { 1, 0 }, mappings);
+        var diagnostics = new DiagnosticBag();
+        new TaintAnalysisRunner(diagnostics).Analyze(bound);
+        Assert.Equal(taintedPath, diagnostics.Any(diagnostic => diagnostic.Code == DiagnosticCode.PathTraversal));
+    }
+
     [Fact]
     public void RegressionCorpusInventory_EnforcesCommittedPrecisionRecallTargets()
     {

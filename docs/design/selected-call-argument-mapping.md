@@ -50,7 +50,7 @@ change. #1397's independently developed275 must be reconciled if it merges.
 
 ## Executable controls
 
-The56 new compiler cases and2 editor cases use existing runners and maintenance
+The64 new compiler cases and2 editor cases use existing runners and maintenance
 files; no benchmark framework, product C# path exemption or test tool was added.
 
 | Control | Evidence |
@@ -65,6 +65,7 @@ files; no benchmark framework, product C# path exemption or test tool was added.
 | Evaluation order | Original C# → Calor → public compilation → emitted assembly execution; four mixed/reordered statement/expression cases retain trace12 |
 | Existing behavior | Native overload, metadata shape/context, nullability predicate and routing/source-catalog suites |
 | Exact taint identities | Eight real binding/taint cases plus four `--analyze` CLI cases preserve `System.IO.File` sink recognition for tainted inputs and reject false alarms on constants; nullable reference syntax is not part of the overload identity |
+| Named taint roles | Eight statement/expression and direct/native-wrapper cases distinguish a tainted path from a tainted encoding; actual selected BCL formal indices drive sink selection and summary construction without reordering executable inputs |
 
 The initial117-case selection passed. Six new source controls then reproduced
 five failures before implementation: missing statement checks, wrongly accused
@@ -96,6 +97,16 @@ The before-fix selection failed eight of ten cases, including two actual CLI
 missed findings. The correction adds nullable-formal `WriteAllText` identity
 controls as well. Source errors/coverage remain pinned by the normal corpus
 ratchet, and fresh final-head review and CI are required after this material fix.
+
+Follow-up falsification found a related consumer defect: after recognizing the
+correct signature, taint rules still indexed source-order arguments as formal
+positions. A reordered `File.ReadAllText(encoding: user_input, path: "safe.txt")`
+incorrectly flagged the encoding as a path. Bound calls now retain the actual
+metadata argument-to-formal indices, and the existing sink selector and summary
+builder consume those indices. A null map retains existing unresolved/native
+behavior; no new mapping is guessed. The original CLI false positive and its
+correction are retained, including the separate unchanged0200 TypeChecker warning
+for the externally resolved encoding type. Taint rules themselves are unchanged.
 
 ## Explicit limits and acceptance gap
 

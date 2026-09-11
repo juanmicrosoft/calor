@@ -378,6 +378,8 @@ public sealed class BoundCallStatement : BoundStatement
     public string? ResolvedMethodName { get; }
     /// <summary>Resolved parameter types retained for overload-sensitive analyses.</summary>
     public IReadOnlyList<string>? ResolvedParameterTypes { get; }
+    /// <summary>Selected metadata formal index for each source-order argument; -1 is unmapped.</summary>
+    public IReadOnlyList<int>? ArgumentParameterIndices { get; init; }
     public override IEnumerable<BoundNode> ChildNodes => Arguments;
 
     public BoundCallStatement(
@@ -821,6 +823,8 @@ public class BoundCallExpression : BoundExpression
     /// Null if parameter types could not be resolved.
     /// </summary>
     public IReadOnlyList<string>? ResolvedParameterTypes { get; }
+    /// <inheritdoc cref="BoundCallStatement.ArgumentParameterIndices"/>
+    public IReadOnlyList<int>? ArgumentParameterIndices { get; init; }
 
     public BoundCallExpression(
         TextSpan span,

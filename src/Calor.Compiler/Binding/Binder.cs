@@ -271,6 +271,21 @@ public sealed class Binder
         miscellaneousOptions: Microsoft.CodeAnalysis.SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers
             | Microsoft.CodeAnalysis.SymbolDisplayMiscellaneousOptions.ExpandNullable);
 
+    private static IReadOnlyList<int>? GetBclArgumentParameterIndices(
+        Metadata.MetadataBinderResult? resolution, int argumentCount)
+    {
+        if (resolution is not { } bcl) return null;
+        var indices = Enumerable.Repeat(-1, argumentCount).ToArray();
+        foreach (var mapping in bcl.Arguments)
+        {
+            var receiverOffset = bcl.Symbol?.ReducedFrom != null
+                && mapping.Parameter.ContainingSymbol is Microsoft.CodeAnalysis.IMethodSymbol { ReducedFrom: null }
+                ? 1 : 0;
+            indices[mapping.ArgumentIndex] = mapping.Parameter.Ordinal - receiverOffset;
+        }
+        return indices;
+    }
+
     private static Microsoft.CodeAnalysis.ITypeSymbol? ResolveBclArgumentType(
         Metadata.MetadataContext context, string typeName)
     {
@@ -1405,7 +1420,10 @@ public sealed class Binder
                 .Select(parameter => parameter.TypeName)
                 ?? args.Select(argument => argument.Type.DisplayString))
                 .ToArray(),
-            receiver);
+            receiver)
+        {
+            ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count)
+        };
     }
 
     private BoundReturnStatement BindReturnStatement(ReturnStatementNode ret)
@@ -3429,7 +3447,10 @@ public sealed class Binder
             isInaccessibleCall: resolution.Kind == OverloadResolutionKind.Inaccessible,
             receiverTypeSymbol: receiverTypeSymbol,
             annotatedReturnType: annotatedReturn,
-            receiver: receiver);
+            receiver: receiver)
+        {
+            ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count)
+        };
     }
 
     /// <summary>

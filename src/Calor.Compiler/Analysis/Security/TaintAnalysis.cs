@@ -888,7 +888,7 @@ public sealed class TaintAnalysis
         {
             RecordSinkFlows(
                 sink.Sink,
-                SelectSinkArguments(sink, arguments),
+                SelectSinkArguments(sink, call, arguments),
                 call.DisplayName,
                 location,
                 state);
@@ -934,11 +934,9 @@ public sealed class TaintAnalysis
             var sink = IdentifySink(call);
             if (sink == null)
                 continue;
-            foreach (var index in sink.GetArgumentIndices(arguments.Count))
+            foreach (var argument in SelectSinkArguments(sink, call, arguments))
             {
-                if (index < 0 || index >= arguments.Count)
-                    continue;
-                foreach (var flow in EvaluateExpression(arguments[index], state))
+                foreach (var flow in EvaluateExpression(argument, state))
                 {
                     if (flow.Origin.ParameterIndex is not { } parameterIndex
                         || flow.IsSanitizedFor(sink.Sink))
@@ -962,11 +960,21 @@ public sealed class TaintAnalysis
 
     private static IReadOnlyList<BoundExpression> SelectSinkArguments(
         TaintSinkRule sink,
-        IReadOnlyList<BoundExpression> arguments) =>
-        sink.GetArgumentIndices(arguments.Count)
+        TaintCallDescriptor call,
+        IReadOnlyList<BoundExpression> arguments)
+    {
+        if (sink.ArgumentIndices == null)
+            return arguments;
+        if (call.ArgumentParameterIndices is { } mappings)
+        {
+            return arguments.Where((_, index) =>
+                index < mappings.Count && sink.ArgumentIndices.Contains(mappings[index])).ToArray();
+        }
+        return sink.GetArgumentIndices(arguments.Count)
             .Where(index => index >= 0 && index < arguments.Count)
             .Select(index => arguments[index])
             .ToArray();
+    }
 
     private static IEnumerable<BoundCallExpression> FindCalls(BoundExpression expression)
     {
@@ -1155,7 +1163,8 @@ public sealed class TaintAnalysis
         string? ResolvedMethodName,
         IReadOnlyList<string>? ResolvedParameterTypes,
         FunctionSymbol? ResolvedSymbol,
-        IReadOnlyList<FunctionSymbol> ResolvedSymbols)
+        IReadOnlyList<FunctionSymbol> ResolvedSymbols,
+        IReadOnlyList<int>? ArgumentParameterIndices = null)
     {
         public bool HasResolvedIdentity =>
             ResolvedSymbol != null
@@ -1171,7 +1180,8 @@ public sealed class TaintAnalysis
             call.ResolvedMethodName,
             call.ResolvedParameterTypes,
             call.ResolvedSymbol,
-            call.ResolvedSymbols);
+            call.ResolvedSymbols,
+            call.ArgumentParameterIndices);
 
         public static TaintCallDescriptor From(BoundCallStatement call) => new(
             call.Target,
@@ -1179,7 +1189,8 @@ public sealed class TaintAnalysis
             call.ResolvedMethodName,
             call.ResolvedParameterTypes,
             call.ResolvedSymbol,
-            call.ResolvedSymbols);
+            call.ResolvedSymbols,
+            call.ArgumentParameterIndices);
     }
 
     [Flags]
