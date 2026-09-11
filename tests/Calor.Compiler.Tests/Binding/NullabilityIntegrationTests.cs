@@ -1394,12 +1394,10 @@ public class NullabilityIntegrationTests
     }
 
     /// <summary>
-    /// Legacy-SemVer branch: modules declaring <c>§SEMVER[1.0.0]</c>
-    /// (or any effective Major &lt; 2) must still see the diagnostics
-    /// at <see cref="DiagnosticSeverity.Info"/>. This test guards the
-    /// legacy fall-through the moment the SEMVER directive is threaded
-    /// through the binder in a follow-up slice; today the callers pass
-    /// the compiler's <see cref="SemanticsVersion.Major"/> instead.
+    /// The helper returns <see cref="DiagnosticSeverity.Info"/> for a supplied
+    /// major below 2. This is not a legacy compilation mode: the parser refuses
+    /// older-major declarations, and binder callers pass the compiler's
+    /// <see cref="SemanticsVersion.Major"/> instead.
     /// </summary>
     [Fact]
     public void NullabilitySeverity_S5Gate_Info_At_LegacyMajor()

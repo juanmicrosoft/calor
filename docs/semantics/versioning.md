@@ -48,6 +48,35 @@ from Info to Error under `SemanticsVersion.Major >= 2`. See
 `docs/plans/v0.14-nullability-enforcement-scoping.md` section D7/F-3 and
 `docs/plans/v0.14-metadata-binding-scoping.md` section F-7.
 
+### Diagnostic routing correction (2026-09-11)
+
+`Error` severity in the binder is not the same as production CLI rejection.
+At checked main revision `080ed5a7`, `Program.Compile` uses
+`BindingDiagnosticPolicy`, which excludes `Calor0272` (binding initialization),
+`Calor0273` (return), and `Calor0274` (argument). The language server's
+`DocumentState` binds directly, so editor diagnostics can differ. Other
+compiler passes may independently reject the same program.
+
+This is not a newly introduced regression. The routing policy and its
+`Program.Compile` call were introduced in
+[`cc62c4ac`](https://github.com/juanmicrosoft/calor/commit/cc62c4ac7b6059de4cb7a31809c298269c6dafe7),
+an ancestor of all three release commits below. Each tagged source has the
+same exclusion and calls the policy from `Program.Compile`.
+
+| Release tag | Commit | Tagged policy / compilation path |
+|-------------|--------|----------------------------------|
+| v0.14.0 | `0e32766496beebf6ef43e62d211efd8bf34586e6` | [Policy](https://github.com/juanmicrosoft/calor/blob/0e32766496beebf6ef43e62d211efd8bf34586e6/src/Calor.Compiler/Binding/Scope.cs#L53-L99) / [Compile](https://github.com/juanmicrosoft/calor/blob/0e32766496beebf6ef43e62d211efd8bf34586e6/src/Calor.Compiler/Program.cs#L792-L796) |
+| v0.14.1 | `473cb5e302789ddbcb97deb565bf04bcbb7637c4` | [Policy](https://github.com/juanmicrosoft/calor/blob/473cb5e302789ddbcb97deb565bf04bcbb7637c4/src/Calor.Compiler/Binding/Scope.cs#L53-L99) / [Compile](https://github.com/juanmicrosoft/calor/blob/473cb5e302789ddbcb97deb565bf04bcbb7637c4/src/Calor.Compiler/Program.cs#L792-L796) |
+| v0.14.2 | `1246d8d9fb36ce64999ebd1e0fc513bcd88c7ab5` | [Policy](https://github.com/juanmicrosoft/calor/blob/1246d8d9fb36ce64999ebd1e0fc513bcd88c7ab5/src/Calor.Compiler/Binding/Scope.cs#L53-L99) / [Compile](https://github.com/juanmicrosoft/calor/blob/1246d8d9fb36ce64999ebd1e0fc513bcd88c7ab5/src/Calor.Compiler/Program.cs#L792-L796) |
+
+These are scoped source-history findings, not a claim that every possibly-null
+program compiles or that every published binary has been independently tested.
+[The bounded 0.22 plan (#1082)](https://github.com/juanmicrosoft/calor/issues/1082)
+is planned, not shipped. It targets specified initialization, return, and
+resolved method-input boundaries, not general mutation, member writes,
+constructor inputs, or whole-program non-nullness. The D3/D12/D14 safeguards
+that demote conditional proofs and retain their runtime guards remain in place.
+
 ---
 
 ## 3. Version Declaration
@@ -117,8 +146,8 @@ is the `calor hook` write-time reminder, which suggests `§SEMVER{2.0.0}`.
 **Incompatible by definition.** Changes may include:
 - Evaluation order changes
 - Operator precedence changes
-- Type system changes (2.0.0: non-nullable `string` and the
-  `Calor0272/0273/0274` nullability errors)
+- Type system changes (the 2.0.0 bump changed binder nullability severity,
+  not production CLI routing; see the correction above)
 - Default behavior changes
 - Removed constructs
 
@@ -162,9 +191,10 @@ rather than silently reinterpreted under the newer rules — this is roadmap
 §3.3 decision 1 ("fail-closed; no silent reinterpretation, and no
 dual-semantics mode to maintain"), tracked as
 [#1084](https://github.com/juanmicrosoft/calor/issues/1084) item 1. The
-error message carries the migration pointer: migrate the module and declare
-`§SEMVER{2.0.0}` after reviewing nullability semantics
-(`Calor0272/0273/0274`).
+error message calls for manual review and migration to current semantics before
+declaring `§SEMVER{2.0.0}`. Changing the declaration alone is not a migration.
+There is no legacy `Info` compilation mode, and `Calor0272/0273/0274` are
+binder/editor diagnostics rather than production CLI rejection gates.
 
 ```csharp
 public static VersionCompatibility CheckCompatibility(Version declared)
@@ -191,12 +221,15 @@ Precursor bump for the v0.14 nullability enforcement workstream (task #14).
 Unblocked the S5 severity flip (`Calor0272/0273/0274` Info → Error), gated
 on `SemanticsVersion.Major >= 2`.
 
-Unreleased (next release): the `§SEMVER` directive is now lexed, parsed and
-checked — it did not exist in the lexer before PR #1087 — and files declaring
-`1.x` (or `0.x`) are refused with `Calor0701` and a migration pointer
-(#1084 item 1); no committed `.calr` in this repository declared a version,
-so the change broke nothing in-tree. Automated 1.x → 2.0.0 migration is
-demand-driven (#1084 item 3).
+The v0.14.0 promise of legacy `Info` severity was a future plan, not a shipped
+mode. The severity helper's lower-major branch does not make older modules
+compatible. The `§SEMVER` parser and fail-closed refusal arrived in
+[#1087](https://github.com/juanmicrosoft/calor/commit/4ac335d5932383bcf6590b34fdc2ad73ff96afbb):
+that commit is not an ancestor of v0.14.0-v0.14.2, but is an ancestor of
+[v0.15.0 (`3bb2601e`)](https://github.com/juanmicrosoft/calor/tree/3bb2601e3ff83597ddf2f27dcc334b6399ab97ea).
+Modules declaring `1.x` or `0.x` are now refused with `Calor0701`, not compiled
+in an `Info` mode. No automated semantics migration tool is supplied by this
+correction; broader migration work remains tracked in #1084.
 
 ### Version 1.0.0
 
@@ -266,10 +299,12 @@ When upgrading a module to a new semantics version:
 3. **Update §SEMVER** declaration
 4. **Test edge cases** related to changed semantics
 
-For 1.x → 2.0.0 specifically: review every `string`-typed binding, return,
-and argument for possibly-null values (`Calor0272/0273/0274` become errors),
-then change the declaration to `§SEMVER{2.0.0}`. Until you do, the 2.x
-compiler refuses the file with `Calor0701`.
+For 1.x → 2.0.0, manually review the current semantics and the module's
+null-handling choices before changing the declaration to `§SEMVER{2.0.0}`.
+Test the migrated code; a version edit or successful compile alone does not
+establish null safety. `Calor0272/0273/0274` can appear in binder/editor
+diagnostics but do not establish production CLI rejection. Other passes may
+reject independently. An older-major declaration still produces `Calor0701`.
 
 ### 8.2 Mixed-Version Projects
 
@@ -366,8 +401,14 @@ Example — refused legacy module:
 
 Expected: `Calor0701` (Error) — "Module declares semantics version 1.0.0,
 but this compiler implements 2.0.0 and refuses files written for an older
-major. ... declare §SEMVER{2.0.0} after reviewing nullability semantics
-(Calor0272/0273/0274). See https://github.com/juanmicrosoft/calor/issues/1084."
+major." The hint continues:
+
+> Manually review and migrate the module to current semantics, then declare
+> §SEMVER{2.0.0}; changing the version alone is not a migration. Legacy Info mode
+> is not supported. Calor0272/0273/0274 are binder/editor diagnostics, not
+> production CLI rejection gates; other passes may still reject the program.
+> See https://github.com/juanmicrosoft/calor/issues/1084 (migration) and
+> https://github.com/juanmicrosoft/calor/issues/1082 (planned nullability enforcement).
 
 ---
 
