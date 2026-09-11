@@ -212,6 +212,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             request_id = gateway.ledger.reserve(gateway.owner, gateway.slot, request)
         except budget.Refusal:
+            gateway.fail("INCOMPLETE_POLICY", "REQUEST_RESERVATION")
             self.reply(402, "PP-W budget scope stopped; collection is incomplete")
             return
         upstream = None

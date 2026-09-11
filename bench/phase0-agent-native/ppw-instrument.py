@@ -580,6 +580,7 @@ def validate_collection_authorization(registration, selected, directory, epoch_i
     authorization = load(proofs["spendAuthorization"])
     require(authorization.get("kind") in {
         "pp-w-rows-spending-authorization", "pp-w-zero-request-recovery-authorization",
+        "pp-w-terminal-semantics-recovery-authorization",
     },
             "structured spending authorization required")
     require(authorization.get("epochId") == epoch_id and authorization.get("stage") == stage,

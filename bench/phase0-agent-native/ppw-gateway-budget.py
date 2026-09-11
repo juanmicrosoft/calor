@@ -824,6 +824,7 @@ class RequestLedger:
 
     @classmethod
     def require_next_slot(cls, db, scope, slot):
+        require(slot not in cls.terminal_slots(db), "duplicate terminal slot")
         planned = decode(scope["binding"]).get("plannedSlots")
         if planned is None:
             return
@@ -899,7 +900,7 @@ class RequestLedger:
             "WIRE_DUPLICATE_HEADER", "WIRE_TRANSFER_ENCODING", "WIRE_CONTENT_ENCODING",
             "WIRE_CONTENT_TYPE", "WIRE_API_VERSION", "WIRE_UNKNOWN_PROVIDER_HEADER",
             "WIRE_BROWSER_ACCESS_VALUE", "WIRE_CONTENT_LENGTH", "WIRE_HOP_CAPABILITY",
-            "WIRE_ENDPOINT", "OBSERVER_OPERATION", "PRICE_REQUEST",
+            "WIRE_ENDPOINT", "OBSERVER_OPERATION", "PRICE_REQUEST", "REQUEST_RESERVATION",
         }, "unregistered nonsecret policy diagnostic")
         with self.transaction() as db:
             row = db.execute("SELECT owner,state FROM scope").fetchone()

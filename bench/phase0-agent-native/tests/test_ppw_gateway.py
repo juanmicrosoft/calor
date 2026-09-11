@@ -641,6 +641,18 @@ class LedgerTests(Fixture):
         ledger.complete(owner)
         self.assertEqual("complete", ledger.snapshot()["state"])
 
+    def test_completion_without_planned_inventory_still_refuses_duplicates(self):
+        ledger, owner = self.ledger()
+        request = budget.admit_request(body())
+        identity = ledger.reserve(owner, "SYNTHETIC-slot", request)
+        ledger.settle(owner, identity, *budget.reconciled_cost(
+            request, budget.MODEL, usage(), "end_turn"))
+        ledger.complete_slot(owner, "SYNTHETIC-slot", self.isolation_evidence(), 0)
+        with self.assertRaisesRegex(budget.Refusal, "duplicate"):
+            ledger.complete_slot(owner, "SYNTHETIC-slot", self.isolation_evidence(), 0)
+        with self.assertRaisesRegex(budget.Refusal, "duplicate"):
+            ledger.reserve(owner, "SYNTHETIC-slot", request)
+
     def test_complete_provider_usage_releases_unused_request_reservation(self):
         ledger, owner = self.ledger()
         request = budget.admit_request(body())
@@ -825,6 +837,37 @@ class TransportTests(Fixture):
             response.read()
             client.close()
         self.assertEqual([], observed)
+        self.assertEqual("INCOMPLETE_BUDGET", ledger.snapshot()["state"])
+
+    def test_reservation_refusal_halts_before_zero_request_invalid_can_advance(self):
+        slot = "task/calor-permissive/1"
+        for failure in ("unregistered-slot", "invalid-price-bound"):
+            with self.subTest(failure=failure):
+                ledger, owner = self.ledger(planned=[slot], terminal=True)
+                factory = Mock(side_effect=AssertionError("refusal must precede upstream"))
+                admission = budget.admit_request(body())
+                if failure == "invalid-price-bound":
+                    admission = dict(admission, maximumMicroUsd=1)
+                selected_slot = "foreign/arm/1" if failure == "unregistered-slot" else slot
+                with patch.object(gateway.budget, "admit_request", return_value=admission), \
+                        gateway.Gateway(ledger, owner, selected_slot, factory) as proxy:
+                    client, response = self.send(proxy, body())
+                    self.assertEqual(402, response.status)
+                    response.read()
+                    client.close()
+                factory.assert_not_called()
+                snapshot = ledger.snapshot()
+                self.assertEqual("INCOMPLETE_POLICY", snapshot["state"])
+                self.assertEqual([], snapshot["requests"])
+                self.assertEqual({
+                    "reason": "INCOMPLETE_POLICY", "diagnostic": "REQUEST_RESERVATION",
+                }, budget.decode(snapshot["events"][-1]["detail"]))
+                directory = self.terminal_attempt(slot)
+                with self.assertRaisesRegex(budget.Refusal, "incomplete scope"):
+                    ledger.complete_invalid_slot(
+                        owner, slot, directory, self.root / "archive",
+                        self.isolation_evidence(), budget.source_identities())
+                shutil.rmtree(self.root / "archive")
 
     def test_provider_error_retains_entire_reservation_and_never_follows_redirects(self):
         for status in (302, 400, 429, 500):

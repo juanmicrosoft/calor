@@ -178,6 +178,8 @@ Missing output, malformed agent results, missing transcripts and non-interrupted
 client crashes with no observed work can qualify. API/price/policy/integrity
 failures, interrupted clients and any unreconciled liability still halt.
 An invalid marker alone cannot advance the schedule.
+Even a pre-reservation ledger refusal durably halts with `REQUEST_RESERVATION`;
+it cannot be relabeled as a zero-request invalid terminal.
 
 Both terminal kinds consume the next registered identity exactly once. Invalid
 attempts are not replaced or counted as zero-valued outcomes. Gateway invalid
@@ -188,6 +190,10 @@ Kernel evidence is written beside the private invocation context, not into
 child-writable output. The collector checks its exact policy/client binding and
 stores it in the protected ledger before publishing the output copy. Scope
 completion requires the entire registered terminal-slot inventory.
+Operational completion does not imply usable data: even a completely invalid
+schedule has zero eligible observations and yields `UNIDENTIFIED`, not a null
+effect or success. No new consecutive-invalid threshold is introduced; that
+would require a separately reviewed change to the frozen stopping rules.
 
 Budget exhaustion produces `INCOMPLETE_BUDGET`, not a reduced-N experiment, a
 scientific null or a stage-2 decision. A complete schedule is still required for
@@ -323,6 +329,13 @@ engineering step, not an operator action after recovery:
 ```bash
 python3 bench/phase0-agent-native/ppw-gateway-register-terminal.py --write
 ```
+
+During pre-merge review, `--write --refresh-unexecuted-proposal` explicitly
+regenerates only the current #1434 proposal after source/evidence corrections.
+It requires the exact original stopped-ledger bytes, unchanged failed archive,
+no target epoch, and unchanged prior proposal documents. It cannot refresh after
+recovery, reset accounting, or overwrite the immutable #1433 predecessors.
+Changed proposal bytes still require final independent review and green CI.
 
 The required evidence uses kind
 `pp-w-engineering-no-forward-native-probe`, has `success: true`,

@@ -4,6 +4,8 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -85,6 +87,30 @@ class TerminalRegistrationTests(unittest.TestCase):
                              side_effect=AssertionError("must refuse before predecessor or ledger reads")):
             with self.assertRaisesRegex(ValueError, "missing root-supplied fresh wire evidence"):
                 terminal_generator.build_documents()
+
+    def test_proposal_refresh_is_explicit_and_refuses_an_existing_target(self):
+        with self.assertRaises(SystemExit):
+            terminal_generator.main(["--refresh-unexecuted-proposal"])
+        with tempfile.TemporaryDirectory(prefix="SYNTHETIC-terminal-generator-", dir=BENCH / "tests") as raw:
+            root = Path(raw)
+            manifest = root / "analysis.json"
+            manifest.write_text(json.dumps({
+                "recoveryStatus": "terminal-semantics-registered",
+                "collectionAuthorized": False,
+                "supersedes": {
+                    "path": analysis.PRE_TERMINAL_MANIFEST,
+                    "sha256": terminal_generator.PRIOR["analysis"][1],
+                },
+            }))
+            (root / "epochs" / terminal_generator.EPOCH).mkdir(parents=True)
+            before = manifest.read_bytes()
+            with patch.object(terminal_generator, "BENCH", root), \
+                    patch.object(terminal_generator, "OUTPUTS", {"analysis": manifest}), \
+                    patch.object(terminal_generator, "module", return_value=SimpleNamespace(
+                        PRE_TERMINAL_MANIFEST=analysis.PRE_TERMINAL_MANIFEST)):
+                with self.assertRaisesRegex(ValueError, "target epoch already exists"):
+                    terminal_generator.write_documents({}, legacy_generator, refresh_unexecuted=True)
+            self.assertEqual(before, manifest.read_bytes())
 
     def test_1432_native_proofs_are_stale_for_changed_terminal_sources(self):
         old_startup = json.loads(
@@ -172,6 +198,27 @@ class TerminalRegistrationTests(unittest.TestCase):
             "ppw-budget/epic1254-pilot.sqlite3",
             authorization["ledgerBinding"]["relativePath"],
         )
+
+    def test_canonical_terminal_authority_passes_actual_collector_admission(self):
+        instrument = load_module("terminal_collector_admission_test", "ppw-instrument.py")
+        registration = gateway.resolve_collection_profile(gateway.RECOVERY_PROFILE)
+        selected = registration["stages"]["pilot"]
+        authority = instrument.validate_collection_authorization(
+            registration, selected, gateway.ROOT, selected["epochId"], "pilot", True)
+        self.assertEqual("pp-w-terminal-semantics-recovery-authorization", authority["kind"])
+        self.assertEqual(1000, authority["spendingCeilingUsd"])
+        with self.assertRaisesRegex(ValueError, "paid collection requires"):
+            instrument.validate_collection_authorization(
+                registration, selected, gateway.ROOT, selected["epochId"], "pilot", False)
+
+    def test_isolation_expectations_remain_identical_across_lifecycle_consumers(self):
+        budget = load_module("terminal_budget_isolation_test", "ppw-gateway-budget.py")
+        recovery = load_module("terminal_recovery_isolation_test", "ppw-gateway-recovery.py")
+        client = load_module("terminal_client_isolation_test", "ppw-gateway-client.py")
+        self.assertEqual(client.ISOLATION, budget.ISOLATION_KIND)
+        self.assertEqual(client.ISOLATION, recovery.ISOLATION_KIND)
+        self.assertEqual(client.PROBE_EXPECTATIONS, budget.ISOLATION_PROBE)
+        self.assertEqual(client.PROBE_EXPECTATIONS, recovery.ISOLATION_PROBE)
 
 
 if __name__ == "__main__":

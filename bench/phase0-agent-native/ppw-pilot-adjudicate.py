@@ -86,6 +86,7 @@ TERMINAL_BASE_ARTIFACTS = (
     PRE_TERMINAL_MANIFEST,
     "ppw-gateway-register-terminal.py",
     "tests/test_ppw_gateway_terminal_registration.py",
+    "tests/test_ppw_terminal_producer.py",
 )
 TERMINAL_ARTIFACTS = (
     TERMINAL_PROFILE,

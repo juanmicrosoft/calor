@@ -1009,15 +1009,15 @@
       "gateway-tools/bash-env.sh": "0f2080f2de7a80651f5f6fc4e3ee25885c860bf4c4284eadc66459fa94325ef9",
       "gateway-tools/python3": "a3b38507fbbd0b298bb71fe0f9d02dd67a434d3d2e9fd36fa54a8103fd57a91d",
       "harness-capture.py": "dc8a75ffb0abe9dd5a8997a06121ee1e2610cffa13cbc436e06524dc0c061c3d",
-      "ppw-budget-gateway.py": "41df66257f35176d3f6c4c8eff5c43d0fe598e68ef61dd6fc04677e67c38aae1",
-      "ppw-gateway-budget.py": "e13d67eb7405a7b33c0444b2102bcf7b65777fb57536f47503cdc665a810cbab",
+      "ppw-budget-gateway.py": "a7904a71e98c6838ad393eed0c642936753426229fa3509c3a92672b42002de8",
+      "ppw-gateway-budget.py": "e210373664b8d0f4b505028e1531bc2284f2443bbaf80ad0f64e8f6b14cd5e6e",
       "ppw-gateway-client.py": "5af515fd0e305bebfd497f0d33ff17825ecb2e8f2317cae327cbc05c45a92586",
       "ppw-gateway-recover.py": "139931cec7d533360b9d6b069574552ccc9c7fc1fb5a5dd360d593ec40f7b0d8",
       "ppw-gateway-recovery.py": "6a4fe07577707319a1040dc4a8555fa3274be715d547738b1b9ff8aa36b577c7",
       "ppw-gateway-register-recovery.py": "8fce2dbbc60f0343f9febfc25d4a4a1bf83158b370ef340e533059e19f5ffd01",
-      "ppw-gateway-register-terminal.py": "b00a228ff870724102ad059f3036e430fecb64f34155fe026debf81afb19c140",
+      "ppw-gateway-register-terminal.py": "947e6db250f89ac20031d80bd79418e1693980eaf8cb361de251d7f7bb1a9833",
       "ppw-gateway-registration.py": "6db123f323560263829d2b5cabec2bce6016006ccb053b7003548ee1202e3e89",
-      "ppw-instrument.py": "2b1f578d1f45f6aea409a2587eb91a989b4c5c198573459e10a2549868f8de86",
+      "ppw-instrument.py": "ec88afcad85d4cb3f3e0c27b65d0a8c8793ae3b20584a18b56bd6afa1148705d",
       "ppw-pins.schema.json": "c737775a952adaeb066042c6d9d204bbfeae929c0bf6d5aa2e628422baf7e5f6",
       "ppw-registration.py": "ab9e86f08723827e5be56dee160cfa6db63849863df33b0428bdc782dfc20e0e",
       "ppw-run-observer.py": "7555bac129bc6f36c902ff112bca3064f7ad26ffb3de40c571ff06a58879a02e",
@@ -1038,11 +1038,11 @@
       "token-usage.sh": "de59280fa8d212397d6154ecc87b2776a73d2dfd6de03515b739119bfb819117"
     },
     "priceSha256": "582a71eeb22ad7604759d7441f719615def5a04a5ca2cecece8a2c9e1f45eb3e",
-    "protocolSha256": "7f8b6b536aab1735f6d475a38ce1fec299635c3c6482579fa5473ea94594eff3",
+    "protocolSha256": "5773c9ed60f37fabc2ff405ed352c3b8ac3285f8bc829e76746f02d27f58287b",
     "stage": "pilot"
   },
   "terminalSemanticsAmendment": {
     "path": "gateway-instrument-amendment-1434.json",
-    "sha256": "ea5357634852bf4dde02d878e580dfda4754a37d8ce0277fb3acdbb07b7269fe"
+    "sha256": "5696d88e8edf9f3fc782c25c625ed426f1bfd9ad10a144fb797899b762c76508"
   }
 }

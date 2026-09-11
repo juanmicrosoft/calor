@@ -23,12 +23,12 @@
   "preservedAttemptedSlots": [
     "C-001-quota-adapter/calor-permissive/1"
   ],
-  "proofSha256": "67f555db0edb2e07d8c6871633e0a86ed5ab1881c8061a5ef595222a84c360d4",
+  "proofSha256": "b5424f4233b56291ac91b7b0b1757f7ef4259f4b4bf2a7a00e08fbf61161be68",
   "protectedRootPathSha256": "c3c5870845dd0b8cf9bde50e2f239f5789b97139ddb95de185856c4f82ab63ca",
-  "recoveryRegistrationSha256": "570a077ce48cdeeec7b14265942274ec6729fd454c51145f38b2ff7fecdbeb78",
+  "recoveryRegistrationSha256": "756ab420af2c8e9e9038ccfa68568d0223e0895575cd0bef3f02639b82c5a3e7",
   "remainingSlotCount": 443,
   "requestCount": 0,
   "schemaVersion": 1,
-  "targetBindingSha256": "1fff7586798767e5acf3d0174a52f2fa6fd71415f8124c11ae45059ff6a3d08e",
+  "targetBindingSha256": "5bf0f7f145e919d7af84172ebeae43d6646e779003db172f8fd041cb3adc68d5",
   "targetEpochId": "w-rows-pilot-gateway-002"
 }

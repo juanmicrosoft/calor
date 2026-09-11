@@ -296,6 +296,8 @@ def build_documents():
     legacy = module("ppw-gateway-register-recovery.py")
     require(WIRE.is_file(), "missing root-supplied fresh wire evidence: " + str(WIRE))
     require(STARTUP.is_file(), "missing root-supplied fresh native startup evidence: " + str(STARTUP))
+    require(not (BENCH / "epochs" / EPOCH).exists(),
+            "the prospective target epoch already exists; registration cannot be refreshed")
     wire = json.loads(WIRE.read_text(encoding="utf-8"))
     legacy.validate_wire_evidence(wire)
     startup = json.loads(STARTUP.read_text(encoding="utf-8"))
@@ -531,19 +533,29 @@ def build_documents():
     return documents
 
 
-def write_documents(documents, legacy):
+def write_documents(documents, legacy, refresh_unexecuted=False):
     adjudication = module("ppw-pilot-adjudicate.py")
-    current = adjudication.validate_analysis_registration()
-    require(current.get("recoveryStatus") == "pending-reviewed-terminal-evidence"
+    current = json.loads(OUTPUTS["analysis"].read_text(encoding="utf-8")) \
+        if refresh_unexecuted else adjudication.validate_analysis_registration()
+    required_status = "terminal-semantics-registered" if refresh_unexecuted \
+        else "pending-reviewed-terminal-evidence"
+    require(current.get("recoveryStatus") == required_status
+            and current.get("collectionAuthorized") is False
             and current.get("supersedes") == {
                 "path": adjudication.PRE_TERMINAL_MANIFEST,
                 "sha256": PRIOR["analysis"][1],
-            }, "active analysis registration is not the exact pending #1434 manifest")
+            }, "active analysis registration is not the expected #1434 proposal")
+    require(not (BENCH / "epochs" / EPOCH).exists(),
+            "the prospective target epoch already exists; registration cannot be refreshed")
     for path, value in documents.items():
         if path == OUTPUTS["analysis"]:
             continue
         encoded = legacy.encoded(value)
-        require(not path.exists() or path.read_bytes() == encoded,
+        registered_proposal = (
+            refresh_unexecuted and path.is_file()
+            and hashlib.sha256(path.read_bytes()).hexdigest()
+            == current.get("artifacts", {}).get(path.relative_to(BENCH).as_posix()))
+        require(not path.exists() or path.read_bytes() == encoded or registered_proposal,
                 "refusing to overwrite a different terminal registration: " + path.name)
     for path, value in documents.items():
         path.write_bytes(legacy.encoded(value))
@@ -555,7 +567,12 @@ def main(argv=None):
                         help="write only the new #1434 registration files and active manifest")
     parser.add_argument("--contract", action="store_true",
                         help="print the fixed input/output contract without reading operational state")
+    parser.add_argument("--refresh-unexecuted-proposal", action="store_true",
+                        help="explicit pre-review refresh; requires the original stopped ledger "
+                             "and no prospective target epoch")
     args = parser.parse_args(argv)
+    if args.refresh_unexecuted_proposal and (not args.write or args.contract):
+        parser.error("--refresh-unexecuted-proposal requires --write without --contract")
     if args.contract:
         print(json.dumps(
             {"inputs": INPUT_CONTRACT, "outputs": OUTPUT_SCHEMA},
@@ -575,7 +592,7 @@ def main(argv=None):
                 },
             }, indent=2, sort_keys=True))
             return 0
-        write_documents(documents, legacy)
+        write_documents(documents, legacy, args.refresh_unexecuted_proposal)
         print(json.dumps({
             "written": [str(path) for path in documents],
             "operationalStateChanged": False,

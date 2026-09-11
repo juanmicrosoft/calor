@@ -1,5 +1,5 @@
 {
-  "authorizationSha256": "570a077ce48cdeeec7b14265942274ec6729fd454c51145f38b2ff7fecdbeb78",
+  "authorizationSha256": "756ab420af2c8e9e9038ccfa68568d0223e0895575cd0bef3f02639b82c5a3e7",
   "budgetExhaustion": "INCOMPLETE_BUDGET; preserve all slots, no adjudication or replacement",
   "ceilingUsd": 1000,
   "clientControl": {
@@ -202,7 +202,7 @@
   "ordering": "run ordinal, frozen task list, A then B",
   "perRunBudgetUsd": null,
   "plannedInvocations": 444,
-  "protocolSha256": "7f8b6b536aab1735f6d475a38ce1fec299635c3c6482579fa5473ea94594eff3",
+  "protocolSha256": "5773c9ed60f37fabc2ff405ed352c3b8ac3285f8bc829e76746f02d27f58287b",
   "recovery": {
     "accountedTerminalSlots": 444,
     "continuationInvocations": 443,
@@ -215,7 +215,7 @@
     "sameExperimentCeiling": true,
     "terminalSemanticsAmendment": {
       "path": "gateway-instrument-amendment-1434.json",
-      "sha256": "ea5357634852bf4dde02d878e580dfda4754a37d8ce0277fb3acdbb07b7269fe"
+      "sha256": "5696d88e8edf9f3fc782c25c625ed426f1bfd9ad10a144fb797899b762c76508"
     },
     "validCompletionPopulation": "registered-terminal-valid-attempts-only"
   },
