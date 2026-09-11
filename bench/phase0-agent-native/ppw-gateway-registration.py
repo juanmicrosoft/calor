@@ -359,6 +359,9 @@ def archive_proof(epoch, proof, expected):
 
 
 def validate_archive(epoch, pins, selected):
+    if "dispositionAuthorization" in selected:
+        require("dispositionEvidence" in selected,
+                "disposition archive cannot omit its activation evidence chain")
     if "dispositionEvidence" in selected:
         return helper("ppw-gateway-disposition-registration.py").validate_archive(
             epoch, pins, selected)

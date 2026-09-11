@@ -69,29 +69,56 @@ class DispositionRegistrationTests(unittest.TestCase):
 
     def test_review_validator_never_fabricates_or_loosens_approval(self):
         review = self.root / "review.json"
-        base = {
-            "schemaVersion": 1,
-            "kind": "pp-w-retained-liability-review",
-            "reviewType": "financial-bound",
-            "verdict": "APPROVE",
-            "authorizationReference": registration.GRANT,
-            "historicalLedgerSha256": core.EXPECTED_OLD_LEDGER_SHA256,
-            "permanentLiabilityMicroUsd": core.PERMANENTLY_RETAINED_MICRO_USD,
-            "ceilingMicroUsd": core.PILOT_CEILING_MICRO_USD,
-            "reference": "SYNTHETIC://independent-review",
-            "scope": "SYNTHETIC exact bound",
-            "findings": ["SYNTHETIC reviewed"],
-        }
+        base = registration.review_index("historical-bound", {
+            key: registration.HISTORY["historical-bound"][key] for key in ("path", "sha256")
+        }, "APPROVE")
         for field, value in (
                 ("verdict", "HOLD"),
-                ("authorizationReference", "SYNTHETIC://other-grant"),
-                ("permanentLiabilityMicroUsd", 0),
-                ("findings", [])):
+                ("subject", "source-implementation"),
+                ("artifact", {"path": "SYNTHETIC.json", "sha256": "0" * 64}),
+                ("findings", ["SYNTHETIC invented scope"])):
             changed = dict(base)
             changed[field] = value
             save(review, changed)
             with self.subTest(field=field), self.assertRaises(ValueError):
-                registration._review(review, "financial-bound")
+                registration._review(review, "historical-bound")
+
+    def test_genuine_history_is_resolved_verbatim_without_promotion(self):
+        for path, subject in ((registration.BOUND_REVIEW, "historical-bound"),
+                              (registration.METHODS_REVIEW, "methods-draft-description")):
+            index = registration._review(path, subject)
+            raw_path = registration.ROOT / index["artifact"]["path"]
+            before = raw_path.read_bytes()
+            raw = registration._history_review(registration.ROOT, index, subject)
+            self.assertEqual(registration.HISTORY[subject]["sha256"], digest(raw_path))
+            self.assertFalse(raw["reviewer"]["humanReview"])
+            self.assertFalse(raw["verdictScope"]["newImplementationApproved"])
+            self.assertFalse(raw["verdictScope"]["operatorExecutionApproved"])
+            self.assertEqual(before, raw_path.read_bytes())
+        self.assertEqual("REQUEST_CHANGES", registration.load(registration.METHODS_REVIEW)["verdict"])
+
+    def test_current_planning_keeps_old_forecast_and_uses_4860_headroom(self):
+        plan = registration.load(registration.OLD_PLAN)
+        original = copy.deepcopy(plan)
+        plan["forecastUse"] = "immutable-historical-reference-not-current-headroom"
+        plan["currentBudgetPlanning"] = registration.planning_projection(plan)
+        registration.validate_planning(plan)
+        self.assertEqual(original["forecast"], plan["forecast"])
+        self.assertEqual(original["forecastRegistration"], plan["forecastRegistration"])
+        projection = plan["currentBudgetPlanning"]
+        self.assertEqual((948_960_000, 951_400_000, 48_600_000, 1_041_440_000, 1_176_490_000), (
+            projection["initialAvailableMicroUsd"], projection["conservativeCombinedMicroUsd"],
+            projection["planningHeadroomMicroUsd"],
+            projection["pricingSensitivityPlusEncumbranceMicroUsd"],
+            projection["trafficStressPlusEncumbranceMicroUsd"]))
+        for field, value in (("planningHeadroomMicroUsd", 99_640_000),
+                             ("unchangedHistoricalReferenceMicroUsd", 898_000_000),
+                             ("newApprovedForecast", True), ("completionGuarantee", True)):
+            with self.subTest(field=field):
+                changed = copy.deepcopy(plan)
+                changed["currentBudgetPlanning"][field] = value
+                with self.assertRaisesRegex(ValueError, "USD 48.60"):
+                    registration.validate_planning(changed)
 
     def historical_archive(self, epoch_id, source_name, source_sha, second=False):
         archive = self.root / epoch_id
@@ -102,11 +129,11 @@ class DispositionRegistrationTests(unittest.TestCase):
         )
         run.mkdir(parents=True)
         (run / "result.json").write_text(
-            '{"SYNTHETIC":"opaque historical record"}\n', encoding="utf-8")
+            '{"SYNTHETIC":"historical record","invalid":true,"censored":true}\n', encoding="utf-8")
         (run / "client-invocation.json").write_text(
             '{"SYNTHETIC":"opaque invocation"}\n', encoding="utf-8")
         (run / "invalid.txt").write_text(
-            "SYNTHETIC actual API raw invalid and censored\n"
+            'SYNTHETIC attempt=0 agent_rc=1: agent output matches error marker: "api error"\n'
             if second else "SYNTHETIC historical terminal invalid\n",
             encoding="utf-8")
         if second:
@@ -119,6 +146,7 @@ class DispositionRegistrationTests(unittest.TestCase):
         save(archive / "pins.json", {
             "epochId": epoch_id,
             "stage": "pilot",
+            "harnessCommit": str(int(second) + 1) * 40,
             "harnessArtifacts": {source_name: source_sha},
         })
         inventory = core.archive_inventory(archive)
@@ -142,6 +170,8 @@ class DispositionRegistrationTests(unittest.TestCase):
             "attemptStartSha256":
                 entries[prefix + "/attempt-start.json"] if second else None,
             "sourceHashes": {source_name: source_sha},
+            "sourceEvidenceKind": "archived-files",
+            "sourceCommit": str(int(second) + 1) * 40,
         }
 
     def test_two_historical_wrappers_form_one_portable_444_population(self):
@@ -178,6 +208,8 @@ class DispositionRegistrationTests(unittest.TestCase):
         evidence = {"path": "SYNTHETIC-disposition.json", "sha256": "e" * 64}
         authorization = {
             "kind": core.DISPOSITION_KIND,
+            "oldSnapshot": {"binding": {
+                "harnessArtifacts": analysis.load(failed / "pins.json")["harnessArtifacts"]}},
             "preservedAttempts": [attempt_a, attempt_b],
             "predecessorArchives": [
                 {

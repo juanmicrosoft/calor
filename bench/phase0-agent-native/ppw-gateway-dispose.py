@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inspect or apply the single reviewed #1436 permanent-liability disposition."""
+"""Inspect or apply the single explicitly activated #1436 liability disposition."""
 import argparse
 import importlib.util
 import json
@@ -50,7 +50,8 @@ class SingleOption(argparse.Action):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     commands = parser.add_subparsers(dest="operation", required=True)
-    commands.add_parser("inspect", help="read-only comparison with the approved fixed evidence")
+    commands.add_parser(
+        "inspect", help="read-only comparison; exact final approvals and metadata activation required")
     apply_parser = commands.add_parser("apply", help="apply once; never starts collection")
     apply_parser.add_argument("--confirmed-proof-sha256", required=True, action=SingleOption)
     args = parser.parse_args(argv)

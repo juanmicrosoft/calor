@@ -498,7 +498,9 @@ debit. The historical rows remain `unknown`, with null usage, and original event
 request deduplication, or financial reset is invented. Two native assistant
 events sharing one provider locator do not merge these two local reservations.
 The independent historical bound review does not establish actual charges or
-approve the new implementation.
+approve the new implementation. This amends the predecessor's **all-reconciled
+financial completion/admission rule for exactly these two rows**. It does not
+change the scientific rules.
 
 The distinct `historical-liability-disposition` event 10 binds the grant,
 the exact stopped ledger (`464acefd37b96620aeab69c025cbb11703ca038d91eaa0d3d514af3d3c8a8990`),
@@ -534,6 +536,13 @@ not a provider receipt or a cryptographic signature from an independent reviewer
 
 ### Attempt and analysis lineage
 
+The actual predecessor archives contain source identities in their original pins,
+but no copies of the 25/30 pinned harness files. Their provenance therefore uses
+the explicit `original-pins-only` kind, the unchanged source hashes and original
+Git commits. It does not claim that source files were retrospectively archived.
+The B1 raw reason remains the original `agent output matches error marker:
+"api error"` classifier, not a new diagnosis of the provider's original failure.
+
 Original A1 remains historically accounted invalid. Actual B1 keeps the frozen
 runner's `invalid: true`, `censored: true`, null unavailable grading fields, and
 API-error-marker reason. It is not recoded as a no-journal crash or an ordinary
@@ -545,12 +554,39 @@ identified historical wrappers. It never re-stamps the original records with
 new source, inspection, usage, or lifecycle claims. Portable analysis verifies
 the copies and their hashes without requiring the original physical worktree.
 The old analysis registration is preserved by explicit supersession.
+Proposal generation leaves its active bytes untouched; only explicit prospective
+activation replaces the active wrapper and preserves the original file verbatim.
 
 Only the original suffix beginning `C-002-shipping-quote/calor-permissive/1` may
 run: **442 new identities plus two preserved identities equals 444**, with
 three tasks, two arms, and 74 runs per task/arm. Run ordinal, task order, and A/B
 order remain unchanged. There is no replacement, retry allocation, replenished
 cohort, or reduced-442 forecast invented to claim affordability.
+
+#### Current-budget planning (conditional, not observations)
+
+The original forecast, proposal and independent forecast review remain immutable.
+The plan's `forecast` field remains historical evidence, explicitly marked
+`immutable-historical-reference-not-current-headroom`. Its old $99.64 headroom
+does **not** account for the permanent encumbrance. A separate
+`currentBudgetPlanning` projection conservatively uses the unchanged full-444
+reference for remaining work:
+
+| Conditional planning quantity | USD |
+| --- | ---: |
+| Same experiment cap | 1,000.00 |
+| Permanent unknown encumbrance | 51.04 |
+| Initially available for new requests | 948.96 |
+| Unchanged full-444 historical reference | 900.36 |
+| Combined planning reference | 951.40 |
+| Current planning headroom | **48.60** |
+| Pricing sensitivity plus encumbrance | 1,041.44 |
+| Traffic stress plus encumbrance | 1,176.49 |
+
+These are integer-microdollar calculations, not usage observations, a newly
+approved forecast, a new task mean, or a completion guarantee. They assume neither
+cheaper redesigned tasks nor a cheaper 442-slot forecast. Admission and portable
+archive analysis both reject missing or changed projections.
 
 Terminal accounting is not model success or scientific eligibility. Progress
 separates accounted, valid-completed, invalid-terminal, request-bearing, and
@@ -604,13 +640,82 @@ these exact response shapes, the retained executable, real native Bash build/tes
 tools, and unchanged containment. Synthetic readiness is not an empirical trial,
 a paid availability probe, or a complete historical provider receipt.
 
-Prospective registration generation requires genuine independent financial-bound
-and registered-methods records plus fresh source-bound wire and native evidence:
+#### Proposal → independent exact-subject reviews → metadata activation
+
+`--contract` describes every input, phase, output and hash subject without reading
+the ledger or archives. Proposal generation requires fresh source-bound wire and
+native evidence plus typed indexes resolving **unchanged raw review artifacts**:
+
+- `gateway-liability-bound-review-1436.json` points to the genuine historical
+  audit at SHA-256 `a387cc8f7376eb48295f63ac87d3c38d85985ac2fc565c96c9982a4f86f4d1a5`.
+  Its `APPROVE` is historical-bound only: no new implementation, human review or
+  operator-execution approval. The missing actual final isolation artifact and
+  trusted-host/provider-contract assumptions remain in that raw audit.
+- `gateway-liability-methods-review-1436.json` points to the genuine draft review
+  at SHA-256 `6d7f03c266ec74f37f4b44aefe5d4ab511774d10e7d0b771169dabc290948c04`.
+  Its verdict remains `REQUEST_CHANGES`; it is description-only history, not
+  final-record, new-financial-implementation or source approval.
+
+Neither history index manufactures final approval. `--write` creates an honest
+**unapproved proposal** for reviewers, not collection authority:
 
 ```bash
 python3 bench/phase0-agent-native/ppw-gateway-register-disposition.py --contract
 python3 bench/phase0-agent-native/ppw-gateway-register-disposition.py --write
 ```
+
+The immutable proposal record set pins authorization, plan, profile, proof,
+prices, inventories, stopped snapshot, evidence, historical lineage, forecast,
+stage/model/source-inspection records and raw review history. It also pins the
+exact source/test/document map. `sourceArtifactsSha256` hashes that map;
+`recordSetSha256` hashes the record-set object excluding its own hash field.
+Canonical encoding is sorted-key JSON with indent 2 and a final newline.
+Raw reviews are always hashed as exact original bytes, never reserialized.
+
+The record set excludes activation, final reviews/indexes and the active analysis
+wrapper, avoiding a hash cycle. The immutable profile names the fixed
+`gateway-disposition-activation-1436.json` basename, never a future hash. Its
+bytes and proposal evidence do not change during activation. Refresh is allowed
+only with `--write --refresh-unexecuted-proposal`, before activation/collection,
+against the exact old ledger, backup and archive inventories. It never rewrites
+the old active analysis or its preserved copy; changed proposal identities
+invalidate any earlier final reviews.
+
+Independent reviewers must produce three raw final reviews with exact subjects:
+`registered-methods-final-records`, `new-financial-implementation`, and
+`source-implementation`. For each, fixed files in `gateway-evidence/` are
+`gateway-<subject>-1436-review.json` and `gateway-<subject>-1436-index.json`.
+The strict raw schema is `pp-w-independent-disposition-final-review`:
+`schemaVersion`, `kind`, `subject`, `verdict` (`APPROVE` or `REQUEST_CHANGES`),
+`reviewer`, `binding`, `scope`, nonempty `findings`, and nonempty `limitations`.
+The contract prints the exact nested fields. The binding names record-set and
+source-map hashes, original ledger, grant, permanent retention, same cap, target
+epoch, null historical actual cost and future-halt policy. The index has exactly
+`schemaVersion`, `kind` (`pp-w-disposition-review-index`), `subject`, `artifact`
+(`path`/byte `sha256`), and verbatim `verdict`. Additional fields, generic scope
+strings, wrong subjects/hashes, description-only approvals and pending verdicts
+cannot satisfy final approval.
+
+Only after those three genuine exact-subject `APPROVE` records:
+
+```bash
+python3 bench/phase0-agent-native/ppw-gateway-register-disposition.py --activate \
+  --confirmed-record-set-sha256 <exact-reviewed-recordSetSha256>
+```
+
+Activation writes **prospective metadata only**. It pins exact final indexes and
+raw reviews, then explicitly supersedes the old analysis registration. It never
+applies the ledger transition, creates an epoch or launches a collector.
+Every live resolver, funding/admission path and canonical operator inspect/apply
+requires this activation. Lower-level financial-core inspection remains available
+to the proposal builder read-only. The collector archives every critical record,
+typed index, raw review, activation and reviewed source file; analysis refuses
+missing archival proofs instead of falling back to canonical physical files.
+
+Content hashes in committed reviews avoid a self-referential final Git commit
+hash. A final-head GitHub review, CI/merge and separate parent/operator decision
+remain external manual gates, explicitly **not machine-attested** by activation.
+No final approval is supplied by this implementation.
 
 The distinct operator interface has no caller-selected ledger or archive:
 

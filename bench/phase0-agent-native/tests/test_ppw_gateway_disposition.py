@@ -67,6 +67,8 @@ class DispositionFixture(unittest.TestCase):
         }
         self.request_ids = ("a" * 48, "b" * 48)
         self.create_archives()
+        self.old_binding["harnessArtifacts"] = json.loads(
+            (self.failed_archive / "pins.json").read_text())["harnessArtifacts"]
         self.create_ledger()
         self.old_backup.write_bytes(b"SYNTHETIC immutable predecessor backup\n")
         self.old_backup.chmod(0o600)
@@ -157,12 +159,15 @@ class DispositionFixture(unittest.TestCase):
                 path = archive / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 content = "SYNTHETIC opaque %s %s\n" % (prefix, name)
+                if name == "rawRecordPath":
+                    content = json.dumps({"synthetic": True, "invalid": True, "censored": True}) + "\n"
                 if prefix == "second" and name == "invalidReasonPath":
-                    content = "SYNTHETIC actual API marker is raw invalid and censored\n"
+                    content = 'SYNTHETIC attempt=0 agent_rc=1: agent output matches error marker: "api error"\n'
                 path.write_bytes(content.encode())
             (archive / "pins.json").write_text(json.dumps({
                 "epochId": "SYNTHETIC-epoch-%03d" % (len(self.attempt_paths) + 1),
                 "stage": "pilot",
+                "harnessCommit": str(len(self.attempt_paths) + 1) * 40,
                 "harnessArtifacts": {
                     Path(paths["sourcePath"]).name: digest(archive / paths["sourcePath"]),
                 },
@@ -193,6 +198,8 @@ class DispositionFixture(unittest.TestCase):
     def attempt(self, index, inventory):
         archive = (self.original_archive, self.failed_archive)[index]
         paths = self.attempt_paths[index]
+        pins = json.loads((archive / "pins.json").read_text())
+        copied = (archive / paths["sourcePath"]).is_file()
         return {
             "slot": self.slots[index],
             "epochId": "SYNTHETIC-epoch-%03d" % (index + 1),
@@ -205,10 +212,14 @@ class DispositionFixture(unittest.TestCase):
             "invalidReasonPath": paths["invalidReasonPath"],
             "invalidReasonSha256": digest(archive / paths["invalidReasonPath"]),
             "attemptStartPath": paths["attemptStartPath"],
-            "attemptStartSha256": digest(archive / paths["attemptStartPath"]),
-            "sourceHashes": {
+            "attemptStartSha256": (
+                digest(archive / paths["attemptStartPath"])
+                if paths["attemptStartPath"] is not None else None),
+            "sourceHashes": ({
                 paths["sourcePath"]: digest(archive / paths["sourcePath"]),
-            },
+            } if copied else pins["harnessArtifacts"]),
+            "sourceEvidenceKind": "archived-files" if copied else "original-pins-only",
+            "sourceCommit": pins["harnessCommit"],
         }
 
     def make_authorization(self):
@@ -353,6 +364,35 @@ class DispositionFixture(unittest.TestCase):
 
 
 class DispositionCoreTests(DispositionFixture):
+    def test_original_pins_only_do_not_fabricate_archived_source_or_first_attempt_start(self):
+        for index, archive in enumerate((self.original_archive, self.failed_archive)):
+            paths = self.attempt_paths[index]
+            (archive / paths["sourcePath"]).unlink()
+            pins = json.loads((archive / "pins.json").read_text())
+            pins["harnessArtifacts"] = dict(self.old_binding["harnessArtifacts"])
+            (archive / "pins.json").write_text(json.dumps(pins) + "\n")
+            if index == 0:
+                (archive / paths["attemptStartPath"]).unlink()
+                paths["attemptStartPath"] = None
+        self.authorization = self.make_authorization()
+        self.authorization_sha256 = hashlib.sha256(
+            disposition.authorization_bytes(self.authorization)).hexdigest()
+        self.target_binding["authorizationSha256"] = self.authorization_sha256
+        for index, archive in enumerate((self.original_archive, self.failed_archive)):
+            attempt = self.authorization["preservedAttempts"][index]
+            self.assertEqual("original-pins-only", attempt["sourceEvidenceKind"])
+            self.assertFalse(any(item["path"].startswith("sources/")
+                                 for item in disposition.archive_inventory(archive)["files"]))
+            altered = dict(attempt, sourceCommit="9" * 40)
+            with self.assertRaisesRegex(ValueError, "pins do not identify"):
+                disposition._validate_archive_pins(
+                    archive, disposition.archive_inventory(archive),
+                    self.authorization["predecessorArchives"][index], altered)
+        self.assertIsNone(self.authorization["preservedAttempts"][0]["attemptStartPath"])
+        self.apply(self.inspect())
+        with self.connect() as db:
+            self.assertEqual(10, db.execute("SELECT COUNT(*) FROM events").fetchone()[0])
+
     def test_contract_inspect_apply_preserves_old_bytes_and_appends_only_event_10(self):
         before = self.ledger_path.read_bytes()
         old_snapshot = copy.deepcopy(self.authorization["oldSnapshot"])

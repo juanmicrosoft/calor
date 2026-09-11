@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Resolve, validate, and prospectively register the fixed #1436 disposition."""
 import copy
+from datetime import datetime, timezone
 import hashlib
 import importlib.util
 import json
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 
 
 BENCH = Path(__file__).resolve().parent
@@ -31,6 +33,32 @@ WIRE = ROOT / "gateway-evidence/gateway-native-wire-1436-evidence.json"
 STARTUP = ROOT / "gateway-evidence/gateway-native-startup-1436-evidence.json"
 BOUND_REVIEW = ROOT / "gateway-evidence/gateway-liability-bound-review-1436.json"
 METHODS_REVIEW = ROOT / "gateway-evidence/gateway-liability-methods-review-1436.json"
+RECORD_SET = ROOT / "gateway-disposition-record-set-1436.json"
+ACTIVATION = ROOT / "gateway-disposition-activation-1436.json"
+HISTORY = {
+    "historical-bound": {
+        "path": "gateway-evidence/historical-bound-review-1436.json",
+        "sha256": "a387cc8f7376eb48295f63ac87d3c38d85985ac2fc565c96c9982a4f86f4d1a5",
+        "kind": "pp-w-historical-two-request-financial-bound-ai-review",
+        "verdict": "APPROVE",
+    },
+    "methods-draft-description": {
+        "path": "gateway-evidence/methods-description-review-1436-d1396511.json",
+        "sha256": "6d7f03c266ec74f37f4b44aefe5d4ab511774d10e7d0b771169dabc290948c04",
+        "kind": "pp-w-independent-methods-registration-draft-review",
+        "verdict": "REQUEST_CHANGES",
+    },
+}
+FINAL_SUBJECTS = (
+    "registered-methods-final-records", "new-financial-implementation",
+    "source-implementation",
+)
+EXTRA_REVIEW_SOURCES = (
+    "README-ppw-gateway.md", "ppw-pilot-adjudicate.py",
+    "tests/test_ppw_gateway_disposition.py",
+    "tests/test_ppw_gateway_disposition_registration.py",
+    "tests/test_ppw_gateway_disposition_collection.py",
+)
 REQUIRED_EVIDENCE_MODE = "registered-operator"
 EXPECTED_OLD_PROFILE_SHA256 = (
     "3869f2d2b21743f917fe010fbf9b6fdac0f9b51eab55a11d4162a4a1d0a766ee"
@@ -58,12 +86,7 @@ OUTPUTS = {
     "failedInventory": ROOT / "gateway-disposition-failed-inventory-1436.json",
     "stoppedSnapshot": ROOT / "gateway-disposition-stopped-snapshot-1436.json",
     "preAnalysis": PRE_DISPOSITION_ANALYSIS,
-    "analysis": OLD_ANALYSIS,
-}
-REVIEW_FIELDS = {
-    "schemaVersion", "kind", "reviewType", "verdict", "authorizationReference",
-    "historicalLedgerSha256", "permanentLiabilityMicroUsd", "ceilingMicroUsd",
-    "reference", "scope", "findings",
+    "recordSet": RECORD_SET,
 }
 
 
@@ -81,13 +104,16 @@ def require(condition, message):
 
 
 def load(path):
+    path = Path(path)
+    require(not any(item.is_symlink() for item in (path, *path.parents)),
+            "metadata must not resolve through symbolic links")
     def unique(pairs):
         value = {}
         for key, item in pairs:
             require(key not in value, "duplicate JSON key: " + key)
             value[key] = item
         return value
-    return json.loads(Path(path).read_text(encoding="utf-8"), object_pairs_hook=unique)
+    return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique)
 
 
 def encoded(value):
@@ -132,6 +158,81 @@ def registration_contract():
             BOUND_REVIEW.relative_to(ROOT).as_posix(),
             METHODS_REVIEW.relative_to(ROOT).as_posix(),
         ],
+        "phases": {
+            "proposal": {
+                "command": "ppw-gateway-register-disposition.py --write",
+                "inputs": "immutable predecessor metadata, stopped ledger/backup/archive read-only "
+                          "proof, typed historical/draft indexes and unchanged raw reviews, "
+                          "fresh source-bound wire/startup evidence",
+                "finalApprovalRequired": False,
+                "activeAnalysisChanged": False,
+                "refresh": "--write --refresh-unexecuted-proposal; exact old state only, "
+                           "no activation or target epoch; preserved analysis bytes never rewritten",
+            },
+            "review": {
+                "subjects": list(FINAL_SUBJECTS),
+                "paths": {subject: dict(zip(("index", "raw"), final_review_paths(subject)))
+                          for subject in FINAL_SUBJECTS},
+                "rawSchema": {
+                    "schemaVersion": 1, "kind": "pp-w-independent-disposition-final-review",
+                    "subject": "one exact required subject",
+                    "verdict": "APPROVE or REQUEST_CHANGES",
+                    "reviewer": {"name": "nonblank real reviewer identity", "kind": "AI or human",
+                                 "independentOfImplementation": True,
+                                 "humanReview": "true iff kind is human", "operator": False},
+                    "binding": {
+                        "recordSetSha256": "proposal recordSetSha256",
+                        "sourceArtifactsSha256": "proposal sourceArtifactsSha256",
+                        "historicalLedgerSha256": "exact authorization oldLedgerSha256",
+                        "authorizationReference": GRANT,
+                        "permanentLiabilityMicroUsd": 51_040_000,
+                        "ceilingMicroUsd": 1_000_000_000, "targetEpochId": EPOCH,
+                        "actualHistoricalCost": None, "futureUnknownPolicy": "halt",
+                    },
+                    "scope": final_scope("<exact subject>"),
+                    "findings": ["nonempty reviewer findings; no fabricated approvals"],
+                    "limitations": ["nonempty scope/assumption/missing-evidence limitations"],
+                },
+                "indexSchema": review_index(
+                    "<exact subject>", {"path": "<fixed raw path>", "sha256": "<raw byte hash>"},
+                    "<verbatim raw verdict>"),
+                "additionalFieldsAllowed": False,
+                "historicalOnlyAndDraftReviewsAreFinalApprovals": False,
+            },
+            "activation": {
+                "command": "ppw-gateway-register-disposition.py --activate "
+                           "--confirmed-record-set-sha256 <recordSetSha256>",
+                "inputs": "unchanged proposal and source map plus all three genuine final APPROVE "
+                          "raw artifacts and typed indexes; unchanged pre-disposition analysis",
+                "record": ACTIVATION.name,
+                "metadataOnly": True,
+                "supersession": "preserve original analysis bytes; publish activation then "
+                               "atomically replace active analysis wrapper",
+            },
+            "operation": {
+                "commands": ["ppw-gateway-dispose.py inspect",
+                             "ppw-gateway-dispose.py apply --confirmed-proof-sha256 <proofSha256>",
+                             "ppw-instrument.py run --registration <activated profile> "
+                             "--epoch-id w-rows-pilot-gateway-003 --stage pilot --confirm-paid-epoch"],
+                "allRequireExactActivation": True,
+                "externalManualGate": "final-head GitHub source review, CI, merge and separate "
+                                      "parent/operator readiness/action; not machine-attested here",
+            },
+        },
+        "hashSubjects": {
+            "encoding": "UTF-8 JSON sorted keys, indent=2, trailing newline (authorization_bytes)",
+            "rawReviews": "SHA-256 of exact immutable reviewer bytes; never reserialized",
+            "sourceArtifactsSha256": "SHA-256 of encoded exact path-to-source-byte-hash map",
+            "recordSetSha256": "SHA-256 of encoded record-set object excluding recordSetSha256",
+            "criticalRecords": "authorization, plan, profile, proof, price, inventories, stopped "
+                               "snapshot, evidence, immutable lineage, forecast artifacts, "
+                               "stage/model/source-inspection records and history indexes/raw reviews",
+            "excludedToAvoidCycles": "record set itself, activation, final-review indexes/raw files, "
+                                    "active analysis wrapper and final Git commit identity",
+            "profile": "names fixed activation basename only, never its future hash",
+            "portableAnalysis": "archive-local critical records, activation, every index AND raw "
+                                "review, and source map files required; no canonical file fallback",
+        },
         "requiredReadinessEvidence": [
             WIRE.relative_to(ROOT).as_posix(),
             STARTUP.relative_to(ROOT).as_posix(),
@@ -144,27 +245,275 @@ def registration_contract():
     }
 
 
-def _review_value(value, review_type):
-    core = module("ppw-gateway-disposition.py")
-    require(set(value) == REVIEW_FIELDS
-            and value["schemaVersion"] == 1
-            and value["kind"] == "pp-w-retained-liability-review"
-            and value["reviewType"] == review_type
-            and value["verdict"] == "APPROVE"
-            and value["authorizationReference"] == GRANT
-            and value["historicalLedgerSha256"] == core.EXPECTED_OLD_LEDGER_SHA256
-            and value["permanentLiabilityMicroUsd"] == core.PERMANENTLY_RETAINED_MICRO_USD
-            and value["ceilingMicroUsd"] == core.PILOT_CEILING_MICRO_USD
-            and isinstance(value["reference"], str) and value["reference"]
-            and isinstance(value["scope"], str) and value["scope"]
-            and isinstance(value["findings"], list) and value["findings"],
-            "independent review does not approve the exact registered bound/method")
+def review_index(subject, artifact, verdict):
+    """An index is a typed pointer, never a replacement for the reviewer's bytes."""
+    return {
+        "schemaVersion": 1, "kind": "pp-w-disposition-review-index",
+        "subject": subject, "artifact": artifact, "verdict": verdict,
+    }
+
+
+def _indexed_review(root, index, subject):
+    require(isinstance(index, dict) and set(index) == {
+        "schemaVersion", "kind", "subject", "artifact", "verdict",
+    } and type(index["schemaVersion"]) is int and index["schemaVersion"] == 1
+        and index["kind"] == "pp-w-disposition-review-index"
+        and index["subject"] == subject
+        and index["verdict"] in ("APPROVE", "REQUEST_CHANGES"),
+        "review index has a wrong subject or schema")
+    raw = _archive_proof(root, index["artifact"], subject + " raw review")
+    require(raw.get("verdict") == index["verdict"], "review index broadens the raw verdict")
+    return raw
+
+
+def _history_review(root, index, subject):
+    expected = HISTORY[subject]
+    require(index == review_index(subject, {
+        "path": expected["path"], "sha256": expected["sha256"],
+    }, expected["verdict"]), "historical review index must resolve the unchanged pinned audit")
+    raw = _indexed_review(root, index, subject)
+    require(raw.get("kind") == expected["kind"]
+            and raw.get("reviewer", {}).get("humanReview") is False
+            and raw.get("verdictScope", {}).get("newImplementationApproved") is False
+            and raw["verdictScope"].get("operatorExecutionApproved") is False,
+            "historical/draft review scope was broadened")
+    if subject == "historical-bound":
+        require(raw["verdictScope"].get("historicalBoundOnly") is True,
+                "historical approval is historical-bound ONLY")
+    else:
+        require(raw["verdictScope"].get("generatedOperationalRecordsApproved") is False,
+                "draft description cannot approve final records")
+    return raw
+
+
+def _review(path, subject):
+    require(Path(path).is_file(), "missing independent review index: " + str(path))
+    value = load(path)
+    _history_review(ROOT, value, subject)
     return value
 
 
-def _review(path, review_type):
-    require(path.is_file(), "missing independent review: " + str(path))
-    return _review_value(load(path), review_type)
+def planning_projection(plan):
+    """Integer-only illustration using the unchanged full-444 historical reference."""
+    spending = module("ppw-spending.py")
+    forecast = plan["forecast"]
+    ceiling = spending.units(plan["ceilingUsd"])
+    reference_cost = spending.units(forecast["estimatedFullPilotUsd"])
+    sensitivities = [spending.units(item["fullPilotUsd"]) for item in forecast["sensitivities"]]
+    permanent = 51_040_000
+    require(ceiling == 1_000_000_000
+            and forecast["plannedInvocations"] == 444
+            and reference_cost == 900_360_000
+            and sensitivities == [990_400_000, 1_125_450_000],
+            "current planning requires the unchanged full-444 historical reference")
+    return {
+        "schemaVersion": 1, "kind": "pp-w-conditional-current-budget-planning",
+        "historicalForecast": {
+            "plan": {"path": OLD_PLAN.name, "sha256": EXPECTED_OLD_PLAN_SHA256},
+            "registration": copy.deepcopy(plan["forecastRegistration"]),
+            "plannedInvocations": 444,
+        },
+        "ceilingMicroUsd": ceiling,
+        "permanentEncumbranceMicroUsd": permanent,
+        "initialAvailableMicroUsd": ceiling - permanent,
+        "unchangedHistoricalReferenceMicroUsd": reference_cost,
+        "conservativeCombinedMicroUsd": reference_cost + permanent,
+        "planningHeadroomMicroUsd": ceiling - permanent - reference_cost,
+        "pricingSensitivityPlusEncumbranceMicroUsd": sensitivities[0] + permanent,
+        "trafficStressPlusEncumbranceMicroUsd": sensitivities[1] + permanent,
+        "conditionalIllustration": True, "observations": False,
+        "completionGuarantee": False, "newTaskMeanEstablished": False,
+        "newApprovedForecast": False, "remaining442CheapnessAssumed": False,
+        "actualHistoricalCost": None,
+    }
+
+
+def validate_planning(plan):
+    require(plan.get("forecastUse") == "immutable-historical-reference-not-current-headroom"
+            and encoded(plan.get("currentBudgetPlanning")) == encoded(planning_projection(plan)),
+            "current-budget planning projection differs (headroom must be USD 48.60)")
+
+
+def final_review_paths(subject):
+    require(subject in FINAL_SUBJECTS, "unknown final review subject")
+    base = "gateway-evidence/gateway-" + subject + "-1436"
+    return base + "-index.json", base + "-review.json"
+
+
+def final_binding(record_set, authorization):
+    return {
+        "recordSetSha256": record_set["recordSetSha256"],
+        "sourceArtifactsSha256": record_set["sourceArtifactsSha256"],
+        "historicalLedgerSha256": authorization["oldLedgerSha256"],
+        "authorizationReference": GRANT,
+        "permanentLiabilityMicroUsd": 51_040_000, "ceilingMicroUsd": 1_000_000_000,
+        "targetEpochId": EPOCH, "actualHistoricalCost": None,
+        "futureUnknownPolicy": "halt",
+    }
+
+
+def final_scope(subject):
+    return {
+        "approvedSubject": subject, "historicalBoundOnly": False,
+        "descriptionOnly": False, "operatorExecutionApproved": False,
+        "additionalFundsApproved": False, "scientificChangesApproved": False,
+        "stage2Approved": False, "releaseApproved": False,
+    }
+
+
+def validate_final_review(raw, subject, record_set, authorization, approved=True):
+    require(isinstance(raw, dict) and set(raw) == {
+        "schemaVersion", "kind", "subject", "verdict", "reviewer",
+        "binding", "scope", "findings", "limitations",
+    } and type(raw["schemaVersion"]) is int and raw["schemaVersion"] == 1
+        and raw["kind"] == "pp-w-independent-disposition-final-review"
+        and raw["subject"] == subject and subject in FINAL_SUBJECTS
+        and raw["verdict"] in ("APPROVE", "REQUEST_CHANGES")
+        and encoded(raw["binding"]) == encoded(final_binding(record_set, authorization))
+        and encoded(raw["scope"]) == encoded(final_scope(subject)),
+        "final review has wrong subject, record set, source map, or financial scope")
+    reviewer = raw["reviewer"]
+    require(isinstance(reviewer, dict) and set(reviewer) == {
+        "name", "kind", "independentOfImplementation", "humanReview", "operator",
+    } and isinstance(reviewer["name"], str) and reviewer["name"].strip()
+        and reviewer["kind"] in ("AI", "human")
+        and reviewer["independentOfImplementation"] is True
+        and reviewer["humanReview"] is (reviewer["kind"] == "human")
+        and reviewer["operator"] is False
+        and isinstance(raw["findings"], list) and raw["findings"]
+        and all(isinstance(item, str) and item.strip() for item in raw["findings"])
+        and isinstance(raw["limitations"], list) and raw["limitations"]
+        and all(isinstance(item, str) and item.strip() for item in raw["limitations"]),
+        "final review must retain independent reviewer identity, findings and limitations")
+    require(not approved or raw["verdict"] == "APPROVE",
+            "REQUEST_CHANGES is not final approval")
+
+
+def _critical_references(evidence, documents):
+    refs = [value for value in evidence.values()
+            if isinstance(value, dict) and set(value) == {"path", "sha256"}]
+    refs += list(evidence["historicalLineage"].values())
+    profile = documents["executionProfile"]
+    refs += [profile[name] for name in (
+        "stageRegistration", "modelRegistration", "sourceInspectionEvidence")]
+    refs += list(documents["spendingPlan"]["forecastRegistration"]["artifacts"].values())
+    for name in ("financialBoundReview", "methodsReview"):
+        refs.append(documents[name]["artifact"])
+    refs.append({"path": EVIDENCE.name, "sha256": sha_bytes(encoded(evidence))})
+    result = {}
+    for ref in refs:
+        require(ref["path"] not in result or result[ref["path"]] == ref["sha256"],
+                "critical record aliases disagree")
+        result[ref["path"]] = ref["sha256"]
+    return result
+
+
+def make_record_set(evidence, documents):
+    sources = dict(documents["authorization"]["targetHarnessArtifacts"])
+    sources.update({name: digest(BENCH / name) for name in EXTRA_REVIEW_SOURCES})
+    body = {
+        "schemaVersion": 1, "kind": "pp-w-immutable-disposition-proposal",
+        "targetEpochId": EPOCH,
+        "criticalRecords": _critical_references(evidence, documents),
+        "sourceArtifacts": sources, "sourceArtifactsSha256": sha_bytes(encoded(sources)),
+    }
+    return dict(body, recordSetSha256=sha_bytes(encoded(body)))
+
+
+def _validate_record_set(root, evidence, documents, record_set, live):
+    require(isinstance(record_set, dict) and set(record_set) == {
+        "schemaVersion", "kind", "targetEpochId", "criticalRecords",
+        "sourceArtifacts", "sourceArtifactsSha256", "recordSetSha256",
+    }, "proposal record set schema differs")
+    body = {key: value for key, value in record_set.items() if key != "recordSetSha256"}
+    sources = record_set["sourceArtifacts"]
+    require(type(record_set["schemaVersion"]) is int and record_set["schemaVersion"] == 1
+            and record_set["kind"] == "pp-w-immutable-disposition-proposal"
+            and record_set["targetEpochId"] == EPOCH
+            and record_set["recordSetSha256"] == sha_bytes(encoded(body))
+            and record_set["sourceArtifactsSha256"] == sha_bytes(encoded(sources))
+            and record_set["criticalRecords"] == _critical_references(evidence, documents)
+            and set(sources) == set(documents["authorization"]["targetHarnessArtifacts"])
+            | set(EXTRA_REVIEW_SOURCES)
+            and all(sources[name] == sha for name, sha
+                    in documents["authorization"]["targetHarnessArtifacts"].items()),
+            "proposal record set or source map identity differs")
+    spending = module("ppw-spending.py")
+    for path, sha in record_set["criticalRecords"].items():
+        spending.pinned_file(root, {"path": path, "sha256": sha},
+                             "critical proposal record " + path)
+    source_root = BENCH if live else Path(root) / "admission/disposition-sources"
+    for path, sha in sources.items():
+        spending.pinned_file(source_root, {"path": path, "sha256": sha}, "reviewed source")
+    validate_planning(documents["spendingPlan"])
+    _history_review(root, documents["financialBoundReview"], "historical-bound")
+    _history_review(root, documents["methodsReview"], "methods-draft-description")
+
+
+def _activation_value(root, record_set, authorization):
+    reviews = {}
+    for subject in FINAL_SUBJECTS:
+        index_path, raw_path = final_review_paths(subject)
+        index = load(Path(root) / index_path)
+        raw = _indexed_review(root, index, subject)
+        require(index["artifact"]["path"] == raw_path, "final review raw path differs")
+        validate_final_review(raw, subject, record_set, authorization)
+        reviews[subject] = {"path": index_path, "sha256": digest(Path(root) / index_path)}
+    return {
+        "schemaVersion": 1, "kind": "pp-w-prospective-disposition-activation",
+        "targetEpochId": EPOCH,
+        "recordSet": {"path": RECORD_SET.name, "sha256": digest(Path(root) / RECORD_SET.name)},
+        "recordSetSha256": record_set["recordSetSha256"],
+        "sourceArtifactsSha256": record_set["sourceArtifactsSha256"],
+        "finalReviews": reviews,
+        "externalManualGate": "final-head-github-review-and-separate-parent-operation",
+        "externalManualGateMachineVerified": False,
+        "ledgerApplied": False, "collectionStarted": False,
+    }
+
+
+def validate_activation(root, evidence, documents, live=True, active=True):
+    root = Path(root)
+    profile = documents["executionProfile"]
+    require(profile.get("activationRecord") == ACTIVATION.name,
+            "profile must name the fixed prospective activation record")
+    record_set = load(root / RECORD_SET.name)
+    _validate_record_set(root, evidence, documents, record_set, live)
+    activation = load(root / ACTIVATION.name)
+    timestamp = activation.get("activatedAt")
+    require(isinstance(timestamp, str)
+            and datetime.fromisoformat(timestamp).utcoffset() is not None,
+            "activation timestamp must have an explicit timezone")
+    require(encoded(activation) == encoded(dict(
+        _activation_value(root, record_set, documents["authorization"]), activatedAt=timestamp)),
+        "activation does not bind exact final reviews and proposal/source identities")
+    if live and active:
+        manifest = load(OLD_ANALYSIS)
+        require(manifest.get("recoveryStatus") == "historical-liability-registered"
+                and manifest.get("collectionAuthorized") is False
+                and manifest.get("supersedes") == {
+                    "path": PRE_DISPOSITION_ANALYSIS.relative_to(BENCH).as_posix(),
+                    "sha256": EXPECTED_OLD_ANALYSIS_SHA256}
+                and manifest.get("gatewayExecutionProfile") == {
+                    "path": PROFILE.relative_to(BENCH).as_posix(), "sha256": digest(PROFILE)}
+                and manifest.get("gatewayDispositionEvidence") == {
+                    "path": EVIDENCE.relative_to(BENCH).as_posix(), "sha256": digest(EVIDENCE)}
+                and manifest.get("gatewayDispositionActivation") == {
+                    "path": ACTIVATION.relative_to(BENCH).as_posix(), "sha256": digest(ACTIVATION)}
+                and digest(PRE_DISPOSITION_ANALYSIS) == EXPECTED_OLD_ANALYSIS_SHA256,
+                "prospective activation and active analysis registration differ")
+    return record_set, activation
+
+
+def archival_references(evidence, documents):
+    record_set, activation = validate_activation(ROOT, evidence, documents)
+    refs = [{"path": path, "sha256": sha}
+            for path, sha in record_set["criticalRecords"].items()]
+    refs += [activation["recordSet"],
+             {"path": ACTIVATION.name, "sha256": digest(ACTIVATION)}]
+    for index_ref in activation["finalReviews"].values():
+        refs += [index_ref, load(ROOT / index_ref["path"])["artifact"]]
+    return refs, record_set["sourceArtifacts"]
 
 
 def _validate_wire(value, price_reference):
@@ -216,8 +565,9 @@ def _source_map(archive, inventory, pins):
         item["path"]: item["sha256"] for item in inventory["files"]
         if item["sha256"] in pinned
     }
-    require(values, "predecessor archive contains no source pinned by its profile")
-    return values
+    if values:
+        return "archived-files", values
+    return "original-pins-only", dict(pins["harnessArtifacts"])
 
 
 def _registered_method_from_profile(profile, spending):
@@ -240,6 +590,7 @@ def _registered_method_from_profile(profile, spending):
 
 def _attempt(core, archive, inventory, archive_record, index):
     pins = load(archive / "pins.json")
+    source_kind, source_hashes = _source_map(archive, inventory, pins)
     run_root = (
         "runs/C-001-quota-adapter/calor-permissive/run-1"
         if index == 0 else "runs/C-001-quota-adapter/calor-strict/run-1"
@@ -273,13 +624,15 @@ def _attempt(core, archive, inventory, archive_record, index):
             None if paths["attemptStartPath"] is None
             else entries[paths["attemptStartPath"]]
         ),
-        "sourceHashes": _source_map(archive, inventory, pins),
+        "sourceHashes": source_hashes,
+        "sourceEvidenceKind": source_kind,
+        "sourceCommit": pins["harnessCommit"],
     }
 
 
-def _load_evidence(path=EVIDENCE):
+def _load_evidence(path=None, require_activation=True):
     spending = module("ppw-spending.py")
-    path = Path(path)
+    path = EVIDENCE if path is None else Path(path)
     require(path.resolve() == EVIDENCE.resolve(),
             "disposition evidence must be the canonical #1436 registration")
     value = load(path)
@@ -325,6 +678,8 @@ def _load_evidence(path=EVIDENCE):
             "sha256": EXPECTED_OLD_ANALYSIS_SHA256,
         },
     }, "pre-disposition profile/plan/authorization/analysis lineage differs")
+    if require_activation:
+        validate_activation(ROOT, value, documents)
     return value, documents
 
 
@@ -377,6 +732,7 @@ def resolve_collection_profile(path):
 
 def canonical_inputs():
     """Return fixed read-only/apply inputs only after the active registration validates."""
+    evidence, documents = _load_evidence()
     adjudication = module("ppw-pilot-adjudicate.py")
     manifest = adjudication.validate_analysis_registration()
     require(manifest.get("recoveryStatus") == "historical-liability-registered"
@@ -384,7 +740,6 @@ def canonical_inputs():
                 "path": EVIDENCE.relative_to(BENCH).as_posix(),
                 "sha256": digest(EVIDENCE),
             }, "the reviewed #1436 disposition registration is not active")
-    evidence, documents = _load_evidence()
     authorization = documents["authorization"]
     spending = module("ppw-spending.py")
     ledger = spending.gateway_ledger_location(
@@ -420,22 +775,16 @@ def build_documents():
     budget = module("ppw-gateway-budget.py")
     core = module("ppw-gateway-disposition.py")
     gateway = module("ppw-gateway-registration.py")
-    active_analysis_sha256 = digest(OLD_ANALYSIS)
-    refreshing = active_analysis_sha256 != EXPECTED_OLD_ANALYSIS_SHA256
-    if refreshing:
-        active = load(OLD_ANALYSIS)
-        require(active.get("recoveryStatus") == "historical-liability-registered"
-                and active.get("collectionAuthorized") is False
-                and not (BENCH / "epochs" / EPOCH).exists()
-                and digest(PRE_DISPOSITION_ANALYSIS) == EXPECTED_OLD_ANALYSIS_SHA256,
-                "only an unexecuted #1436 proposal may be rebuilt")
+    require(digest(OLD_ANALYSIS) == EXPECTED_OLD_ANALYSIS_SHA256
+            and not ACTIVATION.exists() and not ACTIVATION.is_symlink()
+            and not (BENCH / "epochs" / EPOCH).exists(),
+            "proposal generation cannot supersede active analysis or refresh an activation")
     require(digest(OLD_PROFILE) == EXPECTED_OLD_PROFILE_SHA256
             and digest(OLD_PLAN) == EXPECTED_OLD_PLAN_SHA256
-            and digest(OLD_AUTHORIZATION) == EXPECTED_OLD_AUTHORIZATION_SHA256
-            and (not refreshing or PRE_DISPOSITION_ANALYSIS.is_file()),
+            and digest(OLD_AUTHORIZATION) == EXPECTED_OLD_AUTHORIZATION_SHA256,
             "the registered #1434 profile/plan/authorization/analysis lineage changed")
-    bound = _review(BOUND_REVIEW, "financial-bound")
-    methods = _review(METHODS_REVIEW, "registered-methods")
+    bound = _review(BOUND_REVIEW, "historical-bound")
+    methods = _review(METHODS_REVIEW, "methods-draft-description")
     require(WIRE.is_file(), "missing fresh no-forward wire evidence")
     require(STARTUP.is_file(), "missing fresh native startup evidence")
 
@@ -470,7 +819,12 @@ def build_documents():
     require(digest(ledger) == core.EXPECTED_OLD_LEDGER_SHA256
             and digest(old_backup) == core.EXPECTED_OLD_BACKUP_SHA256,
             "canonical ledger or immutable predecessor backup changed")
-    old_snapshot = budget.RequestLedger(ledger).snapshot()
+    # Current-source terminal detection cannot describe a frozen predecessor.
+    # Use the financial core's historical normalization, on an immutable RO connection.
+    with sqlite3.connect(ledger.resolve().as_uri() + "?mode=ro&immutable=1", uri=True) as db:
+        db.row_factory = sqlite3.Row
+        db.execute("PRAGMA query_only=ON")
+        old_snapshot = core._snapshot(*core._database_snapshot(db))
     original_inventory, original_record = _archive_metadata(
         core, ORIGINAL_ARCHIVE, core.ARCHIVE_ROLES[0], core.OLD_EPOCHS[0])
     failed_inventory, failed_record = _archive_metadata(
@@ -483,7 +837,7 @@ def build_documents():
     authorization = {
         "schemaVersion": 1,
         "kind": core.DISPOSITION_KIND,
-        "evidenceMode": "registered-operator",
+        "evidenceMode": REQUIRED_EVIDENCE_MODE,
         "grant": {
             "quote": core.GRANT_QUOTE,
             "authorizedAt": core.GRANT_TIME,
@@ -562,6 +916,8 @@ def build_documents():
         },
     })
     plan["clientControl"]["priceContract"] = price_ref
+    plan["forecastUse"] = "immutable-historical-reference-not-current-headroom"
+    plan["currentBudgetPlanning"] = planning_projection(plan)
     plan_ref = reference(OUTPUTS["plan"], plan)
 
     target_binding = {
@@ -595,6 +951,7 @@ def build_documents():
         "id": "request-reserving-gateway-disposition-1436",
         "epochId": EPOCH,
         "effectiveOn": "independently reviewed activation of the #1436 registration",
+        "activationRecord": ACTIVATION.name,
         "supersedes": {"path": OLD_PROFILE.name, "sha256": EXPECTED_OLD_PROFILE_SHA256},
         "spendAuthorization": authorization_ref,
         "spendingPlan": plan_ref,
@@ -718,13 +1075,12 @@ def build_documents():
             "liveUnknownRequestCountIfComplete": 0,
             "futureUnknownPolicy": "halt",
         },
-        "reviews": {
-            "financialBound": bound,
-            "registeredMethods": methods,
+        "reviewHistoryOnly": {
+            "historicalBound": bound,
+            "draftMethodsDescription": methods,
         },
     }
-    pre_analysis = load(
-        PRE_DISPOSITION_ANALYSIS if refreshing else OLD_ANALYSIS)
+    pre_analysis = load(OLD_ANALYSIS)
     documents = {
         OUTPUTS["authorization"]: authorization,
         OUTPUTS["instrument"]: amendment,
@@ -738,16 +1094,23 @@ def build_documents():
         OUTPUTS["preAnalysis"]: pre_analysis,
         OUTPUTS["evidence"]: evidence,
     }
+    documents[RECORD_SET] = make_record_set(evidence, {
+        **{name: documents[ROOT / evidence[name]["path"]] for name in (
+            "authorization", "executionProfile", "spendingPlan")},
+        "financialBoundReview": bound, "methodsReview": methods,
+    })
+    return documents
+
+
+def _active_analysis(activation):
     adjudication = module("ppw-pilot-adjudicate.py")
-    artifacts = {}
-    for relative in adjudication.ARTIFACTS + adjudication.RECOVERY_ARTIFACTS \
-            + adjudication.TERMINAL_BASE_ARTIFACTS + adjudication.TERMINAL_ARTIFACTS \
-            + adjudication.DISPOSITION_ARTIFACTS:
-        path = BENCH / relative
-        generated = documents.get(path)
-        artifacts[relative] = (
-            sha_bytes(encoded(generated)) if generated is not None else digest(path)
-        )
+    artifacts = {
+        relative: (sha_bytes(encoded(activation)) if BENCH / relative == ACTIVATION
+                   else digest(BENCH / relative))
+        for relative in adjudication.analysis_artifacts("historical-liability-registered")
+    }
+    evidence = load(EVIDENCE)
+    pre_analysis = load(PRE_DISPOSITION_ANALYSIS)
     analysis = copy.deepcopy(pre_analysis)
     analysis.update({
         "artifacts": artifacts,
@@ -768,27 +1131,27 @@ def build_documents():
             "path": adjudication.DISPOSITION_EVIDENCE,
             "sha256": artifacts[adjudication.DISPOSITION_EVIDENCE],
         },
+        "gatewayDispositionActivation": {
+            "path": ACTIVATION.relative_to(BENCH).as_posix(),
+            "sha256": sha_bytes(encoded(activation)),
+        },
         "financialProjection": evidence["financialProjection"],
     })
-    if refreshing:
-        analysis["refreshesUnexecutedProposal"] = {
-            "path": OLD_ANALYSIS.name,
-            "sha256": active_analysis_sha256,
-        }
-    documents[OUTPUTS["analysis"]] = analysis
-    return documents
+    return analysis
 
 
 def document_identities(documents):
     require(isinstance(documents, dict), "documents must be a path/value mapping")
     return {
-        Path(path).relative_to(ROOT).as_posix(): sha_bytes(encoded(value))
+        Path(path).relative_to(ROOT).as_posix(): (
+            EXPECTED_OLD_ANALYSIS_SHA256 if Path(path) == PRE_DISPOSITION_ANALYSIS
+            else sha_bytes(encoded(value)))
         for path, value in sorted(documents.items(), key=lambda item: str(item[0]))
     }
 
 
 def write_documents(documents, refresh_unexecuted=False):
-    """Write only the reviewed prospective registration; never touch operational state."""
+    """Write an unapproved proposal, preserving the active analysis bytes exactly."""
     require(set(map(Path, documents)) == set(OUTPUTS.values()),
             "prospective document set differs")
     target = BENCH / "epochs" / EPOCH
@@ -800,56 +1163,97 @@ def write_documents(documents, refresh_unexecuted=False):
     require(authorization["oldLedgerSha256"] == core.EXPECTED_OLD_LEDGER_SHA256
             and authorization["oldBackupSha256"] == core.EXPECTED_OLD_BACKUP_SHA256,
             "prospective documents do not bind the immutable old state")
+    evidence = documents[OUTPUTS["evidence"]]
+    require(documents[OUTPUTS["recordSet"]] == make_record_set(evidence, {
+        "authorization": authorization, "executionProfile": documents[OUTPUTS["profile"]],
+        "spendingPlan": documents[OUTPUTS["plan"]],
+        "financialBoundReview": load(ROOT / evidence["financialBoundReview"]["path"]),
+        "methodsReview": load(ROOT / evidence["methodsReview"]["path"]),
+    }), "proposed record set must bind the exact documents and sources being written")
+    critical = documents[OUTPUTS["recordSet"]]["criticalRecords"]
+    require(all(critical.get(path.relative_to(ROOT).as_posix()) == sha_bytes(encoded(value))
+                for path, value in documents.items()
+                if path not in (RECORD_SET, PRE_DISPOSITION_ANALYSIS)),
+            "proposed document bytes differ from the critical record hashes")
+    validate_planning(documents[OUTPUTS["plan"]])
     current = OLD_ANALYSIS.read_bytes()
+    require(sha_bytes(current) == EXPECTED_OLD_ANALYSIS_SHA256
+            and not ACTIVATION.exists() and not ACTIVATION.is_symlink(),
+            "active analysis changed or proposal is already activated")
+    spending = module("ppw-spending.py")
+    ledger = spending.gateway_ledger_location(documents[OUTPUTS["plan"]]["ledgerBinding"])
+    require(digest(ledger) == core.EXPECTED_OLD_LEDGER_SHA256
+            and digest(ledger.parent / BACKUP_NAME) == core.EXPECTED_OLD_BACKUP_SHA256
+            and not (ledger.parent / DISPOSITION_BACKUP_NAME).exists()
+            and core.archive_inventory(ORIGINAL_ARCHIVE) == documents[OUTPUTS["originalInventory"]]
+            and core.archive_inventory(FAILED_ARCHIVE) == documents[OUTPUTS["failedInventory"]],
+            "only exact unexecuted old ledger/backup/archive state may be proposed or refreshed")
     if not refresh_unexecuted:
         require(digest(OLD_ANALYSIS) == EXPECTED_OLD_ANALYSIS_SHA256,
                 "active analysis manifest changed before registration")
         for path in OUTPUTS.values():
-            if path != OLD_ANALYSIS:
-                require(not path.exists() and not path.is_symlink(),
-                        "prospective output already exists: " + str(path))
+            require(not path.exists() and not path.is_symlink(),
+                    "prospective output already exists: " + str(path))
     else:
-        active = load(OLD_ANALYSIS)
-        require(active.get("recoveryStatus") == "historical-liability-registered"
-                and active.get("collectionAuthorized") is False
-                and active.get("gatewayDispositionEvidence", {}).get("sha256")
-                == digest(EVIDENCE),
-                "only the current unexecuted #1436 proposal may be refreshed")
-        require(documents[OLD_ANALYSIS].get("refreshesUnexecutedProposal") == {
-            "path": OLD_ANALYSIS.name,
-            "sha256": sha_bytes(current),
-        }, "refreshed proposal does not bind the previous active manifest")
         require(digest(PRE_DISPOSITION_ANALYSIS) == EXPECTED_OLD_ANALYSIS_SHA256,
                 "preserved pre-disposition manifest changed")
         for path in OUTPUTS.values():
-            require(path == OLD_ANALYSIS or path.is_file(),
+            require(path.is_file() and not path.is_symlink(),
                     "refresh cannot introduce a missing reviewed output")
     staging = []
     try:
         for path, value in documents.items():
-            if path == OLD_ANALYSIS:
+            if path == PRE_DISPOSITION_ANALYSIS and refresh_unexecuted:
                 continue
             stage = path.with_name(path.name + ".unexecuted-1436-new")
             require(not stage.exists(), "stale registration staging file: " + str(stage))
-            stage.write_bytes(encoded(value))
+            stage.write_bytes(current if path == PRE_DISPOSITION_ANALYSIS else encoded(value))
             staging.append((stage, path))
-        active_stage = OLD_ANALYSIS.with_name(
-            OLD_ANALYSIS.name + ".unexecuted-1436-new")
-        require(not active_stage.exists(), "stale active-manifest staging file")
-        active_stage.write_bytes(encoded(documents[OLD_ANALYSIS]))
-        staging.append((active_stage, OLD_ANALYSIS))
         for stage, path in staging:
             if refresh_unexecuted:
                 os.replace(stage, path)
             else:
-                require(not path.exists() or path == OLD_ANALYSIS,
+                require(not path.exists(),
                         "prospective output appeared during write: " + str(path))
                 os.replace(stage, path)
         require(PRE_DISPOSITION_ANALYSIS.read_bytes() == current,
                 "pre-disposition manifest bytes were not preserved")
+        require(OLD_ANALYSIS.read_bytes() == current, "proposal changed active analysis")
     finally:
         for stage, _ in staging:
             stage.unlink(missing_ok=True)
+
+
+def activate(confirmed_record_set_sha256):
+    """Prospective metadata only. Never inspect/apply a ledger or start collection."""
+    require(digest(OLD_ANALYSIS) == EXPECTED_OLD_ANALYSIS_SHA256
+            and digest(PRE_DISPOSITION_ANALYSIS) == EXPECTED_OLD_ANALYSIS_SHA256
+            and not ACTIVATION.exists() and not ACTIVATION.is_symlink()
+            and not (BENCH / "epochs" / EPOCH).exists(),
+            "activation requires the unchanged old analysis and an unexecuted proposal")
+    evidence, documents = _load_evidence(require_activation=False)
+    record_set = load(RECORD_SET)
+    _validate_record_set(ROOT, evidence, documents, record_set, live=True)
+    require(confirmed_record_set_sha256 == record_set["recordSetSha256"],
+            "confirmation must name the exact proposed record set SHA-256")
+    activation = dict(
+        _activation_value(ROOT, record_set, documents["authorization"]),
+        activatedAt=datetime.now(timezone.utc).isoformat())
+    analysis = _active_analysis(activation)
+    stage = OLD_ANALYSIS.with_name(OLD_ANALYSIS.name + ".activation-1436-new")
+    try:
+        with stage.open("xb") as stream:
+            stream.write(encoded(analysis))
+        # Publish activation first; a crash before the wrapper swap is fail-closed.
+        with ACTIVATION.open("xb") as stream:
+            stream.write(encoded(activation))
+        require(digest(OLD_ANALYSIS) == EXPECTED_OLD_ANALYSIS_SHA256,
+                "active analysis changed during activation")
+        os.replace(stage, OLD_ANALYSIS)
+        validate_activation(ROOT, evidence, documents)
+    finally:
+        stage.unlink(missing_ok=True)
+    return activation
 
 
 def _archive_proof(epoch, proof, name):
@@ -904,6 +1308,8 @@ def _wrapper(epoch, pins, authorization, evidence_reference, index, inventory):
                 "pinsPath": authorization["predecessorArchives"][index]["pinsPath"],
                 "pinsSha256": authorization["predecessorArchives"][index]["pinsSha256"],
                 "sourceHashes": attempt["sourceHashes"],
+                "sourceEvidenceKind": attempt["sourceEvidenceKind"],
+                "sourceCommit": attempt["sourceCommit"],
             }
             and historical.get("wrapperSourceHashes") == {
                 name: pins["harnessArtifacts"][name]
@@ -919,10 +1325,11 @@ def _wrapper(epoch, pins, authorization, evidence_reference, index, inventory):
             require(entries.get(relative) == attempt[hash_name]
                     and digest(epoch / copied_root / relative) == attempt[hash_name],
                     "copied historical attempt artifact differs")
-    for relative, expected in attempt["sourceHashes"].items():
-        require(entries.get(relative) == expected
-                and digest(epoch / copied_root / relative) == expected,
-                "copied historical source differs")
+    core = module("ppw-gateway-disposition.py")
+    core._validate_archive_pins(
+        epoch / copied_root, inventory, authorization["predecessorArchives"][index], attempt,
+        authorization["oldSnapshot"]["binding"]["harnessArtifacts"] if index == 1 else None)
+    core._validate_attempt_files(epoch / copied_root, inventory, attempt)
     require((directory / "invalid.txt").is_file()
             and "historical" in (directory / "invalid.txt").read_text().lower(),
             "historical wrapper lacks an explicit invalid reason")
@@ -973,8 +1380,13 @@ def validate_archive(epoch, pins, selected):
             "portable disposition authority chain differs")
     target_binding = evidence["targetBinding"]["binding"]
     core.validate_authorization(authorization)
-    _review_value(bound_review, "financial-bound")
-    _review_value(methods_review, "registered-methods")
+    require(authorization["evidenceMode"] == REQUIRED_EVIDENCE_MODE,
+            "portable archive does not have the registered disposition authority")
+    validate_activation(epoch, evidence, {
+        "authorization": authorization, "executionProfile": profile,
+        "spendingPlan": plan, "financialBoundReview": bound_review,
+        "methodsReview": methods_review,
+    }, live=False, active=False)
     require(target_binding["plannedSlots"] == authorization["oldSnapshot"]["binding"]["plannedSlots"]
             and pins["lifecycle"] == "collected"
             and not (epoch / "collection-outcome.json").exists()

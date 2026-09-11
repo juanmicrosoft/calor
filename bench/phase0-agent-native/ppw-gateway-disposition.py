@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import sqlite3
 import stat
 import subprocess
@@ -66,7 +67,7 @@ ATTEMPT_FIELDS = {
     "slot", "epochId", "classification", "archiveRole", "rawRecordPath",
     "rawRecordSha256", "clientInvocationPath", "clientInvocationSha256",
     "invalidReasonPath", "invalidReasonSha256", "attemptStartPath",
-    "attemptStartSha256", "sourceHashes",
+    "attemptStartSha256", "sourceHashes", "sourceEvidenceKind", "sourceCommit",
 }
 ATTEMPT_CLASSIFICATIONS = (
     "HISTORICAL_TERMINAL_INVALID",
@@ -357,11 +358,18 @@ def validate_authorization(value):
             _relative_path(attempt["attemptStartPath"], "preserved attempt attemptStartPath")
             _sha256(attempt["attemptStartSha256"], "preserved attempt attemptStartSha256")
         sources = attempt["sourceHashes"]
+        _require(attempt["sourceEvidenceKind"] in ("archived-files", "original-pins-only")
+                 and isinstance(attempt["sourceCommit"], str)
+                 and re.fullmatch(r"[0-9a-f]{40}", attempt["sourceCommit"]),
+                 "preserved source provenance kind or commit differs")
         _require(isinstance(sources, dict) and sources
                  and all(_relative_path(path, "preserved source path") and _valid_sha(digest)
                          for path, digest in sources.items()),
                  "preserved attempt source hashes differ")
     binding, request_ids = _validate_old_snapshot(value["oldSnapshot"], attempts, mode)
+    if attempts[1]["sourceEvidenceKind"] == "original-pins-only":
+        _require(attempts[1]["sourceHashes"] == binding["harnessArtifacts"],
+                 "epoch 002 declared source differs from its immutable financial binding")
     _require(value["targetEpochId"] != binding["epochId"],
              "target epoch must differ from the old scope")
     artifacts = value["targetHarnessArtifacts"]
@@ -621,18 +629,22 @@ def _validate_attempt_files(root, inventory, attempt):
         current, _ = _hash_regular_file(root / relative, "preserved attempt " + relative)
         _require(current == expected, "preserved attempt artifact changed after inventory")
         identities[path_name] = expected
-    for relative, expected in attempt["sourceHashes"].items():
-        entry = _archive_entry(inventory, relative)
-        _require(entry is not None and entry["sha256"] == expected,
-                 "preserved source changed: " + relative)
+    if attempt["sourceEvidenceKind"] == "archived-files":
+        for relative, expected in attempt["sourceHashes"].items():
+            entry = _archive_entry(inventory, relative)
+            _require(entry is not None and entry["sha256"] == expected,
+                     "preserved source changed: " + relative)
+    record = _decode((root / attempt["rawRecordPath"]).read_bytes(), "historical raw result")
+    _require(isinstance(record, dict) and record.get("invalid") is True
+             and record.get("censored") is True, "historical raw invalid/censored flags differ")
     reason = (root / attempt["invalidReasonPath"]).read_text(encoding="utf-8").lower()
     if attempt["classification"] == "HISTORICAL_RAW_API_INVALID_CENSORED":
-        _require("actual api" in reason and "invalid" in reason and "censor" in reason,
-                 "epoch 002 invalid reason is not the pinned actual-API raw invalid/censored reason")
+        _require(reason.strip().endswith('agent output matches error marker: "api error"'),
+                 "epoch 002 invalid reason is not its frozen API-error-marker classification")
     return identities
 
 
-def _validate_archive_pins(root, inventory, expected, attempt):
+def _validate_archive_pins(root, inventory, expected, attempt, expected_harness=None):
     entry = _archive_entry(inventory, expected["pinsPath"])
     _require(entry is not None and entry["sha256"] == expected["pinsSha256"],
              "predecessor archive pins changed")
@@ -643,11 +655,17 @@ def _validate_archive_pins(root, inventory, expected, attempt):
     _require(isinstance(pins, dict)
              and pins.get("epochId") == expected["epochId"]
              and pins.get("stage") == "pilot"
+             and pins.get("harnessCommit") == attempt["sourceCommit"]
              and isinstance(pins.get("harnessArtifacts"), dict),
              "predecessor archive pins do not identify the preserved epoch")
     pinned_hashes = set(pins["harnessArtifacts"].values())
     _require(set(attempt["sourceHashes"].values()) <= pinned_hashes,
              "preserved attempt sources are not pinned by the predecessor archive")
+    if attempt["sourceEvidenceKind"] == "original-pins-only":
+        _require(attempt["sourceHashes"] == pins["harnessArtifacts"],
+                 "declared source identities differ from the original pins")
+    _require(expected_harness is None or pins["harnessArtifacts"] == expected_harness,
+             "predecessor source pins differ from the immutable financial binding")
     return expected["pinsSha256"]
 
 
@@ -859,7 +877,8 @@ def _inspect_locked(db, authorization, authorization_sha256, target_binding, led
             "fileCount": inventory["fileCount"],
             "byteCount": inventory["byteCount"],
             "pinsSha256": _validate_archive_pins(
-                path, inventory, expected, authorization["preservedAttempts"][index]),
+                path, inventory, expected, authorization["preservedAttempts"][index],
+                authorization["oldSnapshot"]["binding"]["harnessArtifacts"] if index == 1 else None),
         })
         attempt_evidence.append({
             "slot": authorization["preservedAttempts"][index]["slot"],

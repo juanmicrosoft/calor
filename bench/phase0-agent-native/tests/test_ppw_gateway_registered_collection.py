@@ -1,5 +1,6 @@
 """Actual collector output enters the registered adjudicator; every observation remains SYNTHETIC."""
 import copy
+from contextlib import contextmanager
 import shutil
 from pathlib import Path
 import unittest
@@ -49,6 +50,8 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
             path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(registration_helper.ROOT / proof["path"], path)
         plan = analysis.load(self.inputs / self.selected["spendingPlan"]["path"])
+        _, self.historical_prices = self.spending.pinned_document(
+            registration_helper.ROOT, plan["clientControl"]["priceContract"], "historical prices")
         for proof in self.spending.FORECAST_EVIDENCE.values():
             destination = self.inputs / proof["path"]
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -69,6 +72,17 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
                 )["replacementHarnessArtifacts"]
             ),
         )
+
+    @contextmanager
+    def historical_pricing(self):
+        # Reproduce the preserved profile's pricing, not the prospective #1436 policy.
+        with patch.object(collection_tests.budget, "price_contract", return_value=self.historical_prices):
+            self.admission["priceSha256"] = collection_tests.budget.price_identity()
+            yield
+
+    def collect(self):
+        with self.historical_pricing():
+            return super().collect()
 
     def seed_run(self, task, arm, run):
         directory = self.seed / "runs" / task / arm / ("run-%d" % run)
@@ -101,6 +115,10 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
             self.assertEqual({"numerator": 1, "denominator": 2}, estimate["exactEstimate"])
 
     def prepare_recovered_scope(self):
+        with self.historical_pricing():
+            return self._prepare_recovered_scope()
+
+    def _prepare_recovered_scope(self):
         if not self.recovered_fixture:
             return super().prepare_recovered_scope()
         self.prepare_synthetic_terminal_documents()

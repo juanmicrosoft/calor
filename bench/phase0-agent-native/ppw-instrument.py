@@ -612,6 +612,8 @@ def preserve_disposition_attempts(epoch, pins, admission):
                     "pinsPath": archive["pinsPath"],
                     "pinsSha256": archive["pinsSha256"],
                     "sourceHashes": attempt["sourceHashes"],
+                    "sourceEvidenceKind": attempt["sourceEvidenceKind"],
+                    "sourceCommit": attempt["sourceCommit"],
                 },
                 "wrapperSourceHashes": {
                     name: pins["harnessArtifacts"][name]
@@ -670,6 +672,12 @@ def validate_collection_authorization(registration, selected, directory, epoch_i
         disposition = helper("ppw-gateway-disposition.py")
         disposition.validate_authorization(authorization)
         registration = helper("ppw-gateway-disposition-registration.py")
+        evidence, documents = registration._load_evidence()
+        require(selected.get("dispositionEvidence") == {
+            "path": registration.EVIDENCE.name, "sha256": digest(registration.EVIDENCE)}
+            and selected["spendAuthorization"] == evidence["authorization"]
+            and authorization == documents["authorization"],
+            "collection requires the exact activated disposition authority")
         require(digest(registration.OLD_AUTHORIZATION)
                 == registration.EXPECTED_OLD_AUTHORIZATION_SHA256,
                 "historical funding/null-result authorization changed")
@@ -827,6 +835,18 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                     "failedArchiveInventory", "failedOperationalSnapshot",
                 ))
             if "dispositionEvidence" in selected:
+                disposition_registration = helper("ppw-gateway-disposition-registration.py")
+                evidence, documents = disposition_registration._load_evidence()
+                packet_proofs, reviewed_sources = disposition_registration.archival_references(
+                    evidence, documents)
+                proofs.extend(packet_proofs)
+                for name, sha in reviewed_sources.items():
+                    source = local(BENCH, name)
+                    destination = local(epoch / "admission/disposition-sources", name)
+                    require(digest(source) == sha, "reviewed source changed before archival")
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(source, destination)
+                    require(digest(destination) == sha, "reviewed source changed during archival")
                 proofs.extend(selected[name] for name in (
                     "dispositionEvidence", "dispositionAuthorization", "dispositionProof",
                     "originalArchiveInventory", "failedArchiveInventory", "stoppedSnapshot",

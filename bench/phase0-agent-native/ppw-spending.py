@@ -276,6 +276,10 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
             "spending plan belongs to another stage or epoch")
     require(plan.get("authorizationSha256") == selected["spendAuthorization"]["sha256"],
             "spending plan does not bind the supplied authorization")
+    if (authorization.get("kind") == "pp-w-historical-liability-disposition-v1"
+            or "disposition" in plan):
+        require("dispositionEvidence" in selected,
+                "disposition admission cannot omit prospective activation evidence")
     _, amendment = pinned_document(directory, selected.get("instrumentAmendment", {}),
                                    "instrumentAmendment")
     require(isinstance(amendment, dict) and amendment.get("schemaVersion") == 1
@@ -337,6 +341,12 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
         if "dispositionEvidence" in selected:
             disposition_registration = module("ppw-gateway-disposition-registration.py")
             evidence, documents = disposition_registration._load_evidence()
+            require(selected.get("dispositionEvidence") == {
+                "path": disposition_registration.EVIDENCE.name,
+                "sha256": digest(disposition_registration.EVIDENCE)}
+                and selected.get("spendingPlan") == evidence["spendingPlan"]
+                and plan == documents["spendingPlan"],
+                "admission requires the exact activated disposition and current planning")
             disposition_authorization = documents["authorization"]
             target_binding = {
                 "stage": stage, "epochId": epoch_id, "priceSha256": policy.price_identity(),

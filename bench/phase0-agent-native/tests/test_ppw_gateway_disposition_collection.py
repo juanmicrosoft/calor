@@ -6,8 +6,8 @@ no validator is mocked to approve it and no operational registration is changed.
 """
 from contextlib import ExitStack, contextmanager
 import copy
-import functools
 import hashlib
+import json
 import os
 from pathlib import Path
 import shutil
@@ -25,7 +25,11 @@ BENCH = collection.BENCH
 instrument = collection.instrument
 budget = collection.budget
 gateway = collection.gateway
-save = collection.save
+
+
+def save(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 class SyntheticDispositionFixture:
@@ -50,6 +54,7 @@ class SyntheticDispositionFixture:
         self.core = instrument.helper("ppw-gateway-disposition.py")
         self.registration = instrument.helper("ppw-gateway-disposition-registration.py")
         self.profile = instrument.helper("ppw-gateway-registration.py")
+        self.adjudication = instrument.helper("ppw-pilot-adjudicate.py")
         self.spending = self.collector.spending
         self.epoch_id = "SYNTHETIC-disposition-pilot"
         self.collector.epoch_id = self.epoch_id
@@ -77,7 +82,8 @@ class SyntheticDispositionFixture:
             "priceSha256": self.core.HISTORICAL_PRICE_SHA256,
             "authorizationSha256": "1" * 64, "protocolSha256": "2" * 64,
             "planSha256": "3" * 64,
-            "harnessArtifacts": {"ppw-gateway-budget.py": "4" * 64},
+            "harnessArtifacts": analysis.load(
+                self.failed_archive / "pins.json")["harnessArtifacts"],
             "plannedSlots": self.slots,
         }
         self.create_ledger()
@@ -107,10 +113,12 @@ class SyntheticDispositionFixture:
                 "rawRecordPath": prefix + "result.json",
                 "clientInvocationPath": prefix + "client-invocation.json",
                 "invalidReasonPath": prefix + "invalid.txt",
-                "attemptStartPath": prefix + "attempt-start.json",
+                "attemptStartPath": prefix + "attempt-start.json" if index else None,
                 "sourcePath": "sources/SYNTHETIC-historical-source.py",
             }
-            for relative in paths.values():
+            for name, relative in paths.items():
+                if relative is None or name == "sourcePath":
+                    continue
                 path = archive / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("SYNTHETIC historical evidence\n", encoding="utf-8")
@@ -121,14 +129,14 @@ class SyntheticDispositionFixture:
             })
             save(archive / paths["clientInvocationPath"], {"exitCode": 1})
             (archive / paths["invalidReasonPath"]).write_text(
-                "SYNTHETIC actual API raw invalid and censored\n"
+                'SYNTHETIC attempt=0 agent_rc=1: agent output matches error marker: "api error"\n'
                 if index else "SYNTHETIC accounted launch invalid\n",
                 encoding="utf-8")
             save(archive / "pins.json", {
                 "epochId": archive.name, "stage": "pilot", "dataKind": "synthetic",
+                "harnessCommit": str(index + 1) * 40,
                 "harnessArtifacts": {
-                    "SYNTHETIC-historical-source.py":
-                        instrument.digest(archive / paths["sourcePath"]),
+                    "SYNTHETIC-historical-source.py": "4" * 64,
                 },
             })
             self.attempt_paths.append(paths)
@@ -146,6 +154,14 @@ class SyntheticDispositionFixture:
             str(self.common.resolve()).encode()).hexdigest()
         self.funding_reference = self.reference("historical-funding", funding)
         self.funding_path = self.inputs / self.funding_reference["path"]
+        self.active_analysis = self.inputs / "SYNTHETIC-active-analysis.json"
+        self.pre_analysis = self.inputs / self.registration.PRE_DISPOSITION_ANALYSIS.name
+        self.pre_analysis.write_bytes(self.registration.OLD_ANALYSIS.read_bytes())
+        self.active_analysis.write_bytes(self.pre_analysis.read_bytes())
+        self.record_set_path = self.inputs / self.registration.RECORD_SET.name
+        self.activation_path = self.inputs / self.registration.ACTIVATION.name
+        for path in (self.registration.OLD_PROFILE, self.registration.OLD_PLAN):
+            shutil.copy2(path, self.inputs / path.name)
         auth = self.reference("disposition-authorization", self.authorization)
         self.authorization_sha256 = auth["sha256"]
         amendment = {
@@ -171,6 +187,8 @@ class SyntheticDispositionFixture:
         for name in ("clientExecutable", "shellExecutable", "shellSha256", "runtimeSha256",
                      "testHost", "executionRuntime"):
             control[name] = self.collector.admission[name]
+        plan["forecastUse"] = "immutable-historical-reference-not-current-headroom"
+        plan["currentBudgetPlanning"] = self.registration.planning_projection(plan)
         selected["spendingPlan"] = self.reference("plan", plan)
         self.plan = plan
         self.target_binding = {
@@ -231,6 +249,7 @@ class SyntheticDispositionFixture:
             "fixtureKind": "SYNTHETIC-no-operation-authority",
             "id": "request-reserving-gateway-disposition-1436",
             "stage": "pilot", "epochId": self.epoch_id,
+            "activationRecord": self.activation_path.name,
             "baselineRegistration": {"path": self.profile.BASELINE,
                                      "sha256": self.profile.BASELINE_SHA256},
             "allowedDataKinds": ["synthetic", "empirical"],
@@ -258,19 +277,23 @@ class SyntheticDispositionFixture:
             "transportEvidence": profile["transportEvidence"],
             "nativeStartupEvidence": profile["nativeStartupEvidence"],
         }
-        for name, review_type in (("financialBoundReview", "financial-bound"),
-                                  ("methodsReview", "registered-methods")):
-            documents[name] = self.reference(name, {
-                "schemaVersion": 1, "kind": "pp-w-retained-liability-review",
-                "reviewType": review_type, "verdict": "APPROVE",
-                "authorizationReference": self.authorization["grant"]["reference"],
-                "historicalLedgerSha256": self.authorization["oldLedgerSha256"],
-                "permanentLiabilityMicroUsd": 51_040_000,
-                "ceilingMicroUsd": 1_000_000_000,
-                "reference": "SYNTHETIC://test-owned-review",
-                "scope": "SYNTHETIC fixture only; not an independent review",
-                "findings": ["SYNTHETIC no operation authority"],
-            })
+        self.history = {}
+        for name, subject in (("financialBoundReview", "historical-bound"),
+                              ("methodsReview", "methods-draft-description")):
+            expected = self.registration.HISTORY[subject]
+            raw = {
+                "schemaVersion": 1, "kind": expected["kind"], "verdict": expected["verdict"],
+                "fixtureKind": "SYNTHETIC fictional fixture; no operation authority",
+                "reviewer": {"humanReview": False},
+                "verdictScope": {"historicalBoundOnly": subject == "historical-bound",
+                                 "newImplementationApproved": False,
+                                 "generatedOperationalRecordsApproved": False,
+                                 "operatorExecutionApproved": False},
+            }
+            ref = self.reference(name + "-raw", raw)
+            self.history[subject] = {**ref, "kind": raw["kind"], "verdict": raw["verdict"]}
+            documents[name] = self.reference(
+                name, self.registration.review_index(subject, ref, raw["verdict"]))
         self.evidence_path = self.inputs / "SYNTHETIC-disposition-evidence.json"
         save(self.evidence_path, {
             "schemaVersion": 1,
@@ -278,6 +301,12 @@ class SyntheticDispositionFixture:
             "fixtureKind": "SYNTHETIC-no-operation-authority",
             "issue": self.registration.ISSUE, **documents,
             "targetBinding": {"authorization": auth, "binding": self.target_binding},
+            "financialProjection": {
+                "ceilingMicroUsd": 1_000_000_000, "permanentUnknownMicroUsd": 51_040_000,
+                "actualCost": None, "historicalUnknownRequestCount": 2,
+                "historicalUnknownRequestIds": list(self.request_ids),
+                "liveUnknownRequestCountIfComplete": 0, "futureUnknownPolicy": "halt",
+            },
             "historicalLineage": {
                 "preDispositionProfile": {
                     "path": self.registration.OLD_PROFILE.name,
@@ -294,6 +323,47 @@ class SyntheticDispositionFixture:
             },
         })
         self.documents = documents
+        with self.authority_paths():
+            evidence, values = self.registration._load_evidence(require_activation=False)
+            self.record_set = self.registration.make_record_set(evidence, values)
+            save(self.record_set_path, self.record_set)
+            for subject in self.registration.FINAL_SUBJECTS:
+                index_path, raw_path = self.registration.final_review_paths(subject)
+                raw = {
+                    "schemaVersion": 1, "kind": "pp-w-independent-disposition-final-review",
+                    "subject": subject, "verdict": "APPROVE",
+                    "reviewer": {
+                        "name": "SYNTHETIC fictional fixture; no operation authority",
+                        "kind": "AI", "independentOfImplementation": True,
+                        "humanReview": False, "operator": False,
+                    },
+                    "binding": self.registration.final_binding(self.record_set, self.authorization),
+                    "scope": self.registration.final_scope(subject),
+                    "findings": ["SYNTHETIC fictional fixture only"],
+                    "limitations": ["SYNTHETIC fictional fixture; no real independent approval"],
+                }
+                save(self.inputs / raw_path, raw)
+                save(self.inputs / index_path, self.registration.review_index(
+                    subject, {"path": raw_path, "sha256": instrument.digest(self.inputs / raw_path)},
+                    "APPROVE"))
+            activation = dict(
+                self.registration._activation_value(self.inputs, self.record_set, self.authorization),
+                activatedAt="2026-09-11T00:00:00+00:00")
+            save(self.activation_path, activation)
+            save(self.active_analysis, {
+                "recoveryStatus": "historical-liability-registered", "collectionAuthorized": False,
+                "supersedes": {"path": self.pre_analysis.relative_to(BENCH).as_posix(),
+                               "sha256": instrument.digest(self.pre_analysis)},
+                "gatewayExecutionProfile": {
+                    "path": self.profile_path.relative_to(BENCH).as_posix(),
+                    "sha256": instrument.digest(self.profile_path)},
+                "gatewayDispositionEvidence": {
+                    "path": self.evidence_path.relative_to(BENCH).as_posix(),
+                    "sha256": instrument.digest(self.evidence_path)},
+                "gatewayDispositionActivation": {
+                    "path": self.activation_path.relative_to(BENCH).as_posix(),
+                    "sha256": instrument.digest(self.activation_path)},
+            })
 
     def os_command(self, argv, **kwargs):
         if argv == ["/bin/ps", "-axww", "-o", "pid=,ppid=,pgid=,command="]:
@@ -315,6 +385,7 @@ class SyntheticDispositionFixture:
             "ppw-gateway-client.py": self.collector.isolation,
             "ppw-source-inspection.py": self.collector.inspection,
             "ppw-test-host.py": self.collector.test_host,
+            "ppw-pilot-adjudicate.py": self.adjudication,
             "ppw-run-observer.py": Mock(RunObserver=lambda **values: Mock(
                 model_hidden_roots=tuple(values["hidden_roots"]))),
         }
@@ -328,6 +399,9 @@ class SyntheticDispositionFixture:
             for name, value in (
                     ("ROOT", self.inputs), ("PROFILE", self.profile_path),
                     ("EVIDENCE", self.evidence_path), ("EPOCH", self.epoch_id),
+                    ("RECORD_SET", self.record_set_path), ("ACTIVATION", self.activation_path),
+                    ("OLD_ANALYSIS", self.active_analysis),
+                    ("PRE_DISPOSITION_ANALYSIS", self.pre_analysis),
                     ("ORIGINAL_ARCHIVE", self.original_archive),
                     ("FAILED_ARCHIVE", self.failed_archive)):
                 stack.enter_context(patch.object(self.registration, name, value))
@@ -336,6 +410,7 @@ class SyntheticDispositionFixture:
             if synthetic_trust_roots:
                 stack.enter_context(patch.object(
                     self.registration, "REQUIRED_EVIDENCE_MODE", "SYNTHETIC_TEST_ONLY"))
+                stack.enter_context(patch.object(self.registration, "HISTORY", self.history))
                 stack.enter_context(patch.object(
                     self.registration, "OLD_AUTHORIZATION", self.funding_path))
                 stack.enter_context(patch.object(
@@ -346,10 +421,6 @@ class SyntheticDispositionFixture:
                 stack.enter_context(patch.object(
                     self.core, "EXPECTED_OLD_LEDGER_SHA256",
                     self.authorization["oldLedgerSha256"]))
-            original_load = self.registration._load_evidence
-            stack.enter_context(patch.object(
-                self.registration, "_load_evidence",
-                new=functools.partial(original_load, self.evidence_path)))
             yield
 
     def collect(self):
@@ -447,6 +518,9 @@ class DispositionCollectionTests(unittest.TestCase):
         self.assertEqual(list(fixture.core.ATTEMPT_CLASSIFICATIONS),
                          [wrapper["classification"] for wrapper in wrappers])
         self.assertNotEqual(wrappers[0]["sourceEpochId"], wrappers[1]["sourceEpochId"])
+        self.assertIsNone(wrappers[0]["originalRun"]["attemptStartPath"])
+        self.assertTrue(all(item["originalProfile"]["sourceEvidenceKind"] == "original-pins-only"
+                            for item in wrappers))
         final = analysis.load(collector.epoch / "spending-final.json")
         replay = fixture.core.validate_history(
             final, authorization=fixture.authorization,
@@ -491,6 +565,27 @@ class DispositionCollectionTests(unittest.TestCase):
             projection["requestCount"], projection["historicalUnknownRequestCount"],
             projection["liveUnknownRequestCount"], projection["permanentUnknownMicroUsd"],
             projection["ceilingMicroUsd"], projection["actualCost"]))
+        # Canonical originals still exist. None may substitute for missing portable proofs.
+        archive_only_paths = [
+            moved / fixture.activation_path.name,
+            moved / fixture.record_set_path.name,
+            moved / fixture.documents["spendingPlan"]["path"],
+            moved / "admission/disposition-sources/ppw-gateway-disposition-registration.py",
+        ]
+        archive_only_paths += [
+            moved / name for subject in fixture.registration.FINAL_SUBJECTS
+            for name in fixture.registration.final_review_paths(subject)]
+        archive_only_paths += [
+            moved / entry["path"] for entry in fixture.history.values()]
+        for path in archive_only_paths:
+            before = path.read_bytes()
+            with self.subTest(missing_archive_proof=path.relative_to(moved).as_posix()):
+                path.unlink()
+                try:
+                    with self.assertRaises((ValueError, OSError)):
+                        fixture.adjudicate(moved_root)
+                finally:
+                    path.write_bytes(before)
         # The registered consumer still resolves its active registration in
         # validate_scope; archive portability does not remove that prerequisite.
         shutil.rmtree(fixture.inputs)
@@ -546,27 +641,31 @@ class DispositionCollectionTests(unittest.TestCase):
     def test_synthetic_review_cannot_impersonate_hard_pinned_actual_approval(self):
         fixture = self.fixture
         review = analysis.load(fixture.inputs / fixture.documents["financialBoundReview"]["path"])
-        with self.assertRaisesRegex(ValueError, "independent review does not approve"):
-            fixture.registration._review_value(review, "financial-bound")
+        with self.assertRaisesRegex(ValueError, "unchanged pinned audit"):
+            fixture.registration._history_review(fixture.inputs, review, "historical-bound")
 
     def test_synthetic_trust_roots_still_reject_wrong_review_hashes_and_identities(self):
         fixture = self.fixture
         before = fixture.ledger_path.read_bytes()
         with fixture.authority_paths():
-            for name, kind in (("financialBoundReview", "financial-bound"),
-                               ("methodsReview", "registered-methods")):
-                review = analysis.load(fixture.inputs / fixture.documents[name]["path"])
-                self.assertEqual(review, fixture.registration._review_value(review, kind))
+            for kind in fixture.registration.FINAL_SUBJECTS:
+                _, raw_path = fixture.registration.final_review_paths(kind)
+                review = analysis.load(fixture.inputs / raw_path)
+                fixture.registration.validate_final_review(
+                    review, kind, fixture.record_set, fixture.authorization)
                 for field, value in (
                         ("historicalLedgerSha256", "0" * 64),
                         ("authorizationReference", "SYNTHETIC://wrong-grant"),
-                        ("reviewType", "SYNTHETIC-wrong-review-type"),
+                        ("recordSetSha256", "0" * 64),
+                        ("sourceArtifactsSha256", "0" * 64),
                         ("permanentLiabilityMicroUsd", 0),
                         ("ceilingMicroUsd", 1_000_000_001)):
-                    with self.subTest(review=name, field=field):
-                        altered = dict(review, **{field: value})
-                        with self.assertRaisesRegex(ValueError, "independent review does not approve"):
-                            fixture.registration._review_value(altered, kind)
+                    with self.subTest(review=kind, field=field):
+                        altered = copy.deepcopy(review)
+                        altered["binding"][field] = value
+                        with self.assertRaisesRegex(ValueError, "final review has wrong subject"):
+                            fixture.registration.validate_final_review(
+                                altered, kind, fixture.record_set, fixture.authorization)
         self.assertEqual(before, fixture.ledger_path.read_bytes())
 
     def test_synthetic_trust_roots_still_reject_evidence_and_funding_tampering(self):
@@ -605,7 +704,7 @@ class DispositionCollectionTests(unittest.TestCase):
             original_funding = fixture.funding_path.read_bytes()
             try:
                 fixture.funding_path.write_bytes(original_funding + b"\n")
-                with self.assertRaisesRegex(ValueError, "historical funding/null-result authorization changed"):
+                with self.assertRaisesRegex(ValueError, "missing, linked, or changed"):
                     instrument.validate_collection_authorization(
                         resolved, resolved["stages"]["pilot"], fixture.inputs,
                         fixture.epoch_id, "pilot", True)
@@ -613,6 +712,219 @@ class DispositionCollectionTests(unittest.TestCase):
                 fixture.funding_path.write_bytes(original_funding)
         self.assertEqual(before, fixture.ledger_path.read_bytes())
         self.assertFalse(fixture.collector.epoch.exists())
+
+    def test_proposal_without_activation_never_admits_or_changes_active_analysis(self):
+        fixture = self.fixture
+        before = fixture.ledger_path.read_bytes()
+        with fixture.authority_paths():
+            resolved = fixture.registration.resolve_collection_profile(fixture.profile_path)
+            activation = fixture.activation_path.read_bytes()
+            fixture.activation_path.unlink()
+            try:
+                evidence, documents = fixture.registration._load_evidence(require_activation=False)
+                self.assertEqual(fixture.record_set,
+                                 fixture.registration.make_record_set(evidence, documents))
+                for action in (
+                        lambda: fixture.registration.resolve_collection_profile(fixture.profile_path),
+                        lambda: fixture.registration.canonical_inputs(),
+                        lambda: instrument.validate_collection_authorization(
+                            resolved, resolved["stages"]["pilot"], fixture.inputs,
+                            fixture.epoch_id, "pilot", True)):
+                    with self.assertRaises((ValueError, OSError)):
+                        action()
+            finally:
+                fixture.activation_path.write_bytes(activation)
+            selected = dict(resolved["stages"]["pilot"])
+            selected.pop("dispositionEvidence")
+            with self.assertRaisesRegex(ValueError, "cannot omit prospective activation"):
+                fixture.spending.admit(
+                    resolved, selected, {"kind": fixture.core.DISPOSITION_KIND},
+                    fixture.inputs, fixture.epoch_id, "pilot")
+            active = fixture.active_analysis.read_bytes()
+            fixture.active_analysis.write_bytes(fixture.pre_analysis.read_bytes())
+            try:
+                with self.assertRaisesRegex(ValueError, "active analysis registration differ"):
+                    fixture.registration.resolve_collection_profile(fixture.profile_path)
+            finally:
+                fixture.active_analysis.write_bytes(active)
+        self.assertEqual(before, fixture.ledger_path.read_bytes())
+        self.assertFalse(fixture.collector.epoch.exists())
+
+    def test_tampered_raw_history_and_record_set_fail_even_with_synthetic_trust_roots(self):
+        fixture = self.fixture
+        with fixture.authority_paths():
+            for path in ([fixture.inputs / item["path"] for item in fixture.history.values()]
+                         + [fixture.record_set_path, fixture.activation_path]):
+                before = path.read_bytes()
+                with self.subTest(path=path.name):
+                    try:
+                        value = analysis.load(path)
+                        value["SYNTHETIC-tampered"] = True
+                        save(path, value)
+                        with self.assertRaises(ValueError):
+                            fixture.registration.resolve_collection_profile(fixture.profile_path)
+                    finally:
+                        path.write_bytes(before)
+
+    def test_missing_tampered_or_wrong_subject_final_reviews_fail_closed(self):
+        fixture = self.fixture
+        with fixture.authority_paths():
+            for subject in fixture.registration.FINAL_SUBJECTS:
+                index_path, raw_path = fixture.registration.final_review_paths(subject)
+                index_path, raw_path = fixture.inputs / index_path, fixture.inputs / raw_path
+                index_bytes, raw_bytes = index_path.read_bytes(), raw_path.read_bytes()
+                original = analysis.load(raw_path)
+                mutations = [
+                    {"subject": "historical-bound"},
+                    {"subject": "methods-draft-description"},
+                    {"verdict": "REQUEST_CHANGES"},
+                    {"scope": dict(original["scope"], descriptionOnly=True)},
+                    {"binding": dict(original["binding"], recordSetSha256="0" * 64)},
+                    {"binding": dict(original["binding"], sourceArtifactsSha256="0" * 64)},
+                ]
+                for changes in mutations:
+                    with self.subTest(subject=subject, changes=changes):
+                        try:
+                            raw = dict(original, **changes)
+                            save(raw_path, raw)
+                            save(index_path, fixture.registration.review_index(
+                                subject, {"path": raw_path.relative_to(fixture.inputs).as_posix(),
+                                          "sha256": instrument.digest(raw_path)}, raw["verdict"]))
+                            with self.assertRaises(ValueError):
+                                fixture.registration.resolve_collection_profile(fixture.profile_path)
+                        finally:
+                            index_path.write_bytes(index_bytes)
+                            raw_path.write_bytes(raw_bytes)
+                for path in (index_path, raw_path):
+                    before = path.read_bytes()
+                    for tamper in ("missing", "changed"):
+                        with self.subTest(subject=subject, artifact=path.name, tamper=tamper):
+                            try:
+                                if tamper == "missing":
+                                    path.unlink()
+                                else:
+                                    path.write_bytes(before + b"\n")
+                                with self.assertRaises((ValueError, OSError)):
+                                    fixture.registration.resolve_collection_profile(fixture.profile_path)
+                            finally:
+                                path.write_bytes(before)
+
+    def test_activation_is_exact_subject_metadata_only_and_preserves_proposal_bytes(self):
+        fixture = self.fixture
+        helper = fixture.registration
+        with fixture.authority_paths(), ExitStack() as stack:
+            evidence, documents = helper._load_evidence()
+            refs, sources = helper.archival_references(evidence, documents)
+            artifact_names = tuple(sorted(
+                {(fixture.inputs / ref["path"]).relative_to(BENCH).as_posix() for ref in refs}
+                | set(sources)))
+            for name in ("ARTIFACTS", "RECOVERY_ARTIFACTS", "TERMINAL_BASE_ARTIFACTS",
+                         "TERMINAL_ARTIFACTS"):
+                stack.enter_context(patch.object(fixture.adjudication, name, ()))
+            for name, value in (
+                    ("DISPOSITION_ARTIFACTS", artifact_names),
+                    ("PRE_DISPOSITION_MANIFEST", fixture.pre_analysis.relative_to(BENCH).as_posix()),
+                    ("DISPOSITION_PROFILE", fixture.profile_path.relative_to(BENCH).as_posix()),
+                    ("DISPOSITION_EVIDENCE", fixture.evidence_path.relative_to(BENCH).as_posix())):
+                stack.enter_context(patch.object(fixture.adjudication, name, value))
+            fixture.activation_path.unlink()
+            fixture.active_analysis.write_bytes(fixture.pre_analysis.read_bytes())
+            before = {path: path.read_bytes() for path in (
+                fixture.ledger_path, fixture.old_backup, fixture.new_backup,
+                fixture.profile_path, fixture.evidence_path, fixture.record_set_path,
+                fixture.pre_analysis)}
+            with self.assertRaisesRegex(ValueError, "confirmation must name"):
+                helper.activate("0" * 64)
+            self.assertFalse(fixture.activation_path.exists())
+            activation = helper.activate(fixture.record_set["recordSetSha256"])
+            self.assertFalse(activation["ledgerApplied"])
+            self.assertFalse(activation["collectionStarted"])
+            self.assertFalse(fixture.collector.epoch.exists())
+            self.assertEqual(before, {path: path.read_bytes() for path in before})
+            helper.resolve_collection_profile(fixture.profile_path)
+            self.assertEqual("historical-liability-registered",
+                             analysis.load(fixture.active_analysis)["recoveryStatus"])
+            with self.assertRaisesRegex(ValueError, "unexecuted proposal"):
+                helper.activate(fixture.record_set["recordSetSha256"])
+
+    def test_real_proposal_builder_and_refresh_do_not_activate_or_require_final_approval(self):
+        fixture = self.fixture
+        helper = fixture.registration
+        fixture.ledger_path.write_bytes(fixture.new_backup.read_bytes())
+        fixture.new_backup.unlink()
+        fixture.activation_path.unlink()
+        fixture.active_analysis.write_bytes(fixture.pre_analysis.read_bytes())
+        old_profile_path = fixture.inputs / helper.OLD_PROFILE.name
+        old_plan_path = fixture.inputs / helper.OLD_PLAN.name
+        shutil.copy2(helper.ROOT / "gateway-instrument-amendment-1434.json",
+                     fixture.inputs / "gateway-instrument-amendment-1434.json")
+        old_plan = analysis.load(old_plan_path)
+        old_plan["ledgerBinding"] = fixture.plan["ledgerBinding"]
+        save(old_plan_path, old_plan)
+        old_profile = analysis.load(old_profile_path)
+        old_profile.update(
+            spendAuthorization=fixture.funding_reference,
+            spendingPlan={"path": old_plan_path.name, "sha256": instrument.digest(old_plan_path)})
+        for name in ("stageRegistration", "modelRegistration", "sourceInspectionEvidence"):
+            old_profile[name] = fixture.collector.selected[name]
+        save(old_profile_path, old_profile)
+        output_fields = {
+            "authorization": "authorization", "instrument": "instrumentAmendment",
+            "plan": "spendingPlan", "profile": "executionProfile", "proof": "inspectionProof",
+            "price": "priceContract", "originalInventory": "originalArchiveInventory",
+            "failedInventory": "failedArchiveInventory", "stoppedSnapshot": "stoppedSnapshot",
+        }
+        outputs = {name: fixture.inputs / fixture.documents[field]["path"]
+                   for name, field in output_fields.items()}
+        outputs.update(evidence=fixture.evidence_path, preAnalysis=fixture.pre_analysis,
+                       recordSet=fixture.record_set_path)
+        before = {path: path.read_bytes() for path in (
+            fixture.ledger_path, fixture.old_backup, fixture.active_analysis, fixture.pre_analysis)}
+        with fixture.authority_paths(), ExitStack() as stack:
+            for name, value in (
+                    ("OLD_PROFILE", old_profile_path), ("OLD_PLAN", old_plan_path),
+                    ("EXPECTED_OLD_PROFILE_SHA256", instrument.digest(old_profile_path)),
+                    ("EXPECTED_OLD_PLAN_SHA256", instrument.digest(old_plan_path)),
+                    ("BACKUP_NAME", fixture.old_backup.name),
+                    ("DISPOSITION_BACKUP_NAME", fixture.new_backup.name),
+                    ("BOUND_REVIEW", fixture.inputs / fixture.documents["financialBoundReview"]["path"]),
+                    ("METHODS_REVIEW", fixture.inputs / fixture.documents["methodsReview"]["path"]),
+                    ("WIRE", fixture.inputs / fixture.documents["transportEvidence"]["path"]),
+                    ("STARTUP", fixture.inputs / fixture.documents["nativeStartupEvidence"]["path"]),
+                    ("OUTPUTS", outputs)):
+                stack.enter_context(patch.object(helper, name, value))
+            for name, value in (
+                    ("EXPECTED_OLD_BACKUP_SHA256", instrument.digest(fixture.old_backup)),
+                    ("GRANT_REFERENCE", fixture.authorization["grant"]["reference"]),
+                    ("OLD_EPOCHS", (fixture.original_archive.name, fixture.failed_archive.name))):
+                stack.enter_context(patch.object(fixture.core, name, value))
+            stack.enter_context(patch("subprocess.run", side_effect=fixture.os_command))
+            # No final reviews at all: proposal construction remains possible.
+            for subject in helper.FINAL_SUBJECTS:
+                for path in helper.final_review_paths(subject):
+                    (fixture.inputs / path).unlink()
+            proposed = helper.build_documents()
+            self.assertNotIn(fixture.active_analysis, proposed)
+            self.assertNotIn(fixture.activation_path, proposed)
+            self.assertEqual("REQUEST_CHANGES", proposed[fixture.evidence_path][
+                "reviewHistoryOnly"]["draftMethodsDescription"]["verdict"])
+            for path in outputs.values():
+                path.unlink()
+            helper.write_documents(proposed)
+            self.assertEqual(before, {path: path.read_bytes() for path in before})
+            helper.write_documents(proposed, refresh_unexecuted=True)
+            self.assertEqual(before, {path: path.read_bytes() for path in before})
+            self.assertFalse(fixture.activation_path.exists())
+            self.assertFalse(fixture.collector.epoch.exists())
+            self.assertFalse(fixture.new_backup.exists())
+            evidence, documents = helper._load_evidence(require_activation=False)
+            helper._validate_record_set(
+                fixture.inputs, evidence, documents, proposed[fixture.record_set_path], live=True)
+            with self.assertRaises((ValueError, OSError)):
+                helper.resolve_collection_profile(fixture.profile_path)
+            with self.assertRaises((ValueError, OSError)):
+                helper.activate(proposed[fixture.record_set_path]["recordSetSha256"])
+            self.assertEqual(before, {path: path.read_bytes() for path in before})
 
     def test_actual_funding_anchor_cannot_be_reset_to_private_synthetic_ledger(self):
         fixture = self.fixture
