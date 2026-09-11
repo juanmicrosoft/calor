@@ -988,8 +988,8 @@
       "ppw-gateway-recover.py": "9fc26ea601c3fd8b8ec64cb467954fabb98f5f1de92bd2133566422a73526fed",
       "ppw-gateway-recovery.py": "b0532f9e33d7af5face69a1df3c5ac6f644f9ca2ca54363ab2094d87ad7b9de6",
       "ppw-gateway-register-recovery.py": "8fce2dbbc60f0343f9febfc25d4a4a1bf83158b370ef340e533059e19f5ffd01",
-      "ppw-gateway-registration.py": "c5be05b3d73e49333027110336629e2d5ee1fb0a4cacbfe49a811bbae10dcdaa",
-      "ppw-instrument.py": "555075537b5456c8bcb297506da8f92f7855614c3ef01c45e0bb8c6af63bdce5",
+      "ppw-gateway-registration.py": "f0395eb4f4eeace6793d6453029941abd5c6cc0def011d67237f5747e968eef4",
+      "ppw-instrument.py": "85e361ab9043fe6ec8e7dcb9b289b56ebbbc183eac0b068bbec51cd7e1b388e0",
       "ppw-pins.schema.json": "c737775a952adaeb066042c6d9d204bbfeae929c0bf6d5aa2e628422baf7e5f6",
       "ppw-registration.py": "ab9e86f08723827e5be56dee160cfa6db63849863df33b0428bdc782dfc20e0e",
       "ppw-run-observer.py": "7555bac129bc6f36c902ff112bca3064f7ad26ffb3de40c571ff06a58879a02e",
@@ -1010,7 +1010,7 @@
       "token-usage.sh": "de59280fa8d212397d6154ecc87b2776a73d2dfd6de03515b739119bfb819117"
     },
     "priceSha256": "582a71eeb22ad7604759d7441f719615def5a04a5ca2cecece8a2c9e1f45eb3e",
-    "protocolSha256": "724feddc7f5312878932ee7f1a90c006d65ba84a2852e7c2e6c7c45f8710c3e8",
+    "protocolSha256": "e5e6bb66309db62edf73b567e9049303f60e0dad03d652bcaee2faa1a9bc1653",
     "stage": "pilot"
   }
 }

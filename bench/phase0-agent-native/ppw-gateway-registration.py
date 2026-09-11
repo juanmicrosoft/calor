@@ -489,6 +489,8 @@ def validate_archive(epoch, pins, selected):
     return {"id": profile["id"], "authority": profile_proof,
             "instrumentAmendment": profile["instrumentAmendment"],
             "evidenceResolution": "verified-archive-local-files",
-            "requestCount": len(rows), "completedSlots": len(completed),
+            "requestCount": len(rows),
+            "completedSlots": len(completed) - len(preserved_attempted),
+            "accountedSlots": len(completed),
             "preservedAttemptedSlots": preserved_attempted,
             "accountedMicroUsd": exposure, "ceilingMicroUsd": ceiling}

@@ -1,7 +1,7 @@
 {
   "executionProfile": {
     "path": "gateway-execution-profile-1432.json",
-    "sha256": "6f12cfc5171d96fe675df403d73daf05e8f2071c0e0e631082ab0a6c42be35db"
+    "sha256": "8066b86aeecf292a8e86002011fee7415c91c9c528ea25727ab4541f3e05ec2f"
   },
   "failedArchiveInventory": {
     "path": "gateway-recovery-archive-inventory-1432.json",
@@ -27,22 +27,22 @@
   },
   "inspectionProof": {
     "path": "gateway-recovery-proof-1432.json",
-    "sha256": "be449e6839efc09d9a2f7e38cc3b6e2d9115e6a7df85db8df0c0f5c66a2b0bbd"
+    "sha256": "a910b6efb731bc397dbde0aed1ed5a6a42bc85877f7f79ad9f7dafda722eb2f2"
   },
   "issue": "https://github.com/juanmicrosoft/calor/issues/1432",
   "kind": "pp-w-zero-request-recovery-evidence",
   "recoveryAuthorization": {
     "path": "gateway-authorization-1432.json",
-    "sha256": "a9091eee4e3e898ebf4ba14a84fe68c6cfe4cac0c4f5a4de91b995469f9030db"
+    "sha256": "c4aa8608d478870922867f2fb892e14ca3efe442ea6fddca64643927f72e2b43"
   },
   "rootCauseReference": "https://github.com/juanmicrosoft/calor/issues/1432#issuecomment-5627884715",
   "schemaVersion": 1,
   "spendingPlan": {
     "path": "gateway-spending-plan-1432.json",
-    "sha256": "9ac9b3b64b6acf4f079fb1d2897b268b019eca364d8a1a0ee3f4bf6e3b1f9322"
+    "sha256": "ebea4e7db9b6ee1fa67a01b343dd182a9ebb49c673ab967b73750ffefa4b55c4"
   },
   "targetBinding": {
-    "authorizationSha256": "a9091eee4e3e898ebf4ba14a84fe68c6cfe4cac0c4f5a4de91b995469f9030db",
+    "authorizationSha256": "c4aa8608d478870922867f2fb892e14ca3efe442ea6fddca64643927f72e2b43",
     "epochId": "w-rows-pilot-gateway-002",
     "harnessArtifacts": {
       "gateway-tools/bash-env.sh": "0f2080f2de7a80651f5f6fc4e3ee25885c860bf4c4284eadc66459fa94325ef9",
@@ -54,8 +54,8 @@
       "ppw-gateway-recover.py": "9fc26ea601c3fd8b8ec64cb467954fabb98f5f1de92bd2133566422a73526fed",
       "ppw-gateway-recovery.py": "b0532f9e33d7af5face69a1df3c5ac6f644f9ca2ca54363ab2094d87ad7b9de6",
       "ppw-gateway-register-recovery.py": "8fce2dbbc60f0343f9febfc25d4a4a1bf83158b370ef340e533059e19f5ffd01",
-      "ppw-gateway-registration.py": "c5be05b3d73e49333027110336629e2d5ee1fb0a4cacbfe49a811bbae10dcdaa",
-      "ppw-instrument.py": "555075537b5456c8bcb297506da8f92f7855614c3ef01c45e0bb8c6af63bdce5",
+      "ppw-gateway-registration.py": "f0395eb4f4eeace6793d6453029941abd5c6cc0def011d67237f5747e968eef4",
+      "ppw-instrument.py": "85e361ab9043fe6ec8e7dcb9b289b56ebbbc183eac0b068bbec51cd7e1b388e0",
       "ppw-pins.schema.json": "c737775a952adaeb066042c6d9d204bbfeae929c0bf6d5aa2e628422baf7e5f6",
       "ppw-registration.py": "ab9e86f08723827e5be56dee160cfa6db63849863df33b0428bdc782dfc20e0e",
       "ppw-run-observer.py": "7555bac129bc6f36c902ff112bca3064f7ad26ffb3de40c571ff06a58879a02e",
@@ -75,7 +75,7 @@
       "token-usage.py": "b2cd56ed565c40877092640392f0998cb97d637ebdd6de6ead9a96d77398149e",
       "token-usage.sh": "de59280fa8d212397d6154ecc87b2776a73d2dfd6de03515b739119bfb819117"
     },
-    "planSha256": "9ac9b3b64b6acf4f079fb1d2897b268b019eca364d8a1a0ee3f4bf6e3b1f9322",
+    "planSha256": "ebea4e7db9b6ee1fa67a01b343dd182a9ebb49c673ab967b73750ffefa4b55c4",
     "plannedSlots": [
       "C-001-quota-adapter/calor-permissive/1",
       "C-001-quota-adapter/calor-strict/1",
@@ -523,7 +523,7 @@
       "C-003-frame-fingerprint/calor-strict/74"
     ],
     "priceSha256": "582a71eeb22ad7604759d7441f719615def5a04a5ca2cecece8a2c9e1f45eb3e",
-    "protocolSha256": "724feddc7f5312878932ee7f1a90c006d65ba84a2852e7c2e6c7c45f8710c3e8",
+    "protocolSha256": "e5e6bb66309db62edf73b567e9049303f60e0dad03d652bcaee2faa1a9bc1653",
     "stage": "pilot"
   }
 }

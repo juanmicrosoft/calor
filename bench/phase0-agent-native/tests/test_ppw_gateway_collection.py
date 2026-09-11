@@ -424,6 +424,15 @@ class CollectionTests(unittest.TestCase):
             "preservedAttemptedSlots"])
         self.assertEqual(443, len(self.observed))
 
+    def test_conflicting_operational_proof_alias_refuses_before_client_launch(self):
+        self.prepare_recovered_scope()
+        self.selected["recoveryAuthorization"] = dict(
+            self.selected["spendAuthorization"], sha256="0" * 64)
+        save(self.registration_file, self.registration)
+        with self.assertRaisesRegex(ValueError, "operational proof aliases disagree"):
+            self.collect()
+        self.assertEqual([], self.observed)
+
 
 if __name__ == "__main__":
     unittest.main()

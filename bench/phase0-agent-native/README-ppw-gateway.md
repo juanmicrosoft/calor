@@ -241,10 +241,15 @@ and unknown-charge collections from reaching stage analysis.
 
 `test_ppw_gateway_registered_collection.py` additionally sends that actual
 collector's complete 444-slot output directly to the registered adjudicator
-using the real frozen task inventory and current 29-file execution map.
+using the real frozen task inventory and preserved 25-file execution map.
 All observations and the provider/compiler/OS boundaries are explicit synthetic
 fixtures. Both frozen estimands remain exactly one half in that fixture; the
 reported decision remains `SYNTHETIC_ONLY`.
+Its recovery case also executes all 443 continuation slots under the new 29-file
+profile and sends the resulting archive to the registered adjudicator. The
+original invalid launch remains separate: 443 request-bearing completed slots,
+444 accounted slots, and no replacement. The fixture models post-apply accounting
+in a temporary ledger; separate recovery tests exercise atomic apply itself.
 
 `test_ppw_gateway_frozen_controls.py` additionally exercises the real retained
 compiler, source-fragment assembly, visible shim and private observer against all

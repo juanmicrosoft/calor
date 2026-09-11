@@ -660,13 +660,20 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                     "failedArchiveInventory", "failedOperationalSnapshot",
                 ))
             proofs.extend(admission["forecastEvidence"].values())
+            copied_proofs = {}
             for proof in proofs:
                 destination = local(epoch, proof["path"])
+                if destination in copied_proofs:
+                    require(copied_proofs[destination] == proof["sha256"]
+                            and digest(destination) == proof["sha256"],
+                            "operational proof aliases disagree")
+                    continue
                 require(not destination.exists(), "operational proof would overwrite an epoch artifact")
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(local(registration_path.parent, proof["path"]), destination)
                 require(digest(destination) == proof["sha256"],
                         "operational proof changed during archival")
+                copied_proofs[destination] = proof["sha256"]
         pins = {"schemaVersion": 2, "kind": KIND, "epochId": epoch_id, "stage": stage,
                 "dataKind": "empirical", "mode": "live", "lifecycle": "collecting",
                 "harnessCommit": command(["git", "-C", str(REPO), "rev-parse", "HEAD"]),

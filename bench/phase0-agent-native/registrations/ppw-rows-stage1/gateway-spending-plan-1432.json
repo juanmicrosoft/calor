@@ -1,5 +1,5 @@
 {
-  "authorizationSha256": "a9091eee4e3e898ebf4ba14a84fe68c6cfe4cac0c4f5a4de91b995469f9030db",
+  "authorizationSha256": "c4aa8608d478870922867f2fb892e14ca3efe442ea6fddca64643927f72e2b43",
   "budgetExhaustion": "INCOMPLETE_BUDGET; preserve all slots, no adjudication or replacement",
   "ceilingUsd": 1000,
   "clientControl": {
@@ -202,7 +202,7 @@
   "ordering": "run ordinal, frozen task list, A then B",
   "perRunBudgetUsd": null,
   "plannedInvocations": 444,
-  "protocolSha256": "724feddc7f5312878932ee7f1a90c006d65ba84a2852e7c2e6c7c45f8710c3e8",
+  "protocolSha256": "e5e6bb66309db62edf73b567e9049303f60e0dad03d652bcaee2faa1a9bc1653",
   "recovery": {
     "continuationInvocations": 443,
     "failedEpochId": "w-rows-pilot-gateway-001",
