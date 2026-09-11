@@ -71,6 +71,20 @@ safe native input, and wrong named formal attribution. Full failure output/TRX
 remains in the worktree's `.n3-evidence`; successful compiler selections reached
 227 cases before the last eight matrix cases were added.
 
+The first CI run found an additional required product-ratchet update:
+[the per-file audit](../plans/evidence/n3-mapping-2026-09-11/corpus-ratchet-audit.json)
+accounts for exactly four new statement274 findings in Serilog's
+`JsonValueFormatter.cs` (52→56 raw binding Errors, zero propagated before/after).
+Removing exactly those four identities reproduces the prior52-error SHA256.
+All other fields for all364 source files are unchanged:35179 binder visits,
+zero incomplete diagnostics, unchanged source/representation/opacity identities
+and unchanged conversion outcomes. The existing regeneration command updated
+only the two diagnostic fields; the normal ratchet then passed without update
+mode. No skip, comparison, denominator or opaque budget was changed. This is the
+product compiler coverage ratchet, not paused research collection. One newly
+visible finding is the already-owned #1398 coalesce-transfer limitation; none
+of the four is classified as an accepted compatibility break or safe result.
+
 ## Explicit limits and acceptance gap
 
 Mapping a normal array is **not** the same as checking an expanded element.
