@@ -22,6 +22,9 @@ public sealed class RoundTripPipelineSafetyTests
         {
             await File.WriteAllTextAsync(Path.Combine(root, "Lib", "Safe.cs"),
                 "public static class SafeEvidence { public static string Read() => \"safe\"; }");
+            await File.WriteAllTextAsync(Path.Combine(root, "Lib", "Migrated.cs"),
+                "public static class MigratedEvidence { public static string Read() => "
+                + "System.Environment.GetEnvironmentVariable(\"CALOR_E1_UNSET\") ?? \"fallback\"; }");
             await File.WriteAllTextAsync(Path.Combine(root, "Lib", "Skip.g.cs"),
                 "public class ExcludedEvidence { }");
             var report = new RoundTripReport { ProjectName = "Evidence" };
@@ -54,12 +57,14 @@ public sealed class RoundTripPipelineSafetyTests
             Assert.Contains(missing.Candidate!.Diagnostics, diagnostic =>
                 diagnostic.Code == "CS0246" && diagnostic.Line > 0 && diagnostic.Column > 0);
             var safe = results.Single(file => file.FilePath == "Lib/Safe.cs");
+            var migrated = results.Single(file => file.FilePath == "Lib/Migrated.cs");
             Assert.Equal(FileStatus.Replaced, safe.Status);
+            Assert.Equal(FileStatus.Replaced, migrated.Status);
             Assert.DoesNotContain(safe.Candidate!.AnalysisDiagnostics,
                 diagnostic => diagnostic.Code is "Calor0272" or "Calor0273" or "Calor0274");
             var assembly = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
                 $"EvidenceRuntime_{Guid.NewGuid():N}",
-                new[] { nullable, safe }.Select(file =>
+                new[] { nullable, safe, migrated }.Select(file =>
                     Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(file.EmittedCSharp!)),
                 Calor.Compiler.CodeGen.GeneratedCSharpCompiler.References,
                 new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
@@ -67,25 +72,47 @@ public sealed class RoundTripPipelineSafetyTests
             var emitted = assembly.Emit(stream);
             Assert.True(emitted.Success, string.Join("\n", emitted.Diagnostics));
             var loaded = System.Reflection.Assembly.Load(stream.ToArray());
-            Assert.Equal("safe", loaded.GetTypes().Single(type => type.Name == "SafeEvidence").GetMethod("Read")!.Invoke(null, null));
+            object? Read(string type) => loaded.GetTypes().Single(item => item.Name == type).GetMethod("Read")!.Invoke(null, null);
+            var observations = new Dictionary<string, object?> { ["literal"] = Read("SafeEvidence") };
+            Assert.Equal("safe", observations["literal"]);
             var prior = Environment.GetEnvironmentVariable("CALOR_E1_UNSET");
             try
             {
                 Environment.SetEnvironmentVariable("CALOR_E1_UNSET", null);
-                Assert.Null(loaded.GetTypes().Single(type => type.Name == "NullableEvidence").GetMethod("Read")!.Invoke(null, null));
+                observations["nullable-absent"] = Read("NullableEvidence");
+                observations["explicit-fallback-absent"] = Read("MigratedEvidence");
+                Assert.Null(observations["nullable-absent"]);
+                Assert.Equal("fallback", observations["explicit-fallback-absent"]);
+                Environment.SetEnvironmentVariable("CALOR_E1_UNSET", "present");
+                observations["nullable-present"] = Read("NullableEvidence");
+                observations["explicit-fallback-present"] = Read("MigratedEvidence");
+                Assert.Equal("present", observations["nullable-present"]);
+                Assert.Equal("present", observations["explicit-fallback-present"]);
             }
             finally { Environment.SetEnvironmentVariable("CALOR_E1_UNSET", prior); }
-            Assert.Equal(3, report.Evidence!.Inputs.Count);
+            Assert.Equal(4, report.Evidence!.Inputs.Count);
             Assert.Single(report.Evidence.Inputs, input => input.Excluded);
             Assert.All(results, file => Assert.Equal("Unassessed", file.Candidate!.SemanticResolution));
             var coverage = ConversionCoverage.Compute(results, report.ExcludedFileCount);
-            Assert.Equal(3, coverage.TotalConvertibleFiles);
+            Assert.Equal(4, coverage.TotalConvertibleFiles);
             Assert.Equal(0, coverage.FailedConversion);
             Assert.Equal(1, coverage.ExcludedFiles);
             Assert.Equal(1, ConversionCoverage.Compute(missingResults, 0).FailedConversion);
             await ExportEvidenceAsync("converted-controls", report, config, results);
             await ExportEvidenceAsync("baseline-type-failure", missingReport,
                 config with { OriginalProjectPath = missingRoot, ProjectName = "MissingEvidence" }, missingResults);
+            var output = Environment.GetEnvironmentVariable("CALOR_ROUNDTRIP_TEST_EVIDENCE_OUTPUT");
+            if (output is not null)
+                await File.WriteAllTextAsync(Path.Combine(output, "runtime-observations.json"),
+                    System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        test = nameof(Evidence_RealConversionRetainsNullableAnalysisResolutionErrorAndSafeControl),
+                        report.Evidence.Provenance.RepositoryRevision,
+                        report.Evidence.Provenance.Compiler,
+                        observations,
+                        assembly_sha256 = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(stream.ToArray())),
+                        migration = "Explicit, manually authored ?? \"fallback\"; not a converter insertion or activation.",
+                    }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
         }
         finally
         {
