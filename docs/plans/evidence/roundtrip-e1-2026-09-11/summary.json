@@ -1,0 +1,159 @@
+{
+  "measured_repository_revision": "954aef5f0ec135d96eeac1977bf46649437a343f",
+  "tests": {
+    "total": "131",
+    "executed": "131",
+    "passed": "131",
+    "failed": "0",
+    "error": "0",
+    "timeout": "0",
+    "aborted": "0",
+    "inconclusive": "0",
+    "passedButRunAborted": "0",
+    "notRunnable": "0",
+    "notExecuted": "0",
+    "disconnected": "0",
+    "warning": "0",
+    "completed": "0",
+    "inProgress": "0",
+    "pending": "0"
+  },
+  "reports": [
+    {
+      "artifact": "fixtures/baseline-type-failure.json.gz",
+      "run_id": "1749d9b09eea4afe849a5e34ed4e0f73",
+      "counts": {
+        "inventory": 1,
+        "attempted": 1,
+        "context_resolved": 0,
+        "semantic_resolved": 0,
+        "semantic_unassessed": 1,
+        "compilation_accepted": 1,
+        "compilation_rejected": 0,
+        "compilation_not_reached": 0,
+        "skipped": 0,
+        "not_attempted": 0,
+        "crashed": 0,
+        "reverted": 0
+      },
+      "legacy_verdict": "fail",
+      "acceptance": "Unadjudicated"
+    },
+    {
+      "artifact": "fixtures/converted-controls.json.gz",
+      "run_id": "7bfd1e6268f248a3ab40506de80e4d6d",
+      "counts": {
+        "inventory": 4,
+        "attempted": 3,
+        "context_resolved": 0,
+        "semantic_resolved": 0,
+        "semantic_unassessed": 3,
+        "compilation_accepted": 3,
+        "compilation_rejected": 0,
+        "compilation_not_reached": 0,
+        "skipped": 1,
+        "not_attempted": 0,
+        "crashed": 0,
+        "reverted": 0
+      },
+      "legacy_verdict": "fail",
+      "acceptance": "Unadjudicated"
+    },
+    {
+      "artifact": "fixtures/infrastructure-failure.json.gz",
+      "run_id": "5ea97500bfad4ac290b0c8ae02c80076",
+      "counts": {
+        "inventory": 1,
+        "attempted": 0,
+        "context_resolved": 0,
+        "semantic_resolved": 0,
+        "semantic_unassessed": 1,
+        "compilation_accepted": 0,
+        "compilation_rejected": 0,
+        "compilation_not_reached": 1,
+        "skipped": 0,
+        "not_attempted": 1,
+        "crashed": 0,
+        "reverted": 0
+      },
+      "legacy_verdict": "inconclusive",
+      "acceptance": "Unadjudicated"
+    },
+    {
+      "artifact": "fixtures/injected-recovery-control.json.gz",
+      "run_id": "8e060bebcc074660a7865207f0c482ae",
+      "counts": {
+        "inventory": 1,
+        "attempted": 1,
+        "context_resolved": 1,
+        "semantic_resolved": 0,
+        "semantic_unassessed": 1,
+        "compilation_accepted": 1,
+        "compilation_rejected": 0,
+        "compilation_not_reached": 0,
+        "skipped": 0,
+        "not_attempted": 0,
+        "crashed": 0,
+        "reverted": 1
+      },
+      "legacy_verdict": "fail",
+      "acceptance": "Unadjudicated"
+    },
+    {
+      "artifact": "corpus/MediatR.json.gz",
+      "run_id": "fd7d3d08337546219aeb761f94e7d35b",
+      "counts": {
+        "inventory": 32,
+        "attempted": 32,
+        "context_resolved": 32,
+        "semantic_resolved": 0,
+        "semantic_unassessed": 32,
+        "compilation_accepted": 30,
+        "compilation_rejected": 2,
+        "compilation_not_reached": 0,
+        "skipped": 0,
+        "not_attempted": 0,
+        "crashed": 0,
+        "reverted": 0
+      },
+      "legacy_verdict": "pass",
+      "acceptance": "Unadjudicated"
+    },
+    {
+      "artifact": "corpus/Synthetic.json.gz",
+      "run_id": "407164b8e26d44d385d1e77c7fe77056",
+      "counts": {
+        "inventory": 5,
+        "attempted": 5,
+        "context_resolved": 5,
+        "semantic_resolved": 0,
+        "semantic_unassessed": 5,
+        "compilation_accepted": 5,
+        "compilation_rejected": 0,
+        "compilation_not_reached": 0,
+        "skipped": 0,
+        "not_attempted": 0,
+        "crashed": 0,
+        "reverted": 0
+      },
+      "legacy_verdict": "pass",
+      "acceptance": "Unadjudicated"
+    }
+  ],
+  "classification_counts": {
+    "annotation-identity-bug": 2,
+    "baseline-failure": 2,
+    "infrastructure-failure": 1,
+    "safe-control": 1,
+    "unresolved": 343,
+    "unsupported-binding": 6
+  },
+  "baseline_original": {
+    "command": "dotnet build .e1-evidence/runtime/baseline-invalid/Baseline.csproj --nologo --verbosity quiet",
+    "exit_code": 1,
+    "diagnostic": "CS0246",
+    "line": 1,
+    "column": 53,
+    "input_sha256": "c02dc0e8027d4fa158d1e5409025d41cff20e2b80c236888491830d7a8d01afb"
+  }
+}
