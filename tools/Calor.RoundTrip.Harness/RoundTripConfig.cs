@@ -84,6 +84,12 @@ public sealed record RoundTripConfig
     /// </summary>
     public bool LooseDirectoryMode { get; init; }
 
+    /// <summary>Independent reparse/bind observations only; never changes production diagnostic routing.</summary>
+    public bool CaptureBindingAnalysis { get; init; }
+
+    /// <summary>Fixed full-suite attempts on BOTH legs, declared before baseline. Never retry-until-green.</summary>
+    public int TestAttemptsPerLeg { get; init; } = 1;
+
     /// <summary>Path to dotnet executable.</summary>
     public string DotnetPath { get; init; } = "dotnet";
 

@@ -8,6 +8,174 @@ namespace Calor.RoundTrip.Harness.Tests;
 public class ReportGeneratorTests
 {
     [Fact]
+    public void EvidenceComparison_JoinsOriginalInputsAndRetainsBothCandidateAndRecovery()
+    {
+        var baseline = CreatePassingReport();
+        baseline.Evidence = new RunEvidence
+        {
+            Inputs = [new InputEvidence { FileId = "TestProject/Lib/Foo.cs", Path = "Lib/Foo.cs", Sha256 = "original" }],
+        };
+        baseline.FileResults[0].Candidate = new CandidateEvidence
+        {
+            FileId = "TestProject/Lib/Foo.cs", InputSha256 = "original", CandidateId = "before",
+        };
+        var candidate = CreatePassingReport();
+        candidate.Evidence = new RunEvidence
+        {
+            DeclaredTestAttemptsPerLeg = 2,
+            Inputs =
+            [
+                new InputEvidence { FileId = "TestProject/Lib/Foo.cs", Path = "Lib/Foo.cs", Sha256 = "original" },
+                new InputEvidence { FileId = "TestProject/Lib/Extra.cs", Path = "Lib/Extra.cs", Sha256 = "new", Excluded = true },
+            ],
+        };
+        candidate.FileResults[0].Candidate = new CandidateEvidence
+        {
+            FileId = "TestProject/Lib/Foo.cs", InputSha256 = "original", CandidateId = "after",
+            Errors = ["candidate error retained"],
+        };
+        candidate.FileResults[0].Status = FileStatus.Reverted;
+        candidate.FileResults[0].Recovery.Add(new RecoveryEvidence
+        { Phase = "build-recovery", Attempt = 1, Outcome = "Reverted" });
+        using var result = JsonDocument.Parse(ReportGenerator.CompareEvidence(
+            ReportGenerator.GenerateJson(baseline), ReportGenerator.GenerateJson(candidate)));
+        Assert.False(result.RootElement.GetProperty("same_retry_rule").GetBoolean());
+        var rows = result.RootElement.GetProperty("rows");
+        Assert.Equal(2, rows.GetArrayLength());
+        var file = rows.EnumerateArray().Single(row => row.GetProperty("file_id").GetString() == "TestProject/Lib/Foo.cs");
+        Assert.True(file.GetProperty("same_input").GetBoolean());
+        Assert.Equal("before", file.GetProperty("baseline_file").GetProperty("candidate").GetProperty("CandidateId").GetString());
+        Assert.Equal("after", file.GetProperty("candidate_file").GetProperty("candidate").GetProperty("CandidateId").GetString());
+        Assert.Equal("candidate error retained", file.GetProperty("candidate_file").GetProperty("candidate").GetProperty("Errors")[0].GetString());
+        Assert.Equal("Reverted", file.GetProperty("candidate_file").GetProperty("recovery")[0].GetProperty("Outcome").GetString());
+    }
+
+    [Fact]
+    public void EvidenceComparison_RejectsLegacyOnlyReportsInsteadOfInventingProvenance()
+    {
+        var legacy = ReportGenerator.GenerateJson(CreatePassingReport());
+        Assert.Throws<InvalidOperationException>(() => ReportGenerator.CompareEvidence(legacy, legacy));
+    }
+
+    [Fact]
+    public void CandidateDiagnostics_DoNotGuessProducerFromSharedCode()
+    {
+        var diagnostic = new Calor.Compiler.Diagnostics.Diagnostic(
+            "Calor0200", "missing symbol", new Calor.Compiler.Parsing.TextSpan(0, 3, 1, 1));
+        var captured = ReportGenerator.CaptureDiagnostic(diagnostic, "Program.Compile", "Lib/X.cs", "abc\n");
+        Assert.Null(captured.Producer);
+        Assert.Null(captured.BindingDisposition);
+        Assert.Equal(1, captured.Line);
+        Assert.Equal(4, captured.EndColumn);
+        var binder = new Calor.Compiler.Diagnostics.Diagnostic(
+            diagnostic.Code, diagnostic.Message, diagnostic.Span)
+        { BindingContext = Calor.Compiler.Binding.BindingDiagnosticContext.General };
+        Assert.Equal("Binder", ReportGenerator.CaptureDiagnostic(
+            binder, "Program.Compile", "Lib/X.cs", "abc\n").Producer);
+    }
+
+    [Fact]
+    public void CandidateDiagnostics_KeepMultilineUtf16SpanAndAnalysisOnlyRouting()
+    {
+        const string source = "x\n😀\ny";
+        var diagnostic = new Calor.Compiler.Diagnostics.Diagnostic(
+            "Calor0273", "nullable", new Calor.Compiler.Parsing.TextSpan(2, 4, 2, 1))
+        {
+            BindingContext = new(
+                Calor.Compiler.Binding.BindingReceivingBoundary.NativeReturn,
+                Calor.Compiler.Binding.BindingReceivingShape.ScalarString),
+        };
+        var captured = ReportGenerator.CaptureDiagnostic(diagnostic, "shadow-bind", "N.cs", source, true);
+        Assert.Equal("AnalysisOnly", captured.BindingDisposition);
+        Assert.Equal("ScalarString", captured.BindingShape);
+        Assert.Equal(3, captured.EndLine);
+        Assert.Equal(2, captured.EndColumn);
+        Assert.Equal(ReportGenerator.Hash(source), captured.SourceSha256);
+    }
+
+    [Theory]
+    [InlineData("Lib/Bad.cs(4,8): error CS0246: missing type", 4, 8)]
+    [InlineData("Lib/Bad.cs(4,8,4,14): error CS0246: missing type", 4, 8)]
+    public void BuildDiagnostics_RetainObservedCoordinatesWithoutClaimingProducer(string line, int row, int column)
+    {
+        var diagnostic = Assert.Single(ReportGenerator.CaptureBuildDiagnostics([line], "build-recovery", "/work"));
+        Assert.Equal("CS0246", diagnostic.Code);
+        Assert.Equal("Lib/Bad.cs", diagnostic.Path);
+        Assert.Equal(row, diagnostic.Line);
+        Assert.Equal(column, diagnostic.Column);
+        Assert.Null(diagnostic.Start);
+        Assert.Null(diagnostic.Producer);
+        Assert.Equal("MSBuildReportedLocation", diagnostic.SourceKind);
+    }
+
+    [Fact]
+    public void EvidenceSerialization_KeepsCandidateRecoveryAndUnknownClassificationsDistinct()
+    {
+        var report = CreatePassingReport();
+        report.Evidence = new RunEvidence
+        {
+            Inputs =
+            [
+                new InputEvidence { FileId = "TestProject/Lib/Foo.cs", Path = "Lib/Foo.cs", Sha256 = "input" },
+                new InputEvidence { FileId = "TestProject/Lib/Skip.g.cs", Path = "Lib/Skip.g.cs", Excluded = true },
+            ],
+            DeclaredTestAttemptsPerLeg = 2,
+            TestAttempts =
+            [
+                new TestAttemptEvidence { Leg = "baseline", Attempt = 1, Result = new TestRunResult { ExitCode = -1 } },
+                new TestAttemptEvidence { Leg = "baseline", Attempt = 2, Result = new TestRunResult { ExitCode = 0 } },
+            ],
+        };
+        var file = report.FileResults[0];
+        file.Candidate = new CandidateEvidence
+        {
+            FileId = "TestProject/Lib/Foo.cs", InputSha256 = "input", CandidateId = "candidate",
+            Attempted = true, CompilationOutcome = "Accepted", StatusBeforeRecovery = FileStatus.Replaced,
+            Diagnostics = [ReportGenerator.CaptureDiagnostic(new Calor.Compiler.Diagnostics.Diagnostic(
+                "Calor0200", "warning", Calor.Compiler.Parsing.TextSpan.Empty,
+                Calor.Compiler.Diagnostics.DiagnosticSeverity.Warning), "Program.Compile", file.FilePath, "")],
+        };
+        file.Status = FileStatus.Reverted;
+        file.Errors = ["later recovery"];
+        file.Recovery.Add(new RecoveryEvidence
+        {
+            Phase = "build-recovery", Attempt = 1, Outcome = "Reverted",
+            Diagnostics = ReportGenerator.CaptureBuildDiagnostics(
+                ["Lib/Foo.cs(2,3): error CS0246: type"], "build-recovery", "/work"),
+        });
+        using var json = JsonDocument.Parse(ReportGenerator.GenerateJson(report));
+        var detail = json.RootElement.GetProperty("file_detail").EnumerateArray()
+            .Single(item => item.GetProperty("path").GetString() == file.FilePath);
+        Assert.Equal("Replaced", detail.GetProperty("candidate").GetProperty("StatusBeforeRecovery").GetString());
+        Assert.Equal("Calor0200", detail.GetProperty("candidate").GetProperty("Diagnostics")[0].GetProperty("Code").GetString());
+        Assert.Equal("CS0246", detail.GetProperty("recovery")[0].GetProperty("Diagnostics")[0].GetProperty("Code").GetString());
+        Assert.Equal(-1, json.RootElement.GetProperty("evidence").GetProperty("TestAttempts")[0]
+            .GetProperty("Result").GetProperty("ExitCode").GetInt32());
+        using var classifications = JsonDocument.Parse(ReportGenerator.GenerateClassificationTemplate(report));
+        Assert.All(classifications.RootElement.GetProperty("entries").EnumerateArray(), entry =>
+        {
+            Assert.Equal("unresolved", entry.GetProperty("classification").GetString());
+            Assert.False(entry.TryGetProperty("reviewer", out _));
+        });
+        Assert.Contains(classifications.RootElement.GetProperty("entries").EnumerateArray(),
+            entry => entry.GetProperty("path").GetString() == "Lib/Skip.g.cs");
+    }
+
+    [Fact]
+    public void ConversionOptionCapture_UsesActualParseSettingsWithoutSerializingRoslynObjectGraph()
+    {
+        var options = RoundTripPipeline.CreateHarnessConversionOptions(new RoundTripConfig
+        {
+            ProjectName = "Probe", OriginalProjectPath = ".", LibrarySourceRelativePath = ".",
+            SolutionOrProjectFile = "none.csproj",
+        }, null);
+        var captured = ReportGenerator.SnapshotOptions(options);
+        Assert.Equal("Preview", captured["ParseOptions"].GetProperty("SpecifiedLanguageVersion").GetString());
+        Assert.True(captured["PassthroughOnError"].GetBoolean());
+        Assert.False(captured["ValidateRoundTripCSharp"].GetBoolean());
+    }
+
+    [Fact]
     public void GenerateMarkdown_PassVerdict_ContainsPassText()
     {
         var report = CreatePassingReport();
