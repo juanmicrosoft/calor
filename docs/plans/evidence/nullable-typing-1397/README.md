@@ -243,3 +243,25 @@ passes45 T1 plus18 metadata-context cases (63/63). Without that prerequisite the
 profile remains unsupported; the failure was not hidden by a skip or annotation
 fallback. Documentation self-check reports no drift. Actual final-head CI and two
 fresh independent reviews remain separate from these local measurements.
+
+### Final-head provenance-index reconciliation
+
+Two fresh independent contexts accepted `687c036850d1f8c6259cf1cc60eb7a42fbff88c8`
+for the bounded contract. Its CI then exposed one remaining metadata inconsistency:
+the separate commit-stamp index still named the old Calor0425 measurement. Only
+that product ledger's index entry is synchronized to `6b9f4eed`; no source code,
+measurement result, test assertion, frozen ledger or other index entry changes.
+The three existing stamp tests plus the actual corpus recomputation pass4/4.
+Both reviewers must acknowledge the resulting exact head, and actual CI must pass.
+
+The integration reviewer also called out suffix `str?` locals as a transitional
+rough edge. An actual CLI replay with preserved pre-T1 binaries and current
+binaries confirms that both accept `str? x = null; str y = x`; the old checker
+additionally warned0200. This is a previously accepted spelling, not a removed
+rejection. Expanded-prefix locals retain0202 as measured earlier. #1385 still
+owns a consistent activated receiving policy.
+
+**Merge constraint:** use a normal merge commit, not squash/rebase merge, so the
+indexed production measurement commit `6b9f4eed` remains an ancestor and resolves
+in a fresh main checkout. The repository permits merge commits. This is a
+provenance requirement, not authorization to merge before delegated adjudication.

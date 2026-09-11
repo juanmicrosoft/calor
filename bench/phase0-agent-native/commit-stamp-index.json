@@ -12,10 +12,10 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "9a1e84c03f0697692db4c0d939ebe0211f5e9081",
-      "resolvableOnMain": "9a1e84c03f0697692db4c0d939ebe0211f5e9081",
+      "measuredCommit": "6b9f4eeda8199fa8c8f1840066f0b27cbf262f1b",
+      "resolvableOnMain": "6b9f4eeda8199fa8c8f1840066f0b27cbf262f1b",
       "basis": "identical-src-tree",
-      "note": "#1335: regenerated on exact compiler9a1e84c0, preserved by the PR's merge commit. Recognizing the decimal alias in emitted §B{dec:dc} removes one undefined-dc binding error in Serilog JsonValueFormatter and resolves one unknown external call: Serilog Calor0411 sites544->543. Calor0425 diagnostics117, enforced modules326, exclusions and their identities are unchanged. Earlier measurements remain in git history; no completed epoch or frozen protocol is restamped."
+      "note": "#1397: regenerated on exact compiler6b9f4eed; preserve this ancestor with a merge commit. Unknown receivers no longer borrow runtime Option purity, and conditional getters are charged. Calor0411 sites move279->303,543->551,7420->7939 within unchanged12/61/115 unknown-module sets. Calor0425 diagnostics117, modules47, enforced326, exclusions and all other ledger coordinates are unchanged. Earlier measurements remain in git history; no completed epoch, ledger464ace or frozen protocol is restamped."
     },
     {
       "ledger": "higher-order-demand-ledger.json",
