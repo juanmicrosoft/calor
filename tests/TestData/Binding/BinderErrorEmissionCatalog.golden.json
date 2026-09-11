@@ -78,21 +78,8 @@
     "reason": "Duplicate declarations are already compilation errors."
   },
   {
-    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindCallExpression::DiagnosticBag.Report#01",
-    "member": "Calor.Compiler.Binding.Binder.BindCallExpression",
-    "sink": "DiagnosticBag.Report",
-    "helperPath": "DiagnosticBag.Report",
-    "possibleCodes": [
-      "Calor0274"
-    ],
-    "severity": "Dynamic",
-    "disposition": "AnalysisOnly",
-    "owningIssue": 1385,
-    "reason": "Nullability activation requires explicit receiving shape and its staged prerequisites."
-  },
-  {
-    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindCallExpression::DiagnosticBag.Report#02",
-    "member": "Calor.Compiler.Binding.Binder.BindCallExpression",
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.ValidateCallArgument::DiagnosticBag.Report#01",
+    "member": "Calor.Compiler.Binding.Binder.ValidateCallArgument",
     "sink": "DiagnosticBag.Report",
     "helperPath": "DiagnosticBag.Report",
     "possibleCodes": [

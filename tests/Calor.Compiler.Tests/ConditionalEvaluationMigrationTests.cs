@@ -11,6 +11,23 @@ namespace Calor.Compiler.Tests;
 
 public class ConditionalEvaluationMigrationTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void N3_SelectedNamedMapping_DoesNotReorderExecutableInputs(bool expression, bool mixed)
+    {
+        var arguments = mixed ? "Trace(1), optional: Trace(2)" : "optional: Trace(1), required: Trace(2)";
+        AssertRoundTrip($"{(expression ? "int ignored = " : "")}Take({arguments}); return Calls;",
+            12, false, members: """
+                private static int Calls;
+                public sealed class Value { }
+                public static Value Trace(int id) { Calls = Calls * 10 + id; return new Value(); }
+                public static int Take(Value required, Value optional, int omitted = 7) { return omitted; }
+                """);
+    }
+
     [Fact]
     public void FalseAndPostfix_PreservesOriginalResult()
     {

@@ -32,6 +32,253 @@ public class NullabilityIntegrationTests
         return (bound, diagnostics);
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void N3_NativeNamedArguments_CheckActualSuppliedParameter(bool expression, bool nullableToRequired)
+    {
+        var first = nullableToRequired ? "sure" : "maybe";
+        var second = nullableToRequired ? "maybe" : "sure";
+        var call = $"§C{{this.Take}} §A[optional] {first} §A[required] {second} §/C";
+        var source = $$"""
+            §M{m1:NativeMapping}
+              §CL{c1:Bar:pub}
+                §MT{take:Take:pub} (Bar:required, ?Bar:optional) -> i32
+                  §R 1
+                §MT{caller:Caller:pub} (?Bar:maybe, Bar:sure) -> i32
+                  {{(expression ? "§R " : "")}}{{call}}
+                  {{(expression ? "" : "§R 0")}}
+            """;
+
+        var (bound, diagnostics) = BindSource(source);
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NoMatchingOverload || d.Code == DiagnosticCode.AmbiguousOverload);
+        var caller = bound.Functions.Single(f => f.Symbol.Name.EndsWith(".Caller", StringComparison.Ordinal));
+        var resolved = expression
+            ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(caller.Body[0]).Expression).ResolvedSymbol
+            : Assert.IsType<BoundCallStatement>(caller.Body[0]).ResolvedSymbol;
+        Assert.NotNull(resolved);
+        Assert.EndsWith(".Take", resolved.Name);
+
+        var nullableDiagnostics = diagnostics.Where(d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter).ToArray();
+        if (!nullableToRequired)
+        {
+            Assert.Empty(nullableDiagnostics);
+            return;
+        }
+
+        var diagnostic = Assert.Single(nullableDiagnostics);
+        Assert.Contains("'required'", diagnostic.Message);
+        Assert.Equal(source.LastIndexOf("maybe", StringComparison.Ordinal), diagnostic.Span.Start);
+        Assert.Equal("maybe", source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+        Assert.Equal(SemanticsVersion.NullabilitySeverityFor(), diagnostic.Severity);
+        Assert.Equal(BindingReceivingBoundary.MethodArgument, diagnostic.BindingContext!.Boundary);
+        Assert.False(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void N3_BclNamedArguments_CheckActualSuppliedParameter(bool expression)
+    {
+        const string call = "§C{System.IO.Path.Combine} §A[path2] STR:\"safe\" §A[path1] maybe §/C";
+        var source = $$"""
+            §M{m1:BclMapping}
+              §F{caller:Caller:pub} (?string:maybe) -> string
+                {{(expression ? "§R " : "")}}{{call}}
+                {{(expression ? "" : "§R STR:\"done\"")}}
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+        var diagnostic = Assert.Single(diagnostics.Where(d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Contains("'path1'", diagnostic.Message);
+        Assert.Equal(source.LastIndexOf("maybe", StringComparison.Ordinal), diagnostic.Span.Start);
+        Assert.Equal("maybe", source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+        Assert.Equal(SemanticsVersion.NullabilitySeverityFor(), diagnostic.Severity);
+        Assert.False(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+    }
+
+    [Theory]
+    [InlineData(false, "empty", 0)]
+    [InlineData(true, "empty", 0)]
+    [InlineData(false, "array", 0)]
+    [InlineData(true, "array", 0)]
+    [InlineData(false, "named-array", 0)]
+    [InlineData(true, "named-array", 0)]
+    [InlineData(false, "expanded", 1)]
+    [InlineData(true, "expanded", 1)]
+    public void N3_BclParams_ActualPipelineChecksEveryExpandedInput(bool expression, string form, int expected)
+    {
+        var args = form switch
+        {
+            "array" => "§A §C{System.Environment.GetCommandLineArgs} §/C",
+            "named-array" => "§A[paths] §C{System.Environment.GetCommandLineArgs} §/C",
+            "expanded" => "§A STR:\"a\" §A STR:\"b\" §A STR:\"c\" §A STR:\"d\" §A maybe",
+            _ => ""
+        };
+        var source = $$"""
+            §M{m1:BclParams}
+              §F{caller:Caller:pub} (?string:maybe) -> string
+                {{(expression ? "§R " : "")}}§C{System.IO.Path.Combine} {{args}} §/C
+                {{(expression ? "" : "§R STR:\"done\"")}}
+            """;
+        var (bound, diagnostics) = BindSource(source);
+        var findings = diagnostics.Where(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter).ToArray();
+        Assert.Equal(expected, findings.Length);
+        var body = bound.Functions.Single().Body;
+        var parameterTypes = expression
+            ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(body[0]).Expression).ResolvedParameterTypes
+            : Assert.IsType<BoundCallStatement>(body[0]).ResolvedParameterTypes;
+        Assert.Single(parameterTypes!);
+        Assert.Contains("string", parameterTypes![0]);
+        if (expected != 0)
+        {
+            var diagnostic = Assert.Single(findings);
+            Assert.Contains("'paths'", diagnostic.Message);
+            Assert.Equal(source.LastIndexOf("maybe", StringComparison.Ordinal), diagnostic.Span.Start);
+            Assert.Equal(BindingReceivingShape.ScalarString, diagnostic.BindingContext!.Shape);
+            Assert.False(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        }
+    }
+
+    [Theory]
+    [InlineData(false, "params")]
+    [InlineData(true, "params")]
+    [InlineData(false, "optional")]
+    [InlineData(true, "optional")]
+    [InlineData(false, "out")]
+    [InlineData(true, "out")]
+    [InlineData(false, "ref")]
+    [InlineData(true, "ref")]
+    public void N3_ConvertedNativeCalls_PreserveSelectedInputsAndModifiers(bool expression, string form)
+    {
+        var parameters = form switch
+        {
+            "params" => "params Bar[] values",
+            "optional" => "Bar required, Bar? optional = null, int count = 0",
+            "out" => "out Bar value",
+            _ => "ref Bar value"
+        };
+        var arguments = form switch
+        {
+            "params" => "sure, sure, maybe",
+            "optional" => "required: maybe",
+            _ => $"{form} maybe"
+        };
+        var original = $$"""
+            public class Bar
+            {
+                public int Take({{parameters}}) { {{(form == "out" ? "value = new Bar();" : "")}} return 1; }
+                public int Caller(Bar? maybe, Bar sure)
+                {
+                    {{(expression ? "return " : "")}}Take({{arguments}});
+                    {{(expression ? "" : "return 0;")}}
+                }
+            }
+            """;
+        var converted = new Calor.Compiler.Migration.CSharpToCalorConverter().Convert(original);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        var source = converted.CalorSource!;
+        var (bound, diagnostics) = BindSource(source);
+        Assert.DoesNotContain(diagnostics, d => d.Code is DiagnosticCode.NoMatchingOverload or DiagnosticCode.AmbiguousOverload);
+        var caller = bound.Functions.Single(f => f.Symbol.Name.EndsWith(".Caller", StringComparison.Ordinal));
+        var selected = expression
+            ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(caller.Body[0]).Expression).ResolvedSymbol
+            : Assert.IsType<BoundCallStatement>(caller.Body[0]).ResolvedSymbol;
+        Assert.NotNull(selected);
+        Assert.EndsWith(".Take", selected.Name);
+        var findings = diagnostics.Where(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter).ToArray();
+        if (form == "out")
+            Assert.Empty(findings);
+        else
+        {
+            var diagnostic = Assert.Single(findings);
+            Assert.Contains($"'{selected.Parameters[0].Name}'", diagnostic.Message);
+            Assert.Equal(source.LastIndexOf("maybe", StringComparison.Ordinal), diagnostic.Span.Start);
+            Assert.False(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        }
+        var result = Program.Compile(source, "n3-native.calr",
+            new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        if (form is "ref" or "out")
+            Assert.Contains($"{form} maybe", result.GeneratedCode);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void N3_RejectedNativeOverloads_RemainResolutionErrors(bool expression, bool ambiguous)
+    {
+        var source = $$"""
+            §M{m1:RejectedMappings}
+              §F{one:Pick:pub} (i64:required) -> i32
+                §R 1
+              §F{two:Pick:pub} (f64:required) -> i32
+                §R 2
+              §F{caller:Caller:pub} () -> i32
+                {{(expression ? "§R " : "")}}§C{Pick} §A[required] {{(ambiguous ? "INT:1" : "BOOL:true")}} §/C
+                {{(expression ? "" : "§R 0")}}
+            """;
+        var (_, diagnostics) = BindSource(source);
+        var expected = ambiguous ? DiagnosticCode.AmbiguousOverload : DiagnosticCode.NoMatchingOverload;
+        Assert.Contains(diagnostics, d => d.Code == expected && BindingDiagnosticPolicy.IsCompilationError(d));
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+        var result = Program.Compile(source, "n3-resolution.calr",
+            new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics, d => d.Code == expected);
+    }
+
+    [Theory]
+    [InlineData("empty", 0)]
+    [InlineData("array", 1)]
+    [InlineData("named-array", 1)]
+    [InlineData("expanded", 3)]
+    public void N3_NativeParams_PublishesTheWinningMapWithoutReordering(string form, int count)
+    {
+        var arguments = form switch
+        {
+            "array" => "values",
+            "named-array" => "values: values",
+            "expanded" => "sure, sure, sure",
+            _ => ""
+        };
+        var converted = new Calor.Compiler.Migration.CSharpToCalorConverter().Convert($$"""
+            public class Bar
+            {
+                public int Take(params Bar[] values) { return 1; }
+                public int Caller(Bar[] values, Bar sure) { return Take({{arguments}}); }
+            }
+            """);
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        var (bound, diagnostics) = BindSource(converted.CalorSource!);
+        Assert.DoesNotContain(diagnostics, d => BindingDiagnosticPolicy.IsCompilationError(d));
+        var caller = bound.Functions.Single(f => f.Symbol.Name.EndsWith(".Caller", StringComparison.Ordinal));
+        var call = Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(caller.Body[0]).Expression);
+        Assert.NotNull(call.ResolvedSymbol);
+        var scope = new Scope();
+        Assert.True(scope.DeclareOverload(call.ResolvedSymbol));
+        var resolution = scope.ResolveOverload(call.ResolvedSymbol.Name,
+            call.Arguments.Select(argument => argument.Type.DisplayString).ToArray(),
+            call.ArgumentNames, call.ArgumentModifiers);
+        var match = Assert.Single(resolution.Matches);
+        Assert.Same(call.ResolvedSymbol, match.Function);
+        Assert.Equal(count, match.Arguments.Count);
+        Assert.Equal(Enumerable.Range(0, count), match.Arguments.Select(mapping => mapping.ArgumentIndex));
+        Assert.All(match.Arguments, mapping =>
+        {
+            Assert.Equal(0, mapping.ParameterIndex);
+            Assert.Equal(form == "expanded", mapping.IsExpandedParams);
+            Assert.Equal(form == "expanded" ? "Bar" : call.ResolvedSymbol.Parameters[0].TypeName, mapping.ParameterType);
+        });
+    }
+
     /// <summary>
     /// The canonical D3 repro from issue #875: binding
     /// <c>Environment.GetEnvironmentVariable</c>'s Annotated string return
