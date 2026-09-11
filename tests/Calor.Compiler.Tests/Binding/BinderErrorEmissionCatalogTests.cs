@@ -278,12 +278,36 @@ public sealed class BinderErrorEmissionCatalogTests
                         bag.Report(span: span, DiagnosticCode.DuplicateDefinition, "error");
                         return new(DiagnosticCode.UndefinedReference, "error", span);
                     }
+                    public DiagnosticWithFix Fix(TextSpan span) => new(DiagnosticCode.TypeMismatch, "error", span, null!);
                 }
                 """));
         var routes = scanner.Scan();
-        Assert.Equal(2, routes.Count);
+        Assert.Equal(3, routes.Count);
         Assert.All(routes, route => Assert.Equal("Candidate", route.Disposition));
         Assert.Contains(routes, route => route.PossibleCodes.Contains(DiagnosticCode.UndefinedReference));
+    }
+
+    [Fact]
+    public void ScannerCanary_RejectsUnmodeledExternalDiagnosticHelper()
+    {
+        var scanner = BinderErrorEmissionScanner.ForSynthetic(
+            ("src/Calor.Compiler/Binding/Canary.cs", """
+                using Calor.Compiler.Diagnostics;
+                namespace Calor.Compiler.Binding;
+                internal class Canary
+                {
+                    public void Probe(DiagnosticBag bag) => Other.Reporter.Emit(bag);
+                }
+                """),
+            ("Other.cs", """
+                using Calor.Compiler.Diagnostics;
+                namespace Other;
+                internal static class Reporter
+                {
+                    public static void Emit(DiagnosticBag bag) => bag.ReportError(default, "Calor9999", "hidden");
+                }
+                """));
+        Assert.Throws<InvalidOperationException>(() => scanner.Scan());
     }
 
     [Theory]
@@ -482,6 +506,15 @@ public sealed class BinderErrorEmissionCatalogTests
                     source.Text,
                     new CSharpParseOptions(LanguageVersion.Preview),
                     source.Path))
+                .Append(CSharpSyntaxTree.ParseText("""
+                    global using System;
+                    global using System.Collections.Generic;
+                    global using System.IO;
+                    global using System.Linq;
+                    global using System.Net.Http;
+                    global using System.Threading;
+                    global using System.Threading.Tasks;
+                    """, new CSharpParseOptions(LanguageVersion.Preview), path: "<implicit-usings>"))
                 .ToArray();
             var sourceByTree = trees.Zip(allSources).ToDictionary(pair => pair.First, pair => pair.Second);
             var compilation = CSharpCompilation.Create(
@@ -591,8 +624,24 @@ public sealed class BinderErrorEmissionCatalogTests
             ImmutableArray<string> helperPath)
         {
             var method = ResolveMethod(invocation, model);
-            if (method is null || !IsDiagnosticBagMethod(method))
+            if (method is null)
+            {
+                if (invocation.Expression is MemberAccessExpressionSyntax access
+                    && model.GetTypeInfo(access.Expression).Type?.ToDisplayString(TypeFormat)
+                        == "Calor.Compiler.Diagnostics.DiagnosticBag")
+                    throw new InvalidOperationException($"Unresolved DiagnosticBag invocation: {invocation}");
                 return [];
+            }
+            if (!IsDiagnosticBagMethod(method))
+            {
+                if (!method.ContainingNamespace.ToDisplayString().StartsWith("Calor.Compiler.Binding", StringComparison.Ordinal)
+                    && (method.Parameters.Any(parameter => parameter.Type.ToDisplayString(TypeFormat)
+                            == "Calor.Compiler.Diagnostics.DiagnosticBag")
+                        || method.ReturnType.ToDisplayString(TypeFormat) is
+                            "Calor.Compiler.Diagnostics.Diagnostic" or "Calor.Compiler.Diagnostics.DiagnosticWithFix"))
+                    throw new InvalidOperationException($"External diagnostic helper requires explicit analysis: {method}");
+                return [];
+            }
 
             var display = $"DiagnosticBag.{method.Name}";
             if (helperPath.Contains(display))

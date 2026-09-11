@@ -108,5 +108,10 @@ changed invalid input, compiler/schema/semantics changes, and safe recovery.
 No released binary was swapped underneath a live process; version invalidation
 is tested through the existing cache fixtures, not described as such a deployment.
 
+[The process supplement](../plans/evidence/diagnostic-routing-1396/README.md)
+adds actual SDK builds and real watch observations at the pinned implementation
+candidate. Both inherited warnings-as-errors and neutral consumer configurations
+are retained: independent generated-C# rejection is not nullable-binder activation.
+
 No D3/D12/D14 demotion or runtime-guard change, annotation widening, automatic
 converter adaptation, release or research collection is part of this work.
