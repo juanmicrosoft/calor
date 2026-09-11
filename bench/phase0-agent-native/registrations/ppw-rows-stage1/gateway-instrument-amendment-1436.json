@@ -1,0 +1,61 @@
+{
+  "historicalDisposition": {
+    "actualCost": null,
+    "authorization": {
+      "path": "gateway-liability-authorization-1436.json",
+      "sha256": "d222ed741841aaf519c62e4fe6829134711b9731819d2ea7d5f591b21b39e25b"
+    },
+    "continuationInvocations": 442,
+    "futureUnknownPolicy": "halt",
+    "kind": "pp-w-historical-liability-disposition-v1",
+    "permanentUnknownMicroUsd": 51040000,
+    "replacementAttempts": 0,
+    "retainedAttempts": 2,
+    "scientificRulesChanged": false
+  },
+  "kind": "pp-w-prospective-spending-instrument-amendment",
+  "reason": "Register the one authorized permanent historical $51.04 liability, preserve both consumed attempts, and continue only the 442 untouched slots.",
+  "replacementHarnessArtifacts": {
+    "gateway-tools/bash-env.sh": "0f2080f2de7a80651f5f6fc4e3ee25885c860bf4c4284eadc66459fa94325ef9",
+    "gateway-tools/python3": "a3b38507fbbd0b298bb71fe0f9d02dd67a434d3d2e9fd36fa54a8103fd57a91d",
+    "harness-capture.py": "dc8a75ffb0abe9dd5a8997a06121ee1e2610cffa13cbc436e06524dc0c061c3d",
+    "ppw-budget-gateway.py": "27abee7b704585dada3a25a6ef0ab4ccefd964035732844e7eeaa123cfe21aab",
+    "ppw-gateway-budget.py": "f6226e98b282043ed70ffc0768ebc9260b754550ac8d06a99e814dede0b46116",
+    "ppw-gateway-client.py": "5af515fd0e305bebfd497f0d33ff17825ecb2e8f2317cae327cbc05c45a92586",
+    "ppw-gateway-dispose.py": "4556f1581ea6162f4db3c2c4c71920b020eb62c4accde3b61044431ffe695717",
+    "ppw-gateway-disposition-registration.py": "4c49ea0ae3532e847a97c80660adab82d1c7ec7209c916a50d4dadbbe72a61a5",
+    "ppw-gateway-disposition.py": "fa71bce4927406ba6fd634ff0012ff610c556302e9e5eca1ef3ae461c321983c",
+    "ppw-gateway-progress.py": "476142448936cc7f9d665d1f3800088521b1f5c114c3466c50ef2b106511399b",
+    "ppw-gateway-recover.py": "139931cec7d533360b9d6b069574552ccc9c7fc1fb5a5dd360d593ec40f7b0d8",
+    "ppw-gateway-recovery.py": "6a4fe07577707319a1040dc4a8555fa3274be715d547738b1b9ff8aa36b577c7",
+    "ppw-gateway-register-disposition.py": "56fc6780a5d9d453499f0c71a496ebfd3a3a6351ed1d6724a2ca2538c31d5ced",
+    "ppw-gateway-register-recovery.py": "8fce2dbbc60f0343f9febfc25d4a4a1bf83158b370ef340e533059e19f5ffd01",
+    "ppw-gateway-register-terminal.py": "947e6db250f89ac20031d80bd79418e1693980eaf8cb361de251d7f7bb1a9833",
+    "ppw-gateway-registration.py": "b6b4ca000305e20643d217ced86f2b1e3057881c4c66adfadf8e636623d4ca04",
+    "ppw-instrument.py": "9278dc96816409cb864f4e92b36da0d9aea814d0c8c1f493011cd53c3d249dd0",
+    "ppw-pins.schema.json": "c737775a952adaeb066042c6d9d204bbfeae929c0bf6d5aa2e628422baf7e5f6",
+    "ppw-registration.py": "ab9e86f08723827e5be56dee160cfa6db63849863df33b0428bdc782dfc20e0e",
+    "ppw-run-observer.py": "7555bac129bc6f36c902ff112bca3064f7ad26ffb3de40c571ff06a58879a02e",
+    "ppw-source-assembly.py": "0e4002ff79aceb39658223c3820438a4b9832cf4c00ca107d37e47ad5f7c973c",
+    "ppw-source-inspection.py": "836027d7b3db07d061d68f128fff77ab3e1d4a840ef0f3148d9f8da8315727e8",
+    "ppw-spending.py": "42eb5553c2dd0c7928d3413f58f6759846196ec3b9437312da27e225997b036d",
+    "ppw-test-host.py": "41796877f49dfcf5ff51751eb1c24e1bb27c19d32ad77ab7b5f1d913f9a758c3",
+    "run-pair.sh": "80cd8a0a32997836c225c7ddabc465eaeab0b1356a6aff7017b0e56c62a9dedc",
+    "source-inspection/PpwSourceInspector.csproj": "be41403479c72037d16bf22500ab597f1c65babbb3f9935805c90c7a7d64ec62",
+    "source-inspection/Program.cs": "974bfa49a5a0c8435929cfcb5d408f3b26694580c412d5e29b0e5a499f2f1bef",
+    "telemetry-helpers.py": "161b98639de2ac4d7929098530e096cec14d63cb4d4be63ee510a61e4600849e",
+    "templates/calor-arm/CalorArm.Gateway.csproj.template": "f551e7e4fd14434dafc8e332ea3908d8db1695725316856e69f7b1a45cf11159",
+    "templates/calor-arm/CalorArm.csproj.template": "60b56d0475a5ce6f60493cffdab87eb8f90a17f058de7d6bff859769ae11f04c",
+    "templates/calor-arm/policy-canary.calr.txt": "205ad82b07e0781968425b414bde2aa817e93ca9a9392e6727167eed5b46f10e",
+    "test-host/PpwXunitHost.csproj": "34feab8cc7d54a7d2f912fd8ab906ca731ea42f42129c22e1882cfdc4806a9cb",
+    "test-host/Program.cs": "067d7effc75e0edcb70158a3fb21ec92c8cf28167867f45345dee6eebfbaca1d",
+    "token-usage.py": "b2cd56ed565c40877092640392f0998cb97d637ebdd6de6ead9a96d77398149e",
+    "token-usage.sh": "de59280fa8d212397d6154ecc87b2776a73d2dfd6de03515b739119bfb819117"
+  },
+  "schemaVersion": 1,
+  "stage": "pilot",
+  "supersedes": {
+    "path": "gateway-instrument-amendment-1434.json",
+    "sha256": "5696d88e8edf9f3fc782c25c625ed426f1bfd9ad10a144fb797899b762c76508"
+  }
+}
