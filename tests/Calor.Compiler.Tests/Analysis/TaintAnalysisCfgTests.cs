@@ -13,6 +13,66 @@ public sealed class TaintAnalysisCfgTests
 {
     private static TextSpan Span(int start) => new(start, start + 1, 1, start + 1);
 
+    [Theory]
+    [InlineData("Delete", false, false)]
+    [InlineData("Delete", false, true)]
+    [InlineData("ReadAllText", false, false)]
+    [InlineData("ReadAllText", false, true)]
+    [InlineData("ReadAllText", true, false)]
+    [InlineData("ReadAllText", true, true)]
+    [InlineData("WriteAllText", false, false)]
+    [InlineData("WriteAllText", false, true)]
+    public void N3_SelectedBclSignature_PreservesExactTaintSinkIdentity(string method, bool expression, bool tainted)
+    {
+        var source = N3TaintSource(method, expression, tainted);
+        var parsing = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, parsing).TokenizeAllForParser(), parsing).Parse();
+        Assert.False(parsing.HasErrors);
+        var bound = new Binder(new DiagnosticBag()).Bind(module);
+        var statement = bound.Functions.Single().Body[1];
+        var parameterTypes = expression
+            ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundBindStatement>(statement).Initializer).ResolvedParameterTypes
+            : Assert.IsType<BoundCallStatement>(statement).ResolvedParameterTypes;
+        Assert.Equal(Enumerable.Repeat("System.String", method == "WriteAllText" ? 2 : 1), parameterTypes);
+        var diagnostics = new DiagnosticBag();
+        new TaintAnalysisRunner(diagnostics).Analyze(bound);
+        Assert.Equal(tainted, diagnostics.Any(diagnostic => diagnostic.Code == DiagnosticCode.PathTraversal));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void N3_SelectedBclSink_CliAnalyzeRetainsTaintFindings(bool expression, bool tainted)
+    {
+        var directory = Path.Combine(CliTestHarness.FindRepoRoot(), ".n3-taint-cli-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var input = Path.Combine(directory, "input.calr");
+            File.WriteAllText(input, N3TaintSource(expression ? "ReadAllText" : "Delete", expression, tainted));
+            var result = CliTestHarness.RunCli(directory,
+                "-i", input, "-o", Path.Combine(directory, "output.cs"),
+                "--no-cache", "--no-enforce-effects", "--analyze", "--all-findings", "--format", "json");
+            Assert.True(result.ExitCode == 0, result.StdErr + "\n" + result.StdOut);
+            using var document = JsonDocument.Parse(result.StdOut);
+            Assert.Equal(tainted, document.RootElement.GetProperty("diagnostics").EnumerateArray()
+                .Any(diagnostic => diagnostic.GetProperty("code").GetString() == DiagnosticCode.PathTraversal));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static string N3TaintSource(string method, bool expression, bool tainted) => $$"""
+        §M{m1:TaintIdentity}
+          §F{f1:Run:pub} () -> void
+            §B{path:string} {{(tainted ? "§C{System.Environment.GetEnvironmentVariable} §A STR:\"N3_INPUT\" §/C" : "STR:\"constant.txt\"")}}
+            {{(expression ? "§B{ignored} " : "")}}§C{System.IO.File.{{method}}} §A path {{(method == "WriteAllText" ? "§A STR:\"content\"" : "")}} §/C
+        """;
+
     [Fact]
     public void RegressionCorpusInventory_EnforcesCommittedPrecisionRecallTargets()
     {

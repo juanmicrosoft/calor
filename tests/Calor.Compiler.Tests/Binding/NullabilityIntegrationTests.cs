@@ -134,7 +134,7 @@ public class NullabilityIntegrationTests
             ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(body[0]).Expression).ResolvedParameterTypes
             : Assert.IsType<BoundCallStatement>(body[0]).ResolvedParameterTypes;
         Assert.Single(parameterTypes!);
-        Assert.Contains("string", parameterTypes![0]);
+        Assert.Contains("System.String", parameterTypes![0]);
         if (expected != 0)
         {
             var diagnostic = Assert.Single(findings);

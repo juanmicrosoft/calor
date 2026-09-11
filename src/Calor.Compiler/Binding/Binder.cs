@@ -263,6 +263,14 @@ public sealed class Binder
         return result;
     }
 
+    // Exact analysis identities use CLR names, not C# keywords or reference-nullability syntax.
+    private static readonly Microsoft.CodeAnalysis.SymbolDisplayFormat BclParameterIdentityFormat = new(
+        globalNamespaceStyle: Microsoft.CodeAnalysis.SymbolDisplayGlobalNamespaceStyle.Omitted,
+        typeQualificationStyle: Microsoft.CodeAnalysis.SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
+        genericsOptions: Microsoft.CodeAnalysis.SymbolDisplayGenericsOptions.IncludeTypeParameters,
+        miscellaneousOptions: Microsoft.CodeAnalysis.SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers
+            | Microsoft.CodeAnalysis.SymbolDisplayMiscellaneousOptions.ExpandNullable);
+
     private static Microsoft.CodeAnalysis.ITypeSymbol? ResolveBclArgumentType(
         Metadata.MetadataContext context, string typeName)
     {
@@ -1392,7 +1400,7 @@ public sealed class Binder
             receiverTypeSymbol,
             resolvedTypeName,
             resolvedMethodName,
-            (bclResolution?.Symbol?.Parameters.Select(parameter => parameter.Type.ToDisplayString())
+            (bclResolution?.Symbol?.Parameters.Select(parameter => parameter.Type.ToDisplayString(BclParameterIdentityFormat))
                 ?? resolution.Function?.Parameters
                 .Select(parameter => parameter.TypeName)
                 ?? args.Select(argument => argument.Type.DisplayString))
@@ -3405,7 +3413,7 @@ public sealed class Binder
             returnType,
             resolvedTypeName,
             resolvedMethodName,
-            resolvedParameterTypes: (bclResolution?.Symbol?.Parameters.Select(parameter => parameter.Type.ToDisplayString())
+            resolvedParameterTypes: (bclResolution?.Symbol?.Parameters.Select(parameter => parameter.Type.ToDisplayString(BclParameterIdentityFormat))
                 ?? resolution.Function?.Parameters
                 .Select(parameter => parameter.TypeName)
                 ?? args.Select(argument => argument.Type.DisplayString))

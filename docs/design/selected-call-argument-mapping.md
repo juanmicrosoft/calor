@@ -50,7 +50,7 @@ change. #1397's independently developed275 must be reconciled if it merges.
 
 ## Executable controls
 
-The44 new compiler cases and2 editor cases use existing runners and maintenance
+The56 new compiler cases and2 editor cases use existing runners and maintenance
 files; no benchmark framework, product C# path exemption or test tool was added.
 
 | Control | Evidence |
@@ -64,6 +64,7 @@ files; no benchmark framework, product C# path exemption or test tool was added.
 | Rejected selections | Both forms retain active0207/0208; metadata rejects unknown/duplicate names and selects the named object `Concat` overload rather than its string competitor |
 | Evaluation order | Original C# → Calor → public compilation → emitted assembly execution; four mixed/reordered statement/expression cases retain trace12 |
 | Existing behavior | Native overload, metadata shape/context, nullability predicate and routing/source-catalog suites |
+| Exact taint identities | Eight real binding/taint cases plus four `--analyze` CLI cases preserve `System.IO.File` sink recognition for tainted inputs and reject false alarms on constants; nullable reference syntax is not part of the overload identity |
 
 The initial117-case selection passed. Six new source controls then reproduced
 five failures before implementation: missing statement checks, wrongly accused
@@ -84,6 +85,17 @@ mode. No skip, comparison, denominator or opaque budget was changed. This is the
 product compiler coverage ratchet, not paused research collection. One newly
 visible finding is the already-owned #1398 coalesce-transfer limitation; none
 of the four is classified as an accepted compatibility break or safe result.
+
+A final integration reviewer found a separate regression in the new BCL signature
+field: Roslyn's default `string` spelling no longer matched exact taint rules
+expecting `STRING` or `System.String`. Typed source bindings exposed the regression
+that an earlier inferred-spelling probe did not. The correction uses qualified
+CLR type identities without reference-nullability display syntax; it changes
+neither taint policy nor the annotated types used by nullability checking.
+The before-fix selection failed eight of ten cases, including two actual CLI
+missed findings. The correction adds nullable-formal `WriteAllText` identity
+controls as well. Source errors/coverage remain pinned by the normal corpus
+ratchet, and fresh final-head review and CI are required after this material fix.
 
 ## Explicit limits and acceptance gap
 
