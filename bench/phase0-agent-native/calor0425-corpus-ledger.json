@@ -74,7 +74,7 @@
       }
     ]
   },
-  "MeasuredCommit": "9a1e84c03f0697692db4c0d939ebe0211f5e9081",
+  "MeasuredCommit": "6b9f4eeda8199fa8c8f1840066f0b27cbf262f1b",
   "AggregateDiagnostics": 117,
   "AggregateModulesWithDiagnostics": 47,
   "AggregateModulesEnforced": 326,
@@ -110,7 +110,7 @@
         "Calor0208 MediatR/Pipeline/RequestExceptionProcessorBehavior.cs"
       ],
       "BindFailureMultiCause": 0,
-      "Calor0411Sites": 279,
+      "Calor0411Sites": 303,
       "Calor0411Modules": 12
     },
     {
@@ -157,7 +157,7 @@
         "Calor0250 Serilog/Settings/KeyValuePairs/SettingValueConversions.cs"
       ],
       "BindFailureMultiCause": 4,
-      "Calor0411Sites": 543,
+      "Calor0411Sites": 551,
       "Calor0411Modules": 61
     },
     {
@@ -212,7 +212,7 @@
         "Calor0208 FluentValidation/Validators/RegularExpressionValidator.cs"
       ],
       "BindFailureMultiCause": 1,
-      "Calor0411Sites": 7420,
+      "Calor0411Sites": 7939,
       "Calor0411Modules": 115
     }
   ]

@@ -179,3 +179,67 @@ effect-row output adds `mut`. All non-binding coverage coordinates and every
 propagated-error identity remain unchanged. The product source-coverage ratchet
 was regenerated with its existing opt-in; its eight tests pass. These measurements
 do not alter frozen research inputs, ledger464ace or N0/R1 evidence.
+
+## Rebased remediation candidate and product corpus
+
+Production remediation candidate: `6b9f4eeda8199fa8c8f1840066f0b27cbf262f1b`,
+rebased onto E1 merge `be488238d3aac374995174aa47526c7f3d09fd51`.
+The earlier measurements and review SHAs above remain historical; they were not
+relabelled after rebase. No E1 harness file or capacity row was edited.
+
+The existing product golden generators were run at this production commit, after
+reproducing their failures. The DisplayString distribution changes only one typed
+None from `OPTION[inner=INT]` to `Option<INT>`. The Calor0425 ledger retains117
+diagnostics across47 of326 enforced modules,38 propagated-bind exclusions, and
+all cause/coverage/module counts. Only0411 site volumes change:
+
+| Corpus | Old0411 sites | Current0411 sites | Modules with0411, unchanged |
+|---|---:|---:|---:|
+| MediatR | 279 | 303 | 12 |
+| Serilog | 543 | 551 | 61 |
+| FluentValidation | 7420 | 7939 | 115 |
+
+The increase exposes unmodeled receiver/member paths that formerly borrowed the
+pure Option manifest through the unknown `?` sentinel, including conditional
+member accesses now charged by Effects. This is not improved resolution or
+nullable-state activation. The extra sites are inside the already-unknown module
+sets; no zero-Unknown safety claim is made. The ledger pins the actual production
+commit and unchanged corpus revisions:
+MediatR `fb309026775ef953a64fb5339d074426c1ad2c37`,
+Serilog `0597ddfbd4ec594d9c42edd745fe728a2198bad9`,
+FluentValidation `71b3c60cb5a16e02cb7957e478ec3fb6b983a73c`.
+
+The formatter's `11-05.approved.calr` was **already rejected** by the base CLI:
+Calor1002/CS0246 for untranslated `str`/`i32` in the generic static receiver.
+Current CLI rejects earlier with0411/0410 for `?.get_Empty`. Its single baseline
+entry moves from generated-C# failure to semantic failure; the942-file denominator,
+702 successful transformations, parse failures and total fallback count stay fixed.
+Neither the input nor the formatter's safety checks were changed. Arbitrary
+generic static-member resolution is not claimed repaired by T1.
+
+Three additional receiver cases bring the compiler manifest to8788, from the
+initial T1 count8785. The direct getter regressions exercise declared allocation,
+generated C# and actual return values (base3, conditional0/null); unknown receivers
+remain rejected. An initial getter fixture accidentally nested a following class
+after a direct `return new` expression. That fixture was corrected to bind then
+return the value, not counted as a product flake or a green run.
+
+### Remediation validation
+
+At the rebased production candidate above, the expanded original compiler
+selection plus all initially failing product classes passes538/538, no skips.
+The additional selectors are `PrimaryReceivers_PreserveBaseAndConditionalChains`,
+`BoundTypeArchitectureTests`, `Calor0425CorpusLedgerTests`,
+`LosslessFormattingTests` and `BinderIncompleteRatchetTests`.
+Actual TRX SHA-256:
+`c91b3445d5464f173fbcd71aac29f28a64166a8d4840a4099b15de1a4b2935af`.
+LSP11/11, MSBuild/cache105/105, conversion156/156, and product enforcement275/275
+also pass without skips. The enforcement selection adds `EffectEnforcementTests`,
+`Issue1176AccessorContractTests` and `Issue785ClosureTests` to the original197.
+These overlapping selections are not a summed unique-test denominator.
+
+The external-artifacts build, with the same explicitly copied metadata manifest,
+passes45 T1 plus18 metadata-context cases (63/63). Without that prerequisite the
+profile remains unsupported; the failure was not hidden by a skip or annotation
+fallback. Documentation self-check reports no drift. Actual final-head CI and two
+fresh independent reviews remain separate from these local measurements.
