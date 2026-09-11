@@ -167,12 +167,27 @@ modifier is absent. CLI cost estimates never reconcile liability. Missing,
 truncated, interrupted or ambiguous charges remain reserved; no expiry or
 automatic restart resets them.
 
-The collector binds every scheduled slot into the ledger. A slot cannot complete
-without reconciled gateway traffic and a non-interrupted client exit record.
+The collector binds every scheduled slot into the ledger. A **valid completion**
+requires reconciled gateway traffic and a non-interrupted client exit record.
+The #1434 terminal-attempt amendment separately accounts for registered invalid
+attempts, including invalid attempts with no provider request. A protected
+`attempt-start.json`, actual client exit, classified runner reason, reason-file
+hashes, sealed-source inventory and `invalid-terminal.json` must agree. The ledger
+records `slot-terminal-invalid`, never `slot-complete`, for these attempts.
+Missing output, malformed agent results, missing transcripts and non-interrupted
+client crashes with no observed work can qualify. API/price/policy/integrity
+failures, interrupted clients and any unreconciled liability still halt.
+An invalid marker alone cannot advance the schedule.
+
+Both terminal kinds consume the next registered identity exactly once. Invalid
+attempts are not replaced or counted as zero-valued outcomes. Gateway invalid
+records leave unavailable usage/grading fields null; historical non-gateway
+placeholder records remain unchanged. A nonzero, non-interrupted exit with
+observed work retains the existing eligibility rule.
 Kernel evidence is written beside the private invocation context, not into
 child-writable output. The collector checks its exact policy/client binding and
 stores it in the protected ledger before publishing the output copy. Scope
-completion requires the entire registered slot inventory.
+completion requires the entire registered terminal-slot inventory.
 
 Budget exhaustion produces `INCOMPLETE_BUDGET`, not a reduced-N experiment, a
 scientific null or a stage-2 decision. A complete schedule is still required for
@@ -245,11 +260,14 @@ using the real frozen task inventory and preserved 25-file execution map.
 All observations and the provider/compiler/OS boundaries are explicit synthetic
 fixtures. Both frozen estimands remain exactly one half in that fixture; the
 reported decision remains `SYNTHETIC_ONLY`.
-Its recovery case also executes all 443 continuation slots under the new 29-file
+Its recovery case also executes all 443 continuation slots under the new 30-file
 profile and sends the resulting archive to the registered adjudicator. The
 original invalid launch remains separate: 443 request-bearing completed slots,
 444 accounted slots, and no replacement. The fixture models post-apply accounting
 in a temporary ledger; separate recovery tests exercise atomic apply itself.
+An additional mixed fixture includes zero-request and reconciled-request invalid
+terminals, a zero-eligible cell, and read-only analysis after archive relocation.
+These are prescribed engineering cases, not pilot observations.
 
 `test_ppw_gateway_frozen_controls.py` additionally exercises the real retained
 compiler, source-fragment assembly, visible shim and private observer against all
@@ -276,7 +294,7 @@ The opt-in
 other environments skip it explicitly. Earlier whole-run evidence is preserved
 in separate `pre-boundary-1406` records, not presented as proof of the new policy.
 
-## #1432 recovery and operational entrypoint
+## #1432 failure, #1434 continuation and operational entrypoint
 
 The first `w-rows-pilot-gateway-001` launch reached the retained client but
 forwarded zero provider requests. It is still one attempted slot under the
@@ -286,17 +304,24 @@ continues only the remaining 443 slots. It does not replenish the sample,
 increase the $1,000 total allowance, erase the original three-event ledger
 prefix, or rewrite the failed archive.
 
-The old profile below is historical authority only. The collector now accepts
-only the separately reviewed `gateway-execution-profile-1432.json`. That file
+The #1433 recovery proposal was never applied or collected. Its complete
+`*-1432.json` records, original wire/startup evidence and analysis manifest remain
+preserved. #1434 explicitly supersedes that proposal, retaining the same
+prospective `w-rows-pilot-gateway-002`, original ledger and 443 remaining identities.
+It does not create a third segment or a new sample.
+
+The collector accepts only the separately reviewed
+`gateway-execution-profile-1434.json`. That file
 is intentionally not generated until
-`gateway-evidence/gateway-native-wire-1432-evidence.json` exists and passes both
+`gateway-evidence/gateway-native-wire-1434-evidence.json` exists and passes both
 the price and shared production wire contracts. The source-bound
-`gateway-native-startup-1432-evidence.json` must separately prove the scripted
-native build and tests passed. Registration generation is a pre-review
+`gateway-native-startup-1434-evidence.json` must separately prove the scripted
+native build and tests passed under the new trusted attempt lifecycle.
+Registration generation is a pre-review
 engineering step, not an operator action after recovery:
 
 ```bash
-python3 bench/phase0-agent-native/ppw-gateway-register-recovery.py --write
+python3 bench/phase0-agent-native/ppw-gateway-register-terminal.py --write
 ```
 
 The required evidence uses kind
@@ -330,6 +355,14 @@ directory, changes only the proven zero-request scope to the reviewed target
 binding, and appends event 4. It never starts the collector. A later collector
 start appends event 5 and archives the proof, opaque inventory, and original
 three-event operational snapshot into the new epoch.
+The preserved first result is an explicitly identified wrapper, linked to the
+original raw-result, invocation, pins, registration and source hashes. It is not
+presented as a newly run or newly inspected observation.
+
+Progress distinguishes `accountedSlots`, `validCompletedSlots`,
+`invalidTerminalSlots` and `requestBearingSlots`. Accounted slots include the
+original invalid launch and subsequent valid or invalid terminals. Request
+counts are financial traffic, not an attempted/unstarted-trial counter.
 
 `registrations/ppw-rows-stage1/gateway-execution-profile.json` resolves the
 preserved #1431 registration without rewriting it. The new collector archives the
@@ -362,7 +395,7 @@ invocation is:
 
 ```bash
 CLAUDE_MODEL=claude-opus-4-8 python3 bench/phase0-agent-native/ppw-instrument.py run \
-  --registration bench/phase0-agent-native/registrations/ppw-rows-stage1/gateway-execution-profile-1432.json \
+  --registration bench/phase0-agent-native/registrations/ppw-rows-stage1/gateway-execution-profile-1434.json \
   --tasks-root bench/phase0-agent-native/tasks/ppw-redesign \
   --compiler-root <exact-frozen-v0.18.0-checkout> \
   --epoch-id w-rows-pilot-gateway-002 --stage pilot \

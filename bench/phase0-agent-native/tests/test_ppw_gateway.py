@@ -77,14 +77,52 @@ class Fixture(unittest.TestCase):
         self.root.mkdir()
         self.addCleanup(shutil.rmtree, self.root)
 
-    def ledger(self, ceiling=500_000_000, planned=None):
+    def ledger(self, ceiling=500_000_000, planned=None, terminal=False):
         ledger = budget.RequestLedger(self.root / ("SYNTHETIC-" + uuid.uuid4().hex + ".sqlite3"))
         binding = {"stage": "pilot", "epochId": "SYNTHETIC", "priceSha256": budget.price_identity(),
                    "authorization": "SYNTHETIC"}
         if planned is not None:
             binding["plannedSlots"] = planned
+        if terminal:
+            binding["harnessArtifacts"] = budget.source_identities()
         ledger.initialize(binding, ceiling)
         return ledger, ledger.start()
+
+    def terminal_attempt(self, slot="task/calor-permissive/1", exit_code=0,
+                         reason=None, agent_result='{"result":"SYNTHETIC_DONE"}\n'):
+        directory = self.root / "archive/runs/task/calor-permissive/run-1"
+        directory.mkdir(parents=True)
+        (directory / "final-src").mkdir()
+        (directory / "final-src/Source.calr").write_text("§M{m:Synthetic}\n", encoding="utf-8")
+        budget.write_attempt_start(directory, self.root / "archive", slot, 1)
+        (directory / "client-invocation.json").write_text(
+            json.dumps({"exitCode": exit_code}) + "\n", encoding="utf-8")
+        if agent_result is not None:
+            (directory / "agent.json").write_text(agent_result, encoding="utf-8")
+        if reason is None:
+            reason = next(value for value, code in budget.TERMINAL_REASON_CODES.items()
+                          if code == "MISSING_TRANSCRIPT")
+        (directory / "invalid.txt").write_text(
+            "2026-09-11T00:00:00Z attempt=0 agent_rc=%d: %s\n" % (exit_code, reason),
+            encoding="utf-8")
+        (directory / "result.json").write_text(json.dumps({
+            "pair": "task", "arm": "calor-permissive", "run": 1,
+            "invalid": True, "censored": True,
+        }) + "\n", encoding="utf-8")
+        if budget.valid_client_exit(exit_code):
+            budget.write_terminal_attempt(directory, self.root / "archive", slot, reason)
+        return directory
+
+    def isolation_evidence(self):
+        return {
+            "kind": budget.ISOLATION_KIND,
+            "kernelProbe": dict(budget.ISOLATION_PROBE),
+            "modelInvoked": False,
+            "clientSha256": "1" * 64,
+            "policySha256": "2" * 64,
+            "workspaceRoot": str(self.root / "workspace"),
+            "authoritativeRoot": str(self.root / "archive"),
+        }
 
 
 class PriceTests(Fixture):
@@ -401,6 +439,207 @@ class LedgerTests(Fixture):
                   if row["kind"] == "slot-complete"]
         self.assertEqual(["SYNTHETIC-1", "SYNTHETIC-2"], [value["slot"] for value in events])
         self.assertEqual([evidence, evidence], [value["isolation"] for value in events])
+
+    def test_terminal_invalid_accepts_zero_or_reconciled_requests_and_consumes_slots(self):
+        slots = ["task/calor-permissive/1", "task/calor-strict/1"]
+        ledger, owner = self.ledger(planned=slots, terminal=True)
+        evidence = self.isolation_evidence()
+        first = self.terminal_attempt(slots[0])
+        terminal = ledger.complete_invalid_slot(
+            owner, slots[0], first, self.root / "archive", evidence,
+            budget.source_identities())
+        self.assertEqual("MISSING_TRANSCRIPT", terminal["classification"])
+
+        request = budget.admit_request(body())
+        request_id = ledger.reserve(owner, slots[1], request)
+        ledger.settle(
+            owner, request_id,
+            *budget.reconciled_cost(request, budget.MODEL, usage(), "end_turn"))
+        second = self.root / "archive/runs/task/calor-strict/run-1"
+        shutil.copytree(first, second)
+        start = json.loads((second / "attempt-start.json").read_text())
+        start["slot"] = slots[1]
+        (second / "attempt-start.json").write_text(
+            budget.canonical(start) + "\n", encoding="utf-8")
+        (second / "invalid-terminal.json").unlink()
+        result = json.loads((second / "result.json").read_text())
+        result["arm"] = "calor-strict"
+        (second / "result.json").write_text(json.dumps(result) + "\n", encoding="utf-8")
+        reason = next(value for value, code in budget.TERMINAL_REASON_CODES.items()
+                      if code == "MISSING_TRANSCRIPT")
+        budget.write_terminal_attempt(second, self.root / "archive", slots[1], reason)
+        ledger.complete_invalid_slot(
+            owner, slots[1], second, self.root / "archive", evidence,
+            budget.source_identities())
+        ledger.complete(owner)
+        snapshot = ledger.snapshot()
+        self.assertEqual("complete", snapshot["state"])
+        self.assertEqual(
+            slots,
+            [budget.decode(event["detail"])["slot"] for event in snapshot["events"]
+             if event["kind"] == budget.TERMINAL_INVALID_EVENT])
+
+    def test_terminal_invalid_refuses_forgery_order_unknown_charge_and_stopped_scope(self):
+        slots = ["task/calor-permissive/1", "task/calor-strict/1"]
+        evidence = self.isolation_evidence()
+        mutations = (
+            (lambda directory: (directory / "invalid-terminal.json").unlink(), "record is missing"),
+            (lambda directory: (directory / "client-invocation.json").write_text(
+                '{"exitCode":1}\n', encoding="utf-8"), "invocation evidence differs"),
+            (lambda directory: (directory / "final-src/Source.calr").write_text(
+                "changed", encoding="utf-8"), "sealed source differs"),
+            (lambda directory: (directory / "attempt-start.json").write_text(
+                (directory / "attempt-start.json").read_text().replace(
+                    budget.source_identities()["run-pair.sh"], "0" * 64),
+                encoding="utf-8"), "source"),
+        )
+        for mutation, message in mutations:
+            with self.subTest(message=message):
+                ledger, owner = self.ledger(planned=slots, terminal=True)
+                directory = self.terminal_attempt(slots[0])
+                mutation(directory)
+                with self.assertRaisesRegex(budget.Refusal, message):
+                    ledger.complete_invalid_slot(
+                        owner, slots[0], directory, self.root / "archive", evidence,
+                        budget.source_identities())
+                shutil.rmtree(self.root / "archive")
+
+        ledger, owner = self.ledger(planned=slots, terminal=True)
+        directory = self.terminal_attempt(slots[0])
+        forged_isolation = self.isolation_evidence()
+        forged_isolation["kernelProbe"]["authoritativeRead"] = True
+        with self.assertRaisesRegex(budget.Refusal, "isolation"):
+            ledger.complete_invalid_slot(
+                owner, slots[0], directory, self.root / "archive", forged_isolation,
+                budget.source_identities())
+        request = budget.admit_request(body())
+        with self.assertRaisesRegex(budget.Refusal, "out of registered order"):
+            ledger.reserve(owner, slots[1], request)
+        with self.assertRaisesRegex(budget.Refusal, "unregistered"):
+            ledger.reserve(owner, "foreign/arm/1", request)
+        request_id = ledger.reserve(owner, slots[0], request)
+        with self.assertRaises(budget.Refusal):
+            ledger.settle(owner, request_id, 0, {
+                "model": budget.MODEL, "stopReason": "end_turn", "usage": {},
+            })
+        with self.assertRaisesRegex(budget.Refusal, "in-flight or unknown"):
+            ledger.complete_invalid_slot(
+                owner, slots[0], directory, self.root / "archive", evidence,
+                budget.source_identities())
+        ledger.settle(owner, request_id)
+        with self.assertRaisesRegex(budget.Refusal, "incomplete scope"):
+            ledger.complete_invalid_slot(
+                owner, slots[0], directory, self.root / "archive", evidence,
+                budget.source_identities())
+
+        for reason in ("INCOMPLETE_POLICY", "INCOMPLETE_INTERRUPTED"):
+            shutil.rmtree(self.root / "archive")
+            ledger, owner = self.ledger(planned=slots, terminal=True)
+            directory = self.terminal_attempt(slots[0])
+            ledger.stop(owner, reason)
+            with self.subTest(reason=reason), self.assertRaisesRegex(
+                    budget.Refusal, "incomplete scope"):
+                ledger.complete_invalid_slot(
+                    owner, slots[0], directory, self.root / "archive", evidence,
+                    budget.source_identities())
+
+    def test_terminal_invalid_rejects_api_integrity_and_interrupted_failures(self):
+        for reason in (
+                'agent output matches error marker: "api error"',
+                "generated workspace policy/configuration changed during the run",
+                "trusted observer did not archive declared-done source"):
+            with self.subTest(reason=reason), self.assertRaisesRegex(
+                    budget.Refusal, "not an admitted terminal"):
+                budget.terminal_reason_code(reason)
+        directory = self.terminal_attempt(exit_code=124)
+        reason = next(value for value, code in budget.TERMINAL_REASON_CODES.items()
+                      if code == "MISSING_TRANSCRIPT")
+        with self.assertRaisesRegex(budget.Refusal, "noninterrupted"):
+            budget.write_terminal_attempt(
+                directory, self.root / "archive", "task/calor-permissive/1", reason)
+
+    def test_registered_nonzero_no_work_attempt_is_invalid_not_replaced(self):
+        slot = "task/calor-permissive/1"
+        ledger, owner = self.ledger(planned=[slot], terminal=True)
+        directory = self.terminal_attempt(
+            slot, exit_code=1, reason="agent exit code 1 with empty journal.jsonl")
+        terminal = ledger.complete_invalid_slot(
+            owner, slot, directory, self.root / "archive",
+            self.isolation_evidence(), budget.source_identities())
+        self.assertEqual(1, terminal["clientExitCode"])
+        self.assertEqual("CLIENT_EXIT_WITHOUT_OBSERVED_WORK", terminal["classification"])
+        ledger.complete(owner)
+        self.assertEqual(1, ledger.snapshot()["invalidTerminalSlots"])
+        self.assertEqual([], ledger.snapshot()["requests"])
+
+    def test_invalid_reason_predicates_and_hashes_are_required(self):
+        slot = "task/calor-permissive/1"
+        for reason, raw, code in (
+                ("agent.json missing or empty", None, "MISSING_AGENT_RESULT"),
+                ("agent.json is not valid JSON", "SYNTHETIC-not-json", "MALFORMED_AGENT_RESULT")):
+            with self.subTest(code=code):
+                directory = self.terminal_attempt(slot, reason=reason, agent_result=raw)
+                terminal = budget.validate_terminal_attempt(
+                    directory, self.root / "archive", slot)
+                self.assertEqual(code, terminal["classification"])
+                (directory / "agent.json").write_text('{"result":"SYNTHETIC"}\n')
+                with self.assertRaises(budget.Refusal):
+                    budget.validate_terminal_attempt(directory, self.root / "archive", slot)
+                shutil.rmtree(self.root / "archive")
+        directory = self.terminal_attempt(
+            slot, exit_code=1, reason="agent exit code 1 with empty journal.jsonl")
+        (directory / "journal.jsonl").write_text('{"cmd":"build"}\n')
+        with self.assertRaisesRegex(budget.Refusal, "observed work"):
+            budget.validate_terminal_attempt(directory, self.root / "archive", slot)
+        (directory / "journal.jsonl").unlink()
+        (directory / "agent.json").write_text('{"result":"SYNTHETIC-altered"}\n')
+        with self.assertRaisesRegex(budget.Refusal, "reason evidence changed"):
+            budget.validate_terminal_attempt(directory, self.root / "archive", slot)
+
+    def test_source_bound_valid_completion_requires_exact_attempt_and_isolation(self):
+        slot = "task/calor-permissive/1"
+        ledger, owner = self.ledger(planned=[slot], terminal=True)
+        directory = self.terminal_attempt(slot)
+        attempt = budget.validate_attempt_start(directory, self.root / "archive", slot)
+        evidence = self.isolation_evidence()
+        request = budget.admit_request(body())
+        identity = ledger.reserve(owner, slot, request)
+        ledger.settle(owner, identity, *budget.reconciled_cost(
+            request, budget.MODEL, usage(), "end_turn"))
+        for altered in (None, dict(attempt, slot="foreign"), dict(attempt, nonce="missing")):
+            with self.subTest(attempt=altered), self.assertRaises(budget.Refusal):
+                ledger.complete_slot(owner, slot, evidence, 1, attempt=altered)
+        with self.assertRaises(budget.Refusal):
+            ledger.complete_slot(owner, slot, {"kind": "untrusted"}, 1, attempt=attempt)
+        ledger.complete_slot(owner, slot, evidence, 1, attempt=attempt)
+        ledger.complete(owner)
+        self.assertEqual(1, ledger.snapshot()["validCompletedSlots"])
+
+    def test_archived_terminal_origin_survives_relocation_not_origin_changes(self):
+        slot = "task/calor-permissive/1"
+        directory = self.terminal_attempt(slot)
+        old_root = self.root / "archive"
+        relocated = self.root / "relocated-archive"
+        old_root.rename(relocated)
+        moved = relocated / directory.relative_to(old_root)
+        record = budget.validate_terminal_attempt(
+            moved, relocated, slot, recorded_authoritative_root=str(old_root))
+        self.assertEqual("MISSING_TRANSCRIPT", record["classification"])
+        with self.assertRaisesRegex(budget.Refusal, "attempt-start evidence differs"):
+            budget.validate_terminal_attempt(
+                moved, relocated, slot, recorded_authoritative_root=str(self.root / "foreign"))
+        with self.assertRaisesRegex(budget.Refusal, "attempt-start evidence differs"):
+            budget.validate_terminal_attempt(moved, relocated, slot)
+
+    def test_nonzero_exit_with_observed_work_keeps_legacy_valid_completion_guard(self):
+        ledger, owner = self.ledger(planned=["SYNTHETIC-slot"])
+        request = budget.admit_request(body())
+        identity = ledger.reserve(owner, "SYNTHETIC-slot", request)
+        ledger.settle(owner, identity, *budget.reconciled_cost(
+            request, budget.MODEL, usage(), "end_turn"))
+        ledger.complete_slot(owner, "SYNTHETIC-slot", self.isolation_evidence(), 1)
+        ledger.complete(owner)
+        self.assertEqual("complete", ledger.snapshot()["state"])
 
     def test_complete_provider_usage_releases_unused_request_reservation(self):
         ledger, owner = self.ledger()

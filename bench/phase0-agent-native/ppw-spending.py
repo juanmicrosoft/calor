@@ -31,8 +31,20 @@ GATEWAY_ARTIFACTS = COLLECTION_ARTIFACTS + (
     "templates/calor-arm/CalorArm.Gateway.csproj.template",
     "ppw-test-host.py", "test-host/Program.cs", "test-host/PpwXunitHost.csproj",
     "ppw-gateway-registration.py", "ppw-gateway-recovery.py", "ppw-gateway-recover.py",
-    "ppw-gateway-register-recovery.py",
+    "ppw-gateway-register-recovery.py", "ppw-gateway-register-terminal.py",
 )
+PRE_TERMINAL_AMENDMENT = {
+    "path": "gateway-instrument-amendment-1432.json",
+    "sha256": "3d45adad658c569ab84b34b3a9a91a35f4ca65a09e18ee77c327222b9f1a3f59",
+}
+PRE_TERMINAL_AUTHORIZATION = {
+    "path": "gateway-authorization-1432.json",
+    "sha256": "c4aa8608d478870922867f2fb892e14ca3efe442ea6fddca64643927f72e2b43",
+}
+PRE_TERMINAL_PLAN = {
+    "path": "gateway-spending-plan-1432.json",
+    "sha256": "ebea4e7db9b6ee1fa67a01b343dd182a9ebb49c673ab967b73750ffefa4b55c4",
+}
 FORECAST_EVIDENCE = {
     "script": {
         "path": "gateway-forecast/project_cost.py",
@@ -186,6 +198,72 @@ def validate_forecast(plan, ceiling, slot_count, directory):
     return {name: dict(proof) for name, proof in FORECAST_EVIDENCE.items()}
 
 
+def validate_terminal_supersession(selected, authorization, plan, amendment):
+    proof = selected.get("terminalSemanticsAmendment")
+    require(proof == selected.get("instrumentAmendment"),
+            "terminal semantics must bind the selected instrument amendment")
+    semantics = amendment.get("terminalSemantics", {})
+    policy = module("ppw-gateway-budget.py")
+    require(amendment.get("supersedes") == PRE_TERMINAL_AMENDMENT
+            and semantics.get("schemaVersion") == 1
+            and semantics.get("kind") == "pp-w-source-bound-terminal-attempt-semantics-v1"
+            and semantics.get("attemptDefinition") == "scheduled-client-launch"
+            and semantics.get("attemptStart", {}).get("kind") == policy.ATTEMPT_START_KIND
+            and semantics.get("attemptStart", {}).get("requiredBeforeClientInvocation") is True
+            and semantics.get("attemptStart", {}).get("attemptsPerSlot") == 1
+            and semantics.get("attemptStart", {}).get("producerSources")
+            == list(policy.TERMINAL_SOURCE_FILES)
+            and semantics.get("terminalInvalid", {}).get("kind")
+            == policy.TERMINAL_INVALID_KIND
+            and semantics.get("terminalInvalid", {}).get("ledgerEvent")
+            == policy.TERMINAL_INVALID_EVENT
+            and semantics.get("terminalInvalid", {}).get("admittedClassifications")
+            == policy.TERMINAL_CLASSIFICATIONS
+            and semantics.get("terminalInvalid", {}).get("clientExitCodeDomain")
+            == "integer-0-through-127-excluding-124"
+            and semantics.get("terminalInvalid", {}).get("countsAsAccountedSlot") is True
+            and semantics.get("terminalInvalid", {}).get("countsAsValidCompletion") is False
+            and semantics.get("terminalInvalid", {}).get("replacementPermitted") is False
+            and semantics.get("terminalInvalid", {}).get("requiresActualClientInvocation") is True
+            and semantics.get("terminalInvalid", {}).get("requiresTrustedAttemptStart") is True
+            and semantics.get("terminalInvalid", {}).get("requiresReconciledRequests") is True
+            and semantics.get("terminalInvalid", {}).get("requiresSourceInspection") is False
+            and semantics.get("validTerminal", {}).get(
+                "nonzeroWithObservedWorkRemainsEligible") is True
+            and semantics.get("validTerminal", {}).get("clientExitCodeDomain")
+            == "integer-0-through-127-excluding-124"
+            and semantics.get("validTerminal", {}).get("requiresReconciledRequestTraffic") is True
+            and semantics.get("validTerminal", {}).get("requiresSourceInspection") is True
+            and semantics.get("haltConditions") == [
+                "pricing-or-financial-failure",
+                "unknown-or-unreconciled-liability",
+                "isolation-failure",
+                "interrupted-client-invocation",
+                "missing-or-untrusted-terminal-proof",
+            ]
+            and semantics.get("scientificMethodChange") is False
+            and semantics.get("zeroImputationPermitted") is False
+            and semantics.get("poolingChangePermitted") is False,
+            "unregistered terminal-attempt semantics")
+    require(authorization.get("supersedes") == PRE_TERMINAL_AUTHORIZATION
+            and authorization.get("terminalSemanticsAmendment") == proof
+            and authorization.get("additionalAllowance") is False
+            and authorization.get("ledgerReset") is False,
+            "terminal authorization does not preserve the prior allowance and ledger")
+    recovery = plan.get("recovery", {})
+    require(plan.get("supersedes") == PRE_TERMINAL_PLAN
+            and recovery.get("terminalSemanticsAmendment") == proof
+            and recovery.get("plannedInvocations") == 444
+            and recovery.get("continuationInvocations") == 443
+            and recovery.get("replacementAttempts") == 0
+            and recovery.get("sameExperimentCeiling") is True
+            and recovery.get("accountedTerminalSlots") == 444
+            and recovery.get("validCompletionPopulation")
+            == "registered-terminal-valid-attempts-only",
+            "terminal plan changes the frozen population or continuation")
+    return semantics
+
+
 def admit(registration, selected, authorization, directory, epoch_id, stage):
     require(stage == "pilot", "this implementation admits pilot-only scope, not stage 2")
     path, plan = pinned_document(directory, selected.get("spendingPlan", {}), "spendingPlan")
@@ -205,6 +283,8 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
     harness = artifact_manifest(control.get("kind", CONTROL))
     require(amendment.get("replacementHarnessArtifacts") == harness,
             "instrument source differs from the prospectively registered artifact manifest")
+    if "terminalSemanticsAmendment" in selected:
+        validate_terminal_supersession(selected, authorization, plan, amendment)
     require(plan.get("protocolSha256") == protocol_identity(registration, selected, stage, epoch_id),
             "spending plan changes or omits frozen protocol/model/task identities")
     ceiling = units(authorization["spendingCeilingUsd"])

@@ -1,0 +1,163 @@
+{
+  "kind": "pp-w-engineering-no-forward-native-probe",
+  "clientSha256": "553d1b9e9e7068b275c0a783c7e139ff6503096f286e674c8c919379fb0eca62",
+  "clientVersion": "2.1.266 (Claude Code)",
+  "clientFlags": [
+    "--print",
+    "--verbose",
+    "--output-format",
+    "stream-json",
+    "--forward-subagent-text",
+    "--dangerously-skip-permissions"
+  ],
+  "model": "claude-opus-4-8",
+  "toolShellSha256": "6ba6319962b59831740a56aa5f65e91d6467c72997f5d0a18be1ba1a6d8d378b",
+  "clientExitCode": 1,
+  "timedOut": false,
+  "recognizedProbeError": true,
+  "observations": [
+    {
+      "bodyKeys": [
+        "max_tokens",
+        "messages",
+        "metadata",
+        "model",
+        "output_config",
+        "stream",
+        "system",
+        "thinking",
+        "tools"
+      ],
+      "model": "claude-opus-4-8",
+      "maxTokens": 64000,
+      "stream": true,
+      "betaCapabilities": [
+        "advisor-tool-2026-03-01",
+        "claude-code-20250219",
+        "context-management-2025-06-27",
+        "effort-2025-11-24",
+        "interleaved-thinking-2025-05-14",
+        "mid-conversation-system-2026-04-07",
+        "mid-conversation-tool-changes-2026-07-01",
+        "oauth-2025-04-20",
+        "prompt-caching-scope-2026-01-05",
+        "structured-outputs-2025-12-15",
+        "thinking-token-count-2026-05-13"
+      ],
+      "unclassifiedBetaCount": 0,
+      "thinkingKeys": [
+        "type"
+      ],
+      "outputConfigKeys": [
+        "effort",
+        "format"
+      ],
+      "contextManagementKeys": [],
+      "contextEditKeys": [],
+      "contextEditTypes": [],
+      "toolFieldSets": [],
+      "toolTypes": [],
+      "priceContractAccepted": true,
+      "wireContractAccepted": true,
+      "messagesPath": true,
+      "credentialHeaderPresent": true
+    },
+    {
+      "bodyKeys": [
+        "context_management",
+        "max_tokens",
+        "messages",
+        "metadata",
+        "model",
+        "output_config",
+        "stream",
+        "system",
+        "thinking",
+        "tools"
+      ],
+      "model": "claude-opus-4-8",
+      "maxTokens": 64000,
+      "stream": true,
+      "betaCapabilities": [
+        "advisor-tool-2026-03-01",
+        "claude-code-20250219",
+        "context-management-2025-06-27",
+        "effort-2025-11-24",
+        "extended-cache-ttl-2025-04-11",
+        "interleaved-thinking-2025-05-14",
+        "mid-conversation-system-2026-04-07",
+        "mid-conversation-tool-changes-2026-07-01",
+        "oauth-2025-04-20",
+        "prompt-caching-scope-2026-01-05",
+        "thinking-token-count-2026-05-13"
+      ],
+      "unclassifiedBetaCount": 0,
+      "thinkingKeys": [
+        "type"
+      ],
+      "outputConfigKeys": [
+        "effort"
+      ],
+      "contextManagementKeys": [
+        "edits"
+      ],
+      "contextEditKeys": [
+        [
+          "keep",
+          "type"
+        ]
+      ],
+      "contextEditTypes": [
+        "clear_thinking_20251015"
+      ],
+      "toolFieldSets": [
+        [
+          "description",
+          "input_schema",
+          "name"
+        ]
+      ],
+      "toolTypes": [
+        "custom"
+      ],
+      "priceContractAccepted": true,
+      "wireContractAccepted": true,
+      "messagesPath": true,
+      "credentialHeaderPresent": true
+    }
+  ],
+  "kernelEvidence": {
+    "kind": "macos-seatbelt-request-gateway-v1",
+    "kernelProbe": {
+      "gateway": true,
+      "otherPort": false,
+      "samePortIpv6": false,
+      "stateWrite": false,
+      "stateRead": false,
+      "workspaceWrite": true,
+      "authoritativeWrite": false,
+      "authoritativeRead": false,
+      "hiddenTestRead": false,
+      "seededSolutionRead": false,
+      "outsideSignal": false,
+      "hardlinkWrite": false,
+      "symlinkWrite": false,
+      "unixSocket": false,
+      "delegatedPreferencesWrite": false,
+      "readableSourceRead": true,
+      "readableSourceHardlinkWrite": false
+    },
+    "modelInvoked": false
+  },
+  "upstreamRequests": 0,
+  "experimentalObservations": 0,
+  "sourceHashes": {
+    "probe-ppw-gateway.py": "3d789e0c498f054890a3f968b16cc8870544d90ef2dc61bd0829b944f5a1ba99",
+    "ppw-gateway-client.py": "5af515fd0e305bebfd497f0d33ff17825ecb2e8f2317cae327cbc05c45a92586",
+    "run-pair.sh": "80cd8a0a32997836c225c7ddabc465eaeab0b1356a6aff7017b0e56c62a9dedc",
+    "ppw-gateway-budget.py": "e13d67eb7405a7b33c0444b2102bcf7b65777fb57536f47503cdc665a810cbab",
+    "ppw-budget-gateway.py": "41df66257f35176d3f6c4c8eff5c43d0fe598e68ef61dd6fc04677e67c38aae1"
+  },
+  "completeIsolationProof": false,
+  "success": true
+}

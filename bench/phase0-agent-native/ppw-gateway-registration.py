@@ -8,10 +8,35 @@ import re
 BENCH = Path(__file__).resolve().parent
 ROOT = BENCH / "registrations/ppw-rows-stage1"
 PROFILE = ROOT / "gateway-execution-profile.json"
-RECOVERY_PROFILE = ROOT / "gateway-execution-profile-1432.json"
-RECOVERY_EVIDENCE = ROOT / "gateway-recovery-evidence-1432.json"
+PRE_TERMINAL_PROFILE = ROOT / "gateway-execution-profile-1432.json"
+PRE_TERMINAL_EVIDENCE = ROOT / "gateway-recovery-evidence-1432.json"
+RECOVERY_PROFILE = ROOT / "gateway-execution-profile-1434.json"
+RECOVERY_EVIDENCE = ROOT / "gateway-recovery-evidence-1434.json"
 BASELINE = "epochs/w-rows-pilot-001/registration.json"
 BASELINE_SHA256 = "b506c9ec65469640b6135708c7f1e9adbce7dcd318f6ca51e1b305156041484c"
+PRE_TERMINAL_PROFILE_PROOF = {
+    "path": PRE_TERMINAL_PROFILE.name,
+    "sha256": "8066b86aeecf292a8e86002011fee7415c91c9c528ea25727ab4541f3e05ec2f",
+}
+PRE_TERMINAL_EVIDENCE_PROOF = {
+    "path": PRE_TERMINAL_EVIDENCE.name,
+    "sha256": "9c3552b34bd1730f6c028a495a18a1db8918e735309b4b21eb0e81e52864643f",
+}
+PRE_TERMINAL_AMENDMENT_PROOF = {
+    "path": "gateway-instrument-amendment-1432.json",
+    "sha256": "3d45adad658c569ab84b34b3a9a91a35f4ca65a09e18ee77c327222b9f1a3f59",
+}
+PRE_TERMINAL_AUTHORIZATION_PROOF = {
+    "path": "gateway-authorization-1432.json",
+    "sha256": "c4aa8608d478870922867f2fb892e14ca3efe442ea6fddca64643927f72e2b43",
+}
+PRE_TERMINAL_PLAN_PROOF = {
+    "path": "gateway-spending-plan-1432.json",
+    "sha256": "ebea4e7db9b6ee1fa67a01b343dd182a9ebb49c673ab967b73750ffefa4b55c4",
+}
+PR_1433 = "https://github.com/juanmicrosoft/calor/pull/1433"
+MERGE_1433 = "ac4ad3a016feb283e5ea7b3d90e6505ecaf6e49b"
+ACTUAL_SOURCE_COMMIT = "d705c0c015954cf8bfe4d39040db727bfb2d2309"
 WIRE_SOURCE_HASHES = {
     "probe-ppw-gateway.py", "ppw-gateway-client.py", "run-pair.sh",
     "ppw-gateway-budget.py", "ppw-budget-gateway.py",
@@ -48,6 +73,11 @@ def validate_native_startup(value):
             and value.get("outcome") == "passed"
             and value.get("empirical") is False and value.get("modelInvoked") is False
             and value.get("provider", {}).get("realUpstreamGuardInstalled") is True
+            and value.get("accounting", {}).get("state") == "complete"
+            and value.get("accounting", {}).get("sourceBoundAttemptStart") is True
+            and value.get("accounting", {}).get("accountedSlots") == 1
+            and value.get("accounting", {}).get("validCompletedSlots") == 1
+            and value.get("accounting", {}).get("invalidTerminalSlots") == 0
             and value.get("pins", {}).get("clientSha256") == isolation.CLIENT_SHA256
             and value.get("invocation", {}).get("clientFlags") == isolation.registered_client_flags()
             and value.get("nativeToolExecution", {}).get("toolResultErrors") == 0
@@ -149,38 +179,75 @@ def resolve_profile(path):
 
 
 def load_recovery_evidence(path=RECOVERY_EVIDENCE):
-    """Load the canonical reviewed #1432 authority chain; no caller-selected approvals."""
+    """Load the canonical reviewed #1434 authority chain; no caller-selected approvals."""
     spending = helper("ppw-spending.py")
     path = Path(path)
     require(path.resolve() == RECOVERY_EVIDENCE.resolve(),
-            "recovery evidence must be the canonical reviewed #1432 registration")
+            "recovery evidence must be the canonical reviewed #1434 registration")
     value = json.loads(path.read_text(encoding="utf-8"))
     require(value.get("schemaVersion") == 1
-            and value.get("kind") == "pp-w-zero-request-recovery-evidence"
-            and value.get("issue") == "https://github.com/juanmicrosoft/calor/issues/1432"
-            and value.get("rootCauseReference")
-            == "https://github.com/juanmicrosoft/calor/issues/1432#issuecomment-5627884715",
+            and value.get("kind") == "pp-w-terminal-semantics-recovery-evidence"
+            and value.get("issue") == "https://github.com/juanmicrosoft/calor/issues/1434",
             "unrecognized recovery evidence")
     expected_names = {
         "recoveryAuthorization", "executionProfile", "spendingPlan", "inspectionProof",
-        "failedArchiveInventory", "failedOperationalSnapshot",
+        "failedArchiveInventory", "failedOperationalSnapshot", "terminalSemanticsAmendment",
     }
     require(expected_names <= set(value), "recovery evidence chain is incomplete")
     documents = {}
     for name in expected_names:
         _, documents[name] = spending.pinned_document(ROOT, value[name], name)
+    _, predecessor_authorization = spending.pinned_document(
+        ROOT, PRE_TERMINAL_AUTHORIZATION_PROOF, "pre-terminal authorization")
+    _, predecessor_plan = spending.pinned_document(
+        ROOT, PRE_TERMINAL_PLAN_PROOF, "pre-terminal spending plan")
+    _, predecessor_evidence = spending.pinned_document(
+        ROOT, PRE_TERMINAL_EVIDENCE_PROOF, "pre-terminal recovery evidence")
     require(value["executionProfile"] == {
         "path": RECOVERY_PROFILE.name, "sha256": spending.digest(RECOVERY_PROFILE),
     }, "recovery evidence selects another execution profile")
     authorization = documents["recoveryAuthorization"]
     profile = documents["executionProfile"]
     plan = documents["spendingPlan"]
+    amendment = documents["terminalSemanticsAmendment"]
     proof = documents["inspectionProof"]
     inventory = documents["failedArchiveInventory"]
     failed = documents["failedOperationalSnapshot"]
-    require(authorization.get("kind") == "pp-w-zero-request-recovery-authorization"
+    require(profile.get("spendAuthorization") == value["recoveryAuthorization"]
+            and profile.get("spendingPlan") == value["spendingPlan"]
+            and plan.get("authorizationSha256") == value["recoveryAuthorization"]["sha256"],
+            "mixed profile, plan, or authorization sources")
+    require(profile.get("supersedes") == PRE_TERMINAL_PROFILE_PROOF
+            and plan.get("supersedes") == PRE_TERMINAL_PLAN_PROOF
+            and authorization.get("supersedes") == PRE_TERMINAL_AUTHORIZATION_PROOF
+            and amendment.get("supersedes") == PRE_TERMINAL_AMENDMENT_PROOF,
+            "the #1433 proposal is not explicitly preserved and superseded")
+    require(profile.get("instrumentAmendment") == value["terminalSemanticsAmendment"]
+            and profile.get("terminalSemanticsAmendment") == value["terminalSemanticsAmendment"]
+            and authorization.get("terminalSemanticsAmendment")
+            == value["terminalSemanticsAmendment"]
+            and plan.get("recovery", {}).get("terminalSemanticsAmendment")
+            == value["terminalSemanticsAmendment"],
+            "terminal semantics amendment is not bound across the authority chain")
+    spending.validate_terminal_supersession({
+        "instrumentAmendment": value["terminalSemanticsAmendment"],
+        "terminalSemanticsAmendment": value["terminalSemanticsAmendment"],
+    }, authorization, plan, amendment)
+    require(amendment.get("replacementHarnessArtifacts")
+            == spending.artifact_manifest(spending.GATEWAY),
+            "terminal registration binds stale or mixed execution sources")
+    require(authorization.get("kind") == "pp-w-terminal-semantics-recovery-authorization"
             and authorization.get("spendingCeilingUsd") == 1000
+            and authorization.get("additionalAllowance") is False
+            and authorization.get("ledgerReset") is False
             and authorization.get("ledgerBinding") == plan.get("ledgerBinding")
+            and authorization.get("ledgerBinding")
+            == predecessor_authorization.get("ledgerBinding")
+            and authorization.get("oldBinding") == predecessor_authorization.get("oldBinding")
+            and authorization.get("failedLedgerSha256")
+            == predecessor_authorization.get("failedLedgerSha256")
+            and authorization.get("failedArchiveInventorySha256")
+            == predecessor_authorization.get("failedArchiveInventorySha256")
             and authorization.get("failedLedgerSha256") == proof.get("oldLedgerSha256")
             and authorization.get("failedArchiveInventorySha256")
             == proof.get("failedArchiveInventorySha256") == inventory.get("sha256"),
@@ -200,6 +267,44 @@ def load_recovery_evidence(path=RECOVERY_EVIDENCE):
             and failed.get("state") == "INCOMPLETE_POLICY"
             and failed.get("requests") == [] and failed.get("exposureMicroUsd") == 0,
             "recovery evidence is not the zero-request failed scope")
+    require(plan.get("forecast") == predecessor_plan.get("forecast")
+            and plan.get("plannedInvocations") == 444
+            and plan.get("ceilingUsd") == predecessor_plan.get("ceilingUsd") == 1000,
+            "the full-444 forecast or canonical total ceiling changed")
+    history = value.get("sourceHistory")
+    require(isinstance(history, dict)
+            and history == authorization.get("sourceHistory")
+            and history == profile.get("sourceHistory")
+            and history == amendment.get("sourceHistory")
+            and history.get("actualFailedCollection", {}).get("epochId")
+            == "w-rows-pilot-gateway-001"
+            and history["actualFailedCollection"].get("sourceCommit") == ACTUAL_SOURCE_COMMIT
+            and history["actualFailedCollection"].get("bindingSha256")
+            == proof.get("oldBindingSha256")
+            and history["actualFailedCollection"].get("ledgerSha256")
+            == authorization["failedLedgerSha256"]
+            and history["actualFailedCollection"].get("archiveInventorySha256")
+            == authorization["failedArchiveInventorySha256"]
+            and history.get("supersededUnexecutedProposal", {}).get("pullRequest") == PR_1433
+            and history["supersededUnexecutedProposal"].get("mergeCommit") == MERGE_1433
+            and history["supersededUnexecutedProposal"].get("executed") is False
+            and history["supersededUnexecutedProposal"].get("profile")
+            == PRE_TERMINAL_PROFILE_PROOF
+            and history["supersededUnexecutedProposal"].get("recoveryEvidence")
+            == PRE_TERMINAL_EVIDENCE_PROOF
+            and history.get("prospectiveCollection", {}).get("epochId")
+            == "w-rows-pilot-gateway-002"
+            and history["prospectiveCollection"].get("issue")
+            == "https://github.com/juanmicrosoft/calor/issues/1434",
+            "actual, superseded, or prospective source lineage differs")
+    lineage = value.get("historicalLineage", {})
+    require(lineage.get("predecessorRecoveryEvidence") == PRE_TERMINAL_EVIDENCE_PROOF
+            and lineage.get("predecessorProfile") == PRE_TERMINAL_PROFILE_PROOF
+            and lineage.get("predecessorPlan") == PRE_TERMINAL_PLAN_PROOF
+            and lineage.get("predecessorAuthorization") == PRE_TERMINAL_AUTHORIZATION_PROOF,
+            "pre-terminal recovery lineage differs")
+    require(lineage.get("originalActual") == predecessor_evidence.get("historicalLineage"),
+            "original financial and source lineage changed")
     target = value.get("targetBinding")
     invariants = authorization.get("targetInvariants", {})
     require(isinstance(target, dict)
@@ -207,22 +312,26 @@ def load_recovery_evidence(path=RECOVERY_EVIDENCE):
             and target.get("authorizationSha256") == value["recoveryAuthorization"]["sha256"]
             and target.get("planSha256") == value["spendingPlan"]["sha256"]
             and target.get("protocolSha256") == plan.get("protocolSha256")
+            and target.get("harnessArtifacts") == amendment["replacementHarnessArtifacts"]
             and target.get("plannedSlots") == authorization.get("plannedSlots"),
             "recovery target binding is not fully pinned")
     return value, documents
 
 
 def resolve_collection_profile(path):
-    """Resolve only the reviewed recovery profile accepted for a new collector."""
+    """Resolve only the reviewed #1434 terminal profile accepted for a new collector."""
     path = Path(path)
     require(path.resolve() == RECOVERY_PROFILE.resolve(),
-            "collection requires the canonical reviewed #1432 recovery profile")
+            "collection requires the canonical reviewed #1434 terminal profile")
+    require(RECOVERY_PROFILE.is_file() and RECOVERY_EVIDENCE.is_file(),
+            "fresh #1434 terminal profile and recovery evidence are not registered")
     registration = _resolve_profile(path, True)
     evidence, documents = load_recovery_evidence()
     selected = registration["stages"]["pilot"]
     selected["recoveryEvidence"] = {
         "path": RECOVERY_EVIDENCE.name, "sha256": helper("ppw-spending.py").digest(RECOVERY_EVIDENCE),
     }
+    selected["terminalSemanticsAmendment"] = evidence["terminalSemanticsAmendment"]
     for name in ("recoveryAuthorization", "inspectionProof", "failedArchiveInventory",
                  "failedOperationalSnapshot"):
         selected[name] = evidence[name]
@@ -327,6 +436,7 @@ def validate_archive(epoch, pins, selected):
         "protocolSha256": plan["protocolSha256"], "planSha256": selected["spendingPlan"]["sha256"],
         "harnessArtifacts": pins["harnessArtifacts"], "plannedSlots": slots,
     }
+    strict_terminal_lifecycle = budget.strict_terminal_lifecycle(expected_binding)
     initial = budget.decode((epoch / "spending-initial.json").read_bytes())
     final = budget.decode((epoch / "spending-final.json").read_bytes())
     ceiling = spending.units(authorization["spendingCeilingUsd"])
@@ -371,11 +481,58 @@ def validate_archive(epoch, pins, selected):
         directory = epoch / "runs" / task / arm / ("run-" + run)
         recovered_record = json.loads((directory / "result.json").read_text())
         client_invocation = json.loads((directory / "client-invocation.json").read_text())
-        require(recovered_record.get("invalid") is True
+        origin = recovered_record.get("recoveredAttempt", {})
+        original_profile = origin.get("originalProfile") if isinstance(origin, dict) else None
+        original_run = origin.get("originalRun") if isinstance(origin, dict) else None
+        inventory_entries = recovery_documents["failedArchiveInventory"].get("files")
+        require(isinstance(original_profile, dict) and isinstance(original_run, dict)
+                and isinstance(inventory_entries, list)
+                and all(isinstance(item, dict) and set(item) >= {"path", "sha256"}
+                        for item in inventory_entries),
+                "preserved failed attempt provenance is malformed")
+        failed_files = {
+            item["path"]: item["sha256"]
+            for item in inventory_entries
+        }
+        failed_run_root = "runs/%s/%s/run-%s/" % (task, arm, run)
+        require(recovered_record.get("recordKind") == "pp-w-recovered-invalid-wrapper-v1"
+                and recovered_record.get("invalid") is True
                 and recovered_record.get("censored") is True
-                and recovered_record.get("recoveredAttempt", {}).get("slot") == slot
-                and recovered_record["recoveredAttempt"].get("providerRequests") == 0
-                and recovered_record["recoveredAttempt"].get("replacementPermitted") is False
+                and origin.get("kind") == "pp-w-opaque-original-invalid-attempt-v1"
+                and origin.get("failedEpochId") == authority["oldEpochId"]
+                and origin.get("wrapperEpochId") == pins["epochId"]
+                and origin.get("slot") == slot
+                and origin.get("providerRequests") == 0
+                and origin.get("replacementPermitted") is False
+                and origin.get("provenanceResolution")
+                == ("verified-failed-archive" if pins["dataKind"] == "empirical"
+                    else "synthetic-registered-proof-double")
+                and origin.get("failedArchiveInventorySha256")
+                == authority["failedArchiveInventorySha256"]
+                and origin.get("failedLedgerSha256") == authority["failedLedgerSha256"]
+                and original_profile.get("sourceHashes")
+                == authority["oldBinding"]["harnessArtifacts"]
+                and original_profile.get("pinsIdentitySha256")
+                == recovery_documents["inspectionProof"]["failedPinsIdentitySha256"]
+                and original_profile.get("pinsSha256") == failed_files.get("pins.json")
+                and original_profile.get("registrationSha256")
+                == recovery_documents["inspectionProof"]["failedRegistrationSha256"],
+                "preserved failed attempt origin differs from the recovery authority")
+        require(original_run.get("rawRecordRelativePath")
+                == failed_run_root + "result.json"
+                and original_run.get("rawRecordSha256")
+                == failed_files.get(failed_run_root + "result.json")
+                and original_run.get("clientInvocationSha256")
+                == failed_files.get(failed_run_root + "client-invocation.json")
+                and (pins["dataKind"] == "synthetic"
+                     or original_run["clientInvocationSha256"]
+                     == spending.digest(directory / "client-invocation.json"))
+                and original_run.get("runPairSha256")
+                == authority["oldBinding"]["harnessArtifacts"]["run-pair.sh"]
+                and origin.get("wrapperSourceHashes") == {
+                    name: pins["harnessArtifacts"][name]
+                    for name in ("run-pair.sh", "ppw-gateway-budget.py", "ppw-instrument.py")
+                }
                 and (directory / "invalid.txt").is_file()
                 and set(client_invocation) == {"exitCode"}
                 and type(client_invocation["exitCode"]) is int
@@ -386,6 +543,17 @@ def validate_archive(epoch, pins, selected):
         require(initial["state"] == "collecting" and initial["requests"] == []
                 and initial["exposureMicroUsd"] == 0 and len(initial["events"]) == 2,
                 "initial accounting must precede every request")
+    if strict_terminal_lifecycle:
+        require({
+            key: initial.get(key) for key in (
+                "accountedSlots", "validCompletedSlots",
+                "invalidTerminalSlots", "requestBearingSlots")
+        } == {
+            "accountedSlots": len(preserved_attempted),
+            "validCompletedSlots": 0,
+            "invalidTerminalSlots": len(preserved_attempted),
+            "requestBearingSlots": 0,
+        }, "initial terminal-attempt counters differ")
     require(final["state"] == "complete"
             and final["events"][:len(initial["events"])] == initial["events"],
             "incomplete accounting or broken event lineage")
@@ -412,7 +580,10 @@ def validate_archive(epoch, pins, selected):
                 and row["state"] == "reconciled" and row["reason"] is None,
                 "unknown or incorrectly reconciled charge")
         rows[identity] = row
-    outstanding, settled, completed, exposure = {}, set(), list(preserved_attempted), 0
+    outstanding, settled, accounted, valid_completed = (
+        {}, set(), list(preserved_attempted), [])
+    invalid_terminal = list(preserved_attempted)
+    exposure = 0
     require(all(type(event.get("id")) is int for event in final["events"])
             and [event["id"] for event in final["events"]] == list(range(1, len(final["events"]) + 1)),
             "missing or reordered accounting events")
@@ -429,7 +600,7 @@ def validate_archive(epoch, pins, selected):
             require(identity in rows and identity not in outstanding and identity not in settled,
                     "missing or duplicate reservation event")
             row = rows[identity]
-            require(len(completed) < len(slots) and row["slot"] == slots[len(completed)]
+            require(len(accounted) < len(slots) and row["slot"] == slots[len(accounted)]
                     and detail == {"maximumMicroUsd": row["reserved"]},
                     "request after slot completion or wrong reservation")
             outstanding[identity] = row["reserved"]
@@ -444,10 +615,13 @@ def validate_archive(epoch, pins, selected):
             exposure -= outstanding.pop(identity) - row["charge"]
             settled.add(identity)
         elif kind == "slot-complete":
-            require(identity is None and set(detail) == {"slot", "clientExitCode", "isolation"},
+            expected_fields = {"slot", "clientExitCode", "isolation"}
+            if strict_terminal_lifecycle:
+                expected_fields.add("attempt")
+            require(identity is None and set(detail) == expected_fields,
                     "malformed slot completion")
             slot = detail["slot"]
-            require(len(completed) < len(slots) and slot == slots[len(completed)],
+            require(len(accounted) < len(slots) and slot == slots[len(accounted)],
                     "changed order, duplicate or replaced slot")
             requests = {name for name, row in rows.items() if row["slot"] == slot}
             require(requests and requests <= settled, "slot completed without reconciled traffic")
@@ -461,6 +635,15 @@ def validate_archive(epoch, pins, selected):
                     "missing registered isolation evidence")
             task, arm, run = slot.split("/")
             directory = epoch / "runs" / task / arm / ("run-" + run)
+            if strict_terminal_lifecycle:
+                require(detail["attempt"] == budget.validate_attempt_start(
+                    directory, epoch, slot, {
+                        name: pins["harnessArtifacts"][name]
+                        for name in budget.TERMINAL_SOURCE_FILES
+                    }, recorded_authoritative_root=proof["authoritativeRoot"]),
+                    "slot attempt-start evidence differs")
+            require(json.loads((directory / "result.json").read_text()).get("invalid") is False,
+                    "valid terminal event has an invalid result")
             source_report = json.loads((directory / "source-inspection.json").read_text())
             require(source_report.get("inspectorSha256")
                     == source_inspector["files"]["ppw-source-inspector.dll"]
@@ -473,12 +656,54 @@ def validate_archive(epoch, pins, selected):
             require(type(code) is int and 0 <= code < 128 and code != 124
                     and json.loads((directory / "client-invocation.json").read_text())["exitCode"] == code,
                     "interrupted or mismatched client invocation")
-            completed.append(slot)
+            accounted.append(slot)
+            valid_completed.append(slot)
+        elif kind == budget.TERMINAL_INVALID_EVENT:
+            require(strict_terminal_lifecycle and identity is None
+                    and set(detail) == {"slot", "clientExitCode", "isolation", "terminal"},
+                    "malformed or unregistered terminal-invalid event")
+            slot = detail["slot"]
+            require(len(accounted) < len(slots) and slot == slots[len(accounted)],
+                    "changed order, duplicate or replaced terminal-invalid slot")
+            requests = {name for name, row in rows.items() if row["slot"] == slot}
+            require(requests <= settled,
+                    "terminal-invalid slot has unreconciled request traffic")
+            proof = detail["isolation"]
+            require(set(proof) == {"kind", "kernelProbe", "modelInvoked", "clientSha256", "policySha256",
+                                   "workspaceRoot", "authoritativeRoot"}
+                    and proof["kind"] == isolation.ISOLATION
+                    and proof["kernelProbe"] == isolation.PROBE_EXPECTATIONS
+                    and proof["modelInvoked"] is False and proof["clientSha256"] == isolation.CLIENT_SHA256
+                    and re.fullmatch(r"[0-9a-f]{64}", proof["policySha256"]),
+                    "missing registered isolation evidence")
+            task, arm, run = slot.split("/")
+            directory = epoch / "runs" / task / arm / ("run-" + run)
+            terminal = budget.validate_terminal_attempt(
+                directory, epoch, slot, {
+                    name: pins["harnessArtifacts"][name]
+                    for name in budget.TERMINAL_SOURCE_FILES
+                }, recorded_authoritative_root=proof["authoritativeRoot"])
+            require(detail["terminal"] == terminal
+                    and detail["clientExitCode"] == terminal["clientExitCode"]
+                    and budget.valid_client_exit(detail["clientExitCode"])
+                    and json.loads((directory / "gateway-isolation.json").read_text()) == proof,
+                    "terminal-invalid archive evidence differs")
+            accounted.append(slot)
+            invalid_terminal.append(slot)
         elif kind == "collection-complete":
-            expected_detail = ({"preservedAttemptedSlots": preserved_attempted}
-                               if recovery_mode else {})
+            if strict_terminal_lifecycle:
+                expected_detail = {
+                    "accountedSlots": len(slots),
+                    "validCompletedSlots": len(valid_completed),
+                    "invalidTerminalSlots": len(invalid_terminal),
+                }
+                if recovery_mode:
+                    expected_detail["preservedAttemptedSlots"] = preserved_attempted
+            else:
+                expected_detail = ({"preservedAttemptedSlots": preserved_attempted}
+                                   if recovery_mode else {})
             require(index == len(final["events"]) - 1 and identity is None and detail == expected_detail
-                    and completed == slots and not outstanding and settled == set(rows),
+                    and accounted == slots and not outstanding and settled == set(rows),
                     "incomplete final request/slot inventory")
         else:
             raise ValueError("PP-W gateway registration: stopped, unknown or unregistered accounting event")
@@ -486,11 +711,24 @@ def validate_archive(epoch, pins, selected):
             and type(final["exposureMicroUsd"]) is int
             and exposure == final["exposureMicroUsd"] == sum(row["charge"] for row in rows.values()),
             "final liability total differs")
+    if strict_terminal_lifecycle:
+        require({
+            key: final.get(key) for key in (
+                "accountedSlots", "validCompletedSlots",
+                "invalidTerminalSlots", "requestBearingSlots")
+        } == {
+            "accountedSlots": len(accounted),
+            "validCompletedSlots": len(valid_completed),
+            "invalidTerminalSlots": len(invalid_terminal),
+            "requestBearingSlots": len({row["slot"] for row in rows.values()}),
+        }, "final terminal-attempt counters differ")
     return {"id": profile["id"], "authority": profile_proof,
             "instrumentAmendment": profile["instrumentAmendment"],
             "evidenceResolution": "verified-archive-local-files",
             "requestCount": len(rows),
-            "completedSlots": len(completed) - len(preserved_attempted),
-            "accountedSlots": len(completed),
+            "requestBearingSlots": len({row["slot"] for row in rows.values()}),
+            "completedSlots": len(valid_completed),
+            "invalidTerminalSlots": len(invalid_terminal),
+            "accountedSlots": len(accounted),
             "preservedAttemptedSlots": preserved_attempted,
             "accountedMicroUsd": exposure, "ceilingMicroUsd": ceiling}

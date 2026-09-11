@@ -22,12 +22,18 @@ SPENDING_AMENDMENT = "registrations/ppw-rows-stage1/spending-instrument-amendmen
 PRE_PROJECTION_MANIFEST = "registrations/ppw-rows-stage1/analysis-registration.pre-projection-1403.json"
 PRE_GATEWAY_MANIFEST = "registrations/ppw-rows-stage1/analysis-registration.pre-gateway-1406.json"
 PRE_RECOVERY_MANIFEST = "registrations/ppw-rows-stage1/analysis-registration.pre-recovery-1432.json"
+PRE_TERMINAL_MANIFEST = (
+    "registrations/ppw-rows-stage1/analysis-registration.pre-terminal-1434.json"
+)
 GATEWAY_PROFILE = "registrations/ppw-rows-stage1/gateway-execution-profile.json"
 PRE_RECOVERY_PROFILE = (
     "registrations/ppw-rows-stage1/gateway-execution-profile.pre-recovery-1432.json"
 )
 RECOVERY_PROFILE = "registrations/ppw-rows-stage1/gateway-execution-profile-1432.json"
 RECOVERY_EVIDENCE = "registrations/ppw-rows-stage1/gateway-recovery-evidence-1432.json"
+TERMINAL_PROFILE = "registrations/ppw-rows-stage1/gateway-execution-profile-1434.json"
+TERMINAL_EVIDENCE = "registrations/ppw-rows-stage1/gateway-recovery-evidence-1434.json"
+TERMINAL_AMENDMENT = "registrations/ppw-rows-stage1/gateway-instrument-amendment-1434.json"
 ARTIFACTS = (
     "ppw-pilot-adjudicate.py", "registrations/ppw-rows-stage1/precision.py",
     "ppw-instrument.py", "ppw-registration.py", "ppw-source-assembly.py",
@@ -76,6 +82,23 @@ RECOVERY_ARTIFACTS = (
     "registrations/ppw-rows-stage1/gateway-evidence/gateway-native-startup-1432-evidence.json",
     "tests/test_ppw_gateway_native_startup.py",
 )
+TERMINAL_BASE_ARTIFACTS = (
+    PRE_TERMINAL_MANIFEST,
+    "ppw-gateway-register-terminal.py",
+    "tests/test_ppw_gateway_terminal_registration.py",
+)
+TERMINAL_ARTIFACTS = (
+    TERMINAL_PROFILE,
+    TERMINAL_EVIDENCE,
+    TERMINAL_AMENDMENT,
+    "registrations/ppw-rows-stage1/gateway-authorization-1434.json",
+    "registrations/ppw-rows-stage1/gateway-spending-plan-1434.json",
+    "registrations/ppw-rows-stage1/gateway-recovery-archive-inventory-1434.json",
+    "registrations/ppw-rows-stage1/gateway-recovery-original-snapshot-1434.json",
+    "registrations/ppw-rows-stage1/gateway-recovery-proof-1434.json",
+    "registrations/ppw-rows-stage1/gateway-evidence/gateway-native-wire-1434-evidence.json",
+    "registrations/ppw-rows-stage1/gateway-evidence/gateway-native-startup-1434-evidence.json",
+)
 CELL_FIELDS = {
     "pair", "arm", "plannedRuns", "validRuns", "invalidRuns", "censoredRuns",
     "escapes", "shapeRealized", "didNotBuildAtDeclaredDone",
@@ -111,6 +134,18 @@ def module(name, relative):
     return result
 
 
+def analysis_artifacts(status):
+    if status == "pending-reviewed-wire-evidence":
+        return ARTIFACTS
+    if status == "registered":
+        return ARTIFACTS + RECOVERY_ARTIFACTS
+    if status == "pending-reviewed-terminal-evidence":
+        return ARTIFACTS + RECOVERY_ARTIFACTS + TERMINAL_BASE_ARTIFACTS
+    if status == "terminal-semantics-registered":
+        return ARTIFACTS + RECOVERY_ARTIFACTS + TERMINAL_BASE_ARTIFACTS + TERMINAL_ARTIFACTS
+    raise ValueError("analysis registration has an unknown recovery state")
+
+
 def validate_analysis_registration():
     manifest = load(MANIFEST)
     require(manifest.get("schemaVersion") == 1
@@ -118,16 +153,30 @@ def validate_analysis_registration():
             "unrecognized pilot analysis registration")
     expected = manifest.get("artifacts", {})
     recovery_status = manifest.get("recoveryStatus")
-    artifact_names = ARTIFACTS if recovery_status == "pending-reviewed-wire-evidence" \
-        else ARTIFACTS + RECOVERY_ARTIFACTS
+    artifact_names = analysis_artifacts(recovery_status)
     require(set(expected) == set(artifact_names), "analysis artifact inventory differs")
     for relative, sha in expected.items():
         require(digest(BENCH / relative) == sha, "analysis artifact changed: " + relative)
+    terminal_status = recovery_status in {
+        "pending-reviewed-terminal-evidence", "terminal-semantics-registered",
+    }
+    predecessor = PRE_TERMINAL_MANIFEST if terminal_status else PRE_RECOVERY_MANIFEST
     require(manifest.get("supersedes") == {
-        "path": PRE_RECOVERY_MANIFEST, "sha256": expected[PRE_RECOVERY_MANIFEST]},
+        "path": predecessor, "sha256": expected[predecessor]},
         "prior analysis registration must be explicitly preserved")
-    previous = load(BENCH / PRE_RECOVERY_MANIFEST)
-    require(previous["supersedes"] == {
+    previous = load(BENCH / predecessor)
+    pre_recovery = previous if not terminal_status else load(BENCH / PRE_RECOVERY_MANIFEST)
+    if terminal_status:
+        require(previous.get("recoveryStatus") == "registered"
+                and previous.get("collectionAuthorized") is False
+                and previous.get("gatewayExecutionProfile") == {
+                    "path": RECOVERY_PROFILE, "sha256": expected[RECOVERY_PROFILE]}
+                and previous.get("gatewayRecoveryEvidence") == {
+                    "path": RECOVERY_EVIDENCE, "sha256": expected[RECOVERY_EVIDENCE]}
+                and previous.get("supersedes") == {
+                    "path": PRE_RECOVERY_MANIFEST, "sha256": expected[PRE_RECOVERY_MANIFEST]},
+                "the preserved #1433 analysis registration lineage differs")
+    require(pre_recovery["supersedes"] == {
                 "path": PRE_GATEWAY_MANIFEST,
                 "sha256": expected[PRE_GATEWAY_MANIFEST]},
             "the pre-recovery analysis registration lineage differs")
@@ -135,23 +184,43 @@ def validate_analysis_registration():
     require(pre_gateway["supersedes"] == {
         "path": PRE_PROJECTION_MANIFEST, "sha256": expected[PRE_PROJECTION_MANIFEST]},
         "the prior guarded projection lineage differs")
-    require(recovery_status in {"pending-reviewed-wire-evidence", "registered"}
-            and manifest.get("collectionAuthorized") is False,
-            "analysis registration has an unknown #1432 recovery state")
-    expected_profile = RECOVERY_PROFILE if recovery_status == "registered" else GATEWAY_PROFILE
+    require(manifest.get("collectionAuthorized") is False,
+            "analysis registration cannot authorize collection")
+    expected_profile = (
+        TERMINAL_PROFILE if recovery_status == "terminal-semantics-registered"
+        else RECOVERY_PROFILE if recovery_status in {
+            "registered", "pending-reviewed-terminal-evidence",
+        } else GATEWAY_PROFILE
+    )
     require(manifest.get("gatewayExecutionProfile") == {
         "path": expected_profile, "sha256": expected[expected_profile]},
         "operational gateway execution profile is not registered")
     require(expected[PRE_RECOVERY_PROFILE] == expected[GATEWAY_PROFILE],
             "the pre-recovery gateway profile bytes were not preserved")
     gateway_registration = module("registered_gateway_profile", "ppw-gateway-registration.py")
-    if recovery_status == "registered":
+    if recovery_status in {"registered", "pending-reviewed-terminal-evidence"}:
         require(manifest.get("gatewayRecoveryEvidence") == {
             "path": RECOVERY_EVIDENCE, "sha256": expected[RECOVERY_EVIDENCE]},
-            "registered recovery evidence is missing")
-        gateway_registration.resolve_collection_profile(BENCH / RECOVERY_PROFILE)
+            "preserved #1433 recovery evidence is missing")
+    elif recovery_status == "terminal-semantics-registered":
+        require(manifest.get("gatewayRecoveryEvidence") == {
+            "path": TERMINAL_EVIDENCE, "sha256": expected[TERMINAL_EVIDENCE]}
+            and manifest.get("terminalSemanticsAmendment") == {
+                "path": TERMINAL_AMENDMENT, "sha256": expected[TERMINAL_AMENDMENT]},
+            "registered #1434 terminal evidence is missing")
+        gateway_registration.resolve_collection_profile(BENCH / TERMINAL_PROFILE)
     else:
         gateway_registration.resolve_profile(BENCH / GATEWAY_PROFILE)
+    if recovery_status == "pending-reviewed-terminal-evidence":
+        require(manifest.get("terminalRegistrationGenerator") == {
+            "path": "ppw-gateway-register-terminal.py",
+            "sha256": expected["ppw-gateway-register-terminal.py"],
+        } and manifest.get("requiredTerminalEvidence") == [
+            "registrations/ppw-rows-stage1/gateway-evidence/"
+            "gateway-native-wire-1434-evidence.json",
+            "registrations/ppw-rows-stage1/gateway-evidence/"
+            "gateway-native-startup-1434-evidence.json",
+        ], "pending #1434 registration does not identify its exact missing proofs")
     require(manifest.get("guardedExecutionProjection") == {
         "path": GUARDED_PROJECTION, "sha256": expected[GUARDED_PROJECTION]},
         "guarded execution projection is not registered")

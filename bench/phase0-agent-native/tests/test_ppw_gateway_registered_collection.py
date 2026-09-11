@@ -14,8 +14,7 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
         self.assertEqual((3, 74), (tasks, runs))
         self.seed = build(self.root / "registered-SYNTHETIC-seed")
         registration_helper = analysis.module("registered_collector_fixture", "ppw-gateway-registration.py")
-        recovered = self._testMethodName == (
-            "test_recovery_keeps_first_launch_invalid_and_collects_only_unstarted_slots")
+        recovered = self._testMethodName.startswith("test_recovery_")
         profile_path = registration_helper.RECOVERY_PROFILE if recovered else registration_helper.PROFILE
         self.registration = (
             registration_helper.resolve_collection_profile(profile_path) if recovered
@@ -95,7 +94,9 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
         for estimate in report["estimands"].values():
             self.assertEqual({"numerator": 1, "denominator": 2}, estimate["exactEstimate"])
 
-    def test_recovery_keeps_first_launch_invalid_and_collects_only_unstarted_slots(self):
+    def prepare_recovered_scope(self):
+        if self.historical_manifest:
+            return super().prepare_recovered_scope()
         recovery = collection_tests.instrument.helper("ppw-gateway-recovery.py")
         evidence = analysis.load(self.inputs / self.selected["recoveryEvidence"]["path"])
         authority = analysis.load(self.inputs / self.selected["recoveryAuthorization"]["path"])
@@ -108,6 +109,13 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
         collection_tests.save(
             failed_archive / "runs" / first["task"] / first["arm"] / "run-1/client-invocation.json",
             {"exitCode": 1})
+        (failed_archive / "runs" / first["task"] / first["arm"]
+         / "run-1/result.json").write_bytes(
+             b"SYNTHETIC OPAQUE INVALID PLACEHOLDER; NOT AN OUTCOME")
+        for name in ("pins.json", "registration.json"):
+            collection_tests.save(failed_archive / name, {
+                "kind": "SYNTHETIC original provenance double; NOT THE REAL FAILED ARCHIVE",
+            })
         ledger_path = Path(self.admission["ledgerPath"])
         ledger_path.parent.mkdir()
         ledger = collection_tests.budget.RequestLedger(ledger_path)
@@ -135,8 +143,13 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
                 "preservedAttemptedSlots": preserved, "failedArchive": str(failed_archive),
                 "backupName": authority["backupName"],
             })
+        return [slot["id"] for slot in full_slots]
+
+    def test_recovery_keeps_first_launch_invalid_and_collects_only_unstarted_slots(self):
+        full_slots = self.prepare_recovered_scope()
+        preserved = full_slots[:1]
         self.collect()
-        self.assertEqual([slot["id"] for slot in full_slots[1:]], self.launched)
+        self.assertEqual(full_slots[1:], self.launched)
         self.assertEqual(443, len(self.observed))
         before = analysis.inventory(self.epoch, collection_tests.instrument)
         with patch("subprocess.run", side_effect=AssertionError("adjudication must remain read-only")):
@@ -149,3 +162,27 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
         self.assertEqual(444, projection["accountedSlots"])
         self.assertEqual(443, projection["requestCount"])
         self.assertEqual(preserved, projection["preservedAttemptedSlots"])
+
+    def test_recovery_mixes_zero_and_reconciled_terminal_invalids_without_replacement(self):
+        super().test_recovery_mixes_zero_and_reconciled_terminal_invalids_without_replacement()
+        before = analysis.inventory(self.epoch, collection_tests.instrument)
+        with patch("subprocess.run", side_effect=AssertionError("adjudication must remain read-only")):
+            report = analysis.adjudicate(self.epochs, self.epoch_id)
+        projection = report["provenance"]["collectionExecutionProjection"]
+        self.assertEqual(before, report["provenance"]["epochInventory"])
+        self.assertEqual((370, 74, 444), (
+            projection["completedSlots"], projection["invalidTerminalSlots"],
+            projection["accountedSlots"]))
+        self.assertEqual(406, projection["requestBearingSlots"])
+        self.assertEqual(406, projection["requestCount"])
+        self.assertIsNone(report["estimands"]["shapeRealizationRate"]["exactEstimate"])
+        self.assertIsNone(report["estimands"]["armAEscapeRate"]["exactEstimate"])
+        self.assertEqual("UNIDENTIFIED", report["decision"]["evaluatedStatus"])
+        moved_root = self.root / "relocated-SYNTHETIC-epochs"
+        moved_root.mkdir()
+        self.epoch.rename(moved_root / self.epoch_id)
+        with patch("subprocess.run", side_effect=AssertionError("archive analysis is read-only")):
+            moved = analysis.adjudicate(moved_root, self.epoch_id)
+        self.assertEqual(report["estimands"], moved["estimands"])
+        self.assertEqual(report["provenance"]["epochInventory"],
+                         moved["provenance"]["epochInventory"])

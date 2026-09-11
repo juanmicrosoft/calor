@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Bounded one-shot recovery for a proven zero-request PP-W gateway ledger."""
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -12,6 +13,27 @@ from urllib.parse import quote
 KIND = "pp-w-request-gateway-v1"
 RECOVERY_KIND = "pp-w-zero-request-gateway-recovery-v1"
 RECOVERY_EVENT = "zero-request-recovery"
+TERMINAL_INVALID_EVENT = "slot-terminal-invalid"
+TERMINAL_INVALID_KIND = "pp-w-gateway-terminal-invalid-v1"
+ATTEMPT_START_KIND = "pp-w-gateway-attempt-start-v1"
+TERMINAL_SOURCE_FILES = {"run-pair.sh", "ppw-gateway-budget.py"}
+TERMINAL_FIELDS = {
+    "schemaVersion", "kind", "slot", "attemptNumber", "classification",
+    "invalidReason", "attemptStartSha256", "actualClientInvocation",
+    "clientExitCode", "clientInvocationSha256", "invalidReasonSha256",
+    "resultProjectionSha256", "sealedSource", "producerSourceSha256", "reasonEvidence",
+}
+ISOLATION_KIND = "macos-seatbelt-request-gateway-v1"
+ISOLATION_PROBE = {
+    "gateway": True, "otherPort": False, "workspaceWrite": True,
+    "authoritativeWrite": False, "authoritativeRead": False,
+    "hiddenTestRead": False, "seededSolutionRead": False,
+    "stateWrite": False, "stateRead": False,
+    "outsideSignal": False, "hardlinkWrite": False, "symlinkWrite": False,
+    "samePortIpv6": False,
+    "unixSocket": False, "delegatedPreferencesWrite": False,
+    "readableSourceRead": True, "readableSourceHardlinkWrite": False,
+}
 FAILED_STATE = "INCOMPLETE_POLICY"
 PILOT_CEILING_MICRO_USD = 1_000_000_000
 EXPECTED_BINDING_FIELDS = {
@@ -64,6 +86,13 @@ def _sha256_bytes(value):
 
 def _sha256_json(value):
     return _sha256_bytes(_canonical(value).encode("utf-8"))
+
+
+def _strict_terminal_lifecycle(binding):
+    artifacts = binding.get("harnessArtifacts", {}) if isinstance(binding, dict) else {}
+    root = Path(__file__).resolve().parent
+    return all(artifacts.get(name) == _sha256_bytes((root / name).read_bytes())
+               for name in TERMINAL_SOURCE_FILES)
 
 
 def _validate_sha256(value, name):
@@ -286,7 +315,7 @@ def _database_snapshot(db):
 
 
 def _expected_snapshot(binding, ceiling, state, events):
-    return {
+    result = {
         "kind": KIND,
         "state": state,
         "binding": binding,
@@ -297,6 +326,24 @@ def _expected_snapshot(binding, ceiling, state, events):
         "verdict": None,
         "basis": "request reservations; only validated complete provider usage permits release",
     }
+    if _strict_terminal_lifecycle(binding):
+        preserved = []
+        valid = 0
+        invalid = 0
+        for event in events:
+            if event["kind"] == RECOVERY_EVENT:
+                preserved = _event_detail(event)["preservedAttemptedSlots"]
+            elif event["kind"] == "slot-complete":
+                valid += 1
+            elif event["kind"] == TERMINAL_INVALID_EVENT:
+                invalid += 1
+        result.update(
+            accountedSlots=len(preserved) + valid + invalid,
+            validCompletedSlots=valid,
+            invalidTerminalSlots=len(preserved) + invalid,
+            requestBearingSlots=0,
+        )
+    return result
 
 
 def _validate_archive(archive, inventory, old_binding, ceiling, events):
@@ -684,6 +731,10 @@ def complete_recovered_scope(
         expected_ledger_sha256, expected_archive_inventory_sha256,
         recovery_registration_sha256, preserved_attempted_slots):
     """Complete a recovered scope after only the previously unstarted slots finish."""
+    spec = importlib.util.spec_from_file_location(
+        "recovered_terminal_budget", Path(__file__).with_name("ppw-gateway-budget.py"))
+    budget = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(budget)
     _validate_inputs(expected_old_binding, target_binding, expected_ledger_sha256,
                      expected_archive_inventory_sha256, recovery_registration_sha256)
     _require(isinstance(owner, str) and owner, "active owner is required")
@@ -707,6 +758,8 @@ def complete_recovered_scope(
             expected_archive_inventory_sha256=expected_archive_inventory_sha256,
             recovery_registration_sha256=recovery_registration_sha256,
             preserved_attempted_slots=preserved_attempted_slots)
+        _require([event["id"] for event in events] == list(range(1, len(events) + 1)),
+                 "recovered accounting event sequence is missing or reordered")
         _require(all(row["state"] == "reconciled" and row["reason"] is None for row in requests),
                  "in-flight or unknown charge remains")
         remaining = [
@@ -714,21 +767,147 @@ def complete_recovered_scope(
         ]
         _require(not any(row["slot"] in preserved_attempted_slots for row in requests),
                  "preserved failed attempt was retried")
-        completed = [
-            _event_detail(event)["slot"] for event in events if event["kind"] == "slot-complete"
-        ]
-        _require(completed == remaining,
+        rows = {row["id"]: row for row in requests}
+        outstanding, settled, accounted = set(), set(), []
+        valid_slots, invalid_slots = set(), set()
+        for event in events[5:]:
+            kind, request_id, detail = (
+                event["kind"], event["request_id"], _event_detail(event))
+            if kind == "reserved-before-upstream":
+                _require(request_id in rows and request_id not in outstanding
+                         and request_id not in settled,
+                         "recovered reservation event is missing or duplicated")
+                _require(len(accounted) < len(remaining)
+                         and rows[request_id]["slot"] == remaining[len(accounted)],
+                         "request started after a terminal or outside registered order")
+                _require(detail == {"maximumMicroUsd": rows[request_id]["reserved"]},
+                         "recovered reservation detail differs")
+                outstanding.add(request_id)
+            elif kind == "complete-provider-usage":
+                _require(request_id in outstanding,
+                         "recovered reconciliation lacks a preceding reservation")
+                row = rows[request_id]
+                _require(detail == {
+                    "conservativeChargeMicroUsd": row["charge"],
+                    "releasedMicroUsd": row["reserved"] - row["charge"],
+                }, "recovered reconciliation detail differs")
+                outstanding.remove(request_id)
+                settled.add(request_id)
+            elif kind == "slot-complete":
+                _require(request_id is None
+                         and set(detail) == {"slot", "clientExitCode", "isolation", "attempt"}
+                         and budget.valid_client_exit(detail["clientExitCode"])
+                         and isinstance(detail["isolation"], dict)
+                         and isinstance(detail["attempt"], dict)
+                         and set(detail["attempt"]) == {
+                             "schemaVersion", "kind", "slot", "attemptNumber", "maximumAttempts",
+                             "actualClientInvocationPending", "authoritativeRootSha256",
+                             "producerSourceSha256", "nonce",
+                         }
+                         and detail["attempt"].get("schemaVersion") == 1
+                         and detail["attempt"].get("kind") == ATTEMPT_START_KIND
+                         and detail["attempt"].get("slot") == detail["slot"]
+                         and detail["attempt"].get("attemptNumber") == 1
+                         and detail["attempt"].get("maximumAttempts") == 1
+                         and detail["attempt"].get("actualClientInvocationPending") is True
+                         and all(isinstance(detail["attempt"].get(name), str)
+                                 and len(detail["attempt"][name]) == 64
+                                 and all(character in "0123456789abcdef"
+                                         for character in detail["attempt"][name])
+                                 for name in ("authoritativeRootSha256", "nonce"))
+                         and set(detail["attempt"].get("producerSourceSha256", {}))
+                         == TERMINAL_SOURCE_FILES
+                         and all(detail["attempt"]["producerSourceSha256"].get(name)
+                                 == target_binding["harnessArtifacts"].get(name)
+                                 for name in TERMINAL_SOURCE_FILES),
+                         "malformed recovered valid terminal event")
+                _require(detail["isolation"].get("kind") == ISOLATION_KIND
+                         and detail["isolation"].get("kernelProbe") == ISOLATION_PROBE
+                         and detail["isolation"].get("modelInvoked") is False,
+                         "recovered valid isolation evidence differs")
+                slot = detail["slot"]
+                slot_requests = {name for name, row in rows.items() if row["slot"] == slot}
+                _require(slot_requests and slot_requests <= settled,
+                         "valid recovered slot lacks reconciled requests")
+                accounted.append(slot)
+                valid_slots.add(slot)
+            elif kind == TERMINAL_INVALID_EVENT:
+                _require(request_id is None
+                         and set(detail) == {"slot", "clientExitCode", "isolation", "terminal"}
+                         and budget.valid_client_exit(detail["clientExitCode"])
+                         and isinstance(detail["isolation"], dict),
+                         "malformed recovered terminal-invalid event")
+                _require(detail["isolation"].get("kind") == ISOLATION_KIND
+                         and detail["isolation"].get("kernelProbe") == ISOLATION_PROBE
+                         and detail["isolation"].get("modelInvoked") is False,
+                         "recovered terminal-invalid isolation evidence differs")
+                terminal = detail["terminal"]
+                _require(isinstance(terminal, dict)
+                         and set(terminal) == TERMINAL_FIELDS
+                         and terminal.get("schemaVersion") == 1
+                         and terminal.get("kind") == TERMINAL_INVALID_KIND
+                         and terminal.get("slot") == detail["slot"]
+                         and terminal.get("attemptNumber") == 1
+                         and terminal.get("actualClientInvocation") is True
+                         and terminal.get("clientExitCode") == detail["clientExitCode"]
+                         and terminal.get("classification")
+                         == budget.terminal_reason_code(terminal.get("invalidReason"))
+                         and isinstance(terminal.get("reasonEvidence"), dict)
+                         and set(terminal["reasonEvidence"])
+                         == {"agent.json", "transcript.jsonl", "journal.jsonl"}
+                         and all(value is None or budget.sha256_hex(value)
+                                 for value in terminal["reasonEvidence"].values())
+                         and all(isinstance(terminal.get(name), str)
+                                 and len(terminal[name]) == 64
+                                 and all(character in "0123456789abcdef"
+                                         for character in terminal[name])
+                                 for name in ("attemptStartSha256", "clientInvocationSha256",
+                                              "invalidReasonSha256", "resultProjectionSha256"))
+                         and isinstance(terminal.get("sealedSource"), dict)
+                         and set(terminal["sealedSource"])
+                         == {"inventorySha256", "fileCount", "byteCount"}
+                         and isinstance(terminal["sealedSource"]["inventorySha256"], str)
+                         and len(terminal["sealedSource"]["inventorySha256"]) == 64
+                         and all(character in "0123456789abcdef"
+                                 for character in terminal["sealedSource"]["inventorySha256"])
+                         and type(terminal["sealedSource"]["fileCount"]) is int
+                         and terminal["sealedSource"]["fileCount"] > 0
+                         and type(terminal["sealedSource"]["byteCount"]) is int
+                         and terminal["sealedSource"]["byteCount"] >= 0
+                         and set(terminal.get("producerSourceSha256", {}))
+                         == TERMINAL_SOURCE_FILES
+                         and all(terminal["producerSourceSha256"].get(name)
+                                 == target_binding["harnessArtifacts"].get(name)
+                                 for name in TERMINAL_SOURCE_FILES),
+                         "terminal-invalid proof differs from registered source")
+                slot = detail["slot"]
+                slot_requests = {name for name, row in rows.items() if row["slot"] == slot}
+                _require(slot_requests <= settled,
+                         "terminal-invalid recovered slot has unreconciled requests")
+                accounted.append(slot)
+                invalid_slots.add(slot)
+            elif kind == "collection-complete":
+                _require(False, "recovered scope is already complete")
+            else:
+                _require(False, "unknown recovered accounting event")
+            _require(accounted == remaining[:len(accounted)],
+                     "only the exact previously unstarted slot sequence may complete")
+        _require(accounted == remaining,
                  "only the exact previously unstarted slot sequence may complete")
         request_slots = {row["slot"] for row in requests}
-        _require(request_slots == set(remaining),
-                 "each continued slot requires gateway-accounted traffic")
-        _require(not any(event["kind"] == "collection-complete" for event in events),
-                 "recovered scope is already complete")
+        _require(request_slots <= set(remaining)
+                 and valid_slots <= request_slots
+                 and all(row["slot"] in valid_slots | invalid_slots for row in requests)
+                 and not outstanding and settled == set(rows),
+                 "continued request traffic differs from terminal slot accounting")
         db.execute("UPDATE scope SET state='complete' WHERE id=1")
         db.execute("INSERT INTO events(kind,request_id,detail) VALUES(?,?,?)",
-                   ("collection-complete", None, _canonical({
-                       "preservedAttemptedSlots": preserved_attempted_slots,
-                   })))
+                  ("collection-complete", None, _canonical({
+                      "preservedAttemptedSlots": preserved_attempted_slots,
+                      "accountedSlots": len(target_binding["plannedSlots"]),
+                      "validCompletedSlots": len(valid_slots),
+                      "invalidTerminalSlots": len(invalid_slots) + len(preserved_attempted_slots),
+                  })))
         db.execute("COMMIT")
     except BaseException:
         if db.in_transaction:
@@ -741,5 +920,9 @@ def complete_recovered_scope(
         "state": "complete",
         "preservedAttemptedSlots": preserved_attempted_slots,
         "continuedSlots": len(remaining),
+        "accountedSlots": len(target_binding["plannedSlots"]),
+        "requestBearingSlots": len(request_slots),
+        "validCompletedSlots": len(valid_slots),
+        "invalidTerminalSlots": len(invalid_slots) + len(preserved_attempted_slots),
         "plannedSlots": len(target_binding["plannedSlots"]),
     }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inspect or apply the single reviewed #1432 zero-request gateway recovery."""
+"""Inspect or apply the single reviewed #1434 invalid-preserving gateway recovery."""
 import argparse
 import importlib.util
 import json
@@ -25,8 +25,8 @@ def require(condition, message):
 def canonical_inputs():
     adjudication = module("ppw-pilot-adjudicate.py")
     manifest = adjudication.validate_analysis_registration()
-    require(manifest.get("recoveryStatus") == "registered",
-            "the reviewed #1432 recovery registration is not active")
+    require(manifest.get("recoveryStatus") == "terminal-semantics-registered",
+            "the reviewed #1434 terminal recovery registration is not active")
     registration = module("ppw-gateway-registration.py")
     spending = module("ppw-spending.py")
     evidence, documents = registration.load_recovery_evidence()

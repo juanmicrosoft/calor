@@ -691,6 +691,7 @@ class NativeGatewayStartupTests(unittest.TestCase):
                 "epochId": "SYNTHETIC-native-startup",
                 "priceSha256": budget.price_identity(),
                 "plannedSlots": [SLOT],
+                "harnessArtifacts": budget.source_identities(),
             }, 500_000_000)
             owner = ledger.start()
 
@@ -787,7 +788,9 @@ class NativeGatewayStartupTests(unittest.TestCase):
                         )
                     ):
                         ledger.complete_slot(
-                            owner, SLOT, isolation_evidence, completed.returncode
+                            owner, SLOT, isolation_evidence, completed.returncode,
+                            attempt=budget.validate_attempt_start(
+                                run_directory, archive, SLOT, budget.source_identities()),
                         )
                         ledger.complete(owner)
                         snapshot = ledger.snapshot()
@@ -915,6 +918,19 @@ class NativeGatewayStartupTests(unittest.TestCase):
                         snapshot.get("exposureMicroUsd") if snapshot else None
                     ),
                     "requests": accounting,
+                    "accountedSlots": snapshot.get("accountedSlots") if snapshot else None,
+                    "validCompletedSlots": snapshot.get("validCompletedSlots") if snapshot else None,
+                    "invalidTerminalSlots": snapshot.get("invalidTerminalSlots") if snapshot else None,
+                    "sourceBoundAttemptStart": (
+                        (run_directory / "attempt-start.json").is_file()
+                        and snapshot is not None
+                        and any(
+                            item["kind"] == "slot-complete"
+                            and budget.decode(item["detail"]).get("attempt", {}).get(
+                                "producerSourceSha256") == budget.source_identities()
+                            for item in snapshot["events"]
+                        )
+                    ),
                 },
                 "nativeToolExecution": transcript,
                 "observer": {
@@ -985,6 +1001,11 @@ class NativeGatewayStartupTests(unittest.TestCase):
                     and result.get("heldoutPassed") == 4
                     and result.get("taskSuccess") is True
                     and source_inspection_ok
+                    and evidence["accounting"]["state"] == "complete"
+                    and evidence["accounting"]["sourceBoundAttemptStart"] is True
+                    and evidence["accounting"]["accountedSlots"] == 1
+                    and evidence["accounting"]["validCompletedSlots"] == 1
+                    and evidence["accounting"]["invalidTerminalSlots"] == 0
                 )
                 else "failed"
             )
@@ -1021,6 +1042,10 @@ class NativeGatewayStartupTests(unittest.TestCase):
             "native Bash tool result did not produce the second provider turn",
         )
         self.assertEqual("complete", snapshot["state"], "synthetic ledger did not complete")
+        self.assertEqual(1, snapshot["accountedSlots"])
+        self.assertEqual(1, snapshot["validCompletedSlots"])
+        self.assertEqual(0, snapshot["invalidTerminalSlots"])
+        self.assertIs(evidence["accounting"]["sourceBoundAttemptStart"], True)
         self.assertEqual(
             ["reconciled", "reconciled", "reconciled"],
             [request["state"] for request in snapshot["requests"]],
