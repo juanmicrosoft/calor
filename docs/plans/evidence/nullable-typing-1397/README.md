@@ -247,7 +247,7 @@ fresh independent reviews remain separate from these local measurements.
 ### Final-head provenance-index reconciliation
 
 Two fresh independent contexts accepted `687c036850d1f8c6259cf1cc60eb7a42fbff88c8`
-for the bounded contract. Its CI then exposed one remaining metadata inconsistency:
+for the bounded contract. Its CI then exposed a metadata inconsistency:
 the separate commit-stamp index still named the old Calor0425 measurement. Only
 that product ledger's index entry is synchronized to `6b9f4eed`; no source code,
 measurement result, test assertion, frozen ledger or other index entry changes.
@@ -261,7 +261,100 @@ additionally warned0200. This is a previously accepted spelling, not a removed
 rejection. Expanded-prefix locals retain0202 as measured earlier. #1385 still
 owns a consistent activated receiving policy.
 
+This was the remaining failure exposed at that checkpoint, not proof that every
+later internal CI test leg had run. The next section records subsequent failures.
+
+## Dictionary compatibility remediation
+
+Production candidate: `b2c435610c3aa34accc0f28f66d5eca834d7a129`, still based on
+E1 merge `be488238d3aac374995174aa47526c7f3d09fd51`. Version remains0.20.0.
+The historical approvals below do **not** approve this material source change:
+
+| Exact reviewed head | Integration context (GPT-5.5) | Compatibility context (Claude Opus4.8) | Disposition |
+|---|---|---|---|
+| `687c036850d1f8c6259cf1cc60eb7a42fbff88c8` | `41351e45-0b3f-4fa5-bd67-1eacc0f73e64` | `2e3e8b0f-f9a3-44db-942b-9d28505e49d1` | Both accepted; CI subsequently exposed the product stamp-index inconsistency. |
+| `25161a3cfdeabcca841f0d229b6d1fbb53f4d380` | `a88258d2-c108-4261-a033-0cda65649195` | `0bcdf341-35fc-4e03-8229-8e72ea98708c` | Both accepted; actual CI subsequently failed four dictionary runtime cases and the string-origin key ledger. |
+
+Run34652725411 finished with34 successful checks and two failed jobs:
+compiler103438331298 and quality103438331022. The five distinct failures were
+reproduced locally (29 passed,5 failed). They were not flakes, concurrent-main
+changes or reasons to bypass CI. Earlier review and local selections did not
+establish full compatibility.
+
+Preserved C# dictionary initializers assigned to `var` lost the receiver type in
+their Calor binding. Once unknown `?` stopped borrowing Option purity, subsequent
+`Count`/`Keys` access exposed that loss. The converter now retains a spellable
+semantic type only for actual metadata-declared BCL Dictionary, SortedDictionary
+and ConcurrentDictionary results with two supported type arguments. Source
+lookalikes, error/dynamic/anonymous/tuple/nullable arguments and non-dictionary
+results are excluded. This is not arbitrary generic or nullable member inference.
+
+Receiver aliases reuse the existing ConcurrentDictionary manifest. Dictionary
+and SortedDictionary getter entries describe Count as pure and Keys/Values as
+allocating views. SortedDictionary receives no blanket purity/default or method
+coverage. Seven resolver controls cover getter charges and unknown members; four
+converter controls cover spellability and the non-dictionary-result boundary.
+The existing dictionary runtime regressions execute the emitted C#.
+
+### Product data audit at b2c43561
+
+The existing generators ran at that exact production commit; assertions were
+then rerun without regeneration. The two changed product stamp-index entries now
+pin b2c43561. Other index entries, frozen research and prior N0/R1 evidence remain
+unchanged.
+
+- Calor0425 stays117 diagnostics/47 modules/326 enforced and38 propagated-bind
+  exclusions. Calor0411 site totals are297/551/7932 for MediatR/Serilog/
+  FluentValidation, versus the earlier remediation's303/551/7939. The same
+  12/61/115 unknown-module sets and every other ledger coordinate remain.
+- The effect-key ledger records265 bound-origin and826 string-origin lookups,
+  versus265/822 previously. Only the bench subject changes620 to624. The200
+  floor,380 bench files, full scope/denominators and notMeasured identities stay
+  fixed. Lookup provenance is not resolved-signature or nullability coverage.
+- Three additional binder rows change only raw diagnostic hashes:
+  AccessorCache (10 errors), LanguageManager (82), and Mediator (17).
+  The existing diagnostic probe was run in separate processes with preserved
+  pre-dictionary binaries and b2c43561 binaries. Ordered codes, messages, span
+  lengths and columns are identical. Offsets move by0-32 characters and lines
+  by0-2 as emitted effect rows acquire `mut` from the now-resolved existing
+  ConcurrentDictionary manifest. Converted-source diffs contain only those
+  effect-row changes. All364 source keys, propagated identities and non-binding
+  coverage coordinates remain unchanged.
+
+The raw probe output and converted-source pairs are retained in session
+`files/t1-dictionary-repair`, together with the original failure logs. Corpus
+revisions remain the three exact commits stated above.
+
+### Executed b2c43561 validation
+
+Compiler579/579, LSP11/11, MSBuild/cache105/105, product enforcement282/282 and
+conversion156/156 pass, with no skips. These overlapping selections are not a
+summed unique-test denominator. All projects were rebuilt against the current
+source; old copied compiler binaries were not used for these results.
+
+The compiler selection adds `DictionaryInitializerSemanticsTests`,
+`EffectResolverKeyLedgerTests` and `LedgerCommitStampTests` to the earlier538.
+Enforcement uses the same five class selectors as the275-case remediation run,
+plus its seven new cases. The original LSP/tasks/conversion selectors are
+unchanged. Ten affected generator/binder-ratchet cases also passed during
+regeneration; the579-case run separately covers normal assertions.
+The actual compiler TRX SHA-256 is
+`7c7d59b3cc517ac2ab93bb0a44f80f786a31cc499a3aacc61fbf7ffb27e943a1`.
+Documentation self-check reports no drift.
+
+Manifest totals now compiler8792, LSP497, tasks130 and enforcement691, with skips
+unchanged. The initial42 T1 cases grew to45 through receiver controls; the four
+dictionary cases are separate. The earlier external-profile63-case result stays
+dated to its own source candidate; it is not relabeled as a b2c43561 run.
+
+Fresh final-head compiler-integration and adversarial-compatibility contexts must
+review this complete diff and remediation, followed by all actual final-head CI
+and delegated parent adjudication. Exact prompts, model/context IDs and outcomes
+will be posted on the PR. Separate AI contexts can share errors through training,
+prompts and evidence; they are not human reviews or statistically independent
+evidence.
+
 **Merge constraint:** use a normal merge commit, not squash/rebase merge, so the
-indexed production measurement commit `6b9f4eed` remains an ancestor and resolves
+indexed production measurement commit `b2c43561` remains an ancestor and resolves
 in a fresh main checkout. The repository permits merge commits. This is a
 provenance requirement, not authorization to merge before delegated adjudication.

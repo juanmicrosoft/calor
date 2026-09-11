@@ -74,7 +74,7 @@
       }
     ]
   },
-  "MeasuredCommit": "6b9f4eeda8199fa8c8f1840066f0b27cbf262f1b",
+  "MeasuredCommit": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
   "AggregateDiagnostics": 117,
   "AggregateModulesWithDiagnostics": 47,
   "AggregateModulesEnforced": 326,
@@ -110,7 +110,7 @@
         "Calor0208 MediatR/Pipeline/RequestExceptionProcessorBehavior.cs"
       ],
       "BindFailureMultiCause": 0,
-      "Calor0411Sites": 303,
+      "Calor0411Sites": 297,
       "Calor0411Modules": 12
     },
     {
@@ -212,7 +212,7 @@
         "Calor0208 FluentValidation/Validators/RegularExpressionValidator.cs"
       ],
       "BindFailureMultiCause": 1,
-      "Calor0411Sites": 7939,
+      "Calor0411Sites": 7932,
       "Calor0411Modules": 115
     }
   ]
