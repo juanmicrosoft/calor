@@ -148,6 +148,21 @@ class QuiescenceTests(unittest.TestCase):
                             ["/SYNTHETIC/work", "/SYNTHETIC/native"],
                             "2026-09-11T01:00:14.806Z", "/SYNTHETIC/native")
 
+    def test_native_inspection_does_not_depend_on_caller_supplied_markers(self):
+        def run(argv, **kwargs):
+            if argv[:2] == ["/bin/ps", "-axww"]:
+                return subprocess.CompletedProcess(argv, 0, "1 0 1 SYNTHETIC-idle\n", "")
+            if argv[:2] == ["/bin/ps", "-p"]:
+                return subprocess.CompletedProcess(argv, 0, "Sat Sep 12 16:23:55 2026\n", "")
+            return subprocess.CompletedProcess(
+                argv, 0, b"p1\0fcwd\0n/SYNTHETIC/unrelated\0ftxt\0n/SYNTHETIC/native\0", b"")
+        with patch.object(disposition.subprocess, "run", side_effect=run):
+            with self.assertRaisesRegex(ValueError, "may belong"):
+                disposition._quiescence_probe(
+                    [Path("/SYNTHETIC/work")], ["SYNTHETIC-OTHER-MARKER"],
+                    inspect_descriptors=True, first_collector_start="2026-09-11T01:00:14.806Z",
+                    native_executable="/SYNTHETIC/native")
+
 
 if __name__ == "__main__":
     unittest.main()

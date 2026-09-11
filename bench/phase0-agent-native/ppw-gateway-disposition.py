@@ -739,6 +739,7 @@ def _quiescence_probe(paths, markers, inspect_descriptors=False, first_collector
     criteria = sorted(set(
         [str(path) for path in paths]
         + list(markers)
+        + ([native_executable] if inspect_descriptors and native_executable else [])
         + ["ppw-instrument.py", "ppw-budget-gateway.py", "ppw-gateway-client.py", "run-pair.sh"]))
     try:
         completed = subprocess.run(
