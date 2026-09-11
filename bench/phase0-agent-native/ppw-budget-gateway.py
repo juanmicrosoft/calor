@@ -71,6 +71,24 @@ def provider_connection():
                                       context=ssl.create_default_context())
 
 
+def provider_error_code(error):
+    if isinstance(error, budget.Refusal):
+        return budget.provider_refusal_code(error)
+    for kind, code in (
+        (ssl.SSLCertVerificationError, "PROVIDER_TLS_CERTIFICATE"),
+        (ssl.SSLError, "PROVIDER_TLS"),
+        (TimeoutError, "PROVIDER_TIMEOUT"),
+        (socket.gaierror, "PROVIDER_DNS"),
+        (ConnectionError, "PROVIDER_CONNECTION"),
+        (http.client.IncompleteRead, "PROVIDER_HTTP_TRUNCATED"),
+        (http.client.HTTPException, "PROVIDER_HTTP_PROTOCOL"),
+        (OSError, "PROVIDER_IO"),
+    ):
+        if isinstance(error, kind):
+            return code
+    return "PROVIDER_DATA_SHAPE"
+
+
 class Server(ThreadingHTTPServer):
     daemon_threads = False
     allow_reuse_address = False
@@ -218,6 +236,28 @@ class Handler(BaseHTTPRequestHandler):
         upstream = None
         cost = None
         usage = None
+        stream = None
+        phase = "connect"
+        status = None
+        response_type = "unobserved"
+        failure_retained = False
+
+        def retain_failure(code):
+            nonlocal failure_retained
+            if failure_retained:
+                return
+            diagnostic = {
+                "kind": budget.PROVIDER_FAILURE_KIND, "code": code, "phase": phase,
+                "httpStatus": status, "responseType": response_type,
+                "streamState": None if stream is None else {
+                    "started": stream.started, "terminalDeltaSeen": stream.delta_seen,
+                    "stopped": stream.stopped,
+                },
+            }
+            # Commit the first cause and halt admission before draining more bytes.
+            gateway.ledger.settle(gateway.owner, request_id, diagnostic=diagnostic)
+            failure_retained = True
+
         try:
             # Reservation is durable before the first upstream byte or connection.
             upstream = gateway.connection_factory()
@@ -227,8 +267,22 @@ class Handler(BaseHTTPRequestHandler):
                     headers[name] = value
             headers["Content-Length"] = str(len(raw))
             headers["Accept-Encoding"] = "identity"
+            phase = "send-request"
             upstream.request("POST", path + ("?" + query if query else ""), body=raw, headers=headers)
+            phase = "response-headers"
             response = upstream.getresponse()
+            status = response.status
+            stream = budget.UsageStream(request) if request["stream"] else None
+            content_type = response.getheader("Content-Type", "").split(";")[0].strip().lower()
+            response_type = {"": "absent", "text/event-stream": "sse",
+                             "application/json": "json"}.get(content_type, "other")
+            correct_type = content_type == ("text/event-stream" if stream else "application/json")
+            if status != 200:
+                retain_failure("PROVIDER_HTTP_STATUS")
+            elif not correct_type:
+                retain_failure("PROVIDER_CONTENT_TYPE")
+            elif response.getheader("Content-Encoding", "identity").strip().lower() not in ("", "identity"):
+                retain_failure("PROVIDER_CONTENT_ENCODING")
             self.send_response(response.status)
             for name, value in response.getheaders():
                 if name.lower() not in HOP_HEADERS:
@@ -236,11 +290,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Connection", "close")
             self.end_headers()
             self.close_connection = True
-            stream = budget.UsageStream(request) if request["stream"] else None
-            content_type = response.getheader("Content-Type", "").split(";")[0].strip().lower()
-            correct_type = content_type == ("text/event-stream" if stream else "application/json")
             receipt = bytearray()
             disconnected = False
+            phase = "response-body"
             while True:
                 data = response.read1(16 * 1024)
                 if not data:
@@ -251,12 +303,17 @@ class Handler(BaseHTTPRequestHandler):
                         self.wfile.flush()
                     except (BrokenPipeError, ConnectionResetError, OSError):
                         disconnected = True
-                        gateway.fail("INCOMPLETE_INTERRUPTED")
+                        gateway.fail("INCOMPLETE_INTERRUPTED", "CLIENT_DISCONNECTED")
                 if stream:
                     stream.feed(data)
+                    if stream.failure:
+                        retain_failure(stream.failure)
                 elif len(receipt) <= MAX_RECEIPT:
                     receipt.extend(data)
-            if response.status == 200 and correct_type:
+                    if len(receipt) > MAX_RECEIPT:
+                        retain_failure("PROVIDER_RECEIPT_OVERSIZED")
+            if not failure_retained:
+                phase = "receipt-validation"
                 if stream:
                     cost, usage = stream.finish()
                 else:
@@ -267,14 +324,30 @@ class Handler(BaseHTTPRequestHandler):
                     budget.validate_response_content(message.get("content"))
                     cost, usage = budget.reconciled_cost(
                         request, message.get("model"), message.get("usage"), message.get("stop_reason"))
-        except (budget.Refusal, OSError, http.client.HTTPException, ValueError, TypeError, AttributeError):
+        except (budget.Refusal, OSError, http.client.HTTPException, ValueError, TypeError, AttributeError) as error:
             # Never release an error/truncated/ambiguous charge, even for 4xx/5xx.
             cost, usage = None, None
+            retain_failure(provider_error_code(error))
             self.close_connection = True
         finally:
-            if upstream is not None:
-                upstream.close()
-            gateway.ledger.settle(gateway.owner, request_id, cost, usage)
+            try:
+                if cost is None and not failure_retained:
+                    retain_failure("PROVIDER_UNEXPECTED_FAILURE")
+            finally:
+                closed = upstream is None
+                try:
+                    if upstream is not None:
+                        phase = "upstream-close"
+                        upstream.close()
+                        closed = True
+                except (OSError, http.client.HTTPException, ValueError, TypeError, AttributeError) as error:
+                    retain_failure(provider_error_code(error))
+                finally:
+                    if not failure_retained:
+                        if not closed:
+                            retain_failure("PROVIDER_UNEXPECTED_FAILURE")
+                        else:
+                            gateway.ledger.settle(gateway.owner, request_id, cost, usage)
 
 
 class Gateway:

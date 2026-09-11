@@ -22,6 +22,32 @@ def save(path, value):
     path.write_text(json.dumps(value, indent=2) + "\n")
 
 
+def synthetic_current_analysis_manifest(analysis_module, root):
+    """Create a test-owned analysis authority for current code and historical archives."""
+    manifest = copy.deepcopy(analysis_module.load(analysis_module.MANIFEST))
+    manifest["fixtureKind"] = "SYNTHETIC-current-source-analysis-authority"
+    manifest["recoveryStatus"] = "pending-reviewed-wire-evidence"
+    manifest["artifacts"] = {
+        relative: analysis_module.digest(analysis_module.BENCH / relative)
+        for relative in analysis_module.ARTIFACTS
+    }
+    manifest["supersedes"] = {
+        "path": analysis_module.PRE_RECOVERY_MANIFEST,
+        "sha256": manifest["artifacts"][analysis_module.PRE_RECOVERY_MANIFEST],
+    }
+    manifest["gatewayExecutionProfile"] = {
+        "path": analysis_module.GATEWAY_PROFILE,
+        "sha256": manifest["artifacts"][analysis_module.GATEWAY_PROFILE],
+    }
+    for field in (
+            "gatewayRecoveryEvidence", "terminalSemanticsAmendment",
+            "terminalRegistrationGenerator", "requiredTerminalEvidence"):
+        manifest.pop(field, None)
+    path = Path(root) / "SYNTHETIC-current-analysis-registration.json"
+    save(path, manifest)
+    return path
+
+
 def build(root):
     epoch = Path(root) / "synthetic-pilot"
     shutil.copytree(BENCH / "epochs/w-rows-pilot-001", epoch)

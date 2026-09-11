@@ -1,11 +1,11 @@
 """Actual collector output enters the registered adjudicator; every observation remains SYNTHETIC."""
+import copy
 import shutil
-import sqlite3
 from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from ppw_pilot_epoch import analysis, build
+from ppw_pilot_epoch import analysis, build, synthetic_current_analysis_manifest
 import test_ppw_gateway_collection as collection_tests
 
 
@@ -15,13 +15,14 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
         self.seed = build(self.root / "registered-SYNTHETIC-seed")
         registration_helper = analysis.module("registered_collector_fixture", "ppw-gateway-registration.py")
         recovered = self._testMethodName.startswith("test_recovery_")
-        profile_path = registration_helper.RECOVERY_PROFILE if recovered else registration_helper.PROFILE
-        self.registration = (
-            registration_helper.resolve_collection_profile(profile_path) if recovered
-            else registration_helper.resolve_profile(profile_path))
+        self.recovered_fixture = recovered
+        profile_path = registration_helper.PROFILE
+        self.registration = registration_helper.resolve_profile(profile_path)
         self.historical_manifest = not recovered
         self.selected = self.registration["stages"]["pilot"]
-        self.epoch_id = self.selected["epochId"]
+        self.epoch_id = (
+            "SYNTHETIC-terminal-pilot" if recovered else self.selected["epochId"])
+        self.selected["epochId"] = self.epoch_id
         self.epoch = self.epochs / self.epoch_id
         frozen_product = analysis.load(self.seed / "pins.json")["compiler"]
         self.compiler_hash = frozen_product["compilerHash"]
@@ -61,9 +62,12 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
             slots=[{"id": "%s/%s/%d" % (task, arm, run), "task": task, "arm": arm, "run": run}
                    for run in range(1, runs + 1) for task in self.registration["tasks"]
                    for arm in ("calor-permissive", "calor-strict")],
-            harnessArtifacts=analysis.load(
-                registration_helper.ROOT / self.selected["instrumentAmendment"]["path"]
-            )["replacementHarnessArtifacts"],
+            harnessArtifacts=(
+                self.spending.artifact_manifest(self.spending.GATEWAY)
+                if recovered else analysis.load(
+                    registration_helper.ROOT / self.selected["instrumentAmendment"]["path"]
+                )["replacementHarnessArtifacts"]
+            ),
         )
 
     def seed_run(self, task, arm, run):
@@ -75,11 +79,13 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
         collection_tests.save(directory / "source-inspection.json", report)
         return directory
 
-    def test_exact_source_bound_collector_output_reaches_registered_adjudicator(self):
+    def test_synthetic_source_bound_collector_output_reaches_registered_adjudicator(self):
         self.collect()
         before = analysis.inventory(self.epoch, analysis.module("readonly_collector", "ppw-instrument.py"))
+        with self.assertRaisesRegex(ValueError, "analysis artifact changed: ppw-budget-gateway.py"):
+            analysis.validate_analysis_registration()
         with patch("subprocess.run", side_effect=AssertionError("adjudication must remain read-only")):
-            report = analysis.adjudicate(self.epochs, self.epoch_id)
+            report = self.adjudicate(self.epochs)
         projection = report["provenance"]["collectionExecutionProjection"]
         self.assertEqual(444, len(self.observed))
         self.assertEqual(444, projection["completedSlots"])
@@ -95,55 +101,117 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
             self.assertEqual({"numerator": 1, "denominator": 2}, estimate["exactEstimate"])
 
     def prepare_recovered_scope(self):
-        if self.historical_manifest:
+        if not self.recovered_fixture:
             return super().prepare_recovered_scope()
-        recovery = collection_tests.instrument.helper("ppw-gateway-recovery.py")
-        evidence = analysis.load(self.inputs / self.selected["recoveryEvidence"]["path"])
-        authority = analysis.load(self.inputs / self.selected["recoveryAuthorization"]["path"])
-        failed = analysis.load(self.inputs / self.selected["failedOperationalSnapshot"]["path"])
-        target = evidence["targetBinding"]
-        full_slots = list(self.admission["slots"])
-        preserved = authority["preservedAttemptedSlots"]
-        failed_archive = self.root / "SYNTHETIC-original-launch"
-        first = full_slots[0]
-        collection_tests.save(
-            failed_archive / "runs" / first["task"] / first["arm"] / "run-1/client-invocation.json",
-            {"exitCode": 1})
-        (failed_archive / "runs" / first["task"] / first["arm"]
-         / "run-1/result.json").write_bytes(
-             b"SYNTHETIC OPAQUE INVALID PLACEHOLDER; NOT AN OUTCOME")
-        for name in ("pins.json", "registration.json"):
-            collection_tests.save(failed_archive / name, {
-                "kind": "SYNTHETIC original provenance double; NOT THE REAL FAILED ARCHIVE",
-            })
-        ledger_path = Path(self.admission["ledgerPath"])
-        ledger_path.parent.mkdir()
-        ledger = collection_tests.budget.RequestLedger(ledger_path)
-        ledger.initialize(target, recovery.PILOT_CEILING_MICRO_USD)
-        # Model the reviewed post-apply state in a temporary ledger. Atomic apply
-        # itself is exercised against synthetic raw ledgers in the recovery suite.
-        detail = recovery._recovery_detail(
-            authority["oldBinding"], target, authority["failedLedgerSha256"],
-            authority["failedArchiveInventorySha256"],
-            self.selected["recoveryAuthorization"]["sha256"], preserved)
-        with sqlite3.connect(ledger_path) as db:
-            db.execute("DELETE FROM events")
-            for event in failed["events"]:
-                db.execute("INSERT INTO events(id,kind,request_id,detail,created) VALUES(?,?,?,?,?)",
-                           tuple(event[name] for name in ("id", "kind", "request_id", "detail", "created")))
-            db.execute("INSERT INTO events(id,kind,request_id,detail) VALUES(4,?,NULL,?)",
-                       (recovery.RECOVERY_EVENT, collection_tests.budget.canonical(detail)))
+        self.prepare_synthetic_terminal_documents()
+        full_slots = super().prepare_recovered_scope()
+        recovery_evidence = {
+            "kind": "SYNTHETIC-test-owned-recovery-evidence",
+            "targetBinding": self.admission["recovery"]["targetBinding"],
+            **{
+                name: self.selected[name]
+                for name in (
+                    "recoveryAuthorization", "inspectionProof",
+                    "failedArchiveInventory", "failedOperationalSnapshot",
+                )
+            },
+            "executionProfile": self.selected["executionProfile"],
+            "spendingPlan": self.selected["spendingPlan"],
+        }
+        path = self.inputs / "SYNTHETIC-recoveryEvidence.json"
+        collection_tests.save(path, recovery_evidence)
+        self.selected["recoveryEvidence"] = {
+            "path": path.name, "sha256": collection_tests.instrument.digest(path),
+        }
+        collection_tests.save(self.registration_file, self.registration)
+        return full_slots
+
+    def prepare_synthetic_terminal_documents(self):
+        harness = self.spending.artifact_manifest(self.spending.GATEWAY)
+        amendment = analysis.load(self.inputs / self.selected["instrumentAmendment"]["path"])
+        amendment = copy.deepcopy(amendment)
+        amendment["fixtureKind"] = "SYNTHETIC-current-terminal-amendment"
+        amendment["replacementHarnessArtifacts"] = harness
+        amendment_path = self.inputs / "SYNTHETIC-terminal-amendment.json"
+        collection_tests.save(amendment_path, amendment)
+        self.selected["instrumentAmendment"] = {
+            "path": amendment_path.name,
+            "sha256": collection_tests.instrument.digest(amendment_path),
+        }
+
+        authorization = analysis.load(self.inputs / self.selected["spendAuthorization"]["path"])
+        authorization = copy.deepcopy(authorization)
+        authorization.update(
+            fixtureKind="SYNTHETIC-current-terminal-authorization",
+            epochId=self.epoch_id,
+        )
+        authorization_path = self.inputs / "SYNTHETIC-terminal-authorization.json"
+        collection_tests.save(authorization_path, authorization)
+        self.selected["spendAuthorization"] = {
+            "path": authorization_path.name,
+            "sha256": collection_tests.instrument.digest(authorization_path),
+        }
+
+        plan = analysis.load(self.inputs / self.selected["spendingPlan"]["path"])
+        plan = copy.deepcopy(plan)
+        plan.update(
+            fixtureKind="SYNTHETIC-current-terminal-plan",
+            epochId=self.epoch_id,
+            authorizationSha256=self.selected["spendAuthorization"]["sha256"],
+        )
+        plan["protocolSha256"] = self.spending.protocol_identity(
+            self.registration, self.selected, "pilot", self.epoch_id)
+        plan_path = self.inputs / "SYNTHETIC-terminal-plan.json"
+        collection_tests.save(plan_path, plan)
+        self.selected["spendingPlan"] = {
+            "path": plan_path.name,
+            "sha256": collection_tests.instrument.digest(plan_path),
+        }
         self.admission.update(
-            plannedSlots=full_slots, slots=full_slots[1:],
-            recovery={
-                "oldBinding": authority["oldBinding"], "targetBinding": target,
-                "failedLedgerSha256": authority["failedLedgerSha256"],
-                "failedArchiveInventorySha256": authority["failedArchiveInventorySha256"],
-                "recoveryRegistrationSha256": self.selected["recoveryAuthorization"]["sha256"],
-                "preservedAttemptedSlots": preserved, "failedArchive": str(failed_archive),
-                "backupName": authority["backupName"],
-            })
-        return [slot["id"] for slot in full_slots]
+            authorizationSha256=self.selected["spendAuthorization"]["sha256"],
+            planSha256=self.selected["spendingPlan"]["sha256"],
+            protocolSha256=plan["protocolSha256"],
+            harnessArtifacts=harness,
+        )
+
+        profile = {
+            "schemaVersion": 1,
+            "kind": "pp-w-request-gateway-execution-profile",
+            "id": "SYNTHETIC-current-terminal-profile",
+            "fixtureKind": "SYNTHETIC-current-terminal-profile",
+            "stage": "pilot",
+            "epochId": self.epoch_id,
+            "allowedDataKinds": ["synthetic"],
+            **{
+                name: self.selected[name]
+                for name in (
+                    "spendAuthorization", "spendingPlan", "instrumentAmendment",
+                    "stageRegistration", "modelRegistration", "sourceInspectionEvidence",
+                )
+            },
+        }
+        self.synthetic_profile = self.inputs / "SYNTHETIC-terminal-profile.json"
+        collection_tests.save(self.synthetic_profile, profile)
+        self.selected["executionProfile"] = {
+            "path": self.synthetic_profile.name,
+            "sha256": collection_tests.instrument.digest(self.synthetic_profile),
+        }
+        collection_tests.save(self.registration_file, self.registration)
+
+    def adjudicate(self, epochs):
+        manifest = synthetic_current_analysis_manifest(analysis, self.root)
+        if not self.recovered_fixture:
+            with patch.object(analysis, "MANIFEST", manifest):
+                return analysis.adjudicate(epochs, self.epoch_id)
+        archive_gateway = analysis.module(
+            "synthetic_recovery_archive_profile", "ppw-gateway-registration.py")
+        archive_gateway.RECOVERY_PROFILE = self.synthetic_profile
+        original_module = analysis.module
+        with patch.object(analysis, "MANIFEST", manifest), \
+                patch.object(analysis, "module", side_effect=lambda name, relative:
+                             archive_gateway if name == "archived_gateway_profile"
+                             else original_module(name, relative)):
+            return analysis.adjudicate(epochs, self.epoch_id)
 
     def test_recovery_keeps_first_launch_invalid_and_collects_only_unstarted_slots(self):
         full_slots = self.prepare_recovered_scope()
@@ -153,7 +221,7 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
         self.assertEqual(443, len(self.observed))
         before = analysis.inventory(self.epoch, collection_tests.instrument)
         with patch("subprocess.run", side_effect=AssertionError("adjudication must remain read-only")):
-            report = analysis.adjudicate(self.epochs, self.epoch_id)
+            report = self.adjudicate(self.epochs)
         self.assertEqual(before, report["provenance"]["epochInventory"])
         self.assertEqual("SYNTHETIC_ONLY", report["decision"]["status"])
         self.assertFalse(report["empirical"])
@@ -167,7 +235,7 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
         super().test_recovery_mixes_zero_and_reconciled_terminal_invalids_without_replacement()
         before = analysis.inventory(self.epoch, collection_tests.instrument)
         with patch("subprocess.run", side_effect=AssertionError("adjudication must remain read-only")):
-            report = analysis.adjudicate(self.epochs, self.epoch_id)
+            report = self.adjudicate(self.epochs)
         projection = report["provenance"]["collectionExecutionProjection"]
         self.assertEqual(before, report["provenance"]["epochInventory"])
         self.assertEqual((370, 74, 444), (
@@ -182,7 +250,7 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
         moved_root.mkdir()
         self.epoch.rename(moved_root / self.epoch_id)
         with patch("subprocess.run", side_effect=AssertionError("archive analysis is read-only")):
-            moved = analysis.adjudicate(moved_root, self.epoch_id)
+            moved = self.adjudicate(moved_root)
         self.assertEqual(report["estimands"], moved["estimands"])
         self.assertEqual(report["provenance"]["epochInventory"],
                          moved["provenance"]["epochInventory"])

@@ -5,6 +5,14 @@ positive, request-level admission calculation. It does not promise that the
 entire 444-slot pilot will fit the authorized ceiling. Historical spending
 receipts and the estimate-only adapter remain separate.
 
+**#1436 operational hold:** the actual `w-rows-pilot-gateway-002` continuation
+at commit `0b87d52b92c07e0377f4948102f467b890107df5` halted with two unknown
+request charges. Their full $51.04 reservation remains unresolved exposure,
+not verified spending. The commands and registrations below are historical
+authority, not permission to repeat the already applied zero-request recovery
+or to restart collection with this changed source. No new execution profile or
+financial disposition is registered by the diagnostic changes.
+
 **Integration status:** the deterministic HTTP positive path and local kernel/SDK
 canaries exist. Independent no-forward diagnostic-client transport and protected
 control probes succeeded. The author-run shared registered-argument probe also
@@ -166,6 +174,44 @@ provider category counts permit a refund, with conservative prices when a billin
 modifier is absent. CLI cost estimates never reconcile liability. Missing,
 truncated, interrupted or ambiguous charges remain reserved; no expiry or
 automatic restart resets them.
+
+### Prospective failure diagnostics (#1436)
+
+The original final HTTP 402 reports a later stopped-scope refusal. It does not
+identify the cause of either unknown charge: that source discarded the original
+transport and receipt-validation exceptions. Partial native response metadata
+contains `inference_geo: "not_available"`, and a synthetic completed-receipt
+control reproduces `unknown provider geography`. This is a compatibility lead,
+not a recovered raw provider receipt or proof of both original failure causes.
+The response-geography allowlist and all prices remain unchanged. No CLI usage
+or prospective diagnostic is substituted for missing historical provider evidence.
+
+Future gateway failures retain a `pp-w-provider-failure-v1` diagnostic inside
+the protected `unknown-charge-retained` event, bound to its existing request ID.
+The record contains a fixed refusal/exception category, processing phase,
+numeric HTTP status if observed, a categorical content type and SSE lifecycle
+booleans. These booleans describe the observer's prefix, not proven complete
+inference. The phase records the operation attempted; it does not prove that
+bytes reached the provider. No credentials, capability tokens, raw headers,
+exception text, request bodies, model text or tool output enter this record.
+
+The first known HTTP, encoding, parser or usage failure atomically retains the
+full reservation and halts new admission, before draining any remaining bytes.
+Later errors or a secondary 402 cannot replace that cause. Cleanup failure also
+retains the reservation instead of skipping settlement. A client disconnect
+has its own fixed protected stop code; even when complete provider usage can be
+reconciled, the interrupted scope stays halted. Legacy unknown-charge events
+without diagnostics remain unchanged, and no existing unknown request can be
+reconciled by adding a diagnostic.
+
+Both scheduled CLI attempts remain consumed. A1 is the previously accounted
+invalid attempt. Per the [independent methods inspection](https://github.com/juanmicrosoft/calor/issues/1436#issuecomment-5631059582),
+B1 is raw-invalid/censored but operationally unresolved, not an admitted ordinary
+invalid terminal. Exactly 442 identities are untouched. This change does not
+classify financial failures as ordinary attrition, replace attempts, change
+denominators, authorize prefix adjudication or create a continuation path.
+Any future financial/methodological disposition and source-profile supersession
+require separate review and explicit operator action under the same $1,000 cap.
 
 The collector binds every scheduled slot into the ledger. A **valid completion**
 requires reconciled gateway traffic and a non-interrupted client exit record.

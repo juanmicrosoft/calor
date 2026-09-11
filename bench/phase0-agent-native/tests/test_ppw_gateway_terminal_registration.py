@@ -9,6 +9,8 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+from ppw_pilot_epoch import synthetic_current_analysis_manifest
+
 BENCH = Path(__file__).resolve().parents[1]
 
 def load_module(name, filename):
@@ -39,30 +41,31 @@ class TerminalRegistrationTests(unittest.TestCase):
         self.assertEqual(analysis.RECOVERY_PROFILE, value["gatewayExecutionProfile"]["path"])
         self.assertEqual(analysis.RECOVERY_EVIDENCE, value["gatewayRecoveryEvidence"]["path"])
 
-    def test_manifest_is_pending_or_selects_only_the_complete_terminal_chain(self):
-        manifest = analysis.validate_analysis_registration()
+    def test_historical_terminal_manifest_refuses_current_source_and_synthetic_analysis_passes(self):
+        historical = analysis.load(analysis.MANIFEST)
+        self.assertFalse(historical["collectionAuthorized"])
+        self.assertEqual("terminal-semantics-registered", historical["recoveryStatus"])
+        self.assertEqual(
+            analysis.TERMINAL_PROFILE,
+            historical["gatewayExecutionProfile"]["path"],
+        )
+        self.assertEqual(
+            analysis.TERMINAL_EVIDENCE,
+            historical["gatewayRecoveryEvidence"]["path"],
+        )
+        with self.assertRaisesRegex(ValueError, "analysis artifact changed: ppw-budget-gateway.py"):
+            analysis.validate_analysis_registration()
+        with tempfile.TemporaryDirectory(
+                prefix="SYNTHETIC-current-analysis-", dir=BENCH / "tests") as raw:
+            fixture = synthetic_current_analysis_manifest(analysis, Path(raw))
+            with patch.object(analysis, "MANIFEST", fixture):
+                manifest = analysis.validate_analysis_registration()
         self.assertFalse(manifest["collectionAuthorized"])
-        if manifest["recoveryStatus"] == "pending-reviewed-terminal-evidence":
-            self.assertEqual(
-                analysis.RECOVERY_PROFILE,
-                manifest["gatewayExecutionProfile"]["path"],
-            )
-            self.assertEqual([
-                "registrations/ppw-rows-stage1/gateway-evidence/"
-                "gateway-native-wire-1434-evidence.json",
-                "registrations/ppw-rows-stage1/gateway-evidence/"
-                "gateway-native-startup-1434-evidence.json",
-            ], manifest["requiredTerminalEvidence"])
-        else:
-            self.assertEqual("terminal-semantics-registered", manifest["recoveryStatus"])
-            self.assertEqual(
-                analysis.TERMINAL_PROFILE,
-                manifest["gatewayExecutionProfile"]["path"],
-            )
-            self.assertEqual(
-                analysis.TERMINAL_EVIDENCE,
-                manifest["gatewayRecoveryEvidence"]["path"],
-            )
+        self.assertEqual("pending-reviewed-wire-evidence", manifest["recoveryStatus"])
+        self.assertEqual(
+            analysis.GATEWAY_PROFILE,
+            manifest["gatewayExecutionProfile"]["path"],
+        )
 
     def test_generator_contract_has_one_existing_epoch_and_no_operational_writes(self):
         self.assertEqual("w-rows-pilot-gateway-002", terminal_generator.OUTPUT_SCHEMA["targetEpoch"])
@@ -199,17 +202,44 @@ class TerminalRegistrationTests(unittest.TestCase):
             authorization["ledgerBinding"]["relativePath"],
         )
 
-    def test_canonical_terminal_authority_passes_actual_collector_admission(self):
+    def test_historical_authority_refuses_current_source_and_synthetic_admission_passes(self):
         instrument = load_module("terminal_collector_admission_test", "ppw-instrument.py")
-        registration = gateway.resolve_collection_profile(gateway.RECOVERY_PROFILE)
-        selected = registration["stages"]["pilot"]
-        authority = instrument.validate_collection_authorization(
-            registration, selected, gateway.ROOT, selected["epochId"], "pilot", True)
-        self.assertEqual("pp-w-terminal-semantics-recovery-authorization", authority["kind"])
-        self.assertEqual(1000, authority["spendingCeilingUsd"])
-        with self.assertRaisesRegex(ValueError, "paid collection requires"):
-            instrument.validate_collection_authorization(
-                registration, selected, gateway.ROOT, selected["epochId"], "pilot", False)
+        with self.assertRaisesRegex(
+                ValueError, "native compatibility evidence binds different source"):
+            gateway.resolve_collection_profile(gateway.RECOVERY_PROFILE)
+        with tempfile.TemporaryDirectory(
+                prefix="SYNTHETIC-terminal-authority-", dir=BENCH / "tests") as raw:
+            root = Path(raw)
+            registration = gateway.resolve_profile(gateway.PROFILE)
+            selected = registration["stages"]["pilot"]
+            selected["epochId"] = "SYNTHETIC-terminal-pilot"
+            registration.update(collectionAuthorized=True, fundingStatus="approved")
+            for name in ("stageRegistration", "modelRegistration"):
+                source = gateway.ROOT / selected[name]["path"]
+                destination = root / selected[name]["path"]
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(source.read_bytes())
+            authority_path = root / "SYNTHETIC-terminal-authorization.json"
+            authority_path.write_text(json.dumps({
+                "kind": "pp-w-terminal-semantics-recovery-authorization",
+                "epochId": selected["epochId"],
+                "stage": "pilot",
+                "spendingCeilingUsd": 1000,
+                "nullResultAccepted": True,
+                "approvedBy": "SYNTHETIC fixture owner",
+                "approvalReference": "SYNTHETIC test-only authority",
+            }, indent=2) + "\n", encoding="utf-8")
+            selected["spendAuthorization"] = {
+                "path": authority_path.name,
+                "sha256": hashlib.sha256(authority_path.read_bytes()).hexdigest(),
+            }
+            authority = instrument.validate_collection_authorization(
+                registration, selected, root, selected["epochId"], "pilot", True)
+            self.assertEqual("pp-w-terminal-semantics-recovery-authorization", authority["kind"])
+            self.assertEqual(1000, authority["spendingCeilingUsd"])
+            with self.assertRaisesRegex(ValueError, "paid collection requires"):
+                instrument.validate_collection_authorization(
+                    registration, selected, root, selected["epochId"], "pilot", False)
 
     def test_isolation_expectations_remain_identical_across_lifecycle_consumers(self):
         budget = load_module("terminal_budget_isolation_test", "ppw-gateway-budget.py")
