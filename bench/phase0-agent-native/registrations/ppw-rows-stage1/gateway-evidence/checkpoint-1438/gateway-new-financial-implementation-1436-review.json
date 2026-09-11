@@ -1,0 +1,51 @@
+{
+  "binding": {
+    "actualHistoricalCost": null,
+    "authorizationReference": "https://github.com/juanmicrosoft/calor/issues/1436#issuecomment-5633881736",
+    "ceilingMicroUsd": 1000000000,
+    "futureUnknownPolicy": "halt",
+    "historicalLedgerSha256": "464acefd37b96620aeab69c025cbb11703ca038d91eaa0d3d514af3d3c8a8990",
+    "permanentLiabilityMicroUsd": 51040000,
+    "recordSetSha256": "be4835997e360d15470efab4211e4fa0b2719093700f76e4ff4ce09d3099e720",
+    "sourceArtifactsSha256": "31965ec3d42ddb2ce2b82a24b89494cadd1109c97980f729520e4f98d703d458",
+    "targetEpochId": "w-rows-pilot-gateway-003"
+  },
+  "findings": [
+    "APPROVE for the exact new-financial-implementation subject and immutable proposal record set only. registration._load_evidence(require_activation=False) and _validate_record_set(ROOT, ..., live=True) validate recordSetSha256 be4835997e360d15470efab4211e4fa0b2719093700f76e4ff4ce09d3099e720 and sourceArtifactsSha256 31965ec3d42ddb2ce2b82a24b89494cadd1109c97980f729520e4f98d703d458 without activation, ledger application, archive mutation, or collection.",
+    "The financial implementation permanently retains exactly 51,040,000 microUSD for the two enumerated historical unknown request IDs under the same 1,000,000,000 microUSD ceiling, keeps actualHistoricalCost null, preserves futureUnknownPolicy halt, and does not create additional funds, refunds, reconciliation, or a reduced-population forecast.",
+    "The source admission and replay paths enforce the narrow exception: validate_authorization binds the grant, old ledger/backup hashes, two predecessor archives, two preserved attempts, original request rows/events 1-9, the API-marker B1 reason, and original-pins-only provenance where source files were not archived; validate_history requires a single event 10 disposition, event 11 start if collection begins, no preserved-slot retries, ordered continuation over the remaining 442 slots, complete reconciliation for future valid terminals, and halting on future unknown/reserved/policy/interruption/integrity failures.",
+    "Activation and operation are correctly separated from the proposal: the profile names only the fixed activation basename, activate() requires three exact-subject final APPROVE reviews and the confirmed record-set hash, ppw-gateway-dispose.py resolves only canonical activated inputs, and the collector passes the exact registered dispositionProof object into RequestLedger.start before admitting the 442-slot suffix.",
+    "The corrected planning projection is truthful and conservative: the old 900,360,000 microUSD full-444 reference remains historical evidence, the permanent 51,040,000 microUSD encumbrance yields 948,960,000 microUSD initial availability, 951,400,000 microUSD combined reference, 48,600,000 microUSD planning headroom, and stress illustrations of 1,041,440,000 and 1,176,490,000 microUSD without claiming a new task mean or completion guarantee.",
+    "The prospective price/schema handling is fail-closed: public first-party docs corroborate Opus 4.8 model ID, 1M context, 128K output, base pricing, Messages max_tokens as an absolute output bound, and 1.1 US inference multiplier; the implementation accepts only the exact response-side not_available geography sentinel at the conservative 1.1 maximum, rejects unknown strings, and accepts nullable provider container/stop_details fields only when null."
+  ],
+  "kind": "pp-w-independent-disposition-final-review",
+  "limitations": [
+    "This approval is not a methods approval, source-implementation approval, operator execution approval, scientific outcome approval, release approval, stage-2 approval, additional-funds approval, or issue closure.",
+    "I did not inspect or mutate the actual ledger, old archives, activation, collector, operator apply/recovery paths in production, credentials, native provider traffic, cache rebuilds, or scientific outcomes; review was limited to the frozen worktree at HEAD 3d8dc1080b576c29d9bada6c8372193e90c23cbf, the immutable proposal packet, helper validation, public docs, and synthetic unit probes.",
+    "The historical-bound audit remains only an ex-ante two-request bound under its documented trusted-launcher/host/kernel and provider-contract assumptions. It does not prove actual charge, invoice amount, original failure cause, absence of all model activity, or a retained final actual isolation transcript.",
+    "The preserved methods-description review remains REQUEST_CHANGES history only and is not promoted to final methods, records, source, or financial implementation approval by this artifact.",
+    "The quiescence proof is current-process and descriptor evidence under explicit host-clock/source assumptions. It is not a full IPC proof or historical PID receipt, and PID 71893/native predate handling remains limited to the documented outside-protected-path policy.",
+    "Public pricing and residency pages are current public documentation, not a time-authenticated historical pricing archive or account-fee/invoice audit. Request-usage pricing is reviewed; taxes, capacity commitments, marketplace/account fees, discounts, and balance accounting remain out of scope.",
+    "This review assumes the helper code executed from the read-only proposal worktree is the same source pinned by sourceArtifactsSha256, as validated by _validate_record_set(live=True); any changed source, record set, activation, final review, ledger, proof, archive inventory, or operator path requires a new exact-subject review."
+  ],
+  "reviewer": {
+    "humanReview": false,
+    "independentOfImplementation": true,
+    "kind": "AI",
+    "name": "Copilot CLI independent financial-implementation reviewer",
+    "operator": false
+  },
+  "schemaVersion": 1,
+  "scope": {
+    "additionalFundsApproved": false,
+    "approvedSubject": "new-financial-implementation",
+    "descriptionOnly": false,
+    "historicalBoundOnly": false,
+    "operatorExecutionApproved": false,
+    "releaseApproved": false,
+    "scientificChangesApproved": false,
+    "stage2Approved": false
+  },
+  "subject": "new-financial-implementation",
+  "verdict": "APPROVE"
+}

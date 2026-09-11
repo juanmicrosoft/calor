@@ -1,0 +1,57 @@
+{
+  "binding": {
+    "actualHistoricalCost": null,
+    "authorizationReference": "https://github.com/juanmicrosoft/calor/issues/1436#issuecomment-5633881736",
+    "ceilingMicroUsd": 1000000000,
+    "futureUnknownPolicy": "halt",
+    "historicalLedgerSha256": "464acefd37b96620aeab69c025cbb11703ca038d91eaa0d3d514af3d3c8a8990",
+    "permanentLiabilityMicroUsd": 51040000,
+    "recordSetSha256": "be4835997e360d15470efab4211e4fa0b2719093700f76e4ff4ce09d3099e720",
+    "sourceArtifactsSha256": "31965ec3d42ddb2ce2b82a24b89494cadd1109c97980f729520e4f98d703d458",
+    "targetEpochId": "w-rows-pilot-gateway-003"
+  },
+  "findings": [
+    "Record set re-validated with _validate_record_set(ROOT, evidence, documents, record_set, live=True): recordSetSha256=be4835997e360d15470efab4211e4fa0b2719093700f76e4ff4ce09d3099e720 and sourceArtifactsSha256=31965ec3d42ddb2ce2b82a24b89494cadd1109c97980f729520e4f98d703d458 match the on-disk record-set file, and every pinned source byte was re-hashed against BENCH, anchoring this review to the exact reviewed source.",
+    "One-time disposition is enforced structurally: apply_disposition runs under PRAGMA synchronous=FULL + BEGIN IMMEDIATE (OperationalError mapped to refusal), performs a conditional UPDATE scope ... WHERE state='INCOMPLETE_UNKNOWN_CHARGE' requiring rowcount==1, and inserts the single DISPOSITION_EVENT requiring last_insert_rowid()==10; validate_history requires exactly one disposition event at index 9 (event id 10).",
+    "Backup creation (_copy_backup) opens the destination with O_CREAT|O_EXCL|O_NOFOLLOW at mode 0o600 via dir_fd, fsyncs file and directory, re-hashes the result to the confirmed ledger SHA, and refuses any pre-existing/aliasing backup path (_validate_paths: new_backup must not exist, differ from ledger/old_backup, be direct protected state).",
+    "Proof is one-time and non-malleable: _proof_payload/_validate_disposition_event compare canonical JSON (integers distinguished from booleans/floats at every depth), require all six path-hash forms, oldEventCount==9, remainingSlotCount==442, and a self-consistent proofSha256; rehashed/renamed/malformed proofs are rejected (tests: rehashed_malformed/rehashed_proof/malformed_proof_reuse all green).",
+    "Native quiescence (f349) is bound independently of caller markers: _quiescence_probe unconditionally injects the four default launcher markers and, in registered-operator mode, appends the pinned native executable to the criteria set regardless of authorization['quiescenceProcessMarkers']; _descriptor_quiescence uses untruncated `ps -axww` plus current-UID `lsof -nP -a -u <uid> -d cwd,txt -F0pfn` and exempts a native process only when its descriptor path exactly equals the pinned native binary, it holds no protected cwd/txt match, and its kernel lstart predates events[1].created by >2s (test_native_inspection_does_not_depend_on_caller_supplied_markers and test_only_a_preexisting_native_outside_protected_workspaces_can_be_excluded pass).",
+    "Continuation accounting is sound: validate_history replays the immutable 9-event prefix verbatim, requires exact 'started' event 11, forbids duplicate starts, orders the 442 future terminals against remaining slots (no retry/escape into the two preserved slots), reconciles each future request through the budget admitter, and halts (never 'complete') on any future unknown-charge, budget-refusal, stop, in-flight reservation, or missing collection-complete event.",
+    "Permanent $51.04 liability is retained: exposureMicroUsd is required to stay >= 51_040_000 and <= the 1_000_000_000 ceiling, actualCost stays None, futureUnknownPolicy is 'halt', and completion counters fix accountedSlots=444 / continuedSlots=442 / historicalPreservedSlots=2 with the historical request ids and source epoch ids.",
+    "Provenance handling matches the actual layout: original-pins-only preserves declared source IDs plus git commit without fabricating archived copies and forces epoch-002 sourceHashes to equal the immutable financial binding harnessArtifacts and the predecessor pins; the epoch-002 invalid reason must end with the frozen marker 'agent output matches error marker: \"api error\"'; A1's attemptStart path/hash are preserved as paired None (no fabricated first-attempt-start).",
+    "Owner binding is enforced: owner is '<sha>.<owner_binding_identity(binding, proofSha256)>' and is re-checked in complete_scope and in read_progress before any completion is reported.",
+    "Proposal is strictly separated from activation: ppw-gateway-register-disposition.py --write emits activated:false with the three required final subjects and writes no operational state; write_documents preserves the active analysis bytes exactly (staged os.replace, pre/post byte checks) and refuses when an activation already exists; activate() requires the unchanged old analysis, an unexecuted proposal, the confirmed record-set SHA, and all three genuine final APPROVE raw reviews via validate_final_review, publishes the activation before atomically swapping the wrapper (fail-closed), and never inspects/applies a ledger or starts collection. No activation record, epoch w-rows-pilot-gateway-003, or ledger event 10 exists in this proposal.",
+    "Progress reporting is read-only and outcome-blind: ppw-gateway-progress.read_progress opens the ledger mode=ro with PRAGMA query_only=ON, and the emitted record carries outcomeBlind:true, terminalCountersDoNotReportTaskSuccess:true, remainingNonterminalDoesNotMeanUntouched:true, stage2Authorized:false, and accountingComplete decoupled from task success.",
+    "Focused SYNTHETIC suites all pass under pinned Python 3.9.6: 42 tests (test_ppw_gateway_disposition, _disposition_registration, _progress) and 119 tests (test_ppw_gateway_disposition_collection, _archive, _diagnostics, _terminal_registration, _native_startup, _model_pins, _registered_collection, _gateway) = 161 green (1 skip), with the collection lane exercising a real collector + HTTP gateway + private ledger under in-memory SYNTHETIC trust roots and no native opt-in flags."
+  ],
+  "kind": "pp-w-independent-disposition-final-review",
+  "limitations": [
+    "Scope is the source-implementation subject only, at exact worktree HEAD 3d8dc1080b576c29d9bada6c8372193e90c23cbf against base 080ed5a7482612130fa7572dfebe0f3c58a87ea2; reviewed read-only on 2026-09-11.",
+    "This is not the methods-final, new-financial-implementation, or registered-methods-final-records review, and not operator/whole-issue approval; those three genuine final APPROVE artifacts, plus final-head GitHub review, CI, merge, and separate parent/operator readiness and apply/activation, remain manual gates I did not and cannot attest here.",
+    "No operator, ledger, apply, activation, epoch-creation, or collection action was performed, and the real 001/002 archives, live ledger (464acefd...), old backup (0f32...), and pinned assets were not accessed; operator-mode quiescence (the lsof native-cutoff branch, e.g. native PID 71893 Sep 9 vs first-collector-start 2026-09-11T01:00:14.806Z) and real archive/backup integrity were validated only through SYNTHETIC paths, not production state.",
+    "The provider-side original epoch-002 failure remains unproven upstream; I verified only that the code preserves the frozen invalid/censored flags, the 'api error' marker reason, and the two retained request reservations, not the provider's actual behavior.",
+    "Prospective financial reconciliation semantics (the not_available 1.1x-max sentinel, unknown-string rejection, absent/null container/stop details, stricter historical geo price policy) live in ppw-gateway-budget.py and belong to the separate new-financial review; I confirmed only that source-side gates invoke the budget admitter/reconciler and that the tests pass.",
+    "Host/clock assumptions are explicit: pinned Python 3.9.6 on macOS with /bin/ps and /usr/sbin/lsof; the native pre-existing-process cutoff comparison depends on correct host clock and timezone.",
+    "The immutable record set intentionally excludes the activation, final-review indexes/raw files, active-analysis wrapper, and final Git commit identity to avoid hash cycles, so those artifacts are outside this binding."
+  ],
+  "reviewer": {
+    "humanReview": false,
+    "independentOfImplementation": true,
+    "kind": "AI",
+    "name": "Independent adversarial source reviewer (GitHub Copilot CLI, Claude Opus 4.8)",
+    "operator": false
+  },
+  "schemaVersion": 1,
+  "scope": {
+    "additionalFundsApproved": false,
+    "approvedSubject": "source-implementation",
+    "descriptionOnly": false,
+    "historicalBoundOnly": false,
+    "operatorExecutionApproved": false,
+    "releaseApproved": false,
+    "scientificChangesApproved": false,
+    "stage2Approved": false
+  },
+  "subject": "source-implementation",
+  "verdict": "APPROVE"
+}
