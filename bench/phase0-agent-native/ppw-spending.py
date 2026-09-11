@@ -27,9 +27,11 @@ GATEWAY_ARTIFACTS = COLLECTION_ARTIFACTS + (
     "ppw-gateway-budget.py", "ppw-budget-gateway.py", "ppw-gateway-client.py",
     "ppw-run-observer.py",
     "gateway-tools/python3",
+    "gateway-tools/bash-env.sh",
     "templates/calor-arm/CalorArm.Gateway.csproj.template",
     "ppw-test-host.py", "test-host/Program.cs", "test-host/PpwXunitHost.csproj",
-    "ppw-gateway-registration.py",
+    "ppw-gateway-registration.py", "ppw-gateway-recovery.py", "ppw-gateway-recover.py",
+    "ppw-gateway-register-recovery.py",
 )
 FORECAST_EVIDENCE = {
     "script": {
@@ -236,7 +238,7 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
         source_inspector.validate_runtime(control.get("sourceInspector"))
         ledger = gateway_ledger_location(plan["ledgerBinding"])
         policy.RequestLedger(ledger)
-        return {
+        result = {
             "mechanism": GATEWAY, "epochId": epoch_id, "stage": stage, "ceilingUnits": ceiling,
             "authorizationSha256": selected["spendAuthorization"]["sha256"],
             "protocolSha256": plan["protocolSha256"], "planSha256": digest(path),
@@ -249,6 +251,40 @@ def admit(registration, selected, authorization, directory, epoch_id, stage):
             "executionRuntime": control.get("executionRuntime"),
             "forecastEvidence": forecast_evidence,
         }
+        if "recoveryEvidence" in selected:
+            gateway_registration = module("ppw-gateway-registration.py")
+            evidence, documents = gateway_registration.load_recovery_evidence()
+            authorization_record = documents["recoveryAuthorization"]
+            target_binding = {
+                "stage": stage, "epochId": epoch_id, "priceSha256": policy.price_identity(),
+                "authorizationSha256": selected["spendAuthorization"]["sha256"],
+                "protocolSha256": plan["protocolSha256"], "planSha256": digest(path),
+                "harnessArtifacts": harness, "plannedSlots": [slot["id"] for slot in slots],
+            }
+            require(evidence.get("targetBinding") == target_binding,
+                    "recovery target binding differs from the admitted collector")
+            preserved = authorization_record["preservedAttemptedSlots"]
+            require(preserved == [slots[0]["id"]], "only the proven first launch may be preserved")
+            result["slots"] = [slot for slot in slots if slot["id"] not in preserved]
+            result["plannedSlots"] = slots
+            result["recovery"] = {
+                "evidence": selected["recoveryEvidence"],
+                "authorization": selected["recoveryAuthorization"],
+                "inspectionProof": selected["inspectionProof"],
+                "failedArchiveInventory": selected["failedArchiveInventory"],
+                "failedOperationalSnapshot": selected["failedOperationalSnapshot"],
+                "oldBinding": authorization_record["oldBinding"],
+                "targetBinding": target_binding,
+                "failedLedgerSha256": authorization_record["failedLedgerSha256"],
+                "failedArchiveInventorySha256":
+                    authorization_record["failedArchiveInventorySha256"],
+                "recoveryRegistrationSha256":
+                    selected["recoveryAuthorization"]["sha256"],
+                "preservedAttemptedSlots": preserved,
+                "failedArchive": str(ROOT / authorization_record["failedArchivePath"]),
+                "backupName": authorization_record["backupName"],
+            }
+        return result
     ledger = plan.get("ledgerPath")
     require(isinstance(ledger, str) and Path(ledger).is_absolute(),
             "one pinned absolute shared ledger path is required across output roots")

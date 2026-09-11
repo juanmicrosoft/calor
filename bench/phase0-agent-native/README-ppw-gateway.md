@@ -14,7 +14,7 @@ requests. Actual visible and held-out controls passed under final containment.
 The independent historical-traffic forecast and scoped AI methods review are
 bound to the plan. The profile becomes operative on independently reviewed
 merge; collection still requires the explicit operator invocation below.
-The additive 25-artifact execution
+The original additive 25-artifact execution
 profile and 250-to-500-to-1000 financial lineage do not create a live ledger,
 epoch or scientific outcome. Credential and model availability are not blockers.
 
@@ -25,6 +25,7 @@ Run the repository-owned no-forward launcher with the retained native client:
 ```bash
 python3 bench/phase0-agent-native/probe-ppw-gateway.py \
   --client <absolute-path-to-retained-2.1.266> \
+  --shell <absolute-path-to-registered-GNU-Bash> \
   --scratch-root <existing-private-scratch-directory>
 ```
 
@@ -36,6 +37,23 @@ or epoch. Its HTTP server unconditionally rejects requests and has no provider
 forwarding implementation. Native stdout/stderr and request bodies stay in
 memory; the JSON report contains only sanitized capability/shape data and local
 control results. This tests native compatibility, not a complete isolation proof.
+
+The #1432 startup regression uses the actual native client and frozen first-task
+materialization with a deterministic in-process provider. It exercises a real
+Bash edit, build, visible test, and private held-out grading. No provider inference
+occurs. This exposed two additional startup gaps: native client and zsh temporary
+files must stay inside the workspace, and login-shell startup must not reorder
+`PATH` ahead of the test shim. The launcher now selects the already registered
+GNU Bash through `CLAUDE_CODE_SHELL` and supplies a source-pinned `BASH_ENV` that
+restores the instrument's tool path. These settings are process-local; no global
+shell configuration changes or new network allowances are involved.
+
+The SDK's exact `anthropic-dangerous-direct-browser-access: true` header is also
+admitted unchanged. It is the SDK's browser-access opt-in, not a model or pricing
+control ([pinned SDK source](https://github.com/anthropics/anthropic-sdk-typescript/blob/135f71e9297683e14614d4307081c0273ed0a09c/src/client.ts#L1577-L1580)).
+Other values, duplicate headers, unknown provider headers, and capability
+headers marked hop-by-hop remain rejected before reservation. Fixed diagnostic
+codes preserve the original refusal without recording header values or prompts.
 
 The real frozen-task null-agent exercise exposed VSTest's attempted loopback
 listener. Gateway mode instead runs the same xUnit v2 discovery/execution engine
@@ -223,7 +241,7 @@ and unknown-charge collections from reaching stage analysis.
 
 `test_ppw_gateway_registered_collection.py` additionally sends that actual
 collector's complete 444-slot output directly to the registered adjudicator
-using the real frozen task inventory and current 25-file execution map.
+using the real frozen task inventory and current 29-file execution map.
 All observations and the provider/compiler/OS boundaries are explicit synthetic
 fixtures. Both frozen estimands remain exactly one half in that fixture; the
 reported decision remains `SYNTHETIC_ONLY`.
@@ -253,10 +271,63 @@ The opt-in
 other environments skip it explicitly. Earlier whole-run evidence is preserved
 in separate `pre-boundary-1406` records, not presented as proof of the new policy.
 
-## Operational entrypoint
+## #1432 recovery and operational entrypoint
+
+The first `w-rows-pilot-gateway-001` launch reached the retained client but
+forwarded zero provider requests. It is still one attempted slot under the
+registered counting rule ([methods clarification](https://github.com/juanmicrosoft/calor/issues/1432#issuecomment-5627948180)). Recovery therefore preserves
+`C-001-quota-adapter/calor-permissive/1` as an invalid censored attempt and
+continues only the remaining 443 slots. It does not replenish the sample,
+increase the $1,000 total allowance, erase the original three-event ledger
+prefix, or rewrite the failed archive.
+
+The old profile below is historical authority only. The collector now accepts
+only the separately reviewed `gateway-execution-profile-1432.json`. That file
+is intentionally not generated until
+`gateway-evidence/gateway-native-wire-1432-evidence.json` exists and passes both
+the price and shared production wire contracts. The source-bound
+`gateway-native-startup-1432-evidence.json` must separately prove the scripted
+native build and tests passed. Registration generation is a pre-review
+engineering step, not an operator action after recovery:
+
+```bash
+python3 bench/phase0-agent-native/ppw-gateway-register-recovery.py --write
+```
+
+The required evidence uses kind
+`pp-w-engineering-no-forward-native-probe`, has `success: true`,
+`upstreamRequests: 0`, `experimentalObservations: 0`, the retained client hash
+and flags, and at least one observation. Every observation must set
+`messagesPath`, `credentialHeaderPresent`, `priceContractAccepted`, and
+`wireContractAccepted` to `true`, with `unclassifiedBetaCount: 0`.
+`sourceHashes` must contain exactly:
+
+- `probe-ppw-gateway.py`
+- `ppw-gateway-client.py`
+- `run-pair.sh`
+- `ppw-gateway-budget.py`
+- `ppw-budget-gateway.py`
+
+The generator reads the fixed ledger in SQLite `mode=ro`, hashes the failed
+archive opaquely, and creates no epoch, backup, recovery event, or provider
+request. The public recovery command has no caller-selected profile, approval,
+ledger, archive, or backup options:
+
+```bash
+python3 bench/phase0-agent-native/ppw-gateway-recover.py inspect
+python3 bench/phase0-agent-native/ppw-gateway-recover.py apply \
+  --confirmed-proof-sha256 <independently-reviewed-inspect-proof-sha256>
+```
+
+`inspect` is read-only. `apply` separately requires the exact registered proof
+hash, creates a mode-0600 failed-ledger backup under the protected Git-common
+directory, changes only the proven zero-request scope to the reviewed target
+binding, and appends event 4. It never starts the collector. A later collector
+start appends event 5 and archives the proof, opaque inventory, and original
+three-event operational snapshot into the new epoch.
 
 `registrations/ppw-rows-stage1/gateway-execution-profile.json` resolves the
-preserved registration without rewriting it. The new collector archives the
+preserved #1431 registration without rewriting it. The new collector archives the
 resolved registration and every selected operational proof. The original
 eleven-file pins, inactive fifteen-file projection and dated assessment remain
 unchanged. Complete empirical archives have a real admission path; incomplete
@@ -279,15 +350,17 @@ speed/geography evidence uses the implemented conservative 2x/1.1x settlement
 multipliers; outstanding reservations and unknown liabilities further reduce
 available headroom. No cheaper traffic is assumed for the redesigned tasks.
 
-After final independent implementation review and merge,
-the invocation is:
+After the new wire/startup evidence and generated metadata pass independent
+review and final-head CI, merge the PR. Only then may the operator separately
+inspect and apply the recovery. The subsequent collector
+invocation is:
 
 ```bash
 CLAUDE_MODEL=claude-opus-4-8 python3 bench/phase0-agent-native/ppw-instrument.py run \
-  --registration bench/phase0-agent-native/registrations/ppw-rows-stage1/gateway-execution-profile.json \
+  --registration bench/phase0-agent-native/registrations/ppw-rows-stage1/gateway-execution-profile-1432.json \
   --tasks-root bench/phase0-agent-native/tasks/ppw-redesign \
   --compiler-root <exact-frozen-v0.18.0-checkout> \
-  --epoch-id w-rows-pilot-gateway-001 --stage pilot \
+  --epoch-id w-rows-pilot-gateway-002 --stage pilot \
   --confirm-paid-epoch
 ```
 

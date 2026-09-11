@@ -516,15 +516,24 @@ class RequestLedger:
                 self.event(db, "complete-provider-usage", request_id,
                            {"conservativeChargeMicroUsd": cost, "releasedMicroUsd": row["reserved"] - cost})
 
-    def stop(self, owner, reason):
+    def stop(self, owner, reason, diagnostic=None):
         require(reason in ("INCOMPLETE_POLICY", "INCOMPLETE_INTERRUPTED", "INCOMPLETE_UNKNOWN_CHARGE"),
                 "unregistered incomplete reason")
+        require(diagnostic is None or reason == "INCOMPLETE_POLICY" and diagnostic in {
+            "WIRE_DUPLICATE_HEADER", "WIRE_TRANSFER_ENCODING", "WIRE_CONTENT_ENCODING",
+            "WIRE_CONTENT_TYPE", "WIRE_API_VERSION", "WIRE_UNKNOWN_PROVIDER_HEADER",
+            "WIRE_BROWSER_ACCESS_VALUE", "WIRE_CONTENT_LENGTH", "WIRE_HOP_CAPABILITY",
+            "WIRE_ENDPOINT", "OBSERVER_OPERATION", "PRICE_REQUEST",
+        }, "unregistered nonsecret policy diagnostic")
         with self.transaction() as db:
             row = db.execute("SELECT owner,state FROM scope").fetchone()
             require(row and row["owner"] == owner, "stop owner differs")
             if row["state"] == "collecting":
                 db.execute("UPDATE scope SET state=?", (reason,))
-                self.event(db, "stopped", None, {"reason": reason})
+                detail = {"reason": reason}
+                if diagnostic is not None:
+                    detail["diagnostic"] = diagnostic
+                self.event(db, "stopped", None, detail)
 
     def complete_slot(self, owner, slot, evidence, exit_code):
         require(type(exit_code) is int and 0 <= exit_code < 128 and exit_code != 124,

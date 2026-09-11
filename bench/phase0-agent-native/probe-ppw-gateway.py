@@ -47,6 +47,7 @@ def module(name):
 
 isolation = module("ppw-gateway-client")
 budget = module("ppw-gateway-budget")
+wire = module("ppw-budget-gateway")
 
 
 def keys(value):
@@ -111,7 +112,19 @@ class RejectingHandler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "-1"))
             budget.require(0 < length <= 32 * 1024 * 1024, "invalid probe request length")
             observation = footprint(self.rfile.read(length), self.headers.get("anthropic-beta"))
-            path = urlsplit(self.path).path
+            try:
+                wire.request_headers(self.headers)
+                observation["wireContractAccepted"] = True
+            except wire.WireRefusal as error:
+                observation["wireContractAccepted"] = False
+                observation["wireFailureCode"] = error.code
+            endpoint = urlsplit(self.path)
+            path = endpoint.path
+            if not (path.startswith("/" + self.server.capability + "/")
+                    and wire.priced_endpoint(
+                        path[len(self.server.capability) + 1:], endpoint.query)):
+                observation["wireContractAccepted"] = False
+                observation["wireFailureCode"] = "WIRE_ENDPOINT"
             observation.update(
                 messagesPath=path == "/" + self.server.capability + "/v1/messages",
                 credentialHeaderPresent=bool(self.headers.get("Authorization") or self.headers.get("x-api-key")),
@@ -146,9 +159,11 @@ class RejectingServer(ThreadingHTTPServer):
         self.observations.append({"requestTransportError": True})
 
 
-def run(client, scratch_root):
+def run(client, scratch_root, shell_executable):
     isolation.validate_platform()
     client = isolation.validate_client(client)
+    shell_sha256 = hashlib.sha256(Path(shell_executable).read_bytes()).hexdigest()
+    shell = isolation.validate_shell(shell_executable, shell_sha256)
     scratch_root = isolation.canonical_path(scratch_root)
     isolation.require(scratch_root.is_dir(), "existing scratch root required")
     server = RejectingServer()
@@ -173,7 +188,7 @@ def run(client, scratch_root):
                 policy, work, output, protected, (hidden_test, seeded),
                 server.server_port, os.getpid())
             endpoint = "http://127.0.0.1:%d/%s" % (server.server_port, server.capability)
-            environment = isolation.client_environment(work, endpoint)
+            environment = isolation.client_environment(work, endpoint, shell)
             environment["CLAUDE_MODEL"] = budget.MODEL
             argv = ["/usr/bin/sandbox-exec", "-p", policy, str(client)]
             argv += isolation.registered_client_flags() + ["--model", budget.MODEL,
@@ -201,16 +216,18 @@ def run(client, scratch_root):
                 "kind": "pp-w-engineering-no-forward-native-probe",
                 "clientSha256": isolation.CLIENT_SHA256, "clientVersion": isolation.CLIENT_VERSION,
                 "clientFlags": isolation.registered_client_flags(), "model": budget.MODEL,
+                "toolShellSha256": shell_sha256,
                 "clientExitCode": process.returncode, "timedOut": timed_out,
                 "recognizedProbeError": recognized, "observations": server.observations,
                 "kernelEvidence": evidence, "upstreamRequests": 0, "experimentalObservations": 0,
                 "sourceHashes": {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
                                  for name in ("probe-ppw-gateway.py", "ppw-gateway-client.py", "run-pair.sh",
-                                              "ppw-gateway-budget.py")},
+                                              "ppw-gateway-budget.py", "ppw-budget-gateway.py")},
                 "completeIsolationProof": False,
-                "success": not timed_out and recognized and any(
+                "success": not timed_out and recognized and bool(server.observations) and all(
                     value.get("messagesPath") and value.get("credentialHeaderPresent")
-                    and value.get("model") == budget.MODEL for value in server.observations),
+                    and value.get("model") == budget.MODEL and value.get("wireContractAccepted")
+                    and value.get("priceContractAccepted") for value in server.observations),
             }
     finally:
         server.shutdown()
@@ -222,8 +239,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("--client", required=True)
     parser.add_argument("--scratch-root", required=True)
+    parser.add_argument("--shell", required=True, help="registered GNU Bash executable")
     args = parser.parse_args()
-    report = run(args.client, args.scratch_root)
+    report = run(args.client, args.scratch_root, args.shell)
     print(json.dumps(report, indent=2))
     return 0 if report["success"] else 2
 

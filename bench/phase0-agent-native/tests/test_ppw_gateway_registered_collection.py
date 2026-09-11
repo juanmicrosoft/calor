@@ -1,5 +1,6 @@
 """Actual collector output enters the registered adjudicator; every observation remains SYNTHETIC."""
 import shutil
+import unittest
 from unittest.mock import patch
 
 from ppw_pilot_epoch import analysis, build
@@ -12,6 +13,7 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
         self.seed = build(self.root / "registered-SYNTHETIC-seed")
         registration_helper = analysis.module("registered_collector_fixture", "ppw-gateway-registration.py")
         self.registration = registration_helper.resolve_profile(registration_helper.PROFILE)
+        self.historical_manifest = True
         self.selected = self.registration["stages"]["pilot"]
         self.epoch_id = self.selected["epochId"]
         self.epoch = self.epochs / self.epoch_id
@@ -21,8 +23,10 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
         # The compiler/OS boundary remains a double, including its local Runtime
         # fixture. The exact registered source/product metadata goes through the
         # real collector and the real read-only consumer, without running a model.
-        self.registration_file = self.inputs / registration_helper.PROFILE.name
-        shutil.copy2(registration_helper.PROFILE, self.registration_file)
+        self.registration_file = self.inputs / "resolved-historical-registration.json"
+        collection_tests.save(self.registration_file, self.registration)
+        shutil.copy2(registration_helper.PROFILE,
+                     self.inputs / registration_helper.PROFILE.name)
         transport = analysis.load(registration_helper.PROFILE)["transportEvidence"]
         destination = self.inputs / transport["path"]
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -48,6 +52,9 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
             slots=[{"id": "%s/%s/%d" % (task, arm, run), "task": task, "arm": arm, "run": run}
                    for run in range(1, runs + 1) for task in self.registration["tasks"]
                    for arm in ("calor-permissive", "calor-strict")],
+            harnessArtifacts=analysis.load(
+                registration_helper.ROOT / "gateway-instrument-amendment.json"
+            )["replacementHarnessArtifacts"],
         )
 
     def seed_run(self, task, arm, run):
@@ -77,3 +84,7 @@ class RegisteredCollectionTests(collection_tests.CollectionTests):
         self.assertEqual(before, report["provenance"]["epochInventory"])
         for estimate in report["estimands"].values():
             self.assertEqual({"numerator": 1, "denominator": 2}, estimate["exactEstimate"])
+
+    @unittest.skip("final #1432 registered profile awaits reviewed native wire evidence")
+    def test_recovery_keeps_first_launch_invalid_and_collects_only_unstarted_slots(self):
+        pass

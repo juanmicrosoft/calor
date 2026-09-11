@@ -408,6 +408,95 @@ def command(argv, **kwargs):
     return subprocess.run(argv, check=True, text=True, capture_output=True, **kwargs).stdout.strip()
 
 
+def validate_harness_checkout(admission):
+    """Allow only the exact registered failed archive as untracked evidence."""
+    tracked = command([
+        "git", "-C", str(REPO), "status", "--porcelain", "--untracked-files=no", "--", str(BENCH),
+    ])
+    require(not tracked, "harness checkout has tracked changes")
+    status = command([
+        "git", "-C", str(REPO), "status", "--porcelain", "--untracked-files=all", "--", str(BENCH),
+    ])
+    if not status:
+        return
+    recovery = admission.get("recovery")
+    require(isinstance(recovery, dict), "harness checkout has unregistered untracked data")
+    archive = Path(recovery["failedArchive"]).resolve()
+    require(archive == (BENCH / "epochs/w-rows-pilot-gateway-001").resolve(),
+            "recovery names another failed archive")
+    recovery_module = helper("ppw-gateway-recovery.py")
+    inventory = recovery_module.archive_inventory(archive)
+    require(inventory["sha256"] == recovery["failedArchiveInventorySha256"],
+            "registered failed archive inventory changed")
+    allowed = {
+        (archive / item["path"]).relative_to(REPO).as_posix()
+        for item in inventory["files"]
+    }
+    observed = set()
+    for line in status.splitlines():
+        require(line.startswith("?? "), "harness checkout has non-untracked changes")
+        observed.add(line[3:])
+    require(observed and observed <= allowed,
+            "only the exact registered failed archive may remain untracked")
+
+
+def preserve_recovered_attempt(epoch, pins, admission):
+    recovery = admission["recovery"]
+    preserved = recovery["preservedAttemptedSlots"]
+    require(preserved == [admission["plannedSlots"][0]["id"]],
+            "recovery does not preserve the first scheduled attempt")
+    slot = preserved[0]
+    task, arm, run_text = slot.split("/")
+    run = int(run_text)
+    source = Path(recovery["failedArchive"]) / "runs" / task / arm / ("run-%d" % run)
+    invocation = load(source / "client-invocation.json")
+    require(set(invocation) == {"exitCode"} and type(invocation["exitCode"]) is int
+            and 0 < invocation["exitCode"] < 128 and invocation["exitCode"] != 124,
+            "preserved attempt lacks the fixed failed client launch")
+    destination = epoch / "runs" / task / arm / ("run-%d" % run)
+    destination.mkdir(parents=True)
+    shutil.copy2(source / "client-invocation.json", destination / "client-invocation.json")
+    (destination / "invalid.txt").write_text(
+        "Preserved pre-forward client launch from w-rows-pilot-gateway-001; "
+        "the registered attempt is invalid and cannot be replaced.\n",
+        encoding="utf-8")
+    write_new(destination / "result.json", {
+        "epochId": pins["epochId"], "stage": pins["stage"], "dataKind": pins["dataKind"],
+        "pair": task, "arm": arm, "run": run, "nullAgent": False,
+        "compilerCommit": pins["compiler"]["commit"],
+        "productCompilerHash": pins["compiler"]["compilerHash"],
+        "armRepoRoot": pins["compiler"]["repoRoot"], "armConfigKey": arm,
+        "permissiveEffects": arm == "calor-permissive",
+        "controlArmKind": "permissive" if arm == "calor-permissive" else None,
+        "editMechanism": "raw", "invalid": True, "censored": True,
+        "recoveredAttempt": {
+            "failedEpochId": "w-rows-pilot-gateway-001",
+            "slot": slot,
+            "failedArchiveInventorySha256": recovery["failedArchiveInventorySha256"],
+            "clientExitCode": invocation["exitCode"],
+            "providerRequests": 0,
+            "replacementPermitted": False,
+        },
+    })
+
+
+def require_gateway_collecting(ledger, budget_module):
+    snapshot = ledger.snapshot()
+    if snapshot["state"] != "collecting":
+        diagnostics = [
+            budget_module.decode(event["detail"])["diagnostic"]
+            for event in snapshot["events"] if event["kind"] == "stopped"
+            and "diagnostic" in budget_module.decode(event["detail"])
+        ]
+        raise ValueError("pilot incomplete: " + snapshot["state"]
+                         + (" (" + diagnostics[-1] + ")" if diagnostics else ""))
+    return snapshot
+
+
+def current_harness_artifacts(names):
+    return {name: digest(BENCH / name) for name in names}
+
+
 def product(root, commit):
     root = Path(root).resolve()
     require(command(["git", "-C", str(root), "rev-parse", "HEAD"]) == commit,
@@ -436,7 +525,9 @@ def validate_collection_authorization(registration, selected, directory, epoch_i
                 "%s evidence is missing or changed" % name)
         proofs[name] = path
     authorization = load(proofs["spendAuthorization"])
-    require(authorization.get("kind") == "pp-w-rows-spending-authorization",
+    require(authorization.get("kind") in {
+        "pp-w-rows-spending-authorization", "pp-w-zero-request-recovery-authorization",
+    },
             "structured spending authorization required")
     require(authorization.get("epochId") == epoch_id and authorization.get("stage") == stage,
             "spending authorization is for another epoch or stage")
@@ -462,7 +553,8 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
     registration = load(registration_path)
     operational_profile = registration.get("kind") == "pp-w-request-gateway-execution-profile"
     if operational_profile:
-        registration = helper("ppw-gateway-registration.py").resolve_profile(registration_path)
+        registration = helper("ppw-gateway-registration.py").resolve_collection_profile(
+            registration_path)
     selected = validate_registration(registration, stage, epoch_id)
     validate_tasks(tasks_root, registration)
     authorization = validate_collection_authorization(
@@ -475,8 +567,7 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
     gateway_mode = admission.get("mechanism") == spending.GATEWAY
     gateway_module = helper("ppw-budget-gateway.py") if gateway_mode else None
     isolation = helper("ppw-gateway-client.py") if gateway_mode else None
-    require(not command(["git", "-C", str(REPO), "status", "--porcelain",
-                         "--", str(BENCH)]), "harness checkout is dirty")
+    validate_harness_checkout(admission)
     require(os.environ.get("CLAUDE_MODEL") == selected["modelPin"], "CLAUDE_MODEL differs from registration")
     harness_hashes = admission["harnessArtifacts"]
     harness_files = tuple(harness_hashes)
@@ -537,7 +628,9 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                 "authorizationSha256": admission["authorizationSha256"],
                 "protocolSha256": admission["protocolSha256"], "planSha256": admission["planSha256"],
                 "harnessArtifacts": harness_hashes,
-                "plannedSlots": [slot["id"] for slot in admission["slots"]],
+                "plannedSlots": [
+                    slot["id"] for slot in admission.get("plannedSlots", admission["slots"])
+                ],
             }, admission["ceilingUnits"])
         else:
             ledger = spending.Ledger(admission["ledgerPath"])
@@ -558,9 +651,14 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
             proofs = [selected[name] for name in
                       ("spendAuthorization", "stageRegistration", "modelRegistration",
                        "instrumentAmendment", "spendingPlan")]
-            if operational_profile:
+            if "executionProfile" in selected:
                 proofs.append(selected["executionProfile"])
                 proofs.append(selected["sourceInspectionEvidence"])
+            if "recoveryEvidence" in selected:
+                proofs.extend(selected[name] for name in (
+                    "recoveryEvidence", "recoveryAuthorization", "inspectionProof",
+                    "failedArchiveInventory", "failedOperationalSnapshot",
+                ))
             proofs.extend(admission["forecastEvidence"].values())
             for proof in proofs:
                 destination = local(epoch, proof["path"])
@@ -578,15 +676,19 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
         pins["harnessArtifacts"] = harness_hashes
         validate_pins(pins, registration, stage, epoch_id)
         write_new(epoch / "pins.json", pins)
+        if gateway_mode and "recovery" in admission:
+            preserve_recovered_attempt(epoch, pins, admission)
         for run in range(1, selected["runsPerArm"] + 1):
             for task in registration["tasks"]:
                 for definition in ARMS.values():
-                    require({name: digest(BENCH / name) for name in harness_files} == harness_hashes,
+                    require(current_harness_artifacts(harness_files) == harness_hashes,
                             "harness changed during collection")
                     require(product(compiler_root, registration["compilerCommit"]) ==
                             {k: v for k, v in shared.items() if k != "compilerHash"},
                             "shared compiler drift before run")
                     slot = "%s/%s/%d" % (task, definition["label"], run)
+                    if slot in admission.get("recovery", {}).get("preservedAttemptedSlots", ()):
+                        continue
                     run_directory = epoch / "runs" / task / definition["label"] / ("run-%d" % run)
                     if gateway_mode:
                         require(digest(runtime) == admission["runtimeSha256"], "runtime drift before run")
@@ -646,6 +748,7 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                                 command(argv, env=env)
                             evidence = isolation.read_isolation_evidence(context_path, work, epoch)
                             client_exit = load(run_directory / "client-invocation.json").get("exitCode")
+                            require_gateway_collecting(ledger, gateway_module.budget)
                             ledger.complete_slot(owner, slot, evidence, client_exit)
                             write_new(run_directory / "gateway-isolation.json", evidence)
                         finally:
@@ -687,7 +790,21 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                     stamp_run(result_path, pins)
         require(product(compiler_root, registration["compilerCommit"]) ==
                 {k: v for k, v in shared.items() if k != "compilerHash"}, "compiler drift after collection")
-        ledger.complete(owner)
+        if gateway_mode and "recovery" in admission:
+            recovery = admission["recovery"]
+            recovery_module = helper("ppw-gateway-recovery.py")
+            failed_snapshot = load(local(
+                epoch, selected["failedOperationalSnapshot"]["path"]))
+            recovery_module.complete_recovered_scope(
+                admission["ledgerPath"], owner, failed_snapshot,
+                expected_old_binding=recovery["oldBinding"],
+                target_binding=recovery["targetBinding"],
+                expected_ledger_sha256=recovery["failedLedgerSha256"],
+                expected_archive_inventory_sha256=recovery["failedArchiveInventorySha256"],
+                recovery_registration_sha256=recovery["recoveryRegistrationSha256"],
+                preserved_attempted_slots=recovery["preservedAttemptedSlots"])
+        else:
+            ledger.complete(owner)
         write_new(epoch / "spending-final.json", ledger.snapshot())
         pins["lifecycle"] = "collected"
         (epoch / "pins.json").write_text(json.dumps(pins, indent=2) + "\n")

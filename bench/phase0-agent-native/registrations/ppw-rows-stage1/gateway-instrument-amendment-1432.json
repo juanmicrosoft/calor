@@ -1,0 +1,41 @@
+{
+  "kind": "pp-w-prospective-spending-instrument-amendment",
+  "reason": "Reviewed #1432 exact SDK header admission, workspace-local native temporaries, registered Bash/tool PATH preservation, and zero-request recovery integration.",
+  "replacementHarnessArtifacts": {
+    "gateway-tools/bash-env.sh": "0f2080f2de7a80651f5f6fc4e3ee25885c860bf4c4284eadc66459fa94325ef9",
+    "gateway-tools/python3": "a3b38507fbbd0b298bb71fe0f9d02dd67a434d3d2e9fd36fa54a8103fd57a91d",
+    "harness-capture.py": "dc8a75ffb0abe9dd5a8997a06121ee1e2610cffa13cbc436e06524dc0c061c3d",
+    "ppw-budget-gateway.py": "41df66257f35176d3f6c4c8eff5c43d0fe598e68ef61dd6fc04677e67c38aae1",
+    "ppw-gateway-budget.py": "0bbd71892a6291f8813e30a8a6482a4645b392a0ef1067f3ac7ae2236c3c89ba",
+    "ppw-gateway-client.py": "5af515fd0e305bebfd497f0d33ff17825ecb2e8f2317cae327cbc05c45a92586",
+    "ppw-gateway-recover.py": "9fc26ea601c3fd8b8ec64cb467954fabb98f5f1de92bd2133566422a73526fed",
+    "ppw-gateway-recovery.py": "b0532f9e33d7af5face69a1df3c5ac6f644f9ca2ca54363ab2094d87ad7b9de6",
+    "ppw-gateway-register-recovery.py": "8fce2dbbc60f0343f9febfc25d4a4a1bf83158b370ef340e533059e19f5ffd01",
+    "ppw-gateway-registration.py": "c5be05b3d73e49333027110336629e2d5ee1fb0a4cacbfe49a811bbae10dcdaa",
+    "ppw-instrument.py": "555075537b5456c8bcb297506da8f92f7855614c3ef01c45e0bb8c6af63bdce5",
+    "ppw-pins.schema.json": "c737775a952adaeb066042c6d9d204bbfeae929c0bf6d5aa2e628422baf7e5f6",
+    "ppw-registration.py": "ab9e86f08723827e5be56dee160cfa6db63849863df33b0428bdc782dfc20e0e",
+    "ppw-run-observer.py": "7555bac129bc6f36c902ff112bca3064f7ad26ffb3de40c571ff06a58879a02e",
+    "ppw-source-assembly.py": "0e4002ff79aceb39658223c3820438a4b9832cf4c00ca107d37e47ad5f7c973c",
+    "ppw-source-inspection.py": "836027d7b3db07d061d68f128fff77ab3e1d4a840ef0f3148d9f8da8315727e8",
+    "ppw-spending.py": "fbac6d4874703d9d48337619fdf37eef3d4eaba5d4687dc8e55451f0d777c174",
+    "ppw-test-host.py": "41796877f49dfcf5ff51751eb1c24e1bb27c19d32ad77ab7b5f1d913f9a758c3",
+    "run-pair.sh": "77b1b99c763ce14a341a62d0adc895a2b76b3f7d3a1062faa3cf485f5154212f",
+    "source-inspection/PpwSourceInspector.csproj": "be41403479c72037d16bf22500ab597f1c65babbb3f9935805c90c7a7d64ec62",
+    "source-inspection/Program.cs": "974bfa49a5a0c8435929cfcb5d408f3b26694580c412d5e29b0e5a499f2f1bef",
+    "telemetry-helpers.py": "161b98639de2ac4d7929098530e096cec14d63cb4d4be63ee510a61e4600849e",
+    "templates/calor-arm/CalorArm.Gateway.csproj.template": "f551e7e4fd14434dafc8e332ea3908d8db1695725316856e69f7b1a45cf11159",
+    "templates/calor-arm/CalorArm.csproj.template": "60b56d0475a5ce6f60493cffdab87eb8f90a17f058de7d6bff859769ae11f04c",
+    "templates/calor-arm/policy-canary.calr.txt": "205ad82b07e0781968425b414bde2aa817e93ca9a9392e6727167eed5b46f10e",
+    "test-host/PpwXunitHost.csproj": "34feab8cc7d54a7d2f912fd8ab906ca731ea42f42129c22e1882cfdc4806a9cb",
+    "test-host/Program.cs": "067d7effc75e0edcb70158a3fb21ec92c8cf28167867f45345dee6eebfbaca1d",
+    "token-usage.py": "b2cd56ed565c40877092640392f0998cb97d637ebdd6de6ead9a96d77398149e",
+    "token-usage.sh": "de59280fa8d212397d6154ecc87b2776a73d2dfd6de03515b739119bfb819117"
+  },
+  "schemaVersion": 1,
+  "stage": "pilot",
+  "supersedes": {
+    "path": "gateway-instrument-amendment.json",
+    "sha256": "42d58640b45a214e285bb7fffe63da2af16f4712fa06cd71bb883b05958c6d7b"
+  }
+}

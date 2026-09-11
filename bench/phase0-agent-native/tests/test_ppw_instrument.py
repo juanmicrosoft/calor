@@ -321,6 +321,50 @@ class InstrumentTests(unittest.TestCase):
                     instrument.run_epoch("missing-registration", "missing-tasks", "missing-compiler",
                                          self.root, "synthetic-pilot", "pilot")
 
+    def test_dirty_check_allows_only_exact_registered_failed_archive_inventory(self):
+        repo = self.root / "SYNTHETIC-repo"
+        bench = repo / "bench/phase0-agent-native"
+        archive = bench / "epochs/w-rows-pilot-gateway-001"
+        archive.mkdir(parents=True)
+        (archive / "pins.json").write_text("{}\n")
+        # Git status omits ignored archive contents; the inventory still authenticates them.
+        (archive / "ignored-operational-record.json").write_text("{}\n")
+        recovery = instrument.helper("ppw-gateway-recovery.py")
+        inventory = recovery.archive_inventory(archive)
+        relative = (archive / "pins.json").relative_to(repo).as_posix()
+        admission = {"recovery": {
+            "failedArchive": str(archive),
+            "failedArchiveInventorySha256": inventory["sha256"],
+        }}
+
+        def clean_status(argv, **_):
+            return "" if "--untracked-files=no" in argv else "?? " + relative
+
+        with patch.object(instrument, "REPO", repo), patch.object(instrument, "BENCH", bench), \
+                patch.object(instrument, "helper", return_value=recovery), \
+                patch.object(instrument, "command", side_effect=clean_status):
+            instrument.validate_harness_checkout(admission)
+
+        def extra_status(argv, **_):
+            if "--untracked-files=no" in argv:
+                return ""
+            return "?? %s\n?? bench/phase0-agent-native/epochs/unregistered/data.json" % relative
+
+        with patch.object(instrument, "REPO", repo), patch.object(instrument, "BENCH", bench), \
+                patch.object(instrument, "helper", return_value=recovery), \
+                patch.object(instrument, "command", side_effect=extra_status):
+            with self.assertRaisesRegex(ValueError, "exact registered failed archive"):
+                instrument.validate_harness_checkout(admission)
+
+        def tracked_status(argv, **_):
+            return " M bench/phase0-agent-native/epochs/historical/pins.json"
+
+        with patch.object(instrument, "REPO", repo), patch.object(instrument, "BENCH", bench), \
+                patch.object(instrument, "helper", return_value=recovery), \
+                patch.object(instrument, "command", side_effect=tracked_status):
+            with self.assertRaisesRegex(ValueError, "tracked changes"):
+                instrument.validate_harness_checkout(admission)
+
     def fake_capture(self, behavior, arm="B", run=1, spending_ticket=None,
                      budget_support=True, expect_refusal=None, gateway=False):
         """Execute the actual shell runner with deterministic local stand-ins.

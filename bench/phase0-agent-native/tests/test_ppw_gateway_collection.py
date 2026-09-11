@@ -202,12 +202,21 @@ class CollectionTests(unittest.TestCase):
         def synthetic_pins(pins, registration, stage, epoch_id):
             pins["dataKind"] = "synthetic"
             return validate_pins(pins, registration, stage, epoch_id)
+        artifact_manifest = self.spending.artifact_manifest
         with patch.object(instrument, "REPO", self.root), \
                 patch.object(instrument, "helper", side_effect=lambda name:
                              modules[name] if name in modules else helper(name)), \
                 patch.object(instrument, "validate_collection_authorization",
                              return_value={"kind": "SYNTHETIC-not-an-approval"}), \
                 patch.object(self.spending, "admit", return_value=self.admission), \
+                patch.object(self.spending, "artifact_manifest", side_effect=lambda mechanism:
+                             self.admission["harnessArtifacts"]
+                             if getattr(self, "historical_manifest", False)
+                             else artifact_manifest(mechanism)), \
+                patch.object(instrument, "current_harness_artifacts", side_effect=lambda names:
+                             self.admission["harnessArtifacts"]
+                             if getattr(self, "historical_manifest", False)
+                             else {name: instrument.digest(BENCH / name) for name in names}), \
                 patch.object(self.inspection, "prepare", return_value=self.admission["sourceInspector"]), \
                 patch.object(self.test_host, "validate_runtime"), \
                 patch.object(self.isolation, "validate_runtime"), \
@@ -223,6 +232,105 @@ class CollectionTests(unittest.TestCase):
             return instrument.run_epoch(
                 self.registration_file, self.inputs / "tasks",
                 self.compiler_root, self.epochs, self.epoch_id, "pilot", True)
+
+    def prepare_recovered_scope(self):
+        recovery = instrument.helper("ppw-gateway-recovery.py")
+        full_slots = [slot["id"] for slot in self.admission["slots"]]
+        old = {
+            "stage": "pilot", "epochId": "SYNTHETIC-failed",
+            "priceSha256": budget.price_identity(), "authorizationSha256": "a" * 64,
+            "protocolSha256": "1" * 64, "planSha256": "2" * 64,
+            "harnessArtifacts": self.admission["harnessArtifacts"],
+            "plannedSlots": full_slots,
+        }
+        target = {
+            "stage": "pilot", "epochId": self.epoch_id,
+            "priceSha256": budget.price_identity(),
+            "authorizationSha256": self.admission["authorizationSha256"],
+            "protocolSha256": self.admission["protocolSha256"],
+            "planSha256": self.admission["planSha256"],
+            "harnessArtifacts": self.admission["harnessArtifacts"],
+            "plannedSlots": full_slots,
+        }
+        protected = Path(self.admission["ledgerPath"]).parent
+        protected.mkdir()
+        ledger = budget.RequestLedger(self.admission["ledgerPath"])
+        ledger.initialize(old, recovery.PILOT_CEILING_MICRO_USD)
+        owner = ledger.start()
+        initial = ledger.snapshot()
+        ledger.stop(owner, recovery.FAILED_STATE)
+        failed = ledger.snapshot()
+        failed_archive = self.root / "SYNTHETIC-failed-archive"
+        failed_archive.mkdir()
+        save(failed_archive / "registration.json", {
+            "stages": {"pilot": {
+                "spendAuthorization": {"path": "authorization", "sha256": old["authorizationSha256"]},
+                "spendingPlan": {"path": "plan", "sha256": old["planSha256"]},
+            }},
+        })
+        save(failed_archive / "pins.json", {
+            "epochId": old["epochId"], "stage": "pilot", "lifecycle": "collecting",
+            "mode": "live", "harnessArtifacts": old["harnessArtifacts"],
+            "registrationSha256": instrument.digest(failed_archive / "registration.json"),
+            "suite": self.registration["tasks"], "runsPerArm": self.selected["runsPerArm"],
+            "modelPin": budget.MODEL, "agentVersion": self.isolation.CLIENT_VERSION,
+            "compiler": self.product, "arms": instrument.ARMS,
+        })
+        save(failed_archive / "spending-initial.json", initial)
+        save(failed_archive / "collection-outcome.json", {
+            "kind": "pp-w-incomplete-collection", "epochId": old["epochId"],
+            "stage": "pilot", "complete": False, "verdict": None,
+            "reason": "SYNTHETIC pre-forward startup failure", "spending": failed,
+        })
+        first = self.admission["slots"][0]
+        failed_run = failed_archive / "runs" / first["task"] / first["arm"] / (
+            "run-%d" % first["run"])
+        failed_run.mkdir(parents=True)
+        save(failed_run / "client-invocation.json", {"exitCode": 1})
+        inventory = recovery.archive_inventory(failed_archive)
+        ledger_sha = instrument.digest(self.admission["ledgerPath"])
+        recovery_sha = self.admission["authorizationSha256"]
+        proof = recovery.prove_zero_request_recovery(
+            self.admission["ledgerPath"], failed_archive, protected,
+            protected / "SYNTHETIC-failed.sqlite3",
+            expected_old_binding=old, target_binding=target,
+            expected_ledger_sha256=ledger_sha,
+            expected_archive_inventory_sha256=inventory["sha256"],
+            recovery_registration_sha256=recovery_sha)
+        recovery.apply_zero_request_recovery(
+            self.admission["ledgerPath"], failed_archive, protected,
+            protected / "SYNTHETIC-failed.sqlite3",
+            expected_old_binding=old, target_binding=target,
+            expected_ledger_sha256=ledger_sha,
+            expected_archive_inventory_sha256=inventory["sha256"],
+            recovery_registration_sha256=recovery_sha,
+            confirmed_proof_sha256=proof["proofSha256"])
+        documents = {
+            "recoveryEvidence": {"kind": "SYNTHETIC recovery evidence"},
+            "recoveryAuthorization": {"kind": "SYNTHETIC recovery authorization"},
+            "inspectionProof": proof,
+            "failedArchiveInventory": inventory,
+            "failedOperationalSnapshot": failed,
+        }
+        for name, value in documents.items():
+            path = self.inputs / ("SYNTHETIC-" + name + ".json")
+            save(path, value)
+            self.selected[name] = {"path": path.name, "sha256": instrument.digest(path)}
+        save(self.registration_file, self.registration)
+        self.admission.update(
+            ceilingUnits=recovery.PILOT_CEILING_MICRO_USD,
+            plannedSlots=list(self.admission["slots"]),
+            slots=list(self.admission["slots"][1:]),
+            recovery={
+                "oldBinding": old, "targetBinding": target,
+                "failedLedgerSha256": ledger_sha,
+                "failedArchiveInventorySha256": inventory["sha256"],
+                "recoveryRegistrationSha256": recovery_sha,
+                "preservedAttemptedSlots": [full_slots[0]],
+                "failedArchive": str(failed_archive),
+                "backupName": "SYNTHETIC-failed.sqlite3",
+            })
+        return full_slots
 
     def test_real_gateway_collector_hands_complete_synthetic_data_to_stage_analysis(self):
         self.collect()
@@ -282,6 +390,39 @@ class CollectionTests(unittest.TestCase):
                 if failure == "unknown":
                     self.assertEqual(budget.admit_request(body())["maximumMicroUsd"],
                                      outcome["spending"]["exposureMicroUsd"])
+
+    def test_policy_stop_diagnostic_is_reported_before_slot_completion_secondary_error(self):
+        ledger = Mock()
+        ledger.snapshot.return_value = {
+            "state": "INCOMPLETE_POLICY",
+            "events": [{
+                "kind": "stopped",
+                "detail": budget.canonical({
+                    "reason": "INCOMPLETE_POLICY",
+                    "diagnostic": "WIRE_UNKNOWN_PROVIDER_HEADER",
+                }),
+            }],
+        }
+        with self.assertRaisesRegex(
+                ValueError, r"INCOMPLETE_POLICY \(WIRE_UNKNOWN_PROVIDER_HEADER\)"):
+            instrument.require_gateway_collecting(ledger, budget)
+            ledger.complete_slot("owner", "slot", {}, 1)
+        ledger.complete_slot.assert_not_called()
+
+    def test_recovery_keeps_first_launch_invalid_and_collects_only_unstarted_slots(self):
+        full_slots = self.prepare_recovered_scope()
+        self.collect()
+        self.assertEqual(full_slots[1:], self.launched)
+        report = instrument.load(self.epoch / "ppw-stage-ledger.json")
+        first_cell = next(cell for cell in report["perCell"]
+                          if cell["pair"] == self.registration["tasks"][0] and cell["arm"] == "A")
+        self.assertEqual(1, first_cell["invalidRuns"])
+        self.assertEqual(73, first_cell["validRuns"])
+        spending = instrument.load(self.epoch / "spending-final.json")
+        self.assertEqual("complete", spending["state"])
+        self.assertEqual(full_slots[:1], budget.decode(spending["events"][-1]["detail"])[
+            "preservedAttemptedSlots"])
+        self.assertEqual(443, len(self.observed))
 
 
 if __name__ == "__main__":
