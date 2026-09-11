@@ -2,12 +2,29 @@
 title: "Research Evidence Status"
 section: "benchmarking"
 order: 4
-description: "What the 0.20 planning tranche established, what remains unknown, and why it was not a software release"
+description: "The paused PP-W-rows study, its unresolved evidence, and the separate historical M0 outcome"
 ---
 
 Milestone 0.20 reviewed whether Calor had enough evidence and authority for a
 three-arm adopter study: ordinary C#, strong protected C#, and protected Calor.
 It was a planning and evidence tranche, not a compiler release.
+
+## Current PP-W-rows Status: Paused
+
+**The user paused the separate PP-W-rows study on 2026-09-11.** The
+[central pause handoff](https://github.com/juanmicrosoft/calor/issues/1254#issuecomment-5637070487)
+preserves **two consumed invalid/censored attempts** and **442 untouched
+scheduled identities** out of 444. Neither the pilot nor confirmation has
+completed; no benefit or null result exists.
+
+The single total experiment ceiling is **USD1,000**. Two reservations of
+USD25.52 each remain held, **USD51.04 total**. Actual provider charges are
+**unknown**, not reconciled or measured spend. The conditionally authorized
+permanent-retention exception has **not been applied**.
+The [paused draft checkpoint](https://github.com/juanmicrosoft/calor/pull/1438#issuecomment-5637787747)
+records unfinished implementation and reviews. **There is no permission to resume.**
+Product releases proceed independently; they do not complete the study,
+alter its protocol or accounting, or authorize more collection.
 
 ## Recorded Outcome
 
@@ -48,22 +65,20 @@ used the frozen v0.18 release criteria. This deterministic engineering check
 is not an agent observation. Later task preparation, registration, and
 instrument work do not establish a study result.
 
-**Separate financial approval, 2026-09-10: USD250 total, pilot only.** The
+**Earlier financial approval, 2026-09-10: USD250 total, pilot only (superseded ceiling).** The
 [recorded user decision](https://github.com/juanmicrosoft/calor/issues/1259#issuecomment-5618103570)
-and [authorization receipt](https://github.com/juanmicrosoft/calor/pull/1387)
-accept the registered stopping rules and publication of negative or null
+and [historical authorization receipt](https://github.com/juanmicrosoft/calor/pull/1387)
+accepted the registered stopping rules and publication of negative or null
 results. The quote left the stage choice unselected, so the recorded
-interpretation uses the narrower pilot-only scope. This is not automatic
-stage-2 funding, a higher ceiling, or permission to weaken the protocol.
+interpretation used the narrower pilot-only scope. Its **BUDGET_NOT_RUN**
+assessment describes an earlier pre-execution hold, not the current pause
+after two consumed attempts. Neither state is a pilot null/negative or the
+stage-2 **UNDERPOWERED-CARRIED** outcome.
 
-**Operational collection is not admitted.** Trustworthy
-[spending enforcement](https://github.com/juanmicrosoft/calor/issues/1378),
-compatible reviewed pins, and a defensible full-pilot plan within the cap
-remain execution prerequisites. The current assessment is **BUDGET_NOT_RUN**,
-not not-buildable, a pilot null/negative, or stage-2 **UNDERPOWERED-CARRIED**.
-No redesigned agent collection or benefit result exists. The historical M0
-disposition and its separate human/participant approval boundaries are
-unchanged. See [current pilot status](/docs/benchmarking/results/#redesigned-pp-w-rows-deferred).
+The old benefit ledger's `epochRun: false` and `UNDERPOWERED` describe a
+separate historical registration, not the current redesigned attempts.
+The M0 disposition and its separate human/participant approval boundaries
+are unchanged. See the [dated study chronology](/docs/benchmarking/results/#redesigned-pp-w-rows-deferred).
 
 ## Release and Work Boundaries
 
@@ -78,10 +93,11 @@ The following boundaries remain:
 
 - #1284-#1309 are closed as not planned. They were not implemented.
 - #1311 is independent bounded correctness work.
-- M0 did not fund or activate #1254 or #1259. The later pilot-only financial
-  decision is separate and does not re-arm M0.
-- No `sd-001` epoch, participant recruitment, prototype service, or paid
-  collection was created.
+- M0 did not fund or activate #1254 or #1259. Later PP-W financial decisions
+  are separate and do not re-arm M0.
+- The M0 tranche created no `sd-001` epoch, participant recruitment,
+  prototype service, or paid collection. This does not erase the later
+  redesigned PP-W attempts.
 
 ## Repository Record
 
