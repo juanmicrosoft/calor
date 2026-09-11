@@ -95,7 +95,7 @@ class ProspectiveModelPinsTests(unittest.TestCase):
         current = spending.artifact_manifest(spending.GATEWAY)
         self.assertEqual(set(gateway["replacementHarnessArtifacts"]) | {
             "ppw-gateway-recovery.py", "ppw-gateway-recover.py",
-            "ppw-gateway-register-recovery.py",
+            "ppw-gateway-register-recovery.py", "ppw-gateway-register-terminal.py",
             "gateway-tools/bash-env.sh",
         }, set(current))
         self.assertNotEqual(current, gateway["replacementHarnessArtifacts"])

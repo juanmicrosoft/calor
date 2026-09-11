@@ -1,0 +1,94 @@
+{
+  "allowedDataKinds": [
+    "synthetic",
+    "empirical"
+  ],
+  "baselineRegistration": {
+    "path": "epochs/w-rows-pilot-001/registration.json",
+    "sha256": "b506c9ec65469640b6135708c7f1e9adbce7dcd318f6ca51e1b305156041484c"
+  },
+  "createsEpochOrLedger": false,
+  "effectiveOn": "independently reviewed merge of the #1434 implementation PR",
+  "epochId": "w-rows-pilot-gateway-002",
+  "id": "request-reserving-gateway-terminal-1434",
+  "instrumentAmendment": {
+    "path": "gateway-instrument-amendment-1434.json",
+    "sha256": "5696d88e8edf9f3fc782c25c625ed426f1bfd9ad10a144fb797899b762c76508"
+  },
+  "kind": "pp-w-request-gateway-execution-profile",
+  "modelRegistration": {
+    "path": "model-registration.json",
+    "sha256": "60ebedeb63d6507f13b10f21dd7650c505d2f86358508d151e650fabbc06bf27"
+  },
+  "nativeStartupEvidence": {
+    "path": "gateway-evidence/gateway-native-startup-1434-evidence.json",
+    "sha256": "2ee94f52b59e49707e14152551ba4155c7f8d65a448f7f75d88367aea90a6621"
+  },
+  "recovery": {
+    "automaticRecovery": false,
+    "continuationInvocations": 443,
+    "failedEpochId": "w-rows-pilot-gateway-001",
+    "preservedAttemptedSlots": [
+      "C-001-quota-adapter/calor-permissive/1"
+    ],
+    "terminalSemantics": "pp-w-source-bound-terminal-attempt-semantics-v1"
+  },
+  "schemaVersion": 1,
+  "sourceHistory": {
+    "actualFailedCollection": {
+      "archiveInventorySha256": "1554f1d841f4e455c36c677b2d9d778d7903c2153bd210efadb1ecc5351973e2",
+      "bindingSha256": "d16c8a557f20b540c952abf4f4f9a6756c45dc3fd832325a6cce7cce621d97b1",
+      "epochId": "w-rows-pilot-gateway-001",
+      "ledgerSha256": "0f32e092fbd760f7273405b4feda7e107b1a5630c9d98668b90d84a323048295",
+      "sourceCommit": "d705c0c015954cf8bfe4d39040db727bfb2d2309"
+    },
+    "prospectiveCollection": {
+      "epochId": "w-rows-pilot-gateway-002",
+      "issue": "https://github.com/juanmicrosoft/calor/issues/1434",
+      "sourceIdentity": "replacementHarnessArtifacts"
+    },
+    "supersededUnexecutedProposal": {
+      "executed": false,
+      "mergeCommit": "ac4ad3a016feb283e5ea7b3d90e6505ecaf6e49b",
+      "profile": {
+        "path": "gateway-execution-profile-1432.json",
+        "sha256": "8066b86aeecf292a8e86002011fee7415c91c9c528ea25727ab4541f3e05ec2f"
+      },
+      "pullRequest": "https://github.com/juanmicrosoft/calor/pull/1433",
+      "recoveryEvidence": {
+        "path": "gateway-recovery-evidence-1432.json",
+        "sha256": "9c3552b34bd1730f6c028a495a18a1db8918e735309b4b21eb0e81e52864643f"
+      }
+    }
+  },
+  "sourceInspectionEvidence": {
+    "path": "gateway-source-inspections.json",
+    "sha256": "9e443d86d0f1e7b9f926d03427e0f9aaaeee23c81a76796681fadc9c862a356d"
+  },
+  "spendAuthorization": {
+    "path": "gateway-authorization-1434.json",
+    "sha256": "756ab420af2c8e9e9038ccfa68568d0223e0895575cd0bef3f02639b82c5a3e7"
+  },
+  "spendingPlan": {
+    "path": "gateway-spending-plan-1434.json",
+    "sha256": "f4bfa29abc4cab698fd2d612177b506a1dcc6d7a7c55f16fdee293ec4a58efbd"
+  },
+  "stage": "pilot",
+  "stage2Authorized": false,
+  "stageRegistration": {
+    "path": "gateway-admission/stage1-method.json",
+    "sha256": "5db51f1b1451ed0b5d1596faebb50f8576d3b29413970e31422cc243905b5001"
+  },
+  "supersedes": {
+    "path": "gateway-execution-profile-1432.json",
+    "sha256": "8066b86aeecf292a8e86002011fee7415c91c9c528ea25727ab4541f3e05ec2f"
+  },
+  "terminalSemanticsAmendment": {
+    "path": "gateway-instrument-amendment-1434.json",
+    "sha256": "5696d88e8edf9f3fc782c25c625ed426f1bfd9ad10a144fb797899b762c76508"
+  },
+  "transportEvidence": {
+    "path": "gateway-evidence/gateway-native-wire-1434-evidence.json",
+    "sha256": "30356104927b022a9b0ce2cca124c6276426d33a005114865a2f86a27f5365f8"
+  }
+}

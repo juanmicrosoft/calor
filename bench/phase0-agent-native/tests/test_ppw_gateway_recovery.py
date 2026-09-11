@@ -43,6 +43,35 @@ def save(path, value):
     path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 
 
+def isolation():
+    return {
+        "kind": recovery.ISOLATION_KIND,
+        "kernelProbe": dict(recovery.ISOLATION_PROBE),
+        "modelInvoked": False,
+        "clientSha256": "6" * 64,
+        "policySha256": "7" * 64,
+        "workspaceRoot": "/SYNTHETIC/workspace",
+        "authoritativeRoot": "/SYNTHETIC/archive",
+    }
+
+
+def attempt(slot, binding):
+    return {
+        "schemaVersion": 1,
+        "kind": recovery.ATTEMPT_START_KIND,
+        "slot": slot,
+        "attemptNumber": 1,
+        "maximumAttempts": 1,
+        "actualClientInvocationPending": True,
+        "authoritativeRootSha256": "8" * 64,
+        "producerSourceSha256": {
+            name: binding["harnessArtifacts"][name]
+            for name in recovery.TERMINAL_SOURCE_FILES
+        },
+        "nonce": "9" * 64,
+    }
+
+
 class RecoveryFixture(unittest.TestCase):
     def setUp(self):
         self.root = Path(__file__).resolve().parent / (
@@ -57,6 +86,7 @@ class RecoveryFixture(unittest.TestCase):
         self.archive.mkdir()
         self.old = self.binding("w-rows-pilot-gateway-001", "1", "2")
         self.target = self.binding("w-rows-pilot-gateway-002", "3", "4")
+        self.target["harnessArtifacts"].update(budget.source_identities())
         self.recovery_registration_sha256 = "5" * 64
         self.create_ledger()
         self.create_archive()
@@ -244,20 +274,23 @@ class ZeroRequestRecoveryTests(RecoveryFixture):
             modules.return_value.validate_analysis_registration.return_value = {
                 "recoveryStatus": "pending-wire-evidence",
             }
-            with self.assertRaisesRegex(ValueError, "reviewed #1432 recovery registration is not active"):
+            with self.assertRaisesRegex(
+                    ValueError, "reviewed #1434 terminal recovery registration is not active"):
                 operator.canonical_inputs()
             modules.assert_called_once_with("ppw-pilot-adjudicate.py")
 
     def test_native_startup_evidence_requires_actual_tools_and_current_source(self):
         registration = load("startup_evidence_validation", BENCH / "ppw-gateway-registration.py")
         evidence = json.loads((BENCH / "registrations/ppw-rows-stage1/gateway-evidence/"
-                              "gateway-native-startup-1432-evidence.json").read_text())
+                              "gateway-native-startup-1434-evidence.json").read_text())
         registration.validate_native_startup(evidence)
         for mutate in (
             lambda value: value.update(outcome="failed"),
             lambda value: value.update(empirical=True),
             lambda value: value["nativeToolExecution"].update(toolResultErrors=1),
             lambda value: value["observer"].update(journal=[]),
+            lambda value: value["accounting"].update(sourceBoundAttemptStart=False),
+            lambda value: value["accounting"].update(invalidTerminalSlots=1),
             lambda value: value["sourceHashes"].pop("gateway-tools/bash-env.sh"),
             lambda value: value.update(testSha256="0" * 64),
         ):
@@ -320,8 +353,18 @@ class ZeroRequestRecoveryTests(RecoveryFixture):
                 db.execute("INSERT INTO requests VALUES(?,?,?,?,?,?,?,?)", (
                     request_id, slot, "{}", 1, 0, "reconciled", None, "{}"))
                 db.execute("INSERT INTO events(kind,request_id,detail) VALUES(?,?,?)",
+                           ("reserved-before-upstream", request_id, canonical({
+                               "maximumMicroUsd": 1,
+                           })))
+                db.execute("INSERT INTO events(kind,request_id,detail) VALUES(?,?,?)",
+                           ("complete-provider-usage", request_id, canonical({
+                               "conservativeChargeMicroUsd": 0,
+                               "releasedMicroUsd": 1,
+                           })))
+                db.execute("INSERT INTO events(kind,request_id,detail) VALUES(?,?,?)",
                            ("slot-complete", None, canonical({
-                               "slot": slot, "clientExitCode": 0, "isolation": {},
+                               "slot": slot, "clientExitCode": 0, "isolation": isolation(),
+                               "attempt": attempt(slot, self.target),
                            })))
         result = recovery.complete_recovered_scope(
             self.ledger, owner, failed, expected_old_binding=self.old,
@@ -335,8 +378,12 @@ class ZeroRequestRecoveryTests(RecoveryFixture):
             final = db.execute("SELECT kind,detail FROM events ORDER BY id DESC LIMIT 1").fetchone()
         self.assertEqual("complete", scope["state"])
         self.assertEqual("collection-complete", final["kind"])
-        self.assertEqual({"preservedAttemptedSlots": [self.old["plannedSlots"][0]]},
-                         json.loads(final["detail"]))
+        self.assertEqual({
+            "preservedAttemptedSlots": [self.old["plannedSlots"][0]],
+            "accountedSlots": 444,
+            "validCompletedSlots": 443,
+            "invalidTerminalSlots": 1,
+        }, json.loads(final["detail"]))
 
     def test_recovered_completion_refuses_retry_of_preserved_attempt(self):
         proof = self.prove()
@@ -354,6 +401,80 @@ class ZeroRequestRecoveryTests(RecoveryFixture):
                 expected_archive_inventory_sha256=self.archive_sha256,
                 recovery_registration_sha256=self.recovery_registration_sha256,
                 preserved_attempted_slots=[self.old["plannedSlots"][0]])
+
+    def test_recovered_completion_counts_zero_and_reconciled_terminal_invalids(self):
+        proof = self.prove()
+        self.apply(proof)
+        ledger = budget.RequestLedger(self.ledger)
+        owner = ledger.start()
+        failed = json.loads((self.archive / "collection-outcome.json").read_text())["spending"]
+        remaining = self.target["plannedSlots"][1:]
+        with self.connect() as db:
+            for index, slot in enumerate(remaining):
+                request_id = "%048x" % (index + 1)
+                request_bearing = index != 0
+                if request_bearing:
+                    db.execute("INSERT INTO requests VALUES(?,?,?,?,?,?,?,?)", (
+                        request_id, slot, "{}", 1, 0, "reconciled", None, "{}"))
+                    db.execute("INSERT INTO events(kind,request_id,detail) VALUES(?,?,?)",
+                               ("reserved-before-upstream", request_id, canonical({
+                                   "maximumMicroUsd": 1,
+                               })))
+                    db.execute("INSERT INTO events(kind,request_id,detail) VALUES(?,?,?)",
+                               ("complete-provider-usage", request_id, canonical({
+                                   "conservativeChargeMicroUsd": 0,
+                                   "releasedMicroUsd": 1,
+                               })))
+                if index < 2:
+                    terminal = {
+                        "schemaVersion": 1,
+                        "kind": recovery.TERMINAL_INVALID_KIND,
+                        "slot": slot,
+                        "attemptNumber": 1,
+                        "actualClientInvocation": True,
+                        "clientExitCode": 0,
+                        "classification": "MISSING_TRANSCRIPT",
+                        "invalidReason": next(
+                            reason for reason, code in budget.TERMINAL_REASON_CODES.items()
+                            if code == "MISSING_TRANSCRIPT"),
+                        "attemptStartSha256": "1" * 64,
+                        "clientInvocationSha256": "2" * 64,
+                        "invalidReasonSha256": "3" * 64,
+                        "reasonEvidence": {
+                            "agent.json": "6" * 64,
+                            "transcript.jsonl": None,
+                            "journal.jsonl": None,
+                        },
+                        "resultProjectionSha256": "4" * 64,
+                        "sealedSource": {
+                            "inventorySha256": "5" * 64,
+                            "fileCount": 1,
+                            "byteCount": 1,
+                        },
+                        "producerSourceSha256": {
+                            name: self.target["harnessArtifacts"][name]
+                            for name in recovery.TERMINAL_SOURCE_FILES
+                        },
+                    }
+                    db.execute("INSERT INTO events(kind,request_id,detail) VALUES(?,?,?)",
+                               (recovery.TERMINAL_INVALID_EVENT, None, canonical({
+                                   "slot": slot, "clientExitCode": 0,
+                                   "isolation": isolation(), "terminal": terminal,
+                               })))
+                else:
+                    db.execute("INSERT INTO events(kind,request_id,detail) VALUES(?,?,?)",
+                               ("slot-complete", None, canonical({
+                                   "slot": slot, "clientExitCode": 0, "isolation": isolation(),
+                                   "attempt": attempt(slot, self.target),
+                               })))
+        result = recovery.complete_recovered_scope(
+            self.ledger, owner, failed, expected_old_binding=self.old,
+            target_binding=self.target, expected_ledger_sha256=self.ledger_sha256,
+            expected_archive_inventory_sha256=self.archive_sha256,
+            recovery_registration_sha256=self.recovery_registration_sha256,
+            preserved_attempted_slots=[self.old["plannedSlots"][0]])
+        self.assertEqual((441, 3), (
+            result["validCompletedSlots"], result["invalidTerminalSlots"]))
 
     def test_every_request_row_refuses_even_zero_cost_reconciled_rows(self):
         rows = (

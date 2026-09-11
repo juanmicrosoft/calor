@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Request-level financial admission. Never reads credentials or client cost estimates."""
+import argparse
 from contextlib import contextmanager
 import hashlib
 import json
+import os
 from pathlib import Path
+import re
 import secrets
 import sqlite3
+import sys
 
 MICRO = 1_000_000
 KIND = "pp-w-request-gateway-v1"
@@ -47,6 +51,30 @@ REQUEST_CONTENT_FIELDS = {
     "document": {"source", "title", "context", "citations"},
 }
 COUNTERS = ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")
+ATTEMPT_START_KIND = "pp-w-gateway-attempt-start-v1"
+TERMINAL_INVALID_KIND = "pp-w-gateway-terminal-invalid-v1"
+TERMINAL_INVALID_EVENT = "slot-terminal-invalid"
+TERMINAL_SOURCE_FILES = ("run-pair.sh", "ppw-gateway-budget.py")
+TERMINAL_REASON_CODES = {
+    "agent.json missing or empty": "MISSING_AGENT_RESULT",
+    "agent.json is not valid JSON": "MALFORMED_AGENT_RESULT",
+    "transcript.jsonl missing or empty (W1: a run without a per-turn transcript is invalid)":
+        "MISSING_TRANSCRIPT",
+}
+TERMINAL_CLASSIFICATIONS = sorted(
+    set(TERMINAL_REASON_CODES.values()) | {"CLIENT_EXIT_WITHOUT_OBSERVED_WORK"})
+STAMP_FIELDS = {"epochId", "stage", "dataKind", "compilerCommit"}
+ISOLATION_KIND = "macos-seatbelt-request-gateway-v1"
+ISOLATION_PROBE = {
+    "gateway": True, "otherPort": False, "workspaceWrite": True,
+    "authoritativeWrite": False, "authoritativeRead": False,
+    "hiddenTestRead": False, "seededSolutionRead": False,
+    "stateWrite": False, "stateRead": False,
+    "outsideSignal": False, "hardlinkWrite": False, "symlinkWrite": False,
+    "samePortIpv6": False,
+    "unixSocket": False, "delegatedPreferencesWrite": False,
+    "readableSourceRead": True, "readableSourceHardlinkWrite": False,
+}
 
 
 class Refusal(ValueError):
@@ -62,6 +90,18 @@ def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
+def sha256_bytes(value):
+    return hashlib.sha256(value).hexdigest()
+
+
+def digest(path):
+    return sha256_bytes(Path(path).read_bytes())
+
+
+def sha256_hex(value):
+    return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+
+
 def decode(raw):
     def unique(pairs):
         result = {}
@@ -74,6 +114,308 @@ def decode(raw):
                           parse_constant=lambda _: (_ for _ in ()).throw(Refusal("nonfinite JSON")))
     except (UnicodeError, json.JSONDecodeError) as error:
         raise Refusal("invalid JSON") from error
+
+
+def source_identities():
+    root = Path(__file__).resolve().parent
+    return {name: digest(root / name) for name in TERMINAL_SOURCE_FILES}
+
+
+def strict_terminal_lifecycle(binding):
+    artifacts = binding.get("harnessArtifacts", {}) if isinstance(binding, dict) else {}
+    return all(artifacts.get(name) == sha for name, sha in source_identities().items())
+
+
+def contained(path, root):
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+def authoritative_run_directory(run_directory, authoritative_root):
+    root = Path(authoritative_root)
+    directory = Path(run_directory)
+    require(root.is_absolute() and directory.is_absolute(), "attempt paths must be absolute")
+    require(".." not in root.parts and ".." not in directory.parts, "attempt paths must be canonical")
+    require(root.is_dir() and directory.is_dir(), "attempt output directory is missing")
+    require(not any(path.is_symlink() for path in (root, directory, *directory.parents)),
+            "attempt output path is linked")
+    root = root.resolve()
+    directory = directory.resolve()
+    require(contained(directory, root) and directory != root,
+            "attempt output is outside the authoritative archive")
+    return directory, root
+
+
+def read_regular(path, reason):
+    path = Path(path)
+    require(path.is_file() and not path.is_symlink() and path.stat().st_nlink == 1, reason)
+    return path.read_bytes()
+
+
+def tree_inventory(path):
+    root = Path(path)
+    require(root.is_dir() and not root.is_symlink(), "sealed source archive is missing")
+    entries = []
+    for item in sorted(root.rglob("*")):
+        require(not item.is_symlink(), "sealed source archive contains a link")
+        if item.is_dir():
+            continue
+        raw = read_regular(item, "sealed source archive contains a nonregular file")
+        entries.append({
+            "path": item.relative_to(root).as_posix(),
+            "sha256": sha256_bytes(raw),
+            "size": len(raw),
+        })
+    require(entries, "sealed source archive is empty")
+    return {
+        "inventorySha256": sha256_bytes(canonical(entries).encode()),
+        "fileCount": len(entries),
+        "byteCount": sum(item["size"] for item in entries),
+    }
+
+
+def result_projection(value):
+    require(isinstance(value, dict), "invalid result record")
+    return {key: item for key, item in value.items() if key not in STAMP_FIELDS}
+
+
+def attempt_start_path(run_directory):
+    return Path(run_directory) / "attempt-start.json"
+
+
+def terminal_attempt_path(run_directory):
+    return Path(run_directory) / "invalid-terminal.json"
+
+
+def write_json_exclusive(path, value):
+    with Path(path).open("x", encoding="utf-8") as stream:
+        stream.write(json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n")
+
+
+def write_attempt_start(run_directory, authoritative_root, slot, attempt_number):
+    directory, root = authoritative_run_directory(run_directory, authoritative_root)
+    require(isinstance(slot, str) and slot and slot.count("/") == 2, "invalid attempt slot")
+    require(type(attempt_number) is int and attempt_number == 1,
+            "registered slots permit exactly one numbered attempt")
+    value = {
+        "schemaVersion": 1,
+        "kind": ATTEMPT_START_KIND,
+        "slot": slot,
+        "attemptNumber": attempt_number,
+        "maximumAttempts": 1,
+        "actualClientInvocationPending": True,
+        "authoritativeRootSha256": sha256_bytes(str(root).encode()),
+        "producerSourceSha256": source_identities(),
+        "nonce": secrets.token_hex(32),
+    }
+    write_json_exclusive(attempt_start_path(directory), value)
+    return value
+
+
+def _read_attempt_start(run_directory, authoritative_root, expected_slot, expected_sources=None,
+                        recorded_authoritative_root=None):
+    directory, root = authoritative_run_directory(run_directory, authoritative_root)
+    raw = read_regular(attempt_start_path(directory), "trusted attempt-start record is missing")
+    value = decode(raw)
+    expected = source_identities() if expected_sources is None else expected_sources
+    identity_root = root if recorded_authoritative_root is None else recorded_authoritative_root
+    validate_attempt_identity(value, identity_root, expected_slot, expected)
+    return value, sha256_bytes(raw)
+
+
+def validate_attempt_identity(value, root, expected_slot, expected):
+    require(isinstance(expected, dict) and set(expected) == set(TERMINAL_SOURCE_FILES)
+            and all(sha256_hex(item) for item in expected.values()),
+            "registered attempt source identities are missing")
+    require(isinstance(value, dict) and set(value) == {
+        "schemaVersion", "kind", "slot", "attemptNumber", "maximumAttempts",
+        "actualClientInvocationPending", "authoritativeRootSha256",
+        "producerSourceSha256", "nonce",
+    }, "attempt-start fields differ")
+    require(value["schemaVersion"] == 1 and value["kind"] == ATTEMPT_START_KIND
+            and value["slot"] == expected_slot and value["attemptNumber"] == 1
+            and value["maximumAttempts"] == 1
+            and value["actualClientInvocationPending"] is True
+            and value["authoritativeRootSha256"] == sha256_bytes(str(root).encode())
+            and value["producerSourceSha256"] == expected
+            and sha256_hex(value["nonce"]),
+            "attempt-start evidence differs from the registered slot or source")
+
+
+def validate_attempt_start(run_directory, authoritative_root, expected_slot, expected_sources=None,
+                           recorded_authoritative_root=None):
+    value, _ = _read_attempt_start(
+        run_directory, authoritative_root, expected_slot, expected_sources,
+        recorded_authoritative_root)
+    return value
+
+
+def terminal_reason_code(reason):
+    require(isinstance(reason, str), "invalid terminal reason")
+    if reason in TERMINAL_REASON_CODES:
+        return TERMINAL_REASON_CODES[reason]
+    match = re.fullmatch(r"agent exit code ([1-9][0-9]*) with empty journal\.jsonl", reason)
+    if match and valid_client_exit(int(match.group(1))):
+        return "CLIENT_EXIT_WITHOUT_OBSERVED_WORK"
+    raise Refusal("invalid reason is not an admitted terminal attrition reason")
+
+
+def valid_client_exit(value):
+    return type(value) is int and 0 <= value < 128 and value != 124
+
+
+def reason_evidence(directory, reason, exit_code):
+    contents = {}
+    for name in ("agent.json", "transcript.jsonl", "journal.jsonl"):
+        path = directory / name
+        require(not path.is_symlink(), "invalid-reason evidence is linked")
+        contents[name] = read_regular(path, "invalid-reason evidence is not regular") \
+            if path.exists() else None
+    code = terminal_reason_code(reason)
+    if code == "MISSING_AGENT_RESULT":
+        require(not contents["agent.json"], "agent result is not missing or empty")
+    elif code == "MISSING_TRANSCRIPT":
+        require(not contents["transcript.jsonl"], "transcript is not missing or empty")
+    elif code == "MALFORMED_AGENT_RESULT":
+        require(contents["agent.json"], "malformed agent result is missing")
+        try:
+            value = decode(contents["agent.json"])
+        except Refusal:
+            pass
+        else:
+            require(value is None or value is False, "agent result is valid JSON")
+    else:
+        require(exit_code > 0 and reason == "agent exit code %d with empty journal.jsonl" % exit_code
+                and not contents["journal.jsonl"], "client crash has observed work or a different exit")
+    return {name: sha256_bytes(raw) if raw is not None else None for name, raw in contents.items()}
+
+
+def validate_isolation_evidence(evidence):
+    require(isinstance(evidence, dict) and set(evidence) == {
+        "kind", "kernelProbe", "modelInvoked", "clientSha256", "policySha256",
+        "workspaceRoot", "authoritativeRoot",
+    }, "trusted isolation evidence fields differ")
+    require(evidence["kind"] == ISOLATION_KIND
+            and evidence["kernelProbe"] == ISOLATION_PROBE
+            and evidence["modelInvoked"] is False
+            and sha256_hex(evidence["clientSha256"])
+            and sha256_hex(evidence["policySha256"])
+            and all(isinstance(evidence[name], str) and evidence[name]
+                    for name in ("workspaceRoot", "authoritativeRoot")),
+            "trusted isolation evidence differs")
+    return evidence
+
+
+def _invalid_reason_from_log(raw, exit_code):
+    try:
+        lines = raw.decode("utf-8").splitlines()
+    except UnicodeError as error:
+        raise Refusal("invalid reason log is not UTF-8") from error
+    require(lines, "invalid reason log is empty")
+    match = re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z attempt=0 agent_rc=(\d+): (.+)",
+        lines[-1])
+    require(match is not None and int(match.group(1)) == exit_code,
+            "invalid reason log lacks the trusted final attempt")
+    return match.group(2)
+
+
+def write_terminal_attempt(run_directory, authoritative_root, slot, reason):
+    directory, root = authoritative_run_directory(run_directory, authoritative_root)
+    start, start_sha = _read_attempt_start(directory, root, slot)
+    reason_code = terminal_reason_code(reason)
+    invocation_raw = read_regular(
+        directory / "client-invocation.json", "actual client invocation record is missing")
+    invocation = decode(invocation_raw)
+    require(isinstance(invocation, dict) and set(invocation) == {"exitCode"}
+            and valid_client_exit(invocation["exitCode"]),
+            "terminal invalid requires a noninterrupted client invocation")
+    reason_raw = read_regular(directory / "invalid.txt", "invalid reason provenance is missing")
+    require(_invalid_reason_from_log(reason_raw, invocation["exitCode"]) == reason,
+            "invalid reason differs from the trusted runner log")
+    result_raw = read_regular(directory / "result.json", "invalid result record is missing")
+    result = decode(result_raw)
+    task, arm, run = slot.split("/")
+    require(result.get("pair") == task and result.get("arm") == arm
+            and result.get("run") == int(run)
+            and result.get("invalid") is True and result.get("censored") is True,
+            "invalid result does not identify the terminal slot")
+    source = tree_inventory(directory / "final-src")
+    record = {
+        "schemaVersion": 1,
+        "kind": TERMINAL_INVALID_KIND,
+        "slot": slot,
+        "attemptNumber": start["attemptNumber"],
+        "classification": reason_code,
+        "invalidReason": reason,
+        "attemptStartSha256": start_sha,
+        "actualClientInvocation": True,
+        "clientExitCode": invocation["exitCode"],
+        "clientInvocationSha256": sha256_bytes(invocation_raw),
+        "invalidReasonSha256": sha256_bytes(reason_raw),
+        "reasonEvidence": reason_evidence(directory, reason, invocation["exitCode"]),
+        "resultProjectionSha256": sha256_bytes(
+            canonical(result_projection(result)).encode()),
+        "sealedSource": source,
+        "producerSourceSha256": start["producerSourceSha256"],
+    }
+    write_json_exclusive(terminal_attempt_path(directory), record)
+    return record
+
+
+def validate_terminal_attempt(
+        run_directory, authoritative_root, expected_slot, expected_sources=None,
+        recorded_authoritative_root=None):
+    directory, root = authoritative_run_directory(run_directory, authoritative_root)
+    start, start_sha = _read_attempt_start(
+        directory, root, expected_slot, expected_sources, recorded_authoritative_root)
+    raw = read_regular(terminal_attempt_path(directory), "terminal-invalid record is missing")
+    record = decode(raw)
+    require(isinstance(record, dict) and set(record) == {
+        "schemaVersion", "kind", "slot", "attemptNumber", "classification",
+        "invalidReason", "attemptStartSha256", "actualClientInvocation",
+        "clientExitCode", "clientInvocationSha256", "invalidReasonSha256",
+        "resultProjectionSha256", "sealedSource", "producerSourceSha256", "reasonEvidence",
+    }, "terminal-invalid record fields differ")
+    require(record["schemaVersion"] == 1 and record["kind"] == TERMINAL_INVALID_KIND
+            and record["slot"] == expected_slot
+            and record["attemptNumber"] == start["attemptNumber"] == 1
+            and record["classification"] == terminal_reason_code(record["invalidReason"])
+            and record["attemptStartSha256"] == start_sha
+            and record["actualClientInvocation"] is True
+            and valid_client_exit(record["clientExitCode"])
+            and record["producerSourceSha256"] == start["producerSourceSha256"],
+            "terminal-invalid evidence differs from the trusted attempt")
+    invocation_raw = read_regular(
+        directory / "client-invocation.json", "actual client invocation record is missing")
+    invocation = decode(invocation_raw)
+    require(isinstance(invocation, dict) and set(invocation) == {"exitCode"}
+            and valid_client_exit(invocation["exitCode"])
+            and invocation["exitCode"] == record["clientExitCode"]
+            and record["clientInvocationSha256"] == sha256_bytes(invocation_raw),
+            "terminal-invalid client invocation evidence differs")
+    reason_raw = read_regular(directory / "invalid.txt", "invalid reason provenance is missing")
+    require(_invalid_reason_from_log(reason_raw, record["clientExitCode"]) == record["invalidReason"]
+            and record["invalidReasonSha256"] == sha256_bytes(reason_raw),
+            "terminal-invalid reason provenance differs")
+    require(record["reasonEvidence"] == reason_evidence(
+        directory, record["invalidReason"], record["clientExitCode"]),
+        "terminal-invalid reason evidence changed")
+    result_raw = read_regular(directory / "result.json", "invalid result record is missing")
+    result = decode(result_raw)
+    task, arm, run = expected_slot.split("/")
+    require(result.get("pair") == task and result.get("arm") == arm
+            and result.get("run") == int(run)
+            and result.get("invalid") is True and result.get("censored") is True
+            and record["resultProjectionSha256"] == sha256_bytes(
+                canonical(result_projection(result)).encode()),
+            "terminal-invalid result projection differs")
+    require(record["sealedSource"] == tree_inventory(directory / "final-src"),
+            "terminal-invalid sealed source differs")
+    return record
 
 
 def integer(value, upper):
@@ -458,6 +800,42 @@ class RequestLedger:
         db.execute("INSERT INTO events(kind,request_id,detail) VALUES(?,?,?)",
                    (kind, request_id, canonical(detail)))
 
+    @staticmethod
+    def terminal_slots(db):
+        return [
+            decode(row["detail"])["slot"] for row in db.execute(
+                "SELECT detail FROM events WHERE kind IN ('slot-complete',?) ORDER BY id",
+                (TERMINAL_INVALID_EVENT,))
+        ]
+
+    @staticmethod
+    def preserved_slots(db):
+        rows = db.execute(
+            "SELECT detail FROM events WHERE kind='zero-request-recovery' ORDER BY id").fetchall()
+        if not rows:
+            return []
+        require(len(rows) == 1, "duplicate recovery authority")
+        detail = decode(rows[0]["detail"])
+        preserved = detail.get("preservedAttemptedSlots")
+        require(isinstance(preserved, list)
+                and all(isinstance(slot, str) and slot for slot in preserved),
+                "malformed preserved attempt inventory")
+        return preserved
+
+    @classmethod
+    def require_next_slot(cls, db, scope, slot):
+        require(slot not in cls.terminal_slots(db), "duplicate terminal slot")
+        planned = decode(scope["binding"]).get("plannedSlots")
+        if planned is None:
+            return
+        require(slot in planned, "unregistered gateway slot")
+        preserved = cls.preserved_slots(db)
+        remaining = [item for item in planned if item not in preserved]
+        terminals = cls.terminal_slots(db)
+        require(terminals == remaining[:len(terminals)], "terminal slot history is out of order")
+        require(len(terminals) < len(remaining) and slot == remaining[len(terminals)],
+                "gateway slot is duplicate, replaced, or out of registered order")
+
     def start(self):
         owner = secrets.token_hex(32)
         with self.transaction() as db:
@@ -474,8 +852,7 @@ class RequestLedger:
             row = db.execute("SELECT * FROM scope").fetchone()
             require(row and row["owner"] == owner and row["state"] == "collecting",
                     "budget scope is not collecting")
-            planned = decode(row["binding"]).get("plannedSlots")
-            require(planned is None or slot in planned, "unregistered gateway slot")
+            self.require_next_slot(db, row, slot)
             exposure = db.execute("SELECT COALESCE(SUM(charge),0) AS total FROM requests").fetchone()["total"]
             maximum = request["maximumMicroUsd"]
             require(request["priceSha256"] == price_identity() and
@@ -523,7 +900,7 @@ class RequestLedger:
             "WIRE_DUPLICATE_HEADER", "WIRE_TRANSFER_ENCODING", "WIRE_CONTENT_ENCODING",
             "WIRE_CONTENT_TYPE", "WIRE_API_VERSION", "WIRE_UNKNOWN_PROVIDER_HEADER",
             "WIRE_BROWSER_ACCESS_VALUE", "WIRE_CONTENT_LENGTH", "WIRE_HOP_CAPABILITY",
-            "WIRE_ENDPOINT", "OBSERVER_OPERATION", "PRICE_REQUEST",
+            "WIRE_ENDPOINT", "OBSERVER_OPERATION", "PRICE_REQUEST", "REQUEST_RESERVATION",
         }, "unregistered nonsecret policy diagnostic")
         with self.transaction() as db:
             row = db.execute("SELECT owner,state FROM scope").fetchone()
@@ -535,22 +912,54 @@ class RequestLedger:
                     detail["diagnostic"] = diagnostic
                 self.event(db, "stopped", None, detail)
 
-    def complete_slot(self, owner, slot, evidence, exit_code):
-        require(type(exit_code) is int and 0 <= exit_code < 128 and exit_code != 124,
-                "missing or interrupted client invocation")
+    def complete_slot(self, owner, slot, evidence, exit_code, attempt=None):
+        require(valid_client_exit(exit_code), "missing or interrupted client invocation")
         require(isinstance(evidence, dict), "trusted isolation evidence required")
         with self.transaction() as db:
             scope = db.execute("SELECT * FROM scope").fetchone()
             require(scope and scope["owner"] == owner and scope["state"] == "collecting",
                     "incomplete scope cannot complete a slot")
+            if strict_terminal_lifecycle(decode(scope["binding"])):
+                validate_isolation_evidence(evidence)
+                validate_attempt_identity(
+                    attempt, evidence["authoritativeRoot"], slot, source_identities())
+            self.require_next_slot(db, scope, slot)
             requests = db.execute("SELECT state FROM requests WHERE slot=?", (slot,)).fetchall()
             require(requests and all(row["state"] == "reconciled" for row in requests),
                     "slot lacks complete gateway-accounted requests")
-            completed = db.execute("SELECT detail FROM events WHERE kind='slot-complete'").fetchall()
-            require(all(decode(row["detail"])["slot"] != slot for row in completed),
-                    "duplicate slot completion")
-            self.event(db, "slot-complete", None,
-                       {"slot": slot, "clientExitCode": exit_code, "isolation": evidence})
+            detail = {"slot": slot, "clientExitCode": exit_code, "isolation": evidence}
+            if attempt is not None:
+                require(isinstance(attempt, dict) and attempt.get("kind") == ATTEMPT_START_KIND
+                        and attempt.get("slot") == slot and attempt.get("attemptNumber") == 1,
+                        "trusted attempt-start evidence required")
+                detail["attempt"] = attempt
+            self.event(db, "slot-complete", None, detail)
+
+    def complete_invalid_slot(
+            self, owner, slot, run_directory, authoritative_root, evidence, expected_sources):
+        validate_isolation_evidence(evidence)
+        require(expected_sources == source_identities(),
+                "terminal-invalid completion requires the current registered producer sources")
+        terminal = validate_terminal_attempt(
+            run_directory, authoritative_root, slot, expected_sources)
+        with self.transaction() as db:
+            scope = db.execute("SELECT * FROM scope").fetchone()
+            require(scope and scope["owner"] == owner and scope["state"] == "collecting",
+                    "incomplete scope cannot terminally account an invalid slot")
+            require(strict_terminal_lifecycle(decode(scope["binding"])),
+                    "terminal-invalid lifecycle is not source-bound by this scope")
+            self.require_next_slot(db, scope, slot)
+            requests = db.execute(
+                "SELECT state,reason FROM requests WHERE slot=?", (slot,)).fetchall()
+            require(all(row["state"] == "reconciled" and row["reason"] is None for row in requests),
+                    "terminal-invalid slot has in-flight or unknown charge")
+            self.event(db, TERMINAL_INVALID_EVENT, None, {
+                "slot": slot,
+                "clientExitCode": terminal["clientExitCode"],
+                "isolation": evidence,
+                "terminal": terminal,
+            })
+        return terminal
 
     def complete(self, owner):
         with self.transaction() as db:
@@ -561,12 +970,26 @@ class RequestLedger:
                     "in-flight or unknown charge remains")
             planned = decode(row["binding"]).get("plannedSlots")
             if planned is not None:
-                completed = [decode(event["detail"])["slot"] for event in db.execute(
-                    "SELECT detail FROM events WHERE kind='slot-complete'")]
-                require(len(completed) == len(planned) and set(completed) == set(planned),
+                completed = self.terminal_slots(db)
+                require(completed == planned,
                         "complete registered slot inventory is required")
+                if strict_terminal_lifecycle(decode(row["binding"])):
+                    valid = db.execute(
+                        "SELECT COUNT(*) FROM events WHERE kind='slot-complete'").fetchone()[0]
+                    invalid = db.execute(
+                        "SELECT COUNT(*) FROM events WHERE kind=?",
+                        (TERMINAL_INVALID_EVENT,)).fetchone()[0]
+                    detail = {
+                        "accountedSlots": len(completed),
+                        "validCompletedSlots": valid,
+                        "invalidTerminalSlots": invalid,
+                    }
+                else:
+                    detail = {}
+            else:
+                detail = {}
             db.execute("UPDATE scope SET state='complete'")
-            self.event(db, "collection-complete", None, {})
+            self.event(db, "collection-complete", None, detail)
 
     def snapshot(self):
         with self.transaction() as db:
@@ -574,7 +997,59 @@ class RequestLedger:
             requests = [dict(row) for row in db.execute(
                 "SELECT id,slot,request,reserved,charge,state,reason,usage FROM requests ORDER BY rowid")]
             events = [dict(row) for row in db.execute("SELECT * FROM events ORDER BY id")]
-        return {"kind": KIND, "state": scope["state"], "binding": decode(scope["binding"]),
-                "ceilingMicroUsd": scope["ceiling"], "exposureMicroUsd": sum(r["charge"] for r in requests),
-                "requests": requests, "events": events, "verdict": None,
-                "basis": "request reservations; only validated complete provider usage permits release"}
+        binding = decode(scope["binding"])
+        result = {
+            "kind": KIND, "state": scope["state"], "binding": binding,
+            "ceilingMicroUsd": scope["ceiling"],
+            "exposureMicroUsd": sum(row["charge"] for row in requests),
+            "requests": requests, "events": events, "verdict": None,
+            "basis": "request reservations; only validated complete provider usage permits release",
+        }
+        if strict_terminal_lifecycle(binding):
+            preserved = []
+            valid = 0
+            invalid = 0
+            for event in events:
+                if event["kind"] == "zero-request-recovery":
+                    preserved = decode(event["detail"])["preservedAttemptedSlots"]
+                elif event["kind"] == "slot-complete":
+                    valid += 1
+                elif event["kind"] == TERMINAL_INVALID_EVENT:
+                    invalid += 1
+            result.update(
+                accountedSlots=len(preserved) + valid + invalid,
+                validCompletedSlots=valid,
+                invalidTerminalSlots=len(preserved) + invalid,
+                requestBearingSlots=len({row["slot"] for row in requests}),
+            )
+        return result
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
+    subparsers = parser.add_subparsers(dest="operation", required=True)
+    for operation in ("attempt-start", "terminal-invalid"):
+        command = subparsers.add_parser(operation, allow_abbrev=False)
+        command.add_argument("--run-directory", required=True)
+        command.add_argument("--authoritative-root", required=True)
+        command.add_argument("--slot", required=True)
+        if operation == "attempt-start":
+            command.add_argument("--attempt-number", required=True, type=int)
+        else:
+            command.add_argument("--reason", required=True)
+    args = parser.parse_args(argv)
+    try:
+        if args.operation == "attempt-start":
+            value = write_attempt_start(
+                args.run_directory, args.authoritative_root, args.slot, args.attempt_number)
+        else:
+            value = write_terminal_attempt(
+                args.run_directory, args.authoritative_root, args.slot, args.reason)
+        print(canonical(value))
+    except (Refusal, OSError, ValueError, TypeError, KeyError) as error:
+        parser.exit(2, "ERROR: %s\n" % error)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -440,7 +440,7 @@ def validate_harness_checkout(admission):
             "only the exact registered failed archive may remain untracked")
 
 
-def preserve_recovered_attempt(epoch, pins, admission):
+def preserve_recovered_attempt(epoch, pins, admission, failed_inventory, inspection_proof):
     recovery = admission["recovery"]
     preserved = recovery["preservedAttemptedSlots"]
     require(preserved == [admission["plannedSlots"][0]["id"]],
@@ -453,6 +453,37 @@ def preserve_recovered_attempt(epoch, pins, admission):
     require(set(invocation) == {"exitCode"} and type(invocation["exitCode"]) is int
             and 0 < invocation["exitCode"] < 128 and invocation["exitCode"] != 124,
             "preserved attempt lacks the fixed failed client launch")
+    raw_result = source / "result.json"
+    require(raw_result.is_file() and not raw_result.is_symlink(),
+            "preserved attempt lacks its opaque original result record")
+    original_root = Path(recovery["failedArchive"])
+    original_pins = original_root / "pins.json"
+    original_registration = original_root / "registration.json"
+    require(original_pins.is_file() and original_registration.is_file(),
+            "preserved attempt lacks its original profile provenance")
+    original_sources = recovery["oldBinding"]["harnessArtifacts"]
+    require(isinstance(original_sources, dict)
+            and original_sources.get("run-pair.sh")
+            and original_sources.get("ppw-gateway-budget.py"),
+            "preserved attempt lacks original producer source identities")
+    require(failed_inventory.get("sha256") == recovery["failedArchiveInventorySha256"],
+            "preserved failed inventory differs from the recovery authority")
+    inventory_files = {
+        item["path"]: item["sha256"] for item in failed_inventory.get("files", [])
+        if isinstance(item, dict) and set(item) >= {"path", "sha256"}
+    }
+    failed_run_root = "runs/%s/%s/run-%d/" % (task, arm, run)
+    provenance_resolution = (
+        "verified-failed-archive" if pins["dataKind"] == "empirical"
+        else "synthetic-registered-proof-double")
+    if pins["dataKind"] == "empirical":
+        require(digest(raw_result) == inventory_files.get(failed_run_root + "result.json")
+                and digest(source / "client-invocation.json")
+                == inventory_files.get(failed_run_root + "client-invocation.json")
+                and digest(original_pins) == inventory_files.get("pins.json")
+                and digest(original_registration)
+                == inspection_proof["failedRegistrationSha256"],
+                "preserved original files differ from the registered failed inventory")
     destination = epoch / "runs" / task / arm / ("run-%d" % run)
     destination.mkdir(parents=True)
     shutil.copy2(source / "client-invocation.json", destination / "client-invocation.json")
@@ -461,6 +492,7 @@ def preserve_recovered_attempt(epoch, pins, admission):
         "the registered attempt is invalid and cannot be replaced.\n",
         encoding="utf-8")
     write_new(destination / "result.json", {
+        "recordKind": "pp-w-recovered-invalid-wrapper-v1",
         "epochId": pins["epochId"], "stage": pins["stage"], "dataKind": pins["dataKind"],
         "pair": task, "arm": arm, "run": run, "nullAgent": False,
         "compilerCommit": pins["compiler"]["commit"],
@@ -470,9 +502,30 @@ def preserve_recovered_attempt(epoch, pins, admission):
         "controlArmKind": "permissive" if arm == "calor-permissive" else None,
         "editMechanism": "raw", "invalid": True, "censored": True,
         "recoveredAttempt": {
-            "failedEpochId": "w-rows-pilot-gateway-001",
+            "kind": "pp-w-opaque-original-invalid-attempt-v1",
+            "failedEpochId": recovery["oldBinding"]["epochId"],
+            "wrapperEpochId": pins["epochId"],
             "slot": slot,
             "failedArchiveInventorySha256": recovery["failedArchiveInventorySha256"],
+            "failedLedgerSha256": recovery["failedLedgerSha256"],
+            "provenanceResolution": provenance_resolution,
+            "originalProfile": {
+                "pinsSha256": inventory_files["pins.json"],
+                "pinsIdentitySha256": inspection_proof["failedPinsIdentitySha256"],
+                "registrationSha256": inspection_proof["failedRegistrationSha256"],
+                "sourceHashes": original_sources,
+            },
+            "originalRun": {
+                "rawRecordRelativePath": failed_run_root + "result.json",
+                "rawRecordSha256": inventory_files[failed_run_root + "result.json"],
+                "clientInvocationSha256":
+                    inventory_files[failed_run_root + "client-invocation.json"],
+                "runPairSha256": original_sources["run-pair.sh"],
+            },
+            "wrapperSourceHashes": {
+                name: pins["harnessArtifacts"][name]
+                for name in ("run-pair.sh", "ppw-gateway-budget.py", "ppw-instrument.py")
+            },
             "clientExitCode": invocation["exitCode"],
             "providerRequests": 0,
             "replacementPermitted": False,
@@ -527,6 +580,7 @@ def validate_collection_authorization(registration, selected, directory, epoch_i
     authorization = load(proofs["spendAuthorization"])
     require(authorization.get("kind") in {
         "pp-w-rows-spending-authorization", "pp-w-zero-request-recovery-authorization",
+        "pp-w-terminal-semantics-recovery-authorization",
     },
             "structured spending authorization required")
     require(authorization.get("epochId") == epoch_id and authorization.get("stage") == stage,
@@ -567,6 +621,7 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
     gateway_mode = admission.get("mechanism") == spending.GATEWAY
     gateway_module = helper("ppw-budget-gateway.py") if gateway_mode else None
     isolation = helper("ppw-gateway-client.py") if gateway_mode else None
+    inspection = helper("ppw-source-inspection.py") if gateway_mode else None
     validate_harness_checkout(admission)
     require(os.environ.get("CLAUDE_MODEL") == selected["modelPin"], "CLAUDE_MODEL differs from registration")
     harness_hashes = admission["harnessArtifacts"]
@@ -586,7 +641,7 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
     if gateway_mode:
         require(runtime.is_file() and digest(runtime) == admission["runtimeSha256"],
                 "gateway requires the frozen prebuilt runtime, never a rebuilt product")
-        inspection_runtime = helper("ppw-source-inspection.py").prepare(shared["calorDll"])
+        inspection_runtime = inspection.prepare(shared["calorDll"])
         require(inspection_runtime == admission["sourceInspector"],
                 "prospective source-inspector rebuild differs from the registered runtime")
         for certificate in registration["sourceInspections"].values():
@@ -684,7 +739,10 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
         validate_pins(pins, registration, stage, epoch_id)
         write_new(epoch / "pins.json", pins)
         if gateway_mode and "recovery" in admission:
-            preserve_recovered_attempt(epoch, pins, admission)
+            preserve_recovered_attempt(
+                epoch, pins, admission,
+                load(local(epoch, selected["failedArchiveInventory"]["path"])),
+                load(local(epoch, selected["inspectionProof"]["path"])))
         for run in range(1, selected["runsPerArm"] + 1):
             for task in registration["tasks"]:
                 for definition in ARMS.values():
@@ -756,7 +814,42 @@ def run_epoch(registration_path, tasks_root, compiler_root, epochs_root, epoch_i
                             evidence = isolation.read_isolation_evidence(context_path, work, epoch)
                             client_exit = load(run_directory / "client-invocation.json").get("exitCode")
                             require_gateway_collecting(ledger, gateway_module.budget)
-                            ledger.complete_slot(owner, slot, evidence, client_exit)
+                            terminal_lifecycle = gateway_module.budget.strict_terminal_lifecycle({
+                                "harnessArtifacts": harness_hashes,
+                            })
+                            terminal_sources = None
+                            attempt = None
+                            if terminal_lifecycle:
+                                terminal_sources = {
+                                    name: harness_hashes[name]
+                                    for name in gateway_module.budget.TERMINAL_SOURCE_FILES
+                                }
+                                attempt = gateway_module.budget.validate_attempt_start(
+                                    run_directory, epoch, slot, terminal_sources)
+                            result_path = run_directory / "result.json"
+                            result = load(result_path)
+                            if (run_directory / "invalid-terminal.json").exists():
+                                require(terminal_lifecycle,
+                                        "terminal-invalid evidence uses an unregistered source lifecycle")
+                                terminal = ledger.complete_invalid_slot(
+                                    owner, slot, run_directory, epoch, evidence, terminal_sources)
+                                require(result.get("invalid") is True
+                                        and result.get("censored") is True
+                                        and terminal["clientExitCode"] == client_exit,
+                                        "terminal-invalid result or invocation differs")
+                            else:
+                                require(result.get("invalid") is False,
+                                        "invalid result lacks trusted terminal-invalid evidence")
+                                source_report = load(run_directory / "source-inspection.json")
+                                require(
+                                    source_report.get("inspectorSha256")
+                                    == admission["sourceInspector"]["files"][
+                                        "ppw-source-inspector.dll"]
+                                    and source_report.get("inspectorRuntimeSha256")
+                                    == admission["sourceInspector"]["runtimeSha256"],
+                                    "valid run lacks registered source-inspection evidence")
+                                ledger.complete_slot(
+                                    owner, slot, evidence, client_exit, attempt=attempt)
                             write_new(run_directory / "gateway-isolation.json", evidence)
                         finally:
                             context_path.unlink(missing_ok=True)

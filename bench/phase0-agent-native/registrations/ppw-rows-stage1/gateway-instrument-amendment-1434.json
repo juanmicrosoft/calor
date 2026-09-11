@@ -1,0 +1,117 @@
+{
+  "kind": "pp-w-prospective-spending-instrument-amendment",
+  "reason": "Reviewed #1434 source-bound attempt starts and terminal-invalid proofs without changing the frozen estimands, weights, stopping rules, or allowance.",
+  "replacementHarnessArtifacts": {
+    "gateway-tools/bash-env.sh": "0f2080f2de7a80651f5f6fc4e3ee25885c860bf4c4284eadc66459fa94325ef9",
+    "gateway-tools/python3": "a3b38507fbbd0b298bb71fe0f9d02dd67a434d3d2e9fd36fa54a8103fd57a91d",
+    "harness-capture.py": "dc8a75ffb0abe9dd5a8997a06121ee1e2610cffa13cbc436e06524dc0c061c3d",
+    "ppw-budget-gateway.py": "a7904a71e98c6838ad393eed0c642936753426229fa3509c3a92672b42002de8",
+    "ppw-gateway-budget.py": "e210373664b8d0f4b505028e1531bc2284f2443bbaf80ad0f64e8f6b14cd5e6e",
+    "ppw-gateway-client.py": "5af515fd0e305bebfd497f0d33ff17825ecb2e8f2317cae327cbc05c45a92586",
+    "ppw-gateway-recover.py": "139931cec7d533360b9d6b069574552ccc9c7fc1fb5a5dd360d593ec40f7b0d8",
+    "ppw-gateway-recovery.py": "6a4fe07577707319a1040dc4a8555fa3274be715d547738b1b9ff8aa36b577c7",
+    "ppw-gateway-register-recovery.py": "8fce2dbbc60f0343f9febfc25d4a4a1bf83158b370ef340e533059e19f5ffd01",
+    "ppw-gateway-register-terminal.py": "947e6db250f89ac20031d80bd79418e1693980eaf8cb361de251d7f7bb1a9833",
+    "ppw-gateway-registration.py": "6db123f323560263829d2b5cabec2bce6016006ccb053b7003548ee1202e3e89",
+    "ppw-instrument.py": "ec88afcad85d4cb3f3e0c27b65d0a8c8793ae3b20584a18b56bd6afa1148705d",
+    "ppw-pins.schema.json": "c737775a952adaeb066042c6d9d204bbfeae929c0bf6d5aa2e628422baf7e5f6",
+    "ppw-registration.py": "ab9e86f08723827e5be56dee160cfa6db63849863df33b0428bdc782dfc20e0e",
+    "ppw-run-observer.py": "7555bac129bc6f36c902ff112bca3064f7ad26ffb3de40c571ff06a58879a02e",
+    "ppw-source-assembly.py": "0e4002ff79aceb39658223c3820438a4b9832cf4c00ca107d37e47ad5f7c973c",
+    "ppw-source-inspection.py": "836027d7b3db07d061d68f128fff77ab3e1d4a840ef0f3148d9f8da8315727e8",
+    "ppw-spending.py": "7f7cf492e8a8a84d84b5cc356a4d65f7525371525c44f16156de3653bb55822f",
+    "ppw-test-host.py": "41796877f49dfcf5ff51751eb1c24e1bb27c19d32ad77ab7b5f1d913f9a758c3",
+    "run-pair.sh": "80cd8a0a32997836c225c7ddabc465eaeab0b1356a6aff7017b0e56c62a9dedc",
+    "source-inspection/PpwSourceInspector.csproj": "be41403479c72037d16bf22500ab597f1c65babbb3f9935805c90c7a7d64ec62",
+    "source-inspection/Program.cs": "974bfa49a5a0c8435929cfcb5d408f3b26694580c412d5e29b0e5a499f2f1bef",
+    "telemetry-helpers.py": "161b98639de2ac4d7929098530e096cec14d63cb4d4be63ee510a61e4600849e",
+    "templates/calor-arm/CalorArm.Gateway.csproj.template": "f551e7e4fd14434dafc8e332ea3908d8db1695725316856e69f7b1a45cf11159",
+    "templates/calor-arm/CalorArm.csproj.template": "60b56d0475a5ce6f60493cffdab87eb8f90a17f058de7d6bff859769ae11f04c",
+    "templates/calor-arm/policy-canary.calr.txt": "205ad82b07e0781968425b414bde2aa817e93ca9a9392e6727167eed5b46f10e",
+    "test-host/PpwXunitHost.csproj": "34feab8cc7d54a7d2f912fd8ab906ca731ea42f42129c22e1882cfdc4806a9cb",
+    "test-host/Program.cs": "067d7effc75e0edcb70158a3fb21ec92c8cf28167867f45345dee6eebfbaca1d",
+    "token-usage.py": "b2cd56ed565c40877092640392f0998cb97d637ebdd6de6ead9a96d77398149e",
+    "token-usage.sh": "de59280fa8d212397d6154ecc87b2776a73d2dfd6de03515b739119bfb819117"
+  },
+  "schemaVersion": 1,
+  "sourceHistory": {
+    "actualFailedCollection": {
+      "archiveInventorySha256": "1554f1d841f4e455c36c677b2d9d778d7903c2153bd210efadb1ecc5351973e2",
+      "bindingSha256": "d16c8a557f20b540c952abf4f4f9a6756c45dc3fd832325a6cce7cce621d97b1",
+      "epochId": "w-rows-pilot-gateway-001",
+      "ledgerSha256": "0f32e092fbd760f7273405b4feda7e107b1a5630c9d98668b90d84a323048295",
+      "sourceCommit": "d705c0c015954cf8bfe4d39040db727bfb2d2309"
+    },
+    "prospectiveCollection": {
+      "epochId": "w-rows-pilot-gateway-002",
+      "issue": "https://github.com/juanmicrosoft/calor/issues/1434",
+      "sourceIdentity": "replacementHarnessArtifacts"
+    },
+    "supersededUnexecutedProposal": {
+      "executed": false,
+      "mergeCommit": "ac4ad3a016feb283e5ea7b3d90e6505ecaf6e49b",
+      "profile": {
+        "path": "gateway-execution-profile-1432.json",
+        "sha256": "8066b86aeecf292a8e86002011fee7415c91c9c528ea25727ab4541f3e05ec2f"
+      },
+      "pullRequest": "https://github.com/juanmicrosoft/calor/pull/1433",
+      "recoveryEvidence": {
+        "path": "gateway-recovery-evidence-1432.json",
+        "sha256": "9c3552b34bd1730f6c028a495a18a1db8918e735309b4b21eb0e81e52864643f"
+      }
+    }
+  },
+  "stage": "pilot",
+  "supersedes": {
+    "path": "gateway-instrument-amendment-1432.json",
+    "sha256": "3d45adad658c569ab84b34b3a9a91a35f4ca65a09e18ee77c327222b9f1a3f59"
+  },
+  "terminalSemantics": {
+    "attemptDefinition": "scheduled-client-launch",
+    "attemptStart": {
+      "attemptsPerSlot": 1,
+      "kind": "pp-w-gateway-attempt-start-v1",
+      "producerSources": [
+        "run-pair.sh",
+        "ppw-gateway-budget.py"
+      ],
+      "requiredBeforeClientInvocation": true
+    },
+    "haltConditions": [
+      "pricing-or-financial-failure",
+      "unknown-or-unreconciled-liability",
+      "isolation-failure",
+      "interrupted-client-invocation",
+      "missing-or-untrusted-terminal-proof"
+    ],
+    "kind": "pp-w-source-bound-terminal-attempt-semantics-v1",
+    "poolingChangePermitted": false,
+    "schemaVersion": 1,
+    "scientificMethodChange": false,
+    "terminalInvalid": {
+      "admittedClassifications": [
+        "CLIENT_EXIT_WITHOUT_OBSERVED_WORK",
+        "MALFORMED_AGENT_RESULT",
+        "MISSING_AGENT_RESULT",
+        "MISSING_TRANSCRIPT"
+      ],
+      "clientExitCodeDomain": "integer-0-through-127-excluding-124",
+      "countsAsAccountedSlot": true,
+      "countsAsValidCompletion": false,
+      "kind": "pp-w-gateway-terminal-invalid-v1",
+      "ledgerEvent": "slot-terminal-invalid",
+      "replacementPermitted": false,
+      "requiresActualClientInvocation": true,
+      "requiresReconciledRequests": true,
+      "requiresSourceInspection": false,
+      "requiresTrustedAttemptStart": true
+    },
+    "validTerminal": {
+      "clientExitCodeDomain": "integer-0-through-127-excluding-124",
+      "nonzeroWithObservedWorkRemainsEligible": true,
+      "requiresReconciledRequestTraffic": true,
+      "requiresSourceInspection": true
+    },
+    "zeroImputationPermitted": false
+  }
+}

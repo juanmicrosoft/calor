@@ -44,10 +44,11 @@ HARNESS_CAPTURE="$SCRIPT_DIR/harness-capture.py"
 SOURCE_ASSEMBLY="$SCRIPT_DIR/ppw-source-assembly.py"
 
 # ---------------------------------------------------------------------------
-# Invalid-run detection (gates doc §0.2): invalid, crashed, or API-errored
-# runs (e.g. "You've hit your session limit" — epoch feasibility-dry-001) are
-# auto-detected, re-run on a fresh workspace up to MAX_INVALID_RETRIES times,
-# and after the cap counted as task failure with "invalid": true.
+# Invalid-run detection (gates doc §0.2): historical callers may retry invalid
+# runs. Registered PP-W slots never retry. Only trusted, explicitly classified
+# terminal attrition can advance the registered ledger; API, policy, source
+# integrity, timeout, and unknown-liability failures still halt. A nonzero
+# client exit is not by itself a new statistical exclusion or stopping rule.
 #
 # Prints the detection reason and returns 0 if the run is INVALID; returns 1
 # if the run looks valid. Args: <ws_out> [agent_exit_code].
@@ -1564,8 +1565,9 @@ extract_metrics() {
 }
 
 # ---------------------------------------------------------------------------
-# Invalid-slot result (gates doc §0.2): a slot still invalid after the retry
-# cap counts as task failure for the arm, marked "invalid": true.
+# Invalid-slot result (gates doc §0.2): the attempt is retained as invalid and
+# censored. Gateway usage/grading fields stay null; historical callers retain
+# their original placeholder schema and accounting behavior.
 # ---------------------------------------------------------------------------
 write_invalid_result() {
     local ws_out="$1" run_idx="$2"
@@ -1573,6 +1575,7 @@ write_invalid_result() {
         --arg pair "$PAIR_ID" --arg arm "$ARM_LABEL" --argjson run "$run_idx" \
         --argjson itg "$((ITERATION_BUDGET + 1))" \
         --argjson escaped "$HELDOUT_TEST_COUNT" \
+        --argjson gateway "$([[ -n "$PPW_GATEWAY_CLIENT" ]] && echo true || echo false)" \
         --argjson null_agent "$NULL_AGENT" \
         --arg calor_dll "$CALOR_CLI_DLL" --arg edit_mech "$EDIT_MECHANISM" \
         --arg arm_repo_root "$ARM_REPO_ROOT" \
@@ -1601,7 +1604,14 @@ write_invalid_result() {
                  numTurns:null, source:"invalid", transcript:(if $has_transcript then "transcript.jsonl" else null end)},
           agentBuilds:{count:0, file:null},
           tokens:{input:0, output:0}, tokenUsage:{source:"invalid"},
-          nullAgent:($null_agent==1)}' \
+          nullAgent:($null_agent==1)}
+         | if $gateway then
+             .taskSuccess=null | .escapedBugs=null | .heldoutPassed=null
+             | .finalBuild=null | .heldoutFinal=null | .iterations=null
+             | .iterationsToGreen=null | .agentBuilds.count=null
+             | .tokens={input:null,output:null}
+             | .tokenUsage={source:"missing",reason:"terminal-invalid"}
+           else . end' \
         > "$ws_out/result.json"
     cat "$ws_out/result.json"
 }
@@ -1673,6 +1683,9 @@ for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
             python3 "$SCRIPT_DIR/ppw-gateway-client.py" --probe \
                 --context "$PPW_TRUSTED_CONTEXT" --workspace "$WS" \
                 --output "$PPW_TRUSTED_ARCHIVE_ROOT" >/dev/null
+            python3 "$SCRIPT_DIR/ppw-gateway-budget.py" attempt-start \
+                --run-directory "$WS_OUT" --authoritative-root "$PPW_TRUSTED_ARCHIVE_ROOT" \
+                --slot "$PAIR_ID/$ARM_LABEL/$run" --attempt-number "$((attempt + 1))" >/dev/null
         fi
         run_agent "$WS" "$WS_OUT" "$SHIM_DIR" "$run"
 
@@ -1703,8 +1716,17 @@ for (( run=RUN_OFFSET+1; run<=RUN_OFFSET+RUNS; run++ )); do
                 wipe_ws_out "$WS_OUT"   # fresh re-attempt, keep invalid.txt
                 continue
             fi
-            echo "Retry cap reached; counting run $run as task failure (invalid)" >&2
+            if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
+                echo "Retaining invalid run $run without replacement" >&2
+            else
+                echo "Retry cap reached; counting run $run as task failure (invalid)" >&2
+            fi
             write_invalid_result "$WS_OUT" "$run"
+            if [[ -n "$PPW_GATEWAY_CLIENT" ]]; then
+                python3 "$SCRIPT_DIR/ppw-gateway-budget.py" terminal-invalid \
+                    --run-directory "$WS_OUT" --authoritative-root "$PPW_TRUSTED_ARCHIVE_ROOT" \
+                    --slot "$PAIR_ID/$ARM_LABEL/$run" --reason "$reason" >/dev/null
+            fi
             break
         fi
 

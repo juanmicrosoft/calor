@@ -77,6 +77,7 @@ class CollectionTests(unittest.TestCase):
         }
         self.launched = []
         self.failure = None
+        self.invalid_slots = {}
         self.discovery_complete = False
         self.registration_file = self.inputs / "registration.json"
         self.prepare_inventory(3, 74)
@@ -145,7 +146,13 @@ class CollectionTests(unittest.TestCase):
         arm = argv[argv.index("--arm-label") + 1]
         run = int(argv[argv.index("--run-offset") + 1]) + 1
         output = authoritative / "runs" / task / arm / ("run-%d" % run)
-        self.launched.append("%s/%s/%d" % (task, arm, run))
+        slot = "%s/%s/%d" % (task, arm, run)
+        self.launched.append(slot)
+        strict_terminal = budget.strict_terminal_lifecycle({
+            "harnessArtifacts": self.admission["harnessArtifacts"],
+        })
+        if strict_terminal:
+            budget.write_attempt_start(output, authoritative, slot, 1)
         evidence = {
             "kind": self.isolation.ISOLATION, "kernelProbe": dict(self.isolation.PROBE_EXPECTATIONS),
             "modelInvoked": False, "clientSha256": self.isolation.CLIENT_SHA256,
@@ -154,10 +161,15 @@ class CollectionTests(unittest.TestCase):
                 context["hiddenRoots"]).encode()).hexdigest(),
             "workspaceRoot": str(workspace), "authoritativeRoot": str(authoritative),
         }
+        if self.failure == "forged-isolation":
+            evidence["kernelProbe"]["authoritativeRead"] = True
         # Only the OS/client boundary is a double. The real HTTP gateway and
         # request ledger execute unchanged against a deterministic local provider.
         self.isolation.write_isolation_evidence(context_path, evidence)
-        if self.failure != "no-requests":
+        invalid_mode = self.invalid_slots.get(slot)
+        if self.failure == "forged-terminal":
+            invalid_mode = "zero-requests"
+        if self.failure != "no-requests" and invalid_mode != "zero-requests":
             client = http.client.HTTPConnection(endpoint.hostname, endpoint.port, timeout=10)
             client.request("POST", endpoint.path + "/v1/messages?beta=true", body(), {
                 "Content-Type": "application/json", "anthropic-version": "2023-06-01",
@@ -169,10 +181,33 @@ class CollectionTests(unittest.TestCase):
                 raise subprocess.CalledProcessError(1, argv)
         seed = self.seed_run(task, arm, run)
         shutil.copytree(seed, output, dirs_exist_ok=True)
+        source_report = instrument.load(output / "source-inspection.json")
+        source_report.update(
+            inspectorSha256=self.admission["sourceInspector"]["files"][
+                "ppw-source-inspector.dll"],
+            inspectorRuntimeSha256=self.admission["sourceInspector"]["runtimeSha256"])
+        save(output / "source-inspection.json", source_report)
         result = instrument.load(output / "result.json")
         result.update(pair=task, run=run, armRepoRoot=self.product["repoRoot"])
+        if invalid_mode or self.failure == "untrusted-invalid":
+            result.update(invalid=True, censored=True)
         save(output / "result.json", result)
         save(output / "client-invocation.json", {"exitCode": 124 if self.failure == "interrupted" else 0})
+        if invalid_mode:
+            (output / "transcript.jsonl").unlink(missing_ok=True)
+            (output / "source-inspection.json").unlink(missing_ok=True)
+            reason = next(value for value, code in budget.TERMINAL_REASON_CODES.items()
+                          if code == "MISSING_TRANSCRIPT")
+            (output / "invalid.txt").write_text(
+                "2026-09-11T00:00:00Z attempt=0 agent_rc=0: " + reason + "\n",
+                encoding="utf-8")
+            budget.write_terminal_attempt(output, authoritative, slot, reason)
+            if self.failure == "forged-terminal":
+                terminal = instrument.load(output / "invalid-terminal.json")
+                terminal["classification"] = "FORGED"
+                save(output / "invalid-terminal.json", terminal)
+        elif self.failure == "missing-source":
+            (output / "source-inspection.json").unlink()
         return ""
 
     def seed_run(self, task, arm, run):
@@ -287,6 +322,8 @@ class CollectionTests(unittest.TestCase):
             "run-%d" % first["run"])
         failed_run.mkdir(parents=True)
         save(failed_run / "client-invocation.json", {"exitCode": 1})
+        (failed_run / "result.json").write_bytes(
+            b"SYNTHETIC OPAQUE INVALID PLACEHOLDER; NOT AN OUTCOME")
         inventory = recovery.archive_inventory(failed_archive)
         ledger_sha = instrument.digest(self.admission["ledgerPath"])
         recovery_sha = self.admission["authorizationSha256"]
@@ -409,6 +446,21 @@ class CollectionTests(unittest.TestCase):
             ledger.complete_slot("owner", "slot", {}, 1)
         ledger.complete_slot.assert_not_called()
 
+    def test_untrusted_invalid_missing_source_forged_terminal_and_isolation_halt(self):
+        for failure in (
+                "untrusted-invalid", "missing-source", "forged-terminal", "forged-isolation"):
+            with self.subTest(failure=failure):
+                other = CollectionTests()
+                other.setUp()
+                self.addCleanup(other.doCleanups)
+                other.failure = failure
+                with patch.object(instrument, "record_stage") as analyze:
+                    with self.assertRaises((ValueError, OSError)):
+                        other.collect()
+                analyze.assert_not_called()
+                outcome = instrument.load(other.epoch / "collection-outcome.json")
+                self.assertEqual("INCOMPLETE_INTERRUPTED", outcome["spending"]["state"])
+
     def test_recovery_keeps_first_launch_invalid_and_collects_only_unstarted_slots(self):
         full_slots = self.prepare_recovered_scope()
         self.collect()
@@ -422,7 +474,51 @@ class CollectionTests(unittest.TestCase):
         self.assertEqual("complete", spending["state"])
         self.assertEqual(full_slots[:1], budget.decode(spending["events"][-1]["detail"])[
             "preservedAttemptedSlots"])
+        task, arm, run = full_slots[0].split("/")
+        preserved_directory = self.epoch / "runs" / task / arm / ("run-" + run)
+        wrapper = instrument.load(preserved_directory / "result.json")
+        self.assertEqual("pp-w-recovered-invalid-wrapper-v1", wrapper["recordKind"])
+        self.assertEqual(
+            self.admission["recovery"]["oldBinding"]["harnessArtifacts"],
+            wrapper["recoveredAttempt"]["originalProfile"]["sourceHashes"])
+        self.assertFalse((preserved_directory / "invalid-terminal.json").exists())
+        self.assertFalse((preserved_directory / "original-result.json").exists())
         self.assertEqual(443, len(self.observed))
+
+    def test_recovery_mixes_zero_and_reconciled_terminal_invalids_without_replacement(self):
+        full_slots = self.prepare_recovered_scope()
+        first_task = self.registration["tasks"][0]
+        continued_first_cell = [
+            slot["id"] for slot in self.admission["slots"]
+            if slot["task"] == first_task and slot["arm"] == "calor-permissive"
+        ]
+        self.invalid_slots = {
+            slot: ("zero-requests" if index % 2 == 0 else "reconciled-requests")
+            for index, slot in enumerate(continued_first_cell)
+        }
+        self.collect()
+        self.assertEqual(full_slots[1:], self.launched)
+        report = instrument.load(self.epoch / "ppw-stage-ledger.json")
+        first_cell = next(cell for cell in report["perCell"]
+                          if cell["pair"] == first_task and cell["arm"] == "A")
+        self.assertEqual((0, 74, None, None), (
+            first_cell["validRuns"], first_cell["invalidRuns"],
+            first_cell["shapeRealizedRate"], first_cell["escapeRate"]))
+        spending = instrument.load(self.epoch / "spending-final.json")
+        invalid_events = [
+            budget.decode(event["detail"]) for event in spending["events"]
+            if event["kind"] == budget.TERMINAL_INVALID_EVENT
+        ]
+        self.assertEqual(73, len(invalid_events))
+        self.assertEqual(36, sum(
+            any(row["slot"] == event["slot"] for row in spending["requests"])
+            for event in invalid_events))
+        self.assertEqual({
+            "preservedAttemptedSlots": full_slots[:1],
+            "accountedSlots": 444,
+            "validCompletedSlots": 370,
+            "invalidTerminalSlots": 74,
+        }, budget.decode(spending["events"][-1]["detail"]))
 
     def test_conflicting_operational_proof_alias_refuses_before_client_launch(self):
         self.prepare_recovered_scope()

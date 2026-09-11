@@ -143,6 +143,24 @@ analysis. Analysis dependencies are rechecked before reporting. The JSON
 records the inventory hash/file count, pin/registration hashes, analysis
 manifest and execution hashes, model/client and product identity.
 
+The #1434 gateway continuation has one explicit linked-segment exception, not a
+general pooling interface. The original gateway-001 C001-A1 launch remains one
+invalid attempt under its original profile. Its wrapper carries the original
+source and file identities; gateway-002 runs only the other 443 identities under
+the reviewed terminal-attempt profile. The unexecuted #1433 proposal is retained
+as registration history, not treated as a data segment. The unique population
+remains 444 slots and 74 per cell.
+
+Replay distinguishes valid completion events from evidence-backed invalid
+terminals. Both consume a slot; only valid runs enter eligible denominators.
+Zero-request invalids require the protected attempt, invocation, reason and
+sealed-source evidence, not fabricated usage or a missing source-inspection
+report. Financial, pricing, isolation and unknown-liability failures still
+prevent adjudication. The fixed weights, attrition bands, unidentified-outcome
+rules and point stops above are unchanged. Registration history is preserved in
+`analysis-registration.pre-terminal-1434.json`; archive relocation does not alter
+the recorded original authority paths or source identities.
+
 These checks assume an immutable, honestly archived data source. They do not
 cryptographically authenticate model serving, approval provenance, native
 inspection producer claims, independence of fresh runs or provider weights.
