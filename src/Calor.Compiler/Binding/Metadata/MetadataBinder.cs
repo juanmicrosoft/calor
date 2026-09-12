@@ -167,6 +167,49 @@ internal sealed class MetadataBinder
             .FirstOrDefault();
     }
 
+    /// <summary>
+    /// Resolves a readable property or field using the actual access form.
+    /// Roslyn owns inheritance, hiding, accessibility and static/instance rules.
+    /// The declaration symbol, rather than the probe's flow state, owns nullability.
+    /// </summary>
+    public ISymbol? ResolveMemberRead(
+        INamedTypeSymbol receiverType, string memberName, bool isStatic, out string? reason)
+    {
+        var receiverName = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var receiver = isStatic ? receiverName : $"(({receiverName})default!)";
+        var tree = CSharpSyntaxTree.ParseText(
+            "#nullable enable\nclass __CalorMemberReadProbe { void Probe() {\n" +
+            $"var __value = {receiver}.@{memberName};\n" +
+            "} }");
+        var compilation = _context.HostCompilationForBinder.AddSyntaxTrees(tree);
+        var model = compilation.GetSemanticModel(tree);
+        var errors = model.GetDiagnostics().Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).ToArray();
+        if (errors.Length != 0)
+        {
+            reason = string.Join("; ", errors.Select(d => $"{d.Id}: {d.GetMessage()}"));
+            return null;
+        }
+
+        var value = tree.GetRoot().DescendantNodes().OfType<VariableDeclaratorSyntax>()
+            .Single().Initializer!.Value;
+        if (value is not MemberAccessExpressionSyntax access
+            || !SymbolEqualityComparer.Default.Equals(model.GetTypeInfo(access.Expression).Type, receiverType))
+        {
+            reason = $"Receiver '{receiverName}' does not resolve to the supplied type identity in this metadata context.";
+            return null;
+        }
+        var symbol = model.GetSymbolInfo(value).Symbol;
+        if (symbol is IPropertySymbol { IsIndexer: false, GetMethod: not null }
+            or IFieldSymbol)
+        {
+            reason = null;
+            return symbol;
+        }
+
+        reason = $"'{receiverName}.{memberName}' is not a readable property or field.";
+        return null;
+    }
+
     // -------- helpers --------
 
     /// <summary>

@@ -2320,9 +2320,11 @@ public sealed class Binder
                 : "'base' is unavailable outside an instance member");
     }
 
-    private BoundExpression BindFieldAccess(FieldAccessNode fieldAccess)
+    private BoundExpression BindFieldAccess(FieldAccessNode fieldAccess, BoundExpression? boundTarget = null)
     {
-        var target = BindExpression(fieldAccess.Target);
+        var target = boundTarget
+            ?? TryBindMetadataTypeReceiver(fieldAccess.Target)
+            ?? BindExpression(fieldAccess.Target);
         var resolvedFields = fieldAccess.Target switch
         {
             ThisExpressionNode => ResolveAccessibleMembers(_currentClass, fieldAccess.FieldName),
@@ -2337,6 +2339,44 @@ public sealed class Binder
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
+        // Native this/base resolution remains authoritative; N2 owns its annotation transfer.
+        if (fields.Length == 0
+            && target.Type is BoundTypes.NominalBoundType
+            {
+                RoslynSymbol: { IsReferenceType: true, IsGenericType: false } receiverType
+            })
+        {
+            var metadataBinder = GetOrCreateMetadataBinder();
+            string? reason = "The metadata context is unavailable.";
+            var member = metadataBinder?.ResolveMemberRead(
+                receiverType, fieldAccess.FieldName, target is BoundTypeReferenceExpression, out reason);
+            var memberType = member switch
+            {
+                Microsoft.CodeAnalysis.IPropertySymbol property => property.Type,
+                Microsoft.CodeAnalysis.IFieldSymbol field => field.Type,
+                _ => null
+            };
+            if (memberType is Microsoft.CodeAnalysis.INamedTypeSymbol
+                { IsReferenceType: true, IsGenericType: false })
+            {
+                return new BoundFieldAccessExpression(
+                    fieldAccess.Span, target, fieldAccess.FieldName, typeName: null,
+                    fieldNameSpan: fieldAccess.FieldNameSpan,
+                    resolvedType: Metadata.MetadataBinderResult.ToNominalBoundType(memberType))
+                {
+                    ResolvedMetadataMember = member
+                };
+            }
+
+            reason ??= "The member result is outside supported scalar reference reads.";
+            _diagnostics.ReportInfo(fieldAccess.Span, DiagnosticCode.SignatureUnresolved,
+                $"Metadata member resolution incomplete: {reason}");
+            return new BoundFieldAccessExpression(
+                fieldAccess.Span, target, fieldAccess.FieldName, typeName: null,
+                fieldNameSpan: fieldAccess.FieldNameSpan,
+                resolvedType: new BoundTypes.UnresolvedBoundType(reason));
+        }
+
         return new BoundFieldAccessExpression(
             fieldAccess.Span,
             target,
@@ -2346,6 +2386,30 @@ public sealed class Binder
             fieldAccess.FieldNameSpan,
             fields);
     }
+
+    private BoundTypeReferenceExpression? TryBindMetadataTypeReceiver(ExpressionNode expression)
+    {
+        var name = DottedReferenceName(expression);
+        if (name is null)
+            return null;
+        var head = name.Split('.')[0];
+        if (_scope.LookupAll(head).Count != 0 || ResolveAccessibleMembers(_currentClass, head).Count != 0)
+            return null;
+        var type = TryBuildReferenceType(
+            name, _currentClassName, _currentNamespaceIdentity,
+            _currentMemberTypeParameters?.Select(parameter => parameter.Name));
+        return type?.RoslynSymbol is not null
+            ? new BoundTypeReferenceExpression(expression.Span, name, type)
+            : null;
+    }
+
+    private static string? DottedReferenceName(ExpressionNode expression) => expression switch
+    {
+        ReferenceNode reference => reference.Name,
+        FieldAccessNode field when DottedReferenceName(field.Target) is { } prefix =>
+            $"{prefix}.{field.FieldName}",
+        _ => null
+    };
 
     private BoundExpression BindTypeOperation(TypeOperationNode typeOp)
     {
@@ -3198,6 +3262,28 @@ public sealed class Binder
 
         if (symbols.Count == 0)
         {
+            // The lexer also accepts a dotted reference as one token. Route the
+            // resolved external form through the same member binder as explicit dots.
+            var lastDot = refNode.Name.LastIndexOf('.');
+            if (lastDot > 0)
+            {
+                var receiverName = refNode.Name[..lastDot];
+                var receiverSpan = new Parsing.TextSpan(
+                    refNode.Span.Start, lastDot, refNode.Span.Line, refNode.Span.Column);
+                var receiverNode = new ReferenceNode(receiverSpan, receiverName);
+                BoundExpression? receiver = TryBindMetadataTypeReceiver(receiverNode);
+                if (receiver is null && _scope.Lookup(receiverName) is VariableSymbol)
+                    receiver = BindReferenceExpression(receiverNode);
+                if (receiver?.Type is BoundTypes.NominalBoundType { RoslynSymbol: not null })
+                {
+                    var memberSpan = new Parsing.TextSpan(
+                        refNode.Span.Start + lastDot + 1, refNode.Name.Length - lastDot - 1,
+                        refNode.Span.Line, refNode.Span.Column + lastDot + 1);
+                    return BindFieldAccess(new FieldAccessNode(
+                        refNode.Span, receiverNode, refNode.Name[(lastDot + 1)..], memberSpan), receiver);
+                }
+            }
+
             var similarName = _scope.FindSimilarName(refNode.Name);
             if (similarName != null)
             {
