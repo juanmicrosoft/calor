@@ -135,7 +135,7 @@ The downstream exact-pin failure was later fixed by the parent/test owner to nam
 
 Initial raw-binder evidence controls are preserved in `control-results/` and `historical-initial-attempts-20260912T0625/`. Corrected strict controls are in `native-controls/` and `control-results-v2/`. These are evidence-only, not product/test code, and do not change source.
 
-Actual corrected command, run once from each repo worktree with `TMPDIR=$F/n4-corpus-evidence/tmp/native-controls-v2`:
+Reproduction command shape for the corrected native controls:
 
 ```bash
 dotnet run --project $F/n4-corpus-evidence/native-controls/NativeBoundaryProbe.csproj \
@@ -143,6 +143,17 @@ dotnet run --project $F/n4-corpus-evidence/native-controls/NativeBoundaryProbe.c
   $F/n4-corpus-evidence/control-results-v2/<baseline|candidate>-native-boundary-controls-v2.json \
   $F/n4-corpus-evidence/tmp/native-controls-v2/<baseline|candidate>
 ```
+
+The contributor did not retain exact historical outer shell commands, shell
+working directories or environment settings for the strict v2 corpus, native
+or metadata probe launches. This block is not a historical transcript or
+evidence of an exact launch count/TMPDIR value. Native and metadata driver
+source explicitly sets its process working directory to the supplied repo;
+native result JSON separately records each actual child CLI invocation,
+working directory, exit code and binary hash. The corpus driver does not set
+or record its inherited working directory and does not capture its loaded
+compiler assembly. Do not use the separate metadata probe as proof of that
+corpus process's complete environment or reference selection.
 
 Corrected controls used baseline commit `8f9891a1a07f786a76a293017959c3edf28412bf` and current candidate docs/test HEAD `7698718b1d65471c07b4e459e29335fc6a84a90c`; candidate production blobs still match immutable `f642b11`. Every paired control has matching baseline/candidate source SHA-256. Results separate raw binder routing, default `Program.Compile`, and default CLI outcome.
 
@@ -185,7 +196,7 @@ Summary JSON: `control-results-v2/native-boundary-controls-v2-summary.json`.
 
 The original `metadata/*-metadata-reference-profile.json` files are manifest-only copies (167 committed entries generated from .NET 10.0.10). They are preserved and labeled as such. They are not used as a claim about the realized private reference set.
 
-The corrected realized-reference probe is `metadata-realized-probe/`. It ran in baseline and candidate worktrees, checks child process exit codes for git/dotnet provenance, and writes `metadata-realized/*-metadata-realized-references.json` plus `metadata-realized/metadata-realized-summary.json`.
+The corrected realized-reference probe is `metadata-realized-probe/`. It sets its process working directory to the supplied baseline or candidate repo, checks child process exit codes for git/dotnet provenance, and writes `metadata-realized/*-metadata-realized-references.json` plus `metadata-realized/metadata-realized-summary.json`. Its outer shell launch cwd/environment was not retained.
 
 Observed realized private metadata selection on this .NET 10.0.11 host:
 

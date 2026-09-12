@@ -112,6 +112,11 @@ dotnet run --project "$CORPUS/CorpusProbe.csproj" \
 ```
 
 These parameterized reproduction commands are not historical shell transcripts.
+The contributor did not retain exact outer command lines, shell cwd or
+environment for the strict v2 probe launches. Native and metadata drivers set
+their process cwd to the supplied repo; the corpus driver inherits an
+unrecorded cwd. Its reference selection and loaded binary therefore are not
+established by the separately executed metadata/native profiles.
 Native result JSON records each actual CLI invocation, working directory,
 compiler hash, exit code and output. An empty successful probe log does not
 itself retain its invoking command.
