@@ -903,6 +903,51 @@ public sealed class SafeConsumptionTypeCheckerTests
             """);
         var categoryDiagnostic = SingleErrorAt(categoryResult, 10);
         Assert.Contains("Null-coalescing requires", categoryDiagnostic.Message);
+
+        var namedResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Pick:pub} (i32:x, object:y) -> i32
+                §E{}
+                §R x
+              §F{f2:Pick:pub} (object:y, f64:x) -> str
+                §E{}
+                §R "wide"
+              §F{f3:Probe:pub} () -> i32
+                §E{}
+                §R (?? §C{Pick} §A[x] 1 §A[y] "s" §/C 2)
+            """);
+        var namedDiagnostic = SingleErrorAt(namedResult, 10);
+        Assert.Contains("Null-coalescing requires", namedDiagnostic.Message);
+
+        var paramsResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Pick:pub} (i32:value) -> i32
+                §E{}
+                §R value
+              §F{f2:Pick:pub} (i32[]:values:params) -> str
+                §E{}
+                §R "expanded"
+              §F{f3:Probe:pub} () -> i32
+                §E{}
+                §R (?? §C{Pick} §A 1 §/C 2)
+            """);
+        var paramsDiagnostic = SingleErrorAt(paramsResult, 10);
+        Assert.Contains("Null-coalescing requires", paramsDiagnostic.Message);
+
+        var charResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Pick:pub} (i32:value) -> i32
+                §E{}
+                §R value
+              §F{f2:Pick:pub} (f64:value) -> str
+                §E{}
+                §R "wide"
+              §F{f3:Probe:pub} () -> i32
+                §E{}
+                §R (?? §C{Pick} §A (cast char INT:65) §/C 2)
+            """);
+        var charDiagnostic = SingleErrorAt(charResult, 10);
+        Assert.Contains("Null-coalescing requires", charDiagnostic.Message);
     }
 
     [Fact]
@@ -994,6 +1039,153 @@ public sealed class SafeConsumptionTypeCheckerTests
             """);
 
         AssertNoErrors(result);
+    }
+
+    [Fact]
+    public void DelegateCalls_ContextuallyTypeMatchArguments()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (Func<object,object>:transform, i32:value) -> object
+                §E{}
+                §R §C{transform} §A §W{m:expr} value
+                  §K 0 → 1
+                  §K _ → "text"
+                §/C
+            """);
+
+        AssertNoErrors(result);
+    }
+
+    [Fact]
+    public void GenericLambdaContext_UsesOrdinaryArgumentInferenceFirst()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Choose:pub}<T> (Func<T>:factory, T:fallback) -> T
+                §E{}
+                §R fallback
+              §F{f2:Probe:pub} (i32:value, object:fallback) -> object
+                §E{}
+                §R §C{Choose} §A §LAM{l1}
+                  §R §W{m:expr} value
+                    §K 0 → 1
+                    §K _ → "text"
+                §/LAM{l1} §A fallback §/C
+            """);
+
+        AssertNoErrors(result);
+    }
+
+    [Fact]
+    public void InapplicableOverload_DoesNotEraseCallArgumentTarget()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Take:pub} (object:value) -> object
+                §E{}
+                §R value
+              §F{f2:Take:pub} (i32:value, i32:other) -> object
+                §E{}
+                §R value
+              §F{f3:Probe:pub} (i32:value) -> object
+                §E{}
+                §R §C{Take} §A §W{m:expr} value
+                  §K 0 → 1
+                  §K _ → "text"
+                §/C
+            """);
+
+        AssertNoErrors(result);
+    }
+
+    [Fact]
+    public void NonContextualArguments_NarrowTheContextualCandidateSet()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Take:pub} (object:value, i32:tag) -> object
+                §E{}
+                §R value
+              §F{f2:Take:pub} (str:value, str:tag) -> object
+                §E{}
+                §R value
+              §F{f3:Probe:pub} (i32:value) -> object
+                §E{}
+                §R §C{Take} §A §W{m:expr} value
+                  §K 0 → 1
+                  §K _ → "text"
+                §A 1 §/C
+            """);
+
+        AssertNoErrors(result);
+    }
+
+    [Fact]
+    public void ContextualLambda_ValidatesItsDeclaredSignatureAndReturnType()
+    {
+        var returnResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{factory:Func<i32>} §LAM{l1} "wrong" §/LAM{l1}
+            """);
+        Assert.Contains(returnResult.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+
+        var parameterResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{map:Func<i32,i32>} §LAM{l1:value:str} 1 §/LAM{l1}
+            """);
+        Assert.Contains(parameterResult.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void CallStatements_UseSignatureAwareDelegateValidation()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (Action<i32>:consume) -> void
+                §E{}
+                §C{consume} §/C
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
+    [Fact]
+    public void DelegateInvocationAndMethodGroups_RespectByRefAndEnumValueSemantics()
+    {
+        var modifierResult = Check("""
+            §M{m1:SafeConsumption}
+              §DEL{d1:Mutator:pub}
+                §I{i32:value:ref}
+                §O{i32}
+              §F{f1:Probe:pub} (Mutator:mutate, i32:value) -> i32
+                §E{}
+                §R §C{mutate} §A value §/C
+            """);
+        Assert.Contains(modifierResult.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+
+        var enumResult = Check("""
+            §M{m1:SafeConsumption}
+              §EN{e1:Color}
+              Red
+              §/EN{e1}
+              §F{f1:GetColor:pub} () -> Color
+                §E{}
+                §R Color.Red
+              §F{f2:Probe:pub} () -> void
+                §E{}
+                §B{factory:Func<object>} GetColor
+            """);
+        Assert.Contains(enumResult.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
     }
 
     [Theory]
