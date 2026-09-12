@@ -57,7 +57,7 @@ public sealed class SafeConsumptionTypeCheckerTests
             §M{m1:SafeConsumption}
               §F{f1:Probe:pub} (?str:input) -> void
                 §E{alloc,throw}
-                §B{value:i32} (?? input §TH §NEW{ArgumentNullException} §A "input" §/NEW)
+                §B{value:i32} (?? input §TH §NEW{ArgumentNullException})
             """);
 
         var diagnostic = SingleErrorAt(rejected, 4);

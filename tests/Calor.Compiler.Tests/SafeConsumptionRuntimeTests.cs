@@ -61,6 +61,13 @@ public sealed class SafeConsumptionRuntimeTests
             || diagnostic.Code == DiagnosticCode.NoMatchingOverload);
         foreach (var diagnostic in diagnostics.Where(IsNullableDiagnostic))
             Assert.True(BindingDiagnosticPolicy.IsAnalysisOnly(diagnostic));
+        WithCli(source, (exit, _, error) =>
+        {
+            if (consumer == "argument")
+                Assert.NotEqual(0, exit);
+            else
+                Assert.True(exit == 0, error);
+        });
         if (consumer != "argument")
         {
             var result = Program.Compile(source, "consumption.calr");
@@ -249,6 +256,41 @@ public sealed class SafeConsumptionRuntimeTests
         var method = Emit(result.GeneratedCode).GetType("Consumption.ConsumptionModule")!.GetMethod("Probe")!;
         Assert.Equal("value", method.Invoke(null, ["value"]));
         Assert.Equal("fallback", method.Invoke(null, [null]));
+    }
+
+    [Theory]
+    [InlineData("bind")]
+    [InlineData("return")]
+    [InlineData("argument")]
+    public void TypedPattern_AllConsumersHandleNullAndUnmatchedInput(string consumer)
+    {
+        var body = consumer switch
+        {
+            "bind" => "§B{value:str} text\n      §R value",
+            "return" => "§R text",
+            "argument" => "§R §C{Take} §A text §/C",
+            _ => throw new ArgumentOutOfRangeException(nameof(consumer))
+        };
+        var source = $$"""
+            §M{m1:Consumption}
+              §F{f1:Take:pub} (str:value) -> str
+                §E{}
+                §R value
+              §F{f2:Probe:pub} (?object:input) -> str
+                §E{}
+                §IF{if1} (is input str text)
+                  {{body}}
+                §R "fallback"
+            """;
+        var (_, diagnostics) = Bind(source);
+        Assert.Empty(diagnostics.Errors);
+        var result = Program.Compile(source, "pattern-consumers.calr");
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        var method = Emit(result.GeneratedCode).GetType("Consumption.ConsumptionModule")!.GetMethod("Probe")!;
+        Assert.Equal("value", method.Invoke(null, ["value"]));
+        Assert.Equal("fallback", method.Invoke(null, [null]));
+        Assert.Equal("fallback", method.Invoke(null, [42]));
+        WithCli(source, (exit, _, error) => Assert.True(exit == 0, error));
     }
 
     private static string Source(string consumer, string expression, string? extraParameter = null)
