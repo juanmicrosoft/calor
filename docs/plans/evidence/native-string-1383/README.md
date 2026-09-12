@@ -87,6 +87,8 @@ Original probes/results are preserved under
 Their raw-only, manifest-only and broad-catch limits were corrected by later
 probes. They are not default API results or final reference evidence. Generated
 `bin/`, `obj/` and scratch project trees are deliberately not published.
+Retained raw build logs include the original whitespace-only lines. They are
+measurement artifacts, not reformatted source files.
 
 ## Reproduction
 
