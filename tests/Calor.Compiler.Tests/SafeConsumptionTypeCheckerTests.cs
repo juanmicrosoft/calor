@@ -1604,6 +1604,37 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void StatementLambda_UnconditionalLoopCanDefinitelyNotReturn()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{cw}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §WH{w1} true
+                    §P "loop"
+                §/LAM{l1}
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
+    public void MethodGroupParameters_SupportReferenceDelegateVariance()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Use:pub} (Func<object>:factory) -> void
+                §E{}
+              §F{f2:Probe:pub} () -> void
+                §E{}
+                §B{action:Action<Func<str>>} Use
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
     public void MethodGroupParameters_RejectWideningAndBoxing()
     {
         var widening = Check("""

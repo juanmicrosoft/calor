@@ -1528,10 +1528,26 @@ public sealed class TypeChecker
                 && match.Cases.Any(matchCase =>
                     matchCase.Pattern is WildcardPatternNode && matchCase.Guard == null)
                 && match.Cases.All(matchCase => DefinitelyReturns(matchCase.Body)),
+            WhileStatementNode { Condition: BoolLiteralNode { Value: true } } loop
+                => !ContainsBreak(loop.Body),
             TryStatementNode tryStatement => tryStatement.FinallyBody != null
                 && DefinitelyReturns(tryStatement.FinallyBody)
                 || DefinitelyReturns(tryStatement.TryBody)
                 && tryStatement.CatchClauses.All(clause => DefinitelyReturns(clause.Body)),
+            _ => false
+        });
+
+    private static bool ContainsBreak(IReadOnlyList<StatementNode> statements)
+        => statements.Any(statement => statement switch
+        {
+            BreakStatementNode => true,
+            IfStatementNode conditional => ContainsBreak(conditional.ThenBody)
+                || conditional.ElseIfClauses.Any(clause => ContainsBreak(clause.Body))
+                || conditional.ElseBody != null && ContainsBreak(conditional.ElseBody),
+            MatchStatementNode match => match.Cases.Any(matchCase => ContainsBreak(matchCase.Body)),
+            TryStatementNode tryStatement => ContainsBreak(tryStatement.TryBody)
+                || tryStatement.CatchClauses.Any(clause => ContainsBreak(clause.Body))
+                || tryStatement.FinallyBody != null && ContainsBreak(tryStatement.FinallyBody),
             _ => false
         });
 
@@ -2610,6 +2626,11 @@ public sealed class TypeChecker
     {
         if (target.Equals(source))
             return true;
+        if (TryGetDelegateFunctionType(target, out var targetDelegate)
+            && TryGetDelegateFunctionType(source, out var sourceDelegate))
+        {
+            return IsDelegateReferenceCompatible(targetDelegate, sourceDelegate);
+        }
         if (IsPrimitiveValueType(source)
             || source is NullableValueType
             || _moduleDeclaredValueTypes.Contains(source.Name)
@@ -2620,6 +2641,21 @@ public sealed class TypeChecker
             return false;
         }
         return IsAssignable(target, source);
+    }
+
+    private bool IsDelegateReferenceCompatible(FunctionType target, FunctionType source)
+    {
+        if (target.ParameterTypes.Count != source.ParameterTypes.Count)
+            return false;
+        for (var i = 0; i < target.ParameterTypes.Count; i++)
+        {
+            if (!IsMethodGroupParameterCompatible(
+                source.ParameterTypes[i], target.ParameterTypes[i]))
+            {
+                return false;
+            }
+        }
+        return IsMethodGroupReturnCompatible(target.ReturnType, source.ReturnType);
     }
 
     private bool IsMethodGroupReturnCompatible(CalorType target, CalorType source)
