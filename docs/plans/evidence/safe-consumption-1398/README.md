@@ -39,7 +39,7 @@ assert the resulting non-null/nullable annotations instead. A runtime control
 confirms the selected value, including null, through both inferred locals.
 An actual C# typed-pattern conversion also exercises non-null call and return
 consumers on string, null and unmatched inputs; no converter repair is needed.
-The combined inventory is 8,957 + 54 T2 cases = 9,011, with unchanged skips.
+The N2-integrated candidate inventory was 8,957 + 54 T2 cases = 9,011, with unchanged skips.
 The original 42-case and 44-case candidates remain historical, not relabeled.
 Both fresh reviews accepted `cf292161`, but its actual compiler/coverage CI
 still exposed three cases. Primitive-constructor recognition is now scoped to
@@ -47,6 +47,18 @@ throw validation so ordinary constructor/member inference remains unchanged.
 Two older parser/emitter and latent-division fixtures used non-nullable `int`
 with `??`; they now use nullable `int`, preserving the original emission and
 division-finding assertions without relaxing the new operand rule.
+Round four examined `e7063060`: compatibility accepted with a duplicate-warning
+finding, while integration blocked on a missing typed-pattern success scope in
+`while` bodies. Both Binder and TypeChecker now transfer the condition's binding
+into that body only, including conjunctions. TypeChecker reuses the already
+inferred pattern binding type instead of resolving it again and duplicating
+unknown-type warnings. Thirteen additional cases cover all three loop consumers,
+null/unmatched inputs, invalid scope uses, and one warning per source occurrence.
+The combined inventory is now 8,957 + 67 T2 cases = 9,024, with unchanged skips.
+The same e706 compiler CI also reached two more stale non-nullable-integer
+coalesce fixtures, in operator suggestions and wrapper diagnostic reachability.
+They now use nullable inputs without dropping their original assertions.
+The ordinary product corpus ratchet still passes without another baseline update.
 Final-head review and CI records live on the PR. The source-specific corpus
 measurements below remain pinned to their actual c43 and rejected 2d heads.
 

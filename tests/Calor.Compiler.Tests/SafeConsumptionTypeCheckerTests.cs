@@ -286,6 +286,49 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Theory]
+    [InlineData("§IF{if1} (is input Widget text)\n      §R true")]
+    [InlineData("§IF{if1} false\n      §R true\n    §EI (is input Widget text)\n      §R true")]
+    [InlineData("§R (? (is input Widget text) true false)")]
+    [InlineData("§IF{if1} (&& (is input Widget text) true)\n      §R true")]
+    [InlineData("§WH{wh1} (is input Widget text)\n      §R true")]
+    public void UnknownPatternType_IsDiagnosedOnceWhenItsBindingIsTransferred(string body)
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (?object:input) -> bool
+                §E{}
+            """ + "\n    " + body + "\n    §R false");
+
+        AssertNoErrors(result);
+        var warning = Assert.Single(result.Diagnostics.Where(diagnostic =>
+            diagnostic.Code == DiagnosticCode.UndefinedReference));
+        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
+        Assert.Contains("Widget", warning.Message);
+    }
+
+    [Fact]
+    public void UnknownPatternType_DiagnosesEachDistinctSourceOccurrence()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (?object:input) -> bool
+                §E{}
+                §IF{if1} (is input Widget first)
+                  §R true
+                §EI (is input Widget second)
+                  §R true
+                §R false
+            """);
+
+        AssertNoErrors(result);
+        var warnings = result.Diagnostics.Where(diagnostic =>
+            diagnostic.Code == DiagnosticCode.UndefinedReference).ToArray();
+        Assert.Equal(2, warnings.Length);
+        Assert.All(warnings, warning => Assert.Equal(DiagnosticSeverity.Warning, warning.Severity));
+        Assert.Equal(new[] { 4, 6 }, warnings.Select(warning => warning.Span.Line));
+    }
+
+    [Theory]
     [InlineData("(?? INT:1 §TH \"missing\")")]
     [InlineData("(?? BOOL:true false)")]
     [InlineData("(?? INT:1 §C{System.Guid.NewGuid} §/C)")]

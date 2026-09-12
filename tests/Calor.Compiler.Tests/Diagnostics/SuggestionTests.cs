@@ -594,7 +594,8 @@ public class SuggestionTests
     [InlineData("??", false)] // Now supported as null-coalescing operator
     public void Parser_ShortOperators_HandleCorrectly(string op, bool shouldError)
     {
-        var source = $"§M{{m001:Test}} §F{{f001:Fn}} §O{{i32}} §R ({op} 5 3)";
+        var left = op == "??" ? "x" : "5";
+        var source = $"§M{{m001:Test}} §F{{f001:Fn}} §I{{?i32:x}} §O{{i32}} §R ({op} {left} 3)";
         var result = Program.Compile(
             source,
             "test.calr",

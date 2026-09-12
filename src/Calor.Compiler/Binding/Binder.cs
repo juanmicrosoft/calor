@@ -1377,6 +1377,7 @@ public sealed class Binder
         using var _ = PushScope(_scope.CreateChild());
 
         var condition = BindExpression(whileStmt.Condition);
+        DeclareSuccessfulConditionPatterns(whileStmt.Condition, condition);
         var body = BindStatements(whileStmt.Body);
 
         return new BoundWhileStatement(whileStmt.Span, condition, body);

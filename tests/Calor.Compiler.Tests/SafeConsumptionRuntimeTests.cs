@@ -259,10 +259,16 @@ public sealed class SafeConsumptionRuntimeTests
     }
 
     [Theory]
-    [InlineData("bind")]
-    [InlineData("return")]
-    [InlineData("argument")]
-    public void TypedPattern_AllConsumersHandleNullAndUnmatchedInput(string consumer)
+    [InlineData("bind", "if")]
+    [InlineData("return", "if")]
+    [InlineData("argument", "if")]
+    [InlineData("bind", "while")]
+    [InlineData("return", "while")]
+    [InlineData("argument", "while")]
+    [InlineData("bind", "while-conjunction")]
+    [InlineData("return", "while-conjunction")]
+    [InlineData("argument", "while-conjunction")]
+    public void TypedPattern_AllConsumersHandleNullAndUnmatchedInput(string consumer, string branch)
     {
         var body = consumer switch
         {
@@ -271,6 +277,13 @@ public sealed class SafeConsumptionRuntimeTests
             "argument" => "§R §C{Take} §A text §/C",
             _ => throw new ArgumentOutOfRangeException(nameof(consumer))
         };
+        var condition = branch switch
+        {
+            "if" => "§IF{if1} (is input str text)",
+            "while" => "§WH{wh1} (is input str text)",
+            "while-conjunction" => "§WH{wh1} (&& (is input str text) (== text \"value\"))",
+            _ => throw new ArgumentOutOfRangeException(nameof(branch))
+        };
         var source = $$"""
             §M{m1:Consumption}
               §F{f1:Take:pub} (str:value) -> str
@@ -278,7 +291,7 @@ public sealed class SafeConsumptionRuntimeTests
                 §R value
               §F{f2:Probe:pub} (?object:input) -> str
                 §E{}
-                §IF{if1} (is input str text)
+                {{condition}}
                   {{body}}
                 §R "fallback"
             """;
@@ -291,6 +304,30 @@ public sealed class SafeConsumptionRuntimeTests
         Assert.Equal("fallback", method.Invoke(null, [null]));
         Assert.Equal("fallback", method.Invoke(null, [42]));
         WithCli(source, (exit, _, error) => Assert.True(exit == 0, error));
+    }
+
+    [Fact]
+    public void WhilePattern_DoesNotSupplyBindingsAfterTheLoopOrWithoutGuaranteedSuccess()
+    {
+        foreach (var condition in new[] { "(is input str text)", "(! (is input str text))", "(|| (is input str text) true)" })
+        {
+            var source = $$"""
+                §M{m1:Consumption}
+                  §F{f1:Probe:pub} (?object:input) -> str
+                    §E{}
+                    §WH{wh1} {{condition}}
+                      §R text
+                    §R text
+                """;
+            var (_, diagnostics) = Bind(source);
+            Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference
+                && diagnostic.Span.Line == 6 && diagnostic.Message.Contains("text", StringComparison.Ordinal));
+            if (condition != "(is input str text)")
+                Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference
+                    && diagnostic.Span.Line == 5 && diagnostic.Message.Contains("text", StringComparison.Ordinal));
+            Assert.True(Program.Compile(source, "while-pattern-leak.calr").HasErrors);
+            WithCli(source, (exit, _, _) => Assert.NotEqual(0, exit));
+        }
     }
 
     [Fact]

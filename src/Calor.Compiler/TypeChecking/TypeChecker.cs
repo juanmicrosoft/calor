@@ -11,6 +11,7 @@ public sealed class TypeChecker
     private readonly DiagnosticBag _diagnostics;
     private readonly TypeEnvironment _env;
     private readonly HashSet<string> _unmodeledCallReturns = new(StringComparer.Ordinal);
+    private readonly Dictionary<IsPatternNode, CalorType> _patternBindingTypes = new();
 
     public TypeChecker(DiagnosticBag diagnostics)
     {
@@ -20,6 +21,7 @@ public sealed class TypeChecker
 
     public void Check(ModuleNode module)
     {
+        _patternBindingTypes.Clear();
         // Pass -1: the module's OWN type declarations, before anything resolves a type name —
         // including a §RTYPE base type. Without this the checker treats a class the user declared
         // eight lines above as an unknown external type and warns that it "may be a typo": a false
@@ -384,6 +386,7 @@ public sealed class TypeChecker
         }
 
         _env.EnterScope();
+        DefineTrueConditionPatternVariables(whileStmt.Condition);
         foreach (var stmt in whileStmt.Body)
         {
             CheckStatement(stmt);
@@ -1131,9 +1134,12 @@ public sealed class TypeChecker
     private CalorType InferIsPatternType(IsPatternNode isPattern)
     {
         var operandType = InferExpressionType(isPattern.Operand);
+        var targetType = isPattern.TargetType == "var"
+            ? operandType
+            : InferTypePatternBindingType(isPattern.TargetType, isPattern.TargetTypeSpan, isPattern.Span);
+        _patternBindingTypes[isPattern] = targetType;
         if (isPattern.TargetType == "var")
             return PrimitiveType.Bool;
-        var targetType = InferTypePatternBindingType(isPattern.TargetType, isPattern.TargetTypeSpan, isPattern.Span);
 
         if (!CanPossiblyMatchPattern(operandType, targetType))
         {
@@ -1274,9 +1280,8 @@ public sealed class TypeChecker
         }
         if (condition is IsPatternNode { VariableName: { Length: > 0 } name } isPattern)
         {
-            _env.DefineVariable(name, isPattern.TargetType == "var"
-                ? InferExpressionType(isPattern.Operand)
-                : InferTypePatternBindingType(isPattern.TargetType, isPattern.TargetTypeSpan, isPattern.Span));
+            // The condition was already checked; transfer its type without repeating diagnostics.
+            _env.DefineVariable(name, _patternBindingTypes[isPattern]);
         }
     }
 
