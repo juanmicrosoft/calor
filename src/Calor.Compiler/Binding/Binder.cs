@@ -2366,19 +2366,31 @@ public sealed class Binder
             isPattern.Span,
             operand,
             isPattern.TargetType,
-            isPattern.VariableName);
+            isPattern.VariableName)
+        {
+            Binding = isPattern.VariableName is null ? null : CreateLocalVariable(
+                isPattern.VariableName,
+                isPattern.TargetType == "var" ? operand.Type.DisplayString : isPattern.TargetType,
+                isMutable: false, isParameter: false, ParameterModifier.None, isPattern.Span, "pattern",
+                nullableAnnotation: isPattern.TargetType == "var"
+                    ? NullabilityChecker.GetAnnotation(operand.Type) ?? BoundTypes.NullableAnnotation.Oblivious
+                    : BoundTypes.NullableAnnotation.NotAnnotated)
+        };
     }
 
     private void DeclareSuccessfulConditionPatterns(ExpressionNode condition, BoundExpression boundCondition)
     {
-        if (condition is IsPatternNode { VariableName: not null } pattern
-            && boundCondition is BoundIsPatternExpression boundPattern)
+        if (condition is BinaryOperationNode { Operator: BinaryOperator.And } conjunction
+            && boundCondition is BoundBinaryExpression binary)
         {
-            var isVar = pattern.TargetType == "var";
-            DeclarePatternVariable(pattern.Span, pattern.VariableName,
-                isVar ? boundPattern.Operand.Type.DisplayString : pattern.TargetType,
-                isVar ? NullabilityChecker.GetAnnotation(boundPattern.Operand.Type)
-                    ?? BoundTypes.NullableAnnotation.Oblivious : BoundTypes.NullableAnnotation.NotAnnotated);
+            DeclareSuccessfulConditionPatterns(conjunction.Left, binary.Left);
+            DeclareSuccessfulConditionPatterns(conjunction.Right, binary.Right);
+        }
+        if (condition is IsPatternNode { VariableName: not null } pattern
+            && boundCondition is BoundIsPatternExpression { Binding: not null } boundPattern)
+        {
+            DeclarePatternVariable(pattern.Span, pattern.VariableName, boundPattern.Binding.TypeName,
+                boundPattern.Binding.NullableAnnotation, boundPattern.Binding);
         }
     }
 
@@ -2976,13 +2988,14 @@ public sealed class Binder
     }
 
     private void DeclarePatternVariable(Parsing.TextSpan span, string name, string typeName,
-        BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious)
+        BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious,
+        VariableSymbol? binding = null)
     {
         if (_scope.LookupLocal(name) is VariableSymbol existing
             && string.Equals(existing.TypeName, typeName, StringComparison.OrdinalIgnoreCase))
             return;
 
-        var symbol = CreateLocalVariable(
+        var symbol = binding ?? CreateLocalVariable(
             name,
             typeName,
             isMutable: false,
@@ -3302,7 +3315,15 @@ public sealed class Binder
     private BoundBinaryExpression BindBinaryOperation(BinaryOperationNode binOp)
     {
         var left = BindExpression(binOp.Left);
-        var right = BindExpression(binOp.Right);
+        BoundExpression right;
+        if (binOp.Operator == BinaryOperator.And)
+        {
+            using var _ = PushScope(_scope.CreateChild());
+            DeclareSuccessfulConditionPatterns(binOp.Left, left);
+            right = BindExpression(binOp.Right);
+        }
+        else
+            right = BindExpression(binOp.Right);
 
         // Determine result type based on operator (S7 batch-3: .Type.DisplayString shim).
         var resultType = GetBinaryOperationResultType(binOp.Operator, left.Type.DisplayString, right.Type.DisplayString);

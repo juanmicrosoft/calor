@@ -228,6 +228,29 @@ public sealed class SafeConsumptionRuntimeTests
         Assert.Equal("missing", error.InnerException!.Message);
     }
 
+    [Theory]
+    [InlineData("(&& (is input str text) (== text \"value\"))")]
+    [InlineData("(&& true (is input str text))")]
+    [InlineData("(&& (&& true (is input str text)) (== text \"value\"))")]
+    public void Conjunction_PreservesTheSuccessfulPatternInRhsAndBody(string condition)
+    {
+        var source = $$"""
+            §M{m1:Consumption}
+              §F{f1:Probe:pub} (?str:input) -> str
+                §E{}
+                §IF{if1} {{condition}}
+                  §R text
+                §R "fallback"
+            """;
+        var (_, diagnostics) = Bind(source);
+        Assert.Empty(diagnostics.Errors);
+        var result = Program.Compile(source, "and-pattern.calr");
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        var method = Emit(result.GeneratedCode).GetType("Consumption.ConsumptionModule")!.GetMethod("Probe")!;
+        Assert.Equal("value", method.Invoke(null, ["value"]));
+        Assert.Equal("fallback", method.Invoke(null, [null]));
+    }
+
     private static string Source(string consumer, string expression, string? extraParameter = null)
     {
         var body = consumer switch

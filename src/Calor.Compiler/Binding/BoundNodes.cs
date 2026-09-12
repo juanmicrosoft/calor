@@ -2031,6 +2031,7 @@ public sealed class BoundIsPatternExpression : BoundExpression
     public BoundExpression Operand { get; }
     public string TargetType { get; }
     public string? VariableName { get; }
+    public VariableSymbol? Binding { get; init; }
     public override BoundType Type { get; } = new NominalBoundType("BOOL");
     public override IReadOnlyList<BoundExpression> Children { get; }
 

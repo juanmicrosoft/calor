@@ -1246,6 +1246,11 @@ public sealed class TypeChecker
 
     private void DefineTrueConditionPatternVariables(ExpressionNode condition)
     {
+        if (condition is BinaryOperationNode { Operator: BinaryOperator.And } conjunction)
+        {
+            DefineTrueConditionPatternVariables(conjunction.Left);
+            DefineTrueConditionPatternVariables(conjunction.Right);
+        }
         if (condition is IsPatternNode { VariableName: { Length: > 0 } name } isPattern)
         {
             _env.DefineVariable(name, InferTypePatternBindingType(isPattern.TargetType, isPattern.TargetTypeSpan, isPattern.Span));
@@ -1588,7 +1593,16 @@ public sealed class TypeChecker
     private CalorType InferBinaryOperationType(BinaryOperationNode binOp)
     {
         var leftType = InferExpressionType(binOp.Left);
-        var rightType = InferExpressionType(binOp.Right);
+        CalorType rightType;
+        if (binOp.Operator == BinaryOperator.And)
+        {
+            _env.EnterScope();
+            DefineTrueConditionPatternVariables(binOp.Left);
+            rightType = InferExpressionType(binOp.Right);
+            _env.ExitScope();
+        }
+        else
+            rightType = InferExpressionType(binOp.Right);
 
         // Comparison operators return BOOL
         if (binOp.Operator is BinaryOperator.Equal or BinaryOperator.NotEqual
