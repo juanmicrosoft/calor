@@ -1583,6 +1583,12 @@ public sealed class TypeChecker
             return type;
         }
 
+        var functionType = _env.LookupFunction(refNode.Name);
+        if (functionType != null)
+        {
+            return functionType;
+        }
+
         // A dotted reference whose head is not a local is a MEMBER ACCESS, not a variable:
         // `Math.PI`, `int.MaxValue`, `StringComparison.Ordinal`, `System.Environment.NewLine`.
         // The checker models no BCL surface, so it cannot type these — but reporting them as

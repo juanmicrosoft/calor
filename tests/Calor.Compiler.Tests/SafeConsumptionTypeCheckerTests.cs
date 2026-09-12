@@ -394,6 +394,25 @@ public sealed class SafeConsumptionTypeCheckerTests
         Assert.Equal(19, diagnostic.Span.Line);
     }
 
+    [Fact]
+    public void CallExpressions_RecognizeFunctionArguments()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Double:pub} (i32:value) -> i32
+                §E{}
+                §R (* value 2)
+              §F{f2:Map:pub} (Func<i32,i32>:transform §E{}) -> i32
+                §E{}
+                §R §C{transform} §A 1 §/C
+              §F{f3:Probe:pub} () -> i32
+                §E{}
+                §R §C{Map} §A Double §/C
+            """);
+
+        AssertNoErrors(result);
+    }
+
     [Theory]
     [InlineData("§R §C{Take} §A (?? 1 2) §/C")]
     [InlineData("§C{Take} §A (?? 1 2) §/C\n    §R 0")]
