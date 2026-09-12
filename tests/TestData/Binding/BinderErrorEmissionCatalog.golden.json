@@ -398,9 +398,19 @@
       "Calor0274"
     ],
     "severity": "Dynamic",
-    "disposition": "AnalysisOnly",
+    "disposition": "ReceivingContextDependent",
     "owningIssue": 1385,
-    "reason": "Nullability activation requires explicit receiving shape and its staged prerequisites."
+    "reason": "Nullability activation requires explicit receiving shape and its staged prerequisites.",
+    "receivingOverrides": [
+      {
+        "boundary": "MethodArgument",
+        "shape": "ScalarString",
+        "replacesNativeOverloadError": true,
+        "disposition": "CompilationError",
+        "owningIssue": 1383,
+        "reason": "A resolved native scalar STRING input replaces an actual prior overload rejection; other nullable inputs await Stage A."
+      }
+    ]
   },
   {
     "siteId": "src/Calor.Compiler/Binding/Metadata/MetadataBinder.cs::Metadata.MetadataBinderResult.ToDiagnostics::Diagnostic..ctor#01",
