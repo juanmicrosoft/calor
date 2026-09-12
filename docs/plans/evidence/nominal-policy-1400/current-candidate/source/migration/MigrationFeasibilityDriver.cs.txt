@@ -21,6 +21,8 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using CalorProgram = Calor.Compiler.Program;
 using CalorDiagnostic = Calor.Compiler.Diagnostics.Diagnostic;
 using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
+using Binder = Calor.Compiler.Binding.Binder;
+using CompilationOptions = Calor.Compiler.CompilationOptions;
 
 internal static class Program
 {
@@ -606,8 +608,8 @@ internal static class Program
             HasConvertedCalor: true,
             NativeDeclarationCount: current.NativeCoverage?.NativeDeclarationCount ?? 0,
             InteropDeclarationCount: current.NativeCoverage?.InteropDeclarationCount ?? 0,
-            EchoParameterDeclaredNullable: echo?.Parameters.SingleOrDefault()?.TypeName.StartsWith('?', StringComparison.Ordinal),
-            EchoReturnDeclaredNullable: echo?.OutputTypeName?.StartsWith('?', StringComparison.Ordinal),
+            EchoParameterDeclaredNullable: echo?.Parameters.SingleOrDefault()?.TypeName.StartsWith("?", StringComparison.Ordinal),
+            EchoReturnDeclaredNullable: echo?.OutputTypeName?.StartsWith("?", StringComparison.Ordinal),
             FaithfulCandidateMayBeAttempted: echo?.HasItemParameterAndReturn == true,
             Reason: "Current output is classified before any fixture-specific representation. Non-null Item declaration types here are recorded as bare-converter annotation loss when original Roslyn nullable annotation is None under #nullable disable.");
     }
@@ -780,21 +782,18 @@ internal static class Program
 
     private static BoundTypeRecord CaptureBoundType(BoundType type)
     {
-        var common = new BoundTypeRecord
+        var nominal = type as NominalBoundType;
+        return new BoundTypeRecord
         {
             Kind = type.GetType().Name,
             DisplayString = type.DisplayString,
             FullyQualifiedName = type.FullyQualifiedName,
+            QualifiedName = nominal?.QualifiedName,
+            NullableAnnotation = nominal?.NullableAnnotation.ToString(),
+            Declaration = nominal?.Declaration is { } declaration ? TypeSymbolRecord.From(declaration) : null,
+            RoslynSymbol = nominal?.RoslynSymbol is { } symbol ? RoslynSymbolRecord.From(symbol) : null,
+            IsKnownReferenceType = nominal is null ? null : ReadInternalBool(nominal, "IsKnownReferenceType"),
         };
-        if (type is NominalBoundType nominal)
-        {
-            common.QualifiedName = nominal.QualifiedName;
-            common.NullableAnnotation = nominal.NullableAnnotation.ToString();
-            common.Declaration = nominal.Declaration is null ? null : TypeSymbolRecord.From(nominal.Declaration);
-            common.RoslynSymbol = nominal.RoslynSymbol is null ? null : RoslynSymbolRecord.From(nominal.RoslynSymbol);
-            common.IsKnownReferenceType = ReadInternalBool(nominal, "IsKnownReferenceType");
-        }
-        return common;
     }
 
     private static BinderMetadataProfileRecord CaptureBinderMetadataProfile(Binder binder)
@@ -979,7 +978,7 @@ internal static class Program
     private static string StripNullablePrefix(string? typeName)
     {
         if (string.IsNullOrWhiteSpace(typeName)) return string.Empty;
-        return typeName.StartsWith('?', StringComparison.Ordinal) ? typeName[1..] : typeName.EndsWith('?', StringComparison.Ordinal) ? typeName[..^1] : typeName;
+        return typeName.StartsWith("?", StringComparison.Ordinal) ? typeName[1..] : typeName.EndsWith("?", StringComparison.Ordinal) ? typeName[..^1] : typeName;
     }
 
     private static bool IsRoslynError(RoslynDiagnostic d) => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error;
