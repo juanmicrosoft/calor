@@ -17,6 +17,7 @@ public sealed class TypeChecker
     private bool _validateReturnAssignments;
     private bool _suppressContextualDiagnostics;
     private bool _lambdaReturnInvalid;
+    private List<CalorType>? _inferredLambdaReturnTypes;
 
     public TypeChecker(DiagnosticBag diagnostics)
     {
@@ -422,6 +423,7 @@ public sealed class TypeChecker
         if (ret.Expression != null)
         {
             var returnType = InferExpressionType(ret.Expression, _currentReturnType);
+            _inferredLambdaReturnTypes?.Add(returnType);
             if ((_validateReturnAssignments || ret.Expression is CallExpressionNode)
                 && _currentReturnType != null
                 && !ContainsInferencePlaceholder(_currentReturnType)
@@ -1519,6 +1521,10 @@ public sealed class TypeChecker
                 && conditional.ElseIfClauses.All(clause => DefinitelyReturns(clause.Body))
                 && conditional.ElseBody != null
                 && DefinitelyReturns(conditional.ElseBody),
+            MatchStatementNode match => match.Cases.Count > 0
+                && match.Cases.Any(matchCase =>
+                    matchCase.Pattern is WildcardPatternNode && matchCase.Guard == null)
+                && match.Cases.All(matchCase => DefinitelyReturns(matchCase.Body)),
             TryStatementNode tryStatement => tryStatement.FinallyBody != null
                 && DefinitelyReturns(tryStatement.FinallyBody)
                 || DefinitelyReturns(tryStatement.TryBody)
@@ -2317,10 +2323,15 @@ public sealed class TypeChecker
             }
         }
 
-        CalorType? bodyType = null;
         var checkpoint = _diagnostics.CreateCheckpoint();
         var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
+        var previousReturnType = _currentReturnType;
+        var previousValidateReturnAssignments = _validateReturnAssignments;
+        var previousInferredLambdaReturnTypes = _inferredLambdaReturnTypes;
         _suppressContextualDiagnostics = true;
+        _currentReturnType = null;
+        _validateReturnAssignments = false;
+        _inferredLambdaReturnTypes = new List<CalorType>();
         _env.EnterScope();
         var currentSubstitutions =
             new Dictionary<string, CalorType>(substitutions, StringComparer.Ordinal);
@@ -2333,85 +2344,23 @@ public sealed class TypeChecker
         }
         if (lambda.ExpressionBody != null)
         {
-            bodyType = InferExpressionType(lambda.ExpressionBody);
+            _inferredLambdaReturnTypes.Add(InferExpressionType(lambda.ExpressionBody));
         }
         else
         {
-            foreach (var expression in EnumerateReturnExpressions(
-                lambda.StatementBody ?? Array.Empty<StatementNode>()))
+            foreach (var statement in lambda.StatementBody ?? Array.Empty<StatementNode>())
             {
-                InferTypeArguments(
-                    targetTemplate.ReturnType,
-                    InferExpressionType(expression),
-                    substitutions);
+                CheckStatement(statement);
             }
         }
         _env.ExitScope();
+        foreach (var returnType in _inferredLambdaReturnTypes)
+            InferTypeArguments(targetTemplate.ReturnType, returnType, substitutions);
+        _inferredLambdaReturnTypes = previousInferredLambdaReturnTypes;
+        _currentReturnType = previousReturnType;
+        _validateReturnAssignments = previousValidateReturnAssignments;
         _suppressContextualDiagnostics = previousSuppressContextualDiagnostics;
         _diagnostics.RestoreCheckpoint(checkpoint);
-        if (bodyType != null)
-            InferTypeArguments(targetTemplate.ReturnType, bodyType, substitutions);
-    }
-
-    private static IEnumerable<ExpressionNode> EnumerateReturnExpressions(
-        IReadOnlyList<StatementNode> statements)
-    {
-        foreach (var statement in statements)
-        {
-            switch (statement)
-            {
-                case ReturnStatementNode { Expression: not null } returnStatement:
-                    yield return returnStatement.Expression;
-                    break;
-                case IfStatementNode conditional:
-                    foreach (var expression in EnumerateReturnExpressions(conditional.ThenBody))
-                        yield return expression;
-                    foreach (var clause in conditional.ElseIfClauses)
-                    {
-                        foreach (var expression in EnumerateReturnExpressions(clause.Body))
-                            yield return expression;
-                    }
-                    if (conditional.ElseBody != null)
-                    {
-                        foreach (var expression in EnumerateReturnExpressions(conditional.ElseBody))
-                            yield return expression;
-                    }
-                    break;
-                case MatchStatementNode match:
-                    foreach (var matchCase in match.Cases)
-                    {
-                        foreach (var expression in EnumerateReturnExpressions(matchCase.Body))
-                            yield return expression;
-                    }
-                    break;
-                case TryStatementNode tryStatement:
-                    foreach (var expression in EnumerateReturnExpressions(tryStatement.TryBody))
-                        yield return expression;
-                    foreach (var clause in tryStatement.CatchClauses)
-                    {
-                        foreach (var expression in EnumerateReturnExpressions(clause.Body))
-                            yield return expression;
-                    }
-                    if (tryStatement.FinallyBody != null)
-                    {
-                        foreach (var expression in EnumerateReturnExpressions(tryStatement.FinallyBody))
-                            yield return expression;
-                    }
-                    break;
-                case ForStatementNode loop:
-                    foreach (var expression in EnumerateReturnExpressions(loop.Body))
-                        yield return expression;
-                    break;
-                case WhileStatementNode loop:
-                    foreach (var expression in EnumerateReturnExpressions(loop.Body))
-                        yield return expression;
-                    break;
-                case DoWhileStatementNode loop:
-                    foreach (var expression in EnumerateReturnExpressions(loop.Body))
-                        yield return expression;
-                    break;
-            }
-        }
     }
 
     private bool TryGetMethodGroupConversionCost(

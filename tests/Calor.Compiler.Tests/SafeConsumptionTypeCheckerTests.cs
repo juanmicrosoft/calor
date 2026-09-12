@@ -1527,6 +1527,44 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void GenericCalls_InferLambdaResultsFromLocalBindings()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Make:pub}<T> (Func<T>:factory) -> T
+                §E{}
+                §R §C{factory} §/C
+              §F{f2:Probe:pub} () -> i32
+                §E{}
+                §R §C{Make} §A §LAM{l1}
+                  §B{x:i32} 1
+                  §R x
+                §/LAM{l1} §/C
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
+    public void StatementLambda_ExhaustiveMatchCanDefinitelyReturn()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{factory:Func<i32,i32>} §LAM{l1:value:i32}
+                  §W{m1} value
+                    §K 0
+                      §R 1
+                    §K _
+                      §R 2
+                §/LAM{l1}
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
     public void MethodGroupRanking_RejectsParetoIncomparableCandidates()
     {
         var result = Check("""
