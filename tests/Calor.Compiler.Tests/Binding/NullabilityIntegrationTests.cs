@@ -409,6 +409,76 @@ public class NullabilityIntegrationTests
         Assert.False(BindingDiagnosticPolicy.IsCompilationError(finding));
     }
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public void N3_NamedNominalInputs_ThroughTwoInferredLocals_PreserveMappingAndAnnotation(
+        bool bcl, bool expression, bool nullable)
+    {
+        var producer = nullable ? "GetParent" : "CreateDirectory";
+        var call = bcl
+            ? "§C{System.IO.FileSystemAclExtensions.GetAccessControl} §A[directoryInfo] second §/C"
+            : "§C{Take} §A[safe] safe §A[required] second §/C";
+        var source = $$"""
+            §M{m1:LocalMapping}
+              §F{take:Take:pub} (System.IO.DirectoryInfo:required, System.IO.DirectoryInfo:safe) -> i32
+                §R 1
+              §F{probe:Probe:pub} () -> void
+                §B{first} §C{System.IO.Directory.{{producer}}} §A STR:"/" §/C
+                §B{second} first
+                §B{safe} §C{System.IO.Directory.CreateDirectory} §A STR:"/" §/C
+                {{(expression ? "§B{result} " : "")}}{{call}}
+            """;
+        var (bound, diagnostics) = BindSource(source);
+        var probe = bound.Functions.Single(f => f.Symbol.Name == "Probe");
+        var statement = probe.Body[^1];
+        var callExpression = expression
+            ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundBindStatement>(statement).Initializer)
+            : null;
+        var callStatement = expression ? null : Assert.IsType<BoundCallStatement>(statement);
+        var arguments = callExpression?.Arguments ?? callStatement!.Arguments;
+        var argument = arguments[bcl ? 0 : 1];
+        var type = Assert.IsType<NominalBoundType>(argument.Type);
+        Assert.Equal("DirectoryInfo", type.RoslynSymbol?.Name);
+        Assert.Equal(nullable ? NullableAnnotation.Annotated : NullableAnnotation.NotAnnotated,
+            type.NullableAnnotation);
+        Assert.Equal("second", source.Substring(argument.Span.Start, argument.Span.Length));
+        if (bcl)
+        {
+            Assert.Equal(new[] { 0 }, callExpression?.ArgumentParameterIndices ?? callStatement!.ArgumentParameterIndices);
+        }
+        else
+        {
+            var match = Assert.Single(callExpression?.SelectedOverloadMatches ?? callStatement!.SelectedOverloadMatches);
+            Assert.Equal("Take", match.Function.Name);
+            Assert.Contains(match.Arguments, mapping => mapping.ArgumentIndex == 1 && mapping.ParameterIndex == 0);
+            Assert.Contains(match.Arguments, mapping => mapping.ArgumentIndex == 0 && mapping.ParameterIndex == 1);
+        }
+        var findings = diagnostics.Where(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter).ToArray();
+        if (nullable)
+        {
+            var finding = Assert.Single(findings);
+            Assert.Contains(bcl ? "'directoryInfo'" : "'required'", finding.Message);
+            Assert.Equal(argument.Span, finding.Span);
+            Assert.Equal(BindingReceivingShape.Nominal, finding.BindingContext?.Shape);
+            Assert.False(BindingDiagnosticPolicy.IsCompilationError(finding));
+        }
+        else
+        {
+            Assert.Empty(findings);
+        }
+        Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+        var result = Program.Compile(source, "n3-inferred-named-input.calr",
+            new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+    }
+
     /// <summary>
     /// The canonical D3 repro from issue #875: binding
     /// <c>Environment.GetEnvironmentVariable</c>'s Annotated string return

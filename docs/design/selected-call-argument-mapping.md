@@ -77,7 +77,7 @@ and final CI were required before parent adjudication. That head subsequently
 received two fresh no-significant-findings reviews and successful CI, but a
 later fresh-main check found accepted N1 changes; those results remain historical.
 
-### Current reconciliation with accepted N1 — `3b513a63`
+### Historical N1 reconciliation — `d09a47dd` / `3de04d6f` on `3b513a63`
 
 While the first integrated CI ran, #1380/#1451 merged as
 `3b513a632149290481161b195a71aa6cb0e251a8`. Its Binder/metadata/predicate and
@@ -116,6 +116,67 @@ N1, with manifest totals8940/500, unchanged skips and inherited harness291.
 Final CI must verify the actual totals. Two new final-head reviews must assess
 this full integration, the scalar/normal-array distinction and retained1444
 scope before parent adjudication; earlier-head reviews are not substituted.
+
+That production head `d09a47dd` received two non-author no-significant-findings
+reviews and36 successful CI checks. The parent's subsequent historical-count
+wording correction produced the docs-only `3de04d6f`. The original synchronous
+contexts could not receive follow-ups; their full responses and the failed
+resumption attempt are public. Two fresh, explicitly documentation-only contexts
+confirmed the correction and byte-identical remaining tree. That head also
+passed36 new CI checks. Parent adjudicates that disclosed review substitution;
+neither result is relabeled as post-N2 integration.
+
+### Current reconciliation with accepted N2 — `63220eab`
+
+The required fresh-main check after `3de04d6f` CI found #1381/#1452 normally
+merged as `63220eab30c7c8af038efaf06d4cebeae64d3f33`. N3 merges that accepted
+main, not the older unmerged N2 prototype. The accepted final N2 adds101 compiler
+and6 editor cases, not the earlier71/2 checkpoint. Its source, evidence and
+capacity row are retained. There are no new N3 production edits: the incoming
+changes in Binder/BoundNodes/Scope are N2's accepted inference/member work, and
+the existing selected-map, taint, T1 and N1 implementation is preserved. The619
+source-file-header/added/deleted production-line records of N3 versus its new
+base match those of `3de04d6f` versus `3b513a63`; this textual comparison does not
+replace the joint behavior controls.
+
+Eight additional joint controls pass real native/reordered and BCL/named inputs
+through two inferred locals, in both call forms, with nullable/non-null sources.
+They assert actual `DirectoryInfo` Roslyn identity and annotation, selected
+native mapping or BCL formal indices, the actual supplied span/formal name,
+analysis-only disposition and public compiler API acceptance. Filesystem APIs
+are bound, **not executed**. N2's measured direct-versus-through-local native
+applicability distinction is preserved: direct nullable BCL-to-native0208 is
+not rewritten, while already-resolved through-local calls gain the retained
+annotation. This is not new applicability or production enforcement.
+
+The initial combined207-case selection and the existing14-case generator run
+pass. Regeneration changes neither the source-catalog golden nor the coverage
+baseline. A separate fresh conversion/binding capture again produces55 errors
+for `JsonValueFormatter`, with the same complete ordered diagnostic records as
+the prior capture. The [post-N2 audit](../plans/evidence/n3-mapping-2026-09-11/integration-63220-audit.json)
+pins the new production file hashes and actual measurements. Relative to
+accepted N2, only that file's52→55 count/hash differs; removing the same three
+scalar statement identities reproduces its52-error hash. The absent nominal
+`any` finding remains unsupported/Unresolved, **not safe**. All364 source keys,
+other source/opacity/outcome/propagation fields and earlier captures are preserved.
+
+The editor's56 affected cases pass; discovery lists506 cases. Compiler discovery
+lists only8981 cases because it is not the runtime-expanded execution denominator.
+That count was rejected as an inventory proof, rather than used to lower the
+manifest. The unchanged CI shard runner supplies the actual9049-case compiler
+inventory (4484+4565), but the local full run is **not green**:9017 passed,
+29 failed and3 skipped. With required in-repository `TMPDIR`,27 initializer/hook
+tests resolve their fixture directories to the checkout's git root rather than
+the expected child root; two generated-project tests inherit Central Package
+Management and failNU1008. The unchanged initializer and package files, actual
+failures and counters are recorded. Only the tests' generated changes to this
+worktree's `CLAUDE.md`/`.claude/settings.json` were restored. No other worktree,
+skip, comparison or gate was changed. The failed local pass gate is not waived
+or relabeled successful. Expected editor506, compiler skips3 and harness291
+remain; actual final CI in its normal runner layout must pass.
+Fresh full-integration final-head review contexts and actual final CI remain
+required before parent adjudication. Earlier production, doc-only or CI records
+do not approve this newly integrated tree.
 
 ## Data flow
 
@@ -157,9 +218,11 @@ Historically, `be488238` → `47c651b4` changed the source-site catalog from33 t
 routes because two argument emitters became one; its18 code policies were
 unchanged. At that historical checkpoint, #1397's independently developed275
 still required reconciliation if it merged.
-On the **current accepted T1+N1/main `3b513a63` → integrated N3 candidate**,
-the same catalog changes from34 to33 routes, with19 code policies unchanged.
-#1397 has already merged:275 and its active bounded disposition are retained.
+At the accepted T1+N1/main `3b513a63` → N3 `d09a47dd`/`3de04d6f` checkpoint,
+the same catalog changed from34 to33 routes, with19 code policies unchanged.
+On **current accepted T1+N1+N2/main `63220eab` → integrated N3**, the actual
+regenerated catalog remains34→33 routes with19 policies. #1397 has already
+merged:275 and its active bounded disposition are retained.
 
 ## Historical executable controls — `47c651b4`
 

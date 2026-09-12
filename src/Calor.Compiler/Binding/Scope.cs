@@ -1123,18 +1123,21 @@ public sealed class VariableSymbol : Symbol
     public string? DeclaringTypeName { get; }
 
     /// <summary>
-    /// v0.14 nullability workstream — declared nullability of the variable's
-    /// type, captured at binding time from the surface syntax (e.g. <c>:string</c>
-    /// vs <c>:?string</c>). Consumed by <see cref="BoundVariableExpression.Type"/>
-    /// so that reads of a declared-non-null local flow the <c>NotAnnotated</c>
-    /// annotation into downstream nullability checks (Calor0272 and siblings).
+    /// Declared scalar reference annotation, or the established annotation of
+    /// an inferred reference initializer. Consumed by
+    /// <see cref="BoundVariableExpression.Type"/> at subsequent reads.
     ///
     /// <para>Defaults to <see cref="BoundTypes.NullableAnnotation.Oblivious"/>
     /// so pre-existing symbol construction paths keep their conservative
-    /// behavior. S3-scoped: today only STRING-target bind statements populate
-    /// a non-<c>Oblivious</c> value; other targets stay Oblivious per §D6.</para>
+    /// behavior. This annotation alone does not establish a resolved reference
+    /// identity or a flow-sensitive non-null guarantee.</para>
     /// </summary>
     public BoundTypes.NullableAnnotation NullableAnnotation { get; }
+
+    // Inferred references retain the producer's identity, which may not resolve
+    // from its display spelling in the local's lexical namespace.
+    internal BoundTypes.NominalBoundType? InferredReferenceType { get; init; }
+    internal bool IsTypeInferred { get; init; }
 
     /// <summary>
     /// v0.15 E2 slice b, design-doc §8.2 — the function type this variable
