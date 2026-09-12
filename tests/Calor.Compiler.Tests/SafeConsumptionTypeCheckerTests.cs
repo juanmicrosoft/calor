@@ -669,6 +669,73 @@ public sealed class SafeConsumptionTypeCheckerTests
         Assert.Contains("Null-coalescing requires", diagnostic.Message);
     }
 
+    [Fact]
+    public void InlineGenericFunctionNames_AreCallableMethodGroups()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Identity<T>:pub} (T:value) -> T
+                §E{}
+                §R value
+              §F{f2:Probe:pub} () -> void
+                §E{}
+                §B{identity:Func<i32,i32>} Identity
+            """);
+
+        AssertNoErrors(result);
+    }
+
+    [Fact]
+    public void GenericInference_MergesAllArgumentBounds()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Choose:pub}<T> (T:first, T:second) -> T
+                §E{}
+                §R second
+              §F{f2:Probe:pub} () -> i32
+                §E{}
+                §R (?? §C{Choose} §A (cast char INT:65) §A 1 §/C 2)
+            """);
+
+        var diagnostic = SingleErrorAt(result, 7);
+        Assert.Contains("Null-coalescing requires", diagnostic.Message);
+    }
+
+    [Fact]
+    public void NamedUserDelegateCalls_MapArgumentsByName()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §DEL{d1:Picker:pub}
+                §I{i32:number}
+                §I{str:text}
+                §O{str}
+              §F{f1:Probe:pub} (Picker:pick) -> str
+                §E{}
+                §R §C{pick} §A[text] "x" §A[number] 1 §/C
+            """);
+
+        AssertNoErrors(result);
+    }
+
+    [Fact]
+    public void ExpandedParamsCalls_ExposeTheirReturnType()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:First:pub} (i32[]:values:params) -> i32
+                §E{}
+                §R §IDX values 0
+              §F{f2:Probe:pub} () -> i32
+                §E{}
+                §R (?? §C{First} §A 1 §A 2 §/C 3)
+            """);
+
+        var diagnostic = SingleErrorAt(result, 7);
+        Assert.Contains("Null-coalescing requires", diagnostic.Message);
+    }
+
     [Theory]
     [InlineData("§R §C{Take} §A (?? 1 2) §/C")]
     [InlineData("§C{Take} §A (?? 1 2) §/C\n    §R 0")]

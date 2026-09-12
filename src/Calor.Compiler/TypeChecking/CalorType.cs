@@ -383,6 +383,7 @@ public sealed class UnionVariant
 public sealed class FunctionType : CalorType
 {
     public IReadOnlyList<CalorType> ParameterTypes { get; }
+    public IReadOnlyList<string>? ParameterNames { get; }
     public CalorType ReturnType { get; }
     public override string Name
     {
@@ -401,10 +402,14 @@ public sealed class FunctionType : CalorType
         }
     }
 
-    public FunctionType(IReadOnlyList<CalorType> parameterTypes, CalorType returnType)
+    public FunctionType(
+        IReadOnlyList<CalorType> parameterTypes,
+        CalorType returnType,
+        IReadOnlyList<string>? parameterNames = null)
     {
         ParameterTypes = parameterTypes ?? throw new ArgumentNullException(nameof(parameterTypes));
         ReturnType = returnType ?? throw new ArgumentNullException(nameof(returnType));
+        ParameterNames = parameterNames;
     }
 
     public override bool Equals(CalorType? other)
