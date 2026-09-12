@@ -1,5 +1,9 @@
 # T1 nullable-reference typing evidence (#1397)
 
+The current integrated candidate is recorded under
+[Post-publication continuation](#post-publication-continuation-merged-main-not-rewritten-history).
+Earlier sections retain their original measured source, version and review status.
+
 Implementation candidate: **ef4227009f02ea13c3b2ab82719b625f4d10b197**.
 Base: **6a0000bbad93944c55e44d608a65781a4c0df09a**.
 Measurements: 2026-09-11, macOS ARM64, .NET SDK10.0.400,
@@ -404,3 +408,59 @@ also remains unchanged; no such default was added for SortedDictionary.
 Fresh reviews must cover this final source and its exact evidence head. Prior
 approvals and the36-green3bdb8e40 CI result do not approve or validate the later
 head. The b2c43561 ancestry/normal-merge requirement still applies.
+
+## Post-publication continuation: merged main, not rewritten history
+
+The user authorized continued product0.22 work at2026-09-11T23:34:44-04:00.
+This resumes the same bounded T1 context and PR, with no new delivery promise,
+release or research scope. The capacity row records that continuation.
+
+Integrated measurement candidate:
+`6ce32e261ec21df4d307a9a9288a5854e8b90a74`.
+It merges published main `88b5d38df97fd7e438882c956b9f9dcdc7a6cef5` into the
+existing `07dd0158a36c7375a2c92bacf76c3bf02f910011` branch. No squash/rebase or
+conflict resolution was needed. Measurement ancestorb2c43561 remains reachable.
+The entire `src/` tree is unchanged from07dd0158; inherited package version is
+now0.21.0. All earlier0.20.0 measurements and review approvals remain historical,
+not relabeled as this integrated build.
+
+Published release/website/workflow files are unchanged relative to88b5d38d.
+Recovery #1449's MediatR `ExtraBuildProperties` isolation and two tests are
+inherited unchanged; its harness manifest291 is preserved alongside T1's
+compiler8802/LSP497/tasks130/enforcement691. N3 is not integrated or adjudicated
+by this merge. All0272/0273/0274 routes remain AnalysisOnly; no guard or
+transitional-rejection policy changed.
+
+On2026-09-12 UTC, macOS ARM64, SDK10.0.400/runtime10.0.11, the rebuilt candidate
+reports CLI0.21.0. Existing selections pass589 compiler,11 LSP,105 MSBuild/cache,
+282 product enforcement and156 conversion cases, no skips. The four
+`RunConfigOverrideTests` also pass, including both #1449 controls. These are
+overlapping scoped selections, not a full local suite or summed denominator.
+The compiler selection is the exact earlier589-case selection. Product corpus,
+catalog, stamp-index and cache assertions run normally, without regeneration or
+restamping; all product ledger files remain byte-identical to07dd0158.
+
+| Integrated measurement artifact | SHA-256 |
+|---|---|
+| `t1-published-main-compiler.trx` | `39df8aff815538ac8205c2aa29e09b071efc18d853e288fc38ea1090d93d8e02` |
+| Debug `calor.dll` | `b78dbab7434d123aa2e1212abcd5ce0854714a036584948c56c1e446e811d790` |
+| Debug `Calor.Runtime.dll` | `725934220c10b522da3a6c38ab1726b50909538c12863b649953e302bde0e47c` |
+
+These binaries were built at the integrated source candidate above; subsequent
+capacity/evidence-only commits do not create a new claimed binary measurement.
+Documentation self-check reports no drift. Existing reference-profile limits,
+unknown member paths and conditional generic getter failures remain disclosed.
+
+**Known local baseline failure, not hidden:** the parent reports
+`Evidence_ActualBuildRecoveryPreservesOriginalCandidateDiagnostics` line167
+failing identically on macOS at bothb1d23d7d and88b5d38d because the recovery
+diagnostic list is empty; release Linux CI passed without a waiver. This
+continuation did not independently reproduce that baseline result and does not
+claim the full291-case harness passed locally. The affected config selection
+above is explicitly four cases. No E1 assertion, recovery behavior or skip was
+changed to hide the failure; full final-head CI remains a separate required gate.
+
+The prior07dd0158 review pair and36-green CI are not final approval of the
+integrated head. Two fresh non-author contexts, actual final-head CI and parent
+adjudication are required. No self-merge or issue closure is authorized. The
+normal-merge constraint preservingb2c43561 still applies.

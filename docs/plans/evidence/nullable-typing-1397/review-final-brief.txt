@@ -2,9 +2,10 @@ Independent final-head review of juanmicrosoft/calor PR1443, issue1397.
 
 The invocation supplies your exact head and lens. Verify that head and a clean
 tracked worktree before and after reviewing. Base is
-be488238d3aac374995174aa47526c7f3d09fd51; latest source is
-1edc709e25028175be970d704c16eba3af8a5ce1. Product ledgers were generated at
-b2c435610c3aa34accc0f28f66d5eca834d7a129 and assert unchanged at1edc709e. Worktree:
+88b5d38df97fd7e438882c956b9f9dcdc7a6cef5. Integrated measurement source is
+6ce32e261ec21df4d307a9a9288a5854e8b90a74 (normal merge of published main into
+07dd0158, preserving all ancestors). Product ledgers were generated at
+b2c435610c3aa34accc0f28f66d5eca834d7a129 and assert unchanged at6ce32e26. Worktree:
 /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/typing-1397
 
 Read LIVE1397/1082, PR1443, the COMPLETE actual base-to-head diff, the evidence
@@ -14,6 +15,15 @@ high-confidence findings with source/reproducer, actual commands/results and
 honest gaps. Earlier approvals are not approval of the dictionary remediation.
 Parent adjudication and all actual final-head CI are separate required gates.
 Separate AI contexts are not human or statistically independent reviews.
+
+This is the explicitly accepted continuation of the existing T1 slot after
+product0.21 publication, NOT a new issue or release/study authority. Prior07dd
+reviews/36CI are historical, not approval of this head. The src tree is identical
+to07dd; version0.21 and recovery1449 are inherited from published main. Check
+that the MediatR config, two new tests and harness manifest291 remain unchanged
+relative to88b5d38d. Other T1 totals are8802/497/130/691. No release/version/public
+surface should differ from current published base. N3 has not been integrated.
+Read the complete actual88-to-head T1 diff, not only the merge/evidence delta.
 
 Contract: supported ?str/?string/registered ?Foo are nullable REFERENCES, not
 runtime Option<T>. Some/None and explicit Option remain wrappers. Shared
@@ -105,9 +115,20 @@ unless explicitly arranging and documenting its metadata prerequisite. Your own
 scratch only under session files/t1-b2-integration-probes or
 files/t1-b2-compatibility-probes according to lens. No new test framework.
 Author's latest results:589compiler,11LSP,105tasks,282productenforcement,
-156conversion; no skips. The README gives exact selectors; independently run
+156conversion,4RunConfigOverrideTests; no skips. Binaries rebuilt at6ce32e26
+report0.21.0; exact hashes are recorded in the README. Evidence-only later
+commits do not claim a new binary measurement. The README gives selectors; run
 useful tests/counterexamples rather than echoing results. Do not relabel the
 earlier63-case external-profile result as current.
+
+Known unrelated local baseline: parent reports
+Evidence_ActualBuildRecoveryPreservesOriginalCandidateDiagnostics line167
+fails identically on macOS at b1d23d7d and88b5d38d (empty recovery diagnostics);
+release LinuxCI passed unwaived. Author has NOT rerun/reproduced this baseline
+in the continuation and does NOT claim full291 local harness passes. Do not hide
+it, invent a local pass, or make source/skip edits. If you run it, report the
+actual result and distinguish baseline evidence from any demonstrated T1 cause.
+Full final CI remains required. Only four affected config cases were run locally.
 
 RESEARCH FULLY PAUSED: no new proofs/paid calls/study tests, no
 SpikeVerdictTests/EffectRowExperimentHarnessTests, no .git/ppw-budget,
