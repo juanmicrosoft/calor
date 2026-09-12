@@ -275,7 +275,8 @@ internal static class D1NominalPolicyCapture
     }
 
     private static bool IsShadowMode =>
-        MeasurementMode is "shadow-annotated" or "shadow-conservative";
+        string.Equals(MeasurementMode, "shadow-annotated", StringComparison.Ordinal)
+        || string.Equals(MeasurementMode, "shadow-conservative", StringComparison.Ordinal);
 
     private static bool IsConservativeMode =>
         MeasurementMode == "shadow-conservative";

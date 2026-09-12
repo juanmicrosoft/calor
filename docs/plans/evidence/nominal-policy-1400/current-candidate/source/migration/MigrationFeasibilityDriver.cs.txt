@@ -69,6 +69,8 @@ internal static class Program
                 CalorRoot: Path.GetFullPath(options.CalorRoot),
                 OriginalCSharpSha256: Sha256Text(FixtureSources.NativeReferencePassthrough),
                 OriginalCSharp: FixtureSources.NativeReferencePassthrough,
+                ExternalRuntimeHarness: FixtureSources.RuntimeHarness,
+                ExternalRuntimeHarnessSha256: Sha256Text(FixtureSources.RuntimeHarness),
                 ExpectedFileHashes: options.ExpectedFileHashes),
             Driver = DriverRecord.Capture(),
             SourceContext = CaptureSourceContext(options),
@@ -327,10 +329,12 @@ internal static class Program
     {
         var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
         var tree = CSharpSyntaxTree.ParseText(csharpSource, parseOptions, $"{name}.cs", Encoding.UTF8);
-        var syntaxDiagnostics = tree.GetDiagnostics().Where(IsRoslynError).Select(RoslynDiagnosticRecord.From).ToList();
+        var runtimeHarness = CSharpSyntaxTree.ParseText(FixtureSources.RuntimeHarness, parseOptions, "ExternalRuntimeHarness.cs", Encoding.UTF8);
+        var syntaxDiagnostics = tree.GetDiagnostics().Concat(runtimeHarness.GetDiagnostics())
+            .Where(IsRoslynError).Select(RoslynDiagnosticRecord.From).ToList();
         var compilation = CSharpCompilation.Create(
             "NominalMigrationFixture_" + SanitizeAssemblyName(name) + "_" + Guid.NewGuid().ToString("N"),
-            [tree],
+            [tree, runtimeHarness],
             GeneratedCSharpCompiler.References,
             new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
@@ -1225,7 +1229,15 @@ namespace MigrationFeasibility.NominalPolicy1400
             return value.Label.Length;
         }
     }
+}
+""";
 
+    public const string RuntimeHarness = """
+#nullable disable
+using System;
+
+namespace MigrationFeasibility.NominalPolicy1400
+{
     public sealed class RuntimeOutcome
     {
         public bool NullEchoIsNull { get; set; }
@@ -1357,7 +1369,7 @@ internal sealed record EvidenceReport
     public List<FailureRecord> HardFailures { get; } = [];
 }
 
-internal sealed record InputRecord(string CalorRoot, string OriginalCSharpSha256, string OriginalCSharp, IReadOnlyDictionary<string, string> ExpectedFileHashes);
+internal sealed record InputRecord(string CalorRoot, string OriginalCSharpSha256, string OriginalCSharp, string ExternalRuntimeHarness, string ExternalRuntimeHarnessSha256, IReadOnlyDictionary<string, string> ExpectedFileHashes);
 internal sealed record DriverRecord(string ProcessArchitecture, string FrameworkDescription, string OsDescription, string? ExposedAgentName, string? ExposedModel)
 {
     public static DriverRecord Capture() => new(

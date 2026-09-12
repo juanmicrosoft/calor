@@ -143,7 +143,7 @@ def write_mode_source(
     if out_path.exists():
         fail(f"Refusing to overwrite existing generated source {relative_out}")
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(source, encoding="utf-8", newline="\n")
+    out_path.write_bytes(source.encode("utf-8"))
     expected = sha256_text(source)
     actual = sha256_file(out_path)
     if actual != expected:
@@ -174,7 +174,7 @@ def transform_file(
     operations: list[dict[str, object]] = []
     after = transform(before, operations)
     after_hash = sha256_text(after)
-    path.write_text(after, encoding="utf-8", newline="\n")
+    path.write_bytes(after.encode("utf-8"))
     actual_after_hash = sha256_file(path)
     if actual_after_hash != after_hash:
         fail(f"{relative}: post-write hash mismatch expected {after_hash}, got {actual_after_hash}")
