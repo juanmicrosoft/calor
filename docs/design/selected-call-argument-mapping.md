@@ -153,9 +153,13 @@ and formal name, with explicit expanded-element wording and structured
 `MethodArgument`/receiving-shape provenance. Nullable0272/0273/0274 remain
 **AnalysisOnly for every shape**. API acceptance is separate from an editor
 `calor (analysis only)` Error; neither absence nor filtered output proves safety.
-The source-site catalog changes from33 to32 routes at this base because two
-argument emitters become one. The catalog's18 codes and disposition rules do not
-change. #1397's independently developed275 must be reconciled if it merges.
+Historically, `be488238` → `47c651b4` changed the source-site catalog from33 to32
+routes because two argument emitters became one; its18 code policies were
+unchanged. At that historical checkpoint, #1397's independently developed275
+still required reconciliation if it merged.
+On the **current accepted T1+N1/main `3b513a63` → integrated N3 candidate**,
+the same catalog changes from34 to33 routes, with19 code policies unchanged.
+#1397 has already merged:275 and its active bounded disposition are retained.
 
 ## Historical executable controls — `47c651b4`
 
