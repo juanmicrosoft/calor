@@ -198,8 +198,8 @@ public sealed class Binder
         var binder = GetOrCreateMetadataBinder();
         if (binder is null) return null;
 
-        // Resolve receiver type via MetadataContext (reachable through binder).
-        var ctx = Metadata.MetadataContext.Create();
+        // Member reads and their receiving calls must use the same actual reference set.
+        var ctx = binder.Context;
         var receiverType = ctx.TryResolveType(receiverName);
         if (receiverType is null) return null;
 

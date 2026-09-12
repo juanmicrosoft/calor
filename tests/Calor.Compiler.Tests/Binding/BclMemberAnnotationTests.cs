@@ -16,7 +16,7 @@ using NullableAnnotation = Calor.Compiler.Binding.BoundTypes.NullableAnnotation;
 
 namespace Calor.Compiler.Tests;
 
-public class BclMemberAnnotationTests(ITestOutputHelper output)
+public partial class BclMemberAnnotationTests(ITestOutputHelper output)
 {
     public static IEnumerable<object[]> ActualBclCases()
     {
@@ -296,6 +296,13 @@ public class BclMemberAnnotationTests(ITestOutputHelper output)
             public string Property { get; }
             public System.IO.DirectoryInfo DirectoryField;
             public System.IO.DirectoryInfo DirectoryProperty { get; }
+          }
+        }
+        #nullable enable
+        namespace System {
+          public static class N5MemberSink {
+            public static IO.DirectoryInfo Take(
+              IO.DirectoryInfo required, IO.DirectoryInfo? optional, int count = 1) => required;
           }
         }
         """;
