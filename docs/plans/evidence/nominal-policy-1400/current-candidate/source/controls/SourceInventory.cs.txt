@@ -162,7 +162,7 @@ foreach (var subject in subjects)
         }
         contextRows.Add(new
         {
-            measuredE1Context = context,
+            measuredE1Context = context.Clone(),
             evaluatedNullable = nullable,
             sourceDeclarationReconstructionOnly = true,
             completeOriginalBuild = false,
