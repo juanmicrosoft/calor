@@ -1,0 +1,155 @@
+{
+  "binder-incomplete-baseline.json": {
+    "equal": true
+  },
+  "binder-source-coverage.json": {
+    "equal": false
+  },
+  "calor0425-corpus-ledger.json": {
+    "equal": false
+  },
+  "sourceCoverageChanged": [
+    {
+      "file": "serilog/src/Serilog/Events/LogEventProperty.cs",
+      "fields": {
+        "BindingErrorCount": [
+          4,
+          3
+        ],
+        "BindingErrorIdentityHash": [
+          "4da13da3de90fc684d3b33fdf25e6ca04e97d82c6db7e6ba32cd0bc8a198f327",
+          "5c5b805c8ebc82749ce33d483fcc40ba21c7d6b5f9052471c5b6f39b72c7b78c"
+        ],
+        "PropagatedBindingErrorCount": [
+          1,
+          0
+        ],
+        "PropagatedBindingErrorIdentityHash": [
+          "fe60e2444523897ac47c2a54bad39b0f05614dce4cfc8795aab8599532fe6b18",
+          "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        ]
+      }
+    },
+    {
+      "file": "serilog/src/Serilog/Formatting/Json/JsonValueFormatter.cs",
+      "fields": {
+        "BindingErrorCount": [
+          55,
+          56
+        ],
+        "BindingErrorIdentityHash": [
+          "963206acd3677219969931fd33a7ef1c325946dff7d23a1d915fe31c8c7830d6",
+          "f2198cd14fda404f0b45497fc476f5a87f421c304bec6c49dbf2f8ecbabff031"
+        ]
+      }
+    }
+  ],
+  "calor0425AggregateDeltas": [
+    {
+      "field": "MeasuredCommit",
+      "baseline": "8f9891a1a07f786a76a293017959c3edf28412bf",
+      "candidate": "bde9ee88627acb1fcdf62494b701b24856fa5881"
+    },
+    {
+      "field": "AggregateModulesEnforced",
+      "baseline": 326,
+      "candidate": 327
+    },
+    {
+      "field": "AggregateModulesExcluded",
+      "baseline": 38,
+      "candidate": 37
+    }
+  ],
+  "calor0425PerSubjectDeltas": [
+    {
+      "subject": "serilog",
+      "fields": {
+        "ModulesEnforced": [
+          98,
+          99
+        ],
+        "ModulesNotMeasured": [
+          14,
+          13
+        ],
+        "ExcludedBindFailed": [
+          14,
+          13
+        ],
+        "BindFailureCauses": [
+          {
+            "Calor0201": 1,
+            "Calor0208": 6,
+            "Calor0250": 7
+          },
+          {
+            "Calor0201": 1,
+            "Calor0208": 5,
+            "Calor0250": 7
+          }
+        ],
+        "BindFailureModules": [
+          [
+            "Calor0250 Serilog/Capturing/PropertyBinder.cs",
+            "Calor0208 Serilog/Capturing/PropertyValueConverter.cs",
+            "Calor0208 Serilog/Configuration/LoggerEnrichmentConfiguration.cs",
+            "Calor0208 Serilog/Configuration/LoggerSinkConfiguration.cs",
+            "Calor0201 Serilog/Context/EnricherStack.cs",
+            "Calor0208 Serilog/Context/LogContext.cs",
+            "Calor0250 Serilog/Core/Logger.cs",
+            "Calor0250 Serilog/Core/Sinks/Batching/BatchingSink.cs",
+            "Calor0208 Serilog/Events/LogEventProperty.cs",
+            "Calor0250 Serilog/Filters/Matching.cs",
+            "Calor0250 Serilog/Formatting/Display/MessageTemplateTextFormatter.cs",
+            "Calor0250 Serilog/Parsing/MessageTemplateParser.cs",
+            "Calor0208 Serilog/Settings/KeyValuePairs/KeyValuePairSettings.cs",
+            "Calor0250 Serilog/Settings/KeyValuePairs/SettingValueConversions.cs"
+          ],
+          [
+            "Calor0250 Serilog/Capturing/PropertyBinder.cs",
+            "Calor0208 Serilog/Capturing/PropertyValueConverter.cs",
+            "Calor0208 Serilog/Configuration/LoggerEnrichmentConfiguration.cs",
+            "Calor0208 Serilog/Configuration/LoggerSinkConfiguration.cs",
+            "Calor0201 Serilog/Context/EnricherStack.cs",
+            "Calor0208 Serilog/Context/LogContext.cs",
+            "Calor0250 Serilog/Core/Logger.cs",
+            "Calor0250 Serilog/Core/Sinks/Batching/BatchingSink.cs",
+            "Calor0250 Serilog/Filters/Matching.cs",
+            "Calor0250 Serilog/Formatting/Display/MessageTemplateTextFormatter.cs",
+            "Calor0250 Serilog/Parsing/MessageTemplateParser.cs",
+            "Calor0208 Serilog/Settings/KeyValuePairs/KeyValuePairSettings.cs",
+            "Calor0250 Serilog/Settings/KeyValuePairs/SettingValueConversions.cs"
+          ]
+        ],
+        "Calor0411Sites": [
+          551,
+          555
+        ],
+        "Calor0411Modules": [
+          61,
+          62
+        ]
+      }
+    }
+  ],
+  "calor0425CliDeltas": [
+    {
+      "subject": "serilog",
+      "fields": {
+        "BindStopped": [
+          14,
+          13
+        ],
+        "ReachEffectPass": [
+          98,
+          99
+        ],
+        "StopCalor0410": [
+          56,
+          57
+        ]
+      }
+    }
+  ]
+}

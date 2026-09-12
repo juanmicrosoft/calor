@@ -79,6 +79,11 @@ a safety result. Non-null-to-nullable-accepting compatibility may remove an old
 false-positive208 without adding274. Such changes are not equivalent to an
 unsafe formerly rejected input becoming accepted.
 
+The [N4 evidence record](../plans/evidence/native-string-1383/README.md)
+classifies the two changed source rows, distinguishes propagated diagnostics
+from affected-module counts, and retains actual default API/CLI controls,
+realized-versus-manifest reference profiles and failed attempts.
+
 Stage A activation and shipped-CLI acceptance remain #1385/#1386. D1, Stage B,
 real arrays, general writes/flow, proof-demotion/runtime-guard changes, public
 release claims and the paused research experiment are not completed here.
