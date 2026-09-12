@@ -485,8 +485,8 @@ internal static class Program
         if (current is null)
             return IdentityGateRecord.Blocked("Current converter variant is unavailable.");
         var currentBinding = current.Binding;
-        if (current.Parse.Success != true || currentBinding?.Success != true)
-            return IdentityGateRecord.Blocked("Converted Calor did not parse and bind cleanly.");
+        if (current.Parse.Success != true || currentBinding?.BoundIdentity is null || !current.DefaultCompile.Accepted)
+            return IdentityGateRecord.Blocked("Converted Calor did not parse, expose bound identities and pass default compilation.");
 
         var echo = original.Declarations.SingleOrDefault(d => d.Name == "Echo");
         var receive = original.Declarations.SingleOrDefault(d => d.Name == "Receive");
@@ -520,6 +520,9 @@ internal static class Program
                 ["echoCalor"] = calorEcho,
                 ["receiveCalor"] = calorReceive,
                 ["boundItemTypeSymbol"] = boundItem,
+                ["independentBinderSuccess"] = currentBinding.Success,
+                ["retainedBindingDiagnostics"] = currentBinding.Diagnostics,
+                ["scope"] = "Echo/Receive declaration migration only; retained unsupported member findings are not a safety proof.",
             });
     }
 
