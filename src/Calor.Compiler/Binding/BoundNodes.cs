@@ -1960,8 +1960,20 @@ public class BoundStructuralExpression : BoundExpression
         IReadOnlyList<BoundExpression>? children = null,
         IReadOnlyDictionary<string, object?>? metadata = null,
         IReadOnlyList<BoundExpression>? deferredChildren = null,
-        NullableAnnotation typeAnnotation = NullableAnnotation.Oblivious,
-        BoundType? resultType = null)
+        NullableAnnotation typeAnnotation = NullableAnnotation.Oblivious)
+        : this(span, nodeTypeName, typeName, children, metadata, deferredChildren, typeAnnotation, null)
+    {
+    }
+
+    internal BoundStructuralExpression(
+        TextSpan span,
+        string nodeTypeName,
+        string typeName,
+        IReadOnlyList<BoundExpression>? children,
+        IReadOnlyDictionary<string, object?>? metadata,
+        IReadOnlyList<BoundExpression>? deferredChildren,
+        NullableAnnotation typeAnnotation,
+        BoundType? resultType)
         : base(span)
     {
         NodeTypeName = nodeTypeName ?? throw new ArgumentNullException(nameof(nodeTypeName));

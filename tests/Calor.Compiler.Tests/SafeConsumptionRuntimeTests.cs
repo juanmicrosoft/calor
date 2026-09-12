@@ -18,6 +18,68 @@ namespace Calor.Compiler.Tests;
 
 public sealed class SafeConsumptionRuntimeTests
 {
+    [Fact]
+    public void StructuralExpression_PreservesThePublicSevenParameterConstructor()
+    {
+        var constructor = typeof(BoundStructuralExpression).GetConstructor(
+        [
+            typeof(TextSpan), typeof(string), typeof(string), typeof(IReadOnlyList<BoundExpression>),
+            typeof(IReadOnlyDictionary<string, object?>), typeof(IReadOnlyList<BoundExpression>),
+            typeof(NullableAnnotation)
+        ]);
+        Assert.NotNull(constructor);
+        Assert.All(constructor.GetParameters().Skip(3), parameter => Assert.True(parameter.HasDefaultValue));
+        Assert.Equal(NullableAnnotation.Oblivious, constructor.GetParameters()[6].DefaultValue);
+        var value = new BoundStructuralExpression(default, "legacy", "STRING");
+        Assert.Equal(NullableAnnotation.Oblivious, Assert.IsType<NominalBoundType>(value.Type).NullableAnnotation);
+        Assert.Empty(value.Children);
+        Assert.Empty(value.DeferredChildren);
+        Assert.Empty(value.Metadata);
+        Assert.Throws<ArgumentNullException>(() => new BoundStructuralExpression(default, null!, "STRING"));
+        Assert.Throws<ArgumentNullException>(() => new BoundStructuralExpression(default, "legacy", null!));
+        Assert.Equal("", new BoundStructuralExpression(default, "legacy", "").Type.DisplayString);
+    }
+
+    [Fact]
+    public void StructuralExpression_ConsumerCompiledAgainstLegacySignatureRunsUnchanged()
+    {
+        var compiler = typeof(BoundStructuralExpression).Assembly;
+        var references = GeneratedCSharpCompiler.References
+            .Where(reference => reference is not PortableExecutableReference portable
+                || portable.FilePath != compiler.Location).ToArray();
+        var legacyReference = EmitImage($$"""
+            using System.Collections.Generic;
+            [assembly: System.Reflection.AssemblyVersion("{{compiler.GetName().Version}}")]
+            namespace Calor.Compiler.Parsing { public struct TextSpan { } }
+            namespace Calor.Compiler.Binding.BoundTypes {
+                public enum NullableAnnotation { Oblivious, NotAnnotated, Annotated }
+            }
+            namespace Calor.Compiler.Binding {
+                public abstract class BoundExpression { }
+                public class BoundStructuralExpression : BoundExpression {
+                    public BoundStructuralExpression(
+                        Calor.Compiler.Parsing.TextSpan span, string nodeTypeName, string typeName,
+                        IReadOnlyList<BoundExpression> children = null,
+                        IReadOnlyDictionary<string, object> metadata = null,
+                        IReadOnlyList<BoundExpression> deferredChildren = null,
+                        Calor.Compiler.Binding.BoundTypes.NullableAnnotation typeAnnotation =
+                            Calor.Compiler.Binding.BoundTypes.NullableAnnotation.Oblivious) { }
+                }
+            }
+            """, compiler.GetName().Name!, references);
+        var consumer = Assembly.Load(EmitImage("""
+            public static class LegacyConsumer {
+                public static object Create() =>
+                    new Calor.Compiler.Binding.BoundStructuralExpression(default, "legacy", "STRING");
+            }
+            """, "LegacyConsumer_" + Guid.NewGuid().ToString("N"),
+            references.Append(MetadataReference.CreateFromImage(legacyReference))));
+        var instance = consumer.GetType("LegacyConsumer")!.GetMethod("Create")!.Invoke(null, null);
+        var bound = Assert.IsType<BoundStructuralExpression>(instance);
+        Assert.Equal("legacy", bound.NodeTypeName);
+        Assert.Equal("STRING", bound.Type.DisplayString);
+    }
+
     [Theory]
     [InlineData("bind", false)]
     [InlineData("return", false)]
@@ -622,14 +684,18 @@ public sealed class SafeConsumptionRuntimeTests
     }
 
     private static Assembly Emit(string source)
+        => Assembly.Load(EmitImage(source, "Consumption_" + Guid.NewGuid().ToString("N"),
+            GeneratedCSharpCompiler.References));
+
+    private static byte[] EmitImage(string source, string name, IEnumerable<MetadataReference> references)
     {
-        var compilation = CSharpCompilation.Create("Consumption_" + Guid.NewGuid().ToString("N"),
-            [CSharpSyntaxTree.ParseText(source)], GeneratedCSharpCompiler.References,
+        var compilation = CSharpCompilation.Create(name,
+            [CSharpSyntaxTree.ParseText(source)], references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         using var stream = new MemoryStream();
         var result = compilation.Emit(stream);
         Assert.True(result.Success, string.Join(Environment.NewLine, result.Diagnostics));
-        return Assembly.Load(stream.ToArray());
+        return stream.ToArray();
     }
 
     private static void WithCli(string source, Action<int, string, string> assert)

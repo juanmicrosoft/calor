@@ -354,4 +354,84 @@ public sealed class SafeConsumptionTypeCheckerTests
                 diagnostic.Code == DiagnosticCode.TypeMismatch && diagnostic.Span.Line == 7);
         }
     }
+
+    [Theory]
+    [InlineData("Take", "(?? 1 2)")]
+    [InlineData("Take", "(? 1 2 3)")]
+    [InlineData("Take", "(? true §TH §C{MakeString} §/C 1)")]
+    [InlineData("Overloaded", "(?? 1 2)")]
+    [InlineData("Generic", "(?? 1 2)")]
+    [InlineData("Missing", "(?? 1 2)")]
+    [InlineData("Shadowed", "(?? 1 2)")]
+    [InlineData("Take", "§C{Missing} §A (?? 1 2) §/C")]
+    public void CallExpressions_ValidateChildrenWithoutAssumingASelectedReturnType(string target, string argument)
+    {
+        var source = $$"""
+            §M{m1:SafeConsumption}
+              §F{f1:Take:pub} (i32:value) -> i32
+                §E{}
+                §R value
+              §F{f2:MakeString:pub} () -> str
+                §E{}
+                §R "not an exception"
+              §F{f3:Overloaded:pub} (i32:value) -> i32
+                §E{}
+                §R value
+              §F{f4:Overloaded:pub} (str:value) -> str
+                §E{}
+                §R value
+              §F{f5:Generic:pub}<T> (T:value) -> T
+                §E{}
+                §R value
+              §F{f6:Probe:pub} {{(target == "Shadowed" ? "(i32:Shadowed)" : "()")}} -> i32
+                §E{throw}
+                §R §C{{{target}}} §A {{argument}} §/C
+            """;
+        var result = Check(source);
+        Assert.True(result.HasErrors);
+        var diagnostic = Assert.Single(result.Diagnostics.Errors.Where(d =>
+            d.Code == DiagnosticCode.TypeMismatch));
+        Assert.Equal(19, diagnostic.Span.Line);
+    }
+
+    [Theory]
+    [InlineData("§R §C{Take} §A (?? 1 2) §/C")]
+    [InlineData("§C{Take} §A (?? 1 2) §/C\n    §R 0")]
+    [InlineData("§B{result:i32} (?? 1 2)\n    §R result")]
+    public void InvalidCoalesce_HasTheSameOwnedDiagnosticAcrossConsumers(string body)
+    {
+        var source = $$"""
+            §M{m:M}
+              §F{take:Take:pub} (i32:value) -> i32
+                §E{}
+                §R value
+              §F{probe:Probe:pub} () -> i32
+                §E{}
+                {{body}}
+            """;
+        foreach (var result in new[] { Check(source), Program.Compile(source, "invalid-consumer.calr") })
+        {
+            var error = SingleErrorAt(result, 7);
+            Assert.Contains("Null-coalescing requires", error.Message);
+        }
+    }
+
+    [Fact]
+    public void CallArgumentPattern_DoesNotLeakIntoTheEnclosingScope()
+    {
+        var result = Check("""
+            §M{m:M}
+              §F{take:Take:pub} (bool:value) -> bool
+                §E{}
+                §R value
+              §F{probe:Probe:pub} (?str:input) -> str
+                §E{}
+                §B{result} §C{Take} §A (is input str text) §/C
+                §R text
+            """);
+        var error = Assert.Single(result.Diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.UndefinedReference, error.Code);
+        Assert.Equal(8, error.Span.Line);
+        Assert.Contains("text", error.Message);
+    }
 }

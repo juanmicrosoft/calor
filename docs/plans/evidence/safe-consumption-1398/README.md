@@ -1,6 +1,6 @@
 # Safe consumption #1398 final PRODUCT corpus diagnostic audit
 
-**Outcome:** accepted. The c43 PRODUCT corpus measurement changes only the four already-audited nullability transfer rows, and the four prior 2d6 pattern-scope regressions are restored exactly to the approved N1 baseline. I updated `bench/phase0-agent-native/binder-source-coverage.json` from the c43 regeneration and preserved the rejected 2d6 audit as historical evidence.
+**Historical c43 measurement disposition:** accepted by the original audit observer, not parent acceptance of PR #1453. That PRODUCT corpus measurement changes only four audited nullability transfer rows and restores the four prior 2d6 pattern-scope regressions to the approved N1 baseline. The original observer updated `bench/phase0-agent-native/binder-source-coverage.json` from c43 and preserved the rejected 2d6 audit. Later implementation, integration and parent-hold work is recorded separately below.
 
 ## Scope and runtime
 
@@ -137,9 +137,43 @@ coverage and propagated counts. This is not a safety/activation claim.
 runtime, actual removed diagnostic and reconstruction method. Four new joint
 controls exercise reversed named arguments through both call forms with
 fallback/throw and unsafe nullable inputs using default compilation, raw Binder,
-CLI and runtime. The final inventory is 9,049 + 75 = 9,124, with unchanged
-skips. The combined969-case selection and35 editor state cases pass, including
-the ordinary corpus ratchet. New final-head reviews and CI remain required.
+CLI and runtime. That candidate's inventory was 9,049 + 75 = 9,124, with unchanged
+skips. Its combined969-case selection and35 editor state cases passed, including
+the ordinary corpus ratchet. Its reviews/CI do not constitute parent acceptance.
+
+## Parent hold after fbfe8780
+
+The parent withheld acceptance despite two non-author ACCEPTs and 36 green
+checks at `fbfe8780`. Two concrete gaps were reproduced against that source:
+the public structural-expression constructor had replaced its seven-parameter
+CLR signature, and expression-form calls did not visit their argument expressions.
+A legacy-reference consumer actually threw `MissingMethodException`; reflection
+also confirmed that approved base `8f9891a1` exposes seven parameters while
+`fbfe8780` exposed eight. The repair retains the original public signature and
+defaults, delegating result-type override work to an internal overload.
+
+Actual API runs distinguish the child-validation gap from a newly accepted
+default program. On approved `8f9891a1`, all three invalid-coalesce forms
+(expression call, statement call, direct binding) pass the explicitly deferred
+API but fail ordinary default generated validation with `Calor1002`.
+On `fbfe8780`, expression-call arguments still pass deferred checking and fail
+default validation with `Calor1002`; statement calls and direct bindings already
+report `Calor0202` under both option sets. Thus this is incomplete coverage of
+T2's new explicit rules, not a newly introduced default public acceptance.
+Call argument expressions now share traversal before any return-model shortcut,
+including overloaded, generic, unknown and shadowed targets, without selecting
+an arbitrary signature. Fourteen new cases cover CLR signature/binary behavior,
+nested coalesce/conditional/throw checks, consumer diagnostics and scope leakage.
+
+Original held-head review records are preserved verbatim under
+[`reviews/fbfe8780`](reviews/fbfe8780/), extracted from original session events:
+received prompts, full visible responses, exact tool arguments/shell commands,
+event IDs and recorded statuses. The supplemental policy context's actual ID is
+`7340894d-8cfb-4ced-be96-96cc277239f5`; it is not an acknowledgement by the original
+adversarial reviewer. The incorrect `0275` wording remains in that original
+response, alongside the separate correction. System messages and hidden reasoning
+are not exported, and missing shell-exit markers are not reconstructed.
+Fresh full reviews and actual CI are required for the repaired head.
 
 ## Measured totals (original c43 audit)
 
@@ -194,4 +228,10 @@ The rejected 2d6 measurement is not relabeled as final c43 evidence. It is prese
 
 ## Limitations
 
-This artifact is implementation evidence assistance, not the final independent review. The final accepted source-coverage update is scoped to the c43 measurement only; the earlier 2d6 blanket acceptance remains rejected historical evidence. No compiler, tests, source policy, manifests, scoping, release, website, changelog, commits, or pushes were changed.
+The original c43 observer contribution was implementation evidence assistance,
+not the final independent review or parent PR acceptance. That observer's accepted
+source-coverage update was scoped to c43; the earlier 2d6 blanket acceptance remains
+rejected historical evidence. Only for that original observer contribution: no
+compiler, tests, source policy, manifests, scoping, release, website, changelog,
+commits or pushes were changed. The implementer subsequently updated this artifact
+and changed code, tests, inventories, commits and pushes as described above.

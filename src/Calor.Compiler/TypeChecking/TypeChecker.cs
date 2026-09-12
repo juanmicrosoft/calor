@@ -321,8 +321,11 @@ public sealed class TypeChecker
     }
 
     private void CheckCallStatement(CallStatementNode call)
+        => CheckCallArguments(call.Arguments);
+
+    private void CheckCallArguments(IReadOnlyList<ExpressionNode> arguments)
     {
-        foreach (var arg in call.Arguments)
+        foreach (var arg in arguments)
         {
             InferExpressionType(arg);
         }
@@ -1125,6 +1128,7 @@ public sealed class TypeChecker
 
     private CalorType InferCallExpressionType(CallExpressionNode call)
     {
+        CheckCallArguments(call.Arguments);
         // This environment retains one signature, not the selected overload or
         // generic substitution. Never mistake its last declaration for that result.
         if (_unmodeledCallReturns.Contains(call.Target) || _env.LookupVariable(call.Target) != null)

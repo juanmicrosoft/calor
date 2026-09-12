@@ -2836,7 +2836,9 @@ public sealed class Binder
             nameof(NullCoalesceNode),
             resultName,
             [left, right],
+            metadata: null,
             deferredChildren: [right],
+            typeAnnotation: BoundTypes.NullableAnnotation.Oblivious,
             resultType: ExpressionResultTypes.Coalesce(resultName, left.Type, right.Type));
     }
 
