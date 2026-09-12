@@ -8,6 +8,37 @@ delivery or release promise. Two non-author final-head contexts and parent
 adjudication are required; separate AI contexts are not human or statistically
 independent review.
 
+## Current scope and integration gate —2026-09-12
+
+After product-only0.21 publication, the parent explicitly resumed this existing
+N3 slot and accepted the array split in live #1082/#1382/#1444/#1402. #1382 owns
+selected-overload mapping, supplied-argument attribution, statement/expression
+parity and normal-versus-expanded params targets. Real source-array annotation
+transfer and independent container/element predicates remain required by #1444,
+inside0.22, depending on #1397/#1382 and blocking #1402. This resolves the proposed
+split for planning/review; it neither closes N3 nor establishes array safety.
+
+Current work is planning/capacity documentation only. Code integration waits for
+the parent-provided accepted T1 merge SHA; then merge actual main without rewriting
+measurement ancestry, reconcile shared interfaces and actual catalog/manifest/
+corpus results, and obtain fresh final-head reviews and CI. Preserve released0.21
+and the separately merged MediatR test-collection isolation/configuration controls.
+The reported pre-existing E1 recovery-diagnostic test167 failure on both released
+bases is not an N3 fix or safe result; any encounter must retain its actual outcome.
+
+Refreshed integration and adversarial contexts must independently assess the
+explicit split and real mapping coverage. Stage A remains scalar STRING only:
+an expanded supplied scalar argument must have its effective scalar receiving
+shape, not be classified as a normal array target or activate arrays indirectly.
+All0272/0273/0274 remain AnalysisOnly in this slice.
+
+The same AI owner accepts the separately bounded future M slot for #1444:
+known supported array rank/container/element transfer through declared
+parameters/locals and native/BCL method inputs. Behavior starts only after
+#1397/N3 acceptance and a separate parent instruction, on a separate branch/PR.
+No initialization/return-policy expansion, general-flow redesign or activation
+is included. The provisional checkpoint/reviewSep12 is not a delivery promise.
+
 ## Data flow
 
 `Scope.TryMatch` retains the **winning existing map** and its effective parameter
@@ -48,9 +79,15 @@ The source-site catalog changes from33 to32 routes at this base because two
 argument emitters become one. The catalog's18 codes and disposition rules do not
 change. #1397's independently developed275 must be reconciled if it merges.
 
-## Executable controls
+## Historical executable controls — `47c651b4`
 
-The76 new compiler cases and2 editor cases use existing runners and maintenance
+The results in this section belong to `47c651b477640d9b87e285cbe5026b530d71e17d`
+against `be488238d3aac374995174aa47526c7f3d09fd51`, before released0.21/T1
+integration. Its two non-author reviews and36 successful CI checks remain
+historical, not approval or measurements of a later integrated candidate.
+Existing audit identities, failures and test counts are retained unchanged.
+
+The76 added compiler cases and2 editor cases use existing runners and maintenance
 files; no benchmark framework, product C# path exemption or test tool was added.
 
 | Control | Evidence |
@@ -122,7 +159,7 @@ The correction adds twelve cases and does not change taint rules. Earlier
 no-finding reviews do not waive this later finding; fresh final-head reviews and
 CI are required again.
 
-## Explicit limits and acceptance gap
+## Explicit limits and retained array work
 
 Mapping a normal array is **not** the same as checking an expanded element.
 The selected metadata map preserves array-container and element annotations,
@@ -139,11 +176,13 @@ and the existing element predicate consumes the bounded array target. However:
 Therefore normal-array mapping/safe controls do **not** establish rejection of
 every nullable array-container or nullable-element source. That precise gap needs
 a separately bounded annotation/predicate repair and production negatives before
-Stage B ([bounded proposed split #1444](https://github.com/juanmicrosoft/calor/issues/1444),
-coordinated with #1380/#1381/#1402); it must not be waived or labeled green. If #1382's
-container wording requires that repair here, full issue closure is blocked until
-the parent adjudicates the split or accepts the additional scope. This document
-does not silently weaken the acceptance criteria.
+Stage B ([accepted bounded split #1444](https://github.com/juanmicrosoft/calor/issues/1444),
+coordinated with #1380/#1381/#1402); it must not be waived or labeled green.
+The parent's2026-09-12 disposition retains that work inside0.22 rather than
+requiring its implementation in the mapping PR. N3 closure still needs refreshed
+independent review of the explicit split and actual mapping delivery, successful
+integrated-head CI and parent adjudication. Full Stage B/milestone completion
+remains blocked until #1444 and the other prerequisites pass.
 
 A runtime-order fixture using a nested nullable reference initially hit the
 existing Option/type-applicability failure. Its failure is retained; the executable
