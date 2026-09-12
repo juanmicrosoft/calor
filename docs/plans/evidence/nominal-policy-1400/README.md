@@ -17,12 +17,15 @@ Stage B from the full 0.22 scope.
 [Measurement and source-artifact design](current-candidate/PLAN.md) specifies
 the actual-current versus isolated conservative-shadow comparison, resolved
 identity/reference/map evidence, denominators, migration controls and review
-gates. This is **design only**: no new behavioral patch or measurement has run.
+gates. Source preparation is now in progress; no new fallout results are
+claimed by this source checkpoint.
 
-Behavioral work is blocked until the parent supplies accepted merge pins for
-both N2 #1381 and N3 #1382. The issue branch will then normal-merge actual main,
-retain its measured ancestors and record new immutable candidates. Unmerged
-candidate APIs or evidence are not imported as production facts.
+The parent supplied accepted N2 `63220eab` and N3/main `8f9891a1` and explicitly
+started measurement on 2026-09-12T05:52:23-04:00. The issue branch normal-merged
+that actual main as `791e4f44`, retaining its measured ancestors. The new
+non-shipping [compiler](current-candidate/source/compiler/README.md) and
+[migration](current-candidate/source/migration/README.md) source archives are
+pinned before execution. No future-child or unmerged behavior is assumed.
 
 Capacity was [recorded before behavior](https://github.com/juanmicrosoft/calor/issues/1400#issuecomment-5644506295)
 and in N0's current D1 row: Copilot / GPT-6 Astra,

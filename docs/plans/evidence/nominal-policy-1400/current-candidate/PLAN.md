@@ -1,14 +1,16 @@
 # D1 current-candidate measurement and source-artifact design
 
-**Design checkpoint:** 2026-09-12. **Execution status:** blocked on
-parent-provided accepted N2 #1381 and N3 #1382 merge pins.
+**Design checkpoint:** 2026-09-12. **Execution status:** parent STARTed at
+2026-09-12T05:52:23-04:00 after accepted N2 `63220eab` and N3/main `8f9891a1`.
+Both pins are retained by normal integration `791e4f44`.
 **Owner:** Copilot / GPT-6 Astra, `nominal-policy-1400`,
 `ada009ab-5eb3-41ac-82cc-68fa9b4e158a`, existing #1400 / #1450.
 **Capacity:** one bounded M continuation, accepted
 2026-09-12T03:36:50-04:00; recorded before behavior in
 [the issue](https://github.com/juanmicrosoft/calor/issues/1400#issuecomment-5644506295)
 and N0. Provisional checkpoint/two-review target 2026-09-12 depends on those
-merges. No new behavioral prototype, candidate binary or measurement exists.
+merges. Compiler/migration source archives are being pinned before execution;
+this plan is not a result record.
 
 ## 1. Question and bounded scope
 
@@ -286,8 +288,8 @@ unchanged, including capture-time unknowns and missing original TRXs.
 
 ## 9. Stop conditions, review and parent decision
 
-The immediate blocker is missing parent-provided accepted N2/N3 merge pins.
-After those arrive, independently unavailable private profiles, actual selected
+The initial N2/N3 merge-pin blocker was cleared by the parent's explicit START.
+Independently unavailable private profiles, actual selected
 maps, source origins, generator context or faithful migration can block exact
 rows or the recommendation. Report the concrete affected set and dependency;
 do not absorb another implementation slot or declare Stage B permanently
