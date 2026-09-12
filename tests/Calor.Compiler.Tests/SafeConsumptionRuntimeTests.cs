@@ -392,6 +392,55 @@ public sealed class SafeConsumptionRuntimeTests
         Assert.IsType<Exception>(error.InnerException);
     }
 
+    [Fact]
+    public void NominalConditional_ThroughInferredLocalsRetainsTheActualSelectedValue()
+    {
+        foreach (var rightType in new[] { "Foo", "?Foo" })
+        {
+            var source = $$"""
+                §M{m1:Consumption}
+                  §CL{c1:Foo:pub}
+                    §FLD{i32:value:pub}
+                  §F{f1:Probe:pub} (bool:choose, Foo:left, {{rightType}}:right) -> {{rightType}}
+                    §E{}
+                    §B{first} (? choose left right)
+                    §B{second} first
+                    §R second
+                """;
+            var result = Program.Compile(source, "conditional-local-consumption.calr");
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            var assembly = Emit(result.GeneratedCode);
+            var value = Activator.CreateInstance(assembly.GetType("Consumption.Foo")!);
+            var right = rightType == "?Foo" ? null : value;
+            var method = assembly.GetType("Consumption.ConsumptionModule")!.GetMethod("Probe")!;
+            Assert.Same(value, method.Invoke(null, [true, value, right]));
+            Assert.Same(right, method.Invoke(null, [false, value, right]));
+        }
+    }
+
+    [Fact]
+    public void ConvertedTypedPattern_PreservesNonNullCallAndReturnConsumers()
+    {
+        var conversion = new CSharpToCalorConverter().Convert("""
+            #nullable enable
+            public static class ConvertedPattern {
+                public static string Take(string value) => value;
+                public static string Probe(object? input) =>
+                    input switch { string text => Take(text), _ => "fallback" };
+            }
+            """);
+        Assert.True(conversion.Success);
+        Assert.NotNull(conversion.CalorSource);
+        var (_, diagnostics) = Bind(conversion.CalorSource);
+        Assert.DoesNotContain(diagnostics, IsNullableDiagnostic);
+        var result = Program.Compile(conversion.CalorSource, "converted-pattern.calr");
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        var method = Emit(result.GeneratedCode).GetTypes().Single(type => type.Name == "ConvertedPattern").GetMethod("Probe")!;
+        Assert.Equal("value", method.Invoke(null, ["value"]));
+        Assert.Equal("fallback", method.Invoke(null, [null]));
+        Assert.Equal("fallback", method.Invoke(null, [42]));
+    }
+
     private static string Source(string consumer, string expression, string? extraParameter = null)
     {
         var body = consumer switch

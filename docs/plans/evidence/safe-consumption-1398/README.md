@@ -30,8 +30,17 @@ function's return type: they remain unmodeled in this checker until selected-cal
 information is available. An overloaded exception-factory runtime control pins
 that boundary without changing N3's call resolution.
 
-There are now 52 new compiler cases, so the inventory is 8,856 -> 8,908;
-the original 42-case candidate and the 44-case second candidate are historical, not relabeled.
+The pre-N2 candidate added 52 compiler cases (8,856 -> 8,908).
+Approved N2 main `63220eab` was then merged into the issue branch without
+rebasing. Its 101 compiler cases and all other evidence/configuration are
+preserved. Two N2 tests had explicitly characterized nominal conditionals as
+unmodeled; T2 now models these actual known branch identities, so the tests
+assert the resulting non-null/nullable annotations instead. A runtime control
+confirms the selected value, including null, through both inferred locals.
+An actual C# typed-pattern conversion also exercises non-null call and return
+consumers on string, null and unmatched inputs; no converter repair is needed.
+The combined inventory is 8,957 + 54 T2 cases = 9,011, with unchanged skips.
+The original 42-case and 44-case candidates remain historical, not relabeled.
 Final-head review and CI records live on the PR. The source-specific corpus
 measurements below remain pinned to their actual c43 and rejected 2d heads.
 
