@@ -3262,6 +3262,7 @@ public sealed class Binder
 
         if (symbols.Count == 0)
         {
+            BoundExpression? unresolvedMember = null;
             // The lexer also accepts a dotted reference as one token. Route the
             // resolved external form through the same member binder as explicit dots.
             var lastDot = refNode.Name.LastIndexOf('.');
@@ -3279,8 +3280,11 @@ public sealed class Binder
                     var memberSpan = new Parsing.TextSpan(
                         refNode.Span.Start + lastDot + 1, refNode.Name.Length - lastDot - 1,
                         refNode.Span.Line, refNode.Span.Column + lastDot + 1);
-                    return BindFieldAccess(new FieldAccessNode(
+                    var member = BindFieldAccess(new FieldAccessNode(
                         refNode.Span, receiverNode, refNode.Name[(lastDot + 1)..], memberSpan), receiver);
+                    if (member.Type is not BoundTypes.UnresolvedBoundType)
+                        return member;
+                    unresolvedMember = member;
                 }
             }
 
@@ -3306,6 +3310,8 @@ public sealed class Binder
                 _diagnostics.ReportError(refNode.Span, DiagnosticCode.UndefinedReference,
                     $"Undefined variable '{refNode.Name}'");
             }
+            if (unresolvedMember is not null)
+                return unresolvedMember;
             // Return a dummy variable to continue analysis
             return new BoundVariableExpression(
                 refNode.Span,

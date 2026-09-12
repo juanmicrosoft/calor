@@ -145,6 +145,7 @@ public class BclMemberAnnotationTests(ITestOutputHelper output)
         Assert.Null(member.ResolvedMetadataMember);
         var diagnostic = Assert.Single(diagnostics.Where(d => d.Code == DiagnosticCode.SignatureUnresolved));
         Assert.Contains(reason, diagnostic.Message);
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.UndefinedReference);
     }
 
     [Theory]
