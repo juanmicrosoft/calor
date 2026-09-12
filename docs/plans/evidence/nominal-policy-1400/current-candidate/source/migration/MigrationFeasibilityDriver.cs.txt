@@ -1,0 +1,1511 @@
+#nullable enable
+
+using System.Collections;
+using System.Collections.Immutable;
+using System.Reflection;
+using System.Runtime.Loader;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Calor.Compiler.Ast;
+using Calor.Compiler.Binding;
+using Calor.Compiler.Binding.BoundTypes;
+using Calor.Compiler.CodeGen;
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Migration;
+using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using CalorProgram = Calor.Compiler.Program;
+using CalorDiagnostic = Calor.Compiler.Diagnostics.Diagnostic;
+using RoslynDiagnostic = Microsoft.CodeAnalysis.Diagnostic;
+using Binder = Calor.Compiler.Binding.Binder;
+using CompilationOptions = Calor.Compiler.CompilationOptions;
+
+internal static class Program
+{
+    private const string Schema = "calor.issue1400.nominal-policy.migration-feasibility.source.v1";
+    private const string FixtureNamespace = "MigrationFeasibility.NominalPolicy1400";
+    private const string ItemMetadataName = FixtureNamespace + ".Item";
+    private const string NativeSurfaceMetadataName = FixtureNamespace + ".NativeSurface";
+    private const string DownstreamMetadataName = FixtureNamespace + ".Downstream";
+    private const string RuntimeProbeMethodName = "RunAll";
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
+
+    public static int Main(string[] args)
+    {
+        EvidenceReport? report = null;
+        try
+        {
+            var options = DriverOptions.Parse(args);
+            report = Execute(options);
+            WriteReport(report, options.OutputPath);
+            return report.HardFailures.Count == 0 ? 0 : 2;
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            report ??= new EvidenceReport { Schema = Schema, GeneratedAtUtc = DateTimeOffset.UtcNow };
+            report.HardFailures.Add(new FailureRecord("driver-unhandled-exception", ex.GetType().FullName ?? ex.GetType().Name, ex.ToString()));
+            WriteReport(report, DriverOptions.TryGetOutputPath(args));
+            return 1;
+        }
+    }
+
+    private static EvidenceReport Execute(DriverOptions options)
+    {
+        var report = new EvidenceReport
+        {
+            Schema = Schema,
+            GeneratedAtUtc = DateTimeOffset.UtcNow,
+            ConfigurationLabel = options.ConfigurationLabel,
+            Inputs = new InputRecord(
+                CalorRoot: Path.GetFullPath(options.CalorRoot),
+                OriginalCSharpSha256: Sha256Text(FixtureSources.NativeReferencePassthrough),
+                OriginalCSharp: FixtureSources.NativeReferencePassthrough,
+                ExternalRuntimeHarness: FixtureSources.RuntimeHarness,
+                ExternalRuntimeHarnessSha256: Sha256Text(FixtureSources.RuntimeHarness),
+                ExpectedFileHashes: options.ExpectedFileHashes),
+            Driver = DriverRecord.Capture(),
+            SourceContext = CaptureSourceContext(options),
+            ReferenceProfile = CaptureReferenceProfile(),
+        };
+
+        ValidateExpectedSourceHashes(report, options);
+
+        var originalRoslyn = AnalyzeOriginalRoslyn(FixtureSources.NativeReferencePassthrough);
+        report.OriginalRoslyn = originalRoslyn;
+        var originalRuntime = CompileAndRunCSharp("original-csharp", FixtureSources.NativeReferencePassthrough, expectRuntimeShape: true);
+        report.OriginalRuntime = originalRuntime;
+        if (!originalRuntime.RoslynEmitSuccess || !originalRuntime.RuntimeExpectationSatisfied)
+        {
+            report.HardFailures.Add(new FailureRecord(
+                "original-runtime",
+                "Original C# fixture did not compile/run as expected.",
+                JsonSerializer.Serialize(originalRuntime, JsonOptions)));
+        }
+
+        var conversion = ConvertOriginal();
+        report.Conversion = conversion;
+
+        CalorVariantRecord? currentVariant = null;
+        if (conversion.CalorSource is not null)
+        {
+            currentVariant = AnalyzeCalorVariant("current-converter", conversion.CalorSource, expectRuntimeShape: false);
+            report.CurrentVariant = currentVariant;
+            report.CurrentConverterClassification = ClassifyCurrentConverter(originalRoslyn, currentVariant);
+        }
+        else
+        {
+            report.CurrentConverterClassification = new ConverterClassification(
+                HasConvertedCalor: false,
+                NativeDeclarationCount: 0,
+                InteropDeclarationCount: 0,
+                EchoParameterDeclaredNullable: null,
+                EchoReturnDeclaredNullable: null,
+                FaithfulCandidateMayBeAttempted: false,
+                Reason: "Current converter returned no Calor source; candidate AST representation is blocked.");
+        }
+
+        var identityGate = BuildIdentityGate(originalRoslyn, conversion, currentVariant);
+        report.IdentityGate = identityGate;
+
+        if (identityGate.CanAttemptFaithfulCandidate && conversion.CalorSource is not null)
+        {
+            var faithfulCandidate = TryBuildNullableCandidate(conversion.CalorSource, identityGate);
+            report.FaithfulCandidate = faithfulCandidate;
+            if (faithfulCandidate.CandidateCalorSource is not null)
+            {
+                var faithfulVariant = AnalyzeCalorVariant(
+                    "fixture-specific-nullable-reference-candidate",
+                    faithfulCandidate.CandidateCalorSource,
+                    expectRuntimeShape: true);
+                report.FaithfulVariant = faithfulVariant;
+                if (!faithfulVariant.DefaultCompile.Accepted || faithfulVariant.Runtime?.RuntimeExpectationSatisfied != true)
+                {
+                    var reason = "Candidate did not compile and run with expected null/present identity behavior under default Program.Compile.";
+                    faithfulCandidate = faithfulCandidate with
+                    {
+                        Status = "failed",
+                        FailureReason = reason,
+                    };
+                    report.FaithfulCandidate = faithfulCandidate;
+                    report.HardFailures.Add(new FailureRecord(
+                        "faithful-candidate-runtime",
+                        reason,
+                        JsonSerializer.Serialize(faithfulVariant, JsonOptions)));
+                }
+                else
+                {
+                    faithfulCandidate = faithfulCandidate with { Status = "passed-fixture-only" };
+                    report.FaithfulCandidate = faithfulCandidate;
+                }
+            }
+        }
+        else
+        {
+            report.FaithfulCandidate = FaithfulCandidateRecord.Skipped(identityGate.BlockingReason ?? "Identity gate failed.");
+        }
+
+        if (report.FaithfulCandidate?.Status != "passed-fixture-only")
+        {
+            var rawInteropFallback = BuildRawInteropFallback();
+            report.RawInteropFallback = rawInteropFallback;
+            var rawInteropVariant = AnalyzeCalorVariant(
+                "explicit-raw-csharp-interop-fallback",
+                rawInteropFallback.CalorSource,
+                expectRuntimeShape: true);
+            report.RawInteropVariant = rawInteropVariant;
+            if (!rawInteropVariant.DefaultCompile.Accepted || rawInteropVariant.Runtime?.RuntimeExpectationSatisfied != true)
+            {
+                report.HardFailures.Add(new FailureRecord(
+                    "raw-interop-fallback-runtime",
+                    "Explicit §CSHARP fallback did not preserve expected fixture behavior.",
+                    JsonSerializer.Serialize(rawInteropVariant, JsonOptions)));
+            }
+        }
+
+        report.Overall = Summarize(report);
+        return report;
+    }
+
+    private static ConversionRecord ConvertOriginal()
+    {
+        var options = new ConversionOptions
+        {
+            ModuleName = "NominalReferenceMigrationFixture",
+            Fidelity = ConversionFidelity.Lossless,
+            AutoGenerateIds = true,
+            GracefulFallback = true,
+            ValidateRoundTripCSharp = true,
+            OutputKind = OutputKind.DynamicallyLinkedLibrary,
+            ParseOptions = CSharpParseOptions.Default
+                .WithLanguageVersion(LanguageVersion.Preview)
+                .WithDocumentationMode(DocumentationMode.Parse),
+        };
+        var converter = new CSharpToCalorConverter(options);
+        var result = converter.Convert(FixtureSources.NativeReferencePassthrough, "NativeReferenceMigrationFixture.cs");
+        return new ConversionRecord(
+            Success: result.Success,
+            CalorSource: result.CalorSource,
+            CalorSha256: result.CalorSource is null ? null : Sha256Text(result.CalorSource),
+            Issues: result.Issues.Select(i => new ConversionIssueRecord(i.Severity.ToString(), i.Message, i.Feature, i.Line, i.Column)).ToList(),
+            Losses: result.Losses.Select(l => l.ToString()).ToList(),
+            NativeConversionCount: result.NativeConversionCount,
+            InteropPreservationCount: result.InteropPreservationCount,
+            LossySubstitutionCount: result.LossySubstitutionCount,
+            DropCount: result.DropCount,
+            DurationMilliseconds: result.Duration.TotalMilliseconds);
+    }
+
+    private static CalorVariantRecord AnalyzeCalorVariant(string name, string calorSource, bool expectRuntimeShape)
+    {
+        var parse = ParseCalor(calorSource);
+        BindingRecord? binding = null;
+        if (parse.Module is not null)
+            binding = BindCalor(parse.Module, $"{name}.calr");
+
+        var defaultCompile = CompileCalor(name, calorSource, enforceEffects: true);
+        CompileRecord? effectsDisabled = null;
+        if (!defaultCompile.Accepted && defaultCompile.Diagnostics.Any(d => d.Code.StartsWith("Calor04", StringComparison.Ordinal)))
+            effectsDisabled = CompileCalor(name + "-effects-disabled", calorSource, enforceEffects: false);
+
+        RuntimeRecord? runtime = null;
+        var runtimeSource = defaultCompile.Accepted
+            ? defaultCompile.GeneratedCSharp
+            : effectsDisabled?.Accepted == true ? effectsDisabled.GeneratedCSharp : null;
+        if (runtimeSource is not null)
+        {
+            runtime = CompileAndRunCSharp(
+                name,
+                runtimeSource,
+                expectRuntimeShape,
+                runtimeSourceKind: defaultCompile.Accepted ? "default-Program.Compile" : "effects-disabled-Program.Compile");
+        }
+
+        return new CalorVariantRecord(
+            Name: name,
+            CalorSource: calorSource,
+            CalorSha256: Sha256Text(calorSource),
+            NativeCoverage: parse.Module is null ? null : CaptureNativeCoverage(parse.Module),
+            Parse: parse.ToRecord(),
+            Binding: binding,
+            DefaultCompile: defaultCompile,
+            EffectsDisabledCompile: effectsDisabled,
+            Runtime: runtime);
+    }
+
+    private static ParseAttempt ParseCalor(string calorSource)
+    {
+        var diagnostics = new DiagnosticBag();
+        diagnostics.SetFilePath("candidate.calr");
+        try
+        {
+            var lexer = new Lexer(calorSource, diagnostics);
+            var tokens = lexer.TokenizeAllForParser();
+            if (diagnostics.HasErrors)
+                return new ParseAttempt(null, Diagnostics(diagnostics), null);
+            var parser = new Parser(tokens, diagnostics);
+            var module = parser.Parse();
+            return new ParseAttempt(module, Diagnostics(diagnostics), null);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return new ParseAttempt(null, Diagnostics(diagnostics), ExceptionRecord.From(ex));
+        }
+    }
+
+    private static BindingRecord BindCalor(ModuleNode module, string sourceIdentity)
+    {
+        var diagnostics = new DiagnosticBag();
+        diagnostics.SetFilePath(sourceIdentity);
+        try
+        {
+            var binder = new Binder(diagnostics, sourceIdentity);
+            var bound = binder.Bind(module);
+            return new BindingRecord(
+                Success: !diagnostics.HasErrors,
+                Diagnostics: Diagnostics(diagnostics),
+                BinderMetadataProfile: CaptureBinderMetadataProfile(binder),
+                BoundIdentity: CaptureBoundIdentity(bound),
+                Exception: null);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return new BindingRecord(
+                Success: false,
+                Diagnostics: Diagnostics(diagnostics),
+                BinderMetadataProfile: null,
+                BoundIdentity: null,
+                Exception: ExceptionRecord.From(ex));
+        }
+    }
+
+    private static CompileRecord CompileCalor(string name, string calorSource, bool enforceEffects)
+    {
+        try
+        {
+            var result = CalorProgram.Compile(
+                calorSource,
+                name + ".calr",
+                new CompilationOptions
+                {
+                    EnforceEffects = enforceEffects,
+                    StatusWriter = TextWriter.Null,
+                });
+            return new CompileRecord(
+                Label: enforceEffects ? "default" : "effects-disabled",
+                EnforceEffects: enforceEffects,
+                Accepted: !result.HasErrors && !string.IsNullOrWhiteSpace(result.GeneratedCode),
+                Diagnostics: Diagnostics(result.Diagnostics),
+                GeneratedCSharp: string.IsNullOrWhiteSpace(result.GeneratedCode) ? null : result.GeneratedCode,
+                GeneratedCSharpSha256: string.IsNullOrWhiteSpace(result.GeneratedCode) ? null : Sha256Text(result.GeneratedCode),
+                Exception: null);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return new CompileRecord(
+                Label: enforceEffects ? "default" : "effects-disabled",
+                EnforceEffects: enforceEffects,
+                Accepted: false,
+                Diagnostics: [],
+                GeneratedCSharp: null,
+                GeneratedCSharpSha256: null,
+                Exception: ExceptionRecord.From(ex));
+        }
+    }
+
+    private static RuntimeRecord CompileAndRunCSharp(
+        string name,
+        string csharpSource,
+        bool expectRuntimeShape,
+        string runtimeSourceKind = "original-csharp")
+    {
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+        var tree = CSharpSyntaxTree.ParseText(csharpSource, parseOptions, $"{name}.cs", Encoding.UTF8);
+        var runtimeHarness = CSharpSyntaxTree.ParseText(FixtureSources.RuntimeHarness, parseOptions, "ExternalRuntimeHarness.cs", Encoding.UTF8);
+        var syntaxDiagnostics = tree.GetDiagnostics().Concat(runtimeHarness.GetDiagnostics())
+            .Where(IsRoslynError).Select(RoslynDiagnosticRecord.From).ToList();
+        var compilation = CSharpCompilation.Create(
+            "NominalMigrationFixture_" + SanitizeAssemblyName(name) + "_" + Guid.NewGuid().ToString("N"),
+            [tree, runtimeHarness],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                allowUnsafe: true,
+                nullableContextOptions: NullableContextOptions.Enable));
+
+        using var image = new MemoryStream();
+        var emit = compilation.Emit(image);
+        var emitDiagnostics = emit.Diagnostics.Where(IsRoslynError).Select(RoslynDiagnosticRecord.From).ToList();
+        if (syntaxDiagnostics.Count > 0 || !emit.Success)
+        {
+            return new RuntimeRecord(
+                SourceKind: runtimeSourceKind,
+                InputCSharpSha256: Sha256Text(csharpSource),
+                RoslynEmitSuccess: false,
+                SyntaxDiagnostics: syntaxDiagnostics,
+                EmitDiagnostics: emitDiagnostics,
+                EntryPointFound: false,
+                Runtime: null,
+                RuntimeExpectationSatisfied: !expectRuntimeShape,
+                Exception: null);
+        }
+
+        try
+        {
+            image.Position = 0;
+            var alc = new AssemblyLoadContext("NominalMigrationFixture_" + Guid.NewGuid().ToString("N"), isCollectible: true);
+            try
+            {
+                var assembly = alc.LoadFromStream(image);
+                var method = assembly.GetTypes()
+                    .Select(type => type.GetMethod(RuntimeProbeMethodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
+                    .SingleOrDefault(method => method is not null && method.GetParameters().Length == 0);
+                if (method is null)
+                {
+                    return new RuntimeRecord(runtimeSourceKind, Sha256Text(csharpSource), true, syntaxDiagnostics, emitDiagnostics, false, null, !expectRuntimeShape, null);
+                }
+
+                object? returned;
+                try
+                {
+                    returned = method.Invoke(null, null);
+                }
+                catch (TargetInvocationException tie) when (tie.InnerException is not null)
+                {
+                    return new RuntimeRecord(
+                        runtimeSourceKind,
+                        Sha256Text(csharpSource),
+                        true,
+                        syntaxDiagnostics,
+                        emitDiagnostics,
+                        true,
+                        null,
+                        false,
+                        ExceptionRecord.From(tie.InnerException));
+                }
+
+                var values = CapturePublicValues(returned);
+                var expectation = !expectRuntimeShape || RuntimeShapeSatisfied(values);
+                return new RuntimeRecord(runtimeSourceKind, Sha256Text(csharpSource), true, syntaxDiagnostics, emitDiagnostics, true, values, expectation, null);
+            }
+            finally
+            {
+                alc.Unload();
+            }
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return new RuntimeRecord(runtimeSourceKind, Sha256Text(csharpSource), true, syntaxDiagnostics, emitDiagnostics, true, null, false, ExceptionRecord.From(ex));
+        }
+    }
+
+    private static OriginalRoslynRecord AnalyzeOriginalRoslyn(string source)
+    {
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
+        var tree = CSharpSyntaxTree.ParseText(source, parseOptions, "NativeReferenceMigrationFixture.cs", Encoding.UTF8);
+        var compilation = CSharpCompilation.Create(
+            "OriginalDeclarationIdentity",
+            [tree],
+            GeneratedCSharpCompiler.References,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Disable));
+        var model = compilation.GetSemanticModel(tree, ignoreAccessibility: true);
+        var root = tree.GetCompilationUnitRoot();
+        var item = compilation.GetTypeByMetadataName(ItemMetadataName);
+        var native = compilation.GetTypeByMetadataName(NativeSurfaceMetadataName);
+        var downstream = compilation.GetTypeByMetadataName(DownstreamMetadataName);
+
+        var declarations = new List<RoslynDeclarationRecord>();
+        if (item is not null)
+            declarations.Add(RoslynDeclarationRecord.FromType(item, model, root));
+        foreach (var methodName in new[] { "Echo", "MakeFresh" })
+            declarations.Add(CaptureMethod(native, methodName, item, model, root));
+        foreach (var methodName in new[] { "Receive", "ReadLabelLength" })
+            declarations.Add(CaptureMethod(downstream, methodName, item, model, root));
+
+        var diagnostics = compilation.GetDiagnostics().Where(IsRoslynError).Select(RoslynDiagnosticRecord.From).ToList();
+        return new OriginalRoslynRecord(
+            CompilationSuccess: diagnostics.Count == 0,
+            Diagnostics: diagnostics,
+            ItemSymbol: item is null ? null : RoslynSymbolRecord.From(item),
+            Declarations: declarations);
+    }
+
+    private static RoslynDeclarationRecord CaptureMethod(INamedTypeSymbol? container, string methodName, INamedTypeSymbol? item, SemanticModel model, CompilationUnitSyntax root)
+    {
+        if (container is null)
+            return RoslynDeclarationRecord.Missing(methodName, "container type missing");
+        var method = container.GetMembers(methodName).OfType<IMethodSymbol>().SingleOrDefault();
+        if (method is null)
+            return RoslynDeclarationRecord.Missing(methodName, "method missing");
+        var syntax = method.DeclaringSyntaxReferences.Select(r => r.GetSyntax()).OfType<MethodDeclarationSyntax>().SingleOrDefault();
+        var returnMatchesItem = item is not null && SymbolEqualityComparer.Default.Equals(method.ReturnType, item);
+        var parameters = method.Parameters.Select(parameter => new RoslynParameterRecord(
+            parameter.Name,
+            parameter.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            parameter.Type.NullableAnnotation.ToString(),
+            item is not null && SymbolEqualityComparer.Default.Equals(parameter.Type, item),
+            parameter.DeclaringSyntaxReferences.Select(r => r.GetSyntax()).OfType<ParameterSyntax>().SingleOrDefault() is { } ps
+                ? model.GetNullableContext(ps.Type?.SpanStart ?? ps.SpanStart).ToString()
+                : "unavailable",
+            parameter.DeclaringSyntaxReferences.Select(r => r.GetSyntax()).OfType<ParameterSyntax>().SingleOrDefault()?.Type is NullableTypeSyntax)).ToList();
+        return new RoslynDeclarationRecord(
+            Kind: "method",
+            Name: methodName,
+            MetadataName: method.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + "." + method.MetadataName,
+            NullableContextAtDeclaration: syntax is null ? "unavailable" : model.GetNullableContext(syntax.SpanStart).ToString(),
+            SyntaxTypeText: syntax?.ReturnType.ToString(),
+            SyntaxTypeIsNullable: syntax?.ReturnType is NullableTypeSyntax,
+            Symbol: RoslynSymbolRecord.From(method),
+            ReturnType: new RoslynTypeRecord(
+                method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                method.ReturnType.NullableAnnotation.ToString(),
+                returnMatchesItem,
+                syntax is null ? "unavailable" : model.GetNullableContext(syntax.ReturnType.SpanStart).ToString(),
+                syntax?.ReturnType is NullableTypeSyntax),
+            Parameters: parameters,
+            MissingReason: null);
+    }
+
+    private static IdentityGateRecord BuildIdentityGate(OriginalRoslynRecord original, ConversionRecord conversion, CalorVariantRecord? current)
+    {
+        if (!original.CompilationSuccess)
+            return IdentityGateRecord.Blocked("Original Roslyn fixture did not compile.");
+        if (original.ItemSymbol is null)
+            return IdentityGateRecord.Blocked("Original Item symbol is unavailable.");
+        if (conversion.CalorSource is null)
+            return IdentityGateRecord.Blocked("No converted Calor source is available.");
+        if (current is null)
+            return IdentityGateRecord.Blocked("Current converter variant is unavailable.");
+        var currentBinding = current.Binding;
+        if (current.Parse.Success != true || currentBinding?.BoundIdentity is null || !current.DefaultCompile.Accepted)
+            return IdentityGateRecord.Blocked("Converted Calor did not parse, expose bound identities and pass default compilation.");
+
+        var echo = original.Declarations.SingleOrDefault(d => d.Name == "Echo");
+        var receive = original.Declarations.SingleOrDefault(d => d.Name == "Receive");
+        if (!IsGenuinelyUnannotatedItemPassthrough(echo, requireParameter: true))
+            return IdentityGateRecord.Blocked("Echo is not proven as a nullable-disabled unannotated Item parameter/return passthrough declaration.");
+        if (!IsGenuinelyUnannotatedItemPassthrough(receive, requireParameter: true))
+            return IdentityGateRecord.Blocked("Downstream.Receive is not proven as a nullable-disabled unannotated Item parameter/return declaration.");
+
+        var calorEcho = FindMethodShape(current, "Echo");
+        var calorReceive = FindMethodShape(current, "Receive");
+        if (calorEcho is null || calorReceive is null)
+            return IdentityGateRecord.Blocked("Converted Calor AST/bound identity did not expose Echo and Receive methods.");
+        if (!calorEcho.HasItemParameterAndReturn || !calorReceive.HasItemParameterAndReturn)
+            return IdentityGateRecord.Blocked("Converted Calor method declarations do not retain Item parameter/return shapes needed for a fixture-specific transform.");
+        var boundItems = currentBinding!.BoundIdentity?.Types
+            .Where(t => t.Name == "Item" || t.QualifiedName.EndsWith(".Item", StringComparison.Ordinal))
+            .ToList() ?? [];
+        if (boundItems.Count != 1 || !boundItems[0].IsReferenceType)
+            return IdentityGateRecord.Blocked($"Binder did not expose exactly one reference TypeSymbol for Item in the converted Calor program; observed {boundItems.Count}.");
+        var boundItem = boundItems[0];
+
+        return new IdentityGateRecord(
+            CanAttemptFaithfulCandidate: true,
+            BlockingReason: null,
+            ProvenDeclarations: ["NativeSurface.Echo", "Downstream.Receive"],
+            Evidence: new Dictionary<string, object?>
+            {
+                ["originalItemSymbol"] = original.ItemSymbol,
+                ["echoRoslyn"] = echo,
+                ["receiveRoslyn"] = receive,
+                ["echoCalor"] = calorEcho,
+                ["receiveCalor"] = calorReceive,
+                ["boundItemTypeSymbol"] = boundItem,
+                ["independentBinderSuccess"] = currentBinding.Success,
+                ["retainedBindingDiagnostics"] = currentBinding.Diagnostics,
+                ["scope"] = "Echo/Receive declaration migration only; retained unsupported member findings are not a safety proof.",
+            });
+    }
+
+    private static bool IsGenuinelyUnannotatedItemPassthrough(RoslynDeclarationRecord? method, bool requireParameter)
+    {
+        if (method?.ReturnType is null) return false;
+        if (!method.ReturnType.MatchesItemSymbol) return false;
+        if (method.ReturnType.NullableAnnotation != nameof(Microsoft.CodeAnalysis.NullableAnnotation.None)) return false;
+        if (method.ReturnType.SyntaxTypeIsNullable == true) return false;
+        if (!method.ReturnType.NullableContext.Contains(nameof(NullableContext.Disabled), StringComparison.Ordinal)) return false;
+        if (!requireParameter) return true;
+        var parameter = method.Parameters.SingleOrDefault();
+        return parameter is not null
+            && parameter.MatchesItemSymbol
+            && parameter.NullableAnnotation == nameof(Microsoft.CodeAnalysis.NullableAnnotation.None)
+            && parameter.SyntaxTypeIsNullable != true
+            && parameter.NullableContext.Contains(nameof(NullableContext.Disabled), StringComparison.Ordinal);
+    }
+
+    private static MethodShapeRecord? FindMethodShape(CalorVariantRecord variant, string methodName)
+    {
+        var declared = variant.NativeCoverage?.MethodDeclarations.SingleOrDefault(m => m.Name == methodName);
+        if (declared is null) return null;
+        var bound = variant.Binding?.BoundIdentity?.Functions.SingleOrDefault(f => f.Name == methodName);
+        var hasItemParameter = declared.Parameters.Count == 1 && StripNullablePrefix(declared.Parameters[0].TypeName) == "Item";
+        var hasItemReturn = StripNullablePrefix(declared.OutputTypeName) == "Item";
+        return new MethodShapeRecord(
+            methodName,
+            declared.ContainingType,
+            declared.OutputTypeName,
+            declared.Parameters,
+            hasItemParameter && hasItemReturn,
+            bound);
+    }
+
+    private static FaithfulCandidateRecord TryBuildNullableCandidate(string currentCalor, IdentityGateRecord gate)
+    {
+        var parse = ParseCalor(currentCalor);
+        if (parse.Module is null)
+            return FaithfulCandidateRecord.Failed("Current Calor could not be parsed for AST transformation.");
+
+        try
+        {
+            var transformer = new FixtureNullableAstTransformer(new HashSet<string>(StringComparer.Ordinal) { "Echo", "Receive" });
+            var transformed = transformer.TransformModule(parse.Module);
+            if (transformer.ChangedSites.Count != 4)
+                return FaithfulCandidateRecord.Failed($"Expected exactly four declaration-site changes (Echo param/return and Receive param/return), observed {transformer.ChangedSites.Count}.");
+
+            var emitted = new CalorEmitter().Emit(transformed);
+            return new FaithfulCandidateRecord(
+                Status: "attempted",
+                FailureReason: null,
+                ChangedSites: transformer.ChangedSites,
+                CandidateCalorSource: emitted,
+                CandidateCalorSha256: Sha256Text(emitted),
+                GateEvidence: gate.Evidence);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return FaithfulCandidateRecord.Failed(ex.ToString());
+        }
+    }
+
+    private static RawInteropFallbackRecord BuildRawInteropFallback()
+    {
+        var source = "§M{m_raw:RawInteropFallback}\n"
+            + "  §CSHARP{/*__CALOR_COMPILATION_UNIT_PASSTHROUGH__*/\n"
+            + FixtureSources.NativeReferencePassthrough.TrimEnd()
+            + "\n}§/CSHARP\n";
+        var original = CaptureOriginalNativeCoverage(FixtureSources.NativeReferencePassthrough);
+        return new RawInteropFallbackRecord(
+            CalorSource: source,
+            CalorSha256: Sha256Text(source),
+            NativeCoverageLoss: new NativeCoverageLossRecord(
+                OriginalTypeDeclarations: original.TypeDeclarations,
+                OriginalMethodLikeDeclarations: original.MethodLikeDeclarations,
+                NativeCalorTypeDeclarations: 0,
+                NativeCalorMethodLikeDeclarations: 0,
+                LostTypeDeclarations: original.TypeDeclarations,
+                LostMethodLikeDeclarations: original.MethodLikeDeclarations,
+                Explanation: "Whole-compilation-unit §CSHARP fallback preserves runtime behavior but supplies no native Calor declarations for this fixture."));
+    }
+
+    private static ConverterClassification ClassifyCurrentConverter(OriginalRoslynRecord original, CalorVariantRecord? current)
+    {
+        if (current is null)
+            return new ConverterClassification(false, 0, 0, null, null, false, "No current variant.");
+        var echo = FindMethodShape(current, "Echo");
+        return new ConverterClassification(
+            HasConvertedCalor: true,
+            NativeDeclarationCount: current.NativeCoverage?.NativeDeclarationCount ?? 0,
+            InteropDeclarationCount: current.NativeCoverage?.InteropDeclarationCount ?? 0,
+            EchoParameterDeclaredNullable: echo?.Parameters.SingleOrDefault()?.TypeName.StartsWith("?", StringComparison.Ordinal),
+            EchoReturnDeclaredNullable: echo?.OutputTypeName?.StartsWith("?", StringComparison.Ordinal),
+            FaithfulCandidateMayBeAttempted: echo?.HasItemParameterAndReturn == true,
+            Reason: "Current output is classified before any fixture-specific representation. Non-null Item declaration types here are recorded as bare-converter annotation loss when original Roslyn nullable annotation is None under #nullable disable.");
+    }
+
+    private static NativeCoverageRecord CaptureNativeCoverage(ModuleNode module)
+    {
+        var methods = new List<MethodDeclarationRecord>();
+        var typeCount = 0;
+        var constructorCount = 0;
+        void VisitClass(ClassDefinitionNode cls, string? container)
+        {
+            typeCount++;
+            var name = container is null ? cls.Name : container + "." + cls.Name;
+            constructorCount += cls.Constructors.Count;
+
+            var methodItems = cls.Items.Count > 0
+                ? cls.Items.OfType<MethodNode>()
+                : cls.Methods;
+            foreach (var method in methodItems)
+            {
+                methods.Add(new MethodDeclarationRecord(
+                    Name: method.Name,
+                    ContainingType: name,
+                    OutputTypeName: method.Output?.TypeName,
+                    Parameters: method.Parameters.Select(ParameterDeclarationRecord.From).ToList()));
+            }
+
+            var nestedItems = cls.Items.Count > 0
+                ? cls.Items.OfType<ClassDefinitionNode>()
+                : cls.NestedClasses;
+            foreach (var nested in nestedItems)
+                VisitClass(nested, name);
+        }
+        var moduleClasses = module.Items.Count > 0
+            ? module.Items.OfType<ClassDefinitionNode>()
+            : module.Classes;
+        foreach (var cls in moduleClasses)
+            VisitClass(cls, null);
+        foreach (var function in module.Functions)
+        {
+            methods.Add(new MethodDeclarationRecord(function.Name, null, function.Output?.TypeName, function.Parameters.Select(ParameterDeclarationRecord.From).ToList()));
+        }
+        return new NativeCoverageRecord(
+            TypeDeclarations: typeCount,
+            MethodDeclarations: methods.DistinctBy(m => (m.ContainingType, m.Name, m.OutputTypeName)).ToList(),
+            ConstructorDeclarations: constructorCount,
+            InteropBlocks: module.InteropBlocks.Count + module.Classes.Sum(c => c.InteropBlocks.Count),
+            NativeDeclarationCount: typeCount + constructorCount + methods.Count,
+            InteropDeclarationCount: module.InteropBlocks.Count + module.Classes.Sum(c => c.InteropBlocks.Count));
+    }
+
+    private static OriginalCoverageCount CaptureOriginalNativeCoverage(string source)
+    {
+        var root = CSharpSyntaxTree.ParseText(source, CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview)).GetCompilationUnitRoot();
+        var typeDeclarations = root.DescendantNodes().OfType<TypeDeclarationSyntax>().Count();
+        var methodLike = root.DescendantNodes().OfType<MethodDeclarationSyntax>().Count()
+            + root.DescendantNodes().OfType<ConstructorDeclarationSyntax>().Count();
+        return new OriginalCoverageCount(typeDeclarations, methodLike);
+    }
+
+    private static BoundIdentityRecord CaptureBoundIdentity(BoundModule module)
+    {
+        var functions = module.Functions.Select(f => new BoundFunctionRecord(
+            Name: f.Symbol.Name,
+            ContainingType: f.ContainingTypeName,
+            MemberKind: f.MemberKind.ToString(),
+            SymbolId: f.SymbolId.ToString(),
+            ReturnType: f.Symbol.ReturnType,
+            Parameters: f.Symbol.Parameters.Select(BoundVariableRecord.From).ToList())).ToList();
+        var types = module.SymbolsById.Values
+            .OfType<TypeSymbol>()
+            .Select(TypeSymbolRecord.From)
+            .ToList();
+
+        var calls = EnumerateBoundNodes(module)
+            .Where(n => n is BoundCallExpression or BoundCallStatement)
+            .Select(CaptureBoundCall)
+            .ToList();
+        var news = EnumerateBoundNodes(module)
+            .OfType<BoundNewExpression>()
+            .Select(n => new BoundNewRecord(Type: CaptureBoundType(n.Type), ResolvedType: n.ResolvedType is null ? null : TypeSymbolRecord.From(n.ResolvedType)))
+            .ToList();
+        var returns = EnumerateBoundNodes(module)
+            .OfType<BoundReturnStatement>()
+            .Select(r => new BoundReturnRecord(r.Expression is null ? null : CaptureBoundType(r.Expression.Type)))
+            .ToList();
+
+        return new BoundIdentityRecord(functions, types, calls, news, returns);
+    }
+
+    private static IEnumerable<BoundNode> EnumerateBoundNodes(BoundNode root)
+    {
+        var stack = new Stack<BoundNode>();
+        stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var node = stack.Pop();
+            yield return node;
+            foreach (var child in node.ChildNodes.Reverse())
+                stack.Push(child);
+            switch (node)
+            {
+                case BoundCallExpression { Receiver: not null } call:
+                    stack.Push(call.Receiver);
+                    break;
+                case BoundCallStatement { Receiver: not null } call:
+                    stack.Push(call.Receiver);
+                    break;
+            }
+        }
+    }
+
+    private static BoundCallRecord CaptureBoundCall(BoundNode node)
+    {
+        if (node is BoundCallExpression expr)
+        {
+            return new BoundCallRecord(
+                Kind: nameof(BoundCallExpression),
+                Target: expr.Target,
+                ResolvedTypeName: expr.ResolvedTypeName,
+                ResolvedMethodName: expr.ResolvedMethodName,
+                ResolvedParameterTypes: expr.ResolvedParameterTypes,
+                ResolvedSymbol: expr.ResolvedSymbol is null ? null : FunctionSymbolRecord.From(expr.ResolvedSymbol),
+                ReturnType: CaptureBoundType(expr.Type),
+                ArgumentTypes: expr.Arguments.Select(a => CaptureBoundType(a.Type)).ToList(),
+                ArgumentParameterIndices: expr.ArgumentParameterIndices,
+                SelectedOverloadMatches: CaptureOverloadMatches(expr.SelectedOverloadMatches));
+        }
+        var stmt = (BoundCallStatement)node;
+        return new BoundCallRecord(
+            Kind: nameof(BoundCallStatement),
+            Target: stmt.Target,
+            ResolvedTypeName: stmt.ResolvedTypeName,
+            ResolvedMethodName: stmt.ResolvedMethodName,
+            ResolvedParameterTypes: stmt.ResolvedParameterTypes,
+            ResolvedSymbol: stmt.ResolvedSymbol is null ? null : FunctionSymbolRecord.From(stmt.ResolvedSymbol),
+            ReturnType: null,
+            ArgumentTypes: stmt.Arguments.Select(a => CaptureBoundType(a.Type)).ToList(),
+            ArgumentParameterIndices: stmt.ArgumentParameterIndices,
+            SelectedOverloadMatches: CaptureOverloadMatches(stmt.SelectedOverloadMatches));
+    }
+
+    private static List<Dictionary<string, object?>> CaptureOverloadMatches(IEnumerable<object> matches)
+    {
+        var result = new List<Dictionary<string, object?>>();
+        foreach (var match in matches)
+        {
+            var dict = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["type"] = match.GetType().FullName,
+                ["display"] = match.ToString(),
+            };
+            foreach (var prop in match.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (prop.GetIndexParameters().Length != 0) continue;
+                try
+                {
+                    var value = prop.GetValue(match);
+                    dict[prop.Name] = ToJsonSafe(value);
+                }
+                catch (Exception ex) when (ex is not OutOfMemoryException)
+                {
+                    dict[prop.Name] = "unavailable: " + ex.GetType().Name + ": " + ex.Message;
+                }
+            }
+            result.Add(dict);
+        }
+        return result;
+    }
+
+    private static BoundTypeRecord CaptureBoundType(BoundType type)
+    {
+        var nominal = type as NominalBoundType;
+        return new BoundTypeRecord
+        {
+            Kind = type.GetType().Name,
+            DisplayString = type.DisplayString,
+            FullyQualifiedName = type.FullyQualifiedName,
+            QualifiedName = nominal?.QualifiedName,
+            NullableAnnotation = nominal?.NullableAnnotation.ToString(),
+            Declaration = nominal?.Declaration is { } declaration ? TypeSymbolRecord.From(declaration) : null,
+            RoslynSymbol = nominal?.RoslynSymbol is { } symbol ? RoslynSymbolRecord.From(symbol) : null,
+            IsKnownReferenceType = nominal is null ? null : ReadInternalBool(nominal, "IsKnownReferenceType"),
+        };
+    }
+
+    private static BinderMetadataProfileRecord CaptureBinderMetadataProfile(Binder binder)
+    {
+        var field = typeof(Binder).GetField("_metadataBinder", BindingFlags.Instance | BindingFlags.NonPublic);
+        var metadataBinder = field?.GetValue(binder);
+        if (metadataBinder is null)
+            return BinderMetadataProfileRecord.NotInstantiated();
+
+        try
+        {
+            var contextProperty = metadataBinder.GetType().GetProperty("Context", BindingFlags.Instance | BindingFlags.NonPublic);
+            var context = contextProperty?.GetValue(metadataBinder);
+            if (context is null)
+                return BinderMetadataProfileRecord.Unavailable("MetadataBinder.Context reflection returned null.");
+            var hostProperty = context.GetType().GetProperty("HostCompilationForBinder", BindingFlags.Instance | BindingFlags.NonPublic);
+            var compilation = hostProperty?.GetValue(context) as CSharpCompilation;
+            if (compilation is null)
+                return BinderMetadataProfileRecord.Unavailable("HostCompilationForBinder reflection returned null.");
+            var refs = CaptureReferences(compilation.References);
+            return new BinderMetadataProfileRecord("instantiated", null, refs, HashReferenceProfile(refs));
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            return BinderMetadataProfileRecord.Unavailable(ex.GetType().Name + ": " + ex.Message);
+        }
+    }
+
+    private static ReferenceProfileRecord CaptureReferenceProfile()
+    {
+        var refs = CaptureReferences(GeneratedCSharpCompiler.References);
+        return new ReferenceProfileRecord(refs, HashReferenceProfile(refs));
+    }
+
+    private static List<ReferenceRecord> CaptureReferences(IEnumerable<MetadataReference> references)
+    {
+        var records = new List<ReferenceRecord>();
+        var index = 0;
+        foreach (var reference in references)
+        {
+            string? path = (reference as PortableExecutableReference)?.FilePath;
+            string? sha = null;
+            string? hashError = null;
+            string? identity = null;
+            try
+            {
+                if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                {
+                    sha = Sha256File(path);
+                    identity = AssemblyName.GetAssemblyName(path).FullName;
+                }
+                else if (!string.IsNullOrEmpty(reference.Display))
+                {
+                    hashError = "reference has no existing FilePath; Display=" + reference.Display;
+                }
+                else
+                {
+                    hashError = "reference has no Display or existing FilePath";
+                }
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                hashError = ex.GetType().Name + ": " + ex.Message;
+            }
+            records.Add(new ReferenceRecord(
+                Ordinal: index++,
+                Display: reference.Display,
+                FilePath: path,
+                Sha256: sha,
+                HashError: hashError,
+                AssemblyIdentity: identity,
+                Aliases: reference.Properties.Aliases.IsDefault ? [] : reference.Properties.Aliases.ToArray(),
+                EmbedInteropTypes: reference.Properties.EmbedInteropTypes));
+        }
+        return records;
+    }
+
+    private static SourceContextRecord CaptureSourceContext(DriverOptions options)
+    {
+        static SourceFileHash HashUnderRoot(string root, string relative)
+        {
+            var full = Path.GetFullPath(Path.Combine(root, relative));
+            return File.Exists(full)
+                ? new SourceFileHash(relative, Sha256File(full), null)
+                : new SourceFileHash(relative, null, "missing");
+        }
+        var files = new[]
+        {
+            "Directory.Build.props",
+            "Directory.Packages.props",
+            "src/Calor.Compiler/Calor.Compiler.csproj",
+            "src/Calor.Compiler/Migration/CSharpToCalorConverter.cs",
+            "src/Calor.Compiler/Migration/RoslynSyntaxVisitor.cs",
+            "src/Calor.Compiler/Migration/CalorEmitter.cs",
+            "src/Calor.Compiler/Parsing/Parser.cs",
+            "src/Calor.Compiler/Binding/Binder.cs",
+            "src/Calor.Compiler/Binding/BoundTypes/BoundType.cs",
+            "src/Calor.Compiler/CodeGen/CSharpEmitter.cs",
+        }.Select(f => HashUnderRoot(options.CalorRoot, f)).ToList();
+        return new SourceContextRecord(files);
+    }
+
+    private static void ValidateExpectedSourceHashes(EvidenceReport report, DriverOptions options)
+    {
+        foreach (var (relative, expected) in options.ExpectedFileHashes)
+        {
+            var full = Path.GetFullPath(Path.Combine(options.CalorRoot, relative));
+            if (!File.Exists(full))
+            {
+                report.HardFailures.Add(new FailureRecord("source-pin-missing", relative, "Expected source file is missing."));
+                continue;
+            }
+            var actual = Sha256File(full);
+            if (!string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase))
+            {
+                report.HardFailures.Add(new FailureRecord("source-pin-mismatch", relative, $"expected={expected}; actual={actual}"));
+            }
+        }
+    }
+
+    private static bool RuntimeShapeSatisfied(IReadOnlyDictionary<string, object?>? values)
+    {
+        if (values is null) return false;
+        return ReadBool(values, "NullEchoIsNull") == true
+            && ReadBool(values, "PresentEchoSameReference") == true
+            && ReadBool(values, "DownstreamPresentSameReference") == true
+            && ReadBool(values, "FreshIsNotNull") == true
+            && ReadBool(values, "FreshIsDistinctFromPresent") == true
+            && ReadBool(values, "NullDownstreamReadCompleted") == false
+            && string.Equals(ReadString(values, "NullDownstreamReadExceptionType"), typeof(NullReferenceException).FullName, StringComparison.Ordinal);
+    }
+
+    private static IReadOnlyDictionary<string, object?> CapturePublicValues(object? value)
+    {
+        if (value is null) return new Dictionary<string, object?> { ["<returned>"] = null };
+        var dict = new SortedDictionary<string, object?>(StringComparer.Ordinal);
+        var type = value.GetType();
+        foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (prop.GetIndexParameters().Length == 0 && prop.GetMethod is not null)
+                dict[prop.Name] = ToJsonSafe(prop.GetValue(value));
+        }
+        foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Instance))
+            dict[field.Name] = ToJsonSafe(field.GetValue(value));
+        return dict;
+    }
+
+    private static object? ToJsonSafe(object? value)
+    {
+        if (value is null || value is string || value is bool || value is int || value is long || value is double || value is decimal)
+            return value;
+        if (value is Enum e) return e.ToString();
+        if (value is ImmutableArray<int> iai && !iai.IsDefault) return iai.ToArray();
+        if (value is IEnumerable enumerable && value is not string)
+        {
+            var items = new List<object?>();
+            foreach (var item in enumerable)
+                items.Add(ToJsonSafe(item));
+            return items;
+        }
+        return value.ToString();
+    }
+
+    private static bool? ReadInternalBool(object instance, string propertyName)
+    {
+        try
+        {
+            return instance.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)?.GetValue(instance) as bool?;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static bool? ReadBool(IReadOnlyDictionary<string, object?> values, string name) =>
+        values.TryGetValue(name, out var value) && value is bool b ? b : null;
+
+    private static string? ReadString(IReadOnlyDictionary<string, object?> values, string name) =>
+        values.TryGetValue(name, out var value) ? value?.ToString() : null;
+
+    private static string StripNullablePrefix(string? typeName)
+    {
+        if (string.IsNullOrWhiteSpace(typeName)) return string.Empty;
+        return typeName.StartsWith("?", StringComparison.Ordinal) ? typeName[1..] : typeName.EndsWith("?", StringComparison.Ordinal) ? typeName[..^1] : typeName;
+    }
+
+    private static bool IsRoslynError(RoslynDiagnostic d) => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error;
+
+    private static List<DiagnosticRecord> Diagnostics(DiagnosticBag bag) => bag.Select(DiagnosticRecord.From).ToList();
+
+    private static string Sha256Text(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
+
+    private static string Sha256File(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))).ToLowerInvariant();
+
+    private static string HashReferenceProfile(IReadOnlyList<ReferenceRecord> refs) => Sha256Text(string.Join("\n", refs.Select(r => $"{r.Ordinal}|{r.AssemblyIdentity}|{r.FilePath}|{r.Sha256}|{r.HashError}")));
+
+    private static string SanitizeAssemblyName(string name) => new(name.Select(ch => char.IsLetterOrDigit(ch) ? ch : '_').ToArray());
+
+    private static void WriteReport(EvidenceReport report, string? outputPath)
+    {
+        var json = JsonSerializer.Serialize(report, JsonOptions);
+        if (string.IsNullOrWhiteSpace(outputPath))
+        {
+            Console.WriteLine(json);
+            return;
+        }
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath)) ?? ".");
+        File.WriteAllText(outputPath, json, Encoding.UTF8);
+        Console.WriteLine(outputPath);
+    }
+
+    private static OverallRecord Summarize(EvidenceReport report)
+    {
+        var route = report.FaithfulCandidate?.Status == "passed-fixture-only"
+            ? "faithful-fixture-specific-nullable-reference-representation"
+            : report.RawInteropVariant?.Runtime?.RuntimeExpectationSatisfied == true
+                ? "raw-interop-fallback-preserves-runtime-with-native-coverage-loss"
+                : "deferred-or-failed";
+        return new OverallRecord(route, report.HardFailures.Count == 0, report.HardFailures.Select(f => f.Id).ToList());
+    }
+}
+
+internal sealed class FixtureNullableAstTransformer
+{
+    private readonly ISet<string> _methodNames;
+    public List<ChangedSiteRecord> ChangedSites { get; } = [];
+
+    public FixtureNullableAstTransformer(ISet<string> methodNames) => _methodNames = methodNames;
+
+    public ModuleNode TransformModule(ModuleNode module)
+    {
+        var useSourceOrderedItems = module.Items.Count > 0;
+        var classes = useSourceOrderedItems ? module.Classes : module.Classes.Select(TransformClass).ToList();
+        var items = useSourceOrderedItems ? module.Items.Select(TransformModuleItem).ToList() : module.Items;
+        var transformed = new ModuleNode(
+            module.Span,
+            module.Id,
+            module.Name,
+            module.Usings,
+            module.Interfaces,
+            classes,
+            module.Enums,
+            module.EnumExtensions,
+            module.Delegates,
+            module.Functions,
+            module.Attributes,
+            module.Issues,
+            module.Assumptions,
+            module.Invariants,
+            module.Decisions,
+            module.Context,
+            module.InteropBlocks,
+            module.RefinementTypes,
+            module.IndexedTypes,
+            module.TypePreprocessorBlocks,
+            module.IdentifierSpan,
+            items,
+            module.NamespaceScopes,
+            module.DeclaredSemanticsVersion);
+        CopyMetadata(module, transformed);
+        return transformed;
+    }
+
+    private AstNode TransformModuleItem(AstNode item) => item switch
+    {
+        ClassDefinitionNode cls => TransformClass(cls),
+        _ => item,
+    };
+
+    private AstNode TransformClassItem(AstNode item) => item switch
+    {
+        MethodNode method => TransformMethod(method),
+        ClassDefinitionNode cls => TransformClass(cls),
+        _ => item,
+    };
+
+    private ClassDefinitionNode TransformClass(ClassDefinitionNode cls)
+    {
+        var useSourceOrderedItems = cls.Items.Count > 0;
+        var methods = useSourceOrderedItems ? cls.Methods : cls.Methods.Select(TransformMethod).ToList();
+        var nestedClasses = useSourceOrderedItems ? cls.NestedClasses : cls.NestedClasses.Select(TransformClass).ToList();
+        var items = useSourceOrderedItems ? cls.Items.Select(TransformClassItem).ToList() : cls.Items;
+        var transformed = new ClassDefinitionNode(
+            cls.Span,
+            cls.Id,
+            cls.Name,
+            cls.IsAbstract,
+            cls.IsSealed,
+            cls.IsPartial,
+            cls.IsStatic,
+            cls.BaseClass,
+            cls.ImplementedInterfaces,
+            cls.TypeParameters,
+            cls.Fields,
+            cls.Properties,
+            cls.Constructors,
+            methods,
+            cls.Events,
+            cls.OperatorOverloads,
+            cls.Attributes,
+            cls.CSharpAttributes,
+            cls.IsStruct,
+            cls.IsReadOnly,
+            cls.Visibility,
+            cls.InteropBlocks,
+            cls.PreprocessorBlocks,
+            nestedClasses,
+            cls.NestedInterfaces,
+            cls.NestedEnums,
+            cls.Indexers,
+            cls.NestedDelegates,
+            cls.IdentifierSpan,
+            cls.BaseClassSpan,
+            cls.ImplementedInterfaceSpans,
+            items);
+        transformed.SourceFile = cls.SourceFile;
+        CopyMetadata(cls, transformed);
+        return transformed;
+    }
+
+    private MethodNode TransformMethod(MethodNode method)
+    {
+        if (!_methodNames.Contains(method.Name)) return method;
+        var parameters = method.Parameters.Select(p => TransformParameter(method, p)).ToList();
+        var output = method.Output is null ? null : TransformOutput(method, method.Output);
+        var transformed = new MethodNode(
+            method.Span,
+            method.Id,
+            method.Name,
+            method.Visibility,
+            method.Modifiers,
+            method.TypeParameters,
+            parameters,
+            output,
+            method.Effects,
+            method.Preconditions,
+            method.Postconditions,
+            method.Body,
+            method.Attributes,
+            method.CSharpAttributes,
+            method.IsAsync,
+            method.IdentifierSpan)
+        {
+            EffectParameters = method.EffectParameters,
+        };
+        CopyMetadata(method, transformed);
+        return transformed;
+    }
+
+    private ParameterNode TransformParameter(MethodNode owner, ParameterNode parameter)
+    {
+        if (parameter.TypeName != "Item") return parameter;
+        var transformed = new ParameterNode(
+            parameter.Span,
+            parameter.Name,
+            "?Item",
+            parameter.Modifier,
+            parameter.Attributes,
+            parameter.CSharpAttributes,
+            parameter.DefaultValue,
+            parameter.InlineRefinement,
+            parameter.IdentifierSpan,
+            parameter.TypeNameSpan,
+            parameter.Row);
+        CopyMetadata(parameter, transformed);
+        ChangedSites.Add(new ChangedSiteRecord(owner.Name, "parameter", parameter.Name, parameter.TypeName, transformed.TypeName));
+        return transformed;
+    }
+
+    private OutputNode TransformOutput(MethodNode owner, OutputNode output)
+    {
+        if (output.TypeName != "Item") return output;
+        var transformed = new OutputNode(output.Span, "?Item", output.TypeNameSpan, output.Row);
+        CopyMetadata(output, transformed);
+        ChangedSites.Add(new ChangedSiteRecord(owner.Name, "return", null, output.TypeName, transformed.TypeName));
+        return transformed;
+    }
+
+    private static void CopyMetadata(AstNode source, AstNode target)
+    {
+        target.NamespaceIdentity = source.NamespaceIdentity;
+        target.NamespaceScopeId = source.NamespaceScopeId;
+        target.FullyQualifiedSymbolIdentity = source.FullyQualifiedSymbolIdentity;
+        target.DocComment = source.DocComment;
+    }
+}
+
+internal static class FixtureSources
+{
+    public const string NativeReferencePassthrough = """
+#nullable disable
+using System;
+
+namespace MigrationFeasibility.NominalPolicy1400
+{
+    public sealed class Item
+    {
+        public string Label;
+
+        public Item(string label)
+        {
+            Label = label;
+        }
+    }
+
+    public static class NativeSurface
+    {
+        public static Item Echo(Item value)
+        {
+            return value;
+        }
+
+        public static Item MakeFresh()
+        {
+            return new Item("fresh");
+        }
+    }
+
+    public static class Downstream
+    {
+        public static Item Receive(Item value)
+        {
+            return value;
+        }
+
+        public static int ReadLabelLength(Item value)
+        {
+            return value.Label.Length;
+        }
+    }
+}
+""";
+
+    public const string RuntimeHarness = """
+#nullable disable
+using System;
+
+namespace MigrationFeasibility.NominalPolicy1400
+{
+    public sealed class RuntimeOutcome
+    {
+        public bool NullEchoIsNull { get; set; }
+        public bool PresentEchoSameReference { get; set; }
+        public bool DownstreamPresentSameReference { get; set; }
+        public bool FreshIsNotNull { get; set; }
+        public bool FreshIsDistinctFromPresent { get; set; }
+        public bool NullDownstreamReadCompleted { get; set; }
+        public int? NullDownstreamReadValue { get; set; }
+        public string NullDownstreamReadExceptionType { get; set; }
+        public string NullDownstreamReadExceptionMessage { get; set; }
+    }
+
+    public static class RuntimeProbe
+    {
+        public static RuntimeOutcome RunAll()
+        {
+            var present = new Item("present");
+            var echoedNull = NativeSurface.Echo(null);
+            var echoedPresent = NativeSurface.Echo(present);
+            var receivedPresent = Downstream.Receive(echoedPresent);
+            var fresh = NativeSurface.MakeFresh();
+            var outcome = new RuntimeOutcome
+            {
+                NullEchoIsNull = echoedNull is null,
+                PresentEchoSameReference = object.ReferenceEquals(present, echoedPresent),
+                DownstreamPresentSameReference = object.ReferenceEquals(present, receivedPresent),
+                FreshIsNotNull = fresh is not null,
+                FreshIsDistinctFromPresent = !object.ReferenceEquals(present, fresh),
+                NullDownstreamReadCompleted = false,
+                NullDownstreamReadValue = null,
+                NullDownstreamReadExceptionType = string.Empty,
+                NullDownstreamReadExceptionMessage = string.Empty,
+            };
+
+            try
+            {
+                outcome.NullDownstreamReadValue = Downstream.ReadLabelLength(NativeSurface.Echo(null));
+                outcome.NullDownstreamReadCompleted = true;
+            }
+            catch (Exception ex)
+            {
+                outcome.NullDownstreamReadExceptionType = ex.GetType().FullName;
+                outcome.NullDownstreamReadExceptionMessage = ex.Message;
+            }
+
+            return outcome;
+        }
+    }
+}
+""";
+}
+
+internal sealed record DriverOptions(string CalorRoot, string? OutputPath, string ConfigurationLabel, IReadOnlyDictionary<string, string> ExpectedFileHashes)
+{
+    public static DriverOptions Parse(string[] args)
+    {
+        string? calorRoot = null;
+        string? output = null;
+        var label = "current";
+        var expected = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (var i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--calor-root":
+                    calorRoot = RequireValue(args, ref i, "--calor-root");
+                    break;
+                case "--output":
+                    output = RequireValue(args, ref i, "--output");
+                    break;
+                case "--configuration-label":
+                    label = RequireValue(args, ref i, "--configuration-label");
+                    break;
+                case "--expect-file-sha":
+                    var pin = RequireValue(args, ref i, "--expect-file-sha");
+                    var equals = pin.IndexOf('=');
+                    if (equals <= 0 || equals == pin.Length - 1)
+                        throw new ArgumentException("--expect-file-sha must be relative/path=sha256");
+                    expected[pin[..equals]] = pin[(equals + 1)..];
+                    break;
+                default:
+                    throw new ArgumentException("Unknown argument: " + args[i]);
+            }
+        }
+        if (string.IsNullOrWhiteSpace(calorRoot))
+            throw new ArgumentException("--calor-root is required and must point at the scratch compiler source root.");
+        var compilerProject = Path.Combine(calorRoot, "src", "Calor.Compiler", "Calor.Compiler.csproj");
+        if (!File.Exists(compilerProject))
+            throw new DirectoryNotFoundException("Calor compiler project not found under --calor-root: " + compilerProject);
+        return new DriverOptions(calorRoot, output, label, expected);
+    }
+
+    public static string? TryGetOutputPath(string[] args)
+    {
+        for (var i = 0; i < args.Length - 1; i++)
+            if (args[i] == "--output") return args[i + 1];
+        return null;
+    }
+
+    private static string RequireValue(string[] args, ref int i, string name)
+    {
+        if (i + 1 >= args.Length) throw new ArgumentException(name + " requires a value.");
+        i++;
+        return args[i];
+    }
+}
+
+internal sealed record EvidenceReport
+{
+    public string Schema { get; init; } = "";
+    public DateTimeOffset GeneratedAtUtc { get; init; }
+    public string? ConfigurationLabel { get; set; }
+    public InputRecord? Inputs { get; set; }
+    public DriverRecord? Driver { get; set; }
+    public SourceContextRecord? SourceContext { get; set; }
+    public ReferenceProfileRecord? ReferenceProfile { get; set; }
+    public OriginalRoslynRecord? OriginalRoslyn { get; set; }
+    public RuntimeRecord? OriginalRuntime { get; set; }
+    public ConversionRecord? Conversion { get; set; }
+    public CalorVariantRecord? CurrentVariant { get; set; }
+    public ConverterClassification? CurrentConverterClassification { get; set; }
+    public IdentityGateRecord? IdentityGate { get; set; }
+    public FaithfulCandidateRecord? FaithfulCandidate { get; set; }
+    public CalorVariantRecord? FaithfulVariant { get; set; }
+    public RawInteropFallbackRecord? RawInteropFallback { get; set; }
+    public CalorVariantRecord? RawInteropVariant { get; set; }
+    public OverallRecord? Overall { get; set; }
+    public List<FailureRecord> HardFailures { get; } = [];
+}
+
+internal sealed record InputRecord(string CalorRoot, string OriginalCSharpSha256, string OriginalCSharp, string ExternalRuntimeHarness, string ExternalRuntimeHarnessSha256, IReadOnlyDictionary<string, string> ExpectedFileHashes);
+internal sealed record DriverRecord(string ProcessArchitecture, string FrameworkDescription, string OsDescription, string? ExposedAgentName, string? ExposedModel)
+{
+    public static DriverRecord Capture() => new(
+        System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
+        System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+        System.Runtime.InteropServices.RuntimeInformation.OSDescription,
+        Environment.GetEnvironmentVariable("AGENCY_AGENT_NAME") ?? Environment.GetEnvironmentVariable("COPILOT_AGENT_NAME"),
+        Environment.GetEnvironmentVariable("OPENAI_MODEL") ?? Environment.GetEnvironmentVariable("COPILOT_MODEL"));
+}
+internal sealed record SourceContextRecord(IReadOnlyList<SourceFileHash> Files);
+internal sealed record SourceFileHash(string RelativePath, string? Sha256, string? Error);
+internal sealed record ReferenceProfileRecord(IReadOnlyList<ReferenceRecord> References, string ProfileSha256);
+internal sealed record ReferenceRecord(int Ordinal, string? Display, string? FilePath, string? Sha256, string? HashError, string? AssemblyIdentity, string[] Aliases, bool EmbedInteropTypes);
+internal sealed record FailureRecord(string Id, string Message, string? Detail);
+internal sealed record OverallRecord(string Route, bool HardFailureFree, IReadOnlyList<string> HardFailureIds);
+
+internal sealed record OriginalRoslynRecord(bool CompilationSuccess, IReadOnlyList<RoslynDiagnosticRecord> Diagnostics, RoslynSymbolRecord? ItemSymbol, IReadOnlyList<RoslynDeclarationRecord> Declarations);
+internal sealed record RoslynDeclarationRecord(string Kind, string Name, string? MetadataName, string? NullableContextAtDeclaration, string? SyntaxTypeText, bool? SyntaxTypeIsNullable, RoslynSymbolRecord? Symbol, RoslynTypeRecord? ReturnType, IReadOnlyList<RoslynParameterRecord> Parameters, string? MissingReason)
+{
+    public static RoslynDeclarationRecord Missing(string name, string reason) => new("missing", name, null, null, null, null, null, null, [], reason);
+    public static RoslynDeclarationRecord FromType(INamedTypeSymbol symbol, SemanticModel model, CompilationUnitSyntax root)
+    {
+        var syntax = symbol.DeclaringSyntaxReferences.Select(r => r.GetSyntax()).OfType<TypeDeclarationSyntax>().SingleOrDefault();
+        return new RoslynDeclarationRecord("type", symbol.Name, symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), syntax is null ? "unavailable" : model.GetNullableContext(syntax.SpanStart).ToString(), syntax?.Identifier.Text, false, RoslynSymbolRecord.From(symbol), null, [], null);
+    }
+}
+internal sealed record RoslynTypeRecord(string Display, string NullableAnnotation, bool MatchesItemSymbol, string NullableContext, bool? SyntaxTypeIsNullable);
+internal sealed record RoslynParameterRecord(string Name, string TypeDisplay, string NullableAnnotation, bool MatchesItemSymbol, string NullableContext, bool? SyntaxTypeIsNullable);
+internal sealed record RoslynSymbolRecord(string Kind, string Name, string MetadataName, string AssemblyIdentity, bool IsReferenceType, string NullableAnnotation)
+{
+    public static RoslynSymbolRecord From(ISymbol symbol)
+    {
+        var type = symbol switch
+        {
+            IMethodSymbol method => method.ReturnType,
+            IParameterSymbol parameter => parameter.Type,
+            ITypeSymbol ts => ts,
+            _ => null,
+        };
+        return new RoslynSymbolRecord(
+            symbol.Kind.ToString(),
+            symbol.Name,
+            symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            symbol.ContainingAssembly?.Identity.GetDisplayName() ?? "unavailable",
+            type?.IsReferenceType ?? false,
+            type?.NullableAnnotation.ToString() ?? "unavailable");
+    }
+}
+internal sealed record RoslynDiagnosticRecord(string Id, string Severity, string Message, string? Path, int Line, int Column)
+{
+    public static RoslynDiagnosticRecord From(RoslynDiagnostic d)
+    {
+        var span = d.Location.GetLineSpan();
+        return new RoslynDiagnosticRecord(d.Id, d.Severity.ToString(), d.GetMessage(), span.Path, span.StartLinePosition.Line + 1, span.StartLinePosition.Character + 1);
+    }
+}
+
+internal sealed record ConversionRecord(bool Success, string? CalorSource, string? CalorSha256, IReadOnlyList<ConversionIssueRecord> Issues, IReadOnlyList<string> Losses, int NativeConversionCount, int InteropPreservationCount, int LossySubstitutionCount, int DropCount, double DurationMilliseconds);
+internal sealed record ConversionIssueRecord(string Severity, string Message, string? Feature, int? Line, int? Column);
+internal sealed record ConverterClassification(bool HasConvertedCalor, int NativeDeclarationCount, int InteropDeclarationCount, bool? EchoParameterDeclaredNullable, bool? EchoReturnDeclaredNullable, bool FaithfulCandidateMayBeAttempted, string Reason);
+internal sealed record IdentityGateRecord(bool CanAttemptFaithfulCandidate, string? BlockingReason, IReadOnlyList<string> ProvenDeclarations, IReadOnlyDictionary<string, object?> Evidence)
+{
+    public static IdentityGateRecord Blocked(string reason) => new(false, reason, [], new Dictionary<string, object?>());
+}
+internal sealed record MethodShapeRecord(string Name, string? ContainingType, string? OutputTypeName, IReadOnlyList<ParameterDeclarationRecord> Parameters, bool HasItemParameterAndReturn, BoundFunctionRecord? BoundFunction);
+internal sealed record FaithfulCandidateRecord(string Status, string? FailureReason, IReadOnlyList<ChangedSiteRecord> ChangedSites, string? CandidateCalorSource, string? CandidateCalorSha256, IReadOnlyDictionary<string, object?>? GateEvidence)
+{
+    public static FaithfulCandidateRecord Skipped(string reason) => new("skipped", reason, [], null, null, null);
+    public static FaithfulCandidateRecord Failed(string reason) => new("failed", reason, [], null, null, null);
+}
+internal sealed record ChangedSiteRecord(string MethodName, string SiteKind, string? ParameterName, string BeforeType, string AfterType);
+internal sealed record RawInteropFallbackRecord(string CalorSource, string CalorSha256, NativeCoverageLossRecord NativeCoverageLoss);
+internal sealed record NativeCoverageLossRecord(int OriginalTypeDeclarations, int OriginalMethodLikeDeclarations, int NativeCalorTypeDeclarations, int NativeCalorMethodLikeDeclarations, int LostTypeDeclarations, int LostMethodLikeDeclarations, string Explanation);
+internal sealed record OriginalCoverageCount(int TypeDeclarations, int MethodLikeDeclarations);
+
+internal sealed record CalorVariantRecord(string Name, string CalorSource, string CalorSha256, NativeCoverageRecord? NativeCoverage, ParseRecord Parse, BindingRecord? Binding, CompileRecord DefaultCompile, CompileRecord? EffectsDisabledCompile, RuntimeRecord? Runtime);
+internal sealed record ParseAttempt(ModuleNode? Module, IReadOnlyList<DiagnosticRecord> Diagnostics, ExceptionRecord? Exception)
+{
+    public ParseRecord ToRecord() => new(Module is not null && !Diagnostics.Any(d => d.Severity == "Error") && Exception is null, Diagnostics, Exception);
+}
+internal sealed record ParseRecord(bool Success, IReadOnlyList<DiagnosticRecord> Diagnostics, ExceptionRecord? Exception);
+internal sealed record BindingRecord(bool Success, IReadOnlyList<DiagnosticRecord> Diagnostics, BinderMetadataProfileRecord? BinderMetadataProfile, BoundIdentityRecord? BoundIdentity, ExceptionRecord? Exception);
+internal sealed record CompileRecord(string Label, bool EnforceEffects, bool Accepted, IReadOnlyList<DiagnosticRecord> Diagnostics, string? GeneratedCSharp, string? GeneratedCSharpSha256, ExceptionRecord? Exception);
+internal sealed record RuntimeRecord(string SourceKind, string InputCSharpSha256, bool RoslynEmitSuccess, IReadOnlyList<RoslynDiagnosticRecord> SyntaxDiagnostics, IReadOnlyList<RoslynDiagnosticRecord> EmitDiagnostics, bool EntryPointFound, IReadOnlyDictionary<string, object?>? Runtime, bool RuntimeExpectationSatisfied, ExceptionRecord? Exception);
+internal sealed record DiagnosticRecord(string Code, string Severity, string Message, string? FilePath, int Line, int Column)
+{
+    public static DiagnosticRecord From(CalorDiagnostic d) => new(d.Code, d.Severity.ToString(), d.Message, d.FilePath, d.Span.Line, d.Span.Column);
+}
+internal sealed record ExceptionRecord(string Type, string Message, string ToStringValue)
+{
+    public static ExceptionRecord From(Exception ex) => new(ex.GetType().FullName ?? ex.GetType().Name, ex.Message, ex.ToString());
+}
+
+internal sealed record NativeCoverageRecord(int TypeDeclarations, IReadOnlyList<MethodDeclarationRecord> MethodDeclarations, int ConstructorDeclarations, int InteropBlocks, int NativeDeclarationCount, int InteropDeclarationCount);
+internal sealed record MethodDeclarationRecord(string Name, string? ContainingType, string? OutputTypeName, IReadOnlyList<ParameterDeclarationRecord> Parameters);
+internal sealed record ParameterDeclarationRecord(string Name, string TypeName)
+{
+    public static ParameterDeclarationRecord From(ParameterNode node) => new(node.Name, node.TypeName);
+}
+internal sealed record BinderMetadataProfileRecord(string Status, string? Error, IReadOnlyList<ReferenceRecord>? References, string? ProfileSha256)
+{
+    public static BinderMetadataProfileRecord NotInstantiated() => new("not-instantiated", null, null, null);
+    public static BinderMetadataProfileRecord Unavailable(string error) => new("unavailable", error, null, null);
+}
+internal sealed record BoundIdentityRecord(IReadOnlyList<BoundFunctionRecord> Functions, IReadOnlyList<TypeSymbolRecord> Types, IReadOnlyList<BoundCallRecord> Calls, IReadOnlyList<BoundNewRecord> NewExpressions, IReadOnlyList<BoundReturnRecord> ReturnStatements);
+internal sealed record BoundFunctionRecord(string Name, string? ContainingType, string MemberKind, string SymbolId, string ReturnType, IReadOnlyList<BoundVariableRecord> Parameters);
+internal sealed record BoundVariableRecord(string Name, string TypeName, bool IsParameter, string NullableAnnotation, string? InferredReferenceDisplay)
+{
+    public static BoundVariableRecord From(VariableSymbol variable)
+    {
+        var inferred = typeof(VariableSymbol).GetProperty("InferredReferenceType", BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(variable) as NominalBoundType;
+        return new BoundVariableRecord(variable.Name, variable.TypeName, variable.IsParameter, variable.NullableAnnotation.ToString(), inferred?.DisplayString);
+    }
+}
+internal sealed record BoundCallRecord(string Kind, string Target, string? ResolvedTypeName, string? ResolvedMethodName, IReadOnlyList<string>? ResolvedParameterTypes, FunctionSymbolRecord? ResolvedSymbol, BoundTypeRecord? ReturnType, IReadOnlyList<BoundTypeRecord> ArgumentTypes, IReadOnlyList<int>? ArgumentParameterIndices, IReadOnlyList<Dictionary<string, object?>> SelectedOverloadMatches);
+internal sealed record BoundNewRecord(BoundTypeRecord Type, TypeSymbolRecord? ResolvedType);
+internal sealed record BoundReturnRecord(BoundTypeRecord? ExpressionType);
+internal sealed record FunctionSymbolRecord(string Name, string ReturnType, string DisplaySignature, string SymbolId, string? ContainingTypeName, IReadOnlyList<BoundVariableRecord> Parameters)
+{
+    public static FunctionSymbolRecord From(FunctionSymbol symbol) => new(symbol.Name, symbol.ReturnType, symbol.DisplaySignature, symbol.Id.ToString(), symbol.ContainingTypeName, symbol.Parameters.Select(BoundVariableRecord.From).ToList());
+}
+internal sealed record TypeSymbolRecord(string Name, string QualifiedName, string SymbolId, bool IsReferenceType, bool IsDelegate)
+{
+    public static TypeSymbolRecord From(TypeSymbol symbol) => new(symbol.Name, symbol.QualifiedName, symbol.Id.ToString(), symbol.IsReferenceType, symbol.IsDelegate);
+}
+internal sealed record BoundTypeRecord
+{
+    public string? Kind { get; init; }
+    public string? DisplayString { get; init; }
+    public string? FullyQualifiedName { get; init; }
+    public string? QualifiedName { get; init; }
+    public string? NullableAnnotation { get; init; }
+    public bool? IsKnownReferenceType { get; init; }
+    public TypeSymbolRecord? Declaration { get; init; }
+    public RoslynSymbolRecord? RoslynSymbol { get; init; }
+}
