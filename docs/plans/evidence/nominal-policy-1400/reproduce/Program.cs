@@ -303,7 +303,9 @@ object[] ObserveSource(SemanticModel model, SyntaxTree tree)
         var direct = symbol is IMethodSymbol or IPropertySymbol or IFieldSymbol or ILocalSymbol or IParameterSymbol;
         var errors = model.GetDiagnostics(expression.Span)
             .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).Select(d => d.ToString()).ToArray();
-        var inScope = errors.Length == 0 && NominalReference(target) &&
+        var unsupportedReceiving = receivingSymbol is IParameterSymbol { RefKind: not RefKind.None } ||
+            receivingSymbol is IMethodSymbol { ReturnsByRef: true } or IMethodSymbol { ReturnsByRefReadonly: true };
+        var inScope = !unsupportedReceiving && errors.Length == 0 && NominalReference(target) &&
             (knownNull || NominalReference(info.Type) && model.Compilation.ClassifyConversion(info.Type!, target!).IsImplicit);
         var category = !inScope ? "out-of-scope-or-unresolved" :
             targetAnnotation == Annotation.Annotated ? "nullable-target" :
@@ -329,7 +331,7 @@ object[] ObserveSource(SemanticModel model, SyntaxTree tree)
                 : symbol == null ? "expression-or-unresolved" : "metadata-signature",
             receivingSymbol = receivingSymbol?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             effectiveContext = model.GetNullableContext(expression.SpanStart).ToString(),
-            category, knownSafeExpression = knownSafe, mapping, errors,
+            category, knownSafeExpression = knownSafe, unsupportedReceiving, mapping, errors,
             hypotheticalBareTargetObligation = category is "genuinely-oblivious-source" or "explicit-nullable" or "explicit-null-expression",
             caveat = "Not an activated Calor rejection. C# None target does not promise non-null. No flow state or null-forgiving guarantee is used."
         });
