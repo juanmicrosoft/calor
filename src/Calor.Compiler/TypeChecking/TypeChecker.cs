@@ -1225,7 +1225,7 @@ public sealed class TypeChecker
         {
             var type = parameter.TypeName != null
                 ? ResolveTypeName(parameter.TypeName, parameter.Span)
-                : (CalorType)new TypeVariable();
+                : ErrorType.Instance;
             _env.DefineVariable(parameter.Name, type);
             return type;
         }).ToArray();
