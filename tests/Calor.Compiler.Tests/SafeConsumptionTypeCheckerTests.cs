@@ -130,16 +130,14 @@ public sealed class SafeConsumptionTypeCheckerTests
     [Fact]
     public void ConditionalWithBothThrowingArms_HasNeverType()
     {
-        var rejected = Check("""
+        var accepted = Check("""
             §M{m1:SafeConsumption}
               §F{f1:Probe:pub} (bool:flag) -> void
                 §E{throw}
                 §B{value:i32} (?? (? flag §TH "left" §TH "right") "fallback")
             """);
 
-        var diagnostic = SingleErrorAt(rejected, 4);
-        Assert.Contains("str", diagnostic.Message);
-        Assert.DoesNotContain("<error>", diagnostic.Message);
+        AssertNoErrors(accepted);
     }
 
     [Fact]
@@ -163,12 +161,11 @@ public sealed class SafeConsumptionTypeCheckerTests
             §M{m1:SafeConsumption}
               §F{f1:Probe:pub} (bool:flag) -> void
                 §E{}
-                §B{value:object} (? flag INT:1 "fallback")
+                §B{value:str} (? flag INT:1 "fallback")
             """);
 
         var diagnostic = SingleErrorAt(rejected, 4);
-        Assert.Contains("incompatible types", diagnostic.Message);
-        Assert.Contains("i32", diagnostic.Message);
+        Assert.Contains("object", diagnostic.Message);
         Assert.Contains("str", diagnostic.Message);
     }
 

@@ -927,13 +927,16 @@ public sealed class TypeChecker
 
         if (leftType is NeverType)
         {
-            return rightType;
+            return NeverType.Instance;
         }
 
         if (leftType is NullType)
         {
             return rightType is NeverType ? NeverType.Instance : rightType;
         }
+
+        if (rightType is ErrorType)
+            return ErrorType.Instance;
 
         if (leftType is NullableReferenceType nullableReference)
         {
@@ -1155,9 +1158,9 @@ public sealed class TypeChecker
         if (IsAssignable(trueType, falseType)) return trueType;
         if (IsAssignable(falseType, trueType)) return falseType;
 
-        _diagnostics.ReportError(span, DiagnosticCode.TypeMismatch,
-            $"Conditional expression branches have incompatible types: {trueType.SurfaceName} and {falseType.SurfaceName}");
-        return ErrorType.Instance;
+        // C# permits unlike arms when their enclosing target is object.
+        // Preserve a real common type; a narrower target still fails assignment.
+        return PrimitiveType.Object;
     }
 
     private static bool TryUnifyNullableReferences(
@@ -1169,6 +1172,17 @@ public sealed class TypeChecker
         var rightNullable = right as NullableReferenceType;
         var leftReferent = leftNullable?.ReferentType ?? left;
         var rightReferent = rightNullable?.ReferentType ?? right;
+
+        if (left is NullType && (right.Equals(PrimitiveType.String) || right.Equals(PrimitiveType.Object)))
+        {
+            nullable = new NullableReferenceType(right);
+            return true;
+        }
+        if (right is NullType && (left.Equals(PrimitiveType.String) || left.Equals(PrimitiveType.Object)))
+        {
+            nullable = new NullableReferenceType(left);
+            return true;
+        }
 
         if ((leftNullable != null || rightNullable != null)
             && left is not NullType
@@ -2028,7 +2042,10 @@ public sealed class TypeChecker
         if (source is ErrorType) return true; // Allow error types to be assigned anywhere
         if (source is NullType)
         {
-            return target is NullableReferenceType or NullableValueType or ExternalType or ErrorType;
+            // Reference nullability remains analysis-only; introducing a real
+            // null type must not activate the previously accepted literal flow.
+            return target is NullableReferenceType or NullableValueType or ExternalType or ErrorType
+                || target.Equals(PrimitiveType.String) || target.Equals(PrimitiveType.Object);
         }
         if (target is NullableReferenceType nullableTarget)
         {

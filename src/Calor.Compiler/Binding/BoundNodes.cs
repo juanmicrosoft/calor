@@ -1039,7 +1039,7 @@ public sealed class BoundWithExpression : BoundExpression
 public sealed class BoundThrowExpression : BoundExpression
 {
     public BoundExpression Exception { get; }
-    public override BoundType Type { get; } = new NominalBoundType("NEVER");
+    public override BoundType Type { get; } = new NominalBoundType("NEVER", NullableAnnotation.NotAnnotated);
     public override IReadOnlyList<BoundExpression> Children => [Exception];
 
     public BoundThrowExpression(TextSpan span, BoundExpression exception) : base(span)
@@ -1918,53 +1918,9 @@ public sealed class BoundConditionalExpression : BoundExpression
         WhenTrue = whenTrue ?? throw new ArgumentNullException(nameof(whenTrue));
         WhenFalse = whenFalse ?? throw new ArgumentNullException(nameof(whenFalse));
         if (resultType is null) throw new ArgumentNullException(nameof(resultType));
-        // v0.14 nullability follow-up (#1056): propagate STRING branch
-        // annotations. Both branches NotAnnotated → result NotAnnotated
-        // (safe). Either branch Annotated → result Annotated (definitely
-        // possibly-null). Mixed/Oblivious → default Oblivious (conservative).
-        Type = new NominalBoundType(
-            resultType,
-            resultType == "STRING"
-                ? PropagateStringBranchAnnotation(whenTrue.Type, whenFalse.Type)
-                : NullableAnnotation.Oblivious);
+        Type = ExpressionResultTypes.Join(resultType, [whenTrue.Type, whenFalse.Type]);
         Children = [condition, whenTrue, whenFalse];
     }
-
-    private static NullableAnnotation PropagateStringBranchAnnotation(BoundType left, BoundType right)
-    {
-        // A NEVER-typed branch (throw / return in a ternary arm) never
-        // produces a value, so the ternary's nullability is fully
-        // determined by the OTHER branch. Fold it out before the
-        // combining rule.
-        var leftIsNever = IsNever(left);
-        var rightIsNever = IsNever(right);
-        if (leftIsNever && rightIsNever) return NullableAnnotation.Oblivious;
-        if (leftIsNever) return ReadNominalAnnotation(right);
-        if (rightIsNever) return ReadNominalAnnotation(left);
-
-        var la = ReadNominalAnnotation(left);
-        var ra = ReadNominalAnnotation(right);
-        if (la == NullableAnnotation.Annotated || ra == NullableAnnotation.Annotated)
-            return NullableAnnotation.Annotated;
-        if (la == NullableAnnotation.NotAnnotated && ra == NullableAnnotation.NotAnnotated)
-            return NullableAnnotation.NotAnnotated;
-        return NullableAnnotation.Oblivious;
-    }
-
-    private static bool IsNever(BoundType type) =>
-        type is NominalBoundType n && n.QualifiedName == "NEVER";
-
-    // Kept intentionally in sync with NullabilityChecker.GetAnnotation
-    // (see src/Calor.Compiler/Binding/NullabilityChecker.cs). When
-    // Generic/Array bound types start flowing through here, extend this
-    // switch in lockstep with that helper.
-    private static NullableAnnotation ReadNominalAnnotation(BoundType type) => type switch
-    {
-        NominalBoundType n => n.NullableAnnotation,
-        GenericInstantiationBoundType g => g.NullableAnnotation,
-        ArrayBoundType a => a.NullableAnnotation,
-        _ => NullableAnnotation.Oblivious,
-    };
 }
 
 /// <summary>
@@ -1986,18 +1942,13 @@ public class BoundStructuralExpression : BoundExpression
         IReadOnlyList<BoundExpression>? children = null,
         IReadOnlyDictionary<string, object?>? metadata = null,
         IReadOnlyList<BoundExpression>? deferredChildren = null,
-        NullableAnnotation typeAnnotation = NullableAnnotation.Oblivious)
+        NullableAnnotation typeAnnotation = NullableAnnotation.Oblivious,
+        BoundType? resultType = null)
         : base(span)
     {
         NodeTypeName = nodeTypeName ?? throw new ArgumentNullException(nameof(nodeTypeName));
         if (typeName is null) throw new ArgumentNullException(nameof(typeName));
-        // v0.14 nullability follow-up (#1056): the annotation is opt-in per
-        // call site rather than a ctor-level typeName check. Only sites that
-        // know their operation is provably non-null (e.g. BindStringOperation
-        // for Substring/Trim/…) pass NotAnnotated; sites where the STRING
-        // may be null (BindNullCoalesce, BindAwaitExpression unwrapping
-        // Task<string?>) keep the safe Oblivious default.
-        Type = new NominalBoundType(typeName, typeAnnotation);
+        Type = resultType ?? new NominalBoundType(typeName, typeAnnotation);
         Children = children ?? Array.Empty<BoundExpression>();
         Metadata = metadata ?? new Dictionary<string, object?>();
         DeferredChildren = deferredChildren ?? Array.Empty<BoundExpression>();
@@ -2330,7 +2281,9 @@ public sealed class BoundMatchExpression : BoundExpression
         Target = target ?? throw new ArgumentNullException(nameof(target));
         Cases = cases ?? throw new ArgumentNullException(nameof(cases));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
-        Type = new NominalBoundType(resultType ?? throw new ArgumentNullException(nameof(resultType)));
+        Type = ExpressionResultTypes.Join(
+            resultType ?? throw new ArgumentNullException(nameof(resultType)),
+            cases.Where(matchCase => matchCase.Result != null).Select(matchCase => matchCase.Result!.Type));
         Children =
         [
             target,
