@@ -54,11 +54,21 @@ into that body only, including conjunctions. TypeChecker reuses the already
 inferred pattern binding type instead of resolving it again and duplicating
 unknown-type warnings. Thirteen additional cases cover all three loop consumers,
 null/unmatched inputs, invalid scope uses, and one warning per source occurrence.
-The combined inventory is now 8,957 + 67 T2 cases = 9,024, with unchanged skips.
+That candidate's combined inventory was 8,957 + 67 T2 cases = 9,024.
 The same e706 compiler CI also reached two more stale non-nullable-integer
 coalesce fixtures, in operator suggestions and wrapper diagnostic reachability.
 They now use nullable inputs without dropping their original assertions.
 The ordinary product corpus ratchet still passes without another baseline update.
+Following the same true-condition paths exposed the matching transfer gap in
+statement and expression match guards. Both now introduce successful guard
+bindings only in that case. Four more cases cover actual guard consumers,
+round-trip execution, default/negative/disjunctive scope controls and diagnostic
+reuse. The final combined inventory is 8,957 + 71 T2 cases = 9,028, unchanged
+skip budgets. The latest affected run passes 602 cases, including the ordinary
+corpus ratchet, with no further baseline edits.
+The statement-match runtime control uses the supported `var` carrier pattern.
+A guarded wildcard statement case currently emits invalid C# (`case _ when`);
+this transfer repair does not claim to repair that emission form.
 Final-head review and CI records live on the PR. The source-specific corpus
 measurements below remain pinned to their actual c43 and rejected 2d heads.
 

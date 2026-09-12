@@ -2924,6 +2924,8 @@ public sealed class Binder
             using var _ = PushScope(_scope.CreateChild());
             var pattern = BindPattern(matchCase.Pattern);
             var guard = matchCase.Guard != null ? BindExpression(matchCase.Guard) : null;
+            if (matchCase.Guard != null && guard != null)
+                DeclareSuccessfulConditionPatterns(matchCase.Guard, guard);
             var body = BindStatements(matchCase.Body);
             var result = body.LastOrDefault() is BoundReturnStatement { Expression: not null } returnStatement
                 ? returnStatement.Expression

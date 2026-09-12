@@ -330,6 +330,58 @@ public sealed class SafeConsumptionRuntimeTests
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MatchGuardPattern_IsAvailableOnlyInItsSuccessfulCase(bool expression)
+    {
+        var match = expression ? """
+            §R §W{w1:expr} input
+                  §K _ §WHEN (is input str text) → §C{Take} §A text §/C
+                  §K _ → "fallback"
+            """ : """
+            §W{w1} input
+                  §K §VAR{candidate} §WHEN (is input str text)
+                    §B{value:str} text
+                    §R §C{Take} §A value §/C
+                  §K _
+                    §R "fallback"
+            """;
+        var source = $$"""
+            §M{m1:Consumption}
+              §F{f1:Take:pub} (str:value) -> str
+                §E{}
+                §R value
+              §F{f2:Probe:pub} (?object:input) -> str
+                §E{}
+                {{match}}
+            """;
+        foreach (var text in RoundTrip(source))
+        {
+            var (_, diagnostics) = Bind(text);
+            Assert.Empty(diagnostics.Errors);
+            var result = Program.Compile(text, "match-guard-consumption.calr");
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            var method = Emit(result.GeneratedCode).GetType("Consumption.ConsumptionModule")!.GetMethod("Probe")!;
+            Assert.Equal("value", method.Invoke(null, ["value"]));
+            Assert.Equal("fallback", method.Invoke(null, [null]));
+            Assert.Equal("fallback", method.Invoke(null, [42]));
+        }
+        WithCli(source, (exit, _, error) => Assert.True(exit == 0, error));
+        foreach (var unsafeSource in new[]
+        {
+            source.Replace("\"fallback\"", "text", StringComparison.Ordinal),
+            source.Replace("(is input str text)", "(! (is input str text))", StringComparison.Ordinal),
+            source.Replace("(is input str text)", "(|| (is input str text) true)", StringComparison.Ordinal)
+        })
+        {
+            var (_, diagnostics) = Bind(unsafeSource);
+            Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference
+                && diagnostic.Message.Contains("text", StringComparison.Ordinal));
+            Assert.True(Program.Compile(unsafeSource, "match-guard-leak.calr").HasErrors);
+        }
+    }
+
     [Fact]
     public void ExplicitOptionUnwrap_RetainsItsActualRuntimeContract()
     {

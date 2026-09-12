@@ -491,6 +491,7 @@ public sealed class TypeChecker
             if (matchCase.Guard != null)
             {
                 var guardType = InferExpressionType(matchCase.Guard);
+                DefineTrueConditionPatternVariables(matchCase.Guard);
                 if (IsDefinitelyNotBool(guardType))
                 {
                     _diagnostics.ReportError(matchCase.Guard.Span, DiagnosticCode.TypeMismatch,
@@ -1802,6 +1803,7 @@ public sealed class TypeChecker
             if (matchCase.Guard != null)
             {
                 var guardType = InferExpressionType(matchCase.Guard);
+                DefineTrueConditionPatternVariables(matchCase.Guard);
                 if (IsDefinitelyNotBool(guardType))
                 {
                     _diagnostics.ReportError(matchCase.Guard.Span, DiagnosticCode.TypeMismatch,

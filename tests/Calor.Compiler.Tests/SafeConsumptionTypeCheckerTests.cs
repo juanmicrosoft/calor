@@ -291,6 +291,8 @@ public sealed class SafeConsumptionTypeCheckerTests
     [InlineData("§R (? (is input Widget text) true false)")]
     [InlineData("§IF{if1} (&& (is input Widget text) true)\n      §R true")]
     [InlineData("§WH{wh1} (is input Widget text)\n      §R true")]
+    [InlineData("§W{w1} input\n      §K _ §WHEN (is input Widget text)\n        §R true")]
+    [InlineData("§R §W{w1:expr} input\n      §K _ §WHEN (is input Widget text) → true\n      §K _ → false")]
     public void UnknownPatternType_IsDiagnosedOnceWhenItsBindingIsTransferred(string body)
     {
         var result = Check("""
