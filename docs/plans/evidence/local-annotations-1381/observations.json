@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "1b60a8dc0273af04ffbf8fe649a4b400c57ca825",
+  "sourceCommit": "3f2712449152361d230c71c23b75f0570d356e0a",
   "baseCommit": "3b513a632149290481161b195a71aa6cb0e251a8",
   "scope": "N2 inferred references and already-resolved native member reads; no activation or safety claim for unsupported rows",
   "observations": {
     "compiler-corpus": {
-      "file": "n2-1b60-compiler-corpus.trx",
-      "sha256": "f5f2ce075dbbd32d427edc5b355f31fec892b15d9b8bc571e82bba8504463fbe",
+      "file": "n2-3f271-compiler-corpus.trx",
+      "sha256": "11bb160f6414bd6a39fa10872bdf8ebd7c2802b879c4f2699aec12d14c015c22",
       "counters": {
-        "total": 404,
-        "executed": 404,
-        "passed": 404,
+        "total": 434,
+        "executed": 434,
+        "passed": 434,
         "failed": 0,
         "error": 0,
         "timeout": 0,
@@ -25,15 +25,15 @@
         "inProgress": 0,
         "pending": 0
       },
-      "n2Cases": 71
+      "n2Cases": 101
     },
     "editor": {
-      "file": "n2-1b60-editor.trx",
-      "sha256": "5c098a135f6e14c0791cd17336cc01fb101bcecb55e7fac72349f54beeee9601",
+      "file": "n2-3f271-editor.trx",
+      "sha256": "a5833594bd3fbf46b995a1a5a33d26f83f1c0803ae35c415ae6f3be186e21375",
       "counters": {
-        "total": 99,
-        "executed": 99,
-        "passed": 99,
+        "total": 103,
+        "executed": 103,
+        "passed": 103,
         "failed": 0,
         "error": 0,
         "timeout": 0,
@@ -48,11 +48,11 @@
         "inProgress": 0,
         "pending": 0
       },
-      "n2Cases": 2
+      "n2Cases": 6
     },
     "conversion": {
-      "file": "n2-1b60-conversion.trx",
-      "sha256": "95aa1abbb7c7ee237acee935719a4d9e0a2dfcfb3f3b04efe24833987d5e1f3d",
+      "file": "n2-3f271-conversion.trx",
+      "sha256": "e34e0918743e5865ffae240b5ad1f11ab5a6a2bf6ea53ea6f16e8da7c7f91ff3",
       "counters": {
         "total": 280,
         "executed": 280,
@@ -74,8 +74,8 @@
       "n2Cases": 0
     },
     "ids": {
-      "file": "n2-1b60-ids.trx",
-      "sha256": "38147a8122402744505ed40a34a0e46414cdc2a8d95e1435fadc61d65f45d194",
+      "file": "n2-3f271-ids.trx",
+      "sha256": "eb66d2706ca65574d267958f28bd8fb00b5862b16a2761a002e0a53817e57bc7",
       "counters": {
         "total": 9,
         "executed": 9,
@@ -97,8 +97,8 @@
       "n2Cases": 0
     },
     "effects": {
-      "file": "n2-1b60-effects.trx",
-      "sha256": "c13ddc43696771dc247eaf7a4a41a08607036769cdc05e65523d9cebf7f9e140",
+      "file": "n2-3f271-effects.trx",
+      "sha256": "ca425341f73ae41c1cce1047108b12bc633113952d026c944dedfe1af53abfa7",
       "counters": {
         "total": 204,
         "executed": 204,
