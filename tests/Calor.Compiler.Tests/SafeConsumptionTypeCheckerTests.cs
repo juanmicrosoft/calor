@@ -504,6 +504,171 @@ public sealed class SafeConsumptionTypeCheckerTests
         AssertNoErrors(result);
     }
 
+    [Fact]
+    public void NamedArguments_SelectTheMappedOverloadReturnType()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Pick:pub} (str:value, i32:number) -> str
+                §E{}
+                §R value
+              §F{f2:Pick:pub} (i32:value, str:number) -> i32
+                §E{}
+                §R value
+              §F{f3:Probe:pub} () -> str
+                §E{}
+                §R (?? §C{Pick} §A[number] 7 §A[value] "ok" §/C "fallback")
+            """);
+
+        AssertNoErrors(result);
+    }
+
+    [Fact]
+    public void GenericCallReturnType_IsCheckedByOuterConsumer()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Identity:pub}<T> (T:value) -> T
+                §E{}
+                §R value
+              §F{f2:Probe:pub} () -> i32
+                §E{}
+                §R (?? §C{Identity<i32>} §A 1 §/C 2)
+            """);
+
+        var diagnostic = SingleErrorAt(result, 7);
+        Assert.Contains("Null-coalescing requires", diagnostic.Message);
+    }
+
+    [Fact]
+    public void DelegateCalls_ValidateArgumentsAndExposeReturnType()
+    {
+        var wrongArgument = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (Func<i32,i32>:transform) -> i32
+                §E{}
+                §R §C{transform} §A "wrong" §/C
+            """);
+        Assert.True(wrongArgument.HasErrors);
+
+        var invalidConsumer = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (Func<i32,i32>:transform) -> i32
+                §E{}
+                §R (?? §C{transform} §A 1 §/C 2)
+            """);
+        var diagnostic = SingleErrorAt(invalidConsumer, 4);
+        Assert.Contains("Null-coalescing requires", diagnostic.Message);
+    }
+
+    [Fact]
+    public void GenericAndVariantMethodGroups_ConvertToDelegateTargets()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Identity:pub}<T> (T:value) -> T
+                §E{}
+                §R value
+              §F{f2:GetText:pub} () -> str
+                §E{}
+                §R "text"
+              §F{f3:Probe:pub} () -> void
+                §E{}
+                §B{identity:Func<i32,i32>} Identity
+                §B{textFactory:Func<object>} GetText
+            """);
+
+        AssertNoErrors(result);
+    }
+
+    [Fact]
+    public void OverloadedMethodGroups_UseCallArgumentDelegateContext()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Pick:pub} (str:value) -> str
+                §E{}
+                §R value
+              §F{f2:Pick:pub} (i32:value) -> i32
+                §E{}
+                §R value
+              §F{f3:Map:pub} (Func<i32,i32>:transform) -> i32
+                §E{}
+                §R §C{transform} §A 1 §/C
+              §F{f4:Probe:pub} () -> i32
+                §E{}
+                §R §C{Map} §A Pick §/C
+            """);
+
+        AssertNoErrors(result);
+    }
+
+    [Fact]
+    public void UserDeclaredDelegate_ProvidesMethodGroupContext()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §DEL{d1:Picker:pub}
+                §I{i32:value}
+                §O{i32}
+              §F{f1:Pick:pub} (str:value) -> str
+                §E{}
+                §R value
+              §F{f2:Pick:pub} (i32:value) -> i32
+                §E{}
+                §R value
+              §F{f3:Probe:pub} () -> void
+                §E{}
+                §B{picker:Picker} Pick
+            """);
+
+        AssertNoErrors(result);
+    }
+
+    [Fact]
+    public void NullableValueCommonType_IsIndependentOfArmOrder()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (bool:flag, ?i32:maybe) -> void
+                §E{}
+                §B{value:?f64} (? flag maybe FLOAT:1.5)
+                §B{reverse:?f64} (? flag FLOAT:1.5 maybe)
+            """);
+
+        AssertNoErrors(result);
+    }
+
+    [Fact]
+    public void MatchExpression_RejectsUnrelatedInferredArmTypes()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (i32:value) -> void
+                §E{}
+                §B{mixed} §W{m:expr} value
+                  §K 0 → 1
+                  §K _ → "text"
+            """);
+
+        var diagnostic = SingleErrorAt(result, 4);
+        Assert.Contains("incompatible types", diagnostic.Message);
+    }
+
+    [Fact]
+    public void UnmodeledStructuralWrappers_StillValidateNestedExpressions()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> str
+                §E{}
+                §R §INTERP "value=" §EXP (?? 1 2) §/INTERP
+            """);
+
+        var diagnostic = SingleErrorAt(result, 4);
+        Assert.Contains("Null-coalescing requires", diagnostic.Message);
+    }
+
     [Theory]
     [InlineData("§R §C{Take} §A (?? 1 2) §/C")]
     [InlineData("§C{Take} §A (?? 1 2) §/C\n    §R 0")]
