@@ -12,10 +12,10 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
-      "resolvableOnMain": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
+      "measuredCommit": "374f40ac12f4161fdc05c90ba754506c822d504a",
+      "resolvableOnMain": "374f40ac12f4161fdc05c90ba754506c822d504a",
       "basis": "identical-src-tree",
-      "note": "#1397: regenerated on exact compilerb2c43561; preserve this ancestor with a merge commit. Unknown receivers no longer borrow runtime Option purity; known dictionary receivers/getters resolve and conditional getters are charged. Calor0411 sites move279->297,543->551,7420->7932 within unchanged12/61/115 unknown-module sets. Calor0425 diagnostics117, modules47, enforced326, exclusions and all other ledger coordinates are unchanged. Earlier measurements remain in git history; no completed epoch, ledger464ace or frozen protocol is restamped."
+      "note": "#1383/#1384: regenerated on the normal merged N4+N5 candidate 374f40ac. Native nullable STRING applicability keeps Calor0425 diagnostics117 and affected modules47 fixed while enforced modules move326->327 and exclusions38->37. N5 member-resolution changes remain integrated; the actual production denominator and all other coordinates are preserved except the previously documented N4 reachability delta. Preserve this measured ancestor with a normal merge; no release, activation, proof claim, or research record is restamped."
     },
     {
       "ledger": "higher-order-demand-ledger.json",

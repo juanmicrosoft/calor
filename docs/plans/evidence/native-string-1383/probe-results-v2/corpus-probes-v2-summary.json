@@ -1,0 +1,71 @@
+{
+  "LogEventProperty": {
+    "baseline": {
+      "commit": "8f9891a1a07f786a76a293017959c3edf28412bf",
+      "sourceSha256": "ac398230b91da5c0bac90aedd7ec51503546a321783b2c62c195a8c26a1365fc",
+      "binderExpressionsBound": 27,
+      "diagnosticCounts": {
+        "Calor0208": 1,
+        "Calor0200": 3
+      },
+      "propagatedCounts": {
+        "Calor0208": 1
+      },
+      "effectRan": false,
+      "effectCounts": {}
+    },
+    "candidate": {
+      "commit": "7698718b1d65471c07b4e459e29335fc6a84a90c",
+      "sourceSha256": "ac398230b91da5c0bac90aedd7ec51503546a321783b2c62c195a8c26a1365fc",
+      "binderExpressionsBound": 27,
+      "diagnosticCounts": {
+        "Calor0200": 3
+      },
+      "propagatedCounts": {},
+      "effectRan": true,
+      "effectCounts": {
+        "Calor0411": 4,
+        "Calor0410": 1,
+        "Calor0422": 2
+      }
+    }
+  },
+  "JsonValueFormatter": {
+    "baseline": {
+      "commit": "8f9891a1a07f786a76a293017959c3edf28412bf",
+      "sourceSha256": "3f6fa1f940815933c4aa948d41eac450a783530453bc31af1ee1a2a76e3e9d87",
+      "binderExpressionsBound": 392,
+      "diagnosticCounts": {
+        "Calor0200": 51,
+        "Calor0274": 3,
+        "Calor0272": 1
+      },
+      "propagatedCounts": {},
+      "effectRan": true,
+      "effectCounts": {
+        "Calor0411": 77,
+        "Calor0425": 4,
+        "Calor0410": 25,
+        "Calor0422": 1
+      }
+    },
+    "candidate": {
+      "commit": "7698718b1d65471c07b4e459e29335fc6a84a90c",
+      "sourceSha256": "3f6fa1f940815933c4aa948d41eac450a783530453bc31af1ee1a2a76e3e9d87",
+      "binderExpressionsBound": 392,
+      "diagnosticCounts": {
+        "Calor0200": 51,
+        "Calor0274": 4,
+        "Calor0272": 1
+      },
+      "propagatedCounts": {},
+      "effectRan": true,
+      "effectCounts": {
+        "Calor0411": 77,
+        "Calor0425": 4,
+        "Calor0410": 25,
+        "Calor0422": 1
+      }
+    }
+  }
+}

@@ -11,6 +11,40 @@ namespace Calor.LanguageServer.Tests.Utilities;
 
 public class BindingDiagnosticRoutingTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task NativeStringOwnership_IsNotInferredFromDiagnosticCodeOrCachedSourceAsync(
+        bool expression, bool objectOverload)
+    {
+        var extra = objectOverload
+            ? "  §F{object:Take:pub} (object:value) -> i32\n    §E{}\n    §R 2\n"
+            : "";
+        var source = "§M{m1:Routing}\n  §F{take:Take:pub} (str:value) -> i32\n    §E{}\n    §R 1\n"
+            + extra
+            + "  §F{caller:Caller:pub} (?str:value) -> i32\n    §E{}\n    "
+            + (expression ? "§R " : "") + "§C{Take} §A value §/C\n"
+            + (expression ? "" : "    §R 0\n");
+        var path = Path.Combine(Path.GetTempPath(), "native-routing-" + Guid.NewGuid().ToString("N") + ".calr");
+        using var document = new DocumentState(new Uri(path), source);
+        await document.ReanalyzeAsync();
+        var diagnostic = Assert.Single(document.Diagnostics.Where(d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Equal(!objectOverload, diagnostic.BindingContext!.ReplacesNativeOverloadError);
+        var lsp = DiagnosticConverter.ToLspDiagnostic(diagnostic, source);
+        Assert.Equal(objectOverload ? "calor (analysis only)" : "calor", lsp.Source);
+        Assert.Equal(PositionConverter.ToLspRange(diagnostic.Span, source), lsp.Range);
+        Assert.Equal(!objectOverload, Compiler.Program.Compile(source, path).HasErrors);
+
+        var safe = source.Replace("(str:value)", "(?str:value)", StringComparison.Ordinal);
+        var update = await document.UpdateAsync(safe, 1);
+        Assert.True(update.Accepted);
+        Assert.DoesNotContain(update.Snapshot.Diagnostics, d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
     [Fact]
     public async Task CodeActions_PreserveAnalysisOnlyProvenanceAsync()
     {

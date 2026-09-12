@@ -26,6 +26,51 @@ public class BindingRoutingCliTests : IDisposable
         yield return new object[] { 0, true };
     }
 
+    public static IEnumerable<object[]> NativeStringModes()
+    {
+        foreach (var expression in new[] { false, true })
+        foreach (var mode in new[] { 0, 2, 4, 8, 16, 31 })
+            yield return [expression, mode];
+    }
+
+    [Theory]
+    [MemberData(nameof(NativeStringModes))]
+    public void NativeStringInput_KeepsRejectionWithTheCorrectCode(bool expression, int mode)
+    {
+        var source = $$"""
+            §M{m1:Routing}
+              §F{take:Take:pub} (str:value) -> i32
+                §E{}
+                §R 1
+              §F{caller:Caller:pub} (?str:value) -> i32
+                §E{}
+                {{(expression ? "§R " : "")}}§C{Take} §A value §/C
+                {{(expression ? "" : "§R 0")}}
+            """;
+        var file = Path.Combine(_directory, "native.calr");
+        File.WriteAllText(file, source);
+        var arguments = new List<string> { "-i", file, "--format", "json", "--no-cache", "--no-telemetry" };
+        if ((mode & 1) != 0) arguments.Add("--verify");
+        if ((mode & 2) != 0) arguments.Add("--no-type-check");
+        if ((mode & 4) != 0) arguments.Add("--transpile-only");
+        if ((mode & 8) != 0) arguments.Add("--permissive-effects");
+        if ((mode & 16) != 0) arguments.AddRange(["--enforce-effects", "false"]);
+        var result = CliTestHarness.RunCli(_directory,
+            new Dictionary<string, string> { ["CALOR_NO_TYPE_CHECK"] = mode == 31 ? "1" : "0" },
+            arguments.ToArray());
+        Assert.Equal(1, result.ExitCode);
+        using var json = JsonDocument.Parse(result.StdOut);
+        var diagnostic = Assert.Single(json.RootElement.GetProperty("diagnostics").EnumerateArray());
+        var api = Assert.Single(Program.Compile(source, file).Diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.NullableArgumentToNonNullableParameter, api.Code);
+        Assert.Equal(api.Code, diagnostic.GetProperty("code").GetString());
+        Assert.Equal("error", diagnostic.GetProperty("severity").GetString());
+        var location = diagnostic.GetProperty("location");
+        Assert.Equal(api.Span.Line, location.GetProperty("line").GetInt32());
+        Assert.Equal(api.Span.Column, location.GetProperty("column").GetInt32());
+        Assert.Equal(api.Span.Length, location.GetProperty("length").GetInt32());
+    }
+
     [Theory]
     [MemberData(nameof(RootModes))]
     public void RootCli_ActiveErrorMatchesApiAcrossSupportedModes(int mode, bool environmentOptOut)

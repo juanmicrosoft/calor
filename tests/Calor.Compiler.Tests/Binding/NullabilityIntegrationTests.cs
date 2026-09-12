@@ -299,30 +299,29 @@ public class NullabilityIntegrationTests
             """);
         Assert.Equal(!nullable, converted.Success);
         if (nullable)
-            Assert.Contains(converted.Issues, issue => issue.Message.Contains("No overload", StringComparison.Ordinal));
+            Assert.Contains(converted.Issues, issue => issue.Message.Contains("may be null", StringComparison.Ordinal));
         var (bound, diagnostics) = BindSource(converted.CalorSource!);
         var caller = bound.Functions.Single(f => f.Symbol.Name.EndsWith(".Caller", StringComparison.Ordinal));
         var matches = expression
             ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(caller.Body[0]).Expression).SelectedOverloadMatches
             : Assert.IsType<BoundCallStatement>(caller.Body[0]).SelectedOverloadMatches;
-        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NoMatchingOverload);
+        var match = Assert.Single(matches);
+        Assert.Equal(new[] { 0, 1, 2 }, match.Arguments.Select(a => a.ArgumentIndex));
+        Assert.All(match.Arguments, mapping =>
+        {
+            Assert.Equal(0, mapping.ParameterIndex);
+            Assert.True(mapping.IsExpandedParams);
+            Assert.Equal("STRING", TypeIdentity.Canonicalize(mapping.ParameterType));
+        });
         if (nullable)
         {
-            Assert.Empty(matches);
-            Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NoMatchingOverload
+            Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
                 && BindingDiagnosticPolicy.IsCompilationError(d));
         }
         else
         {
             Assert.DoesNotContain(diagnostics, d => BindingDiagnosticPolicy.IsCompilationError(d));
-            var match = Assert.Single(matches);
-            Assert.Equal(new[] { 0, 1, 2 }, match.Arguments.Select(a => a.ArgumentIndex));
-            Assert.All(match.Arguments, mapping =>
-            {
-                Assert.Equal(0, mapping.ParameterIndex);
-                Assert.True(mapping.IsExpandedParams);
-                Assert.Equal("STRING", TypeIdentity.Canonicalize(mapping.ParameterType));
-            });
         }
         var result = Program.Compile(converted.CalorSource!, "n3-native-string-params.calr",
             new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
@@ -2461,49 +2460,31 @@ public class NullabilityIntegrationTests
     // ================================================================
 
     /// <summary>
-    /// F-3A scope-surprise pin (fire path blocked by overload gap).
-    /// The natural repro — a <c>:?string</c> local or an inline
-    /// <c>Environment.GetEnvironmentVariable</c> call passed into a
-    /// Calor-native <c>:string</c> parameter — cannot fire Calor0274
-    /// today because pure-Calor <see cref="Binder.ResolveCall"/> does
-    /// not OPTION-unwrap argument types before overload matching
-    /// (only the BCL branch's <c>TryResolveBclCall</c> does that
-    /// stripping, per PR #1060 review finding M1). The call therefore
-    /// fails resolution with <c>Calor0208 NoMatchingOverload</c> and
-    /// my widening — which only fires on <c>Kind == Resolved</c> —
-    /// never gets a chance to fire.
-    ///
-    /// This test pins that behavior. A future slice (either PR B
-    /// threading Calor-native return-type annotation flow so an
-    /// inline call can surface a matching DisplayString, or a
-    /// dedicated widening of <see cref="Binder.ResolveCall"/> to
-    /// treat OPTION as an implicit conversion) will flip the
-    /// assertion. The <c>S8_Calor0274_Predicate_Fires_For_NullableUserClass_Argument</c>
-    /// direct-predicate test above already locks the predicate
-    /// wiring — this fixture guards the emission path so a future
-    /// widening doesn't accidentally regress.
+    /// N4 replaces the historical Scope-blocked pin: reference annotation
+    /// compatibility permits selection, then the shared predicate reports0274.
+    /// Runtime Option conversion is not part of this compatibility.
     /// </summary>
-    [Fact]
-    public void F3A_Calor0274_ScopeBlocked_When_NullableArg_Fails_CalorOverload()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void F3A_Calor0274_Replaces_ScopeBlocked_NullableStringArgument(bool expression)
     {
-        const string source = """
+        var source = $$"""
             §M{m1:F3ANativeBlocked}
-              §F{f1:Take:pub} (string:name) -> void
+              §F{f1:Take:pub} (string:name) -> i32
                 §E{env}
-              §F{f2:Caller:pub} () -> void
+                §R 1
+              §F{f2:Caller:pub} () -> i32
                 §E{env}
-                §C{Take} §A §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C §/C
+                {{(expression ? "§R " : "")}}§C{Take} §A §C{System.Environment.GetEnvironmentVariable} §A STR:"PATH" §/C §/C
+                {{(expression ? "" : "§R 0")}}
             """;
 
         var (_, diagnostics) = BindSource(source);
 
-        // Current behavior: overload resolution fails (Calor0208)
-        // before Calor0274 can fire. Flip both asserts in the follow-on
-        // slice that widens ResolveCall or threads Calor-native return
-        // annotations to matching-DisplayString shapes.
-        Assert.Contains(diagnostics, d =>
-            d.Code == DiagnosticCode.NoMatchingOverload);
         Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NoMatchingOverload);
+        Assert.Contains(diagnostics, d =>
             d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
     }
 
@@ -2576,14 +2557,9 @@ public class NullabilityIntegrationTests
     /// User-ref works end-to-end today because
     /// <see cref="BoundVariableExpression.BuildStringAnnotatedTypeOrDefault"/>
     /// strips the leading '?' from the QualifiedName on user-ref
-    /// references (per PR #1074's dotted-namespace bridge), so the
-    /// argument's DisplayString "Foo" canonicalizes cleanly and
-    /// overload resolution succeeds. The scalar STRING variant does
-    /// NOT have that stripping (STRING's OPTION-of-STRING branch keeps
-    /// "?string" on the QualifiedName so downstream Option-shaped
-    /// consumers stay unchanged), so the STRING fire path stays
-    /// blocked pending a follow-on slice — see the scope-blocked pin
-    /// above.
+    /// references, so the argument's DisplayString "Foo" canonicalizes
+    /// cleanly and overload resolution succeeds. N4 separately repairs
+    /// scalar STRING applicability without converting runtime Option values.
     /// </summary>
     [Fact]
     public void F3A_Calor0274_Fires_For_NullableUserRefArg_To_NonNullable_CalorParameter()
