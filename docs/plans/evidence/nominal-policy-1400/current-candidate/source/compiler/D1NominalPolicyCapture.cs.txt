@@ -15,16 +15,47 @@ using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Diagnostic = Calor.Compiler.Diagnostics.Diagnostic;
+using CompilationOptions = Calor.Compiler.CompilationOptions;
 
 namespace Calor.Compiler.Binding;
 
-internal static class D1NominalPolicyCapture
+public static class D1NominalPolicyCapture
 {
     private const string MeasurementMode = "__D1_MEASUREMENT_MODE__";
     private const string AcceptedSourceCommit = "8f9891a1a07f786a76a293017959c3edf28412bf";
     private static readonly AsyncLocal<CaptureScope?> Current = new();
+    private static readonly AsyncLocal<SourceScope?> CurrentSource = new();
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private static long _sequence;
+
+    public static IDisposable? BeginSource(
+        string source, string? filePath, string phase, CompilationOptions? options)
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("D1_CAPTURE_DIR")))
+            return null;
+        var scope = new SourceScope(new Dictionary<string, object?>
+        {
+            ["phase"] = phase,
+            ["filePath"] = filePath,
+            ["sourceSha256"] = Sha256Bytes(Encoding.UTF8.GetBytes(source)),
+            ["source"] = source,
+            ["options"] = options is null ? null : new Dictionary<string, object?>
+            {
+                ["enforceEffects"] = options.EnforceEffects,
+                ["contractMode"] = options.ContractMode.ToString(),
+                ["deferGeneratedOutputValidation"] = options.DeferGeneratedOutputValidation,
+                ["statusWriterType"] = options.StatusWriter?.GetType().FullName,
+            },
+        }, CurrentSource.Value);
+        CurrentSource.Value = scope;
+        return scope;
+    }
+
+    private sealed class SourceScope(Dictionary<string, object?> record, SourceScope? previous) : IDisposable
+    {
+        internal Dictionary<string, object?> Record { get; } = record;
+        public void Dispose() => CurrentSource.Value = previous;
+    }
 
     internal static CaptureScope? BeginBind(ModuleNode module, string sourceIdentity)
     {
@@ -89,6 +120,10 @@ internal static class D1NominalPolicyCapture
                 ["finishedAtUtc"] = finished,
                 ["processId"] = Environment.ProcessId,
                 ["sourceIdentity"] = scope.SourceIdentity,
+                ["sourceContext"] = scope.SourceContext,
+                ["callerChain"] = scope.CallerChain,
+                ["sourceContextAvailability"] = scope.SourceContext is null
+                    ? "UnavailableForThisDirectBinderInvocation" : "CapturedAtActualSourceEntry",
                 ["module"] = new Dictionary<string, object?>
                 {
                     ["id"] = scope.ModuleId,
@@ -244,6 +279,11 @@ internal static class D1NominalPolicyCapture
         internal List<PredicateAttempt> PredicateAttempts { get; } = [];
         internal List<BclResolutionAttempt> BclResolutionAttempts { get; } = [];
         internal List<CallArgumentValidation> CallArgumentValidations { get; } = [];
+        internal object? SourceContext { get; } = CurrentSource.Value?.Record;
+        internal string[] CallerChain { get; } = new System.Diagnostics.StackTrace(false).GetFrames()
+            .Select(frame => frame.GetMethod())
+            .Select(method => $"{method?.DeclaringType?.FullName}.{method?.Name}")
+            .Take(24).ToArray();
 
         internal CaptureScope(
             string captureDirectory,

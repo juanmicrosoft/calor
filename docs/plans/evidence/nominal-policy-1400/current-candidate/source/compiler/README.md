@@ -46,6 +46,7 @@ The materializer asserts exact pre-image SHA-256 hashes for:
 - `src/Calor.Compiler/Binding/Binder.cs`
 - `src/Calor.Compiler/Binding/NullabilityChecker.cs`
 - `src/Calor.Compiler/Binding/Scope.cs`
+- `src/Calor.Compiler/Program.cs`
 - `tools/Calor.RoundTrip.Harness/RoundTripPipeline.cs`
 
 It adds:
@@ -56,6 +57,8 @@ It adds:
 It patches only exact text anchors:
 
 - `Binder.Bind` begin/completed capture.
+- actual `Program.Compile` source/hash/options scope and a separately labelled
+  E1 independent-rebind source scope, plus the actual Binder caller chain.
 - actual `TryResolveBclCall` result capture.
 - actual `ValidateCallArguments` for statement and expression call sites.
 - shared `NullabilityChecker.IsPossiblyNullAssignedTo` predicate capture.
@@ -76,6 +79,12 @@ Each binder invocation writes one immutable JSON file to `D1_CAPTURE_DIR`:
   "measurementMode": "current|shadow-annotated|shadow-conservative",
   "invocationId": "d1-<sha-prefix>-<sequence>",
   "compiler": {"assemblyLocation": "...", "sha256": "..."},
+  "sourceContext": {
+    "phase": "Program.Compile|E1IndependentBinding",
+    "sourceSha256": "...",
+    "source": "...",
+    "options": {}
+  },
   "privateMetadataProfile": {
     "state": "NotInstantiated|Instantiated",
     "profileHash": "...",
@@ -100,6 +109,10 @@ copied TRX bytes when `D1_CAPTURE_DIR` is set.
 - Origin classification is intentionally not reduced in-source. The JSON keeps
   raw ingredients; parent reduction must retain `OriginUnobservable` and
   transfer-loss rows rather than filtering them.
+- E1 compilation explicitly disables effects/contracts and defers generated
+  output validation. Its observations are not default API/CLI observations.
+  Direct Binder calls outside a captured source scope retain an explicit
+  unavailable source-context marker rather than borrowing another invocation.
 - Source preparation: `d1-compiler-shadow-artifacts`,
   `ae77764f-32f5-4913-9291-61451d1b129e`, requested/registry model `gpt-5.5`.
   This is an implementation helper, not an independent final reviewer.

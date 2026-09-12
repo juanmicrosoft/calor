@@ -28,6 +28,7 @@ PINNED_INPUT_SHA256 = {
     "src/Calor.Compiler/Binding/Binder.cs": "641bf91a4f3b5c528d7b3c8aed3cc2ec687eb9f6a53e57380d0ee05a960e7dc3",
     "src/Calor.Compiler/Binding/NullabilityChecker.cs": "af932a552e7e738b7132faa5d201af1ee0d2d7c83740f1cce2c1c30a26410785",
     "src/Calor.Compiler/Binding/Scope.cs": "cdf664997accd073527820c216ce03f4287eaf2dc2bd56879c3d2c20e6b2252c",
+    "src/Calor.Compiler/Program.cs": "c8dc9d3f839e7385bed19ec246c7347be44ef770c6a7381160435aff32c5c92a",
     "tools/Calor.RoundTrip.Harness/RoundTripPipeline.cs": "19ab767553f942d0488856b88dd9ff322ca04a2ac4f36d8659f6367bcad64a1a",
 }
 
@@ -86,6 +87,7 @@ def main() -> int:
     transform_file(root, "src/Calor.Compiler/Binding/Binder.cs", transform_binder(args.mode), manifest)
     transform_file(root, "src/Calor.Compiler/Binding/NullabilityChecker.cs", transform_nullability(args.mode), manifest)
     transform_file(root, "src/Calor.Compiler/Binding/Scope.cs", transform_scope(), manifest)
+    transform_file(root, "src/Calor.Compiler/Program.cs", transform_program(), manifest)
     transform_file(root, "tools/Calor.RoundTrip.Harness/RoundTripPipeline.cs", transform_roundtrip(), manifest)
 
     print(json.dumps(manifest, indent=2, sort_keys=True))
@@ -382,6 +384,19 @@ def transform_scope() -> Callable[[str, list[dict[str, object]]], str]:
 
 def transform_roundtrip() -> Callable[[str, list[dict[str, object]]], str]:
     def apply(text: str, operations: list[dict[str, object]]) -> str:
+        text = replace_exact(
+            text,
+            "E1 independent rebind source attribution",
+            """    private static void CaptureBindingAnalysis(CandidateEvidence candidate, string source, string sourcePath, string relativePath)
+    {
+        try""",
+            """    private static void CaptureBindingAnalysis(CandidateEvidence candidate, string source, string sourcePath, string relativePath)
+    {
+        using var d1Source = Compiler.Binding.D1NominalPolicyCapture.BeginSource(
+            source, sourcePath, "E1IndependentBinding", null);
+        try""",
+            operations,
+        )
         return replace_exact(
             text,
             "RoundTripPipeline raw TRX archival hook",
@@ -393,6 +408,24 @@ def transform_roundtrip() -> Callable[[str, list[dict[str, object]]], str]:
             operations,
         )
 
+    return apply
+
+
+def transform_program() -> Callable[[str, list[dict[str, object]]], str]:
+    def apply(text: str, operations: list[dict[str, object]]) -> str:
+        return replace_exact(
+            text,
+            "Actual Program.Compile input and options",
+            """    public static CompilationResult Compile(string source, string? filePath, CompilationOptions options)
+    {
+        var diagnostics = new DiagnosticBag();""",
+            """    public static CompilationResult Compile(string source, string? filePath, CompilationOptions options)
+    {
+        using var d1Source = Binding.D1NominalPolicyCapture.BeginSource(
+            source, filePath, "Program.Compile", options);
+        var diagnostics = new DiagnosticBag();""",
+            operations,
+        )
     return apply
 
 

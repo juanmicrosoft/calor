@@ -48,6 +48,15 @@ coalesces, `Option<T>`, broad `?` replacement, or production converter changes.
 If that route fails, the driver emits a real `§CSHARP` fallback result with
 native coverage loss instead of reporting fallback as native success.
 
+The null/present caller harness is separate C# test code, not converted library
+code. Its source/hash are explicit inputs on both runtime legs. The first
+all-in-one fixture hit the retained direct null-literal native applicability
+limit and is preserved as a failed development attempt. A raw passthrough
+attempt also failed with duplicated declarations; it is not reported as
+successful fallback coverage. The revised fixture gates only Echo/Receive on
+actual reference identity and default compilation, retaining the independent
+raw `Calor0200` finding on `value.Label` as unsupported member evidence.
+
 Source preparation: `d1-migration-artifacts`,
 `5ab0fac2-b888-43ba-84e6-9088be71aa84`, requested/registry model `gpt-5.5`.
 This is an implementation helper, not an independent final reviewer.
