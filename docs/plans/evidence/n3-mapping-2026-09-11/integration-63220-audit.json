@@ -165,7 +165,12 @@
       "statement/expression",
       "nullable/non-null"
     ],
-    "assertions": "Actual DirectoryInfo Roslyn identity/annotation after two inferred locals, actual selected map/formal span, AnalysisOnly findings and default compiler API acceptance; filesystem APIs are bound only, never executed.",
+    "assertions": "Actual DirectoryInfo Roslyn identity/annotation after two inferred locals, actual selected map/formal span, AnalysisOnly findings and compiler API acceptance with EnforceEffects=false; not default compilation. Filesystem APIs are bound only, never executed.",
+    "apiOptions": {
+      "EnforceEffects": false,
+      "StatusWriter": "TextWriter.Null"
+    },
+    "apiObservationCorrection": "The d6ca95dd descriptive assertions incorrectly called these eight observations default compiler API acceptance. The unchanged test source explicitly sets the options above. This corrects the label, not the source, measurements or production-admissibility coverage.",
     "initialTargetedCounters": {
       "total": "207",
       "executed": "207",

@@ -143,8 +143,12 @@ Eight additional joint controls pass real native/reordered and BCL/named inputs
 through two inferred locals, in both call forms, with nullable/non-null sources.
 They assert actual `DirectoryInfo` Roslyn identity and annotation, selected
 native mapping or BCL formal indices, the actual supplied span/formal name,
-analysis-only disposition and public compiler API acceptance. Filesystem APIs
-are bound, **not executed**. N2's measured direct-versus-through-local native
+analysis-only disposition and public compiler API acceptance with
+`EnforceEffects=false` and `StatusWriter=TextWriter.Null`. These eight API
+observations are **not default compilation or default production-admissibility
+evidence**. The audit's earlier "default" label was incorrect; its correction
+does not change the test source or measurements. Filesystem APIs are bound,
+**not executed**. N2's measured direct-versus-through-local native
 applicability distinction is preserved: direct nullable BCL-to-native0208 is
 not rewritten, while already-resolved through-local calls gain the retained
 annotation. This is not new applicability or production enforcement.
