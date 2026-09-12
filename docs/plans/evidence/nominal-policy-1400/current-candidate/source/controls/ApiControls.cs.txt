@@ -58,7 +58,7 @@ var binder = new Binder(diagnostics, "private-profile-discovery.calr");
 binder.Bind(module);
 var metadata = typeof(Binder).GetField("_metadataBinder", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(binder)
     ?? throw new InvalidOperationException("Actual private metadata Binder was not instantiated.");
-var context = metadata.GetType().GetProperty("Context")!.GetValue(metadata)!;
+var context = metadata.GetType().GetProperty("Context", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!.GetValue(metadata)!;
 var host = (CSharpCompilation)(context.GetType().GetProperty("HostCompilationForBinder", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(context)
     ?? throw new InvalidOperationException("Actual host compilation unavailable."));
 var profile = host.References.Select((reference, index) =>
@@ -130,7 +130,7 @@ JsonSerializer.Serialize(stream, new {
     privateProfile = profile, warmSource, warmSourceSha256 = Hash(Encoding.UTF8.GetBytes(warmSource)),
     discovery = new {
         inspectedMethods, eligibleMethods = eligible.Count,
-        filter = "Public static ordinary nongeneric method; nongeneric named reference return with actual None annotation, excluding STRING; <=2 supplied string/int32/bool inputs; first8 ordinal signature order, no execution.",
+        filter = "Public top-level type; public static ordinary nongeneric method; nongeneric named reference return with actual None annotation, excluding STRING; <=2 supplied string/int32/bool inputs; first8 ordinal signature order, no execution.",
         selected = selected.Select(m => new { signature = m.ToDisplayString(), assembly = m.ContainingAssembly.Identity.ToString(),
             returnAnnotation = m.ReturnType.NullableAnnotation.ToString(),
             definitionAnnotation = m.OriginalDefinition.ReturnType.NullableAnnotation.ToString() }).ToArray(),
