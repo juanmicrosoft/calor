@@ -842,6 +842,160 @@ public sealed class SafeConsumptionTypeCheckerTests
             [typeof(string), typeof(FunctionType)]));
     }
 
+    [Fact]
+    public void MatchExpression_UsesReturnAndCallParameterTargets()
+    {
+        var returnResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (i32:value) -> object
+                §E{}
+                §R §W{m:expr} value
+                  §K 0 → 1
+                  §K _ → "text"
+            """);
+        AssertNoErrors(returnResult);
+
+        var argumentResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Take:pub} (object:value) -> object
+                §E{}
+                §R value
+              §F{f2:Probe:pub} (i32:value) -> object
+                §E{}
+                §R §C{Take} §A §W{m:expr} value
+                  §K 0 → 1
+                  §K _ → "text"
+                §/C
+            """);
+        AssertNoErrors(argumentResult);
+    }
+
+    [Fact]
+    public void OverloadInference_PrefersIdentityConversion()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Pick:pub} (i32:value) -> i32
+                §E{}
+                §R value
+              §F{f2:Pick:pub} (f64:value) -> str
+                §E{}
+                §R "wide"
+              §F{f3:Probe:pub} () -> i32
+                §E{}
+                §R (?? §C{Pick} §A 1 §/C 2)
+            """);
+
+        var diagnostic = SingleErrorAt(result, 10);
+        Assert.Contains("Null-coalescing requires", diagnostic.Message);
+
+        var categoryResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Pick:pub} (object:value) -> str
+                §E{}
+                §R "boxed"
+              §F{f2:Pick:pub} (f64:value) -> i32
+                §E{}
+                §R 1
+              §F{f3:Probe:pub} () -> i32
+                §E{}
+                §R (?? §C{Pick} §A 1 §/C 2)
+            """);
+        var categoryDiagnostic = SingleErrorAt(categoryResult, 10);
+        Assert.Contains("Null-coalescing requires", categoryDiagnostic.Message);
+    }
+
+    [Fact]
+    public void MethodGroupConversion_RejectsBoxingReturnsAndModifierMismatches()
+    {
+        var boxingResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:GetInt:pub} () -> i32
+                §E{}
+                §R 1
+              §F{f2:Probe:pub} () -> void
+                §E{}
+                §B{factory:Func<object>} GetInt
+            """);
+        Assert.Contains(boxingResult.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+
+        var modifierResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Bump:pub} (i32:value:ref) -> i32
+                §E{}
+                §R value
+              §F{f2:Probe:pub} () -> void
+                §E{}
+                §B{f:Func<i32,i32>} Bump
+            """);
+        Assert.Contains(modifierResult.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void DelegateCalls_ReportShapeErrorsAndPreserveNamedResults()
+    {
+        var arityResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (Func<i32,i32>:transform) -> i32
+                §E{}
+                §R §C{transform} §A 1 §A 2 §/C
+            """);
+        Assert.Contains(arityResult.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+
+        var namedResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (Func<i32,i32>:transform) -> i32
+                §E{}
+                §R (?? §C{transform} §A[arg] 1 §/C 2)
+            """);
+        var diagnostic = SingleErrorAt(namedResult, 4);
+        Assert.Contains("Null-coalescing requires", diagnostic.Message);
+    }
+
+    [Fact]
+    public void GenericMethodGroupInference_IsIndependentOfDeclarationOrder()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Get:pub} (object:value) -> str
+                §E{}
+                §R "wide"
+              §F{f2:Get:pub} (str:value) -> i32
+                §E{}
+                §R 1
+              §F{f3:Choose:pub}<T> (Func<str,T>:factory, T:fallback) -> T
+                §E{}
+                §R fallback
+              §F{f4:Probe:pub} () -> i32
+                §E{}
+                §R (?? §C{Choose} §A Get §A 1 §/C 2)
+            """);
+
+        var diagnostic = SingleErrorAt(result, 13);
+        Assert.Contains("Null-coalescing requires", diagnostic.Message);
+    }
+
+    [Fact]
+    public void StatementLambda_UsesItsDelegateReturnTarget()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (i32:value) -> i32
+                §E{}
+                §B{factory:Func<object>} §LAM{l1}
+                  §R §W{m:expr} value
+                    §K 0 → 1
+                    §K _ → "text"
+                §/LAM{l1}
+                §R 0
+            """);
+
+        AssertNoErrors(result);
+    }
+
     [Theory]
     [InlineData("§R §C{Take} §A (?? 1 2) §/C")]
     [InlineData("§C{Take} §A (?? 1 2) §/C\n    §R 0")]

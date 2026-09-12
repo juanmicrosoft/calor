@@ -1,3 +1,5 @@
+using Calor.Compiler.Ast;
+
 namespace Calor.Compiler.TypeChecking;
 
 /// <summary>
@@ -384,6 +386,7 @@ public sealed class FunctionType : CalorType
 {
     public IReadOnlyList<CalorType> ParameterTypes { get; }
     public IReadOnlyList<string>? ParameterNames { get; }
+    public IReadOnlyList<ParameterModifier>? ParameterModifiers { get; }
     public CalorType ReturnType { get; }
     public override string Name
     {
@@ -411,10 +414,20 @@ public sealed class FunctionType : CalorType
         IReadOnlyList<CalorType> parameterTypes,
         CalorType returnType,
         IReadOnlyList<string>? parameterNames)
+        : this(parameterTypes, returnType, parameterNames, null)
+    {
+    }
+
+    public FunctionType(
+        IReadOnlyList<CalorType> parameterTypes,
+        CalorType returnType,
+        IReadOnlyList<string>? parameterNames,
+        IReadOnlyList<ParameterModifier>? parameterModifiers)
     {
         ParameterTypes = parameterTypes ?? throw new ArgumentNullException(nameof(parameterTypes));
         ReturnType = returnType ?? throw new ArgumentNullException(nameof(returnType));
         ParameterNames = parameterNames;
+        ParameterModifiers = parameterModifiers;
     }
 
     public override bool Equals(CalorType? other)
