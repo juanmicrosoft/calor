@@ -925,7 +925,9 @@ public sealed class Binder
         bool isStatic = false,
         ConditionalAlternative? conditionalAlternative = null,
         BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious,
-        BoundTypes.FunctionBoundType? functionType = null)
+        BoundTypes.FunctionBoundType? functionType = null,
+        BoundTypes.NominalBoundType? inferredReferenceType = null,
+        bool isTypeInferred = false)
     {
         var symbol = new VariableSymbol(
             id,
@@ -943,7 +945,11 @@ public sealed class Binder
             isStatic,
             conditionalAlternative,
             nullableAnnotation,
-            functionType);
+            functionType)
+        {
+            InferredReferenceType = inferredReferenceType,
+            IsTypeInferred = isTypeInferred
+        };
         TrackSymbol(symbol);
         return symbol;
     }
@@ -958,7 +964,9 @@ public sealed class Binder
         string kind,
         ExpressionNode? defaultValue = null,
         BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious,
-        BoundTypes.FunctionBoundType? functionType = null)
+        BoundTypes.FunctionBoundType? functionType = null,
+        BoundTypes.NominalBoundType? inferredReferenceType = null,
+        bool isTypeInferred = false)
     {
         var context = _declarationContext.IsNone ? _moduleSymbolId : _declarationContext;
         return CreateVariable(
@@ -971,7 +979,9 @@ public sealed class Binder
             declarationSpan,
             defaultValue,
             nullableAnnotation: nullableAnnotation,
-            functionType: functionType);
+            functionType: functionType,
+            inferredReferenceType: inferredReferenceType,
+            isTypeInferred: isTypeInferred);
     }
 
     private SymbolId CreateDeclarationId(
@@ -1483,24 +1493,17 @@ public sealed class Binder
             return new BoundBindStatement(bind.Span, rebindTarget, initializer);
         }
 
-        // v0.14 nullability workstream (follow-up to #1057) — capture the
-        // declared nullability on the VariableSymbol so subsequent
-        // BoundVariableExpression reads inherit NotAnnotated for
-        // §B{x:string} and Annotated for §B{x:?string}. Scoped to STRING
-        // targets per §D6; non-STRING targets keep the safe Oblivious
-        // default and land in a follow-on slice.
-        // v0.14 nullability workstream — capture the declared annotation on
-        // the VariableSymbol so subsequent BoundVariableExpression reads
-        // inherit NotAnnotated for §B{x:string} and Annotated for
-        // §B{x:?string}. When the type is INFERRED (bind.TypeName is null),
-        // inherit the initializer's annotation instead — otherwise a
-        // §B{x} STR:"hi" (STRING literal, provably NotAnnotated) would
-        // stay Oblivious on the symbol and later §B{y:string} x would
-        // trip Calor0272 falsely (review finding from PR #1059).
+        // Explicit declarations win. Inferred references carry the producer's
+        // resolved identity as well as its annotation; unknown expressions do not
+        // acquire a non-null guarantee merely from an inferred type spelling.
+        var inferredReferenceType = bind.TypeName is null
+            ? GetInferredReferenceType(initializer)
+            : null;
         var declaredAnnotation = TryReadDeclaredStringAnnotation(bind.TypeName)
             is var explicitAnnotation && explicitAnnotation != BoundTypes.NullableAnnotation.Oblivious
                 ? explicitAnnotation
-                : InferAnnotationForStringBinding(bind.TypeName, typeName, initializer);
+                : inferredReferenceType?.NullableAnnotation
+                    ?? InferAnnotationForStringBinding(bind.TypeName, typeName, initializer);
 
         // v0.15 E2 slice b — position 7's row (§3.3), and §3.5's asymmetry:
         //   * a row that is WRITTEN is the binding's row (Calor0405 when the
@@ -1525,7 +1528,9 @@ public sealed class Binder
             bind.IdentifierSpan,
             "local",
             nullableAnnotation: declaredAnnotation,
-            functionType: bindFunctionType);
+            functionType: bindFunctionType,
+            inferredReferenceType: inferredReferenceType,
+            isTypeInferred: bind.TypeName is null);
 
         if (!_scope.TryDeclare(variable))
         {
@@ -1712,6 +1717,37 @@ public sealed class Binder
             context = separator < 0 ? null : context[..separator];
         }
         yield return name;
+    }
+
+    private BoundTypes.NominalBoundType? TryBuildVariableReference(VariableSymbol variable) =>
+        variable.IsTypeInferred ? variable.InferredReferenceType : TryBuildReferenceType(
+            variable.TypeName,
+            variable.DeclaringTypeName ?? _currentClassName,
+            _currentNamespaceIdentity,
+            variable.DeclaringTypeName is null
+                ? _currentMemberTypeParameters?.Select(parameter => parameter.Name)
+                : null,
+            allowObject: variable.NullableAnnotation != BoundTypes.NullableAnnotation.Oblivious);
+
+    private BoundTypes.NominalBoundType? GetInferredReferenceType(BoundExpression? expression)
+    {
+        if (expression?.Type is not BoundTypes.NominalBoundType nominal)
+            return null;
+        if (nominal.IsKnownReferenceType)
+            return nominal;
+        if (expression is not BoundNewExpression constructed)
+            return null;
+
+        // Keep the constructor's existing annotation; only recover its actual
+        // type identity for later local reads.
+        var identity = constructed.ResolvedType is { } declaration
+            ? new BoundTypes.NominalBoundType(nominal.QualifiedName, nominal.NullableAnnotation, declaration)
+            : TryBuildReferenceType(nominal.QualifiedName, _currentClassName,
+                _currentNamespaceIdentity, _currentMemberTypeParameters?.Select(parameter => parameter.Name));
+        return identity is { IsKnownReferenceType: true }
+            ? new BoundTypes.NominalBoundType(nominal.QualifiedName, nominal.NullableAnnotation,
+                identity.Declaration, identity.RoslynSymbol)
+            : null;
     }
 
     private BoundTypes.NominalBoundType? TryBuildCallableReference(string typeName, FunctionSymbol function)
@@ -2336,6 +2372,16 @@ public sealed class Binder
             .Select(field => TypeIdentity.Canonicalize(field.TypeName))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
+        BoundTypes.BoundType? resolvedType = null;
+        if (fields is [var field])
+        {
+            var identity = TryBuildVariableReference(field);
+            var isString = TryBuildDeclaredNullabilityShape(field.TypeName, out var declared)
+                && declared is BoundTypes.NominalBoundType { QualifiedName: "STRING" };
+            if (identity is not null || isString)
+                resolvedType = new BoundTypes.NominalBoundType(
+                    field.TypeName, field.NullableAnnotation, identity?.Declaration, identity?.RoslynSymbol);
+        }
 
         return new BoundFieldAccessExpression(
             fieldAccess.Span,
@@ -2344,7 +2390,8 @@ public sealed class Binder
             fieldTypes.Length == 1 ? fields[0].TypeName : "OBJECT",
             fields.FirstOrDefault(),
             fieldAccess.FieldNameSpan,
-            fields);
+            fields,
+            resolvedType);
     }
 
     private BoundExpression BindTypeOperation(TypeOperationNode typeOp)
@@ -3257,12 +3304,7 @@ public sealed class Binder
             }
 
             var identity = variables.Length == 1
-                ? TryBuildReferenceType(
-                    variables[0].TypeName,
-                    variables[0].DeclaringTypeName ?? _currentClassName,
-                    _currentNamespaceIdentity,
-                    _currentMemberTypeParameters?.Select(parameter => parameter.Name),
-                    allowObject: variables[0].NullableAnnotation != BoundTypes.NullableAnnotation.Oblivious)
+                ? TryBuildVariableReference(variables[0])
                 : null;
             return new BoundVariableExpression(refNode.Span, variables[0], variables,
                 typeOverride: null, referenceIdentity: identity);
