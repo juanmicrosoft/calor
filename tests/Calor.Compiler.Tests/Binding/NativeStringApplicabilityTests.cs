@@ -263,6 +263,35 @@ public sealed class NativeStringApplicabilityTests
         Assert.Same(concrete, result.Function);
     }
 
+    [Fact]
+    public void ConditionalConcreteStringAlternatives_WinNullableCompatibilityTieWithInferredGeneric()
+    {
+        var scope = new Scope();
+        var generic = new FunctionSymbol("Take", "T", [new VariableSymbol("value", "T", false)], ["T"]);
+        var first = new FunctionSymbol(
+            SymbolId.None,
+            "Take",
+            "i32",
+            [new VariableSymbol("value", "str", false)],
+            conditionalAlternative: new ConditionalAlternative("take", 0));
+        var second = new FunctionSymbol(
+            SymbolId.None,
+            "Take",
+            "i32",
+            [new VariableSymbol("value", "str", false)],
+            conditionalAlternative: new ConditionalAlternative("take", 1));
+        Assert.True(scope.TryDeclareOverload("Take", generic, out _));
+        Assert.True(scope.TryDeclareOverload("Take", first, out _));
+        Assert.True(scope.TryDeclareOverload("Take", second, out _));
+
+        var result = scope.ResolveOverload("Take", ["?str"], null, null, null, null,
+            allowNullableStringCompatibility: true);
+
+        Assert.Equal(OverloadResolutionKind.Resolved, result.Kind);
+        Assert.Same(first, result.Function);
+        Assert.Equal([first, second], result.Functions);
+    }
+
     [Theory]
     [InlineData("str")]
     [InlineData("STRING")]

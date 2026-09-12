@@ -1578,7 +1578,7 @@ public sealed class Scope
         ResolveOverload(name, argumentTypes, argumentNames, argumentModifiers,
             typeArguments, implicitConversionCost, allowNullableStringCompatibility: false);
 
-    internal OverloadResolutionResult ResolveOverload(
+    public OverloadResolutionResult ResolveOverload(
         string name,
         IReadOnlyList<string> argumentTypes,
         IReadOnlyList<string?>? argumentNames,
@@ -1640,18 +1640,48 @@ public sealed class Scope
         if (best.Length == 1)
             return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType, best[0].Arguments);
 
-        var concreteNullableStringMatches = best
+        var concreteNullableStringGroups = best
             .Where(item => item.UsesNullableStringCompatibility && item.Function.GenericArity == 0)
+            .GroupBy(item => item.Function.SignatureKey, StringComparer.Ordinal)
+            .Where(group =>
+            {
+                var candidates = group.Select(item => item.Function).ToArray();
+                return candidates
+                    .Skip(1)
+                    .All(candidate => candidates
+                        .Where(other => !ReferenceEquals(other, candidate))
+                        .All(other => AreMutuallyExclusiveAlternatives(candidate, other)));
+            })
+            .Select(group => group.ToArray())
             .ToArray();
-        if (concreteNullableStringMatches.Length == 1
-            && best.Where(item => !ReferenceEquals(item.Function, concreteNullableStringMatches[0].Function))
-                .All(item => item.Function.GenericArity > 0))
+        if (concreteNullableStringGroups.Length == 1)
         {
-            var selected = concreteNullableStringMatches[0];
-            return OverloadResolutionResult.Resolved(
-                selected.Function,
-                selected.ReturnType,
-                selected.Arguments);
+            var selected = concreteNullableStringGroups[0];
+            var selectedFunctions = selected.Select(item => item.Function).ToHashSet();
+            if (best.Where(item => !selectedFunctions.Contains(item.Function))
+                .All(item => item.Function.GenericArity > 0))
+            {
+                if (selected.Length == 1)
+                {
+                    return OverloadResolutionResult.Resolved(
+                        selected[0].Function,
+                        selected[0].ReturnType,
+                        selected[0].Arguments);
+                }
+
+                var alternativeReturnTypes = selected
+                    .Select(item => TypeIdentity.Canonicalize(item.ReturnType))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray();
+                return OverloadResolutionResult.ResolvedAlternatives(
+                    selected.Select(item => item.Function).ToArray(),
+                    alternativeReturnTypes.Length == 1
+                        ? alternativeReturnTypes[0]
+                        : "OBJECT",
+                    selected.Select(item =>
+                            new ResolvedOverloadMatch(item.Function, item.ReturnType, item.Arguments))
+                        .ToArray());
+            }
         }
 
         var bestFunctions = best.Select(item => item.Function).ToArray();

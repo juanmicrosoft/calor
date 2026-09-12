@@ -121,6 +121,39 @@ public class CrossFileResolutionTests
     }
 
     [Fact]
+    public void ResolveProjectCall_UsesNullableStringCompatibilityAcrossFiles()
+    {
+        var workspace = new WorkspaceState();
+        var definitionsState = workspace.GetOrCreate(
+            DocumentUri.From("file:///utils.calr"),
+            """
+            §M{m001:Utils}
+              §F{f001:Take:pub} (str:value) -> str
+                §E{}
+                §R value
+            """);
+        var use = """
+            §M{m002:Main}
+              §F{f002:Run:pub} (?str:value) -> str
+                §E{}
+                §R §C{Take} §A value §/C
+            """;
+        var useState = workspace.GetOrCreate(
+            DocumentUri.From("file:///main.calr"),
+            use);
+        var call = SymbolFinder.FindBoundCallAtOffset(
+            useState.BoundModule,
+            use.IndexOf("Take", StringComparison.Ordinal));
+
+        var resolved = workspace.ResolveProjectCall(call);
+
+        Assert.Same(definitionsState, resolved.Doc);
+        Assert.Equal(
+            Assert.Single(definitionsState.BoundModule!.Functions).SymbolId,
+            resolved.Symbol?.Id);
+    }
+
+    [Fact]
     public void EquivalentWorkspaceRoots_ProducePortableStableSymbolIds()
     {
         const string source = """

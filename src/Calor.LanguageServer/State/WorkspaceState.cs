@@ -1138,7 +1138,9 @@ public sealed class WorkspaceState
                 .ToArray(),
             argumentNames,
             argumentModifiers,
-            typeArguments);
+            typeArguments,
+            implicitConversionCost: null,
+            allowNullableStringCompatibility: true);
         return resolution.Function == null
             ? new ProjectFunctionLocation(null, null, null)
             : FindFunctionOwner(documents, resolution.Function.Id);
