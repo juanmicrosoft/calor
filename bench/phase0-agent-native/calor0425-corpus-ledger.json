@@ -48,9 +48,9 @@
         "Subject": "serilog",
         "Files": 112,
         "ParseFailed": 0,
-        "BindStopped": 14,
-        "ReachEffectPass": 98,
-        "StopCalor0410": 56,
+        "BindStopped": 13,
+        "ReachEffectPass": 99,
+        "StopCalor0410": 57,
         "StopCalor0422Or0423": 5,
         "StopCalor1002": 25,
         "CompileClean": 12,
@@ -74,11 +74,11 @@
       }
     ]
   },
-  "MeasuredCommit": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
+  "MeasuredCommit": "bde9ee88627acb1fcdf62494b701b24856fa5881",
   "AggregateDiagnostics": 117,
   "AggregateModulesWithDiagnostics": 47,
-  "AggregateModulesEnforced": 326,
-  "AggregateModulesExcluded": 38,
+  "AggregateModulesEnforced": 327,
+  "AggregateModulesExcluded": 37,
   "PerSubject": [
     {
       "Subject": "MediatR",
@@ -117,8 +117,8 @@
       "Subject": "serilog",
       "Diagnostics": 43,
       "ModulesWithDiagnostics": 16,
-      "ModulesEnforced": 98,
-      "ModulesNotMeasured": 14,
+      "ModulesEnforced": 99,
+      "ModulesNotMeasured": 13,
       "RowlessDestination": 1,
       "UnknownSource": 0,
       "Assumed": 0,
@@ -131,13 +131,13 @@
       "InvocationWitness": 18,
       "ExcludedConversionFailed": 0,
       "ExcludedParseFailed": 0,
-      "ExcludedBindFailed": 14,
+      "ExcludedBindFailed": 13,
       "ExcludedEffectPassFaulted": 0,
       "ModulesEnforcedRawBagRule": 51,
       "RawBagBindFailed": 61,
       "BindFailureCauses": {
         "Calor0201": 1,
-        "Calor0208": 6,
+        "Calor0208": 5,
         "Calor0250": 7
       },
       "BindFailureModules": [
@@ -149,7 +149,6 @@
         "Calor0208 Serilog/Context/LogContext.cs",
         "Calor0250 Serilog/Core/Logger.cs",
         "Calor0250 Serilog/Core/Sinks/Batching/BatchingSink.cs",
-        "Calor0208 Serilog/Events/LogEventProperty.cs",
         "Calor0250 Serilog/Filters/Matching.cs",
         "Calor0250 Serilog/Formatting/Display/MessageTemplateTextFormatter.cs",
         "Calor0250 Serilog/Parsing/MessageTemplateParser.cs",
@@ -157,8 +156,8 @@
         "Calor0250 Serilog/Settings/KeyValuePairs/SettingValueConversions.cs"
       ],
       "BindFailureMultiCause": 4,
-      "Calor0411Sites": 551,
-      "Calor0411Modules": 61
+      "Calor0411Sites": 555,
+      "Calor0411Modules": 62
     },
     {
       "Subject": "FluentValidation",

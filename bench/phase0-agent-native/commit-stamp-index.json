@@ -12,10 +12,10 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
-      "resolvableOnMain": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
+      "measuredCommit": "bde9ee88627acb1fcdf62494b701b24856fa5881",
+      "resolvableOnMain": "bde9ee88627acb1fcdf62494b701b24856fa5881",
       "basis": "identical-src-tree",
-      "note": "#1397: regenerated on exact compilerb2c43561; preserve this ancestor with a merge commit. Unknown receivers no longer borrow runtime Option purity; known dictionary receivers/getters resolve and conditional getters are charged. Calor0411 sites move279->297,543->551,7420->7932 within unchanged12/61/115 unknown-module sets. Calor0425 diagnostics117, modules47, enforced326, exclusions and all other ledger coordinates are unchanged. Earlier measurements remain in git history; no completed epoch, ledger464ace or frozen protocol is restamped."
+      "note": "#1383: regenerated at bde9ee88 with implementation f642b11a unchanged; preserve both ancestors with a normal merge. Native non-null STRING now matches nullable-accepting IsValidName in Serilog/Events/LogEventProperty.cs. Calor0425 diagnostics117 and affected modules47 stay fixed; enforced326->327 and excluded38->37. Serilog Calor0411 upper-bound sites551->555 and modules61->62 reflect the newly reached effect pass, not a clean compilation or proven purity. Earlier product measurements and the historical R2 MISS remain in git history; no completed epoch or frozen protocol is restamped."
     },
     {
       "ledger": "higher-order-demand-ledger.json",
