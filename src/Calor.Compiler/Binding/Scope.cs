@@ -861,6 +861,8 @@ public static class TypeIdentity
         "System.TimeSpan", "System.Guid"
     }.ToFrozenSet(StringComparer.Ordinal);
 
+    internal static bool IsKnownValueMetadataName(string name) => NullableValueMetadataNames.Contains(name);
+
     private static string MapKnownShortTypeName(string shortName) => shortName switch
     {
         // Calor runtime static helper classes
@@ -1297,6 +1299,7 @@ public sealed class TypeSymbol : Symbol
 {
     public string QualifiedName { get; }
     public Visibility Visibility { get; }
+    public bool IsReferenceType { get; init; }
 
     /// <summary>
     /// v0.15 E1 slice 2b — true for a type declared with <c>§DEL</c>. This is
@@ -1323,6 +1326,7 @@ public sealed class TypeSymbol : Symbol
         QualifiedName = qualifiedName ?? throw new ArgumentNullException(nameof(qualifiedName));
         Visibility = visibility;
         IsDelegate = isDelegate;
+        IsReferenceType = isDelegate;
     }
 }
 

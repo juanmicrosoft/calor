@@ -39,6 +39,7 @@ namespace Calor.Compiler.Binding.Metadata;
 internal sealed class MetadataBinder
 {
     private readonly MetadataContext _context;
+    internal MetadataContext Context => _context;
 
     public MetadataBinder(MetadataContext context)
     {
