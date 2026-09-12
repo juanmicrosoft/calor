@@ -1528,7 +1528,6 @@ public sealed class TypeChecker
             TryStatementNode tryStatement => tryStatement.FinallyBody != null
                 && DefinitelyReturns(tryStatement.FinallyBody)
                 || DefinitelyReturns(tryStatement.TryBody)
-                && tryStatement.CatchClauses.Count > 0
                 && tryStatement.CatchClauses.All(clause => DefinitelyReturns(clause.Body)),
             _ => false
         });
@@ -2600,8 +2599,24 @@ public sealed class TypeChecker
             .ToArray();
         var candidateReturn = SubstituteTypeParameters(candidate.Type.ReturnType, substitutions);
         return candidateParameters.Zip(target.ParameterTypes)
-                .All(pair => IsAssignable(pair.First, pair.Second))
+                .All(pair => IsMethodGroupParameterCompatible(pair.First, pair.Second))
             && IsMethodGroupReturnCompatible(target.ReturnType, candidateReturn);
+    }
+
+    private bool IsMethodGroupParameterCompatible(CalorType target, CalorType source)
+    {
+        if (target.Equals(source))
+            return true;
+        if (IsPrimitiveValueType(source)
+            || source is NullableValueType
+            || _moduleDeclaredValueTypes.Contains(source.Name)
+            || IsPrimitiveValueType(target)
+            || target is NullableValueType
+            || _moduleDeclaredValueTypes.Contains(target.Name))
+        {
+            return false;
+        }
+        return IsAssignable(target, source);
     }
 
     private bool IsMethodGroupReturnCompatible(CalorType target, CalorType source)

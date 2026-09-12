@@ -1565,17 +1565,61 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void StatementLambda_ReturningTryWithFinallyCanDefinitelyReturn()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{cw}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §TR{t1}
+                    §R 1
+                  §FI
+                    §P "cleanup"
+                §/LAM{l1}
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
+    public void MethodGroupParameters_RejectWideningAndBoxing()
+    {
+        var widening = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Widen:pub} (f64:value) -> void
+                §E{}
+              §F{f2:Probe:pub} () -> void
+                §E{}
+                §B{action:Action<i32>} Widen
+            """);
+        Assert.Contains(widening.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+
+        var boxing = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Box:pub} (object:value) -> void
+                §E{}
+              §F{f2:Probe:pub} () -> void
+                §E{}
+                §B{action:Action<i32>} Box
+            """);
+        Assert.Contains(boxing.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
     public void MethodGroupRanking_RejectsParetoIncomparableCandidates()
     {
         var result = Check("""
             §M{m1:SafeConsumption}
-              §F{f1:Pick:pub} (i32:left, object:right) -> i32
+              §F{f1:Pick:pub} (str:left, object:right) -> i32
                 §E{}
-                §R left
-              §F{f2:Pick:pub} (f64:left, str:right) -> i32
+                §R left.Length
+              §F{f2:Pick:pub} (object:left, str:right) -> i32
                 §E{}
                 §R right.Length
-              §F{f3:Take:pub} (Func<i32,str,i32>:picker) -> void
+              §F{f3:Take:pub} (Func<str,str,i32>:picker) -> void
                 §E{}
               §F{f4:Probe:pub} () -> void
                 §E{}
