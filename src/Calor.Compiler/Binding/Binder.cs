@@ -2900,8 +2900,7 @@ public sealed class Binder
                 return Pattern(pattern);
             case VariablePatternNode variable:
                 if (allowBindings && !variable.Name.Contains('.', StringComparison.Ordinal))
-                    if (allowBindings)
-                        DeclarePatternVariable(variable.IdentifierSpan, variable.Name, "OBJECT");
+                    DeclarePatternVariable(variable.IdentifierSpan, variable.Name, "OBJECT");
                 return Pattern(
                     variable,
                     metadata: new Dictionary<string, object?>
@@ -2910,7 +2909,8 @@ public sealed class Binder
                         ["IsConstant"] = variable.Name.Contains('.', StringComparison.Ordinal),
                     });
             case VarPatternNode variable:
-                DeclarePatternVariable(variable.IdentifierSpan, variable.Name, "OBJECT");
+                if (allowBindings)
+                    DeclarePatternVariable(variable.IdentifierSpan, variable.Name, "OBJECT");
                 return Pattern(
                     variable,
                     metadata: new Dictionary<string, object?> { ["Name"] = variable.Name });
@@ -4607,13 +4607,6 @@ public sealed class Binder
             || typeName.Equals("ValueTask", StringComparison.OrdinalIgnoreCase)
             ? "VOID"
             : "OBJECT";
-    }
-
-    private static string UnwrapOptionOrNullable(string typeName)
-    {
-        return TypeIdentity.TryUnwrapOptionOrNullable(typeName, out var elementType)
-            ? elementType
-            : typeName;
     }
 
     private static string GetIndexedElementType(string typeName)

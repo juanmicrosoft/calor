@@ -1567,7 +1567,7 @@ public sealed class TypeChecker
             return NullType.Instance;
         }
 
-        if (refNode.Name is "default" or "null" or "this" or "base" or "value")
+        if (refNode.Name is "default" or "this" or "base" or "value")
         {
             return ErrorType.Instance;
         }

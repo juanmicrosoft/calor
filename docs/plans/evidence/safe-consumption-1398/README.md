@@ -4,7 +4,23 @@
 
 ## Scope and runtime
 
-- Current source: `/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/consumption-1398`, branch `fix/1398-safe-consumption`, HEAD `c43aefbb3d945eb63d39c6376537efb683b3683a`.
+PR #1453's first exact-head reviews examined `1452bb4b`. The integration
+review accepted; the adversarial review blocked on two old raw-Binder tests
+that expected `??` to unwrap runtime Option payloads. Actual default compilation
+already rejected those Option expressions before T2. The tests now require
+non-resolution rather than fictional payload conversion, and a generated-runtime
+control exercises explicit `Option.Unwrap()` on Some and None.
+
+The internal transfer helper was colocated with the expression types in
+`BoundNodes.cs`, following the existing compiler source layout and Calor-first
+gate. Subsequent cleanup also applies the existing negative/disjunctive pattern
+binding restriction to `VarPatternNode`, with a direct regression control.
+There are now 44 new compiler cases, so the inventory is 8,856 -> 8,900;
+the original 42-case candidate and its failed CI are historical, not relabeled.
+Final-head review and CI records live on the PR. The source-specific corpus
+measurements below remain pinned to their actual c43 and rejected 2d heads.
+
+- Measured source: `/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/consumption-1398`, branch `fix/1398-safe-consumption`, HEAD `c43aefbb3d945eb63d39c6376537efb683b3683a`.
 - Approved N1 baseline source: `/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/t2-corpus-baseline-1398`, HEAD `3b513a632149290481161b195a71aa6cb0e251a8`.
 - Base approved N1 main: `3b513a63`.
 - Corpus gitlinks: FluentValidation `71b3c60cb5a16e02cb7957e478ec3fb6b983a73c`, MediatR `fb309026775ef953a64fb5339d074426c1ad2c37`, serilog `0597ddfbd4ec594d9c42edd745fe728a2198bad9`.

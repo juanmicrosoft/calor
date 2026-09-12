@@ -182,7 +182,8 @@ public sealed class StructuralBindingCompletenessTests
                     new NoneExpressionNode(Span, "i32"),
                     new IntLiteralNode(Span, 0)),
                 out _));
-        Assert.Equal("INT", coalesce.Type.DisplayString);
+        // Runtime None<T> is an Option value, not a nullable T operand.
+        Assert.Equal("OBJECT", coalesce.Type.DisplayString);
 
         var match = new MatchExpressionNode(
             Span,

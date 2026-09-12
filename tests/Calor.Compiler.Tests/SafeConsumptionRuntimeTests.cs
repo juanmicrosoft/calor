@@ -293,6 +293,50 @@ public sealed class SafeConsumptionRuntimeTests
         WithCli(source, (exit, _, error) => Assert.True(exit == 0, error));
     }
 
+    [Fact]
+    public void ExplicitOptionUnwrap_RetainsItsActualRuntimeContract()
+    {
+        const string source = """
+            §M{m1:Consumption}
+              §F{f1:Probe:pub} (bool:present) -> str
+                §E{alloc,throw}
+                §B{opt:Option<str>} (? present §SM "value" §NN{str})
+                §R §C{opt.Unwrap} §/C
+            """;
+        foreach (var text in RoundTrip(source))
+        {
+            var result = Program.Compile(text, "option-consumption.calr");
+            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+            Assert.Contains("Option", result.GeneratedCode);
+            Assert.Contains("opt.Unwrap()", result.GeneratedCode);
+            var method = Emit(result.GeneratedCode).GetType("Consumption.ConsumptionModule")!.GetMethod("Probe")!;
+            Assert.Equal("value", method.Invoke(null, [true]));
+            var error = Assert.Throws<TargetInvocationException>(() => method.Invoke(null, [false]));
+            Assert.IsType<InvalidOperationException>(error.InnerException);
+        }
+        WithCli(source, (exit, _, error) => Assert.True(exit == 0, error));
+    }
+
+    [Fact]
+    public void NegatedAndDisjunctiveVarPatterns_DoNotSupplySuccessfulBindings()
+    {
+        foreach (var pattern in new[] { "(not §VAR{text})", "(or §VAR{text} _)" })
+        {
+            var source = $$"""
+                §M{m1:Consumption}
+                  §F{f1:Probe:pub} (?str:input) -> str
+                    §E{}
+                    §R §W{w1:expr} input
+                      §K {{pattern}} → text
+                      §K _ → "fallback"
+                """;
+            var (_, diagnostics) = Bind(source);
+            Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference
+                && diagnostic.Message.Contains("text", StringComparison.Ordinal));
+            Assert.True(Program.Compile(source, "invalid-pattern-binding.calr").HasErrors);
+        }
+    }
+
     private static string Source(string consumer, string expression, string? extraParameter = null)
     {
         var body = consumer switch
