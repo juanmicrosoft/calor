@@ -17,6 +17,35 @@ public class RunConfigOverrideTests
         "MediatR.Tests.GenericRequestHandlerTests.ShouldThrowExceptionWhenTimeoutOccurs";
 
     [Fact]
+    public void MediatR_SerializesTestCollectionsWithoutChangingSelectionOrAttempts()
+    {
+        var canonical = ProjectConfigs.Get("MediatR", "/corpus", "dotnet")!;
+        var effective = canonical.WithRunOverrides(
+            enableBisect: true, buildTimeout: TimeSpan.FromMinutes(5),
+            minimumCoverage: null, minimumNative: null);
+
+        foreach (var config in new[] { canonical, effective })
+        {
+            Assert.Contains("-p:VSTestCLIRunSettings=xUnit.ParallelizeTestCollections=false",
+                config.ExtraBuildProperties, StringComparison.Ordinal);
+            Assert.Null(config.TestFilter);
+            Assert.Equal(1, config.TestAttemptsPerLeg);
+            Assert.Equal("net8.0", config.TargetFramework);
+        }
+    }
+
+    [Fact]
+    public void OtherProjects_DoNotApplyMediatRTestIsolation()
+    {
+        foreach (var project in new[] { "Synthetic", "Synthetic2", "Serilog", "FluentValidation" })
+        {
+            var config = ProjectConfigs.Get(project, "/corpus", "dotnet")!;
+            Assert.DoesNotContain("VSTestCLIRunSettings", config.ExtraBuildProperties,
+                StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void WithRunOverrides_PreservesMediatRFlakeAllowlist()
     {
         var canonical = ProjectConfigs.Get("MediatR", "/corpus", "dotnet");
