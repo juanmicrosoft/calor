@@ -78,32 +78,6 @@
     "reason": "Duplicate declarations are already compilation errors."
   },
   {
-    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindCallExpression::DiagnosticBag.Report#01",
-    "member": "Calor.Compiler.Binding.Binder.BindCallExpression",
-    "sink": "DiagnosticBag.Report",
-    "helperPath": "DiagnosticBag.Report",
-    "possibleCodes": [
-      "Calor0274"
-    ],
-    "severity": "Dynamic",
-    "disposition": "AnalysisOnly",
-    "owningIssue": 1385,
-    "reason": "Nullability activation requires explicit receiving shape and its staged prerequisites."
-  },
-  {
-    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindCallExpression::DiagnosticBag.Report#02",
-    "member": "Calor.Compiler.Binding.Binder.BindCallExpression",
-    "sink": "DiagnosticBag.Report",
-    "helperPath": "DiagnosticBag.Report",
-    "possibleCodes": [
-      "Calor0274"
-    ],
-    "severity": "Dynamic",
-    "disposition": "AnalysisOnly",
-    "owningIssue": 1385,
-    "reason": "Nullability activation requires explicit receiving shape and its staged prerequisites."
-  },
-  {
     "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindForStatement::DiagnosticBag.ReportError#01",
     "member": "Calor.Compiler.Binding.Binder.BindForStatement",
     "sink": "DiagnosticBag.ReportError",
@@ -414,6 +388,19 @@
     "disposition": "AnalysisOnly",
     "owningIssue": 1396,
     "reason": "A failed best-effort member analysis is not a successful safety result or a new production gate."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.ValidateCallArgument::DiagnosticBag.Report#01",
+    "member": "Calor.Compiler.Binding.Binder.ValidateCallArgument",
+    "sink": "DiagnosticBag.Report",
+    "helperPath": "DiagnosticBag.Report",
+    "possibleCodes": [
+      "Calor0274"
+    ],
+    "severity": "Dynamic",
+    "disposition": "AnalysisOnly",
+    "owningIssue": 1385,
+    "reason": "Nullability activation requires explicit receiving shape and its staged prerequisites."
   },
   {
     "siteId": "src/Calor.Compiler/Binding/Metadata/MetadataBinder.cs::Metadata.MetadataBinderResult.ToDiagnostics::Diagnostic..ctor#01",
