@@ -49,7 +49,8 @@ foreach (var name in ProjectConfigs.KnownProjects)
     foreach (var contextElement in contexts)
     {
         var context = contextElement.Deserialize<FileContextDetail>()!;
-        if (!LanguageVersionFacts.TryParse(context.LanguageVersion, out var languageVersion))
+        if (!Enum.TryParse<LanguageVersion>(context.LanguageVersion, out var languageVersion) &&
+            !LanguageVersionFacts.TryParse(context.LanguageVersion, out languageVersion))
             throw new InvalidOperationException("Unknown observed language version: " + context.LanguageVersion);
         var parseOptions = new CSharpParseOptions(languageVersion,
             preprocessorSymbols: context.DefinedSymbols);
@@ -66,7 +67,7 @@ foreach (var name in ProjectConfigs.KnownProjects)
                 File.Exists(p) && HashFile(p).Equals(expected, StringComparison.OrdinalIgnoreCase));
             inputRows.Add(new { relative, expected, chosen, state = chosen is null ? "missing-or-hash-mismatch" : "verified" });
             if (chosen != null)
-                trees.Add(CSharpSyntaxTree.ParseText(File.ReadAllText(chosen), parseOptions, original));
+                trees.Add(CSharpSyntaxTree.ParseText(File.ReadAllText(chosen), parseOptions, chosen));
         }
         var references = new List<MetadataReference>();
         var referenceRows = new List<object>();
@@ -99,7 +100,9 @@ foreach (var name in ProjectConfigs.KnownProjects)
                 .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).Select(d => d.ToString()).ToArray(),
             limit = "Source-side Roslyn reconstruction, NOT private Calor MetadataBinder reference selection."
         });
-        foreach (var tree in trees.Where(t => !t.FilePath.Contains("/obj/", StringComparison.Ordinal)))
+        foreach (var tree in trees.Where(t =>
+            t.FilePath.StartsWith(library + Path.DirectorySeparatorChar, StringComparison.Ordinal) &&
+            !t.FilePath.Contains("/obj/", StringComparison.Ordinal)))
         {
             var relative = Path.GetRelativePath(config.OriginalProjectPath, tree.FilePath);
             var reportFile = files.FirstOrDefault(f => f.GetProperty("path").GetString() == relative);
@@ -108,7 +111,7 @@ foreach (var name in ProjectConfigs.KnownProjects)
             sourceRows.Add(new
             {
                 file = relative, sourceSha256 = HashFile(tree.FilePath),
-                e1Candidate = reportFile.ValueKind == JsonValueKind.Undefined ? (JsonElement?)null : reportFile.GetProperty("candidate").Clone(),
+                e1CandidateId = reportFile.ValueKind == JsonValueKind.Undefined ? null : StringProperty(reportFile.GetProperty("candidate"), "CandidateId"),
                 e1Status = reportFile.ValueKind == JsonValueKind.Undefined ? null : reportFile.GetProperty("status").GetString(),
                 input = excluded.ValueKind == JsonValueKind.Undefined ? (JsonElement?)null : excluded.Clone(),
                 directives = tree.GetRoot().DescendantTrivia(descendIntoTrivia: true)
@@ -121,18 +124,37 @@ foreach (var name in ProjectConfigs.KnownProjects)
     foreach (var file in files)
     {
         var candidate = file.GetProperty("candidate");
-        var converted = candidate.GetProperty("ConvertedCalor").GetString();
+        var converted = StringProperty(candidate, "ConvertedCalor");
         if (!string.IsNullOrEmpty(converted))
             boundRows.Add(new
             {
                 file = file.GetProperty("path").GetString(), status = file.GetProperty("status").GetString(),
-                candidateId = candidate.GetProperty("CandidateId").GetString(),
+                candidateId = StringProperty(candidate, "CandidateId"),
                 observation = ObserveBound(converted, file.GetProperty("path").GetString()!)
             });
     }
     projects.Add(new
     {
         name, reportPath, reportSha256 = HashFile(reportPath),
+        physicalInputs = report.GetProperty("evidence").GetProperty("Inputs").EnumerateArray().Select(input =>
+        {
+            var path = Path.Combine(config.OriginalProjectPath, input.GetProperty("Path").GetString()!);
+            return new
+            {
+                input = input.Clone(), actualSha256 = HashFile(path),
+                physicalNullableDirectiveLines = File.ReadAllLines(path).Select((text, index) => new { text, line = index + 1 })
+                    .Where(l => l.text.TrimStart().StartsWith("#nullable", StringComparison.Ordinal)).ToArray()
+            };
+        }).ToArray(),
+        declaredNullableSettings = Directory.EnumerateFiles(config.OriginalProjectPath, "*", SearchOption.AllDirectories)
+            .Where(p => !p.Contains("/obj/") && !p.Contains("/bin/") &&
+                (p.EndsWith(".csproj") || p.EndsWith(".props") || p.EndsWith(".targets")))
+            .Select(p => new
+            {
+                path = Path.GetRelativePath(config.OriginalProjectPath, p), sha256 = HashFile(p),
+                nullableLines = File.ReadAllLines(p).Select((text, index) => new { text, line = index + 1 })
+                    .Where(l => l.text.Contains("<Nullable", StringComparison.Ordinal)).ToArray()
+            }).Where(p => p.nullableLines.Length != 0).ToArray(),
         measuredE1 = report.GetProperty("evidence").GetProperty("Provenance").Clone(),
         denominators = report.GetProperty("evidence_counts").Clone(),
         contexts = contextRows, sourceFiles = sourceRows, convertedFiles = boundRows,
@@ -275,14 +297,18 @@ object[] ObserveSource(SemanticModel model, SyntaxTree tree)
         var knownSafe = expression is ObjectCreationExpressionSyntax or ImplicitObjectCreationExpressionSyntax ||
             expression is LiteralExpressionSyntax literal && !literal.IsKind(SyntaxKind.NullLiteralExpression)
                 && !literal.IsKind(SyntaxKind.DefaultLiteralExpression);
+        var knownNull = expression.IsKind(SyntaxKind.NullLiteralExpression) ||
+            expression.IsKind(SyntaxKind.DefaultLiteralExpression) ||
+            expression is DefaultExpressionSyntax && info.Type?.IsReferenceType == true;
         var direct = symbol is IMethodSymbol or IPropertySymbol or IFieldSymbol or ILocalSymbol or IParameterSymbol;
         var errors = model.GetDiagnostics(expression.Span)
             .Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).Select(d => d.ToString()).ToArray();
-        var inScope = errors.Length == 0 && NominalReference(target) && NominalReference(info.Type) &&
-            model.Compilation.ClassifyConversion(info.Type!, target!).IsImplicit;
+        var inScope = errors.Length == 0 && NominalReference(target) &&
+            (knownNull || NominalReference(info.Type) && model.Compilation.ClassifyConversion(info.Type!, target!).IsImplicit);
         var category = !inScope ? "out-of-scope-or-unresolved" :
             targetAnnotation == Annotation.Annotated ? "nullable-target" :
             knownSafe ? "known-safe-expression" :
+            knownNull ? "explicit-null-expression" :
             !direct ? "expression-transfer-unassessed" :
             annotation == Annotation.Annotated ? "explicit-nullable" :
             annotation == Annotation.None ? "genuinely-oblivious-source" : "declared-not-annotated";
@@ -296,10 +322,15 @@ object[] ObserveSource(SemanticModel model, SyntaxTree tree)
             sourceSymbol = symbol?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             sourceSymbolAssembly = symbol?.ContainingAssembly?.Identity.ToString(),
             sourceSymbolOrigin = symbol == null ? "unresolved" : symbol.Locations.Any(l => l.IsInSource) ? "source" : "metadata",
+            sourceMethodKind = (symbol as IMethodSymbol)?.MethodKind.ToString(),
+            annotationOrigin = symbol is IMethodSymbol { MethodKind: MethodKind.DelegateInvoke }
+                ? "instantiated-delegate-signature-not-evidence-of-unannotated-BCL-definition"
+                : symbol?.Locations.Any(l => l.IsInSource) == true ? "source-declaration"
+                : symbol == null ? "expression-or-unresolved" : "metadata-signature",
             receivingSymbol = receivingSymbol?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
             effectiveContext = model.GetNullableContext(expression.SpanStart).ToString(),
             category, knownSafeExpression = knownSafe, mapping, errors,
-            hypotheticalBareTargetObligation = category is "genuinely-oblivious-source" or "explicit-nullable",
+            hypotheticalBareTargetObligation = category is "genuinely-oblivious-source" or "explicit-nullable" or "explicit-null-expression",
             caveat = "Not an activated Calor rejection. C# None target does not promise non-null. No flow state or null-forgiving guarantee is used."
         });
     }
@@ -308,21 +339,23 @@ object[] ObserveSource(SemanticModel model, SyntaxTree tree)
 object ObserveBound(string source, string path)
 {
     var bag = new DiagnosticBag();
-    var ast = new Parser(new Lexer(source, bag).Tokenize(), bag).Parse();
+    var ast = new Parser(new Lexer(source, bag).TokenizeAllForParser(), bag).Parse();
     if (bag.HasErrors) return new { parseErrors = bag.Select(Diagnostic).ToArray() };
     var bound = new Binder(bag, path).Bind(ast);
     var boundaries = new List<object>();
     var calls = new List<object>();
-    var astBindings = Descendants(ast).OfType<BindStatementNode>().ToDictionary(b => b.Span.Start, b => b.TypeName);
+    var astBindings = Descendants(ast).OfType<BindStatementNode>().GroupBy(b => b.Span.Start)
+        .ToDictionary(g => g.Key, g => g.Select(b => b.TypeName).Distinct().ToArray());
     foreach (var function in bound.Functions)
     foreach (var node in Walk(function))
     {
         if (node is BoundBindStatement { Initializer: { } initializer } binding &&
-            astBindings.TryGetValue(binding.Span.Start, out var explicitType) && explicitType != null)
-            Add("explicit-local-initialization", initializer, explicitType);
+            astBindings.TryGetValue(binding.Span.Start, out var explicitTypes) &&
+            explicitTypes is [not null])
+            Add("explicit-local-initialization", initializer, explicitTypes[0]!, function.Symbol.Name);
         if (node is BoundReturnStatement { Expression: { } returned } &&
             function.MemberKind is BoundMemberKind.TopLevelFunction or BoundMemberKind.Method)
-            Add("native-return", returned, function.Symbol.ReturnType);
+            Add("native-return", returned, function.Symbol.ReturnType, function.Symbol.Name);
         if (node is BoundCallExpression call)
             calls.Add(new
             {
@@ -340,9 +373,10 @@ object ObserveBound(string source, string path)
     {
         diagnostics = bag.Select(Diagnostic).ToArray(), boundaries, expressionCalls = calls,
         statementCallCount = Walk(bound).OfType<BoundCallStatement>().Count(),
+        ambiguousBindingTargetSpans = astBindings.Where(p => p.Value.Length != 1).Select(p => p.Key).ToArray(),
         limitation = "Statement-call mappings unassessed; separate expression calls are not all call forms. Binder private selected references not observed."
     };
-    void Add(string boundary, BoundExpression expression, string targetName)
+    void Add(string boundary, BoundExpression expression, string targetName, string function)
     {
         object?[] targetArgs = [targetName, null];
         var supported = (bool)targetBuilder.Invoke(null, targetArgs)!;
@@ -350,7 +384,7 @@ object ObserveBound(string source, string path)
         var current = supported && (bool)checker.Invoke(null, [expression, target!])!;
         boundaries.Add(new
         {
-            boundary, span = expression.Span, expressionKind = expression.GetType().Name,
+            boundary, function, span = expression.Span, expressionKind = expression.GetType().Name,
             source = BoundTypeInfo(expression.Type), targetName,
             target = target == null ? null : BoundTypeInfo(target), currentPredicate = current,
             shadowConservative = target is NominalBoundType t && t.QualifiedName is not ("STRING" or "string" or "str")
@@ -409,6 +443,7 @@ static string Decode(ref ReadOnlySpan<char> encoded)
     return result;
 }
 static string HashFile(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
+static string? StringProperty(JsonElement element, string key) => element.TryGetProperty(key, out var value) ? value.GetString() : null;
 static string HashText(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
 void Write(string file, object value) => File.WriteAllText(Path.Combine(output, file), JsonSerializer.Serialize(value, jsonOptions));
 static object RunControls(CSharpCompilation compilation)
