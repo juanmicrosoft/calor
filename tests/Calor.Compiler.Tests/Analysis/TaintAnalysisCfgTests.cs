@@ -13,6 +13,210 @@ public sealed class TaintAnalysisCfgTests
 {
     private static TextSpan Span(int start) => new(start, start + 1, 1, start + 1);
 
+    [Theory]
+    [InlineData("Delete", false, false)]
+    [InlineData("Delete", false, true)]
+    [InlineData("ReadAllText", false, false)]
+    [InlineData("ReadAllText", false, true)]
+    [InlineData("ReadAllText", true, false)]
+    [InlineData("ReadAllText", true, true)]
+    [InlineData("WriteAllText", false, false)]
+    [InlineData("WriteAllText", false, true)]
+    public void N3_SelectedBclSignature_PreservesExactTaintSinkIdentity(string method, bool expression, bool tainted)
+    {
+        var source = N3TaintSource(method, expression, tainted);
+        var parsing = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, parsing).TokenizeAllForParser(), parsing).Parse();
+        Assert.False(parsing.HasErrors);
+        var bound = new Binder(new DiagnosticBag()).Bind(module);
+        var statement = bound.Functions.Single().Body[1];
+        var parameterTypes = expression
+            ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundBindStatement>(statement).Initializer).ResolvedParameterTypes
+            : Assert.IsType<BoundCallStatement>(statement).ResolvedParameterTypes;
+        Assert.Equal(Enumerable.Repeat("System.String", method == "WriteAllText" ? 2 : 1), parameterTypes);
+        var diagnostics = new DiagnosticBag();
+        new TaintAnalysisRunner(diagnostics).Analyze(bound);
+        Assert.Equal(tainted, diagnostics.Any(diagnostic => diagnostic.Code == DiagnosticCode.PathTraversal));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void N3_SelectedBclSink_CliAnalyzeRetainsTaintFindings(bool expression, bool tainted)
+    {
+        var directory = Path.Combine(CliTestHarness.FindRepoRoot(), ".n3-taint-cli-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var input = Path.Combine(directory, "input.calr");
+            File.WriteAllText(input, N3TaintSource(expression ? "ReadAllText" : "Delete", expression, tainted));
+            var result = CliTestHarness.RunCli(directory,
+                "-i", input, "-o", Path.Combine(directory, "output.cs"),
+                "--no-cache", "--no-enforce-effects", "--analyze", "--all-findings", "--format", "json");
+            Assert.True(result.ExitCode == 0, result.StdErr + "\n" + result.StdOut);
+            using var document = JsonDocument.Parse(result.StdOut);
+            Assert.Equal(tainted, document.RootElement.GetProperty("diagnostics").EnumerateArray()
+                .Any(diagnostic => diagnostic.GetProperty("code").GetString() == DiagnosticCode.PathTraversal));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static string N3TaintSource(string method, bool expression, bool tainted) => $$"""
+        §M{m1:TaintIdentity}
+          §F{f1:Run:pub} () -> void
+            §B{path:string} {{(tainted ? "§C{System.Environment.GetEnvironmentVariable} §A STR:\"N3_INPUT\" §/C" : "STR:\"constant.txt\"")}}
+            {{(expression ? "§B{ignored} " : "")}}§C{System.IO.File.{{method}}} §A path {{(method == "WriteAllText" ? "§A STR:\"content\"" : "")}} §/C
+        """;
+
+    [Theory]
+    [InlineData(false, false, false, false)]
+    [InlineData(false, false, true, false)]
+    [InlineData(false, true, false, false)]
+    [InlineData(false, true, true, false)]
+    [InlineData(true, false, false, false)]
+    [InlineData(true, false, true, false)]
+    [InlineData(true, true, false, false)]
+    [InlineData(true, true, true, false)]
+    [InlineData(false, false, true, true)]
+    [InlineData(false, true, true, true)]
+    [InlineData(true, false, true, true)]
+    [InlineData(true, true, true, true)]
+    public void N3_NamedBclSink_UsesActualFormalRolesInDirectAndSummaryFlows(
+        bool expression, bool taintedPath, bool wrapper, bool namedWrapper)
+    {
+        var parameters = taintedPath ? "System.Text.Encoding:encoding, string:user_input" : "System.Text.Encoding:user_input";
+        var encoding = taintedPath ? "encoding" : "user_input";
+        var path = taintedPath ? "user_input" : "STR:\"safe.txt\"";
+        var bcl = $"{(expression ? "§B{ignored} " : "")}§C{{System.IO.File.ReadAllText}} §A[encoding] {(wrapper ? "encoding" : encoding)} §A[path] {(wrapper ? "path" : path)} §/C";
+        var wrapperArguments = namedWrapper ? $"§A[path] {path} §A[encoding] {encoding}" : $"§A {encoding} §A {path}";
+        var source = wrapper ? $$"""
+            §M{m1:NamedSummary}
+              §F{helper:Wrapper:pub} (System.Text.Encoding:encoding, string:path) -> string
+                {{bcl}}
+                §R STR:"done"
+              §F{caller:Run:pub} ({{parameters}}) -> void
+                {{(expression ? "§B{result} " : "")}}§C{Wrapper} {{wrapperArguments}} §/C
+            """ : $$"""
+            §M{m1:NamedDirect}
+              §F{caller:Run:pub} ({{parameters}}) -> void
+                {{bcl}}
+            """;
+        var parsing = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, parsing).TokenizeAllForParser(), parsing).Parse();
+        Assert.False(parsing.HasErrors, string.Join("\n", parsing));
+        var binding = new DiagnosticBag();
+        var bound = new Binder(binding).Bind(module);
+        Assert.DoesNotContain(binding, diagnostic => BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        var statement = bound.Functions[0].Body[0];
+        var mappings = expression
+            ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundBindStatement>(statement).Initializer).ArgumentParameterIndices
+            : Assert.IsType<BoundCallStatement>(statement).ArgumentParameterIndices;
+        Assert.Equal(new[] { 1, 0 }, mappings);
+        if (wrapper)
+        {
+            var wrapperStatement = bound.Functions[1].Body[0];
+            var selected = expression
+                ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundBindStatement>(wrapperStatement).Initializer).SelectedOverloadMatches
+                : Assert.IsType<BoundCallStatement>(wrapperStatement).SelectedOverloadMatches;
+            var match = Assert.Single(selected);
+            Assert.Equal(bound.Functions[0].SymbolId, match.Function.Id);
+            Assert.Equal(namedWrapper ? new[] { 1, 0 } : new[] { 0, 1 },
+                match.Arguments.Select(argument => argument.ParameterIndex));
+        }
+        var diagnostics = new DiagnosticBag();
+        new TaintAnalysisRunner(diagnostics).Analyze(bound);
+        Assert.Equal(taintedPath, diagnostics.Any(diagnostic => diagnostic.Code == DiagnosticCode.PathTraversal));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void N3_NativeReturnSummary_UsesSelectedArgumentRoles(bool named, bool taintedReturn)
+    {
+        var keep = taintedReturn ? "user_input" : "STR:\"safe.txt\"";
+        var drop = taintedReturn ? "STR:\"unused\"" : "user_input";
+        var arguments = named ? $"§A[keep] {keep} §A[drop] {drop}" : $"§A {drop} §A {keep}";
+        var source = $$"""
+            §M{m1:NamedReturnSummary}
+              §F{helper:Choose:pub} (string:drop, string:keep) -> string
+                §R keep
+              §F{caller:Run:pub} (string:user_input) -> void
+                §B{result} §C{Choose} {{arguments}} §/C
+                §C{System.IO.File.Delete} §A result §/C
+            """;
+        var parsing = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, parsing).TokenizeAllForParser(), parsing).Parse();
+        Assert.False(parsing.HasErrors, string.Join("\n", parsing));
+        var binding = new DiagnosticBag();
+        var bound = new Binder(binding).Bind(module);
+        Assert.DoesNotContain(binding, diagnostic => BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        var call = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundBindStatement>(bound.Functions[1].Body[0]).Initializer);
+        var match = Assert.Single(call.SelectedOverloadMatches);
+        Assert.Equal(bound.Functions[0].SymbolId, match.Function.Id);
+        Assert.Equal(named ? new[] { 1, 0 } : new[] { 0, 1 },
+            match.Arguments.Select(argument => argument.ParameterIndex));
+        var diagnostics = new DiagnosticBag();
+        new TaintAnalysisRunner(diagnostics).Analyze(bound);
+        Assert.Equal(taintedReturn, diagnostics.Any(diagnostic => diagnostic.Code == DiagnosticCode.PathTraversal));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void N3_AlternativeSummaries_UseEachSelectedFunctionsOwnMapping(bool returnSummary, bool taintedKeep)
+    {
+        var scope = new Scope();
+        var alternatives = Enumerable.Range(0, 2).Select(index =>
+        {
+            var keep = Variable("keep", "STRING", $"param:keep:{index}", true);
+            var drop = Variable("drop", "STRING", $"param:drop:{index}", true);
+            var symbol = new FunctionSymbol(new SymbolId($"fn:alternative:{index}"), "Choose",
+                returnSummary ? "STRING" : "VOID", index == 0 ? [drop, keep] : [keep, drop],
+                conditionalAlternative: new ConditionalAlternative("branches", index));
+            Assert.True(scope.DeclareOverload(symbol));
+            return new BoundFunction(Span(10 + index), symbol,
+                returnSummary
+                    ? [new BoundReturnStatement(Span(20 + index), Reference(keep, 30 + index))]
+                    : [Call("db.execute", Reference(keep, 30 + index), 20 + index)], new Scope());
+        }).ToArray();
+        var resolution = scope.ResolveOverload("Choose", ["STRING", "STRING"], ["keep", "drop"]);
+        Assert.Equal(OverloadResolutionKind.Resolved, resolution.Kind);
+        Assert.Equal(2, resolution.Matches.Count);
+        Assert.Equal(new[] { 1, 0 }, resolution.Matches[0].Arguments.Select(argument => argument.ParameterIndex));
+        Assert.Equal(new[] { 0, 1 }, resolution.Matches[1].Arguments.Select(argument => argument.ParameterIndex));
+        var input = Variable("user_input", "STRING", "param:caller", true);
+        BoundExpression[] arguments = taintedKeep
+            ? [Reference(input, 40), new BoundStringLiteral(Span(41), "safe")]
+            : [new BoundStringLiteral(Span(40), "safe"), Reference(input, 41)];
+        var result = Variable("result", "STRING", "local:result");
+        var caller = Function("Run", "fn:caller", [input], returnSummary
+            ? [
+                new BoundBindStatement(Span(42), result,
+                    new BoundCallExpression(Span(43), "Choose", arguments, "STRING",
+                        resolvedSymbols: resolution.Functions, argumentNames: ["keep", "drop"])
+                    { SelectedOverloadMatches = resolution.Matches }),
+                Call("db.execute", Reference(result, 44), 45)
+            ]
+            : [
+                new BoundCallStatement(Span(43), "Choose", arguments,
+                    resolvedSymbols: resolution.Functions, argumentNames: ["keep", "drop"])
+                { SelectedOverloadMatches = resolution.Matches }
+            ]);
+        var diagnostics = new DiagnosticBag();
+        new TaintAnalysisRunner(diagnostics).Analyze(Module([.. alternatives, caller]));
+        Assert.Equal(taintedKeep, diagnostics.Any(diagnostic => diagnostic.Code == DiagnosticCode.SqlInjection));
+    }
+
     [Fact]
     public void RegressionCorpusInventory_EnforcesCommittedPrecisionRecallTargets()
     {

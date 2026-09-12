@@ -194,21 +194,7 @@ internal sealed class MetadataContext : IDisposable
         ThrowIfDisposed();
 
         var receiverFq = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        var argExprs = new string[arguments.Count];
-        for (int i = 0; i < arguments.Count; i++)
-        {
-            var argFq = arguments[i].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            // out/ref parameters need matching argument syntax; a value cast
-            // fails overload resolution with CS1620. `out var _o{i}` /
-            // `ref var _r{i}` produces a fresh local that Roslyn accepts.
-            argExprs[i] = arguments[i].RefKind switch
-            {
-                RefKind.Out => $"out {argFq} _o{i}",
-                RefKind.Ref => $"ref var _r{i}",
-                RefKind.In => $"in (({argFq})default!)",
-                _ => $"(({argFq})default!)",
-            };
-        }
+        var argExprs = MetadataBinder.BuildArgumentExpressions(arguments);
 
         // Round-2 C2 mitigation: static-vs-instance based on the actual
         // method group, not on `receiverType.IsStatic` (which is only true
@@ -258,6 +244,7 @@ internal sealed class MetadataContext : IDisposable
         var source =
             "#nullable enable\n" +
             "class __CalorSynth { static void __Probe() {\n" +
+            MetadataBinder.BuildArgumentLocals(arguments) +
             $"    _ = {receiverExpr}.{methodName}({string.Join(", ", argExprs)});\n" +
             "} }\n";
 
@@ -456,7 +443,10 @@ internal sealed class MetadataContext : IDisposable
 /// (type, ref-kind) pair so Roslyn's overload resolution can distinguish
 /// value / out / ref / in parameters correctly (CS1620 otherwise).
 /// </summary>
-internal readonly record struct MetadataArgument(ITypeSymbol Type, RefKind RefKind = RefKind.None);
+internal readonly record struct MetadataArgument(
+    ITypeSymbol Type,
+    RefKind RefKind = RefKind.None,
+    string? Name = null);
 
 /// <summary>
 /// v0.17 R3 — member lookup over the receiver's whole inheritance surface.

@@ -1123,18 +1123,21 @@ public sealed class VariableSymbol : Symbol
     public string? DeclaringTypeName { get; }
 
     /// <summary>
-    /// v0.14 nullability workstream — declared nullability of the variable's
-    /// type, captured at binding time from the surface syntax (e.g. <c>:string</c>
-    /// vs <c>:?string</c>). Consumed by <see cref="BoundVariableExpression.Type"/>
-    /// so that reads of a declared-non-null local flow the <c>NotAnnotated</c>
-    /// annotation into downstream nullability checks (Calor0272 and siblings).
+    /// Declared scalar reference annotation, or the established annotation of
+    /// an inferred reference initializer. Consumed by
+    /// <see cref="BoundVariableExpression.Type"/> at subsequent reads.
     ///
     /// <para>Defaults to <see cref="BoundTypes.NullableAnnotation.Oblivious"/>
     /// so pre-existing symbol construction paths keep their conservative
-    /// behavior. S3-scoped: today only STRING-target bind statements populate
-    /// a non-<c>Oblivious</c> value; other targets stay Oblivious per §D6.</para>
+    /// behavior. This annotation alone does not establish a resolved reference
+    /// identity or a flow-sensitive non-null guarantee.</para>
     /// </summary>
     public BoundTypes.NullableAnnotation NullableAnnotation { get; }
+
+    // Inferred references retain the producer's identity, which may not resolve
+    // from its display spelling in the local's lexical namespace.
+    internal BoundTypes.NominalBoundType? InferredReferenceType { get; init; }
+    internal bool IsTypeInferred { get; init; }
 
     /// <summary>
     /// v0.15 E2 slice b, design-doc §8.2 — the function type this variable
@@ -1339,6 +1342,18 @@ public enum OverloadResolutionKind
     Resolved,
 }
 
+/// <summary>An entry from the winning argument map, indexed in source evaluation order.</summary>
+public sealed record ResolvedArgumentMapping(
+    int ArgumentIndex,
+    int ParameterIndex,
+    string ParameterType,
+    bool IsExpandedParams);
+
+public sealed record ResolvedOverloadMatch(
+    FunctionSymbol Function,
+    string ReturnType,
+    IReadOnlyList<ResolvedArgumentMapping> Arguments);
+
 public sealed class OverloadResolutionResult
 {
     public OverloadResolutionKind Kind { get; }
@@ -1346,19 +1361,22 @@ public sealed class OverloadResolutionResult
     public string? ResolvedReturnType { get; }
     public IReadOnlyList<FunctionSymbol> Candidates { get; }
     public IReadOnlyList<FunctionSymbol> Functions { get; }
+    public IReadOnlyList<ResolvedOverloadMatch> Matches { get; }
 
     private OverloadResolutionResult(
         OverloadResolutionKind kind,
         FunctionSymbol? function,
         string? resolvedReturnType,
         IReadOnlyList<FunctionSymbol> candidates,
-        IReadOnlyList<FunctionSymbol>? functions = null)
+        IReadOnlyList<FunctionSymbol>? functions = null,
+        IReadOnlyList<ResolvedOverloadMatch>? matches = null)
     {
         Kind = kind;
         Function = function;
         ResolvedReturnType = resolvedReturnType;
         Candidates = candidates;
         Functions = functions ?? Array.Empty<FunctionSymbol>();
+        Matches = matches ?? Array.Empty<ResolvedOverloadMatch>();
     }
 
     public static OverloadResolutionResult NotFound() =>
@@ -1377,9 +1395,21 @@ public sealed class OverloadResolutionResult
     public static OverloadResolutionResult Resolved(FunctionSymbol function, string returnType) =>
         new(OverloadResolutionKind.Resolved, function, returnType, [function], [function]);
 
+    public static OverloadResolutionResult Resolved(
+        FunctionSymbol function,
+        string returnType,
+        IReadOnlyList<ResolvedArgumentMapping> arguments) =>
+        new(OverloadResolutionKind.Resolved, function, returnType, [function], [function],
+            [new ResolvedOverloadMatch(function, returnType, arguments)]);
+
     public static OverloadResolutionResult ResolvedAlternatives(
         IReadOnlyList<FunctionSymbol> functions,
-        string returnType)
+        string returnType) => ResolvedAlternatives(functions, returnType, null);
+
+    public static OverloadResolutionResult ResolvedAlternatives(
+        IReadOnlyList<FunctionSymbol> functions,
+        string returnType,
+        IReadOnlyList<ResolvedOverloadMatch>? matches)
     {
         ArgumentNullException.ThrowIfNull(functions);
         if (functions.Count == 0)
@@ -1390,7 +1420,8 @@ public sealed class OverloadResolutionResult
             functions[0],
             returnType,
             functions,
-            functions);
+            functions,
+            matches);
     }
 }
 
@@ -1542,7 +1573,8 @@ public sealed class Scope
                 ?? OverloadResolutionResult.NotFound();
         }
 
-        var applicable = new List<(FunctionSymbol Function, string ReturnType, int Score)>();
+        var applicable = new List<(FunctionSymbol Function, string ReturnType, int Score,
+            IReadOnlyList<ResolvedArgumentMapping> Arguments)>();
         foreach (var function in overloads)
         {
             if (TryMatch(
@@ -1553,9 +1585,10 @@ public sealed class Scope
                     typeArguments,
                     implicitConversionCost,
                     out var resolvedReturnType,
-                    out var score))
+                    out var score,
+                    out var mappedArguments))
             {
-                applicable.Add((function, resolvedReturnType, score));
+                applicable.Add((function, resolvedReturnType, score, mappedArguments));
             }
         }
 
@@ -1565,7 +1598,7 @@ public sealed class Scope
         var bestScore = applicable.Min(item => item.Score);
         var best = applicable.Where(item => item.Score == bestScore).ToArray();
         if (best.Length == 1)
-            return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType);
+            return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType, best[0].Arguments);
 
         var bestFunctions = best.Select(item => item.Function).ToArray();
         if (bestFunctions
@@ -1587,7 +1620,9 @@ public sealed class Scope
                 bestFunctions,
                 alternativeReturnTypes.Length == 1
                     ? alternativeReturnTypes[0]
-                    : "OBJECT");
+                    : "OBJECT",
+                best.Select(item => new ResolvedOverloadMatch(item.Function, item.ReturnType, item.Arguments))
+                    .ToArray());
         }
 
         return OverloadResolutionResult.Ambiguous(bestFunctions);
@@ -1692,10 +1727,12 @@ public sealed class Scope
         IReadOnlyList<string>? typeArguments,
         Func<string, string, int?>? implicitConversionCost,
         out string resolvedReturnType,
-        out int score)
+        out int score,
+        out IReadOnlyList<ResolvedArgumentMapping> mappedArguments)
     {
         resolvedReturnType = function.ReturnType;
         score = int.MaxValue;
+        mappedArguments = Array.Empty<ResolvedArgumentMapping>();
 
         if (typeArguments != null && function.GenericArity != typeArguments.Count)
             return false;
@@ -1716,6 +1753,7 @@ public sealed class Scope
 
             var matches = true;
             var conversionScore = 0;
+            var parameterTypes = new string[argumentTypes.Count];
             for (var argumentIndex = 0; argumentIndex < argumentTypes.Count; argumentIndex++)
             {
                 var parameter = function.Parameters[mapping.ParameterMap[argumentIndex]];
@@ -1733,6 +1771,7 @@ public sealed class Scope
                     matches = false;
                     break;
                 }
+                parameterTypes[argumentIndex] = parameterType;
 
                 if (TypeIdentity.TryUnify(
                         parameterType,
@@ -1775,6 +1814,14 @@ public sealed class Scope
             resolvedReturnType = substitutions.Count == 0
                 ? function.ReturnType
                 : TypeIdentity.Substitute(function.ReturnType, substitutions);
+            mappedArguments = mapping.ParameterMap.Select((parameterIndex, argumentIndex) =>
+                new ResolvedArgumentMapping(
+                    argumentIndex,
+                    parameterIndex,
+                    substitutions.Count == 0
+                        ? parameterTypes[argumentIndex]
+                        : TypeIdentity.Substitute(parameterTypes[argumentIndex], substitutions),
+                    mapping.ExpandedParams[argumentIndex])).ToArray();
         }
 
         return score != int.MaxValue;

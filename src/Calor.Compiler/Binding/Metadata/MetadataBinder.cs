@@ -5,6 +5,7 @@ using Calor.Compiler.Parsing;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace Calor.Compiler.Binding.Metadata;
 
@@ -62,17 +63,17 @@ internal sealed class MetadataBinder
         // Primary path: TryResolveOverload from the S1 mechanism, extended
         // with System.Linq usings and a smarter static-vs-instance heuristic.
         var resolved = TryResolveWithLinq(receiverType, methodName, arguments, out var reason);
-        if (resolved is not null)
+        if (resolved is { } selected)
         {
-            return MetadataBinderResult.CreateResolved(resolved);
+            return selected;
         }
 
         // Fallback: static-only retry when the primary path chose instance
         // syntax on a mixed group but no instance overload matched the arity.
         var staticFallback = TryResolveStaticOnly(receiverType, methodName, arguments);
-        if (staticFallback is not null)
+        if (staticFallback is { } staticSelected)
         {
-            return MetadataBinderResult.CreateResolved(staticFallback);
+            return staticSelected;
         }
 
         // v0.17 R3 — the probe is a synthetic C# file compiled against the
@@ -89,9 +90,9 @@ internal sealed class MetadataBinder
                      _context.HostCompilationForBinder, receiverType, methodName))
         {
             var inherited = TryResolveWithLinq(declaringType, methodName, arguments, out _);
-            if (inherited is not null)
+            if (inherited is { } inheritedSelected)
             {
-                return MetadataBinderResult.CreateResolved(inherited);
+                return inheritedSelected;
             }
         }
 
@@ -217,14 +218,13 @@ internal sealed class MetadataBinder
     /// added so extension-on-interface resolves. Behavior otherwise mirrors
     /// <see cref="MetadataContext.TryResolveOverload"/>.
     /// </summary>
-    private IMethodSymbol? TryResolveWithLinq(
+    private MetadataBinderResult? TryResolveWithLinq(
         ITypeSymbol receiverType,
         string methodName,
         IReadOnlyList<MetadataArgument> arguments,
         out string? unresolvedReason)
     {
         var receiverFq = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        var argExprs = BuildArgumentExpressions(arguments);
 
         // Static-vs-instance heuristic identical to MetadataContext's, but
         // exposed here because we need to know which branch was taken for
@@ -254,7 +254,7 @@ internal sealed class MetadataBinder
             return null;
         }
 
-        var source = BuildSyntheticSource(receiverExpr, methodName, argExprs);
+        var source = BuildSyntheticSource(receiverExpr, methodName, arguments);
         return QueryInvocation(source, out unresolvedReason);
     }
 
@@ -264,43 +264,55 @@ internal sealed class MetadataBinder
     /// when the mixed-group path fails — a call whose arity matches only
     /// static overloads should still resolve.
     /// </summary>
-    private IMethodSymbol? TryResolveStaticOnly(
+    private MetadataBinderResult? TryResolveStaticOnly(
         ITypeSymbol receiverType,
         string methodName,
         IReadOnlyList<MetadataArgument> arguments)
     {
         var receiverFq = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        var argExprs = BuildArgumentExpressions(arguments);
-        var source = BuildSyntheticSource(receiverFq, methodName, argExprs);
+        var source = BuildSyntheticSource(receiverFq, methodName, arguments);
         return QueryInvocation(source, out _);
     }
 
-    private static string[] BuildArgumentExpressions(IReadOnlyList<MetadataArgument> arguments)
+    internal static string[] BuildArgumentExpressions(IReadOnlyList<MetadataArgument> arguments)
     {
         var exprs = new string[arguments.Count];
         for (int i = 0; i < arguments.Count; i++)
         {
-            var argFq = arguments[i].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var argument = arguments[i];
+            var argFq = argument.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             exprs[i] = arguments[i].RefKind switch
             {
-                RefKind.Out => $"out {argFq} _o{i}",
-                RefKind.Ref => $"ref var _r{i}",
-                RefKind.In => $"in (({argFq})default!)",
+                RefKind.Out => $"out __arg{i}",
+                RefKind.Ref => $"ref __arg{i}",
+                RefKind.In => $"in __arg{i}",
                 _ => $"(({argFq})default!)",
             };
+            if (argument.Name is { Length: > 0 } name)
+                exprs[i] = $"@{name}: {exprs[i]}";
         }
         return exprs;
     }
 
-    private static string BuildSyntheticSource(string receiverExpr, string methodName, string[] argExprs) =>
-        "#nullable enable\n" +
-        "using System.Linq;\n" +
-        "using System.Collections.Generic;\n" +
-        "class __CalorS4Synth { static void __Probe() {\n" +
-        $"    _ = {receiverExpr}.{methodName}({string.Join(", ", argExprs)});\n" +
-        "} }\n";
+    internal static string BuildArgumentLocals(IReadOnlyList<MetadataArgument> arguments) =>
+        string.Concat(arguments.Select((argument, index) =>
+            argument.RefKind == RefKind.None
+                ? ""
+                : $"{argument.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)} __arg{index} = default!;\n"));
 
-    private IMethodSymbol? QueryInvocation(string source, out string? unresolvedReason)
+    private static string BuildSyntheticSource(
+        string receiverExpr, string methodName, IReadOnlyList<MetadataArgument> arguments)
+    {
+        return "#nullable enable\n" +
+            "using System.Linq;\n" +
+            "using System.Collections.Generic;\n" +
+            "class __CalorS4Synth { static void __Probe() {\n" +
+            BuildArgumentLocals(arguments) +
+            $"    _ = {receiverExpr}.{methodName}({string.Join(", ", BuildArgumentExpressions(arguments))});\n" +
+            "} }\n";
+    }
+
+    private MetadataBinderResult? QueryInvocation(string source, out string? unresolvedReason)
     {
         var tree = CSharpSyntaxTree.ParseText(source);
         var extended = _context.HostCompilationForBinder.AddSyntaxTrees(tree);
@@ -317,10 +329,57 @@ internal sealed class MetadataBinder
         }
 
         var info = model.GetSymbolInfo(invocation);
-        if (info.Symbol is IMethodSymbol resolved)
+        if (info.Symbol is IMethodSymbol resolved
+            && model.GetOperation(invocation) is IInvocationOperation operation)
         {
             unresolvedReason = null;
-            return resolved;
+            var mappings = new List<MetadataCallArgument>();
+            var argumentIndices = invocation.ArgumentList.Arguments
+                .Select((argument, index) => (argument.Span, Index: index))
+                .ToDictionary(item => item.Span, item => item.Index);
+            foreach (var argument in operation.Arguments)
+            {
+                if (argument.Parameter is not { } parameter
+                    || argument.ArgumentKind == ArgumentKind.DefaultValue)
+                    continue;
+
+                if (argument.ArgumentKind == ArgumentKind.ParamArray
+                    && parameter.Type is IArrayTypeSymbol arrayType
+                    && argument.Value is IArrayCreationOperation { Initializer: { } initializer })
+                {
+                    foreach (var element in initializer.ElementValues)
+                        AddMapping(element.Syntax, parameter, arrayType.ElementType, isExpanded: true);
+                }
+                else if (argument.ArgumentKind == ArgumentKind.ParamCollection
+                    && parameter.Type is INamedTypeSymbol { Arity: 1 } collectionType
+                    && collectionType.ContainingNamespace.ToDisplayString() == "System"
+                    && collectionType.Name is "Span" or "ReadOnlySpan")
+                {
+                    var collection = argument.Value as ICollectionExpressionOperation
+                        ?? (argument.Value as IConversionOperation)?.Operand as ICollectionExpressionOperation;
+                    if (collection != null)
+                    {
+                        foreach (var element in collection.Elements)
+                            AddMapping(element.Syntax, parameter, collectionType.TypeArguments[0], isExpanded: true);
+                    }
+                }
+                // Roslyn marks supplied cast arguments IsImplicit too; only
+                // ArgumentKind and the actual supplied syntax distinguish them.
+                else if (argument.ArgumentKind == ArgumentKind.Explicit)
+                {
+                    AddMapping(argument.Syntax, parameter, parameter.Type, isExpanded: false);
+                }
+            }
+            return MetadataBinderResult.CreateResolved(
+                resolved, mappings.OrderBy(mapping => mapping.ArgumentIndex).ToArray());
+
+            void AddMapping(SyntaxNode syntax, IParameterSymbol parameter, ITypeSymbol target, bool isExpanded)
+            {
+                var supplied = syntax.FirstAncestorOrSelf<ArgumentSyntax>();
+                if (supplied is null) return;
+                if (argumentIndices.TryGetValue(supplied.Span, out var index))
+                    mappings.Add(new MetadataCallArgument(index, parameter, target, isExpanded));
+            }
         }
 
         unresolvedReason = info.CandidateReason switch
@@ -357,6 +416,12 @@ internal sealed class MetadataBinder
     }
 }
 
+internal sealed record MetadataCallArgument(
+    int ArgumentIndex,
+    IParameterSymbol Parameter,
+    ITypeSymbol TargetType,
+    bool IsExpandedParams);
+
 /// <summary>Result of a call to <see cref="MetadataBinder.ResolveCall"/> or
 /// <see cref="MetadataBinder.ResolveConstructor"/>.</summary>
 internal readonly struct MetadataBinderResult
@@ -364,14 +429,21 @@ internal readonly struct MetadataBinderResult
     public IMethodSymbol? Symbol { get; }
     public string? UnresolvedReason { get; }
     public bool IsResolved => Symbol is not null;
+    public IReadOnlyList<MetadataCallArgument> Arguments { get; }
 
-    private MetadataBinderResult(IMethodSymbol? symbol, string? unresolvedReason)
+    private MetadataBinderResult(
+        IMethodSymbol? symbol,
+        string? unresolvedReason,
+        IReadOnlyList<MetadataCallArgument>? arguments = null)
     {
         Symbol = symbol;
         UnresolvedReason = unresolvedReason;
+        Arguments = arguments ?? Array.Empty<MetadataCallArgument>();
     }
 
-    public static MetadataBinderResult CreateResolved(IMethodSymbol symbol) => new(symbol, null);
+    public static MetadataBinderResult CreateResolved(
+        IMethodSymbol symbol,
+        IReadOnlyList<MetadataCallArgument>? arguments = null) => new(symbol, null, arguments);
 
     public static MetadataBinderResult CreateUnresolved(string reason) => new(null, reason);
 
