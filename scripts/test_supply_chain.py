@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -16,6 +17,40 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 class SupplyChainTests(unittest.TestCase):
+    def test_paid_benchmarks_require_explicit_manual_opt_in(self) -> None:
+        workflow = (REPO_ROOT / ".github/workflows/benchmark.yml").read_text()
+        skip_input = workflow.split("      skip_llm:", 1)[1].split("      agent_refactoring:", 1)[0]
+        self.assertIn("default: 'true'", skip_input)
+        self.assertIn("type: boolean", skip_input)
+        steps = {
+            block.splitlines()[0]: block
+            for block in workflow.split("      - name: ")[1:]
+        }
+        manual_guard = (
+            "github.event_name == 'workflow_dispatch' "
+            "&& github.event.inputs.skip_llm == 'false'"
+        )
+        for name in (
+            "Restore LLM response cache",
+            "Run LLM Comprehension evaluation",
+            "Run TaskCompletion benchmark (LLM)",
+            "Run Safety benchmark (LLM)",
+            "Run EffectDiscipline benchmark (LLM)",
+            "Merge LLM results into benchmark-results.json",
+        ):
+            with self.subTest(step=name):
+                guards = re.findall(r"(?m)^        if: (.+)$", steps[name])
+                self.assertEqual([manual_guard], guards)
+        refactoring_job = workflow.split("  agent-refactoring-benchmark:", 1)[1].split("    steps:", 1)[0]
+        self.assertEqual(
+            ["github.event_name == 'workflow_dispatch' && github.event.inputs.agent_refactoring == 'true'"],
+            re.findall(r"(?m)^    if: (.+)$", refactoring_job),
+        )
+        self.assertEqual(6, workflow.count("secrets.ANTHROPIC_API_KEY"))
+        static_run = steps["Run static benchmarks"]
+        self.assertIn("--statistical", static_run)
+        self.assertIn('--runs "${{ github.event.inputs.statistical_runs || \'30\' }}"', static_run)
+
     def test_build_project_has_no_network_or_tracked_resource_mutation_targets(self) -> None:
         project = (REPO_ROOT / "src/Calor.Compiler/Calor.Compiler.csproj").read_text()
         for forbidden in (

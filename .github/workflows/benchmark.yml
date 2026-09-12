@@ -1,7 +1,7 @@
 name: Benchmarks
 
 on:
-  # Run on releases - includes all benchmarks (LLM included)
+  # Release and push events run deterministic benchmarks only.
   release:
     types: [created]
   # Allow manual trigger
@@ -12,9 +12,9 @@ on:
         required: false
         default: '30'
       skip_llm:
-        description: 'Skip LLM benchmarks (faster, cheaper)'
+        description: 'Skip paid LLM benchmarks (default true; opting in requires separate authorization)'
         required: false
-        default: 'false'
+        default: 'true'
         type: boolean
       agent_refactoring:
         description: 'Run agent refactoring benchmark'
@@ -63,6 +63,8 @@ jobs:
       - name: Run static benchmarks
         run: |
           dotnet run --project tests/Calor.Evaluation -c Release -- run \
+            --statistical \
+            --runs "${{ github.event.inputs.statistical_runs || '30' }}" \
             --format website \
             --output website/public/data/benchmark-results.json \
             --verbose
@@ -78,9 +80,9 @@ jobs:
             --output website/public/data/benchmark-results-statistical.json \
             --verbose
 
-      # LLM Benchmarks - run on release, or when not skipped in manual trigger
+      # Paid calls require an explicit manual opt-in, never release/push events.
       - name: Restore LLM response cache
-        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm == 'false'
         uses: actions/cache@v4
         with:
           path: ~/.calor/llm-cache
@@ -89,7 +91,7 @@ jobs:
             llm-cache-
 
       - name: Run LLM Comprehension evaluation
-        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm == 'false'
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -105,7 +107,7 @@ jobs:
             --verbose
 
       - name: Run TaskCompletion benchmark (LLM)
-        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm == 'false'
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -121,7 +123,7 @@ jobs:
             --verbose
 
       - name: Run Safety benchmark (LLM)
-        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm == 'false'
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -136,7 +138,7 @@ jobs:
             --verbose
 
       - name: Run EffectDiscipline benchmark (LLM)
-        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm == 'false'
         continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -156,19 +158,16 @@ jobs:
           node-version: '20'
 
       - name: Merge LLM results into benchmark-results.json
-        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm != 'true')
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.skip_llm == 'false'
         run: |
           node scripts/merge-llm-results.js
 
       - name: Generate docs/benchmarking/results.md
         run: node scripts/generate-results-md.js
 
-      # #1157 defect 2. The static run above writes benchmark-results.json with
-      # statisticalRunCount: 0, and the committed file is a 30-run result. Without
-      # this step the bot opens a PR that replaces a 30-run overallAdvantage with a
-      # single-run one under the same key, described as "latest metrics" — which
-      # reads as a movement in Calor's advantage and is not one. Measured at
-      # 74ba4973: 30 runs / 1.32 becomes 0 runs / 1.28, same eight metrics.
+      # #1157: automatic runs now preserve the 30-run methodology. Retain this
+      # gate for explicit manual changes to run count or metric set; a weaker
+      # measurement must not be presented as a comparable movement in the score.
       - name: Check the result is not a weaker measurement (#1157)
         id: methodology
         run: |
@@ -263,7 +262,7 @@ jobs:
   # Uses Claude Code CLI to perform refactoring tasks and measures pass rates
   agent-refactoring-benchmark:
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || github.event.inputs.agent_refactoring == 'true'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.agent_refactoring == 'true'
     needs: benchmark
     permissions:
       contents: write

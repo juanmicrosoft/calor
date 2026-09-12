@@ -9,8 +9,8 @@ What Calor's benchmark runners calculate, which artifacts actually ran, and
 which questions remain proposals.
 
 The [proposed Effect Rows Study](/docs/benchmarking/effect-rows-study/) has a
-separate two-stage protocol. Its pilot budget is approved, but collection is
-not admitted. It is not this static
+separate two-stage protocol. The user paused it on 2026-09-11 after two
+invalid/censored attempts; neither stage has completed. It is not this static
 evaluation framework or the outcome-based Effect Discipline runner.
 
 ---
@@ -26,8 +26,9 @@ The **published static dashboard** is narrower than the full framework: it uses
 Optional LLM suites are separate artifacts and do not contribute to the 1.32x
 headline.
 
-Its recorded source is `1caf9138`, which declares compiler `0.19.0`; the exact
-executed measurement binary was not independently recorded. The corpus is
+Recorded on 2026-09-11 for release v0.21.0, its source is `be488238`, which
+declares compiler `0.20.0` before the release version bump. The exact executed
+measurement binary was not independently recorded. The corpus is
 `tests/TestData/Benchmarks`. See the [snapshot provenance and limits](/docs/benchmarking/results/#read-the-results-carefully).
 
 ### Published artifact inventory
@@ -38,7 +39,7 @@ the field.
 
 | Artifact | Date and source | Denominator | Execution and configuration | Headline use |
 |:---------|:----------------|:------------|:----------------------------|:-------------|
-| [Eight-metric static dashboard](/docs/benchmarking/results/) | 2026-09-10; [source `1caf9138`](https://github.com/juanmicrosoft/calor/commit/1caf9138), declaring compiler `0.19.0` | 217 source pairs | Deterministic calculators repeated 30 times. No LLM. The exact measurement binary and working-tree state are unknown. | Supplies the legacy 1.32x composite. That composite is not a language or agent advantage. |
+| [Eight-metric static dashboard](/docs/benchmarking/results/) | 2026-09-11; [source `be488238`](https://github.com/juanmicrosoft/calor/commit/be488238), declaring compiler `0.20.0` before the v0.21.0 bump | 217 source pairs | Deterministic calculators repeated 30 times. No LLM. No independently attested measurement binary. | Supplies the legacy 1.32x composite. It establishes no measured language, agent-productivity, correctness, or safety advantage. |
 | [Correctness estimation mode](/docs/benchmarking/metrics/correctness/) inside the static dashboard | Same artifact and 217 pairs | 217 source pairs | Historical heuristic scoring because no LLM provider was configured. It does not execute generated programs as an agent study. | Included as one of the eight legacy dashboard metrics. |
 | Historical [Safety estimation](/docs/benchmarking/metrics/safety/) | 2026-02-17; [artifact revision `e02684e1`](https://github.com/juanmicrosoft/calor/blob/e02684e132cd86044ece331bf4c34a9eaaf0e8d6/website/public/data/benchmark-results.json), recording source `59799d1` | 40 programs | Historical heuristic estimate; no agent execution. Current provider-backed runners do not silently fall back to it. | Supplies the separate historical 1.59x Safety headline; not part of the 1.32x dashboard. |
 | Historical [Effect Discipline estimation](/docs/benchmarking/metrics/effect-discipline/) | 2026-02-17; [artifact revision `e02684e1`](https://github.com/juanmicrosoft/calor/blob/e02684e132cd86044ece331bf4c34a9eaaf0e8d6/website/public/data/benchmark-results.json), recording source `59799d1` | 40 programs | Historical structural estimate; no agent execution. Current provider-backed runners do not silently fall back to it. | Supplies a separate historical 1.00x tie; not part of the 1.32x dashboard. |
@@ -49,7 +50,8 @@ the field.
 | [Agent refactoring snapshot](https://github.com/juanmicrosoft/calor/blob/c89938c9d19fdb53daa1eabde90b438074508fa1/website/public/data/agent-refactoring-results.json) | 2026-02-15; [source `580e189`](https://github.com/juanmicrosoft/calor/commit/580e189), declaring compiler `0.2.3` | 20 tasks per language, three runs per task | `claude-code`, exact model unknown; majority vote requires two of three runs. | Supplies the separate public 95% snapshot headline for each language; not part of the static composite. |
 | [PP-E1 effect-row proof point](https://github.com/juanmicrosoft/calor/blob/3bb2601e3ff83597ddf2f27dcc334b6399ab97ea/bench/phase0-agent-native/effect-rows-probe-ledger.json) | 2026-08-27; artifact revision `3bb2601e3ff83597ddf2f27dcc334b6399ab97ea`, measured release commit `72d060f400b5787ba4ec11cb4dd8860c95173da3` | 10 seeded mutations plus 40 ordinary-task runs | `claude-opus-4-8`, Claude Code 2.1.243; v0.14.3 control versus v0.15.0 treatment, five runs per arm. Verdict **HIT** for its bounded toolchain-cost claim. | Separate proof point; no contribution to 1.32x. |
 | [PP-W-rows practice and sizing](https://github.com/juanmicrosoft/calor/blob/82a7c653cbf1ea2f6231e38cc328c74a34e6589b/bench/phase0-agent-native/effect-rows-benefit-ledger.json) | 2026-09-01; artifact revision `82a7c653cbf1ea2f6231e38cc328c74a34e6589b`. Its `measuredCommit` value `3bb2601e0cbd93fc25fdaaf2a0ea5183b8a2dd6a` does not resolve; the pins record arm commits `283ec9f9964ddd5b21da15b646a0dd77d53de99e` and `3bb2601e3ff83597ddf2f27dcc334b6399ab97ea`. | 28 valid practice runs; registered main epoch had zero runs | `claude-opus-4-8`, Claude Code 2.1.248 and 2.1.252; v0.14.3 pre-rows/permissive control versus v0.15.0 strict treatment, three runs per arm. The main `w-rows-001` epoch never ran; verdict **UNDERPOWERED**. | No effect-row safety-benefit headline. |
-| [Redesigned PP-W-rows protocol](https://github.com/juanmicrosoft/calor/blob/16880d006db760d7b47d829fd4282b033c3158a0/docs/plans/2026-09-05-ppw-rows-fixture-redesign.md) | 2026-09-08; revision `16880d006db760d7b47d829fd4282b033c3158a0` | No pilot or confirmatory runs | Local buildability [subsequently passed](https://github.com/juanmicrosoft/calor/pull/1348) on 2026-09-10. Separate [pilot-only financial approval](https://github.com/juanmicrosoft/calor/pull/1387) sets a USD250 total ceiling; operational admission remains pending. | No agent-benefit result. BUDGET_NOT_RUN: no defensible complete-pilot plan within the cap established. |
+| [Redesigned PP-W-rows protocol](https://github.com/juanmicrosoft/calor/blob/16880d006db760d7b47d829fd4282b033c3158a0/docs/plans/2026-09-05-ppw-rows-fixture-redesign.md) | 2026-09-08; revision `16880d006db760d7b47d829fd4282b033c3158a0` | Registered method, not collected observations | Local buildability [subsequently passed](https://github.com/juanmicrosoft/calor/pull/1348) on 2026-09-10. This document records the design rules; later attempts are tracked separately below. | No agent-benefit result follows from registration or buildability. |
+| [Paused redesigned PP-W-rows study](https://github.com/juanmicrosoft/calor/issues/1254#issuecomment-5637070487) | 2026-09-11 user-directed pause; [draft checkpoint](https://github.com/juanmicrosoft/calor/pull/1438#issuecomment-5637787747) | Two consumed invalid/censored attempts; 442 untouched identities out of 444 | Single USD1,000 total ceiling. Two reservations hold USD51.04 total; actual charges are unknown, not measured spend. Permanent-retention exception not applied. No permission to resume. | Neither pilot nor confirmation completed; no benefit or null result. This is not the historical ledger's unrun epoch. |
 
 The [Results page](/docs/benchmarking/results/) explains the PP-W chronology
 and the [Effect Rows Study](/docs/benchmarking/effect-rows-study/) records the
@@ -516,8 +518,9 @@ advantage.
 ### Automated Benchmarks
 
 Repository workflows may run selected benchmark and regression commands.
-Workflow availability is not evidence that a weekly multi-model LLM study or
-the proposed PP-W redesign has executed.
+Workflow availability does not establish a completed weekly multi-model LLM
+study, PP-W pilot, or confirmation. The paused PP-W attempts are recorded
+separately in the inventory above.
 
 ### Regression Detection
 
