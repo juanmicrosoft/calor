@@ -449,11 +449,22 @@ public sealed class TypeChecker
 
         if (bind.Initializer != null)
         {
-            var initType = InferExpressionType(bind.Initializer);
-
             if (bind.TypeName != null)
             {
                 varType = ResolveTypeName(bind.TypeName, bind.Span);
+                CalorType initType;
+                if (bind.Initializer is ReferenceNode functionReference
+                    && TryGetDelegateFunctionType(varType, out _)
+                    && _env.LookupFunctions(functionReference.Name) is { Count: > 0 } overloads)
+                {
+                    initType = IsFunctionReferenceAssignable(varType, functionReference.Name)
+                        ? varType
+                        : overloads[0];
+                }
+                else
+                {
+                    initType = InferExpressionType(bind.Initializer);
+                }
                 if (!IsAssignable(varType, initType))
                 {
                     _diagnostics.ReportError(bind.Span, DiagnosticCode.TypeMismatch,
@@ -462,6 +473,7 @@ public sealed class TypeChecker
             }
             else
             {
+                var initType = InferExpressionType(bind.Initializer);
                 varType = initType;
             }
         }
@@ -919,6 +931,7 @@ public sealed class TypeChecker
             MatchExpressionNode match => InferMatchExpressionType(match),
             NewExpressionNode newExpression => InferNewExpressionType(newExpression),
             CallExpressionNode call => InferCallExpressionType(call),
+            ExpressionCallNode call => InferExpressionCallType(call),
             // Collection expression types
             ListCreationNode list => InferListCreationType(list),
             DictionaryCreationNode dict => InferDictionaryCreationType(dict),
@@ -1128,12 +1141,31 @@ public sealed class TypeChecker
 
     private CalorType InferCallExpressionType(CallExpressionNode call)
     {
-        CheckCallArguments(call.Arguments);
-        // This environment retains one signature, not the selected overload or
-        // generic substitution. Never mistake its last declaration for that result.
-        if (_unmodeledCallReturns.Contains(call.Target) || _env.LookupVariable(call.Target) != null)
+        var argumentTypes = call.Arguments.Select(InferExpressionType).ToArray();
+        if (_env.LookupVariable(call.Target) != null)
             return ErrorType.Instance;
-        return _env.LookupFunction(call.Target)?.ReturnType ?? ErrorType.Instance;
+
+        var candidates = _env.LookupFunctions(call.Target)
+            .Where(candidate => candidate.ParameterTypes.Count == argumentTypes.Length
+                && candidate.ParameterTypes.Zip(argumentTypes)
+                    .All(pair => IsAssignable(pair.First, pair.Second)))
+            .ToArray();
+        return candidates.Length == 1 ? candidates[0].ReturnType : ErrorType.Instance;
+    }
+
+    private CalorType InferExpressionCallType(ExpressionCallNode call)
+    {
+        var targetType = InferExpressionType(call.TargetExpression);
+        var argumentTypes = call.Arguments.Select(InferExpressionType).ToArray();
+        if (targetType is not FunctionType function
+            || function.ParameterTypes.Count != argumentTypes.Length
+            || !function.ParameterTypes.Zip(argumentTypes)
+                .All(pair => IsAssignable(pair.First, pair.Second)))
+        {
+            return ErrorType.Instance;
+        }
+
+        return function.ReturnType;
     }
 
     private CalorType InferIsPatternType(IsPatternNode isPattern)
@@ -1269,6 +1301,18 @@ public sealed class TypeChecker
         if (rightNullable != null && left is NullType)
         {
             nullable = rightNullable;
+            return true;
+        }
+
+        if (left is NullType && IsPrimitiveValueType(right))
+        {
+            nullable = new NullableValueType(right);
+            return true;
+        }
+
+        if (right is NullType && IsPrimitiveValueType(left))
+        {
+            nullable = new NullableValueType(left);
             return true;
         }
 
@@ -1834,26 +1878,9 @@ public sealed class TypeChecker
                     caseType = PrimitiveType.Unit;
                 }
 
-                if (unifiedType == null)
-                {
-                    unifiedType = caseType;
-                }
-                else if (!unifiedType.Equals(caseType) && caseType is not ErrorType && unifiedType is not ErrorType)
-                {
-                    if (IsNumeric(unifiedType) && IsNumeric(caseType) && IsAssignable(unifiedType, caseType))
-                    {
-                        // The existing common type already accommodates this arm.
-                    }
-                    else if (IsNumeric(unifiedType) && IsNumeric(caseType) && IsAssignable(caseType, unifiedType))
-                    {
-                        unifiedType = caseType;
-                    }
-                    else
-                    {
-                        _diagnostics.ReportError(match.Span, DiagnosticCode.TypeMismatch,
-                            $"Match expression branches have incompatible types: {unifiedType.SurfaceName} and {caseType.SurfaceName}");
-                    }
-                }
+                unifiedType = unifiedType == null
+                    ? caseType
+                    : CommonConditionalType(match.Span, unifiedType, caseType);
             }
 
             _env.ExitScope();
@@ -2115,8 +2142,11 @@ public sealed class TypeChecker
         if (target is NullableValueType nullableValueTarget)
         {
             return source is NullableValueType nullableValueSource
-                && IsAssignable(nullableValueTarget.UnderlyingType, nullableValueSource.UnderlyingType);
+                ? IsAssignable(nullableValueTarget.UnderlyingType, nullableValueSource.UnderlyingType)
+                : IsAssignable(nullableValueTarget.UnderlyingType, source);
         }
+        if (TryGetDelegateFunctionType(target, out var targetFunction) && source is FunctionType sourceFunction)
+            return targetFunction.Equals(sourceFunction);
         // Nothing is known about an unmodeled external type, in either direction.
         if (target is ExternalType || source is ExternalType) return true;
         if (target.Equals(PrimitiveType.Float) && source.Equals(PrimitiveType.Int)) return true;
@@ -2133,6 +2163,7 @@ public sealed class TypeChecker
         {
             return false;
         }
+
         // char widens to an integer, as in C#. Not the reverse: `i32 -> char` is a narrowing
         // conversion C# requires an explicit cast for.
         if (target.Equals(PrimitiveType.Int) && source.Equals(PrimitiveType.Char)) return true;
@@ -2141,6 +2172,43 @@ public sealed class TypeChecker
         if (target.Equals(PrimitiveType.Decimal) && source.Equals(PrimitiveType.Int)) return true;
         // Refined type is a subtype of its base type (erasure)
         if (source is RefinedType refinedSource && IsAssignable(target, refinedSource.BaseType)) return true;
+        return false;
+    }
+
+    private bool IsFunctionReferenceAssignable(CalorType target, string name)
+    {
+        if (!TryGetDelegateFunctionType(target, out var targetFunction))
+            return false;
+
+        return _env.LookupFunctions(name).Any(candidate => targetFunction.Equals(candidate));
+    }
+
+    private static bool TryGetDelegateFunctionType(CalorType type, out FunctionType function)
+    {
+        if (type is FunctionType direct)
+        {
+            function = direct;
+            return true;
+        }
+
+        if (type is GenericInstanceType generic
+            && generic.BaseName.Equals("Func", StringComparison.OrdinalIgnoreCase)
+            && generic.TypeArguments.Count >= 1)
+        {
+            function = new FunctionType(
+                generic.TypeArguments.Take(generic.TypeArguments.Count - 1).ToArray(),
+                generic.TypeArguments[^1]);
+            return true;
+        }
+
+        if (type is GenericInstanceType action
+            && action.BaseName.Equals("Action", StringComparison.OrdinalIgnoreCase))
+        {
+            function = new FunctionType(action.TypeArguments, PrimitiveType.Void);
+            return true;
+        }
+
+        function = null!;
         return false;
     }
 
@@ -2162,7 +2230,7 @@ public sealed class TypeEnvironment
     private readonly Stack<Dictionary<string, CalorType>> _variableScopes = new();
     private readonly Stack<Dictionary<string, CalorType>> _typeScopes = new();
     private readonly Dictionary<string, CalorType> _globalTypes = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, FunctionType> _functions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<FunctionType>> _functions = new(StringComparer.OrdinalIgnoreCase);
 
     public TypeEnvironment()
     {
@@ -2226,11 +2294,22 @@ public sealed class TypeEnvironment
 
     public void DefineFunction(string name, FunctionType type)
     {
-        _functions[name] = type;
+        if (!_functions.TryGetValue(name, out var overloads))
+        {
+            overloads = new List<FunctionType>();
+            _functions[name] = overloads;
+        }
+        overloads.Add(type);
     }
 
     public FunctionType? LookupFunction(string name)
     {
-        return _functions.TryGetValue(name, out var type) ? type : null;
+        var overloads = LookupFunctions(name);
+        return overloads.Count == 1 ? overloads[0] : null;
     }
+
+    public IReadOnlyList<FunctionType> LookupFunctions(string name)
+        => _functions.TryGetValue(name, out var overloads)
+            ? overloads
+            : Array.Empty<FunctionType>();
 }

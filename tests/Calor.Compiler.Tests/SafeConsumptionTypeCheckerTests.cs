@@ -413,6 +413,97 @@ public sealed class SafeConsumptionTypeCheckerTests
         AssertNoErrors(result);
     }
 
+    [Fact]
+    public void ExpressionCalls_ValidateNestedArguments()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Double:pub} (i32:value) -> i32
+                §E{}
+                §R (* value 2)
+              §F{f2:GetTransform:pub} () -> Func<i32,i32>
+                §E{}
+                §R Double
+              §F{f3:Probe:pub} () -> i32
+                §E{}
+                §R §C §C{GetTransform} §/C §A (?? INT:1 INT:2) §/C
+            """);
+
+        var diagnostic = SingleErrorAt(result, 10);
+        Assert.Contains("Null-coalescing requires", diagnostic.Message);
+    }
+
+    [Fact]
+    public void ResolvedOverloadReturnType_IsCheckedByOuterConsumer()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Pick:pub} (i32:value) -> i32
+                §E{}
+                §R value
+              §F{f2:Pick:pub} (str:value) -> str
+                §E{}
+                §R value
+              §F{f3:Probe:pub} () -> i32
+                §E{}
+                §R (?? §C{Pick} §A 1 §/C 2)
+            """);
+
+        var diagnostic = SingleErrorAt(result, 10);
+        Assert.Contains("Null-coalescing requires", diagnostic.Message);
+    }
+
+    [Fact]
+    public void NullableValueBindings_AcceptValuesAndConditionalNull()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (bool:flag) -> void
+                §E{}
+                §B{direct:?i32} INT:1
+                §B{conditional:?i32} (? flag null INT:1)
+            """);
+
+        AssertNoErrors(result);
+    }
+
+    [Fact]
+    public void MatchExpressions_UnifyThrowingAndNullArms()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (i32:value) -> void
+                §E{throw}
+                §B{text:str} §W{m1:expr} value
+                  §K 0 → "ok"
+                  §K _ → §TH "bad"
+                §B{nullable:?str} §W{m2:expr} value
+                  §K 0 → "ok"
+                  §K _ → null
+            """);
+
+        AssertNoErrors(result);
+    }
+
+    [Fact]
+    public void FunctionReferences_AreMatchedAgainstDelegateTargetsAndOverloads()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Pick:pub} (str:value) -> str
+                §E{}
+                §R value
+              §F{f2:Pick:pub} (i32:value) -> i32
+                §E{}
+                §R value
+              §F{f3:Probe:pub} () -> void
+                §E{}
+                §B{picker:Func<i32,i32>} Pick
+            """);
+
+        AssertNoErrors(result);
+    }
+
     [Theory]
     [InlineData("§R §C{Take} §A (?? 1 2) §/C")]
     [InlineData("§C{Take} §A (?? 1 2) §/C\n    §R 0")]
