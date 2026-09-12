@@ -252,8 +252,15 @@ annotation blanket or flow-sensitive guarantee is proposed.
 
 ## Reproduce and validate
 
-Use an isolated checkout of the observer source above. Initialize only the
-three product corpus submodules. Keep scratch files under that checkout.
+The measured ancestor above retains the exact originally built project.
+The final PR stores the observer as non-shipping `.cs.txt`/`.csproj.txt`
+source archives, following N0's reproduction-artifact convention, not as
+new product C# or a solution project. The first CI head correctly rejected
+the original new `.cs` path under the Calor-first guard; no guard or allowlist
+was changed. The commands below materialize the archived source in a local
+reproduction directory. Use an isolated checkout of the final PR head,
+initialize only the three product corpus submodules, and keep scratch
+files under that checkout.
 
 ```bash
 git submodule update --init -- bench/corpus/MediatR bench/corpus/serilog bench/corpus/FluentValidation
@@ -271,8 +278,12 @@ for project in Synthetic Synthetic2 MediatR Serilog FluentValidation; do
     --output "$PWD/.d1-work/reports" > ".d1-work/logs/$project.log" 2>&1
   printf '%s\t%s\n' "$project" "$?" >> .d1-work/run-exits.tsv
 done
-dotnet build docs/plans/evidence/nominal-policy-1400/reproduce/Probe.csproj
-dotnet run --no-build --project docs/plans/evidence/nominal-policy-1400/reproduce/Probe.csproj -- \
+mkdir -p .d1-work/probe
+cp docs/plans/evidence/nominal-policy-1400/reproduce/Program.cs.txt .d1-work/probe/Program.cs
+cp docs/plans/evidence/nominal-policy-1400/reproduce/Probe.csproj.txt .d1-work/probe/Probe.csproj
+cp docs/plans/evidence/nominal-policy-1400/reproduce/packages.lock.json .d1-work/probe/packages.lock.json
+dotnet build .d1-work/probe/Probe.csproj -p:CalorRoot="$PWD"
+dotnet run --no-build --project .d1-work/probe/Probe.csproj -p:CalorRoot="$PWD" -- \
   "$PWD" "$PWD/.d1-work/reports" "$PWD/.d1-work/observations"
 python3 docs/plans/evidence/nominal-policy-1400/reproduce/summarize.py \
   .d1-work/observations .d1-work/reports .d1-work/summary

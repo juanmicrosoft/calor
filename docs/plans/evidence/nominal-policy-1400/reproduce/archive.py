@@ -57,15 +57,15 @@ for report_path in sorted((args.work / "reports").glob("*-roundtrip.json")):
                 attempt["Leg"] + "-" + str(attempt["Attempt"]) + "-" + str(index) + ".trx"))
 root = Path.cwd()
 binary_paths = [
-    root / "docs/plans/evidence/nominal-policy-1400/reproduce/bin/Debug/net10.0/Probe.dll",
-    root / "docs/plans/evidence/nominal-policy-1400/reproduce/bin/Debug/net10.0/calor.dll",
-    root / "docs/plans/evidence/nominal-policy-1400/reproduce/bin/Debug/net10.0/Calor.RoundTrip.Harness.dll",
-    root / "docs/plans/evidence/nominal-policy-1400/reproduce/bin/Debug/net10.0/Microsoft.CodeAnalysis.CSharp.dll"
+    args.work / "probe/bin/Debug/net10.0/Probe.dll",
+    args.work / "probe/bin/Debug/net10.0/calor.dll",
+    args.work / "probe/bin/Debug/net10.0/Calor.RoundTrip.Harness.dll",
+    args.work / "probe/bin/Debug/net10.0/Microsoft.CodeAnalysis.CSharp.dll"
 ]
 provenance = {
     "observerSource": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
     "observerTrackedDiffSha256": hashlib.sha256(subprocess.check_output(["git", "diff", "--binary"])).hexdigest(),
-    "binaries": [{"path": str(p.relative_to(root)), "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
+    "binaries": [{"path": str(p.resolve().relative_to(root)), "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
                  for p in binary_paths],
     "e1Source": "39348d8c7262bac90120c6d30c01c4476e97acde",
     "scope": "Product D1 pre-T1 measurement; no enforcement or paid research",

@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../../../../src/Calor.Compiler/Calor.Compiler.csproj" />
-    <ProjectReference Include="../../../../../tools/Calor.RoundTrip.Harness/Calor.RoundTrip.Harness.csproj" />
+    <ProjectReference Include="$(CalorRoot)/src/Calor.Compiler/Calor.Compiler.csproj" />
+    <ProjectReference Include="$(CalorRoot)/tools/Calor.RoundTrip.Harness/Calor.RoundTrip.Harness.csproj" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,5 @@
-// NON-SHIPPING observation driver. No compiler policy or converted source is mutated.
+// NON-SHIPPING observation source archive. Materialize under the reproduction work directory.
+// No compiler policy or converted source is mutated.
 using System.Collections.Immutable;
 using System.Reflection;
 using System.Security.Cryptography;
