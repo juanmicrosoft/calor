@@ -9,6 +9,37 @@ namespace Calor.LanguageServer.Tests.State;
 
 public class DocumentStateTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void N3_NamedCall_EditorRetainsActualArgumentSpanAndAnalysisOnlyRoute(bool expression)
+    {
+        var source = $$"""
+            §M{m1:EditorMapping}
+              §F{caller:Caller:pub} (?string:maybe) -> string
+                {{(expression ? "§R " : "")}}§C{System.IO.Path.Combine} §A[path2] STR:"safe" §A[path1] maybe §/C
+                {{(expression ? "" : "§R STR:\"done\"")}}
+            """;
+        var state = LspTestHarness.CreateDocument(source);
+        var diagnostic = Assert.Single(state.Diagnostics.Where(d =>
+            d.Code == Compiler.Diagnostics.DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Contains("'path1'", diagnostic.Message);
+        Assert.Equal(source.LastIndexOf("maybe", StringComparison.Ordinal), diagnostic.Span.Start);
+        var lsp = Calor.LanguageServer.Utilities.DiagnosticConverter.ToLspDiagnostic(diagnostic, source);
+        Assert.Equal("calor (analysis only)", lsp.Source);
+        Assert.Equal(OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error, lsp.Severity);
+        Assert.Equal(diagnostic.Span.Line - 1, lsp.Range.Start.Line);
+        Assert.Equal(diagnostic.Span.Column - 1, lsp.Range.Start.Character);
+        Assert.Equal(5, lsp.Range.End.Character - lsp.Range.Start.Character);
+        var result = Compiler.Program.Compile(source, "n3-editor.calr",
+            new Compiler.CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        Assert.DoesNotContain(result.Diagnostics, d =>
+            d.Code == Compiler.Diagnostics.DiagnosticCode.NullableArgumentToNonNullableParameter);
+        Assert.Contains("path2:", result.GeneratedCode);
+        Assert.Contains("path1:", result.GeneratedCode);
+    }
+
     [Fact]
     public void Constructor_SetsProperties()
     {

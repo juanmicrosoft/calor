@@ -26,6 +26,102 @@ public class MetadataBinderNullabilityTests
         _binder = new MetadataBinder(_ctx);
     }
 
+    [Fact]
+    public void N3_MetadataSelectedMap_UsesRoslynNamedParameterIdentity()
+    {
+        var stringType = _ctx.TryResolveType("System.String")!;
+        var result = _binder.ResolveCall(_ctx.TryResolveType("System.IO.Path")!, "Combine",
+            [new MetadataArgument(stringType, Name: "path2"), new MetadataArgument(stringType, Name: "path1")]);
+
+        Assert.True(result.IsResolved, result.UnresolvedReason);
+        Assert.Equal(new[] { 0, 1 }, result.Arguments.Select(argument => argument.ArgumentIndex));
+        Assert.Equal(new[] { "path2", "path1" }, result.Arguments.Select(argument => argument.Parameter.Name));
+        Assert.Equal(new[] { 1, 0 }, result.Arguments.Select(argument => argument.Parameter.Ordinal));
+        Assert.All(result.Arguments, argument => Assert.False(argument.IsExpandedParams));
+    }
+
+    [Theory]
+    [InlineData("empty", 0)]
+    [InlineData("array", 1)]
+    [InlineData("named-array", 1)]
+    [InlineData("expanded", 5)]
+    public void N3_MetadataParams_UsesSelectedNormalOrExpandedForm(string form, int count)
+    {
+        var stringType = _ctx.TryResolveType("System.String")!;
+        var array = _ctx.HostCompilationForBinder.CreateArrayTypeSymbol(stringType);
+        var arguments = form switch
+        {
+            "array" => new[] { new MetadataArgument(array) },
+            "named-array" => new[] { new MetadataArgument(array, Name: "paths") },
+            _ => Enumerable.Range(0, count).Select(_ => new MetadataArgument(stringType)).ToArray()
+        };
+        var result = _binder.ResolveCall(_ctx.TryResolveType("System.IO.Path")!, "Combine", arguments);
+        Assert.True(result.IsResolved, result.UnresolvedReason);
+        Assert.Equal(count, result.Arguments.Count);
+        Assert.All(result.Arguments, mapping =>
+        {
+            Assert.Equal("paths", mapping.Parameter.Name);
+            Assert.Equal(form == "expanded", mapping.IsExpandedParams);
+            Assert.Equal(form == "expanded",
+                mapping.TargetType.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_String);
+            if (form != "expanded")
+            {
+                var target = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IArrayTypeSymbol>(mapping.TargetType);
+                Assert.Equal(1, target.Rank);
+                Assert.Equal(Microsoft.CodeAnalysis.SpecialType.System_String, target.ElementType.SpecialType);
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData("missing", "path1")]
+    [InlineData("path1", "path1")]
+    public void N3_MetadataRejectedNames_DoNotExposeAMapping(string first, string second)
+    {
+        var type = _ctx.TryResolveType("System.String")!;
+        var result = _binder.ResolveCall(_ctx.TryResolveType("System.IO.Path")!, "Combine",
+            [new MetadataArgument(type, Name: first), new MetadataArgument(type, Name: second)]);
+        Assert.False(result.IsResolved);
+        Assert.Empty(result.Arguments);
+        Assert.NotEmpty(result.UnresolvedReason!);
+    }
+
+    [Fact]
+    public void N3_MetadataOptional_DefaultIsNotASuppliedArgument()
+    {
+        var result = _binder.ResolveCall(_ctx.TryResolveType("System.IO.File")!, "ReadAllTextAsync",
+            [new MetadataArgument(_ctx.TryResolveType("System.String")!, Name: "path")]);
+        Assert.True(result.IsResolved, result.UnresolvedReason);
+        var argument = Assert.Single(result.Arguments);
+        Assert.Equal("path", argument.Parameter.Name);
+        Assert.True(result.Symbol!.Parameters.Length > result.Arguments.Count);
+        Assert.Contains(result.Symbol.Parameters, parameter => parameter.IsOptional);
+    }
+
+    [Fact]
+    public void N3_MetadataNames_SelectTheActualObjectOverload()
+    {
+        var type = _ctx.TryResolveType("System.String")!;
+        var result = _binder.ResolveCall(type, "Concat",
+            [new MetadataArgument(type, Name: "arg1"), new MetadataArgument(type, Name: "arg0")]);
+        Assert.True(result.IsResolved, result.UnresolvedReason);
+        Assert.All(result.Symbol!.Parameters,
+            parameter => Assert.Equal(Microsoft.CodeAnalysis.SpecialType.System_Object, parameter.Type.SpecialType));
+        Assert.Equal(new[] { "arg1", "arg0" }, result.Arguments.Select(mapping => mapping.Parameter.Name));
+    }
+
+    [Fact]
+    public void N3_MetadataOut_PreservesNamedModifierAndSelectedParameter()
+    {
+        var integer = _ctx.TryResolveType("System.Int32")!;
+        var result = _binder.ResolveCall(integer, "TryParse",
+            [new MetadataArgument(integer, Microsoft.CodeAnalysis.RefKind.Out, "result"),
+                new MetadataArgument(_ctx.TryResolveType("System.String")!, Name: "s")]);
+        Assert.True(result.IsResolved, result.UnresolvedReason);
+        Assert.Equal(new[] { "result", "s" }, result.Arguments.Select(mapping => mapping.Parameter.Name));
+        Assert.Equal(Microsoft.CodeAnalysis.RefKind.Out, result.Arguments[0].Parameter.RefKind);
+    }
+
     // ================================================================
     // MapAnnotation — the pure enum translation
     // ================================================================
