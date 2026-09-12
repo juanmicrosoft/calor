@@ -319,23 +319,53 @@ public class LocalReferenceAnnotationTests
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.UndefinedReference);
     }
 
-    [Fact]
-    public void NullableBclReturnToNativeInput_RetainsExistingApplicabilityRejection()
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(1, true)]
+    [InlineData(2, true)]
+    [InlineData(0, false)]
+    [InlineData(1, false)]
+    [InlineData(2, false)]
+    public void BclToNativeInputs_RetainApplicabilityAndAnalysisOnlyStaging(int depth, bool nullable)
     {
-        const string source = """
+        var value = $"§C{{System.IO.Directory.{(nullable ? "GetParent" : "CreateDirectory")}}} §A STR:\"/\" §/C";
+        var statements = new List<string>();
+        for (var i = 0; i < depth; i++)
+        {
+            statements.Add($"§B{{local{i}}} {value}");
+            value = $"local{i}";
+        }
+        statements.Add($"§R §C{{Holder.Consume}} §A {value} §/C");
+        var source = $$"""
             §M{m1:RetainedNativeInputLimit}
               §CL{c1:Holder:pub}
                 §MT{consume:Consume:pub:static} (System.IO.DirectoryInfo:value) -> i32
+                  §E{}
                   §R 0
                 §MT{probe:Probe:pub:static} () -> i32
-                  §R §C{Holder.Consume} §A §C{System.IO.Directory.GetParent} §A STR:"/" §/C §/C
+                  §E{fs:{{(nullable ? "r" : "w")}}}
+                  {{string.Join("\n      ", statements)}}
             """;
         var (module, diagnostics) = Bind(source);
         var call = Assert.IsType<BoundCallExpression>(
-            Assert.IsType<BoundReturnStatement>(Assert.Single(Probe(module).Body)).Expression);
-        Assert.Null(call.ResolvedSymbol);
-        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NoMatchingOverload);
-        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+            Assert.IsType<BoundReturnStatement>(Probe(module).Body.Last()).Expression);
+        var argument = Assert.IsType<NominalBoundType>(Assert.Single(call.Arguments).Type);
+        Assert.Equal("DirectoryInfo", argument.RoslynSymbol?.Name);
+        Assert.Equal(nullable ? NullableAnnotation.Annotated : NullableAnnotation.NotAnnotated,
+            argument.NullableAnnotation);
+        var rejected = nullable && depth == 0;
+        Assert.Equal(!rejected, call.ResolvedSymbol is not null);
+        Assert.Equal(rejected, diagnostics.Any(d => d.Code == DiagnosticCode.NoMatchingOverload));
+        Assert.Equal(nullable && !rejected,
+            diagnostics.Any(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+
+        // Pre-existing production behavior, not Stage B enforcement: adding a
+        // local already resolved this call at the base, without any annotation.
+        var result = Program.Compile(source, "native-bcl-local.calr");
+        Assert.Equal(rejected, result.HasErrors);
+        Assert.Equal(!rejected, !string.IsNullOrEmpty(result.GeneratedCode));
+        Assert.DoesNotContain(result.Diagnostics,
+            d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
     }
 
     public static IEnumerable<object[]> StringMemberAliases()
