@@ -47,7 +47,7 @@ public sealed class BinderErrorEmissionCatalogTests
             route.SiteId.StartsWith("src/Calor.Compiler/Binding/Binder.cs::", StringComparison.Ordinal)).ToArray();
         Assert.Equal(24, binderRoutes.Count(route =>
             route.Sink is "DiagnosticBag.ReportError" or "DiagnosticBag.ReportErrorWithFix"));
-        Assert.Equal(4, binderRoutes.Count(route => route.Sink == "DiagnosticBag.Report"));
+        Assert.Equal(3, binderRoutes.Count(route => route.Sink == "DiagnosticBag.Report"));
         Assert.Equal(3, binderRoutes
             .Where(route => route.Sink is "DiagnosticBag.ReportDuplicateDefinitionWithFix"
                 or "DiagnosticBag.ReportNotAVariableWithFix")

@@ -165,9 +165,8 @@ public sealed class Binder
 
     /// <summary>
     /// Best-effort BCL-shaped call resolution via MetadataBinder. Returns
-    /// both the annotated return type and the annotated parameter types
-    /// (return type in <c>Return</c>, parameters in <c>Parameters</c>, plus
-    /// the resolved Roslyn <c>ParameterNames</c>), or null when the receiver
+    /// the selected Roslyn symbol and its actual supplied-argument mappings,
+    /// including normal versus expanded params, or null when the receiver
     /// is not BCL-shaped, MetadataBinder is unavailable, or resolution
     /// fails. Additive: never subtracts from Binder's own string-based
     /// resolve.
@@ -177,7 +176,11 @@ public sealed class Binder
     /// only the return type; the parameter list is the incremental extension
     /// this slice needs.</para>
     /// </summary>
-    private BclCallResolution? TryResolveBclCall(string callTarget, IReadOnlyList<BoundExpression> args)
+    private Metadata.MetadataBinderResult? TryResolveBclCall(
+        string callTarget,
+        IReadOnlyList<BoundExpression> args,
+        IReadOnlyList<string?>? argumentNames,
+        IReadOnlyList<string?>? argumentModifiers)
     {
         // BCL-shape heuristic: receiver contains at least one dot AND starts
         // with System./Microsoft. or a capitalized identifier followed by a dot.
@@ -215,59 +218,171 @@ public sealed class Binder
         for (var i = 0; i < args.Count; i++)
         {
             var display = args[i].Type.DisplayString;
-            // Nullability markers on the argument are irrelevant for
-            // overload resolution — strip them so the metadata name is
-            // unannotated. Three surface forms to handle:
-            //   - Roslyn suffix "?" (e.g. "string?" from
-            //     GetEnvironmentVariable's return type)
-            //   - Calor surface prefix "?" (e.g. "?string" if a caller
-            //     bypasses ExpandType)
-            //   - Parser-expanded OPTION wrapper (e.g.
-            //     "OPTION[inner=STRING]" from :?string variables)
-            // Review finding M1 from PR #1060: before the OPTION unwrap
-            // and prefix trim, :?string arguments mapped to
-            // Calor.Runtime.Option`1, overload resolution failed, and
-            // Calor0274 silently didn't fire on the highest-value case
-            // (a Calor :?string variable passed into a BCL :string
-            // parameter).
+            // Strip only recognized nullable annotations for metadata lookup.
+            // Explicit runtime Option<T> retains its distinct representation.
             var trimmed = display;
             while (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(trimmed, out var referent))
             {
                 trimmed = referent;
             }
-            var mapped = TypeIdentity.MapShortTypeNameToFullName(trimmed);
-            var t = ctx.TryResolveType(mapped)
-                    ?? ctx.TryResolveType(trimmed)
-                    ?? ctx.TryResolveType("System.Object");
+            var t = ResolveBclArgumentType(ctx, trimmed) ?? ctx.TryResolveType("System.Object");
             if (t is null) return null;
-            metaArgs[i] = new Metadata.MetadataArgument(t);
+            var modifier = argumentModifiers != null && i < argumentModifiers.Count
+                ? argumentModifiers[i]
+                : null;
+            var refKind = modifier switch
+            {
+                "out" => Microsoft.CodeAnalysis.RefKind.Out,
+                "ref" => Microsoft.CodeAnalysis.RefKind.Ref,
+                "in" => Microsoft.CodeAnalysis.RefKind.In,
+                _ => Microsoft.CodeAnalysis.RefKind.None,
+            };
+            var name = argumentNames != null && i < argumentNames.Count ? argumentNames[i] : null;
+            metaArgs[i] = new Metadata.MetadataArgument(t, refKind, name);
         }
 
         var result = binder.ResolveCall(receiverType, methodName, metaArgs);
         if (!result.IsResolved) return null;
 
-        // v0.14 §S6 — prefer the element-annotation-preserving
-        // GetReturnBoundTypeEx so IArrayTypeSymbol returns surface as
-        // ArrayBoundType(elementType with real annotation). Non-array
-        // returns fall through to the same NominalBoundType shape as
-        // GetReturnBoundType, so BCL callers observe no change.
-        var returnType = result.GetReturnBoundTypeEx();
-        var paramTypes = result.GetParameterBoundTypes();
-        var paramNames = result.Symbol!.Parameters.Select(p => p.Name).ToArray();
-        return new BclCallResolution(returnType, paramTypes, paramNames);
+        return result;
     }
 
-    /// <summary>
-    /// v0.14 §S4 helper — the aggregate of a resolved BCL call's annotated
-    /// return type plus its resolved parameter types (each annotated) and
-    /// parameter names. Return-side flows to
-    /// <c>BoundCallExpression.Type</c>; parameter-side feeds the Calor0274
-    /// argument-nullability check.
-    /// </summary>
-    private readonly record struct BclCallResolution(
-        BoundTypes.BoundType? Return,
-        IReadOnlyList<BoundTypes.NominalBoundType> Parameters,
-        IReadOnlyList<string> ParameterNames);
+    // Exact analysis identities use CLR names, not C# keywords or reference-nullability syntax.
+    private static readonly Microsoft.CodeAnalysis.SymbolDisplayFormat BclParameterIdentityFormat = new(
+        globalNamespaceStyle: Microsoft.CodeAnalysis.SymbolDisplayGlobalNamespaceStyle.Omitted,
+        typeQualificationStyle: Microsoft.CodeAnalysis.SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
+        genericsOptions: Microsoft.CodeAnalysis.SymbolDisplayGenericsOptions.IncludeTypeParameters,
+        miscellaneousOptions: Microsoft.CodeAnalysis.SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers
+            | Microsoft.CodeAnalysis.SymbolDisplayMiscellaneousOptions.ExpandNullable);
+
+    private static IReadOnlyList<int>? GetBclArgumentParameterIndices(
+        Metadata.MetadataBinderResult? resolution, int argumentCount)
+    {
+        if (resolution is not { } bcl) return null;
+        var indices = Enumerable.Repeat(-1, argumentCount).ToArray();
+        foreach (var mapping in bcl.Arguments)
+        {
+            var receiverOffset = bcl.Symbol?.ReducedFrom != null
+                && mapping.Parameter.ContainingSymbol is Microsoft.CodeAnalysis.IMethodSymbol { ReducedFrom: null }
+                ? 1 : 0;
+            indices[mapping.ArgumentIndex] = mapping.Parameter.Ordinal - receiverOffset;
+        }
+        return indices;
+    }
+
+    private static Microsoft.CodeAnalysis.ITypeSymbol? ResolveBclArgumentType(
+        Metadata.MetadataContext context, string typeName)
+    {
+        string? elementName = null;
+        if (typeName.EndsWith("[]", StringComparison.Ordinal))
+            elementName = typeName[..^2];
+        else if (typeName.StartsWith("ARRAY[element=", StringComparison.Ordinal) && typeName.EndsWith(']'))
+            elementName = typeName["ARRAY[element=".Length..^1];
+        else if (typeName.StartsWith('[') && typeName.EndsWith(']') && !typeName.Contains(','))
+            elementName = typeName[1..^1];
+
+        if (elementName != null)
+        {
+            var element = ResolveBclArgumentType(context, elementName.Trim('?'));
+            return element == null ? null : context.HostCompilationForBinder.CreateArrayTypeSymbol(element);
+        }
+
+        return context.TryResolveType(TypeIdentity.MapShortTypeNameToFullName(typeName))
+            ?? context.TryResolveType(typeName);
+    }
+
+    private void ValidateCallArguments(
+        IReadOnlyList<BoundExpression> arguments,
+        OverloadResolutionResult resolution,
+        Metadata.MetadataBinderResult? bclResolution)
+    {
+        var reported = new HashSet<(Parsing.TextSpan Span, string ParameterName, string TargetShape)>();
+        if (bclResolution is { } bcl)
+        {
+            foreach (var mapping in bcl.Arguments)
+            {
+                if (mapping.Parameter.RefKind == Microsoft.CodeAnalysis.RefKind.Out)
+                    continue;
+                var target = TryBuildBclArgumentTarget(mapping.TargetType);
+                if (target != null)
+                    ValidateCallArgument(arguments[mapping.ArgumentIndex], mapping.Parameter.Name, target,
+                        mapping.IsExpandedParams, reported);
+            }
+            return;
+        }
+
+        foreach (var match in resolution.Matches)
+        {
+            foreach (var mapping in match.Arguments)
+            {
+                var parameter = match.Function.Parameters[mapping.ParameterIndex];
+                if (parameter.Modifier.HasFlag(ParameterModifier.Out)
+                    || !TryBuildStringTarget(mapping.ParameterType, out var target, match.Function))
+                    continue;
+                ValidateCallArgument(arguments[mapping.ArgumentIndex], parameter.Name, target!,
+                    mapping.IsExpandedParams, reported);
+            }
+        }
+    }
+
+    private void ValidateCallArgument(
+        BoundExpression argument,
+        string parameterName,
+        BoundTypes.BoundType target,
+        bool isExpandedParams,
+        HashSet<(Parsing.TextSpan Span, string ParameterName, string TargetShape)> reported)
+    {
+        if (!NullabilityChecker.IsPossiblyNullAssignedTo(argument, target))
+            return;
+
+        var (targetShapeLabel, fixHintTargetLabel) = DescribeStringTargetShape(target);
+        if (!reported.Add((argument.Span, parameterName, targetShapeLabel)))
+            return;
+        var receivingPosition = isExpandedParams ? "Expanded argument to element of params parameter" : "Argument to parameter";
+        var parameterPart = isExpandedParams ? "parameter element" : "parameter";
+        _diagnostics.Report(
+            argument.Span,
+            DiagnosticCode.NullableArgumentToNonNullableParameter,
+            $"{receivingPosition} '{parameterName}' declares non-nullable {targetShapeLabel} " +
+            $"but the value may be null (source annotation: '{DescribeAnnotation(argument)}'). " +
+            $"Change the {parameterPart} type to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
+            SemanticsVersion.NullabilitySeverityFor(),
+            BindingDiagnosticContext.For(BindingReceivingBoundary.MethodArgument, target));
+    }
+
+    private static BoundTypes.BoundType? TryBuildBclArgumentTarget(Microsoft.CodeAnalysis.ITypeSymbol type)
+    {
+        if (type.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_String)
+            return new BoundTypes.NominalBoundType("STRING", Metadata.MetadataBinderResult.MapAnnotation(type.NullableAnnotation));
+
+        var nominal = Metadata.MetadataBinderResult.ToNominalBoundType(type);
+        if (nominal.IsKnownReferenceType)
+            return nominal;
+
+        if (type is Microsoft.CodeAnalysis.IArrayTypeSymbol { Rank: 1 } array
+            && array.ElementType.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_String)
+        {
+            return new BoundTypes.ArrayBoundType(
+                new BoundTypes.NominalBoundType("STRING",
+                    Metadata.MetadataBinderResult.MapAnnotation(array.ElementType.NullableAnnotation)),
+                rank: array.Rank,
+                nullableAnnotation: Metadata.MetadataBinderResult.MapAnnotation(array.NullableAnnotation));
+        }
+
+        if (type is Microsoft.CodeAnalysis.INamedTypeSymbol { IsGenericType: true } generic
+            && generic.TypeArguments.Length == 1
+            && generic.TypeArguments[0].SpecialType == Microsoft.CodeAnalysis.SpecialType.System_String
+            && GenericStringContainerWhitelist.Contains(
+                $"{generic.ContainingNamespace.ToDisplayString()}.{generic.Name}"))
+        {
+            return new BoundTypes.GenericInstantiationBoundType(
+                new BoundTypes.NominalBoundType(generic.Name, BoundTypes.NullableAnnotation.Oblivious),
+                [new BoundTypes.NominalBoundType("STRING",
+                    Metadata.MetadataBinderResult.MapAnnotation(generic.TypeArguments[0].NullableAnnotation))],
+                Metadata.MetadataBinderResult.MapAnnotation(generic.NullableAnnotation));
+        }
+        return null;
+    }
 
     private IDisposable PushScope(Scope newScope)
     {
@@ -925,7 +1040,9 @@ public sealed class Binder
         bool isStatic = false,
         ConditionalAlternative? conditionalAlternative = null,
         BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious,
-        BoundTypes.FunctionBoundType? functionType = null)
+        BoundTypes.FunctionBoundType? functionType = null,
+        BoundTypes.NominalBoundType? inferredReferenceType = null,
+        bool isTypeInferred = false)
     {
         var symbol = new VariableSymbol(
             id,
@@ -943,7 +1060,11 @@ public sealed class Binder
             isStatic,
             conditionalAlternative,
             nullableAnnotation,
-            functionType);
+            functionType)
+        {
+            InferredReferenceType = inferredReferenceType,
+            IsTypeInferred = isTypeInferred
+        };
         TrackSymbol(symbol);
         return symbol;
     }
@@ -958,7 +1079,9 @@ public sealed class Binder
         string kind,
         ExpressionNode? defaultValue = null,
         BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious,
-        BoundTypes.FunctionBoundType? functionType = null)
+        BoundTypes.FunctionBoundType? functionType = null,
+        BoundTypes.NominalBoundType? inferredReferenceType = null,
+        bool isTypeInferred = false)
     {
         var context = _declarationContext.IsNone ? _moduleSymbolId : _declarationContext;
         return CreateVariable(
@@ -971,7 +1094,9 @@ public sealed class Binder
             declarationSpan,
             defaultValue,
             nullableAnnotation: nullableAnnotation,
-            functionType: functionType);
+            functionType: functionType,
+            inferredReferenceType: inferredReferenceType,
+            isTypeInferred: isTypeInferred);
     }
 
     private SymbolId CreateDeclarationId(
@@ -1265,6 +1390,10 @@ public sealed class Binder
             call.ArgumentNames,
             call.ArgumentModifiers,
             call.TypeArguments);
+        var bclResolution = resolution.Kind == OverloadResolutionKind.NotFound
+            ? TryResolveBclCall(call.Target, args, call.ArgumentNames, call.ArgumentModifiers)
+            : null;
+        ValidateCallArguments(args, resolution, bclResolution);
         var (resolvedTypeName, resolvedMethodName) = GetResolvedCallIdentity(
             call.Target,
             receiverSymbol,
@@ -1292,11 +1421,16 @@ public sealed class Binder
             receiverTypeSymbol,
             resolvedTypeName,
             resolvedMethodName,
-            (resolution.Function?.Parameters
+            (bclResolution?.Symbol?.Parameters.Select(parameter => parameter.Type.ToDisplayString(BclParameterIdentityFormat))
+                ?? resolution.Function?.Parameters
                 .Select(parameter => parameter.TypeName)
                 ?? args.Select(argument => argument.Type.DisplayString))
                 .ToArray(),
-            receiver);
+            receiver)
+        {
+            ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count),
+            SelectedOverloadMatches = resolution.Matches
+        };
     }
 
     private BoundReturnStatement BindReturnStatement(ReturnStatementNode ret)
@@ -1483,24 +1617,17 @@ public sealed class Binder
             return new BoundBindStatement(bind.Span, rebindTarget, initializer);
         }
 
-        // v0.14 nullability workstream (follow-up to #1057) — capture the
-        // declared nullability on the VariableSymbol so subsequent
-        // BoundVariableExpression reads inherit NotAnnotated for
-        // §B{x:string} and Annotated for §B{x:?string}. Scoped to STRING
-        // targets per §D6; non-STRING targets keep the safe Oblivious
-        // default and land in a follow-on slice.
-        // v0.14 nullability workstream — capture the declared annotation on
-        // the VariableSymbol so subsequent BoundVariableExpression reads
-        // inherit NotAnnotated for §B{x:string} and Annotated for
-        // §B{x:?string}. When the type is INFERRED (bind.TypeName is null),
-        // inherit the initializer's annotation instead — otherwise a
-        // §B{x} STR:"hi" (STRING literal, provably NotAnnotated) would
-        // stay Oblivious on the symbol and later §B{y:string} x would
-        // trip Calor0272 falsely (review finding from PR #1059).
+        // Explicit declarations win. Inferred references carry the producer's
+        // resolved identity as well as its annotation; unknown expressions do not
+        // acquire a non-null guarantee merely from an inferred type spelling.
+        var inferredReferenceType = bind.TypeName is null
+            ? GetInferredReferenceType(initializer)
+            : null;
         var declaredAnnotation = TryReadDeclaredStringAnnotation(bind.TypeName)
             is var explicitAnnotation && explicitAnnotation != BoundTypes.NullableAnnotation.Oblivious
                 ? explicitAnnotation
-                : InferAnnotationForStringBinding(bind.TypeName, typeName, initializer);
+                : inferredReferenceType?.NullableAnnotation
+                    ?? InferAnnotationForStringBinding(bind.TypeName, typeName, initializer);
 
         // v0.15 E2 slice b — position 7's row (§3.3), and §3.5's asymmetry:
         //   * a row that is WRITTEN is the binding's row (Calor0405 when the
@@ -1525,7 +1652,9 @@ public sealed class Binder
             bind.IdentifierSpan,
             "local",
             nullableAnnotation: declaredAnnotation,
-            functionType: bindFunctionType);
+            functionType: bindFunctionType,
+            inferredReferenceType: inferredReferenceType,
+            isTypeInferred: bind.TypeName is null);
 
         if (!_scope.TryDeclare(variable))
         {
@@ -1712,6 +1841,37 @@ public sealed class Binder
             context = separator < 0 ? null : context[..separator];
         }
         yield return name;
+    }
+
+    private BoundTypes.NominalBoundType? TryBuildVariableReference(VariableSymbol variable) =>
+        variable.IsTypeInferred ? variable.InferredReferenceType : TryBuildReferenceType(
+            variable.TypeName,
+            variable.DeclaringTypeName ?? _currentClassName,
+            _currentNamespaceIdentity,
+            variable.DeclaringTypeName is null
+                ? _currentMemberTypeParameters?.Select(parameter => parameter.Name)
+                : null,
+            allowObject: variable.NullableAnnotation != BoundTypes.NullableAnnotation.Oblivious);
+
+    private BoundTypes.NominalBoundType? GetInferredReferenceType(BoundExpression? expression)
+    {
+        if (expression?.Type is not BoundTypes.NominalBoundType nominal)
+            return null;
+        if (nominal.IsKnownReferenceType)
+            return nominal;
+        if (expression is not BoundNewExpression constructed)
+            return null;
+
+        // Keep the constructor's existing annotation; only recover its actual
+        // type identity for later local reads.
+        var identity = constructed.ResolvedType is { } declaration
+            ? new BoundTypes.NominalBoundType(nominal.QualifiedName, nominal.NullableAnnotation, declaration)
+            : TryBuildReferenceType(nominal.QualifiedName, _currentClassName,
+                _currentNamespaceIdentity, _currentMemberTypeParameters?.Select(parameter => parameter.Name));
+        return identity is { IsKnownReferenceType: true }
+            ? new BoundTypes.NominalBoundType(nominal.QualifiedName, nominal.NullableAnnotation,
+                identity.Declaration, identity.RoslynSymbol)
+            : null;
     }
 
     private BoundTypes.NominalBoundType? TryBuildCallableReference(string typeName, FunctionSymbol function)
@@ -2180,10 +2340,9 @@ public sealed class Binder
         // based ratchet on typename-string-equality sites.
         if (bindTypeName is not null) return BoundTypes.NullableAnnotation.Oblivious;
         if (initializer is null) return BoundTypes.NullableAnnotation.Oblivious;
-        // Scope-gate to STRING targets (mirrors NullabilityChecker.IsScalarString).
-        var normalized = typeName?.Trim();
-        var isString = normalized is "STRING" or "string" or "str" or "System.String";
-        if (!isString) return BoundTypes.NullableAnnotation.Oblivious;
+        if (!TryBuildDeclaredNullabilityShape(typeName, out var target)
+            || target is not BoundTypes.NominalBoundType { QualifiedName: "STRING" })
+            return BoundTypes.NullableAnnotation.Oblivious;
         return initializer.Type is BoundTypes.NominalBoundType n
             ? n.NullableAnnotation
             : BoundTypes.NullableAnnotation.Oblivious;
@@ -2336,6 +2495,16 @@ public sealed class Binder
             .Select(field => TypeIdentity.Canonicalize(field.TypeName))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
+        BoundTypes.BoundType? resolvedType = null;
+        if (fields is [var field])
+        {
+            var identity = TryBuildVariableReference(field);
+            var isString = TryBuildDeclaredNullabilityShape(field.TypeName, out var declared)
+                && declared is BoundTypes.NominalBoundType { QualifiedName: "STRING" };
+            if (identity is not null || isString)
+                resolvedType = new BoundTypes.NominalBoundType(
+                    field.TypeName, field.NullableAnnotation, identity?.Declaration, identity?.RoslynSymbol);
+        }
 
         return new BoundFieldAccessExpression(
             fieldAccess.Span,
@@ -2344,7 +2513,8 @@ public sealed class Binder
             fieldTypes.Length == 1 ? fields[0].TypeName : "OBJECT",
             fields.FirstOrDefault(),
             fieldAccess.FieldNameSpan,
-            fields);
+            fields,
+            resolvedType);
     }
 
     private BoundExpression BindTypeOperation(TypeOperationNode typeOp)
@@ -3257,12 +3427,7 @@ public sealed class Binder
             }
 
             var identity = variables.Length == 1
-                ? TryBuildReferenceType(
-                    variables[0].TypeName,
-                    variables[0].DeclaringTypeName ?? _currentClassName,
-                    _currentNamespaceIdentity,
-                    _currentMemberTypeParameters?.Select(parameter => parameter.Name),
-                    allowObject: variables[0].NullableAnnotation != BoundTypes.NullableAnnotation.Oblivious)
+                ? TryBuildVariableReference(variables[0])
                 : null;
             return new BoundVariableExpression(refNode.Span, variables[0], variables,
                 typeOverride: null, referenceIdentity: identity);
@@ -3355,8 +3520,10 @@ public sealed class Binder
         // additionally consumes the parameter-side annotations from the same
         // resolution to fire Calor0274 for possibly-null strings passed into
         // non-nullable :string parameters.
-        var bclResolution = TryResolveBclCall(callExpr.Target, args);
-        var annotatedReturn = bclResolution?.Return;
+        var bclResolution = resolution.Kind == OverloadResolutionKind.NotFound
+            ? TryResolveBclCall(callExpr.Target, args, callExpr.ArgumentNames, callExpr.ArgumentModifiers)
+            : null;
+        var annotatedReturn = bclResolution?.GetReturnBoundTypeEx();
 
         // v0.14 §F-3B (nullability): thread the declared return-type
         // annotation from a resolved pure-Calor callee onto BoundCallExpression.Type.
@@ -3387,82 +3554,7 @@ public sealed class Binder
             }
         }
 
-        // v0.14 §S4 nullability check (issue #875, D2 predicate at the
-        // call-site boundary). §S6 widens the target-shape gate to include
-        // array-of-STRING parameters — the same predicate now fires when
-        // a possibly-null-element array is passed into a non-null-element
-        // parameter (e.g. String.Join(string, string[])). BCL-only for now
-        // (mirrors S3b's System.*/Microsoft.* narrowing): the parameter-
-        // side annotation flow requires a resolved Roslyn IMethodSymbol,
-        // and non-BCL Calor callees do not yet carry annotated parameter
-        // BoundTypes. Current semantics produces binder Errors, kept
-        // analysis-only by BindingDiagnosticPolicy.
-        if (bclResolution is { } bcl)
-        {
-            var paramTypes = bcl.Parameters;
-            var paramNames = bcl.ParameterNames;
-            for (var i = 0; i < args.Count && i < paramTypes.Count; i++)
-            {
-                var paramType = paramTypes[i];
-                var stringTarget = TryBuildScalarStringTarget(paramType);
-                if (stringTarget is null) continue;
-                if (!NullabilityChecker.IsPossiblyNullAssignedTo(args[i], stringTarget)) continue;
-
-                var paramName = i < paramNames.Count && !string.IsNullOrEmpty(paramNames[i])
-                    ? paramNames[i]
-                    : $"arg{i}";
-                var (targetShapeLabel, fixHintTargetLabel) = DescribeStringTargetShape(stringTarget);
-                _diagnostics.Report(
-                    args[i].Span,
-                    DiagnosticCode.NullableArgumentToNonNullableParameter,
-                    $"Argument to parameter '{paramName}' declares non-nullable {targetShapeLabel} " +
-                    $"but the value may be null (source annotation: '{DescribeAnnotation(args[i])}'). " +
-                    $"Change the parameter type to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
-                    SemanticsVersion.NullabilitySeverityFor(),
-                    BindingDiagnosticContext.For(BindingReceivingBoundary.MethodArgument, stringTarget));
-            }
-        }
-        else if (resolution.Kind == OverloadResolutionKind.Resolved
-            && resolution.Function is { } calorCallee)
-        {
-            // v0.14 §F-3A — Calor-native call-site widening (unblocks S8-
-            // Oblivious). Symmetric with the BCL branch above but reads the
-            // declared parameter TypeName off the resolved Calor FunctionSymbol
-            // and routes through the same TryBuildStringTarget shape gate +
-            // NullabilityChecker.IsPossiblyNullAssignedTo predicate. Parameter
-            // TypeName may be either the raw surface form (":?string", "Foo")
-            // or post-expansion ("OPTION[inner=STRING]"); TryBuildStringTarget
-            // accepts both. When the target-shape gate yields Annotated the
-            // parameter accepts null by design and we skip. Overload resolution
-            // that did not converge to a single Function (Ambiguous / NoMatch /
-            // Inaccessible) is skipped — that is a separate slice.
-            var parameters = calorCallee.Parameters;
-            for (var i = 0; i < args.Count && i < parameters.Count; i++)
-            {
-                var paramSymbol = parameters[i];
-                if (!TryBuildStringTarget(paramSymbol.TypeName, out var stringTarget, calorCallee)) continue;
-                if (stringTarget is BoundTypes.NominalBoundType nominal
-                    && nominal.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated) continue;
-                if (stringTarget is BoundTypes.ArrayBoundType array
-                    && array.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated) continue;
-                if (stringTarget is BoundTypes.GenericInstantiationBoundType generic
-                    && generic.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated) continue;
-                if (!NullabilityChecker.IsPossiblyNullAssignedTo(args[i], stringTarget!)) continue;
-
-                var paramName = !string.IsNullOrEmpty(paramSymbol.Name)
-                    ? paramSymbol.Name
-                    : $"arg{i}";
-                var (targetShapeLabel, fixHintTargetLabel) = DescribeStringTargetShape(stringTarget!);
-                _diagnostics.Report(
-                    args[i].Span,
-                    DiagnosticCode.NullableArgumentToNonNullableParameter,
-                    $"Argument to parameter '{paramName}' declares non-nullable {targetShapeLabel} " +
-                    $"but the value may be null (source annotation: '{DescribeAnnotation(args[i])}'). " +
-                    $"Change the parameter type to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
-                    SemanticsVersion.NullabilitySeverityFor(),
-                    BindingDiagnosticContext.For(BindingReceivingBoundary.MethodArgument, stringTarget!));
-            }
-        }
+        ValidateCallArguments(args, resolution, bclResolution);
 
         return new BoundCallExpression(
             callExpr.Span,
@@ -3471,7 +3563,8 @@ public sealed class Binder
             returnType,
             resolvedTypeName,
             resolvedMethodName,
-            resolvedParameterTypes: (resolution.Function?.Parameters
+            resolvedParameterTypes: (bclResolution?.Symbol?.Parameters.Select(parameter => parameter.Type.ToDisplayString(BclParameterIdentityFormat))
+                ?? resolution.Function?.Parameters
                 .Select(parameter => parameter.TypeName)
                 ?? args.Select(argument => argument.Type.DisplayString))
                 .ToArray(),
@@ -3486,7 +3579,11 @@ public sealed class Binder
             isInaccessibleCall: resolution.Kind == OverloadResolutionKind.Inaccessible,
             receiverTypeSymbol: receiverTypeSymbol,
             annotatedReturnType: annotatedReturn,
-            receiver: receiver);
+            receiver: receiver)
+        {
+            ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count),
+            SelectedOverloadMatches = resolution.Matches
+        };
     }
 
     /// <summary>

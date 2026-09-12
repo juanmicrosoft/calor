@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "baselineCommit": "3b513a632149290481161b195a71aa6cb0e251a8",
+  "candidateCommit": "4bb47d54f826a88e16a026c811a7efd4e71e4127",
+  "comparison": "Identical native-input depth0/1/2 sources; unchanged applicability and public compilation outcome; N2 preserves Annotated instead of Oblivious and adds analysis-only Calor0274 for local inputs.",
+  "probeSourceSha256": "bc72e830429cbdd617ce2ab278dc4edc357322dbeb3c6ca0f5333d950f2228c3",
+  "instrument": "Session-only identical source included in the existing xUnit runner at both exact commits via CustomAfterMicrosoftCommonTargets; no committed test hook or new testing dependency.",
+  "cases": [
+    {
+      "depth": 0,
+      "source": "§M{m1:NativeInputAudit}\n  §CL{c1:H:pub}\n    §MT{consume:Consume:pub:static} (System.IO.DirectoryInfo:value) -> i32\n      §E{}\n      §R 0\n    §MT{probe:Probe:pub:static} () -> i32\n      §E{fs:r}\n      §R §C{H.Consume} §A §C{System.IO.Directory.GetParent} §A STR:\"/\" §/C §/C",
+      "sourceSha256": "d9eef7154f287ff8dd50aacc7a5d3aa2401524e1c6935c7fa9d45483e4809c89",
+      "baselineCaptureSha256": "d616e50434ca8e6d3765bfe63f132f52365a14eed5df79589bb9d2cef596959c",
+      "candidateCaptureSha256": "c52b4f0b86896bca6ec12ce4ee4c1c631624c169da11335c40362dc9289a0964",
+      "generatedCodeByteIdentical": true,
+      "baseline": {
+        "resolvedNativeConsumer": null,
+        "argumentDisplay": "System.IO.DirectoryInfo?",
+        "argumentAnnotation": "Annotated",
+        "producerAnnotation": "Annotated",
+        "producerAssembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+        "rawDiagnostics": [
+          {
+            "Code": "Calor0208",
+            "Message": "No overload of internal call 'H.Consume' matches (System.IO.DirectoryInfo?). Candidates: H.Consume(System.IO.DirectoryInfo) [calor://source/%3Cmemory%3E/module/m1/class/ast%3Ac1/method/ast%3Aconsume]",
+            "Severity": "Error",
+            "CompilationError": true,
+            "Start": 203,
+            "Length": 69
+          }
+        ],
+        "compiledHasErrors": true,
+        "compiledDiagnostics": [
+          {
+            "Code": "Calor0208",
+            "Message": "No overload of internal call 'H.Consume' matches (System.IO.DirectoryInfo?). Candidates: H.Consume(System.IO.DirectoryInfo) [calor://source/native-input-depth0.calr/module/m1/class/ast%3Ac1/method/ast%3Aconsume]"
+          }
+        ],
+        "emittedOutput": false,
+        "generatedCodeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "candidate": {
+        "resolvedNativeConsumer": null,
+        "argumentDisplay": "System.IO.DirectoryInfo?",
+        "argumentAnnotation": "Annotated",
+        "producerAnnotation": "Annotated",
+        "producerAssembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+        "rawDiagnostics": [
+          {
+            "Code": "Calor0208",
+            "Message": "No overload of internal call 'H.Consume' matches (System.IO.DirectoryInfo?). Candidates: H.Consume(System.IO.DirectoryInfo) [calor://source/%3Cmemory%3E/module/m1/class/ast%3Ac1/method/ast%3Aconsume]",
+            "Severity": "Error",
+            "CompilationError": true,
+            "Start": 203,
+            "Length": 69
+          }
+        ],
+        "compiledHasErrors": true,
+        "compiledDiagnostics": [
+          {
+            "Code": "Calor0208",
+            "Message": "No overload of internal call 'H.Consume' matches (System.IO.DirectoryInfo?). Candidates: H.Consume(System.IO.DirectoryInfo) [calor://source/native-input-depth0.calr/module/m1/class/ast%3Ac1/method/ast%3Aconsume]"
+          }
+        ],
+        "emittedOutput": false,
+        "generatedCodeSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "depth": 1,
+      "source": "§M{m1:NativeInputAudit}\n  §CL{c1:H:pub}\n    §MT{consume:Consume:pub:static} (System.IO.DirectoryInfo:value) -> i32\n      §E{}\n      §R 0\n    §MT{probe:Probe:pub:static} () -> i32\n      §E{fs:r}\n      §B{a0} §C{System.IO.Directory.GetParent} §A STR:\"/\" §/C\n      §R §C{H.Consume} §A a0 §/C",
+      "sourceSha256": "ef6eff14c0cc684195af07ce3c4b1d3e9127b8df2bd93c3868b04eb9776a8c06",
+      "baselineCaptureSha256": "4a12cf33cc20323cbe275375ece675d7b2ffd16d2dfc40a3d84a516fa4501492",
+      "candidateCaptureSha256": "1bb0a7400e5c442f0d67b094ddcc1ec7b31487e06c56f2147d78cae4d79978b1",
+      "generatedCodeByteIdentical": true,
+      "baseline": {
+        "resolvedNativeConsumer": "H.Consume",
+        "argumentDisplay": "System.IO.DirectoryInfo",
+        "argumentAnnotation": "Oblivious",
+        "producerAnnotation": "Annotated",
+        "producerAssembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+        "rawDiagnostics": [],
+        "compiledHasErrors": false,
+        "compiledDiagnostics": [],
+        "emittedOutput": true,
+        "generatedCodeSha256": "35494f1e245cec203008df9aad43c64a740b364f91174f2cb44629c726dd4061"
+      },
+      "candidate": {
+        "resolvedNativeConsumer": "H.Consume",
+        "argumentDisplay": "System.IO.DirectoryInfo",
+        "argumentAnnotation": "Annotated",
+        "producerAnnotation": "Annotated",
+        "producerAssembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+        "rawDiagnostics": [
+          {
+            "Code": "Calor0274",
+            "Message": "Argument to parameter 'value' declares non-nullable 'System.IO.DirectoryInfo' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?System.IO.DirectoryInfo' or add an explicit non-null check at the interop boundary.",
+            "Severity": "Error",
+            "CompilationError": false,
+            "Start": 282,
+            "Length": 2
+          }
+        ],
+        "compiledHasErrors": false,
+        "compiledDiagnostics": [],
+        "emittedOutput": true,
+        "generatedCodeSha256": "35494f1e245cec203008df9aad43c64a740b364f91174f2cb44629c726dd4061"
+      }
+    },
+    {
+      "depth": 2,
+      "source": "§M{m1:NativeInputAudit}\n  §CL{c1:H:pub}\n    §MT{consume:Consume:pub:static} (System.IO.DirectoryInfo:value) -> i32\n      §E{}\n      §R 0\n    §MT{probe:Probe:pub:static} () -> i32\n      §E{fs:r}\n      §B{a0} §C{System.IO.Directory.GetParent} §A STR:\"/\" §/C\n      §B{a1} a0\n      §R §C{H.Consume} §A a1 §/C",
+      "sourceSha256": "f0c924c82f19b83d62fa8c6a6b3540fb80f5ee2f7e678cb9b730a19e9ae37503",
+      "baselineCaptureSha256": "b837d938fd4869b2114f10c29d4ab5ba35ccb9b93202e980278617ad8f839302",
+      "candidateCaptureSha256": "324fb0dfc7a42beaa7fee2dab9a9d1fefbe7e66c9533789e0831719ad2149094",
+      "generatedCodeByteIdentical": true,
+      "baseline": {
+        "resolvedNativeConsumer": "H.Consume",
+        "argumentDisplay": "System.IO.DirectoryInfo",
+        "argumentAnnotation": "Oblivious",
+        "producerAnnotation": "Annotated",
+        "producerAssembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+        "rawDiagnostics": [],
+        "compiledHasErrors": false,
+        "compiledDiagnostics": [],
+        "emittedOutput": true,
+        "generatedCodeSha256": "4010b31abec9a711cf67efd512aafc5059b2cf042497c2df9f63ddd3d61c74f9"
+      },
+      "candidate": {
+        "resolvedNativeConsumer": "H.Consume",
+        "argumentDisplay": "System.IO.DirectoryInfo",
+        "argumentAnnotation": "Annotated",
+        "producerAnnotation": "Annotated",
+        "producerAssembly": "System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+        "rawDiagnostics": [
+          {
+            "Code": "Calor0274",
+            "Message": "Argument to parameter 'value' declares non-nullable 'System.IO.DirectoryInfo' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?System.IO.DirectoryInfo' or add an explicit non-null check at the interop boundary.",
+            "Severity": "Error",
+            "CompilationError": false,
+            "Start": 298,
+            "Length": 2
+          }
+        ],
+        "compiledHasErrors": false,
+        "compiledDiagnostics": [],
+        "emittedOutput": true,
+        "generatedCodeSha256": "4010b31abec9a711cf67efd512aafc5059b2cf042497c2df9f63ddd3d61c74f9"
+      }
+    }
+  ],
+  "limits": [
+    "This is a three-case base/head comparison, not a corpus audit.",
+    "Program.Compile used default options and explicit effect rows; generated filesystem operations were not executed.",
+    "Public compilation acceptance is not a non-null guarantee or Stage B enforcement.",
+    "Raw capture files remain in session evidence; current final-head controls are in LocalReferenceAnnotationTests."
+  ]
+}

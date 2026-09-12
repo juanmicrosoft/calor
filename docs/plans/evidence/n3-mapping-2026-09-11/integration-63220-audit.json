@@ -1,0 +1,312 @@
+{
+  "schemaVersion": 1,
+  "observationDateUtc": "2026-09-12T08:11:55.171743+00:00",
+  "observer": "Copilot/GPT-6 Astra e9c6935e-da28-4a3b-94d4-0a5bbb596332",
+  "baselineCommit": "63220eab30c7c8af038efaf06d4cebeae64d3f33",
+  "historicalIntegratedN3Commit": "3de04d6f7a26a68fcb4aa314e4b21cbfdbbcf10d",
+  "measurementContext": "Actual N3 worktree normally merging accepted N2, before merge commit. Production file hashes pin measured content. Earlier d09/3de/3b/e299/56-error captures remain unchanged.",
+  "productionSourceSha256": {
+    "src/Calor.Compiler/Binding/Binder.cs": "641bf91a4f3b5c528d7b3c8aed3cc2ec687eb9f6a53e57380d0ee05a960e7dc3",
+    "src/Calor.Compiler/Binding/Scope.cs": "cdf664997accd073527820c216ce03f4287eaf2dc2bd56879c3d2c20e6b2252c",
+    "src/Calor.Compiler/Binding/BoundNodes.cs": "7e44b601e835b4799a4dc33fb45a62b43d0b505c1ee9df8a4190d466522b6169",
+    "src/Calor.Compiler/Binding/BoundTypes/BoundType.cs": "287a478e4ebf0553a361b866ac3b9d479fa55a7970d8935ca3ebd47547088f41",
+    "src/Calor.Compiler/Binding/NullabilityChecker.cs": "af932a552e7e738b7132faa5d201af1ee0d2d7c83740f1cce2c1c30a26410785",
+    "src/Calor.Compiler/Binding/Metadata/MetadataBinder.cs": "ac4c7cb52557eceb1d661baf2140574040b12671403a207d5143f5f8be583ab0",
+    "src/Calor.Compiler/Binding/Metadata/MetadataContext.cs": "d166095081aa1590992ba66a55746ae1b0619caaa78c9de01ee9166cb6b99c60",
+    "src/Calor.Compiler/Analysis/Security/TaintAnalysis.cs": "fc3a143d19b3acb6e9a28c6d2c48b1ffe99b1d55fe59840f1d6b1a75b53aeadf"
+  },
+  "n3AddedDeletedProductionLinesUnchangedAgainstNewBase": true,
+  "comparedSourceFileHeaderAndAddedDeletedLineRecords": 619,
+  "sourceFiles": 364,
+  "binderAttempts": 35179,
+  "deltaFromAcceptedMain": {
+    "serilog/src/Serilog/Formatting/Json/JsonValueFormatter.cs": {
+      "BindingErrorCount": {
+        "before": 52,
+        "after": 55
+      },
+      "BindingErrorIdentityHash": {
+        "before": "d9f3e84be63e78f368284f88c05fbd08262dd9fff97669959b558f5f79f0ef42",
+        "after": "963206acd3677219969931fd33a7ef1c325946dff7d23a1d915fe31c8c7830d6"
+      }
+    }
+  },
+  "coverageAndCatalogByteIdenticalToPreN2Candidate": true,
+  "allOtherSourceOpacityOutcomeAndPropagationFieldsUnchanged": true,
+  "freshDiagnosticCapture": {
+    "candidate": "Working N3 integration of accepted N2 63220eab30c7c8af038efaf06d4cebeae64d3f33 into prior3de04d6f; not a relabeling of historical3b513a/d09 captures",
+    "sourceHash": "3f6fa1f940815933c4aa948d41eac450a783530453bc31af1ee1a2a76e3e9d87",
+    "conversionReportedSuccess": false,
+    "bindingErrorCount": 55,
+    "identityHash": "963206acd3677219969931fd33a7ef1c325946dff7d23a1d915fe31c8c7830d6",
+    "allOrderedDiagnosticRecordsEqualPriorActualCapture": true,
+    "currentAdditionalStatementDiagnostics": [
+      {
+        "Code": "Calor0274",
+        "Severity": "Error",
+        "Message": "Argument to parameter 'str' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary.",
+        "Start": 4078,
+        "End": 4113,
+        "Line": 103,
+        "Column": 40,
+        "Text": "(str (?? element.Key.Value \"null\"))",
+        "Context": {
+          "Boundary": 3,
+          "Shape": 1
+        },
+        "Propagated": false,
+        "StatementArgument": [
+          {
+            "Target": "WriteQuotedJsonString",
+            "Line": 103
+          }
+        ]
+      },
+      {
+        "Code": "Calor0274",
+        "Severity": "Error",
+        "Message": "Argument to parameter 'str' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary.",
+        "Start": 6807,
+        "End": 6818,
+        "Line": 170,
+        "Column": 38,
+        "Text": "(str value)",
+        "Context": {
+          "Boundary": 3,
+          "Shape": 1
+        },
+        "Propagated": false,
+        "StatementArgument": [
+          {
+            "Target": "FormatStringValue",
+            "Line": 170
+          }
+        ]
+      },
+      {
+        "Code": "Calor0274",
+        "Severity": "Error",
+        "Message": "Argument to parameter 'str' declares non-nullable 'string' but the value may be null (source annotation: 'Oblivious'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary.",
+        "Start": 10755,
+        "End": 10774,
+        "Line": 247,
+        "Column": 34,
+        "Text": "(?? (str value) \"\")",
+        "Context": {
+          "Boundary": 3,
+          "Shape": 1
+        },
+        "Propagated": false,
+        "StatementArgument": [
+          {
+            "Target": "FormatStringValue",
+            "Line": 247
+          }
+        ]
+      }
+    ],
+    "identityHashAfterRemovingThoseThree": "d9f3e84be63e78f368284f88c05fbd08262dd9fff97669959b558f5f79f0ef42",
+    "freshNominalConsumer": [
+      {
+        "Target": "FormatLiteralObjectValue",
+        "Callee": "Serilog.Formatting.Json.JsonValueFormatter.FormatLiteralObjectValue",
+        "ContainingTypeName": "Serilog.Formatting.Json.JsonValueFormatter",
+        "Arguments": [
+          {
+            "Start": 7412,
+            "DisplayString": "any",
+            "Kind": "NominalBoundType",
+            "Declaration": null,
+            "MetadataSymbol": null
+          },
+          {
+            "Start": 7421,
+            "DisplayString": "TextWriter",
+            "Kind": "NominalBoundType",
+            "Declaration": null,
+            "MetadataSymbol": null
+          }
+        ],
+        "SelectedMaps": [
+          {
+            "Name": "Serilog.Formatting.Json.JsonValueFormatter.FormatLiteralObjectValue",
+            "Arguments": [
+              {
+                "ArgumentIndex": 0,
+                "ParameterIndex": 0,
+                "ParameterType": "any"
+              },
+              {
+                "ArgumentIndex": 1,
+                "ParameterIndex": 1,
+                "ParameterType": "TextWriter"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "disposition": "Three scalar statements remain AnalysisOnly/Unresolved;10755 retains1398's transfer limitation. Historical nominal any at7412..7417 remains unsupported/unresolved, not safe: the fresh argument still lacks Declaration and RoslynSymbol."
+  },
+  "actualCatalog": {
+    "baseRoutes": 34,
+    "candidateRoutes": 33,
+    "codePolicies": 19,
+    "nullable272273274": "AnalysisOnly",
+    "referenceOption275": "CompilationError"
+  },
+  "integrationControls": {
+    "source": "tests/Calor.Compiler.Tests/Binding/NullabilityIntegrationTests.cs",
+    "sourceSha256": "2388ec83bc1e1fcd27ed75f51340d6bbe40f4c79e747c95e5cb03b4a8d686ec6",
+    "method": "N3_NamedNominalInputs_ThroughTwoInferredLocals_PreserveMappingAndAnnotation",
+    "cases": 8,
+    "axes": [
+      "native/reordered versus BCL/named",
+      "statement/expression",
+      "nullable/non-null"
+    ],
+    "assertions": "Actual DirectoryInfo Roslyn identity/annotation after two inferred locals, actual selected map/formal span, AnalysisOnly findings and compiler API acceptance with EnforceEffects=false; not default compilation. Filesystem APIs are bound only, never executed.",
+    "apiOptions": {
+      "EnforceEffects": false,
+      "StatusWriter": "TextWriter.Null"
+    },
+    "apiObservationCorrection": "The d6ca95dd descriptive assertions incorrectly called these eight observations default compiler API acceptance. The unchanged test source explicitly sets the options above. This corrects the label, not the source, measurements or production-admissibility coverage.",
+    "initialTargetedCounters": {
+      "total": "207",
+      "executed": "207",
+      "passed": "207",
+      "failed": "0",
+      "error": "0",
+      "timeout": "0",
+      "aborted": "0",
+      "inconclusive": "0",
+      "passedButRunAborted": "0",
+      "notRunnable": "0",
+      "notExecuted": "0",
+      "disconnected": "0",
+      "warning": "0",
+      "completed": "0",
+      "inProgress": "0",
+      "pending": "0"
+    },
+    "generatorCounters": {
+      "total": "14",
+      "executed": "14",
+      "passed": "14",
+      "failed": "0",
+      "error": "0",
+      "timeout": "0",
+      "aborted": "0",
+      "inconclusive": "0",
+      "passedButRunAborted": "0",
+      "notRunnable": "0",
+      "notExecuted": "0",
+      "disconnected": "0",
+      "warning": "0",
+      "completed": "0",
+      "inProgress": "0",
+      "pending": "0"
+    },
+    "editorTargetedCounters": {
+      "total": "56",
+      "executed": "56",
+      "passed": "56",
+      "failed": "0",
+      "error": "0",
+      "timeout": "0",
+      "aborted": "0",
+      "inconclusive": "0",
+      "passedButRunAborted": "0",
+      "notRunnable": "0",
+      "notExecuted": "0",
+      "disconnected": "0",
+      "warning": "0",
+      "completed": "0",
+      "inProgress": "0",
+      "pending": "0"
+    }
+  },
+  "inventory": {
+    "compilerManifest": 9049,
+    "editorManifestAndActualDiscovery": 506,
+    "harnessUnchanged": 291,
+    "compilerDiscoveryOnly": 8981,
+    "discoveryLimitation": "Discovery alone omitted runtime-expanded cases, so it was rejected as an exact execution denominator. The unchanged CI shard runner supplies actual TRX totals instead.",
+    "compilerShard1": {
+      "total": "4484",
+      "executed": "4482",
+      "passed": "4472",
+      "failed": "10",
+      "error": "0",
+      "timeout": "0",
+      "aborted": "0",
+      "inconclusive": "0",
+      "passedButRunAborted": "0",
+      "notRunnable": "0",
+      "notExecuted": "0",
+      "disconnected": "0",
+      "warning": "0",
+      "completed": "0",
+      "inProgress": "0",
+      "pending": "0"
+    },
+    "compilerShard2": {
+      "total": "4565",
+      "executed": "4564",
+      "passed": "4545",
+      "failed": "19",
+      "error": "0",
+      "timeout": "0",
+      "aborted": "0",
+      "inconclusive": "0",
+      "passedButRunAborted": "0",
+      "notRunnable": "0",
+      "notExecuted": "0",
+      "disconnected": "0",
+      "warning": "0",
+      "completed": "0",
+      "inProgress": "0",
+      "pending": "0"
+    },
+    "localFullRunSuccess": false,
+    "localInventoryPassGateAccepted": false,
+    "failureCount": 29,
+    "failureIdentities": [
+      "Calor.Compiler.Tests.ClaudeInitializerMcpTests.Initialize_RemovesIncorrectCalorLspEntry",
+      "Calor.Compiler.Tests.ClaudeInitializerMcpTests.Initialize_SettingsJson_DoesNotContainMcpServers",
+      "Calor.Compiler.Tests.ClaudeInitializerMcpTests.Initialize_CreatesNewProjectEntry_WhenNotExists",
+      "Calor.Compiler.Tests.RunTestCommandTests.Test_PairLayoutFixture_PassesAndExitsZero",
+      "Calor.Compiler.Tests.ClaudeInitializerMcpTests.Initialize_McpServerConfigHasCorrectFormat",
+      "Calor.Compiler.Tests.RunTestCommandTests.Test_BenchmarkPairDirectory_N1003CsvRow_PassesAndExitsZero",
+      "Calor.Compiler.Tests.ClaudeInitializerMcpTests.Initialize_ConfiguresMcpServer_InClaudeJson",
+      "Calor.Compiler.Tests.ClaudeInitializerMcpTests.Initialize_HooksAndMcpServers_InSeparateFiles",
+      "Calor.Compiler.Tests.SolutionInitializationIntegrationTests.Init_LocalMockSolution_WithAi_CreatesFilesCorrectly",
+      "Calor.Compiler.Tests.SolutionInitializerTests.InitializeAsync_WithAiInitializer_CreatesAiFilesInSolutionDir",
+      "Calor.Compiler.Tests.HookCommandTests.ClaudeInitializer_PreservesExistingSettings",
+      "Calor.Compiler.Tests.InitCommandIntegrationTests.ClaudeInit_MultipleRuns_IsIdempotent",
+      "Calor.Compiler.Tests.InitCommandE2ETests.AllAgentsInit_CreatesAllExpectedFiles",
+      "Calor.Compiler.Tests.HookCommandTests.ClaudeInitializer_ReportsSettingsFileAsUpdatedWhenModified",
+      "Calor.Compiler.Tests.InitCommandIntegrationTests.ClaudeInit_WithExistingClaudeMd_AppendsCalorSection",
+      "Calor.Compiler.Tests.InitCommandIntegrationTests.ClaudeInit_ConfiguresMcpServerInClaudeJson",
+      "Calor.Compiler.Tests.InitCommandTests.ClaudeInitializer_Initialize_RunsMultipleTimesIdempotently",
+      "Calor.Compiler.Tests.InitCommandIntegrationTests.MsBuildInit_ThenClaudeInit_IsAdditive",
+      "Calor.Compiler.Tests.InitCommandIntegrationTests.ClaudeInit_WithExistingCalorSection_ReplacesSection",
+      "Calor.Compiler.Tests.HookCommandTests.ClaudeInitializer_ConfiguresHooks",
+      "Calor.Compiler.Tests.InitCommandTests.ClaudeInitializer_Initialize_ClaudeMdContainsAiGuidelines",
+      "Calor.Compiler.Tests.HookCommandTests.ClaudeInitializer_ReportsSettingsFileAsCreated",
+      "Calor.Compiler.Tests.InitCommandE2ETests.ClaudeInit_CreatesAllExpectedFiles",
+      "Calor.Compiler.Tests.HookCommandTests.ClaudeInitializer_DoesNotDuplicateHooks",
+      "Calor.Compiler.Tests.InitCommandIntegrationTests.ClaudeInit_AddsCalorTargets_AndCreatesClaudeFiles",
+      "Calor.Compiler.Tests.InitCommandTests.ClaudeInitializer_Initialize_PreservesUserContentBeforeAndAfterSection",
+      "Calor.Compiler.Tests.InitCommandTests.ClaudeInitializer_Initialize_AppendsCalorSectionWhenNoMarkers",
+      "Calor.Compiler.Tests.InitCommandTests.ClaudeInitializer_Initialize_CreatesClaudeMdWithMarkers",
+      "Calor.Compiler.Tests.InitCommandTests.ClaudeInitializer_Initialize_ReplacesExistingCalorSection"
+    ],
+    "failureDiagnosis": "27 initialization/hook tests resolve in-repository TMPDIR fixtures to the checkout's git root via unchanged ClaudeInitializer.FindGitRoot; expected child artifacts are absent. Two RunTestCommand generated projects inherit root Central Package Management and fail NU1008. Full failed logs/TRX retained, no retries/skips/gate changes. Only demonstrated test-generated CLAUDE.md/.claude/settings.json changes in this worktree were restored to their pre-run bytes; initializer tests use isolated ClaudeJsonPathOverride values. New CI in its normal runner layout must pass.",
+    "unchangedDiagnosticCodePaths": {
+      "src/Calor.Compiler/Init/ClaudeInitializer.cs": "b38b89ebcb075641158722ae517950d60ccc97e27f27891ca14762388e98c9c1",
+      "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
+    }
+  },
+  "limitations": "This is product mapping/inference integration, not StageA/B activation, array transfer/predicate completion, a new safe classification, or an E1 repair.1444 still requires N3 acceptance and a separate start. No original production-review shell history was fabricated."
+}

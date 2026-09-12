@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "observationDateUtc": "2026-09-12",
+  "observer": "Copilot/GPT-6 Astra e9c6935e-da28-4a3b-94d4-0a5bbb596332",
+  "baselineCommit": "3b513a632149290481161b195a71aa6cb0e251a8",
+  "historicalIntegratedN3Commit": "a0839cf70152e870327a7d5f7f03a86c0bb2127a",
+  "measurementContext": "Actual N3 worktree after accepted N1 reconciliation, before merge commit. Production hashes pin the tested contents. Earlier56-error and e299 captures remain unchanged.",
+  "productionSourceSha256": {
+    "src/Calor.Compiler/Binding/Binder.cs": "a8176248da2d3c57819bec6975ce0fbe2ea03f89973db36d9a47a6aea7388d13",
+    "src/Calor.Compiler/Binding/Scope.cs": "24885ddc53691fa93607f4941abaa2ddec7766929a94de760b5cf56ec2a77927",
+    "src/Calor.Compiler/Binding/BoundNodes.cs": "798e4b430ad5f4d12b73dabdfa272cf8b0783ba0c70f89510f230f086cda1e5d",
+    "src/Calor.Compiler/Binding/BoundTypes/BoundType.cs": "287a478e4ebf0553a361b866ac3b9d479fa55a7970d8935ca3ebd47547088f41",
+    "src/Calor.Compiler/Binding/NullabilityChecker.cs": "af932a552e7e738b7132faa5d201af1ee0d2d7c83740f1cce2c1c30a26410785",
+    "src/Calor.Compiler/Binding/Metadata/MetadataBinder.cs": "ac4c7cb52557eceb1d661baf2140574040b12671403a207d5143f5f8be583ab0",
+    "src/Calor.Compiler/Binding/Metadata/MetadataContext.cs": "d166095081aa1590992ba66a55746ae1b0619caaa78c9de01ee9166cb6b99c60",
+    "src/Calor.Compiler/Analysis/Security/TaintAnalysis.cs": "fc3a143d19b3acb6e9a28c6d2c48b1ffe99b1d55fe59840f1d6b1a75b53aeadf"
+  },
+  "sourceFiles": 364,
+  "binderAttempts": 35179,
+  "deltaFromAcceptedMain": {
+    "serilog/src/Serilog/Formatting/Json/JsonValueFormatter.cs": {
+      "BindingErrorCount": {
+        "before": 52,
+        "after": 55
+      },
+      "BindingErrorIdentityHash": {
+        "before": "d9f3e84be63e78f368284f88c05fbd08262dd9fff97669959b558f5f79f0ef42",
+        "after": "963206acd3677219969931fd33a7ef1c325946dff7d23a1d915fe31c8c7830d6"
+      }
+    }
+  },
+  "deltaFromAutomaticMerge": {
+    "serilog/src/Serilog/Formatting/Json/JsonValueFormatter.cs": {
+      "BindingErrorCount": {
+        "before": 56,
+        "after": 55
+      },
+      "BindingErrorIdentityHash": {
+        "before": "2b1d449e0c39fb15d136f7176980fe63311effadcc8dded0297ff9c467cdfaf9",
+        "after": "963206acd3677219969931fd33a7ef1c325946dff7d23a1d915fe31c8c7830d6"
+      }
+    }
+  },
+  "allOtherSourceOpacityOutcomeAndPropagationFieldsUnchanged": true,
+  "freshDiagnosticCapture": {
+    "bindingErrorCount": 55,
+    "identityHash": "963206acd3677219969931fd33a7ef1c325946dff7d23a1d915fe31c8c7830d6",
+    "sourceHash": "3f6fa1f940815933c4aa948d41eac450a783530453bc31af1ee1a2a76e3e9d87",
+    "conversionReportedSuccess": false,
+    "historicalDiagnosticRemovedByN1IdentityEligibility": {
+      "Code": "Calor0274",
+      "Severity": "Error",
+      "Message": "Argument to parameter 'value' declares non-nullable 'any' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?any' or add an explicit non-null check at the interop boundary.",
+      "Start": 7412,
+      "End": 7417,
+      "Line": 184,
+      "Column": 41,
+      "Text": "value",
+      "Context": {
+        "Boundary": 3,
+        "Shape": 4
+      },
+      "Propagated": false,
+      "StatementArgument": [
+        {
+          "Target": "FormatLiteralObjectValue",
+          "Line": 184
+        }
+      ]
+    },
+    "removedDiagnosticDisposition": "Unresolved/unsupported identity, NOT safe. Fresh bound any argument has neither Declaration nor RoslynSymbol. N1 no longer guesses reference eligibility from its display name.",
+    "freshNominalConsumer": [
+      {
+        "Target": "FormatLiteralObjectValue",
+        "Callee": "Serilog.Formatting.Json.JsonValueFormatter.FormatLiteralObjectValue",
+        "ContainingTypeName": "Serilog.Formatting.Json.JsonValueFormatter",
+        "Arguments": [
+          {
+            "Start": 7412,
+            "DisplayString": "any",
+            "Kind": "NominalBoundType",
+            "Declaration": null,
+            "MetadataSymbol": null
+          },
+          {
+            "Start": 7421,
+            "DisplayString": "TextWriter",
+            "Kind": "NominalBoundType",
+            "Declaration": null,
+            "MetadataSymbol": null
+          }
+        ],
+        "SelectedMaps": [
+          {
+            "Name": "Serilog.Formatting.Json.JsonValueFormatter.FormatLiteralObjectValue",
+            "Arguments": [
+              {
+                "ArgumentIndex": 0,
+                "ParameterIndex": 0,
+                "ParameterType": "any"
+              },
+              {
+                "ArgumentIndex": 1,
+                "ParameterIndex": 1,
+                "ParameterType": "TextWriter"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "threeRemainingN3Findings": [
+      {
+        "Code": "Calor0274",
+        "Severity": "Error",
+        "Message": "Argument to parameter 'str' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary.",
+        "Start": 4078,
+        "End": 4113,
+        "Line": 103,
+        "Column": 40,
+        "Text": "(str (?? element.Key.Value \"null\"))",
+        "Context": {
+          "Boundary": 3,
+          "Shape": 1
+        },
+        "Propagated": false,
+        "StatementArgument": [
+          {
+            "Target": "WriteQuotedJsonString",
+            "Line": 103
+          }
+        ]
+      },
+      {
+        "Code": "Calor0274",
+        "Severity": "Error",
+        "Message": "Argument to parameter 'str' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary.",
+        "Start": 6807,
+        "End": 6818,
+        "Line": 170,
+        "Column": 38,
+        "Text": "(str value)",
+        "Context": {
+          "Boundary": 3,
+          "Shape": 1
+        },
+        "Propagated": false,
+        "StatementArgument": [
+          {
+            "Target": "FormatStringValue",
+            "Line": 170
+          }
+        ]
+      },
+      {
+        "Code": "Calor0274",
+        "Severity": "Error",
+        "Message": "Argument to parameter 'str' declares non-nullable 'string' but the value may be null (source annotation: 'Oblivious'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary.",
+        "Start": 10755,
+        "End": 10774,
+        "Line": 247,
+        "Column": 34,
+        "Text": "(?? (str value) \"\")",
+        "Context": {
+          "Boundary": 3,
+          "Shape": 1
+        },
+        "Propagated": false,
+        "StatementArgument": [
+          {
+            "Target": "FormatStringValue",
+            "Line": 247
+          }
+        ]
+      }
+    ],
+    "remainingFindingsDisposition": "AnalysisOnly/Unresolved; the existing1398 coalesce-transfer limitation remains.",
+    "subtractThreeCount": 52,
+    "subtractThreeHash": "d9f3e84be63e78f368284f88c05fbd08262dd9fff97669959b558f5f79f0ef42"
+  },
+  "validation": {
+    "initialNormalRatchet": "Failed on56->55 raw identity/count; all192 other selected tests passed. Failure retained.",
+    "existingGenerators": "CALOR_UPDATE_BINDER_ERROR_EMISSION_CATALOG=1 CALOR_UPDATE_BINDER_BASELINE=1, selected source-catalog and normal conversion ratchet;14 passed.",
+    "normalFollowUp": "590 affected compiler/runtime/taint/N1/T1/corpus tests and50 editor tests passed.",
+    "catalogRoutes": 33
+  },
+  "scope": "No N1 policy rewrite, array annotation/predicate work,275 expansion or activation;1444 remains required and separately gated."
+}
