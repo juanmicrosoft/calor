@@ -2216,10 +2216,9 @@ public sealed class Binder
         // based ratchet on typename-string-equality sites.
         if (bindTypeName is not null) return BoundTypes.NullableAnnotation.Oblivious;
         if (initializer is null) return BoundTypes.NullableAnnotation.Oblivious;
-        // Scope-gate to STRING targets (mirrors NullabilityChecker.IsScalarString).
-        var normalized = typeName?.Trim();
-        var isString = normalized is "STRING" or "string" or "str" or "System.String";
-        if (!isString) return BoundTypes.NullableAnnotation.Oblivious;
+        if (!TryBuildDeclaredNullabilityShape(typeName, out var target)
+            || target is not BoundTypes.NominalBoundType { QualifiedName: "STRING" })
+            return BoundTypes.NullableAnnotation.Oblivious;
         return initializer.Type is BoundTypes.NominalBoundType n
             ? n.NullableAnnotation
             : BoundTypes.NullableAnnotation.Oblivious;

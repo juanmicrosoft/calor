@@ -338,6 +338,111 @@ public class LocalReferenceAnnotationTests
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
     }
 
+    public static IEnumerable<object[]> StringMemberAliases()
+    {
+        foreach (var kind in new[] { "field", "property" })
+        foreach (var typeName in new[] { "string", "str", "?string", "?str", "string?", "str?" })
+            yield return [kind, typeName];
+    }
+
+    [Theory]
+    [MemberData(nameof(StringMemberAliases))]
+    public void NativeStringMember_InferredChainsPreserveAnnotationForBareThisAndBase(
+        string kind, string typeName)
+    {
+        var nullable = typeName.Contains('?');
+        var member = kind == "field"
+            ? $"§FLD{{{typeName}:Value:pub}}"
+            : $"§PROP{{p1:Value:{typeName}:pub:get,set}}";
+        var source = $$"""
+            §M{m1:StringMemberInference}
+              §CL{c1:Parent:pub}
+                {{member}}
+              §CL{c2:Child:pub}
+                §EXT{Parent}
+                §MT{probe:Probe:pub} () -> void
+                  §B{bareFirst} Value
+                  §B{bareSecond} bareFirst
+                  §B{bareResult:string} bareSecond
+                  §B{thisFirst} §THIS.Value
+                  §B{thisSecond} thisFirst
+                  §B{thisResult:string} thisSecond
+                  §B{baseFirst} §BASE.Value
+                  §B{baseSecond} baseFirst
+                  §B{baseResult:string} baseSecond
+            """;
+        var (module, diagnostics) = Bind(source);
+        var bindings = Probe(module).Body.Cast<BoundBindStatement>().ToArray();
+        var annotation = nullable ? NullableAnnotation.Annotated : NullableAnnotation.NotAnnotated;
+        for (var i = 0; i < bindings.Length; i++)
+        {
+            Assert.Equal(annotation, Assert.IsType<NominalBoundType>(bindings[i].Initializer!.Type).NullableAnnotation);
+            Assert.Equal(i % 3 == 2 ? NullableAnnotation.NotAnnotated : annotation,
+                bindings[i].Variable.NullableAnnotation);
+        }
+        Assert.Equal(nullable ? 3 : 0,
+            diagnostics.Count(d => d.Code == DiagnosticCode.NullableToNonNullableBinding));
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.UndefinedReference);
+    }
+
+    public static IEnumerable<object[]> StringSourceAliases()
+    {
+        foreach (var returned in new[] { false, true })
+        foreach (var typeName in new[] { "string", "str", "?string", "?str", "string?", "str?" })
+            yield return [returned, typeName];
+    }
+
+    [Theory]
+    [MemberData(nameof(StringSourceAliases))]
+    public void NativeStringParameterAndReturn_InferredChainsKeepEstablishedAnnotation(
+        bool returned, string typeName)
+    {
+        var source = $$"""
+            §M{m1:StringSourceInference}
+              §CL{c1:Holder:pub}
+                §MT{get:Get:pub:static} ({{typeName}}:input) -> {{typeName}}
+                  §R input
+                §MT{probe:Probe:pub:static} ({{typeName}}:input) -> void
+                  §B{first} {{(returned ? "§C{Holder.Get} §A input §/C" : "input")}}
+                  §B{second} first
+                  §B{result:string} second
+            """;
+        var (module, diagnostics) = Bind(source);
+        var nullable = typeName.Contains('?');
+        var annotation = nullable ? NullableAnnotation.Annotated : NullableAnnotation.NotAnnotated;
+        var bindings = Probe(module).Body.Cast<BoundBindStatement>().ToArray();
+        foreach (var binding in bindings.Take(2))
+        {
+            Assert.Equal(annotation, Assert.IsType<NominalBoundType>(binding.Initializer!.Type).NullableAnnotation);
+            Assert.Equal(annotation, binding.Variable.NullableAnnotation);
+        }
+        Assert.Equal(annotation, Assert.IsType<NominalBoundType>(bindings[2].Initializer!.Type).NullableAnnotation);
+        Assert.Equal(nullable,
+            diagnostics.Any(d => d.Code == DiagnosticCode.NullableToNonNullableBinding));
+        Assert.DoesNotContain(diagnostics, d => d.Code is
+            DiagnosticCode.NoMatchingOverload or DiagnosticCode.UndefinedReference);
+    }
+
+    [Fact]
+    public void RuntimeOption_InferredChainDoesNotBecomeNullableReferenceAnnotation()
+    {
+        const string source = """
+            §M{m1:OptionInference}
+              §CL{c1:Holder:pub}
+                §MT{probe:Probe:pub:static} () -> void
+                  §B{first} §SM STR:"value"
+                  §B{second} first
+                  §B{result:string} second
+            """;
+        var (module, diagnostics) = Bind(source);
+        foreach (var binding in Probe(module).Body.Take(2).Cast<BoundBindStatement>())
+        {
+            Assert.Equal(NullableAnnotation.Oblivious, binding.Variable.NullableAnnotation);
+            Assert.Null(binding.Variable.InferredReferenceType);
+        }
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.ReferenceOptionMismatch);
+    }
+
     private static BoundExpression ConsumerValue(BoundStatement statement, string boundary)
     {
         var expression = statement switch
