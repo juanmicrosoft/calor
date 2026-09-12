@@ -38,6 +38,38 @@ public class IncrementalCliBuildTests : IDisposable
         return path;
     }
 
+    [Fact]
+    public void RootAndWatchEffectiveTypingAndElision_ChangeTheSharedOptionsIdentity()
+    {
+        static string Token(bool typing, bool elide) => Program.BuildOptionsToken(
+            strictApi: false, requireDocs: false, enforceEffects: false,
+            enableTypeChecking: typing, strictEffects: false, permissiveEffects: false,
+            contractMode: "debug", verify: false, verificationTimeout: 5000,
+            analyze: false, allFindings: false, strictBindInference: false,
+            experimentalFlags: null, elideProvenGuards: elide);
+
+        var previous = Environment.GetEnvironmentVariable("CALOR_NO_TYPE_CHECK");
+        try
+        {
+            Environment.SetEnvironmentVariable("CALOR_NO_TYPE_CHECK", "0");
+            var enabled = Program.IsTypeCheckingEffectivelyEnabled(noTypeCheck: false, transpileOnly: false);
+            Assert.True(enabled);
+            Assert.False(Program.IsTypeCheckingEffectivelyEnabled(noTypeCheck: true, transpileOnly: false));
+            Assert.False(Program.IsTypeCheckingEffectivelyEnabled(noTypeCheck: false, transpileOnly: true));
+            Environment.SetEnvironmentVariable("CALOR_NO_TYPE_CHECK", "1");
+            var disabled = Program.IsTypeCheckingEffectivelyEnabled(noTypeCheck: false, transpileOnly: false);
+            Assert.False(disabled);
+            Assert.NotEqual(Token(enabled, true), Token(disabled, true));
+            Assert.NotEqual(Token(enabled, true), Token(enabled, false));
+            Assert.NotEqual(BuildStateCache.ComputeOptionsHash(Token(enabled, true)),
+                BuildStateCache.ComputeOptionsHash(Token(disabled, true)));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("CALOR_NO_TYPE_CHECK", previous);
+        }
+    }
+
     private (string APath, string BPath) WriteIndependentPair()
     {
         var a = WriteSource("a.calr", """
@@ -498,7 +530,7 @@ public class IncrementalCliEndToEndTests : IDisposable
     [Fact]
     public void Cache_DoesNotReplayNoTypeCheckSuccessForDefaultOptOutDefaultSequence()
     {
-        var source = WriteNullableLiteralTypeCheckerOnlyViolation();
+        var source = WriteTransitionalNullableAssignmentViolation();
 
         var firstDefault = CliTestHarness.RunCli(
             _tempDir,
@@ -531,7 +563,7 @@ public class IncrementalCliEndToEndTests : IDisposable
     [Fact]
     public void Cache_DoesNotReplayEnvironmentOptOutSuccessForDefaultCompile()
     {
-        var source = WriteNullableLiteralTypeCheckerOnlyViolation();
+        var source = WriteTransitionalNullableAssignmentViolation();
 
         var envOptOut = CliTestHarness.RunCli(
             _tempDir,
@@ -549,14 +581,15 @@ public class IncrementalCliEndToEndTests : IDisposable
         Assert.DoesNotContain("Up-to-date (cached)", defaultCompile.StdOut);
     }
 
-    private string WriteNullableLiteralTypeCheckerOnlyViolation()
+    private string WriteTransitionalNullableAssignmentViolation()
     {
-        var path = Path.Combine(_tempDir, "nullable-literal.calr");
+        var path = Path.Combine(_tempDir, "nullable-assignment.calr");
         File.WriteAllText(path, """
             §M{m001:N0}
               §F{f001:Probe:pub} () -> void
                 §E{}
-                §B{x:?str} "safe"
+                §B{x:?str} null
+                §B{y:str} x
             """);
         return path;
     }

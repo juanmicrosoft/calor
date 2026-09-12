@@ -96,6 +96,7 @@ public sealed class Binder
     private readonly Dictionary<string, HashSet<string>> _topLevelFunctionLookupNames = new(StringComparer.Ordinal);
     private readonly Dictionary<SymbolId, Symbol> _symbolsById = new();
     private readonly Dictionary<string, int> _declarationIdOccurrences = new(StringComparer.Ordinal);
+    private IReadOnlySet<string> _declaredReferenceTypes = new HashSet<string>(StringComparer.Ordinal);
     private SymbolId _moduleSymbolId;
     private SymbolId _declarationContext;
     private string? _currentClassName;
@@ -127,8 +128,8 @@ public sealed class Binder
     /// predicate S3b uses at <c>§B</c> sites. Set via
     /// <see cref="PushReturnTypeContext"/> at every function-binding entry
     /// point (BindFunction / BindMethod / BindConstructor / BindPropertyAccessor
-    /// / BindOperator / BindIndexerAccessor). Lambdas don't set this — their
-    /// return type is inferred, not declared.
+    /// / BindOperator / BindIndexerAccessor). Lambdas clear this context because
+    /// their return type is inferred, not the enclosing function's declaration.
     /// </summary>
     private string? _currentFunctionReturnType;
 
@@ -229,15 +230,10 @@ public sealed class Binder
             // (a Calor :?string variable passed into a BCL :string
             // parameter).
             var trimmed = display;
-            while (trimmed.StartsWith("OPTION[inner=", StringComparison.Ordinal)
-                   && trimmed.EndsWith("]", StringComparison.Ordinal))
+            while (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(trimmed, out var referent))
             {
-                trimmed = trimmed["OPTION[inner=".Length..^1];
+                trimmed = referent;
             }
-            if (trimmed.EndsWith("?", StringComparison.Ordinal) && trimmed.Length > 1)
-                trimmed = trimmed[..^1];
-            if (trimmed.StartsWith("?", StringComparison.Ordinal) && trimmed.Length > 1)
-                trimmed = trimmed[1..];
             var mapped = TypeIdentity.MapShortTypeNameToFullName(trimmed);
             var t = ctx.TryResolveType(mapped)
                     ?? ctx.TryResolveType(trimmed)
@@ -354,8 +350,7 @@ public sealed class Binder
     /// <summary>
     /// v0.14 §S4 — set <see cref="_currentFunctionReturnType"/> for the
     /// scope of a function/method/accessor body, restoring the previous
-    /// value on dispose. Nested lambdas keep their enclosing function's
-    /// return-type context intact (BindLambdaExpression does not push);
+    /// value on dispose. Nested lambdas clear the enclosing context;
     /// yield-return statements share the same context by design (they still
     /// contribute to the enclosing function's return-type contract).
     /// </summary>
@@ -377,6 +372,7 @@ public sealed class Binder
     public BoundModule Bind(ModuleNode module)
     {
         using var diagnosticContext = _diagnostics.EnterBindingContext();
+        _declaredReferenceTypes = Parsing.AttributeHelper.GetDeclaredReferenceTypeNames(module);
         _scope = new Scope();
         _functionSymbols.Clear();
         _classScopes.Clear();
@@ -1297,6 +1293,8 @@ public sealed class Binder
     private BoundReturnStatement BindReturnStatement(ReturnStatementNode ret)
     {
         var expr = ret.Expression != null ? BindExpression(ret.Expression) : null;
+        var incompatibleRepresentation = expr is not null && _currentFunctionReturnType is not null
+            && CheckReferenceOptionRepresentation(_currentFunctionReturnType, expr);
 
         // v0.14 §S4 nullability check (issue #875, D2 predicate). Return-site
         // sibling of the §S3b BindBindStatement check. Fires when the current
@@ -1308,7 +1306,8 @@ public sealed class Binder
         // returns silently pass. Current semantics produces binder Errors;
         // BindingDiagnosticPolicy keeps these analysis-only. Unsupported
         // major versions are rejected before binding, not compiled in Info mode.
-        if (expr != null
+        if (!incompatibleRepresentation
+            && expr != null
             && _currentFunctionReturnType != null
             && TryBuildStringTarget(_currentFunctionReturnType, out var stringTarget)
             && NullabilityChecker.IsPossiblyNullAssignedTo(expr, stringTarget!))
@@ -1525,6 +1524,9 @@ public sealed class Binder
                 $"Variable '{bind.Name}' is already defined");
         }
 
+        var incompatibleRepresentation = initializer is not null && bind.TypeName is not null
+            && CheckReferenceOptionRepresentation(bind.TypeName, initializer);
+
         // v0.14 §S3 nullability check (issue #875, D2 predicate). Fires when
         // an explicit :string / :str target is initialized with a value whose
         // BoundType.NullableAnnotation is Annotated or Oblivious (per D3,
@@ -1534,7 +1536,8 @@ public sealed class Binder
         // now carry real annotations on their BoundCallExpression.Type.
         // Current semantics produces binder Errors, kept analysis-only by
         // BindingDiagnosticPolicy. Unsupported majors do not compile in Info mode.
-        if (initializer != null
+        if (!incompatibleRepresentation
+            && initializer != null
             && bind.TypeName != null
             && TryBuildStringTarget(bind.TypeName, out var stringTarget)
             && NullabilityChecker.IsPossiblyNullAssignedTo(initializer, stringTarget!))
@@ -1551,6 +1554,20 @@ public sealed class Binder
         }
 
         return new BoundBindStatement(bind.Span, variable, initializer);
+    }
+
+    private bool CheckReferenceOptionRepresentation(string targetType, BoundExpression source)
+    {
+        if (Parsing.AttributeHelper.IsReferenceOptionMismatch(
+            targetType, source.Type.DisplayString, _declaredReferenceTypes))
+        {
+            _diagnostics.ReportError(source.Span, DiagnosticCode.ReferenceOptionMismatch,
+                $"Cannot assign '{Parsing.AttributeHelper.ToSurfaceSpelling(source.Type.DisplayString)}' " +
+                $"to '{Parsing.AttributeHelper.ToSurfaceSpelling(targetType)}': reference values and " +
+                "runtime Option values are distinct. Use explicit Option construction or consumption.");
+            return true;
+        }
+        return false;
     }
 
     /// <summary>
@@ -1574,7 +1591,7 @@ public sealed class Binder
             {
                 // F2: same fail-open rule as CheckRowPosition. A §B of an unknown
                 // nominal type keeps its row rather than drawing a hard error.
-                if (!TypeIdentity.IsProvablyNonFunctionType(subjectType))
+                if (!IsProvablyNonFunctionBindingType(subjectType))
                     return TryBuildFunctionType(subjectType, bind.Row, binders: null);
 
                 ReportRowOnNonFunctionType(bind.Row, subjectType, bind.Name, "binding");
@@ -2659,6 +2676,7 @@ public sealed class Binder
         using var _scopeGuard = PushScope(_scope.CreateChild());
         using var _staticGuard = PushStaticContext(lambda.IsStatic);
         using var _identityGuard = PushDeclarationContext(lambdaIdentity);
+        using var _returnGuard = PushReturnTypeContext(null);
 
         var parameters = new List<VariableSymbol>(lambda.Parameters.Count);
         foreach (var parameter in lambda.Parameters)
@@ -3956,6 +3974,11 @@ public sealed class Binder
     private bool IsNominalTypeInvisibleToThisModule(string type)
     {
         var canonical = TypeIdentity.Canonicalize(type);
+        // These spellings previously had the built-in OPTION head and therefore did not
+        // suppress a failed overload. Keep that rejection until #1382/#1383/#1385 hand it off.
+        // This compatibility condition is not a claim that the referent was resolved.
+        if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(canonical, out _))
+            return false;
 
         // Head of a generic/array/option form: `Seq<Assembly>` -> `Seq`.
         var head = canonical;
@@ -4438,7 +4461,7 @@ public sealed class Binder
         $"{elementType}[{new string(',', Math.Max(0, rank - 1))}]";
 
     private static string MakeOptionType(string innerType) =>
-        $"OPTION[inner={innerType}]";
+        $"Option<{innerType}>";
 
     private static string MakeResultType(string okType, string errorType) =>
         $"RESULT[ok={okType}][err={errorType}]";
@@ -5596,7 +5619,7 @@ public sealed class Binder
         // "I do not know what this is", which is not a verdict. `!IsFunctionTypedSpelling`
         // was the wrong complement of a LIST predicate and made a legal delegate
         // a hard error.
-        if (!TypeIdentity.IsProvablyNonFunctionType(typeName)) return;
+        if (!IsProvablyNonFunctionBindingType(typeName)) return;
 
         ReportRowOnNonFunctionType(row, typeName, subject, subjectKind);
     }
@@ -5611,6 +5634,15 @@ public sealed class Binder
     /// </summary>
     private bool IsFunctionTypedSpelling(string? typeName)
         => TypeIdentity.IsFunctionTypeName(typeName, _delegateTypeNames.Contains);
+
+    private bool IsProvablyNonFunctionBindingType(string? typeName)
+    {
+        if (!string.IsNullOrWhiteSpace(typeName)
+            && Parsing.AttributeHelper.TryUnwrapNullableAnnotation(typeName, out var referent)
+            && ResolveTypeSymbol(referent) is { } declaration)
+            return !declaration.IsDelegate;
+        return TypeIdentity.IsProvablyNonFunctionType(typeName);
+    }
 
     private void ReportRowOnNonFunctionType(
         EffectsNode row,

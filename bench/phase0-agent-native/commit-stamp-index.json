@@ -12,10 +12,10 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "9a1e84c03f0697692db4c0d939ebe0211f5e9081",
-      "resolvableOnMain": "9a1e84c03f0697692db4c0d939ebe0211f5e9081",
+      "measuredCommit": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
+      "resolvableOnMain": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
       "basis": "identical-src-tree",
-      "note": "#1335: regenerated on exact compiler9a1e84c0, preserved by the PR's merge commit. Recognizing the decimal alias in emitted §B{dec:dc} removes one undefined-dc binding error in Serilog JsonValueFormatter and resolves one unknown external call: Serilog Calor0411 sites544->543. Calor0425 diagnostics117, enforced modules326, exclusions and their identities are unchanged. Earlier measurements remain in git history; no completed epoch or frozen protocol is restamped."
+      "note": "#1397: regenerated on exact compilerb2c43561; preserve this ancestor with a merge commit. Unknown receivers no longer borrow runtime Option purity; known dictionary receivers/getters resolve and conditional getters are charged. Calor0411 sites move279->297,543->551,7420->7932 within unchanged12/61/115 unknown-module sets. Calor0425 diagnostics117, modules47, enforced326, exclusions and all other ledger coordinates are unchanged. Earlier measurements remain in git history; no completed epoch, ledger464ace or frozen protocol is restamped."
     },
     {
       "ledger": "higher-order-demand-ledger.json",
@@ -33,10 +33,10 @@
     },
     {
       "ledger": "effect-resolver-key-ledger.json",
-      "measuredCommit": "b732c4abf8b78e2327f565886e6366e2d64644ea",
-      "resolvableOnMain": "b732c4abf8b78e2327f565886e6366e2d64644ea",
+      "measuredCommit": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
+      "resolvableOnMain": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
       "basis": "identical-src-tree",
-      "note": "#1335: regenerated onb732c4ab with the two surrogate-literal D-S1.5 Calor fixtures. Bench files measured378->380. Bound-origin keys265, string-origin keys822, the200 floor and all notMeasured identities are unchanged. The exact measured commit remains reachable through the PR merge commit. Historical measurements remain in git history."
+      "note": "#1397: regenerated onb2c43561 after receiver/member traversal changes. String-origin keys822->826 (bench620->624); bound-origin265, bench files380, the200 floor, scope and all notMeasured identities are unchanged. This is lookup provenance, not resolved-signature or nullability coverage. Preserve the exact measured ancestor with a merge commit. Historical measurements remain in git history; frozen research is unchanged."
     },
     {
       "ledger": "effect-rows-benefit-ledger.json",

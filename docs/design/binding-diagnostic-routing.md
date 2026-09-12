@@ -12,13 +12,14 @@ substitutes for a claimed human review.
 
 ## Executable inventory
 
-`BindingDiagnosticPolicy.Catalog` classifies18 Error-capable codes:8 existing
-`CompilationError` codes and10 `AnalysisOnly` codes. Every entry has a reason and
+After #1397, `BindingDiagnosticPolicy.Catalog` classifies19 Error-capable codes:
+9 `CompilationError` codes and10 `AnalysisOnly` codes. The #1396 baseline was18
+codes (8 active); its frozen evidence is not relabeled. Every entry has a reason and
 owning issue. The policy stays in its original `Binding/Scope.cs` maintenance
 surface; no new product C# path or Calor-first allowlist exception is introduced.
 The source-site golden in
-`tests/TestData/Binding/BinderErrorEmissionCatalog.golden.json` records33 routes:
-18 compilation-error leaves,14 analysis-only leaves and one filtered forwarder.
+`tests/TestData/Binding/BinderErrorEmissionCatalog.golden.json` records34 routes:
+19 compilation-error leaves,14 analysis-only leaves and one filtered forwarder.
 These are **emission-site counts**, not fixture counts or distinct-code counts.
 The metadata helper `MetadataBinderResult.ToDiagnostics` is included because its
 caller-selected severity can be Error even though its default is Info. It is not
@@ -57,12 +58,27 @@ other shape decisions belong to #1400/#1402 and their prerequisites. An absent o
 unsupported context does not become a new safe row. No suppression flag exists.
 
 `Program.Compile` still runs TypeChecker first and can return before binding.
-For example, a string literal initializing `?str` currently reports TypeChecker0202;
-opting out of typing changes that result. This is not a duplicate binder diagnostic
-and not an active-binder bypass. #1397 owns nullable-reference versus Option
-representation and cross-pass predicate ownership; #1398 owns consumption transfer.
-Neither repair is performed here. Nullable values, coalescing, throws, typed
-patterns and unchecked mutation retain the N0 behavior and limitations.
+The #1396/N0 nullable-literal0202 example is historical: #1397 repairs supported
+nullable-reference literals and inline type names. An expanded nullable local
+assigned to non-nullable `str` still reports transitional TypeChecker0202 before
+binding. A raw inline nullable parameter did not have that rejection at the
+measured baseline; normalization does not silently activate it. Both spellings
+now denote the same reference type, but this temporary compatibility distinction
+retains the previously shipped gates until #1385 can take ownership.
+
+`Calor0275` is an active **representation mismatch**, not a nullable-state finding:
+supported STRING/declared reference values and explicit runtime `Option<T>` values
+cannot stand in for one another at binding initializations or native returns.
+Default typing can reject the initializer earlier with genuine0202; otherwise
+Binder owns0275, including no-type-check/transpile and editor paths. Ordinary
+object boxing preserves the complete Option value and is not an unwrap. Unknown
+source types are not classified as proven mismatches or counted as safe.
+
+#1398 still owns coalesce/throw/pattern transfer; #1382/#1383 still own selected
+call mapping and native nullable STRING inputs. Failed nullable native overloads
+retain0208 instead of disappearing into an "unresolved argument" fallback when
+the canonical nullable spelling changes. General mutable assignment and
+unchecked mutation remain outside these new representation checks.
 
 `DiagnosticBag` scopes provenance only during `Binder.Bind` and restores it after
 the call. Parser/TypeChecker diagnostics using the same code remain distinguishable.
@@ -108,6 +124,10 @@ Root caching requires default output layout: explicit `-o` is intentionally
 uncached, including with `--cache`. Transpile-only remains uncached. Regressions
 cover warm opt-out to default typing, environment transitions, guard options,
 changed invalid input, compiler/schema/semantics changes, and safe recovery.
+After #1397 fixes nullable literal initialization, the live cache fixture uses a
+real transitional nullable-to-nonnullable assignment instead of the old false
+positive. Direct effective-options identity checks remain; the frozen N0/R1
+process outputs still describe their original candidates and fixtures.
 No released binary was swapped underneath a live process; version invalidation
 is tested through the existing cache fixtures, not described as such a deployment.
 

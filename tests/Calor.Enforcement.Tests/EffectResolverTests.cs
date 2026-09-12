@@ -80,6 +80,34 @@ public class EffectResolverTests
         Assert.True(resolution.Effects.IsEmpty || resolution.Status == EffectResolutionStatus.PureExplicit);
     }
 
+    [Theory]
+    [InlineData("Dict<str, i32>", "Count", false)]
+    [InlineData("Dict<str, i32>", "Keys", true)]
+    [InlineData("Dict<str, i32>", "Values", true)]
+    [InlineData("SortedDictionary<str, i32>", "Count", false)]
+    [InlineData("SortedDictionary<str, i32>", "Keys", true)]
+    [InlineData("SortedDictionary<str, i32>", "Values", true)]
+    public void ResolveDictionaryGetter_UsesActualReceiverAndChargesViewAllocation(
+        string type, string member, bool allocates)
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        var resolution = resolver.Resolve(EffectResolverKey.FromStrings(
+            EffectEnforcementPass.MapShortTypeNameToFullName(type), member, kind: EffectMemberKind.Getter));
+        Assert.NotEqual(EffectResolutionStatus.Unknown, resolution.Status);
+        Assert.Equal(allocates, !resolution.Effects.IsEmpty);
+        Assert.True(resolution.Effects.IsSubsetOf(EffectSet.From("alloc")));
+    }
+
+    [Fact]
+    public void SortedDictionaryGetterCoverage_DoesNotMakeUncoveredMembersPure()
+    {
+        var resolver = new EffectResolver();
+        resolver.Initialize();
+        Assert.Equal(EffectResolutionStatus.Unknown, resolver.Resolve(
+            EffectResolverKey.FromStrings("System.Collections.Generic.SortedDictionary`2", "Uncovered")).Status);
+    }
+
     [Fact]
     public void Resolve_ReturnsUnknown_ForUnknownMethod()
     {
@@ -777,15 +805,15 @@ public class EffectResolverTests
     }
 
     [Theory]
-    [InlineData("?i32", "Calor.Runtime.Option`1")]
-    [InlineData("?str", "Calor.Runtime.Option`1")]
+    [InlineData("?i32", "System.Nullable`1")]
+    [InlineData("?str", "System.String")]
     [InlineData("Option<i32>", "Calor.Runtime.Option`1")]
     [InlineData("i32!str", "Calor.Runtime.Result`2")]
     [InlineData("Result<i32,str>", "Calor.Runtime.Result`2")]
     [InlineData("Option", "Calor.Runtime.Option")]
     [InlineData("Result", "Calor.Runtime.Result")]
     [InlineData("Console", "System.Console")]
-    public void MapShortTypeName_ResolvesCalorOptionResultSurfaceTypes(string surface, string expected)
+    public void MapShortTypeName_DistinguishesNullableAndRuntimeOptionResultTypes(string surface, string expected)
     {
         Assert.Equal(expected, EffectEnforcementPass.MapShortTypeNameToFullName(surface));
     }
