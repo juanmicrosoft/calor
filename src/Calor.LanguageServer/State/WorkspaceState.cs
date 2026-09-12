@@ -1140,7 +1140,7 @@ public sealed class WorkspaceState
             argumentModifiers,
             typeArguments,
             implicitConversionCost: null,
-            allowNullableStringCompatibility: true);
+            allowNullableStringCompatibility: call is not BoundNewExpression);
         return resolution.Function == null
             ? new ProjectFunctionLocation(null, null, null)
             : FindFunctionOwner(documents, resolution.Function.Id);
