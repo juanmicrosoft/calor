@@ -1,5 +1,10 @@
 # N5 scalar BCL member annotations (#1384)
 
+**Historical N1-based record below.** Current combined N2/N3/N5 evidence is in
+[combined-audit/README.md](combined-audit/README.md), measured against accepted
+main `8f9891a1` at production `4aaad31b`. Original source, evidence, reviews and CI
+remain retained history; they are not approval of the combined candidate.
+
 Base: `3b513a632149290481161b195a71aa6cb0e251a8` (accepted N1 #1451).
 Production: `a6a87f3975f85cead21d89d3d129690413309e78`.
 Initial production checkpoint: `60ad2e08cebee26a8e4188fc76a9bba32912ab56`.
