@@ -11,6 +11,40 @@ namespace Calor.LanguageServer.Tests.Utilities;
 
 public class BindingDiagnosticRoutingTests
 {
+    [Theory]
+    [InlineData("?[str]", "container")]
+    [InlineData("[?str]", "elements")]
+    [InlineData("?[?str]", "container and STRING elements")]
+    public async Task A4_ArrayInputs_RetainAnalysisOnlyArrayContextAndExactSpanAsync(string sourceType, string component)
+    {
+        var source = $$"""
+            §M{m1:ArrayRouting}
+              §F{take:Take:pub} ([str]:items) -> i32
+                §E{}
+                §R 1
+              §F{caller:Caller:pub} ({{sourceType}}:values) -> i32
+                §E{}
+                §B{first} values
+                §B{second} first
+                §R §C{Take} §A[items] second §/C
+            """;
+        var path = Path.Combine(Environment.CurrentDirectory, "array-routing-" + Guid.NewGuid().ToString("N") + ".calr");
+        using var document = new DocumentState(new Uri(path), source);
+        await document.ReanalyzeAsync();
+        var diagnostic = Assert.Single(document.Diagnostics.Where(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Equal(BindingReceivingBoundary.MethodArgument, diagnostic.BindingContext?.Boundary);
+        Assert.Equal(BindingReceivingShape.Array, diagnostic.BindingContext?.Shape);
+        Assert.Equal("second", source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+        Assert.Contains(component, diagnostic.Message);
+        var lsp = DiagnosticConverter.ToLspDiagnostic(diagnostic, source);
+        Assert.Equal("calor (analysis only)", lsp.Source);
+        Assert.Equal(PositionConverter.ToLspRange(diagnostic.Span, source), lsp.Range);
+        Assert.Equal(OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error, lsp.Severity);
+        var compiled = Compiler.Program.Compile(source, path);
+        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.DoesNotContain(compiled.Diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
     [Fact]
     public async Task CodeActions_PreserveAnalysisOnlyProvenanceAsync()
     {

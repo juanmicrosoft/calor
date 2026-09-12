@@ -1138,6 +1138,7 @@ public sealed class VariableSymbol : Symbol
     // from its display spelling in the local's lexical namespace.
     internal BoundTypes.NominalBoundType? InferredReferenceType { get; init; }
     internal bool IsTypeInferred { get; init; }
+    internal BoundTypes.ArrayBoundType? MethodInputArrayType { get; init; }
 
     /// <summary>
     /// v0.15 E2 slice b, design-doc §8.2 — the function type this variable
