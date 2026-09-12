@@ -25,7 +25,7 @@ This selection separates corrected observations from historical initial attempts
 ## Corrected strict corpus diagnostic/effect probe
 
 - `probe/CorpusProbe.csproj`
-- `probe/Program.cs`
+- `probe/Program.cs.txt`
 - `probe-results-v2/corpus-probes-v2-summary.json`
 - `probe-results-v2/baseline-LogEventProperty-v2.json`
 - `probe-results-v2/candidate-LogEventProperty-v2.json`
@@ -39,7 +39,7 @@ This selection separates corrected observations from historical initial attempts
 ## Corrected native boundary controls
 
 - `native-controls/NativeBoundaryProbe.csproj`
-- `native-controls/Program.cs`
+- `native-controls/Program.cs.txt`
 - `control-results-v2/native-boundary-controls-v2-summary.json`
 - `control-results-v2/baseline-native-boundary-controls-v2.json`
 - `control-results-v2/candidate-native-boundary-controls-v2.json`
@@ -57,7 +57,7 @@ Manifest-only profiles, retained only with the README label:
 Actual realized reference probe and outputs:
 
 - `metadata-realized-probe/MetadataRealizedProbe.csproj`
-- `metadata-realized-probe/Program.cs`
+- `metadata-realized-probe/Program.cs.txt`
 - `metadata-realized/metadata-realized-summary.json`
 - `metadata-realized/baseline-metadata-realized-references.json`
 - `metadata-realized/candidate-metadata-realized-references.json`
@@ -92,9 +92,9 @@ Do not publish `n4-final-validation/tmp/**`.
 Publish this folder only under its historical label; do not mix these outputs with corrected observations.
 
 - `historical-initial-attempts-20260912T0625/corpus-probe-initial/CorpusProbe.csproj`
-- `historical-initial-attempts-20260912T0625/corpus-probe-initial/Program.cs`
+- `historical-initial-attempts-20260912T0625/corpus-probe-initial/Program.cs.txt`
 - `historical-initial-attempts-20260912T0625/native-controls-initial/NativeBoundaryProbe.csproj`
-- `historical-initial-attempts-20260912T0625/native-controls-initial/Program.cs`
+- `historical-initial-attempts-20260912T0625/native-controls-initial/Program.cs.txt`
 - `historical-initial-attempts-20260912T0625/probe-results-initial/baseline-LogEventProperty.json`
 - `historical-initial-attempts-20260912T0625/probe-results-initial/candidate-LogEventProperty.json`
 - `historical-initial-attempts-20260912T0625/probe-results-initial/baseline-JsonValueFormatter.json`

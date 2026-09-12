@@ -212,8 +212,8 @@ Observed realized private metadata selection on this .NET 10.0.11 host:
 
 Both probe programs now avoid success-shaped fallbacks:
 
-- `probe/Program.cs` fails nonzero on empty conversion output, converted-parse errors, effect-pass exceptions, uncataloged binder diagnostics, and failed git child commands.
-- `native-controls/Program.cs` fails nonzero on parse failure, uncataloged binder diagnostics, missing CLI assembly, and failed provenance commands. CLI compilation itself is captured with exit code because compile failures are the expected measured outcome for some samples.
+- `probe/Program.cs.txt` fails nonzero on empty conversion output, converted-parse errors, effect-pass exceptions, uncataloged binder diagnostics, and failed git child commands.
+- `native-controls/Program.cs.txt` fails nonzero on parse failure, uncataloged binder diagnostics, missing CLI assembly, and failed provenance commands. CLI compilation itself is captured with exit code because compile failures are the expected measured outcome for some samples.
 - Initial broad-catch/raw-only outputs are preserved under `historical-initial-attempts-20260912T0625/`.
 
 Strict corpus probes (`probe-results-v2/`) reproduce the same classified product deltas:
