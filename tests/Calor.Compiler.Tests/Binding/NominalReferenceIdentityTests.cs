@@ -136,9 +136,11 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     }
 
     [Theory]
-    [InlineData("A.Foo", true)]
-    [InlineData("B.Foo", false)]
-    public void NativeReturn_ResolvesDeclarationInCalleeNamespace(string receivingType, bool expected)
+    [InlineData("A.Foo", true, "Foo")]
+    [InlineData("B.Foo", false, "Foo")]
+    [InlineData("Foo", false, "Container")]
+    public void NativeReturn_ResolvesDeclarationInCalleeNamespace(
+        string receivingType, bool expected, string callerClassName)
     {
         const string sourceA = """
             §M{m1:Namespaces}
@@ -148,7 +150,7 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
             """;
         var sourceB = $$"""
             §M{m1:Namespaces}
-              §CL{c2:Foo:pub}
+              §CL{c2:{{callerClassName}}:pub}
                 §MT{probe:Probe:pub:static} () -> void
                   §B{value:{{receivingType}}} §C{A.Foo.Get} §/C
             """;
@@ -159,7 +161,7 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
         var classA = Assert.Single(parsedA.Classes);
         var classB = Assert.Single(parsedB.Classes);
         Assert.Equal("Foo", classA.Name);
-        Assert.Equal("Foo", classB.Name);
+        Assert.Equal(callerClassName, classB.Name);
         classA.NamespaceIdentity = "A";
         classB.NamespaceIdentity = "B";
         var parsed = new ModuleNode(parsedA.Span, parsedA.Id, parsedA.Name,

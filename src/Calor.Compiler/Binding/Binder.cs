@@ -1689,17 +1689,6 @@ public sealed class Binder
                     : null;
         }
 
-        // Match the existing binder's unique-short-name fallback, never an
-        // ambiguous tail match between unrelated namespace-qualified types.
-        var shortDeclarations = _symbolsById.Values.OfType<TypeSymbol>()
-            .Where(symbol => symbol.Name == referent)
-            .Take(2).ToArray();
-        if (shortDeclarations.Length != 0)
-            return shortDeclarations is [var declaration] && declaration.IsReferenceType
-                && !declaration.QualifiedName.Contains('`')
-                ? new BoundTypes.NominalBoundType(referent, annotation, declaration)
-                : null;
-
         var metadataName = TypeIdentity.MapShortTypeNameToFullName(lookupNames[^1]);
         if (!metadataName.Contains('.', StringComparison.Ordinal))
             return null;
