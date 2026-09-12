@@ -9,6 +9,45 @@ namespace Calor.LanguageServer.Tests.Utilities;
 
 public class NullableReferenceTypingTests
 {
+    [Theory]
+    [InlineData("input", "Foo")]
+    [InlineData("§THIS.Value", "Foo")]
+    [InlineData("input", "string")]
+    [InlineData("§THIS.Value", "string")]
+    [InlineData("input", "str")]
+    [InlineData("§THIS.Value", "str")]
+    public async Task LocalAndMemberReturnDiagnostic_IsAnalysisOnlyAndClearsOnSafeEditAsync(
+        string value, string referenceType)
+    {
+        var source = $$"""
+            §M{m1:LocalMemberAnnotations}
+              §CL{c1:Foo:pub}
+                §FLD{?{{referenceType}}:Value:pub}
+                §MT{probe:Probe:pub} (?{{referenceType}}:input) -> {{referenceType}}
+                  §B{first} {{value}}
+                  §B{second} first
+                  §R second
+            """;
+        var path = Path.Combine(Path.GetTempPath(), "local-member-" + Guid.NewGuid().ToString("N") + ".calr");
+        using var document = new DocumentState(new Uri(path), source);
+        await document.ReanalyzeAsync();
+        var diagnostic = Assert.Single(document.Diagnostics.Where(d => d.Code == DiagnosticCode.NullableReturnFromNonNullable));
+        Assert.False(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        var lsp = DiagnosticConverter.ToLspDiagnostic(diagnostic, source);
+        Assert.Equal("calor (analysis only)", lsp.Source);
+        Assert.Equal(PositionConverter.ToLspRange(diagnostic.Span, source), lsp.Range);
+        Assert.Equal(referenceType == "Foo" ? BindingReceivingShape.Nominal : BindingReceivingShape.ScalarString,
+            diagnostic.BindingContext?.Shape);
+        Assert.Contains("source annotation: 'Annotated'", diagnostic.Message);
+        var result = Compiler.Program.Compile(source, path);
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == diagnostic.Code);
+        var update = await document.UpdateAsync(
+            source.Replace($"-> {referenceType}", $"-> ?{referenceType}", StringComparison.Ordinal), 1);
+        Assert.True(update.Accepted);
+        Assert.DoesNotContain(update.Snapshot.Diagnostics, d => d.Code == diagnostic.Code);
+    }
+
     [Fact]
     public async Task NominalReturnDiagnostic_IsAnalysisOnlyAndClearsOnSafeEditAsync()
     {
