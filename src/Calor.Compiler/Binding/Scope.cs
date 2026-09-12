@@ -1606,6 +1606,7 @@ public sealed class Scope
         }
 
         var applicable = new List<(FunctionSymbol Function, string ReturnType, int Score,
+            bool UsesNullableStringCompatibility,
             IReadOnlyList<ResolvedArgumentMapping> Arguments)>();
         foreach (var function in overloads)
         {
@@ -1619,9 +1620,15 @@ public sealed class Scope
                     allowNullableStringCompatibility,
                     out var resolvedReturnType,
                     out var score,
+                    out var usesNullableStringCompatibility,
                     out var mappedArguments))
             {
-                applicable.Add((function, resolvedReturnType, score, mappedArguments));
+                applicable.Add((
+                    function,
+                    resolvedReturnType,
+                    score,
+                    usesNullableStringCompatibility,
+                    mappedArguments));
             }
         }
 
@@ -1632,6 +1639,20 @@ public sealed class Scope
         var best = applicable.Where(item => item.Score == bestScore).ToArray();
         if (best.Length == 1)
             return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType, best[0].Arguments);
+
+        var concreteNullableStringMatches = best
+            .Where(item => item.UsesNullableStringCompatibility && item.Function.GenericArity == 0)
+            .ToArray();
+        if (concreteNullableStringMatches.Length == 1
+            && best.Where(item => !ReferenceEquals(item.Function, concreteNullableStringMatches[0].Function))
+                .All(item => item.Function.GenericArity > 0))
+        {
+            var selected = concreteNullableStringMatches[0];
+            return OverloadResolutionResult.Resolved(
+                selected.Function,
+                selected.ReturnType,
+                selected.Arguments);
+        }
 
         var bestFunctions = best.Select(item => item.Function).ToArray();
         if (bestFunctions
@@ -1762,10 +1783,12 @@ public sealed class Scope
         bool allowNullableStringCompatibility,
         out string resolvedReturnType,
         out int score,
+        out bool usesNullableStringCompatibility,
         out IReadOnlyList<ResolvedArgumentMapping> mappedArguments)
     {
         resolvedReturnType = function.ReturnType;
         score = int.MaxValue;
+        usesNullableStringCompatibility = false;
         mappedArguments = Array.Empty<ResolvedArgumentMapping>();
 
         if (typeArguments != null && function.GenericArity != typeArguments.Count)
@@ -1787,6 +1810,7 @@ public sealed class Scope
 
             var matches = true;
             var conversionScore = 0;
+            var mappingUsesNullableStringCompatibility = false;
             var parameterTypes = new string[argumentTypes.Count];
             for (var argumentIndex = 0; argumentIndex < argumentTypes.Count; argumentIndex++)
             {
@@ -1818,9 +1842,10 @@ public sealed class Scope
 
                 if (allowNullableStringCompatibility
                     && (parameter.Modifier & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In)) == 0
-                    && !typeParameterSet.Any(typeParameter => TypeIdentity.Canonicalize(typeParameter) == "STRING")
+                    && !typeParameterSet.Contains(parameterType)
                     && HasNullableStringAnnotationDifference(parameterType, argumentTypes[argumentIndex]))
                 {
+                    mappingUsesNullableStringCompatibility = true;
                     continue;
                 }
 
@@ -1853,6 +1878,7 @@ public sealed class Scope
                 continue;
 
             score = candidateScore;
+            usesNullableStringCompatibility = mappingUsesNullableStringCompatibility;
             resolvedReturnType = substitutions.Count == 0
                 ? function.ReturnType
                 : TypeIdentity.Substitute(function.ReturnType, substitutions);

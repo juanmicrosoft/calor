@@ -247,6 +247,50 @@ public sealed class NativeStringApplicabilityTests
         Assert.Equal(OverloadResolutionKind.NoMatch, result.Kind);
     }
 
+    [Fact]
+    public void ConcreteStringOverload_WinsNullableCompatibilityTieWithInferredGeneric()
+    {
+        var scope = new Scope();
+        var generic = new FunctionSymbol("Take", "T", [new VariableSymbol("value", "T", false)], ["T"]);
+        var concrete = new FunctionSymbol("Take", "i32", [new VariableSymbol("value", "str", false)]);
+        Assert.True(scope.TryDeclareOverload("Take", generic, out _));
+        Assert.True(scope.TryDeclareOverload("Take", concrete, out _));
+
+        var result = scope.ResolveOverload("Take", ["?str"], null, null, null, null,
+            allowNullableStringCompatibility: true);
+
+        Assert.Equal(OverloadResolutionKind.Resolved, result.Kind);
+        Assert.Same(concrete, result.Function);
+    }
+
+    [Theory]
+    [InlineData("str")]
+    [InlineData("STRING")]
+    public void AliasNamedTypeParameter_DoesNotDisableConcreteStringCompatibility(string typeParameter)
+    {
+        var scope = new Scope();
+        var function = new FunctionSymbol("Take", "i32",
+            [
+                new VariableSymbol("item", typeParameter, false),
+                new VariableSymbol("value", "string", false)
+            ],
+            [typeParameter]);
+        Assert.True(scope.TryDeclareOverload("Take", function, out _));
+
+        var result = scope.ResolveOverload(
+            "Take",
+            ["i32", "?str"],
+            null,
+            null,
+            ["i32"],
+            (parameter, argument) =>
+                TypeIdentity.Canonicalize(parameter) == TypeIdentity.Canonicalize(argument) ? 0 : null,
+            allowNullableStringCompatibility: true);
+
+        Assert.Equal(OverloadResolutionKind.Resolved, result.Kind);
+        Assert.Same(function, result.Function);
+    }
+
     [Theory]
     [InlineData("Option<str>")]
     [InlineData("?i32")]
