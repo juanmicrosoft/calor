@@ -1,0 +1,6 @@
+§M{m1:D1NullableReturn}
+  §CL{c1:Item:pub}
+  §CL{c2:Flow:pub}
+    §MT{f1:Return:pub:static} (?Item:value) -> Item
+      §E{}
+      §R value
