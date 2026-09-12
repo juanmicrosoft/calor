@@ -185,6 +185,37 @@ public class CrossFileResolutionTests
     }
 
     [Fact]
+    public void ResolveProjectCall_DoesNotApplyNullableStringCompatibilityToBaseInitializers()
+    {
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(
+            DocumentUri.From("file:///base.calr"),
+            """
+            §M{m001:Models}
+              §CL{c001:Base:pub}
+                §CTOR{ctor001:pub} (str:value)
+            """);
+        var use = """
+            §M{m002:Main}
+              §CL{c002:Derived:Base:pub}
+                §CTOR{ctor002:pub} (?str:value)
+                  §BASE
+                    §A value
+            """;
+        var useState = workspace.GetOrCreate(
+            DocumentUri.From("file:///derived.calr"),
+            use);
+        var initializer = SymbolFinder.FindBoundCallAtOffset(
+            useState.BoundModule,
+            use.IndexOf("§BASE", StringComparison.Ordinal));
+
+        var resolved = workspace.ResolveProjectCall(initializer);
+
+        Assert.Null(resolved.Doc);
+        Assert.Null(resolved.Symbol);
+    }
+
+    [Fact]
     public void EquivalentWorkspaceRoots_ProducePortableStableSymbolIds()
     {
         const string source = """
