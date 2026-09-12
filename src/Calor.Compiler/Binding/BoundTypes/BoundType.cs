@@ -129,6 +129,23 @@ public sealed class NominalBoundType : BoundType
         && n.NullableAnnotation == NullableAnnotation;
 
     public override int GetHashCode() => HashCode.Combine(QualifiedName, NullableAnnotation);
+
+    internal bool IsKnownReferenceType =>
+        RoslynSymbol is { IsReferenceType: true, IsGenericType: false }
+        || Declaration is { IsReferenceType: true } declaration
+            && !declaration.QualifiedName.Contains('`');
+
+    /// <summary>Reference identity for nullability checks, not annotation-sensitive type equality.</summary>
+    internal bool HasSameUnderlyingReferenceType(NominalBoundType other)
+    {
+        if (!IsKnownReferenceType || !other.IsKnownReferenceType)
+            return false;
+        if (RoslynSymbol is not null && other.RoslynSymbol is not null)
+            return SymbolEqualityComparer.Default.Equals(RoslynSymbol, other.RoslynSymbol);
+        return Declaration is { Id.IsNone: false } declaration
+            && other.Declaration is { Id.IsNone: false } otherDeclaration
+            && declaration.Id == otherDeclaration.Id;
+    }
 }
 
 /// <summary>Kind 3: generic instantiation (<c>List&lt;int&gt;</c>,

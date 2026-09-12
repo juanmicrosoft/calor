@@ -39,7 +39,7 @@ parameters/locals and native/BCL method inputs. Behavior starts only after
 No initialization/return-policy expansion, general-flow redesign or activation
 is included. The provisional checkpoint/reviewSep12 is not a delivery promise.
 
-### Actual combined-tree reconciliation
+### First combined-tree reconciliation — historical `a0839cf7` / `e299f246`
 
 The Binder conflict retains T1's `TryUnwrapNullableAnnotation` loop and
 `TypeIdentity.MapShortTypeNameToFullName` behavior inside N3's existing array-aware
@@ -73,7 +73,49 @@ editor tests. There are80 N3 compiler additions relative to accepted T1 and2
 editor additions; manifest totals8882/499 retain existing skip counts and
 harness291. Exact total execution is enforced by final CI's existing TRX gates,
 not inferred from these targeted selections. Two new final-head review contexts
-and final CI remain required before parent adjudication.
+and final CI were required before parent adjudication. That head subsequently
+received two fresh no-significant-findings reviews and successful CI, but a
+later fresh-main check found accepted N1 changes; those results remain historical.
+
+### Current reconciliation with accepted N1 — `3b513a63`
+
+While the first integrated CI ran, #1380/#1451 merged as
+`3b513a632149290481161b195a71aa6cb0e251a8`. Its Binder/metadata/predicate and
+baseline changes overlap N3. The new normal merge retains that accepted code,
+both preceding histories and every earlier audit rather than presenting an
+`e299f246` candidate as current integration.
+
+Two mapped-call integration points preserve N1's contract: native effective
+parameter targets use the **selected function's** lexical declaring context,
+and BCL mapped targets retain N1's actual eligible Roslyn reference symbol.
+The N1 identity resolver/predicate and T1 representation guards are not rewritten.
+Four added controls cover named native inputs across shadowing namespaces and
+named BCL nominal inputs in both call forms, including the public compile API.
+An initial native fixture with class IDs `a`/`b` left its qualified getter calls
+unresolved; the retained failures were corrected to use the existing N1
+`c1`/`c2` fixture convention, with explicit resolved-declaration assertions.
+Unresolved calls were not accepted as passing identity controls.
+
+The first normal corpus ratchet correctly rejected the automatic merge's56-error
+record: actual N1/N3 binding yields55. The existing generators and a fresh
+inspection of the existing conversion/binding pipeline establish the exact
+delta in the [new integration audit](../plans/evidence/n3-mapping-2026-09-11/integration-3b513a-audit.json).
+One historical274 at7412..7417, the `any` input to `FormatLiteralObjectValue`,
+is no longer reported under N1's resolved-identity requirement. Its fresh bound
+source has neither a declaration nor a Roslyn symbol. This remains
+**unsupported/unresolved, not safe**. No diagnostic suppression was added.
+The three remaining scalar statement findings stay AnalysisOnly/Unresolved;
+subtracting their exact identities reproduces accepted main's52-error hash.
+All other source, opacity, outcome and propagation fields match accepted main.
+Earlier56-error captures remain untouched.
+
+Actual regenerated source catalog/canaries and the normal corpus ratchet pass.
+The affected selection passes590 compiler/runtime/taint/N1/T1/corpus tests and50
+editor tests. N3 now adds84 compiler cases and2 editor cases relative to accepted
+N1, with manifest totals8940/500, unchanged skips and inherited harness291.
+Final CI must verify the actual totals. Two new final-head reviews must assess
+this full integration, the scalar/normal-array distinction and retained1444
+scope before parent adjudication; earlier-head reviews are not substituted.
 
 ## Data flow
 

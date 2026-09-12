@@ -9,6 +9,34 @@ namespace Calor.LanguageServer.Tests.Utilities;
 
 public class NullableReferenceTypingTests
 {
+    [Fact]
+    public async Task NominalReturnDiagnostic_IsAnalysisOnlyAndClearsOnSafeEditAsync()
+    {
+        const string source = """
+            §M{m1:NominalIdentity}
+              §CL{c1:Foo:pub}
+                §MT{get:Get:pub:static} (?Foo:input) -> ?Foo
+                  §R input
+                §MT{probe:Probe:pub:static} (?Foo:input) -> Foo
+                  §R §C{Foo.Get} §A input §/C
+            """;
+        var path = Path.Combine(Path.GetTempPath(), "nominal-" + Guid.NewGuid().ToString("N") + ".calr");
+        using var document = new DocumentState(new Uri(path), source);
+        await document.ReanalyzeAsync();
+        var diagnostic = Assert.Single(document.Diagnostics.Where(d => d.Code == DiagnosticCode.NullableReturnFromNonNullable));
+        Assert.False(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        var lsp = DiagnosticConverter.ToLspDiagnostic(diagnostic, source);
+        Assert.Equal("calor (analysis only)", lsp.Source);
+        Assert.Equal(PositionConverter.ToLspRange(diagnostic.Span, source), lsp.Range);
+        Assert.Equal(BindingReceivingShape.Nominal, diagnostic.BindingContext?.Shape);
+        var result = Compiler.Program.Compile(source, path);
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == diagnostic.Code);
+        var update = await document.UpdateAsync(source.Replace("-> Foo", "-> ?Foo", StringComparison.Ordinal), 1);
+        Assert.True(update.Accepted);
+        Assert.DoesNotContain(update.Snapshot.Diagnostics, d => d.Code == diagnostic.Code);
+    }
+
     [Theory]
     [InlineData("?str", "\"safe\"")]
     [InlineData("?string", "§C{System.Environment.GetEnvironmentVariable} §A \"CALOR_T1_EDITOR\" §/C")]

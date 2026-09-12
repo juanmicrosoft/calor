@@ -329,6 +329,86 @@ public class NullabilityIntegrationTests
         Assert.Equal(nullable, result.HasErrors);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void N3_NamedBclNominalInput_PreservesResolvedReferenceIdentity(bool expression)
+    {
+        const string call = "§C{System.IO.FileSystemAclExtensions.GetAccessControl} §A[directoryInfo] §C{System.IO.Directory.GetParent} §A STR:\"/\" §/C §/C";
+        var source = $$"""
+            §M{m1:NominalMapping}
+              §F{probe:Probe:pub} () -> void
+                {{(expression ? "§B{permissions} " : "")}}{{call}}
+            """;
+        var (bound, diagnostics) = BindSource(source);
+        var statement = Assert.Single(Assert.Single(bound.Functions).Body);
+        var argument = expression
+            ? Assert.Single(Assert.IsType<BoundCallExpression>(Assert.IsType<BoundBindStatement>(statement).Initializer).Arguments)
+            : Assert.Single(Assert.IsType<BoundCallStatement>(statement).Arguments);
+        var sourceType = Assert.IsType<NominalBoundType>(argument.Type);
+        Assert.Equal("DirectoryInfo", sourceType.RoslynSymbol?.Name);
+        var finding = Assert.Single(diagnostics.Where(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Contains("'directoryInfo'", finding.Message);
+        Assert.Equal(argument.Span, finding.Span);
+        Assert.Equal(BindingReceivingShape.Nominal, finding.BindingContext?.Shape);
+        Assert.False(BindingDiagnosticPolicy.IsCompilationError(finding));
+        var result = Program.Compile(source, "n3-nominal-input.calr",
+            new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void N3_NamedNativeInput_ResolvesFormalInSelectedCalleeNamespace(bool expression)
+    {
+        const string producer = """
+            §M{m1:LexicalMapping}
+              §CL{c1:Foo:pub}
+                §MT{get:Get:pub:static} () -> ?Foo
+                  §R §NEW{Foo}
+                §MT{take:Take:pub:static} (Foo:required, ?Foo:optional) -> i32
+                  §R 1
+            """;
+        var consumer = $$"""
+            §M{m1:LexicalMapping}
+              §CL{c2:Foo:pub}
+                §MT{probe:Probe:pub:static} () -> i32
+                  {{(expression ? "§R " : "")}}§C{A.Foo.Take} §A[optional] §C{A.Foo.Get} §/C §A[required] §C{A.Foo.Get} §/C §/C
+                  {{(expression ? "" : "§R 0")}}
+            """;
+        var parsing = new DiagnosticBag();
+        var a = new Parser(new Lexer(producer, parsing).TokenizeAllForParser(), parsing).Parse();
+        var b = new Parser(new Lexer(consumer, parsing).TokenizeAllForParser(), parsing).Parse();
+        Assert.False(parsing.HasErrors, string.Join("\n", parsing));
+        var classA = Assert.Single(a.Classes);
+        var classB = Assert.Single(b.Classes);
+        classA.NamespaceIdentity = "A";
+        classB.NamespaceIdentity = "B";
+        var module = new ModuleNode(a.Span, a.Id, a.Name,
+            a.Usings, a.Interfaces, [classA, classB], a.Functions, a.Attributes);
+        var diagnostics = new DiagnosticBag();
+        var bound = new Binder(diagnostics).Bind(module);
+        Assert.DoesNotContain(diagnostics, d => BindingDiagnosticPolicy.IsCompilationError(d));
+        var caller = bound.Functions.Single(f => f.Symbol.Name.EndsWith(".Probe", StringComparison.Ordinal));
+        var arguments = expression
+            ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(caller.Body[0]).Expression).Arguments
+            : Assert.IsType<BoundCallStatement>(caller.Body[0]).Arguments;
+        Assert.All(arguments, argument =>
+        {
+            var type = Assert.IsType<NominalBoundType>(argument.Type);
+            var call = Assert.IsType<BoundCallExpression>(argument);
+            Assert.True(type.Declaration?.QualifiedName == "A.Foo",
+                $"{call.Target}: selected={call.ResolvedSymbol?.Name}, type={type.DisplayString}, " +
+                $"declaration={type.Declaration?.QualifiedName}; functions={string.Join(", ", bound.Functions.Select(f => f.Symbol.Name))}; diagnostics={string.Join("; ", diagnostics)}");
+        });
+        var finding = Assert.Single(diagnostics.Where(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Contains("'required'", finding.Message);
+        Assert.Equal(arguments[1].Span, finding.Span);
+        Assert.Equal(BindingReceivingShape.Nominal, finding.BindingContext?.Shape);
+        Assert.False(BindingDiagnosticPolicy.IsCompilationError(finding));
+    }
+
     /// <summary>
     /// The canonical D3 repro from issue #875: binding
     /// <c>Environment.GetEnvironmentVariable</c>'s Annotated string return
@@ -2215,9 +2295,14 @@ public class NullabilityIntegrationTests
     [Fact]
     public void S8_Calor0274_Predicate_Fires_For_NullableUserClass_Argument()
     {
+        var declaration = new TypeSymbol(
+            SymbolId.Create("test", "Bar"), "Bar", "Bar", Visibility.Public, default)
+        {
+            IsReferenceType = true
+        };
         var source = new NullabilityTestExpr(
-            new NominalBoundType("Bar", NullableAnnotation.Annotated));
-        var parameterTarget = new NominalBoundType("Bar", NullableAnnotation.NotAnnotated);
+            new NominalBoundType("Bar", NullableAnnotation.Annotated, declaration));
+        var parameterTarget = new NominalBoundType("Bar", NullableAnnotation.NotAnnotated, declaration);
 
         Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(source, parameterTarget));
     }
@@ -2258,21 +2343,20 @@ public class NullabilityIntegrationTests
     }
 
     /// <summary>
-    /// S8 dotted-namespace bridge — <see cref="NullabilityChecker"/>'s
-    /// short-name comparator (<c>ShortNameEquals</c>) treats
-    /// <c>My.Custom.Foo</c> and <c>Foo</c> as equivalent for the purpose
-    /// of source-vs-target shape matching. A Roslyn-resolved BCL type
-    /// (fully qualified) assigned into a Calor target (bare identifier)
-    /// must therefore fire the same predicate. Guards against a future
-    /// change that drops the dotted-name bridging and silently breaks
-    /// BCL-source / Calor-target user-ref cases.
+    /// Short and qualified display spellings match only when both carry
+    /// the same resolved declaration. A matching textual tail is insufficient.
     /// </summary>
     [Fact]
-    public void S8_Bridges_Dotted_Namespace_On_ShortName_Match()
+    public void S8_Bridges_Dotted_Namespace_On_ResolvedIdentity()
     {
+        var declaration = new TypeSymbol(
+            SymbolId.Create("test", "My.Custom.Foo"), "Foo", "My.Custom.Foo", Visibility.Public, default)
+        {
+            IsReferenceType = true
+        };
         var source = new NullabilityTestExpr(
-            new NominalBoundType("My.Custom.Foo", NullableAnnotation.Annotated));
-        var target = new NominalBoundType("Foo", NullableAnnotation.NotAnnotated);
+            new NominalBoundType("My.Custom.Foo", NullableAnnotation.Annotated, declaration));
+        var target = new NominalBoundType("Foo", NullableAnnotation.NotAnnotated, declaration);
 
         Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
     }
