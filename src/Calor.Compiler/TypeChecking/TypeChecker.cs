@@ -396,6 +396,7 @@ public sealed class TypeChecker
         }
 
         _env.EnterScope();
+        DefineTrueConditionPatternVariables(ifStmt.Condition);
         foreach (var stmt in ifStmt.ThenBody)
         {
             CheckStatement(stmt);
@@ -412,6 +413,7 @@ public sealed class TypeChecker
             }
 
             _env.EnterScope();
+            DefineTrueConditionPatternVariables(elseIf.Condition);
             foreach (var stmt in elseIf.Body)
             {
                 CheckStatement(stmt);
@@ -752,7 +754,7 @@ public sealed class TypeChecker
         _env.ExitScope();
     }
 
-    private void CheckPattern(PatternNode pattern, CalorType expectedType)
+    private void CheckPattern(PatternNode pattern, CalorType expectedType, bool bindVariables = true)
     {
         switch (pattern)
         {
@@ -761,7 +763,10 @@ public sealed class TypeChecker
                 break;
 
             case VariablePatternNode varPat:
-                _env.DefineVariable(varPat.Name, expectedType);
+                if (bindVariables)
+                {
+                    _env.DefineVariable(varPat.Name, expectedType);
+                }
                 break;
 
             case LiteralPatternNode litPat:
@@ -776,7 +781,7 @@ public sealed class TypeChecker
             case SomePatternNode somePat:
                 if (expectedType is OptionType optType)
                 {
-                    CheckPattern(somePat.InnerPattern, optType.InnerType);
+                    CheckPattern(somePat.InnerPattern, optType.InnerType, bindVariables);
                 }
                 else
                 {
@@ -796,7 +801,7 @@ public sealed class TypeChecker
             case OkPatternNode okPat:
                 if (expectedType is ResultType resType)
                 {
-                    CheckPattern(okPat.InnerPattern, resType.OkType);
+                    CheckPattern(okPat.InnerPattern, resType.OkType, bindVariables);
                 }
                 else
                 {
@@ -808,7 +813,7 @@ public sealed class TypeChecker
             case ErrPatternNode errPat:
                 if (expectedType is ResultType errResType)
                 {
-                    CheckPattern(errPat.InnerPattern, errResType.ErrType);
+                    CheckPattern(errPat.InnerPattern, errResType.ErrType, bindVariables);
                 }
                 else
                 {
@@ -819,31 +824,35 @@ public sealed class TypeChecker
             // `§VAR{d}` — the `var d` pattern. Binds like VariablePatternNode; it reached the
             // default arm below and hard-errored, so every switch arm using it was rejected.
             case VarPatternNode varPatNode:
-                _env.DefineVariable(varPatNode.Name, expectedType);
+                if (bindVariables)
+                {
+                    _env.DefineVariable(varPatNode.Name, expectedType);
+                }
                 break;
 
             // `§K{Type:name}` — a type test with an optional binding. The bound name takes the
             // tested type, which the checker may not model; ExternalType is the honest answer.
             case TypePatternNode typePat:
-                if (!string.IsNullOrEmpty(typePat.BindingName))
+                var typePatternType = InferTypePatternBindingType(typePat.TypeName, typePat.TypeNameSpan, typePat.Span);
+                if (bindVariables && !string.IsNullOrEmpty(typePat.BindingName))
                 {
-                    _env.DefineVariable(typePat.BindingName!, ResolveTypeName(typePat.TypeName, typePat.Span));
+                    _env.DefineVariable(typePat.BindingName!, typePatternType);
                 }
                 break;
 
             // Composites: recurse so nested bindings land in scope.
             case AndPatternNode andPat:
-                CheckPattern(andPat.Left, expectedType);
-                CheckPattern(andPat.Right, expectedType);
+                CheckPattern(andPat.Left, expectedType, bindVariables);
+                CheckPattern(andPat.Right, expectedType, bindVariables);
                 break;
 
             case OrPatternNode orPat:
-                CheckPattern(orPat.Left, expectedType);
-                CheckPattern(orPat.Right, expectedType);
+                CheckPattern(orPat.Left, expectedType, bindVariables: false);
+                CheckPattern(orPat.Right, expectedType, bindVariables: false);
                 break;
 
             case NegatedPatternNode negPat:
-                CheckPattern(negPat.Inner, expectedType);
+                CheckPattern(negPat.Inner, expectedType, bindVariables: false);
                 break;
 
             case ListPatternNode listPat:
@@ -853,7 +862,7 @@ public sealed class TypeChecker
                         : ErrorType.Instance;
                 foreach (var sub in listPat.Patterns)
                 {
-                    CheckPattern(sub, elementType);
+                    CheckPattern(sub, elementType, bindVariables);
                 }
                 break;
 
@@ -876,6 +885,9 @@ public sealed class TypeChecker
             FloatLiteralNode => PrimitiveType.Float,
             BoolLiteralNode => PrimitiveType.Bool,
             StringLiteralNode => PrimitiveType.String,
+            NullCoalesceNode coalesce => InferNullCoalesceType(coalesce),
+            ConditionalExpressionNode conditional => InferConditionalExpressionType(conditional),
+            ThrowExpressionNode throwExpression => InferThrowExpressionType(throwExpression),
             CharOperationNode operation => operation.Operation switch
             {
                 CharOp.IsLetter or CharOp.IsDigit or CharOp.IsWhiteSpace
@@ -884,6 +896,7 @@ public sealed class TypeChecker
                 _ => PrimitiveType.Char
             },
             ReferenceNode refNode => InferReferenceType(refNode),
+            UnaryOperationNode unary => InferUnaryOperationType(unary),
             BinaryOperationNode binOp => InferBinaryOperationType(binOp),
             SomeExpressionNode some => InferSomeType(some),
             NoneExpressionNode none => InferNoneType(none),
@@ -892,6 +905,8 @@ public sealed class TypeChecker
             RecordCreationNode rec => InferRecordCreationType(rec),
             FieldAccessNode field => InferFieldAccessType(field),
             MatchExpressionNode match => InferMatchExpressionType(match),
+            NewExpressionNode newExpression => InferNewExpressionType(newExpression),
+            CallExpressionNode call => InferCallExpressionType(call),
             // Collection expression types
             ListCreationNode list => InferListCreationType(list),
             DictionaryCreationNode dict => InferDictionaryCreationType(dict),
@@ -900,8 +915,383 @@ public sealed class TypeChecker
             CollectionCountNode count => InferCollectionCountType(count),
             ArrayAccessNode arrayAccess => InferArrayAccessType(arrayAccess),
             TypeOperationNode typeOp => InferTypeOperationType(typeOp),
+            IsPatternNode isPattern => InferIsPatternType(isPattern),
             _ => ErrorType.Instance
         };
+    }
+
+    private CalorType InferNullCoalesceType(NullCoalesceNode coalesce)
+    {
+        var leftType = InferExpressionType(coalesce.Left);
+        var rightType = InferExpressionType(coalesce.Right);
+
+        if (leftType is NeverType)
+        {
+            return rightType;
+        }
+
+        if (leftType is NullType)
+        {
+            return rightType is NeverType ? NeverType.Instance : rightType;
+        }
+
+        if (leftType is NullableReferenceType nullableReference)
+        {
+            if (rightType is NeverType)
+            {
+                return nullableReference.ReferentType;
+            }
+
+            if (rightType is NullType)
+            {
+                return nullableReference;
+            }
+
+            if (rightType is NullableReferenceType rightNullable
+                && IsAssignable(nullableReference.ReferentType, rightNullable.ReferentType))
+            {
+                return new NullableReferenceType(
+                    nullableReference.ReferentType,
+                    nullableReference.RequiresTransitionalAssignmentCheck
+                        || rightNullable.RequiresTransitionalAssignmentCheck);
+            }
+
+            if (IsAssignable(nullableReference.ReferentType, rightType))
+            {
+                return nullableReference.ReferentType;
+            }
+
+            if (rightType is not ErrorType)
+            {
+                _diagnostics.ReportError(coalesce.Right.Span, DiagnosticCode.TypeMismatch,
+                    $"Null-coalescing fallback type {rightType.SurfaceName} is not assignable to {nullableReference.ReferentType.SurfaceName}");
+            }
+            return ErrorType.Instance;
+        }
+
+        if (leftType is NullableValueType nullableValue)
+        {
+            if (rightType is NeverType)
+            {
+                return nullableValue.UnderlyingType;
+            }
+
+            if (rightType is NullType)
+            {
+                return nullableValue;
+            }
+
+            if (rightType is NullableValueType rightNullable
+                && IsAssignable(nullableValue.UnderlyingType, rightNullable.UnderlyingType))
+            {
+                return nullableValue;
+            }
+
+            if (IsAssignable(nullableValue.UnderlyingType, rightType))
+            {
+                return nullableValue.UnderlyingType;
+            }
+
+            if (rightType is not ErrorType)
+            {
+                _diagnostics.ReportError(coalesce.Right.Span, DiagnosticCode.TypeMismatch,
+                    $"Null-coalescing fallback type {rightType.SurfaceName} is not assignable to {nullableValue.UnderlyingType.SurfaceName}");
+            }
+            return ErrorType.Instance;
+        }
+
+        if (leftType is ErrorType || leftType is ExternalType)
+        {
+            return ErrorType.Instance;
+        }
+
+        if (IsObliviousReferenceType(leftType))
+        {
+            if (rightType is NeverType or NullType)
+            {
+                return leftType;
+            }
+
+            if (rightType is ErrorType)
+            {
+                return ErrorType.Instance;
+            }
+
+            if (IsAssignable(leftType, rightType))
+            {
+                return leftType;
+            }
+
+            if (IsAssignable(rightType, leftType))
+            {
+                return rightType;
+            }
+
+            _diagnostics.ReportError(coalesce.Right.Span, DiagnosticCode.TypeMismatch,
+                $"Null-coalescing fallback type {rightType.SurfaceName} is not assignable to {leftType.SurfaceName}");
+            return ErrorType.Instance;
+        }
+
+        if (leftType is OptionType)
+        {
+            _diagnostics.ReportError(coalesce.Left.Span, DiagnosticCode.TypeMismatch,
+                $"Null-coalescing does not unwrap runtime {leftType.SurfaceName}; use Option.Unwrap explicitly");
+            return ErrorType.Instance;
+        }
+
+        return CommonConditionalType(coalesce.Span, leftType, rightType);
+    }
+
+    private CalorType InferConditionalExpressionType(ConditionalExpressionNode conditional)
+    {
+        var conditionType = InferExpressionType(conditional.Condition);
+        if (IsDefinitelyNotBool(conditionType))
+        {
+            _diagnostics.ReportError(conditional.Condition.Span, DiagnosticCode.TypeMismatch,
+                $"Conditional expression condition must be bool, got {conditionType.SurfaceName}");
+        }
+
+        _env.EnterScope();
+        DefineTrueConditionPatternVariables(conditional.Condition);
+        var trueType = InferExpressionType(conditional.WhenTrue);
+        _env.ExitScope();
+
+        var falseType = InferExpressionType(conditional.WhenFalse);
+        return CommonConditionalType(conditional.Span, trueType, falseType);
+    }
+
+    private CalorType InferThrowExpressionType(ThrowExpressionNode throwExpression)
+    {
+        var exceptionType = InferExpressionType(throwExpression.Exception);
+        if (!IsSupportedThrowException(throwExpression.Exception, exceptionType))
+        {
+            _diagnostics.ReportError(throwExpression.Exception.Span, DiagnosticCode.TypeMismatch,
+                $"Throw expression requires an exception value, got {exceptionType.SurfaceName}");
+        }
+        return NeverType.Instance;
+    }
+
+    private CalorType InferUnaryOperationType(UnaryOperationNode unary)
+    {
+        var operandType = InferExpressionType(unary.Operand);
+        return unary.Operator switch
+        {
+            UnaryOperator.Not => PrimitiveType.Bool,
+            UnaryOperator.Negate => IsNumericType(operandType) ? operandType : ErrorType.Instance,
+            UnaryOperator.BitwiseNot => operandType.Equals(PrimitiveType.Int) ? PrimitiveType.Int : ErrorType.Instance,
+            UnaryOperator.PreIncrement or UnaryOperator.PreDecrement
+                or UnaryOperator.PostIncrement or UnaryOperator.PostDecrement
+                => IsNumericType(operandType) ? operandType : ErrorType.Instance,
+            _ => ErrorType.Instance
+        };
+    }
+
+    private CalorType InferNewExpressionType(NewExpressionNode newExpression)
+    {
+        foreach (var argument in newExpression.Arguments)
+        {
+            InferExpressionType(argument);
+        }
+
+        foreach (var initializer in newExpression.Initializers)
+        {
+            InferExpressionType(initializer.Value);
+        }
+
+        return _env.LookupType(newExpression.TypeName) ?? new ExternalType(newExpression.TypeName);
+    }
+
+    private CalorType InferCallExpressionType(CallExpressionNode call)
+    {
+        return _env.LookupFunction(call.Target)?.ReturnType ?? ErrorType.Instance;
+    }
+
+    private CalorType InferIsPatternType(IsPatternNode isPattern)
+    {
+        var operandType = InferExpressionType(isPattern.Operand);
+        var targetType = InferTypePatternBindingType(isPattern.TargetType, isPattern.TargetTypeSpan, isPattern.Span);
+
+        if (!CanPossiblyMatchPattern(operandType, targetType))
+        {
+            _diagnostics.ReportError(isPattern.Span, DiagnosticCode.TypeMismatch,
+                $"Pattern type {targetType.SurfaceName} is not compatible with input type {operandType.SurfaceName}");
+        }
+
+        return PrimitiveType.Bool;
+    }
+
+    private CalorType CommonConditionalType(Parsing.TextSpan span, CalorType trueType, CalorType falseType)
+    {
+        if (trueType is NeverType && falseType is NeverType) return NeverType.Instance;
+        if (trueType is NeverType) return falseType;
+        if (falseType is NeverType) return trueType;
+        if (trueType is ErrorType || falseType is ErrorType) return ErrorType.Instance;
+        if (trueType.Equals(falseType)) return trueType;
+        if (trueType is TypeVariable) return falseType;
+        if (falseType is TypeVariable) return trueType;
+
+        if (trueType is OptionType trueOption && falseType is OptionType falseOption)
+        {
+            return new OptionType(CommonConditionalType(span, trueOption.InnerType, falseOption.InnerType));
+        }
+
+        if (trueType is ResultType trueResult && falseType is ResultType falseResult)
+        {
+            return new ResultType(
+                CommonConditionalType(span, trueResult.OkType, falseResult.OkType),
+                CommonConditionalType(span, trueResult.ErrType, falseResult.ErrType));
+        }
+
+        if (TryUnifyNullableReferences(trueType, falseType, out var nullableReference))
+        {
+            return nullableReference;
+        }
+
+        if (TryUnifyNullableValues(trueType, falseType, out var nullableValue))
+        {
+            return nullableValue;
+        }
+
+        if (IsAssignable(trueType, falseType)) return trueType;
+        if (IsAssignable(falseType, trueType)) return falseType;
+
+        _diagnostics.ReportError(span, DiagnosticCode.TypeMismatch,
+            $"Conditional expression branches have incompatible types: {trueType.SurfaceName} and {falseType.SurfaceName}");
+        return ErrorType.Instance;
+    }
+
+    private static bool TryUnifyNullableReferences(
+        CalorType left,
+        CalorType right,
+        out NullableReferenceType nullable)
+    {
+        var leftNullable = left as NullableReferenceType;
+        var rightNullable = right as NullableReferenceType;
+        var leftReferent = leftNullable?.ReferentType ?? left;
+        var rightReferent = rightNullable?.ReferentType ?? right;
+
+        if ((leftNullable != null || rightNullable != null)
+            && left is not NullType
+            && right is not NullType
+            && IsAssignable(leftReferent, rightReferent))
+        {
+            nullable = new NullableReferenceType(
+                leftReferent,
+                (leftNullable?.RequiresTransitionalAssignmentCheck ?? false)
+                    || (rightNullable?.RequiresTransitionalAssignmentCheck ?? false));
+            return true;
+        }
+
+        if (leftNullable != null && right is NullType)
+        {
+            nullable = leftNullable;
+            return true;
+        }
+
+        if (rightNullable != null && left is NullType)
+        {
+            nullable = rightNullable;
+            return true;
+        }
+
+        nullable = null!;
+        return false;
+    }
+
+    private static bool TryUnifyNullableValues(CalorType left, CalorType right, out NullableValueType nullable)
+    {
+        var leftNullable = left as NullableValueType;
+        var rightNullable = right as NullableValueType;
+        var leftUnderlying = leftNullable?.UnderlyingType ?? left;
+        var rightUnderlying = rightNullable?.UnderlyingType ?? right;
+
+        if ((leftNullable != null || rightNullable != null)
+            && left is not NullType
+            && right is not NullType
+            && IsAssignable(leftUnderlying, rightUnderlying))
+        {
+            nullable = new NullableValueType(leftUnderlying);
+            return true;
+        }
+
+        if (leftNullable != null && right is NullType)
+        {
+            nullable = leftNullable;
+            return true;
+        }
+
+        if (rightNullable != null && left is NullType)
+        {
+            nullable = rightNullable;
+            return true;
+        }
+
+        nullable = null!;
+        return false;
+    }
+
+    private void DefineTrueConditionPatternVariables(ExpressionNode condition)
+    {
+        if (condition is IsPatternNode { VariableName: { Length: > 0 } name } isPattern)
+        {
+            _env.DefineVariable(name, InferTypePatternBindingType(isPattern.TargetType, isPattern.TargetTypeSpan, isPattern.Span));
+        }
+    }
+
+    private CalorType InferTypePatternBindingType(
+        string typeName,
+        Parsing.TextSpan typeNameSpan,
+        Parsing.TextSpan fallbackSpan)
+    {
+        var span = typeNameSpan == Parsing.TextSpan.Empty ? fallbackSpan : typeNameSpan;
+        var type = ResolveTypeName(typeName, span);
+        return type switch
+        {
+            NullableReferenceType nullable => nullable.ReferentType,
+            NullableValueType nullable => nullable.UnderlyingType,
+            _ => type
+        };
+    }
+
+    private static bool CanPossiblyMatchPattern(CalorType inputType, CalorType patternType)
+    {
+        if (inputType is ErrorType or ExternalType or NeverType or NullType) return true;
+        if (patternType is ErrorType or ExternalType or NeverType) return true;
+        if (inputType.Equals(PrimitiveType.Object) || patternType.Equals(PrimitiveType.Object)) return true;
+
+        var input = inputType switch
+        {
+            NullableReferenceType nullable => nullable.ReferentType,
+            NullableValueType nullable => nullable.UnderlyingType,
+            _ => inputType
+        };
+        var pattern = patternType switch
+        {
+            NullableReferenceType nullable => nullable.ReferentType,
+            NullableValueType nullable => nullable.UnderlyingType,
+            _ => patternType
+        };
+
+        return input.Equals(pattern)
+            || IsAssignable(input, pattern)
+            || IsAssignable(pattern, input);
+    }
+
+    private static bool IsSupportedThrowException(ExpressionNode exception, CalorType exceptionType)
+    {
+        if (exception is NewExpressionNode or RawCSharpExpressionNode or CallExpressionNode)
+        {
+            return true;
+        }
+
+        if (exception is StringLiteralNode or InterpolatedStringNode
+            or IntLiteralNode or BoolLiteralNode or FloatLiteralNode
+            or DecimalLiteralNode or CharOperationNode)
+        {
+            return true;
+        }
+
+        return exceptionType is ErrorType or ExternalType;
     }
 
     private CalorType InferListCreationType(ListCreationNode list)
@@ -1119,10 +1509,21 @@ public sealed class TypeChecker
 
     private static bool IsValueType(CalorType type)
     {
-        return type.Equals(PrimitiveType.Int)
-            || type.Equals(PrimitiveType.Float)
-            || type.Equals(PrimitiveType.Bool);
+        return IsPrimitiveValueType(type);
     }
+
+    private static CalorType? ResolveNullableValueReferent(string typeName)
+    {
+        var referent = PrimitiveType.FromName(Parsing.AttributeHelper.ToSurfaceSpelling(typeName));
+        return referent is not null && IsPrimitiveValueType(referent) ? referent : null;
+    }
+
+    private static bool IsPrimitiveValueType(CalorType type)
+        => type.Equals(PrimitiveType.Int)
+            || type.Equals(PrimitiveType.Float)
+            || type.Equals(PrimitiveType.Bool)
+            || type.Equals(PrimitiveType.Char)
+            || type.Equals(PrimitiveType.Decimal);
 
     private CalorType InferReferenceType(ReferenceNode refNode)
     {
@@ -1142,6 +1543,11 @@ public sealed class TypeChecker
         // C# expression keywords that reach the checker as bare references. `default` is the one
         // observed (generic code emits `default`); the others are listed because they arrive by
         // the same route and reporting any of them as an undefined VARIABLE is simply wrong.
+        if (refNode.Name == "null")
+        {
+            return NullType.Instance;
+        }
+
         if (refNode.Name is "default" or "null" or "this" or "base" or "value")
         {
             return ErrorType.Instance;
@@ -1407,8 +1813,16 @@ public sealed class TypeChecker
                 return new NullableReferenceType(supportedReference,
                     typeName.StartsWith("OPTION[inner=", StringComparison.OrdinalIgnoreCase));
             }
-            // Other annotations retain the existing unsupported/unresolved behavior.
-            // In particular, this is not permission to model nullable value types as references.
+
+            var valueReferent = ResolveNullableValueReferent(referentName);
+            if (valueReferent is not null)
+            {
+                return new NullableValueType(valueReferent);
+            }
+
+            // Other annotations retain the existing unsupported/unresolved behavior. In
+            // particular, this is not permission to model arbitrary nullable payloads as
+            // references or runtime Options.
         }
 
         // Arrays, in BOTH spellings the compiler produces. `T[]` is what the C# converter and
@@ -1596,8 +2010,12 @@ public sealed class TypeChecker
         type.Equals(PrimitiveType.String)
         || type is NullableReferenceType nullable && nullable.ReferentType.Equals(PrimitiveType.String);
 
+    private static bool IsObliviousReferenceType(CalorType type)
+        => type.Equals(PrimitiveType.String) || type.Equals(PrimitiveType.Object);
+
     private static bool IsDefinitelyNotBool(CalorType type)
-        => !type.Equals(PrimitiveType.Bool) && type is not ErrorType && type is not ExternalType;
+        => !type.Equals(PrimitiveType.Bool) && type is not ErrorType && type is not ExternalType
+            && type is not NeverType;
 
     private static bool IsNumeric(CalorType type)
         => type.Equals(PrimitiveType.Int) || type.Equals(PrimitiveType.Float)
@@ -1606,17 +2024,29 @@ public sealed class TypeChecker
     private static bool IsAssignable(CalorType target, CalorType source)
     {
         if (target.Equals(source)) return true;
+        if (source is NeverType) return true;
         if (source is ErrorType) return true; // Allow error types to be assigned anywhere
+        if (source is NullType)
+        {
+            return target is NullableReferenceType or NullableValueType or ExternalType or ErrorType;
+        }
         if (target is NullableReferenceType nullableTarget)
         {
             if (source is NullableReferenceType nullableSource)
                 return IsAssignable(nullableTarget.ReferentType, nullableSource.ReferentType);
+            if (source is NullType)
+                return true;
             if (nullableTarget.ReferentType.Equals(PrimitiveType.Object))
                 return true; // Boxing to object preserves the value; this does not unwrap Option.
             if (source is OptionType or ResultType
                 || nullableTarget.ReferentType is ExternalType && source is PrimitiveType)
                 return false;
             return IsAssignable(nullableTarget.ReferentType, source);
+        }
+        if (target is NullableValueType nullableValueTarget)
+        {
+            return source is NullableValueType nullableValueSource
+                && IsAssignable(nullableValueTarget.UnderlyingType, nullableValueSource.UnderlyingType);
         }
         // Nothing is known about an unmodeled external type, in either direction.
         if (target is ExternalType || source is ExternalType) return true;
@@ -1629,6 +2059,10 @@ public sealed class TypeChecker
         {
             return !nullableReference.RequiresTransitionalAssignmentCheck
                 && IsAssignable(target, nullableReference.ReferentType);
+        }
+        if (source is NullableValueType)
+        {
+            return false;
         }
         // char widens to an integer, as in C#. Not the reverse: `i32 -> char` is a narrowing
         // conversion C# requires an explicit cast for.

@@ -238,6 +238,26 @@ public sealed class NullableReferenceType : CalorType
 }
 
 /// <summary>
+/// A nullable value type such as <c>?i32</c>. This is not a runtime <see cref="OptionType"/>.
+/// </summary>
+public sealed class NullableValueType : CalorType
+{
+    public CalorType UnderlyingType { get; }
+    public override string Name => $"?{UnderlyingType.Name}";
+    public override string SurfaceName => $"?{UnderlyingType.SurfaceName}";
+
+    public NullableValueType(CalorType underlyingType)
+    {
+        UnderlyingType = underlyingType ?? throw new ArgumentNullException(nameof(underlyingType));
+    }
+
+    public override bool Equals(CalorType? other)
+        => other is NullableValueType nullable && UnderlyingType.Equals(nullable.UnderlyingType);
+
+    public override int GetHashCode() => HashCode.Combine("NullableValue", UnderlyingType);
+}
+
+/// <summary>
 /// Represents a runtime Option[T] type, distinct from a nullable reference.
 /// </summary>
 public sealed class OptionType : CalorType
@@ -434,6 +454,40 @@ public sealed class RefinedType : CalorType
     }
 
     public override int GetHashCode() => HashCode.Combine("Refined", BaseType, PredicateText);
+}
+
+/// <summary>
+/// Represents the null literal. It is only assignable to nullable targets and unmodeled external
+/// references, never to a known non-null value.
+/// </summary>
+public sealed class NullType : CalorType
+{
+    public static readonly NullType Instance = new();
+
+    public override string Name => "<null>";
+    public override string SurfaceName => "null";
+
+    private NullType() { }
+
+    public override bool Equals(CalorType? other) => other is NullType;
+    public override int GetHashCode() => "<null>".GetHashCode();
+}
+
+/// <summary>
+/// Represents a non-returning expression, such as a throw expression. It is assignable to any
+/// successful target without reclassifying checker errors or unmodeled expressions as non-null.
+/// </summary>
+public sealed class NeverType : CalorType
+{
+    public static readonly NeverType Instance = new();
+
+    public override string Name => "NEVER";
+    public override string SurfaceName => "never";
+
+    private NeverType() { }
+
+    public override bool Equals(CalorType? other) => other is NeverType;
+    public override int GetHashCode() => "NEVER".GetHashCode();
 }
 
 /// <summary>
