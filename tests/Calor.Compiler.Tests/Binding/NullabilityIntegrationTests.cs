@@ -1918,9 +1918,14 @@ public class NullabilityIntegrationTests
     [Fact]
     public void S8_Calor0274_Predicate_Fires_For_NullableUserClass_Argument()
     {
+        var declaration = new TypeSymbol(
+            SymbolId.Create("test", "Bar"), "Bar", "Bar", Visibility.Public, default)
+        {
+            IsReferenceType = true
+        };
         var source = new NullabilityTestExpr(
-            new NominalBoundType("Bar", NullableAnnotation.Annotated));
-        var parameterTarget = new NominalBoundType("Bar", NullableAnnotation.NotAnnotated);
+            new NominalBoundType("Bar", NullableAnnotation.Annotated, declaration));
+        var parameterTarget = new NominalBoundType("Bar", NullableAnnotation.NotAnnotated, declaration);
 
         Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(source, parameterTarget));
     }
@@ -1961,21 +1966,20 @@ public class NullabilityIntegrationTests
     }
 
     /// <summary>
-    /// S8 dotted-namespace bridge — <see cref="NullabilityChecker"/>'s
-    /// short-name comparator (<c>ShortNameEquals</c>) treats
-    /// <c>My.Custom.Foo</c> and <c>Foo</c> as equivalent for the purpose
-    /// of source-vs-target shape matching. A Roslyn-resolved BCL type
-    /// (fully qualified) assigned into a Calor target (bare identifier)
-    /// must therefore fire the same predicate. Guards against a future
-    /// change that drops the dotted-name bridging and silently breaks
-    /// BCL-source / Calor-target user-ref cases.
+    /// Short and qualified display spellings match only when both carry
+    /// the same resolved declaration. A matching textual tail is insufficient.
     /// </summary>
     [Fact]
-    public void S8_Bridges_Dotted_Namespace_On_ShortName_Match()
+    public void S8_Bridges_Dotted_Namespace_On_ResolvedIdentity()
     {
+        var declaration = new TypeSymbol(
+            SymbolId.Create("test", "My.Custom.Foo"), "Foo", "My.Custom.Foo", Visibility.Public, default)
+        {
+            IsReferenceType = true
+        };
         var source = new NullabilityTestExpr(
-            new NominalBoundType("My.Custom.Foo", NullableAnnotation.Annotated));
-        var target = new NominalBoundType("Foo", NullableAnnotation.NotAnnotated);
+            new NominalBoundType("My.Custom.Foo", NullableAnnotation.Annotated, declaration));
+        var target = new NominalBoundType("Foo", NullableAnnotation.NotAnnotated, declaration);
 
         Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(source, target));
     }

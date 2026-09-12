@@ -87,6 +87,7 @@ public sealed class Binder
     private readonly string _sourceIdentity;
     private Scope _scope;
     private readonly Dictionary<AstNode, FunctionSymbol> _functionSymbols = new();
+    private readonly Dictionary<SymbolId, string?> _functionNamespaces = new();
     private readonly Dictionary<ClassDefinitionNode, Scope> _classScopes = new();
     private readonly Dictionary<ClassDefinitionNode, string> _qualifiedClassNames = new();
     private readonly Dictionary<ClassDefinitionNode, SymbolId> _classSymbolIds = new();
@@ -375,6 +376,7 @@ public sealed class Binder
         _declaredReferenceTypes = Parsing.AttributeHelper.GetDeclaredReferenceTypeNames(module);
         _scope = new Scope();
         _functionSymbols.Clear();
+        _functionNamespaces.Clear();
         _classScopes.Clear();
         _qualifiedClassNames.Clear();
         _classSymbolIds.Clear();
@@ -437,6 +439,7 @@ public sealed class Binder
                 output: function.Output,
                 effectParameters: function.EffectParameters);
             _functionSymbols.Add(function, symbol);
+            _functionNamespaces.Add(symbol.Id, function.NamespaceIdentity);
 
             var simpleLookupName = GetCallableLookupName(function.Name);
             var lookupName = QualifyTopLevelName(
@@ -519,7 +522,10 @@ public sealed class Binder
             definitionSpan,
             // E1 slice 2b: §DEL declarations are function types. Marking the
             // symbol is what lets a consumer ask the type instead of the string.
-            isDelegate: kind == "delegate"));
+            isDelegate: kind == "delegate")
+        {
+            IsReferenceType = kind is "interface" or "delegate"
+        });
 
     }
 
@@ -539,7 +545,10 @@ public sealed class Binder
             qualifiedClassName,
             cls.Visibility,
             cls.IdentifierSpan,
-            cls.Span);
+            cls.Span)
+        {
+            IsReferenceType = !cls.IsStruct
+        };
         TrackSymbol(classSymbol);
 
         _classScopes.Add(cls, classScope);
@@ -1620,7 +1629,113 @@ public sealed class Binder
         return TryBuildFunctionType(bind.TypeName ?? typeName, row: null, binders: null);
     }
 
-    private static bool TryBuildStringTarget(string bindTypeName, out BoundTypes.BoundType? target)
+    private bool TryBuildStringTarget(
+        string bindTypeName,
+        out BoundTypes.BoundType? target,
+        FunctionSymbol? declaringFunction = null)
+    {
+        if (!TryBuildDeclaredNullabilityShape(bindTypeName, out target))
+            return false;
+        if (target is BoundTypes.NominalBoundType nominal
+            && TypeIdentity.Canonicalize(nominal.QualifiedName) != "STRING")
+        {
+            target = declaringFunction is not null
+                ? TryBuildCallableReference(bindTypeName, declaringFunction)
+                : TryBuildReferenceType(
+                    bindTypeName, _currentClassName, _currentNamespaceIdentity,
+                    _currentMemberTypeParameters?.Select(parameter => parameter.Name));
+            return target is not null;
+        }
+        return true;
+    }
+
+    private BoundTypes.NominalBoundType? TryBuildReferenceType(
+        string typeName,
+        string? containingTypeName,
+        string? namespaceIdentity,
+        IEnumerable<string>? typeParameters = null,
+        bool allowObject = true)
+    {
+        var referent = typeName.Trim();
+        var annotated = Parsing.AttributeHelper.TryUnwrapNullableAnnotation(referent, out var inner);
+        if (annotated)
+            referent = inner.Trim();
+        if (referent.Length == 0 || referent.IndexOfAny(['[', ']', '<', '>', '`', '*', '&', '(', ')']) >= 0
+            || typeParameters?.Contains(referent, StringComparer.Ordinal) == true)
+            return null;
+        var canonical = TypeIdentity.Canonicalize(referent);
+        if (TypeIdentity.IsBuiltinCanonicalName(canonical) && canonical != "OBJECT"
+            || TypeIdentity.IsKnownValueMetadataName(referent))
+            return null;
+        if (canonical == "OBJECT" && !allowObject)
+            return null;
+        if (containingTypeName is not null
+            && _classesByQualifiedName.TryGetValue(containingTypeName, out var containingClass)
+            && containingClass.TypeParameters.Any(parameter => parameter.Name == referent))
+            return null;
+
+        var annotation = annotated
+            ? BoundTypes.NullableAnnotation.Annotated
+            : BoundTypes.NullableAnnotation.NotAnnotated;
+        var lookupNames = ReferenceLookupNames(referent, containingTypeName ?? namespaceIdentity).ToArray();
+        foreach (var lookupName in lookupNames)
+        {
+            var declarations = _symbolsById.Values.OfType<TypeSymbol>()
+                .Where(symbol => symbol.QualifiedName == lookupName)
+                .Take(2).ToArray();
+            if (declarations.Length != 0)
+                return declarations is [var declaration] && declaration.IsReferenceType
+                    ? new BoundTypes.NominalBoundType(referent, annotation, declaration)
+                    : null;
+        }
+
+        // Match the existing binder's unique-short-name fallback, never an
+        // ambiguous tail match between unrelated namespace-qualified types.
+        var shortDeclarations = _symbolsById.Values.OfType<TypeSymbol>()
+            .Where(symbol => symbol.Name == referent)
+            .Take(2).ToArray();
+        if (shortDeclarations.Length != 0)
+            return shortDeclarations is [var declaration] && declaration.IsReferenceType
+                && !declaration.QualifiedName.Contains('`')
+                ? new BoundTypes.NominalBoundType(referent, annotation, declaration)
+                : null;
+
+        var metadataName = TypeIdentity.MapShortTypeNameToFullName(lookupNames[^1]);
+        if (!metadataName.Contains('.', StringComparison.Ordinal))
+            return null;
+        var symbol = GetOrCreateMetadataBinder()?.Context.TryResolveType(metadataName);
+        return symbol is { IsReferenceType: true, IsGenericType: false }
+            ? new BoundTypes.NominalBoundType(referent, annotation, roslynSymbol: symbol)
+            : null;
+    }
+
+    private static IEnumerable<string> ReferenceLookupNames(string name, string? context)
+    {
+        if (name.StartsWith("global::", StringComparison.Ordinal))
+        {
+            yield return name["global::".Length..];
+            yield break;
+        }
+        while (!string.IsNullOrEmpty(context))
+        {
+            yield return $"{context}.{name}";
+            var separator = context.LastIndexOf('.');
+            context = separator < 0 ? null : context[..separator];
+        }
+        yield return name;
+    }
+
+    private BoundTypes.NominalBoundType? TryBuildCallableReference(string typeName, FunctionSymbol function)
+    {
+        _functionNamespaces.TryGetValue(function.Id, out var namespaceIdentity);
+        if (function.ContainingTypeName is not null
+            && _classesByQualifiedName.TryGetValue(function.ContainingTypeName, out var cls))
+            namespaceIdentity = cls.NamespaceIdentity;
+        return TryBuildReferenceType(
+            typeName, function.ContainingTypeName, namespaceIdentity, function.TypeParameters);
+    }
+
+    private static bool TryBuildDeclaredNullabilityShape(string bindTypeName, out BoundTypes.BoundType? target)
     {
         target = null;
         var trimmed = bindTypeName.Trim();
@@ -1657,35 +1772,11 @@ public sealed class Binder
             return true;
         }
 
-        bool annotatedNullable = false;
+        var annotatedNullable = Parsing.AttributeHelper.TryUnwrapNullableAnnotation(trimmed, out var referent);
+        if (annotatedNullable)
+            trimmed = referent.Trim();
 
-        // Parser's ExpandType normalizes surface forms:
-        //   :string / :str        -> "STRING"
-        //   :?string / :?str      -> "OPTION[inner=STRING]"
-        // Match both post-expansion forms plus the raw surface forms (in case
-        // callers construct BindStatementNode directly, bypassing ExpandType).
-        if (trimmed.StartsWith("OPTION[inner=", StringComparison.Ordinal)
-            && trimmed.EndsWith("]", StringComparison.Ordinal))
-        {
-            annotatedNullable = true;
-            trimmed = trimmed["OPTION[inner=".Length..^1];
-        }
-        else if (trimmed.StartsWith("?", StringComparison.Ordinal))
-        {
-            annotatedNullable = true;
-            trimmed = trimmed[1..];
-        }
-        // Postfix nullable form (§B{x:string?}) — parser passes through
-        // untouched, so recognize it here alongside the prefix form. Review
-        // finding from PR #1059: without this, :string? silently degrades
-        // to Oblivious and a subsequent §B{y:string} x MISSES Calor0272.
-        else if (trimmed.EndsWith("?", StringComparison.Ordinal) && trimmed.Length > 1)
-        {
-            annotatedNullable = true;
-            trimmed = trimmed[..^1];
-        }
-
-        if (trimmed is ("STRING" or "string" or "str"))
+        if (trimmed is ("STRING" or "string" or "str" or "System.String"))
         {
             target = new BoundTypes.NominalBoundType(
                 "STRING",
@@ -1695,20 +1786,10 @@ public sealed class Binder
             return true;
         }
 
-        // v0.14 §S8 (task #7 Phase-C) — user-declared reference-type targets.
-        // Any nominal type name that is neither STRING (handled above) nor a
-        // built-in value type participates: :Foo (non-null) vs :?Foo (nullable)
-        // trips Calor0272/0273/0274 symmetrically with the scalar STRING gate.
-        // Runs LAST so post-expansion shapes (ARRAY[…], OPTION[inner=…]) are
-        // caught by the S6/S7/scalar paths first — this branch reaches only
-        // bare identifiers after prefix/postfix '?' peel.
-        // Value types (INT/BOOL/…) return false because they can never be
-        // null. Names containing `[` or `.` are excluded — they are either
-        // post-expansion residue or dotted namespace-qualified forms we do
-        // not yet classify (defer to a future D6 follow-on).
+        // This reads a declared spelling, not its resolved kind. The receiving
+        // gate separately requires a real reference declaration or metadata symbol.
         if (trimmed.Length > 0
-            && !trimmed.Contains('[', System.StringComparison.Ordinal)
-            && !trimmed.Contains('.', System.StringComparison.Ordinal)
+            && trimmed.IndexOfAny(['[', ']', '<', '>', '*', '&', '(', ')']) < 0
             && !IsBuiltInValueTypeName(trimmed))
         {
             target = new BoundTypes.NominalBoundType(
@@ -1723,13 +1804,10 @@ public sealed class Binder
 
     /// <summary>
     /// v0.14 §S8 helper — Calor built-in value type names that must NOT
-    /// participate in the widened user-ref nullability gate. Value types
-    /// can never be null, so a <c>:INT</c> target has no meaningful
-    /// mismatch with an Annotated source. Names are matched exactly (case-
-    /// sensitive) to keep the gate narrow; typos like <c>:inT</c> fall
-    /// through to the user-ref path where they will later fail resolution.
+    /// participate in the reference nullability gate. Absence from this
+    /// list is not evidence that a type is a reference.
     /// </summary>
-    private static bool IsBuiltInValueTypeName(string name) => name switch
+    internal static bool IsBuiltInValueTypeName(string name) => name switch
     {
         "INT" or "int" or "i32" => true,
         "LONG" or "long" or "i64" => true,
@@ -1968,6 +2046,9 @@ public sealed class Binder
                 BoundTypes.NullableAnnotation.NotAnnotated);
         }
 
+        if (parameterType.IsKnownReferenceType)
+            return parameterType;
+
         // v0.14 §S6 — array-of-STRING parameter shape. MetadataBinder
         // currently flattens Roslyn IArrayTypeSymbol into a NominalBoundType
         // whose QualifiedName is "string[]" / "System.String[]". Parse
@@ -2122,7 +2203,7 @@ public sealed class Binder
     private static BoundTypes.NullableAnnotation TryReadDeclaredStringAnnotation(string? bindTypeName)
     {
         if (bindTypeName is null) return BoundTypes.NullableAnnotation.Oblivious;
-        if (!TryBuildStringTarget(bindTypeName, out var target)) return BoundTypes.NullableAnnotation.Oblivious;
+        if (!TryBuildDeclaredNullabilityShape(bindTypeName, out var target)) return BoundTypes.NullableAnnotation.Oblivious;
         // This helper feeds the scalar VariableSymbol.NullableAnnotation
         // for downstream BoundVariableExpression reads. Only scalar STRING
         // targets contribute — array-shape (§S6) VariableSymbols do not
@@ -3186,7 +3267,16 @@ public sealed class Binder
                     CreateUnresolvedVariable(refNode));
             }
 
-            return new BoundVariableExpression(refNode.Span, variables[0], variables);
+            var identity = variables.Length == 1
+                ? TryBuildReferenceType(
+                    variables[0].TypeName,
+                    variables[0].DeclaringTypeName ?? _currentClassName,
+                    _currentNamespaceIdentity,
+                    _currentMemberTypeParameters?.Select(parameter => parameter.Name),
+                    allowObject: variables[0].NullableAnnotation != BoundTypes.NullableAnnotation.Oblivious)
+                : null;
+            return new BoundVariableExpression(refNode.Span, variables[0], variables,
+                typeOverride: null, referenceIdentity: identity);
         }
 
         // Symbol exists but is not a variable - provide helpful fix
@@ -3302,7 +3392,9 @@ public sealed class Binder
             var declaredAnnotation = TryReadDeclaredStringAnnotation(calorReturnee.ReturnType);
             if (declaredAnnotation != BoundTypes.NullableAnnotation.Oblivious)
             {
-                annotatedReturn = new BoundTypes.NominalBoundType(returnType, declaredAnnotation);
+                var identity = TryBuildCallableReference(calorReturnee.ReturnType, calorReturnee);
+                annotatedReturn = new BoundTypes.NominalBoundType(
+                    returnType, declaredAnnotation, identity?.Declaration, identity?.RoslynSymbol);
             }
         }
 
@@ -3359,7 +3451,7 @@ public sealed class Binder
             for (var i = 0; i < args.Count && i < parameters.Count; i++)
             {
                 var paramSymbol = parameters[i];
-                if (!TryBuildStringTarget(paramSymbol.TypeName, out var stringTarget)) continue;
+                if (!TryBuildStringTarget(paramSymbol.TypeName, out var stringTarget, calorCallee)) continue;
                 if (stringTarget is BoundTypes.NominalBoundType nominal
                     && nominal.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated) continue;
                 if (stringTarget is BoundTypes.ArrayBoundType array

@@ -183,6 +183,16 @@ public sealed class BoundVariableExpression : BoundExpression
         VariableSymbol variable,
         IReadOnlyList<VariableSymbol>? resolvedSymbols = null,
         BoundType? typeOverride = null)
+        : this(span, variable, resolvedSymbols, typeOverride, referenceIdentity: null)
+    {
+    }
+
+    internal BoundVariableExpression(
+        TextSpan span,
+        VariableSymbol variable,
+        IReadOnlyList<VariableSymbol>? resolvedSymbols,
+        BoundType? typeOverride,
+        NominalBoundType? referenceIdentity)
         : base(span)
     {
         Variable = variable;
@@ -218,6 +228,10 @@ public sealed class BoundVariableExpression : BoundExpression
         Type = resolvedTypes.Length == 1
             ? BuildStringAnnotatedTypeOrDefault(variable, resolvedTypeName)
             : new NominalBoundType(resolvedTypeName, NullableAnnotation.Oblivious);
+        if (resolvedTypes.Length == 1 && referenceIdentity is not null && Type is NominalBoundType nominal)
+            Type = new NominalBoundType(
+                nominal.QualifiedName, nominal.NullableAnnotation,
+                referenceIdentity.Declaration, referenceIdentity.RoslynSymbol);
     }
 
     // S3 scope (§D6): flow the STRING annotation only. Handles both the
