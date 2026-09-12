@@ -50,6 +50,53 @@ public sealed class SafeConsumptionRuntimeTests
     }
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Coalesce_SelectedNamedArgumentsAgreeAcrossBothCallForms(bool statement, bool throwing)
+    {
+        var expression = throwing ? "(?? input §TH \"missing\")" : "(?? input \"fallback\")";
+        var call = $"§C{{Take}} §A[number] INT:7 §A[value] {expression} §/C";
+        var source = $$"""
+            §M{m1:Consumption}
+              §F{f1:Take:pub} (str:value, i32:number) -> str
+                §E{}
+                §R value
+              §F{f2:Probe:pub} (?str:input) -> str
+                §E{throw}
+                {{(statement ? call + "\n    §R \"done\"" : "§R " + call)}}
+            """;
+        var (bound, diagnostics) = Bind(source);
+        Assert.Empty(diagnostics.Errors);
+        var matches = statement
+            ? Assert.IsType<BoundCallStatement>(bound.Functions[1].Body[0]).SelectedOverloadMatches
+            : Assert.IsType<BoundCallExpression>(
+                Assert.IsType<BoundReturnStatement>(bound.Functions[1].Body[0]).Expression).SelectedOverloadMatches;
+        var match = Assert.Single(matches);
+        Assert.Equal(new[] { 1, 0 }, match.Arguments.Select(argument => argument.ParameterIndex));
+        var result = Program.Compile(source, "named-consumption.calr");
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        var method = Emit(result.GeneratedCode).GetType("Consumption.ConsumptionModule")!.GetMethod("Probe")!;
+        Assert.Equal(statement ? "done" : "value", method.Invoke(null, ["value"]));
+        if (throwing)
+        {
+            var error = Assert.Throws<TargetInvocationException>(() => method.Invoke(null, [null]));
+            Assert.Equal("missing", Assert.IsType<Exception>(error.InnerException).Message);
+        }
+        else
+            Assert.Equal(statement ? "done" : "fallback", method.Invoke(null, [null]));
+        WithCli(source, (exit, _, error) => Assert.True(exit == 0, error));
+
+        var unsafeSource = source.Replace(expression, "input", StringComparison.Ordinal);
+        var (_, unsafeDiagnostics) = Bind(unsafeSource);
+        Assert.Contains(unsafeDiagnostics, diagnostic =>
+            IsNullableDiagnostic(diagnostic) || diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+        Assert.True(Program.Compile(unsafeSource, "unsafe-named-consumption.calr").HasErrors);
+        WithCli(unsafeSource, (exit, _, _) => Assert.NotEqual(0, exit));
+    }
+
+    [Theory]
     [InlineData("bind")]
     [InlineData("return")]
     [InlineData("argument")]

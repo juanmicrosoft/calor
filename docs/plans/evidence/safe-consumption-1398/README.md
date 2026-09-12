@@ -63,8 +63,8 @@ Following the same true-condition paths exposed the matching transfer gap in
 statement and expression match guards. Both now introduce successful guard
 bindings only in that case. Four more cases cover actual guard consumers,
 round-trip execution, default/negative/disjunctive scope controls and diagnostic
-reuse. The final combined inventory is 8,957 + 71 T2 cases = 9,028, unchanged
-skip budgets. The latest affected run passes 602 cases, including the ordinary
+reuse. The pre-N3 combined inventory was 8,957 + 71 T2 cases = 9,028, unchanged
+skip budgets. That affected run passed 602 cases, including the ordinary
 corpus ratchet, with no further baseline edits.
 The statement-match runtime control uses the supported `var` carrier pattern.
 A guarded wildcard statement case currently emits invalid C# (`case _ when`);
@@ -115,7 +115,33 @@ The diagnostic probe was rerun against the actual N1 and c43 assemblies for all 
 - `/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/safe-consumption-1398-audit/current-diagnostics.c43-final-audit.json`
 - `/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/safe-consumption-1398-audit/binder-source-coverage.c43aefbb-current-measured.json`
 
-## Measured totals
+## Approved N3 integration
+
+Both fresh non-author reviews accepted `95e579dc`, but approved N3 main
+`8f9891a1` landed during that review. Normal merge `37195a7c` preserves its
+selected maps, taint identities, 19-policy/33-route catalog, editor506 and
+harness291. The original T2 and N3 measurements are not relabeled.
+
+The first combined run had 964 passes and one corpus mismatch: N3's
+`JsonValueFormatter` raw binding-error count55 becomes54. A fresh capture of
+all54 identities, plus exactly the removed0274 identity, reconstructs the
+approved N3 hash. This is the scalar statement argument
+`value.ToString() ?? ""` at source line541: T2's non-null fallback now reaches
+N3's shared argument validator. The other two N3 statement findings remain.
+Regeneration compared all364 records and changed only that row's diagnostic
+count/hash; the four original T2 rows and every other field were preserved.
+Raw errors across the approved N3 baseline move4925 to4920, with unchanged
+coverage and propagated counts. This is not a safety/activation claim.
+
+[Exact integration audit](integration-8f9891a1-audit.json) pins the source,
+runtime, actual removed diagnostic and reconstruction method. Four new joint
+controls exercise reversed named arguments through both call forms with
+fallback/throw and unsafe nullable inputs using default compilation, raw Binder,
+CLI and runtime. The final inventory is 9,049 + 75 = 9,124, with unchanged
+skips. The combined969-case selection and35 editor state cases pass, including
+the ordinary corpus ratchet. New final-head reviews and CI remain required.
+
+## Measured totals (original c43 audit)
 
 | Metric | N1 baseline | c43 measured |
 | --- | ---: | ---: |
