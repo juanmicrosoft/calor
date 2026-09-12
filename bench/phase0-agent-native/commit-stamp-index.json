@@ -15,7 +15,7 @@
       "measuredCommit": "bde9ee88627acb1fcdf62494b701b24856fa5881",
       "resolvableOnMain": "bde9ee88627acb1fcdf62494b701b24856fa5881",
       "basis": "identical-src-tree",
-      "note": "#1383: regenerated at bde9ee88 with implementation f642b11a unchanged; preserve both ancestors with a normal merge. Native non-null STRING now matches nullable-accepting IsValidName in Serilog/Events/LogEventProperty.cs. Calor0425 diagnostics117 and affected modules47 stay fixed; enforced326->327 and excluded38->37. Serilog Calor0411 upper-bound sites551->555 and modules61->62 reflect the newly reached effect pass, not a clean compilation or proven purity. Earlier product measurements and the historical R2 MISS remain in git history; no completed epoch or frozen protocol is restamped."
+      "note": "#1383/#1384 integration: regenerate this entry on the merged N4+N5 candidate before acceptance; the retained N4 values are provisional conflict resolution, not final evidence."
     },
     {
       "ledger": "higher-order-demand-ledger.json",

@@ -1671,6 +1671,7 @@ public sealed class BoundBaseExpression : BoundExpression
 /// </summary>
 public sealed class BoundFieldAccessExpression : BoundExpression
 {
+    internal Microsoft.CodeAnalysis.ISymbol? ResolvedMetadataMember { get; init; }
     public BoundExpression Target { get; }
     public string FieldName { get; }
     public TextSpan FieldNameSpan { get; }
