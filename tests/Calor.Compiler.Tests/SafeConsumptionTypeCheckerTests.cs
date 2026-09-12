@@ -948,6 +948,21 @@ public sealed class SafeConsumptionTypeCheckerTests
             """);
         var charDiagnostic = SingleErrorAt(charResult, 10);
         Assert.Contains("Null-coalescing requires", charDiagnostic.Message);
+
+        var optionalResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Pick:pub} (i32:value) -> i32
+                §E{}
+                §R value
+              §F{f2:Pick:pub} (i32:value, i32:other = 0) -> str
+                §E{}
+                §R "optional"
+              §F{f3:Probe:pub} () -> i32
+                §E{}
+                §R (?? §C{Pick} §A 1 §/C 2)
+            """);
+        var optionalDiagnostic = SingleErrorAt(optionalResult, 10);
+        Assert.Contains("Null-coalescing requires", optionalDiagnostic.Message);
     }
 
     [Fact]
@@ -1186,6 +1201,135 @@ public sealed class SafeConsumptionTypeCheckerTests
             """);
         Assert.Contains(enumResult.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+
+        var identityResult = Check("""
+            §M{m1:SafeConsumption}
+              §DEL{d1:Mutator:pub}
+                §I{f64:value:ref}
+                §O{void}
+              §F{f1:Probe:pub} (Mutator:mutate, i32:value:ref) -> void
+                §E{}
+                §C{mutate} §A{ref} value §/C
+            """);
+        Assert.Contains(identityResult.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void UncontextualizedLambda_StillTraversesNestedConsumers()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §C{System.Threading.Tasks.Task.Run} §A §LAM{l1} (?? 1 2) §/LAM{l1} §/C
+            """);
+
+        var diagnostic = SingleErrorAt(result, 4);
+        Assert.Contains("Null-coalescing requires", diagnostic.Message);
+    }
+
+    [Fact]
+    public void ContextualInference_HandlesParamsAndVariableGenericBounds()
+    {
+        var paramsResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Take:pub} (object[]:values:params) -> object
+                §E{}
+                §R values
+              §F{f2:Probe:pub} (i32:value) -> object
+                §E{}
+                §R §C{Take} §A §W{m:expr} value
+                  §K 0 → 1
+                  §K _ → "text"
+                §/C
+            """);
+        AssertNoErrors(paramsResult);
+
+        var variableResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Choose:pub}<T> (T:first, T:second) -> T
+                §E{}
+                §R first
+              §F{f2:Probe:pub} (i32:value, object:fallback) -> object
+                §E{}
+                §R §C{Choose} §A fallback §A §W{m:expr} value
+                  §K 0 → 1
+                  §K _ → "text"
+                §/C
+            """);
+        AssertNoErrors(variableResult);
+    }
+
+    [Fact]
+    public void OverloadedMethodGroupInference_UsesTheBestMember()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Value:pub} (object:value) -> i32
+                §E{}
+                §R 1
+              §F{f2:Value:pub} (str:value) -> str
+                §E{}
+                §R value
+              §F{f3:Use:pub}<T> (Func<str,T>:factory) -> T
+                §E{}
+                §R §C{factory} §A "x" §/C
+              §F{f4:Probe:pub} () -> i32
+                §E{}
+                §R §C{Use} §A Value §/C
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void LosingLambdaOverloads_DoNotLeakDiagnostics()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Pick:pub} (Func<i32,i32>:map) -> i32
+                §E{}
+                §R §C{map} §A 1 §/C
+              §F{f2:Pick:pub} (Func<str,str>:map) -> str
+                §E{}
+                §R §C{map} §A "x" §/C
+              §F{f3:Probe:pub} () -> i32
+                §E{}
+                §R §C{Pick} §A §LAM{l1:x:i32} x §/LAM{l1} §/C
+            """);
+        AssertNoErrors(result);
+
+        var actionResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Identity:pub} (i32:value) -> i32
+                §E{}
+                §R value
+              §F{f2:Probe:pub} () -> void
+                §E{}
+                §B{action:Action<i32>} §LAM{l1:x:i32}
+                  §C{Identity} §A x §/C
+                §/LAM{l1}
+            """);
+        AssertNoErrors(actionResult);
+    }
+
+    [Fact]
+    public void NestedMatchExpressions_InheritTheOuterTarget()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (i32:value) -> object
+                §E{}
+                §R §W{outer:expr} value
+                  §K 0 → §W{inner:expr} value
+                    §K 0 → 1
+                    §K _ → "text"
+                  §K _ → "fallback"
+            """);
+
+        AssertNoErrors(result);
     }
 
     [Theory]

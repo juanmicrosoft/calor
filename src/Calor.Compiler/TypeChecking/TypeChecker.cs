@@ -15,6 +15,8 @@ public sealed class TypeChecker
     private readonly HashSet<string> _moduleDeclaredValueTypes = new(StringComparer.OrdinalIgnoreCase);
     private CalorType? _currentReturnType;
     private bool _validateReturnAssignments;
+    private bool _suppressContextualDiagnostics;
+    private bool _lambdaReturnInvalid;
 
     public TypeChecker(DiagnosticBag diagnostics)
     {
@@ -420,14 +422,19 @@ public sealed class TypeChecker
         if (ret.Expression != null)
         {
             var returnType = InferExpressionType(ret.Expression, _currentReturnType);
-            if (_validateReturnAssignments && _currentReturnType != null
+            if ((_validateReturnAssignments || ret.Expression is CallExpressionNode)
+                && _currentReturnType != null
                 && !ContainsInferencePlaceholder(_currentReturnType)
                 && !ContainsInferencePlaceholder(returnType)
                 && !IsAssignable(_currentReturnType, returnType))
             {
-                _diagnostics.ReportError(ret.Expression.Span, DiagnosticCode.TypeMismatch,
-                    $"Return type {returnType.SurfaceName} is not assignable to "
-                    + _currentReturnType.SurfaceName);
+                _lambdaReturnInvalid = true;
+                if (!_suppressContextualDiagnostics)
+                {
+                    _diagnostics.ReportError(ret.Expression.Span, DiagnosticCode.TypeMismatch,
+                        $"Return type {returnType.SurfaceName} is not assignable to "
+                        + _currentReturnType.SurfaceName);
+                }
             }
         }
     }
@@ -1290,6 +1297,8 @@ public sealed class TypeChecker
             .Where(candidate => !candidates.Any(other =>
                 !ReferenceEquals(candidate, other) && IsBetterConversion(other, candidate)))
             .ToArray();
+        if (bestCandidates.Length == 1)
+            ValidateSelectedContextualArguments(call, bestCandidates[0]);
         return bestCandidates.Length > 0
             && bestCandidates.All(candidate => candidate.Type.ReturnType.Equals(bestCandidates[0].Type.ReturnType))
                 ? bestCandidates[0].Type.ReturnType
@@ -1311,9 +1320,24 @@ public sealed class TypeChecker
     }
 
     private CalorType InferCallArgument(ExpressionNode argument, CalorType? expectedType)
-        => argument is LambdaExpressionNode && (expectedType == null || ContainsTypeParameter(expectedType))
-            ? ErrorType.Instance
-            : InferExpressionType(argument, expectedType);
+    {
+        if (argument is MatchExpressionNode && expectedType == null)
+            return ErrorType.Instance;
+        if (argument is LambdaExpressionNode && expectedType != null && ContainsTypeParameter(expectedType))
+            return ErrorType.Instance;
+        return InferExpressionType(argument, expectedType);
+    }
+
+    private void ValidateSelectedContextualArguments(
+        CallExpressionNode call,
+        ResolvedCallCandidate candidate)
+    {
+        for (var i = 0; i < call.Arguments.Count; i++)
+        {
+            if (RequiresTargetType(call.Arguments[i]))
+                InferExpressionType(call.Arguments[i], candidate.ConversionTargets[i]);
+        }
+    }
 
     private static bool RequiresTargetType(ExpressionNode argument)
         => argument is MatchExpressionNode or LambdaExpressionNode;
@@ -1351,9 +1375,12 @@ public sealed class TypeChecker
         var signatureValid = true;
         if (expectedFunction != null && lambda.Parameters.Count != expectedFunction.ParameterTypes.Count)
         {
-            _diagnostics.ReportError(lambda.Span, DiagnosticCode.TypeMismatch,
-                $"Lambda has {lambda.Parameters.Count} parameter(s), but target delegate expects "
-                + expectedFunction.ParameterTypes.Count);
+            if (!_suppressContextualDiagnostics)
+            {
+                _diagnostics.ReportError(lambda.Span, DiagnosticCode.TypeMismatch,
+                    $"Lambda has {lambda.Parameters.Count} parameter(s), but target delegate expects "
+                    + expectedFunction.ParameterTypes.Count);
+            }
             signatureValid = false;
         }
         _env.EnterScope();
@@ -1369,9 +1396,12 @@ public sealed class TypeChecker
                 && index < expectedFunction.ParameterTypes.Count
                 && !declaredType.Equals(expectedFunction.ParameterTypes[index]))
             {
-                _diagnostics.ReportError(parameter.Span, DiagnosticCode.TypeMismatch,
-                    $"Lambda parameter type {declaredType.SurfaceName} does not match target type "
-                    + expectedFunction.ParameterTypes[index].SurfaceName);
+                if (!_suppressContextualDiagnostics)
+                {
+                    _diagnostics.ReportError(parameter.Span, DiagnosticCode.TypeMismatch,
+                        $"Lambda parameter type {declaredType.SurfaceName} does not match target type "
+                        + expectedFunction.ParameterTypes[index].SurfaceName);
+                }
                 signatureValid = false;
             }
             _env.DefineVariable(parameter.Name, declaredType);
@@ -1380,20 +1410,28 @@ public sealed class TypeChecker
 
         var previousReturnType = _currentReturnType;
         var previousValidateReturnAssignments = _validateReturnAssignments;
+        var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
+        var previousLambdaReturnInvalid = _lambdaReturnInvalid;
+        if (expectedFunction == null)
+            _suppressContextualDiagnostics = true;
+        _lambdaReturnInvalid = false;
         _currentReturnType = expectedFunction?.ReturnType;
         _validateReturnAssignments = expectedFunction != null;
         CalorType returnType;
         if (lambda.ExpressionBody != null)
         {
             returnType = InferExpressionType(lambda.ExpressionBody, expectedFunction?.ReturnType);
-            if (expectedFunction != null
+            if (expectedFunction != null && !IsVoidCompatibleLambdaExpression(expectedFunction, lambda.ExpressionBody)
                 && !ContainsInferencePlaceholder(expectedFunction.ReturnType)
                 && !ContainsInferencePlaceholder(returnType)
                 && !IsAssignable(expectedFunction.ReturnType, returnType))
             {
-                _diagnostics.ReportError(lambda.ExpressionBody.Span, DiagnosticCode.TypeMismatch,
-                    $"Lambda return type {returnType.SurfaceName} is not assignable to "
-                    + expectedFunction.ReturnType.SurfaceName);
+                if (!_suppressContextualDiagnostics)
+                {
+                    _diagnostics.ReportError(lambda.ExpressionBody.Span, DiagnosticCode.TypeMismatch,
+                        $"Lambda return type {returnType.SurfaceName} is not assignable to "
+                        + expectedFunction.ReturnType.SurfaceName);
+                }
                 signatureValid = false;
             }
         }
@@ -1405,13 +1443,22 @@ public sealed class TypeChecker
             }
             returnType = PrimitiveType.Void;
         }
+        signatureValid &= !_lambdaReturnInvalid;
         _currentReturnType = previousReturnType;
         _validateReturnAssignments = previousValidateReturnAssignments;
+        _suppressContextualDiagnostics = previousSuppressContextualDiagnostics;
+        _lambdaReturnInvalid = previousLambdaReturnInvalid;
         _env.ExitScope();
         _ = parameterTypes;
         _ = returnType;
         return expectedFunction is not null && signatureValid ? expectedFunction : ErrorType.Instance;
     }
+
+    private static bool IsVoidCompatibleLambdaExpression(
+        FunctionType expectedFunction,
+        ExpressionNode expression)
+        => expectedFunction.ReturnType.Equals(PrimitiveType.Void)
+            && expression is CallExpressionNode or ExpressionCallNode or NewExpressionNode;
 
     private CalorType InferQuantifierType(
         IReadOnlyList<QuantifierVariableNode> variables,
@@ -1495,7 +1542,11 @@ public sealed class TypeChecker
 
             var parameterIndex = parameterIndices[argumentIndex];
             var candidateExpected = EffectiveParameterType(
-                candidate, parameterTypes[parameterIndex], parameterIndex, preliminaryTypes[argumentIndex]);
+                candidate,
+                parameterTypes[parameterIndex],
+                parameterIndex,
+                preliminaryTypes[argumentIndex],
+                RequiresTargetType(call.Arguments[argumentIndex]));
             if (ContainsTypeParameter(candidateExpected))
                 return null;
             if (!found)
@@ -1532,8 +1583,10 @@ public sealed class TypeChecker
                 candidate,
                 candidate.Type.ParameterTypes[parameterIndex],
                 parameterIndex,
-                preliminaryTypes[argumentIndex]);
-            if (call.Arguments[argumentIndex] is not ReferenceNode)
+                preliminaryTypes[argumentIndex],
+                forceExpanded: false);
+            if (call.Arguments[argumentIndex] is not ReferenceNode reference
+                || _env.LookupFunctionCandidates(reference.Name).Count == 0)
                 InferTypeArguments(template, preliminaryTypes[argumentIndex], substitutions);
         }
 
@@ -1546,7 +1599,11 @@ public sealed class TypeChecker
                 continue;
             var parameterIndex = parameterIndices[argumentIndex];
             var target = EffectiveParameterType(
-                candidate, parameterTypes[parameterIndex], parameterIndex, preliminaryTypes[argumentIndex]);
+                candidate,
+                parameterTypes[parameterIndex],
+                parameterIndex,
+                preliminaryTypes[argumentIndex],
+                forceExpanded: false);
             if (call.Arguments[argumentIndex] is ReferenceNode methodGroup
                 && _env.LookupFunctionCandidates(methodGroup.Name) is { Count: > 0 } methodCandidates)
             {
@@ -1568,10 +1625,11 @@ public sealed class TypeChecker
         FunctionCandidate candidate,
         CalorType parameterType,
         int parameterIndex,
-        CalorType argumentType)
+        CalorType argumentType,
+        bool forceExpanded)
         => candidate.ParameterModifiers[parameterIndex].HasFlag(ParameterModifier.Params)
             && parameterType is ArrayType array
-            && !IsAssignable(parameterType, argumentType)
+            && (forceExpanded || !IsAssignable(parameterType, argumentType))
                 ? array.ElementType
                 : parameterType;
 
@@ -1684,6 +1742,7 @@ public sealed class TypeChecker
                 if (paramsIndex >= 0 && parameterIndex >= paramsIndex
                     && (parameterIndex >= mappedArguments.Length
                         || argumentTypes.Count - argumentIndex > mappedArguments.Length - paramsIndex
+                        || RequiresTargetType(call.Arguments[argumentIndex])
                         || !IsAssignable(candidate.Type.ParameterTypes[paramsIndex], argumentTypes[argumentIndex])))
                 {
                     if (call.ArgumentModifiers != null
@@ -1763,18 +1822,50 @@ public sealed class TypeChecker
 
         for (var i = 0; i < mappedArguments.Length; i++)
         {
-            if (mappedArguments[i] is { Expression: LambdaExpressionNode lambda } argument)
+            if (mappedArguments[i] is { } argument
+                && RequiresTargetType(argument.Expression))
             {
-                var expectedLambdaType =
+                var substitutedParameter =
                     SubstituteTypeParameters(candidate.Type.ParameterTypes[i], substitutions);
-                var inferredLambdaType = InferExpressionType(lambda, expectedLambdaType);
-                mappedArguments[i] = (inferredLambdaType, argument.Expression, argument.SourceIndex);
+                var expectedArgumentType = EffectiveParameterType(
+                    candidate,
+                    substitutedParameter,
+                    i,
+                    argument.Type,
+                    forceExpanded: true);
+                var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
+                _suppressContextualDiagnostics = true;
+                var inferredArgumentType =
+                    InferExpressionType(argument.Expression, expectedArgumentType);
+                _suppressContextualDiagnostics = previousSuppressContextualDiagnostics;
+                if (inferredArgumentType is ErrorType)
+                    return null;
+                mappedArguments[i] =
+                    (inferredArgumentType, argument.Expression, argument.SourceIndex);
             }
         }
 
         var parameterTypes = candidate.Type.ParameterTypes
             .Select(parameter => SubstituteTypeParameters(parameter, substitutions))
             .ToArray();
+        if (paramsIndex >= 0 && parameterTypes[paramsIndex] is ArrayType contextualParamsArray)
+        {
+            for (var i = 0; i < expandedParamsArguments.Count; i++)
+            {
+                var argument = expandedParamsArguments[i];
+                if (!RequiresTargetType(argument.Expression))
+                    continue;
+                var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
+                _suppressContextualDiagnostics = true;
+                var inferredArgumentType =
+                    InferExpressionType(argument.Expression, contextualParamsArray.ElementType);
+                _suppressContextualDiagnostics = previousSuppressContextualDiagnostics;
+                if (inferredArgumentType is ErrorType)
+                    return null;
+                expandedParamsArguments[i] =
+                    (inferredArgumentType, argument.Expression, argument.SourceIndex);
+            }
+        }
         var conversionCosts = new int[argumentTypes.Count];
         var conversionTargets = new CalorType[argumentTypes.Count];
         for (var i = 0; i < mappedArguments.Length; i++)
@@ -1784,14 +1875,15 @@ public sealed class TypeChecker
 
             conversionTargets[argument.SourceIndex] = parameterTypes[i];
             if (argument.Expression is ReferenceNode methodGroup
-                && _env.LookupFunctionCandidates(methodGroup.Name).Count > 0)
+                && _env.LookupFunctionCandidates(methodGroup.Name) is { Count: > 0 } methodCandidates)
             {
                 if (!TryGetDelegateFunctionType(parameterTypes[i], out var delegateType)
-                    || !_env.LookupFunctionCandidates(methodGroup.Name)
-                        .Any(overload => IsMethodGroupCompatible(delegateType, overload)))
+                    || methodCandidates.All(overload => !IsMethodGroupCompatible(delegateType, overload)))
                 {
                     return null;
                 }
+                conversionCosts[argument.SourceIndex] =
+                    GetMethodGroupConversionCost(delegateType, methodCandidates);
             }
             else if (!IsAssignable(parameterTypes[i], argument.Type))
             {
@@ -1826,7 +1918,9 @@ public sealed class TypeChecker
                 SubstituteTypeParameters(candidate.Type.ReturnType, substitutions)),
             conversionCosts,
             conversionTargets,
-            expandedParamsArguments.Count > 0);
+            expandedParamsArguments.Count > 0,
+            mappedArguments.Select((argument, index) => (argument, index))
+                .Count(item => item.argument == null && candidate.OptionalParameters[item.index]));
     }
 
     private static int GetImplicitConversionCost(CalorType target, CalorType source)
@@ -1884,14 +1978,19 @@ public sealed class TypeChecker
         }
         if (strictlyBetter)
             return true;
-        return !left.UsesExpandedParams && right.UsesExpandedParams;
+        if (!left.UsesExpandedParams && right.UsesExpandedParams)
+            return true;
+        if (left.UsesExpandedParams && !right.UsesExpandedParams)
+            return false;
+        return left.OmittedOptionalCount < right.OmittedOptionalCount;
     }
 
     private sealed record ResolvedCallCandidate(
         FunctionType Type,
         IReadOnlyList<int> ConversionCosts,
         IReadOnlyList<CalorType> ConversionTargets,
-        bool UsesExpandedParams);
+        bool UsesExpandedParams,
+        int OmittedOptionalCount);
 
     private static bool ContainsTypeParameter(CalorType type)
         => type switch
@@ -1993,6 +2092,11 @@ public sealed class TypeChecker
         if (!TryGetDelegateFunctionType(delegateTemplate, out var targetTemplate))
             return false;
 
+        var applicable = new List<(
+            FunctionCandidate Method,
+            Dictionary<string, CalorType> Substitutions,
+            FunctionType Target,
+            int Cost)>();
         foreach (var method in methodCandidates)
         {
             if (method.Type.ParameterTypes.Count != targetTemplate.ParameterTypes.Count)
@@ -2008,12 +2112,39 @@ public sealed class TypeChecker
             var resolvedTarget = (FunctionType)SubstituteTypeParameters(targetTemplate, trial);
             if (!IsMethodGroupCompatible(resolvedTarget, method))
                 continue;
-
-            foreach (var (name, type) in trial)
-                substitutions[name] = type;
-            return true;
+            applicable.Add((method, trial, resolvedTarget,
+                GetMethodGroupCandidateCost(resolvedTarget, method)));
         }
-        return false;
+        if (applicable.Count == 0)
+            return false;
+
+        var bestCost = applicable.Min(item => item.Cost);
+        var best = applicable.Where(item => item.Cost == bestCost).ToArray();
+        if (best.Length != 1)
+            return false;
+        foreach (var (name, type) in best[0].Substitutions)
+            substitutions[name] = type;
+        return true;
+    }
+
+    private int GetMethodGroupConversionCost(
+        FunctionType target,
+        IReadOnlyList<FunctionCandidate> candidates)
+        => candidates
+            .Where(candidate => IsMethodGroupCompatible(target, candidate))
+            .Select(candidate => GetMethodGroupCandidateCost(target, candidate))
+            .DefaultIfEmpty(5)
+            .Min();
+
+    private static int GetMethodGroupCandidateCost(
+        FunctionType target,
+        FunctionCandidate candidate)
+    {
+        var cost = 0;
+        for (var i = 0; i < target.ParameterTypes.Count; i++)
+            cost += GetImplicitConversionCost(candidate.Type.ParameterTypes[i], target.ParameterTypes[i]);
+        cost += candidate.Type.ReturnType.Equals(target.ReturnType) ? 0 : 2;
+        return cost;
     }
 
     private static CalorType SubstituteTypeParameters(
@@ -2082,7 +2213,12 @@ public sealed class TypeChecker
                 valid = false;
                 continue;
             }
-            if (!IsAssignable(function.ParameterTypes[parameterIndex], argumentTypes[argumentIndex]))
+            var requiresIdentity = (expectedModifier
+                & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In)) != 0;
+            var typeMatches = requiresIdentity
+                ? function.ParameterTypes[parameterIndex].Equals(argumentTypes[argumentIndex])
+                : IsAssignable(function.ParameterTypes[parameterIndex], argumentTypes[argumentIndex]);
+            if (!typeMatches)
             {
                 _diagnostics.ReportError(arguments[argumentIndex].Span, DiagnosticCode.TypeMismatch,
                     $"Argument type {argumentTypes[argumentIndex].SurfaceName} is not assignable to "
@@ -2868,6 +3004,7 @@ public sealed class TypeChecker
         // Unify the types of all case bodies
         CalorType? unifiedType = null;
         var reportedTargetMismatch = false;
+        var hasTargetMismatch = false;
         foreach (var matchCase in match.Cases)
         {
             // Each arm gets its own scope with the pattern's bindings in it, exactly as
@@ -2895,7 +3032,7 @@ public sealed class TypeChecker
                 CalorType caseType;
                 if (lastStmt is ReturnStatementNode ret && ret.Expression != null)
                 {
-                    caseType = InferExpressionType(ret.Expression);
+                    caseType = InferExpressionType(ret.Expression, expectedType);
                 }
                 else
                 {
@@ -2906,8 +3043,13 @@ public sealed class TypeChecker
                 {
                     if (!reportedTargetMismatch && !IsAssignable(expectedType, caseType))
                     {
-                        _diagnostics.ReportError(match.Span, DiagnosticCode.TypeMismatch,
-                            $"Match arm type {caseType.SurfaceName} is not assignable to {expectedType.SurfaceName}");
+                        hasTargetMismatch = true;
+                        if (!_suppressContextualDiagnostics)
+                        {
+                            _diagnostics.ReportError(match.Span, DiagnosticCode.TypeMismatch,
+                                $"Match arm type {caseType.SurfaceName} is not assignable to "
+                                + expectedType.SurfaceName);
+                        }
                         reportedTargetMismatch = true;
                     }
                     unifiedType = expectedType;
@@ -2923,7 +3065,7 @@ public sealed class TypeChecker
             _env.ExitScope();
         }
 
-        return unifiedType ?? PrimitiveType.Unit;
+        return hasTargetMismatch ? ErrorType.Instance : unifiedType ?? PrimitiveType.Unit;
     }
 
     private CalorType CommonMatchType(Parsing.TextSpan span, CalorType left, CalorType right)
@@ -2939,8 +3081,11 @@ public sealed class TypeChecker
         if (IsAssignable(left, right)) return left;
         if (IsAssignable(right, left)) return right;
 
-        _diagnostics.ReportError(span, DiagnosticCode.TypeMismatch,
-            $"Match expression branches have incompatible types: {left.SurfaceName} and {right.SurfaceName}");
+        if (!_suppressContextualDiagnostics)
+        {
+            _diagnostics.ReportError(span, DiagnosticCode.TypeMismatch,
+                $"Match expression branches have incompatible types: {left.SurfaceName} and {right.SurfaceName}");
+        }
         return ErrorType.Instance;
     }
 
