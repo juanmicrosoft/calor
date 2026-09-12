@@ -337,6 +337,61 @@ public sealed class SafeConsumptionRuntimeTests
         }
     }
 
+    [Fact]
+    public void VarPattern_PreservesNullableOperandWithoutUnknownTypeWarnings()
+    {
+        const string source = """
+            §M{m1:Consumption}
+              §F{f1:Probe:pub} (?str:input) -> str
+                §E{}
+                §R (? (is input var text) text "fallback")
+            """;
+        var (_, diagnostics) = Bind(source);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable);
+        var result = Program.Compile(source, "var-consumption.calr");
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference);
+        var method = Emit(result.GeneratedCode).GetType("Consumption.ConsumptionModule")!.GetMethod("Probe")!;
+        Assert.Null(method.Invoke(null, [null]));
+        Assert.Equal("value", method.Invoke(null, ["value"]));
+    }
+
+    [Fact]
+    public void ThrowNull_RetainsItsNonReturningRuntimeSemantics()
+    {
+        var source = Source("return", "(?? input §TH null)");
+        var result = Program.Compile(source, "throw-null.calr");
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        var method = Emit(result.GeneratedCode).GetType("Consumption.ConsumptionModule")!.GetMethod("Probe")!;
+        Assert.Equal("value", method.Invoke(null, ["value"]));
+        var error = Assert.Throws<TargetInvocationException>(() => method.Invoke(null, [null]));
+        Assert.IsType<NullReferenceException>(error.InnerException);
+    }
+
+    [Fact]
+    public void OverloadedExceptionFactory_DoesNotUseAnUnselectedReturnType()
+    {
+        const string source = """
+            §M{m1:Consumption}
+              §F{f1:Make:pub} (i32:value) -> System.Exception
+                §E{alloc}
+                §B{exception:System.Exception} §NEW{System.Exception}
+                §R exception
+              §F{f2:Make:pub} (str:value) -> str
+                §E{}
+                §R value
+              §F{f3:Probe:pub} (?str:input) -> str
+                §E{alloc,throw}
+                §R (?? input §TH §C{Make} §A INT:1 §/C)
+            """;
+        var result = Program.Compile(source, "overloaded-exception.calr");
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        var method = Emit(result.GeneratedCode).GetType("Consumption.ConsumptionModule")!.GetMethod("Probe")!;
+        Assert.Equal("value", method.Invoke(null, ["value"]));
+        var error = Assert.Throws<TargetInvocationException>(() => method.Invoke(null, [null]));
+        Assert.IsType<Exception>(error.InnerException);
+    }
+
     private static string Source(string consumer, string expression, string? extraParameter = null)
     {
         var body = consumer switch

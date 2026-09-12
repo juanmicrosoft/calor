@@ -284,4 +284,29 @@ public sealed class SafeConsumptionTypeCheckerTests
         Assert.Contains("str", diagnostic.Message);
         Assert.Contains("i32", diagnostic.Message);
     }
+
+    [Theory]
+    [InlineData("(?? INT:1 §TH \"missing\")")]
+    [InlineData("(?? BOOL:true false)")]
+    [InlineData("(?? INT:1 §C{System.Guid.NewGuid} §/C)")]
+    [InlineData("(? true §TH §C{MakeString} §/C \"fallback\")")]
+    [InlineData("(? true §TH §NEW{i32} \"fallback\")")]
+    public void KnownInvalidOperands_AreRejectedBeforeGeneratedValidation(string expression)
+    {
+        var source = $$"""
+            §M{m1:SafeConsumption}
+              §F{f1:MakeString:pub} () -> str
+                §E{}
+                §R "not an exception"
+              §F{f2:Probe:pub} () -> object
+                §E{alloc,throw}
+                §R {{expression}}
+            """;
+        foreach (var result in new[] { Check(source), Program.Compile(source, "invalid-consumption.calr") })
+        {
+            Assert.True(result.HasErrors);
+            Assert.Contains(result.Diagnostics.Errors, diagnostic =>
+                diagnostic.Code == DiagnosticCode.TypeMismatch && diagnostic.Span.Line == 7);
+        }
+    }
 }

@@ -10,6 +10,7 @@ public sealed class TypeChecker
 {
     private readonly DiagnosticBag _diagnostics;
     private readonly TypeEnvironment _env;
+    private readonly HashSet<string> _unmodeledCallReturns = new(StringComparer.Ordinal);
 
     public TypeChecker(DiagnosticBag diagnostics)
     {
@@ -45,6 +46,10 @@ public sealed class TypeChecker
         }
 
         // First pass: register all type definitions
+        _unmodeledCallReturns.Clear();
+        _unmodeledCallReturns.UnionWith(module.Functions.GroupBy(function => function.Name, StringComparer.Ordinal)
+            .Where(group => group.Count() != 1 || group.Any(function => function.TypeParameters.Count != 0))
+            .Select(group => group.Key));
         foreach (var func in module.Functions)
         {
             RegisterFunction(func);
@@ -935,6 +940,20 @@ public sealed class TypeChecker
             return rightType is NeverType ? NeverType.Instance : rightType;
         }
 
+        if (leftType is OptionType)
+        {
+            _diagnostics.ReportError(coalesce.Left.Span, DiagnosticCode.TypeMismatch,
+                $"Null-coalescing does not unwrap runtime {leftType.SurfaceName}; use Option.Unwrap explicitly");
+            return ErrorType.Instance;
+        }
+        if (IsPrimitiveValueType(leftType) || leftType is ResultType
+            || leftType.Equals(PrimitiveType.Void) || leftType.Equals(PrimitiveType.Unit))
+        {
+            _diagnostics.ReportError(coalesce.Left.Span, DiagnosticCode.TypeMismatch,
+                $"Null-coalescing requires a reference or nullable value operand, got {leftType.SurfaceName}");
+            return ErrorType.Instance;
+        }
+
         if (rightType is ErrorType)
             return ErrorType.Instance;
 
@@ -1035,14 +1054,7 @@ public sealed class TypeChecker
             return ErrorType.Instance;
         }
 
-        if (leftType is OptionType)
-        {
-            _diagnostics.ReportError(coalesce.Left.Span, DiagnosticCode.TypeMismatch,
-                $"Null-coalescing does not unwrap runtime {leftType.SurfaceName}; use Option.Unwrap explicitly");
-            return ErrorType.Instance;
-        }
-
-        return CommonConditionalType(coalesce.Span, leftType, rightType);
+        return ErrorType.Instance;
     }
 
     private CalorType InferConditionalExpressionType(ConditionalExpressionNode conditional)
@@ -1101,17 +1113,25 @@ public sealed class TypeChecker
             InferExpressionType(initializer.Value);
         }
 
-        return _env.LookupType(newExpression.TypeName) ?? new ExternalType(newExpression.TypeName);
+        return PrimitiveType.FromName(Parsing.AttributeHelper.ToSurfaceSpelling(newExpression.TypeName))
+            ?? _env.LookupType(newExpression.TypeName)
+            ?? new ExternalType(newExpression.TypeName);
     }
 
     private CalorType InferCallExpressionType(CallExpressionNode call)
     {
+        // This environment retains one signature, not the selected overload or
+        // generic substitution. Never mistake its last declaration for that result.
+        if (_unmodeledCallReturns.Contains(call.Target) || _env.LookupVariable(call.Target) != null)
+            return ErrorType.Instance;
         return _env.LookupFunction(call.Target)?.ReturnType ?? ErrorType.Instance;
     }
 
     private CalorType InferIsPatternType(IsPatternNode isPattern)
     {
         var operandType = InferExpressionType(isPattern.Operand);
+        if (isPattern.TargetType == "var")
+            return PrimitiveType.Bool;
         var targetType = InferTypePatternBindingType(isPattern.TargetType, isPattern.TargetTypeSpan, isPattern.Span);
 
         if (!CanPossiblyMatchPattern(operandType, targetType))
@@ -1253,7 +1273,9 @@ public sealed class TypeChecker
         }
         if (condition is IsPatternNode { VariableName: { Length: > 0 } name } isPattern)
         {
-            _env.DefineVariable(name, InferTypePatternBindingType(isPattern.TargetType, isPattern.TargetTypeSpan, isPattern.Span));
+            _env.DefineVariable(name, isPattern.TargetType == "var"
+                ? InferExpressionType(isPattern.Operand)
+                : InferTypePatternBindingType(isPattern.TargetType, isPattern.TargetTypeSpan, isPattern.Span));
         }
     }
 
@@ -1298,11 +1320,6 @@ public sealed class TypeChecker
 
     private static bool IsSupportedThrowException(ExpressionNode exception, CalorType exceptionType)
     {
-        if (exception is NewExpressionNode or RawCSharpExpressionNode or CallExpressionNode)
-        {
-            return true;
-        }
-
         if (exception is StringLiteralNode or InterpolatedStringNode
             or IntLiteralNode or BoolLiteralNode or FloatLiteralNode
             or DecimalLiteralNode or CharOperationNode)
@@ -1310,7 +1327,10 @@ public sealed class TypeChecker
             return true;
         }
 
-        return exceptionType is ErrorType or ExternalType;
+        // Nominal inheritance and unmodeled external expressions are validated
+        // by generated C#. A modeled call/new value is not exempt just because
+        // of its syntax; e.g. a known str-returning call cannot be thrown.
+        return exceptionType is ErrorType or ExternalType or NullType or NeverType;
     }
 
     private CalorType InferListCreationType(ListCreationNode list)

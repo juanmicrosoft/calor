@@ -15,8 +15,23 @@ The internal transfer helper was colocated with the expression types in
 `BoundNodes.cs`, following the existing compiler source layout and Calor-first
 gate. Subsequent cleanup also applies the existing negative/disjunctive pattern
 binding restriction to `VarPatternNode`, with a direct regression control.
-There are now 44 new compiler cases, so the inventory is 8,856 -> 8,900;
-the original 42-case candidate and its failed CI are historical, not relabeled.
+Round two examined `5b60733e`: compatibility accepted, while integration
+identified two explicit type-rule gaps on the API path that defers Roslyn
+validation. Known non-exception call/new values can no longer be thrown just
+because of their syntax, and known non-nullable value operands cannot use `??`.
+These are type errors, not activation of nullable-state diagnostics. Unknown
+nominal inheritance and external expressions still require generated C#
+validation; this work does not claim a complete exception type checker.
+Valid `throw null` behavior and nullable `var` pattern bindings have separate
+runtime controls.
+
+Overloaded, generic and shadowed native calls do not borrow the last registered
+function's return type: they remain unmodeled in this checker until selected-call
+information is available. An overloaded exception-factory runtime control pins
+that boundary without changing N3's call resolution.
+
+There are now 52 new compiler cases, so the inventory is 8,856 -> 8,908;
+the original 42-case candidate and the 44-case second candidate are historical, not relabeled.
 Final-head review and CI records live on the PR. The source-specific corpus
 measurements below remain pinned to their actual c43 and rejected 2d heads.
 
