@@ -1453,9 +1453,11 @@ public sealed class TypeChecker
         var previousValidateReturnAssignments = _validateReturnAssignments;
         var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
         var previousLambdaReturnInvalid = _lambdaReturnInvalid;
+        var previousInferredLambdaReturnTypes = _inferredLambdaReturnTypes;
         if (expectedFunction == null)
             _suppressContextualDiagnostics = true;
         _lambdaReturnInvalid = false;
+        _inferredLambdaReturnTypes = null;
         _currentReturnType = expectedFunction?.ReturnType;
         _validateReturnAssignments = expectedFunction != null;
         CalorType returnType;
@@ -1500,6 +1502,7 @@ public sealed class TypeChecker
         _validateReturnAssignments = previousValidateReturnAssignments;
         _suppressContextualDiagnostics = previousSuppressContextualDiagnostics;
         _lambdaReturnInvalid = previousLambdaReturnInvalid;
+        _inferredLambdaReturnTypes = previousInferredLambdaReturnTypes;
         _env.ExitScope();
         _ = parameterTypes;
         _ = returnType;

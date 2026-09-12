@@ -1546,6 +1546,27 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void GenericCalls_ExcludeNestedLambdaReturnsFromOuterInference()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Make:pub}<T> (Func<T>:factory) -> T
+                §E{}
+                §R §C{factory} §/C
+              §F{f2:Probe:pub} () -> i32
+                §E{}
+                §R §C{Make} §A §LAM{l1}
+                  §B{nested:Func<str>} §LAM{l2}
+                    §R "nested"
+                  §/LAM{l2}
+                  §R 1
+                §/LAM{l1} §/C
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
     public void StatementLambda_ExhaustiveMatchCanDefinitelyReturn()
     {
         var result = Check("""
