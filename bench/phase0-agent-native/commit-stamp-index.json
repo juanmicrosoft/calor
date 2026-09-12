@@ -12,10 +12,10 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
-      "resolvableOnMain": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
+      "measuredCommit": "4aaad31b8b93bc449e04ebda6b184435057a4f96",
+      "resolvableOnMain": "4aaad31b8b93bc449e04ebda6b184435057a4f96",
       "basis": "identical-src-tree",
-      "note": "#1397: regenerated on exact compilerb2c43561; preserve this ancestor with a merge commit. Unknown receivers no longer borrow runtime Option purity; known dictionary receivers/getters resolve and conditional getters are charged. Calor0411 sites move279->297,543->551,7420->7932 within unchanged12/61/115 unknown-module sets. Calor0425 diagnostics117, modules47, enforced326, exclusions and all other ledger coordinates are unchanged. Earlier measurements remain in git history; no completed epoch, ledger464ace or frozen protocol is restamped."
+      "note": "#1384: regenerated with the existing writer and actual CLI cross-check on combined N2/N3/N5 compiler4aaad31b, after normal merge of accepted8f9891a1. Preserve this measured ancestor with a normal merge. Every non-stamp coordinate, including the actual CLI block, equals the historical N5 a6a87f39 capture. Relative to accepted8f, resolved BCL members change MediatR's historical raw-bag denominator28->29 and raw rejects8->7; the actual production denominator remains34. FluentValidation Calor0411 sites7932->7931 because ToString(Environment.NewLine) resolves to the native STRING overload, retaining Assumed-not-Verified effects. Calor0425 diagnostics117, affected modules47, enforced326, exclusions and all other numeric coordinates remain unchanged. Prior measurements remain in git history; unrelated entries and completed research records are unchanged."
     },
     {
       "ledger": "higher-order-demand-ledger.json",

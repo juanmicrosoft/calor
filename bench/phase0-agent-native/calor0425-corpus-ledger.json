@@ -74,7 +74,7 @@
       }
     ]
   },
-  "MeasuredCommit": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
+  "MeasuredCommit": "4aaad31b8b93bc449e04ebda6b184435057a4f96",
   "AggregateDiagnostics": 117,
   "AggregateModulesWithDiagnostics": 47,
   "AggregateModulesEnforced": 326,
@@ -100,8 +100,8 @@
       "ExcludedParseFailed": 0,
       "ExcludedBindFailed": 2,
       "ExcludedEffectPassFaulted": 0,
-      "ModulesEnforcedRawBagRule": 28,
-      "RawBagBindFailed": 8,
+      "ModulesEnforcedRawBagRule": 29,
+      "RawBagBindFailed": 7,
       "BindFailureCauses": {
         "Calor0208": 2
       },
@@ -212,7 +212,7 @@
         "Calor0208 FluentValidation/Validators/RegularExpressionValidator.cs"
       ],
       "BindFailureMultiCause": 1,
-      "Calor0411Sites": 7932,
+      "Calor0411Sites": 7931,
       "Calor0411Modules": 115
     }
   ]
