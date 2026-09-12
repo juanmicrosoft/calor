@@ -18,8 +18,11 @@ codes (8 active); its frozen evidence is not relabeled. Every entry has a reason
 owning issue. The policy stays in its original `Binding/Scope.cs` maintenance
 surface; no new product C# path or Calor-first allowlist exception is introduced.
 The source-site golden in
-`tests/TestData/Binding/BinderErrorEmissionCatalog.golden.json` records34 routes:
-19 compilation-error leaves,14 analysis-only leaves and one filtered forwarder.
+`tests/TestData/Binding/BinderErrorEmissionCatalog.golden.json` now records33 routes:
+19 compilation-error leaves,12 analysis-only leaves, one receiving-context-dependent
+leaf and one filtered forwarder. N3 unified the two argument-report sites; N4
+records the provenance-specific override below. The earlier34-route checkpoint
+remains historical rather than being relabeled.
 These are **emission-site counts**, not fixture counts or distinct-code counts.
 The metadata helper `MetadataBinderResult.ToDiagnostics` is included because its
 caller-selected severity can be Error even though its default is Info. It is not
@@ -46,16 +49,26 @@ message, span and `HasErrors` behavior.
 ## Structured receiving policy and pass ownership
 
 `BindingDiagnosticContext` records binder origin, receiving boundary and structural
-target shape. The four existing nullable report sites attach initializer,
+target shape. The three existing nullable report sites attach initializer,
 native-return or method-argument context. STRING aliases use `TypeIdentity`,
 never diagnostic prose. Arrays, generic instantiations, nominal types and
 unsupported types are distinct. None of these labels proves reference resolution,
 supported rank/payload, null state or safety.
 
-All18 receiving rules (three codes times six shape values) remain `AnalysisOnly`.
-0272/0273/0274 are not build blockers. Scalar STRING activation belongs to #1385;
-other shape decisions belong to #1400/#1402 and their prerequisites. An absent or
-unsupported context does not become a new safe row. No suppression flag exists.
+The18 ordinary receiving rules (three codes times six shape values) remain
+`AnalysisOnly`. N4 adds one narrowly scoped ownership rule: a native
+`MethodArgument`/`ScalarString`0274 with `ReplacesNativeOverloadError=true`
+retains the rejection previously owned by0208 or0207. Binder sets that provenance
+only after actual old-resolver replay and the original unresolved-argument
+suppression check. It is not a user suppression flag or a null-state proof.
+The source-site golden records the override, reason and owner explicitly rather
+than mislabeling the whole shared report site analysis-only.
+
+Previously accepted inputs, including an already-applicable OBJECT alternative,
+still have ordinary analysis-only0274. BCL inputs and other shapes do not acquire
+this provenance. General scalar STRING activation belongs to #1385; other shape
+decisions belong to #1400/#1402 and their prerequisites. An absent or unsupported
+context does not become a safe row.
 
 `Program.Compile` still runs TypeChecker first and can return before binding.
 The #1396/N0 nullable-literal0202 example is historical: #1397 repairs supported
@@ -74,11 +87,14 @@ Binder owns0275, including no-type-check/transpile and editor paths. Ordinary
 object boxing preserves the complete Option value and is not an unwrap. Unknown
 source types are not classified as proven mismatches or counted as safe.
 
-#1398 still owns coalesce/throw/pattern transfer; #1382/#1383 still own selected
-call mapping and native nullable STRING inputs. Failed nullable native overloads
-retain0208 instead of disappearing into an "unresolved argument" fallback when
-the canonical nullable spelling changes. General mutable assignment and
-unchecked mutation remain outside these new representation checks.
+#1398 still owns coalesce/throw/pattern transfer. N3 supplies selected mappings;
+N4 separates concrete scalar STRING annotation compatibility from ordinary
+native overload applicability. Unsafe inputs formerly rejected by native
+applicability retain rejection through0274, not a fabricated unresolved fallback.
+Non-null inputs to nullable-accepting parameters can resolve. Runtime Option,
+generic payloads, by-reference parameters and constructors retain their existing
+applicability; general mutable assignment and unchecked mutation remain outside
+these representation checks. See [the N4 contract](native-string-argument-compatibility.md).
 
 `DiagnosticBag` scopes provenance only during `Binder.Bind` and restores it after
 the call. Parser/TypeChecker diagnostics using the same code remain distinguishable.
@@ -102,8 +118,9 @@ the same fix-aware converter rather than reconstructing a metadata-free diagnost
 | `ExternalCallCollector` | Uses a separate binder bag for receiver resolution, not publication. Existing unresolved behavior is unchanged. |
 
 Active binding remains enabled with all supported type/effect opt-outs, including
-transpile-only. No nullable case is activated here, so future active nullable
-code/span/severity parity is still mandatory at #1385/#1402. Existing0206 has
+transpile-only. N4's existing-rejection handoff has API/CLI/editor
+code/span/severity controls; this does not replace future activation parity at
+#1385/#1402. Existing0206 has
 API/CLI/editor parity and remains rejecting after changed warm source.
 
 ## Cache identity correction

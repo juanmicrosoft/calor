@@ -320,7 +320,7 @@ public sealed class Binder
                     || !TryBuildStringTarget(mapping.ParameterType, out var target, match.Function))
                     continue;
                 ValidateCallArgument(arguments[mapping.ArgumentIndex], parameter.Name, target!,
-                    mapping.IsExpandedParams, reported);
+                    mapping.IsExpandedParams, reported, resolution.ReplacesNativeOverloadError);
             }
         }
     }
@@ -330,7 +330,8 @@ public sealed class Binder
         string parameterName,
         BoundTypes.BoundType target,
         bool isExpandedParams,
-        HashSet<(Parsing.TextSpan Span, string ParameterName, string TargetShape)> reported)
+        HashSet<(Parsing.TextSpan Span, string ParameterName, string TargetShape)> reported,
+        bool replacesNativeOverloadError = false)
     {
         if (!NullabilityChecker.IsPossiblyNullAssignedTo(argument, target))
             return;
@@ -340,6 +341,9 @@ public sealed class Binder
             return;
         var receivingPosition = isExpandedParams ? "Expanded argument to element of params parameter" : "Argument to parameter";
         var parameterPart = isExpandedParams ? "parameter element" : "parameter";
+        var context = BindingDiagnosticContext.For(BindingReceivingBoundary.MethodArgument, target);
+        if (replacesNativeOverloadError && context.Shape == BindingReceivingShape.ScalarString)
+            context = context with { ReplacesNativeOverloadError = true };
         _diagnostics.Report(
             argument.Span,
             DiagnosticCode.NullableArgumentToNonNullableParameter,
@@ -347,7 +351,7 @@ public sealed class Binder
             $"but the value may be null (source annotation: '{DescribeAnnotation(argument)}'). " +
             $"Change the {parameterPart} type to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
             SemanticsVersion.NullabilitySeverityFor(),
-            BindingDiagnosticContext.For(BindingReceivingBoundary.MethodArgument, target));
+            context);
     }
 
     private static BoundTypes.BoundType? TryBuildBclArgumentTarget(Microsoft.CodeAnalysis.ITypeSymbol type)
@@ -1389,7 +1393,8 @@ public sealed class Binder
             args,
             call.ArgumentNames,
             call.ArgumentModifiers,
-            call.TypeArguments);
+            call.TypeArguments,
+            allowNullableStringCompatibility: true);
         var bclResolution = resolution.Kind == OverloadResolutionKind.NotFound
             ? TryResolveBclCall(call.Target, args, call.ArgumentNames, call.ArgumentModifiers)
             : null;
@@ -3592,7 +3597,8 @@ public sealed class Binder
             args,
             callExpr.ArgumentNames,
             callExpr.ArgumentModifiers,
-            callExpr.TypeArguments);
+            callExpr.TypeArguments,
+            allowNullableStringCompatibility: true);
         var returnType = resolution.ResolvedReturnType ?? "OBJECT";
 
         var (resolvedTypeName, resolvedMethodName) = GetResolvedCallIdentity(
@@ -3988,8 +3994,11 @@ public sealed class Binder
         IReadOnlyList<BoundExpression> arguments,
         IReadOnlyList<string?>? argumentNames,
         IReadOnlyList<string?>? argumentModifiers,
-        IReadOnlyList<string>? typeArguments)
+        IReadOnlyList<string>? typeArguments,
+        bool allowNullableStringCompatibility = false)
     {
+        // Synthetic constructor targets can also occur in ordinary call nodes.
+        allowNullableStringCompatibility &= !target.EndsWith("..ctor", StringComparison.Ordinal);
         var argumentTypes = arguments
             .Select(argument =>
                 argument is BoundVariableExpression { Variable.Id.IsNone: true }
@@ -4003,7 +4012,8 @@ public sealed class Binder
                 argumentTypes,
                 argumentNames,
                 argumentModifiers,
-                typeArguments);
+                typeArguments,
+                allowNullableStringCompatibility);
             if (resolution.Kind == OverloadResolutionKind.NotFound)
                 continue;
 
@@ -4020,6 +4030,19 @@ public sealed class Binder
             var hasUnresolvedArguments = argumentTypes.Any(type =>
                 string.Equals(type, "<unresolved>", StringComparison.Ordinal)
                 || IsNominalTypeInvisibleToThisModule(type));
+            if (allowNullableStringCompatibility && !hasUnresolvedArguments
+                && resolution.Kind == OverloadResolutionKind.Resolved
+                && resolution.Matches.Any(match => match.Arguments.Any(mapping =>
+                    Scope.HasNullableStringAnnotationDifference(
+                        mapping.ParameterType, argumentTypes[mapping.ArgumentIndex]))))
+            {
+                // Preserve actual prior rejection, not a guess based on the new
+                // winner: an OBJECT overload may already have accepted this call.
+                var previous = ResolveAccessibleOverload(
+                    lookupName, argumentTypes, argumentNames, argumentModifiers, typeArguments);
+                if (previous.Kind is OverloadResolutionKind.NoMatch or OverloadResolutionKind.Ambiguous)
+                    resolution = resolution.WithReplacedNativeOverloadError();
+            }
             if (!hasUnresolvedArguments
                 && resolution.Kind == OverloadResolutionKind.NoMatch)
             {
@@ -4051,7 +4074,8 @@ public sealed class Binder
         IReadOnlyList<string> argumentTypes,
         IReadOnlyList<string?>? argumentNames,
         IReadOnlyList<string?>? argumentModifiers,
-        IReadOnlyList<string>? typeArguments)
+        IReadOnlyList<string>? typeArguments,
+        bool allowNullableStringCompatibility = false)
     {
         var candidates = _scope.GetOverloads(lookupName)
             .ToArray();
@@ -4074,7 +4098,8 @@ public sealed class Binder
             argumentNames,
             argumentModifiers,
             typeArguments,
-            GetImplicitConversionCost);
+            GetImplicitConversionCost,
+            allowNullableStringCompatibility);
     }
 
     /// <summary>

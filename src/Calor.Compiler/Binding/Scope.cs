@@ -81,6 +81,9 @@ public sealed record BindingDiagnosticContext(
     BindingReceivingBoundary Boundary,
     BindingReceivingShape Shape)
 {
+    // Provenance of an actual prior applicability error, not general activation.
+    public bool ReplacesNativeOverloadError { get; init; }
+
     public static BindingDiagnosticContext General { get; } =
         new(BindingReceivingBoundary.None, BindingReceivingShape.None);
 
@@ -210,6 +213,16 @@ public static class BindingDiagnosticPolicy
                         ? "Scalar STRING is planned Stage A, not activated by the routing catalog."
                         : "Non-scalar or unsupported receiving context is not Stage A; Stage B requires a separate measured decision.",
                     shape == BindingReceivingShape.ScalarString ? 1385 : 1402))))
+            .Append(new BindingReceivingRule(
+                DiagnosticCode.NullableArgumentToNonNullableParameter,
+                new(BindingReceivingBoundary.MethodArgument, BindingReceivingShape.ScalarString)
+                {
+                    ReplacesNativeOverloadError = true
+                },
+                new(DiagnosticCode.NullableArgumentToNonNullableParameter,
+                    BindingDiagnosticDisposition.CompilationError,
+                    "A resolved native scalar STRING input replaces an actual prior overload rejection; other nullable inputs await Stage A.",
+                    1383)))
             .ToArray());
     }
 }
@@ -1362,6 +1375,7 @@ public sealed class OverloadResolutionResult
     public IReadOnlyList<FunctionSymbol> Candidates { get; }
     public IReadOnlyList<FunctionSymbol> Functions { get; }
     public IReadOnlyList<ResolvedOverloadMatch> Matches { get; }
+    internal bool ReplacesNativeOverloadError { get; }
 
     private OverloadResolutionResult(
         OverloadResolutionKind kind,
@@ -1369,7 +1383,8 @@ public sealed class OverloadResolutionResult
         string? resolvedReturnType,
         IReadOnlyList<FunctionSymbol> candidates,
         IReadOnlyList<FunctionSymbol>? functions = null,
-        IReadOnlyList<ResolvedOverloadMatch>? matches = null)
+        IReadOnlyList<ResolvedOverloadMatch>? matches = null,
+        bool replacesNativeOverloadError = false)
     {
         Kind = kind;
         Function = function;
@@ -1377,7 +1392,12 @@ public sealed class OverloadResolutionResult
         Candidates = candidates;
         Functions = functions ?? Array.Empty<FunctionSymbol>();
         Matches = matches ?? Array.Empty<ResolvedOverloadMatch>();
+        ReplacesNativeOverloadError = replacesNativeOverloadError;
     }
+
+    internal OverloadResolutionResult WithReplacedNativeOverloadError() =>
+        new(Kind, Function, ResolvedReturnType, Candidates, Functions, Matches,
+            replacesNativeOverloadError: true);
 
     public static OverloadResolutionResult NotFound() =>
         new(OverloadResolutionKind.NotFound, null, null, Array.Empty<FunctionSymbol>());
@@ -1554,7 +1574,18 @@ public sealed class Scope
         IReadOnlyList<string?>? argumentNames = null,
         IReadOnlyList<string?>? argumentModifiers = null,
         IReadOnlyList<string>? typeArguments = null,
-        Func<string, string, int?>? implicitConversionCost = null)
+        Func<string, string, int?>? implicitConversionCost = null) =>
+        ResolveOverload(name, argumentTypes, argumentNames, argumentModifiers,
+            typeArguments, implicitConversionCost, allowNullableStringCompatibility: false);
+
+    public OverloadResolutionResult ResolveOverload(
+        string name,
+        IReadOnlyList<string> argumentTypes,
+        IReadOnlyList<string?>? argumentNames,
+        IReadOnlyList<string?>? argumentModifiers,
+        IReadOnlyList<string>? typeArguments,
+        Func<string, string, int?>? implicitConversionCost,
+        bool allowNullableStringCompatibility)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(argumentTypes);
@@ -1569,11 +1600,13 @@ public sealed class Scope
                     argumentNames,
                     argumentModifiers,
                     typeArguments,
-                    implicitConversionCost)
+                    implicitConversionCost,
+                    allowNullableStringCompatibility)
                 ?? OverloadResolutionResult.NotFound();
         }
 
         var applicable = new List<(FunctionSymbol Function, string ReturnType, int Score,
+            bool UsesNullableStringCompatibility,
             IReadOnlyList<ResolvedArgumentMapping> Arguments)>();
         foreach (var function in overloads)
         {
@@ -1584,11 +1617,18 @@ public sealed class Scope
                     argumentModifiers,
                     typeArguments,
                     implicitConversionCost,
+                    allowNullableStringCompatibility,
                     out var resolvedReturnType,
                     out var score,
+                    out var usesNullableStringCompatibility,
                     out var mappedArguments))
             {
-                applicable.Add((function, resolvedReturnType, score, mappedArguments));
+                applicable.Add((
+                    function,
+                    resolvedReturnType,
+                    score,
+                    usesNullableStringCompatibility,
+                    mappedArguments));
             }
         }
 
@@ -1599,6 +1639,50 @@ public sealed class Scope
         var best = applicable.Where(item => item.Score == bestScore).ToArray();
         if (best.Length == 1)
             return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType, best[0].Arguments);
+
+        var concreteNullableStringGroups = best
+            .Where(item => item.UsesNullableStringCompatibility && item.Function.GenericArity == 0)
+            .GroupBy(item => item.Function.SignatureKey, StringComparer.Ordinal)
+            .Where(group =>
+            {
+                var candidates = group.Select(item => item.Function).ToArray();
+                return candidates
+                    .Skip(1)
+                    .All(candidate => candidates
+                        .Where(other => !ReferenceEquals(other, candidate))
+                        .All(other => AreMutuallyExclusiveAlternatives(candidate, other)));
+            })
+            .Select(group => group.ToArray())
+            .ToArray();
+        if (concreteNullableStringGroups.Length == 1)
+        {
+            var selected = concreteNullableStringGroups[0];
+            var selectedFunctions = selected.Select(item => item.Function).ToHashSet();
+            if (best.Where(item => !selectedFunctions.Contains(item.Function))
+                .All(item => item.Function.GenericArity > 0))
+            {
+                if (selected.Length == 1)
+                {
+                    return OverloadResolutionResult.Resolved(
+                        selected[0].Function,
+                        selected[0].ReturnType,
+                        selected[0].Arguments);
+                }
+
+                var alternativeReturnTypes = selected
+                    .Select(item => TypeIdentity.Canonicalize(item.ReturnType))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray();
+                return OverloadResolutionResult.ResolvedAlternatives(
+                    selected.Select(item => item.Function).ToArray(),
+                    alternativeReturnTypes.Length == 1
+                        ? alternativeReturnTypes[0]
+                        : "OBJECT",
+                    selected.Select(item =>
+                            new ResolvedOverloadMatch(item.Function, item.ReturnType, item.Arguments))
+                        .ToArray());
+            }
+        }
 
         var bestFunctions = best.Select(item => item.Function).ToArray();
         if (bestFunctions
@@ -1726,12 +1810,15 @@ public sealed class Scope
         IReadOnlyList<string?>? argumentModifiers,
         IReadOnlyList<string>? typeArguments,
         Func<string, string, int?>? implicitConversionCost,
+        bool allowNullableStringCompatibility,
         out string resolvedReturnType,
         out int score,
+        out bool usesNullableStringCompatibility,
         out IReadOnlyList<ResolvedArgumentMapping> mappedArguments)
     {
         resolvedReturnType = function.ReturnType;
         score = int.MaxValue;
+        usesNullableStringCompatibility = false;
         mappedArguments = Array.Empty<ResolvedArgumentMapping>();
 
         if (typeArguments != null && function.GenericArity != typeArguments.Count)
@@ -1753,6 +1840,7 @@ public sealed class Scope
 
             var matches = true;
             var conversionScore = 0;
+            var mappingUsesNullableStringCompatibility = false;
             var parameterTypes = new string[argumentTypes.Count];
             for (var argumentIndex = 0; argumentIndex < argumentTypes.Count; argumentIndex++)
             {
@@ -1779,6 +1867,15 @@ public sealed class Scope
                         typeParameterSet,
                         substitutions))
                 {
+                    continue;
+                }
+
+                if (allowNullableStringCompatibility
+                    && (parameter.Modifier & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In)) == 0
+                    && !typeParameterSet.Contains(parameterType)
+                    && HasNullableStringAnnotationDifference(parameterType, argumentTypes[argumentIndex]))
+                {
+                    mappingUsesNullableStringCompatibility = true;
                     continue;
                 }
 
@@ -1811,6 +1908,7 @@ public sealed class Scope
                 continue;
 
             score = candidateScore;
+            usesNullableStringCompatibility = mappingUsesNullableStringCompatibility;
             resolvedReturnType = substitutions.Count == 0
                 ? function.ReturnType
                 : TypeIdentity.Substitute(function.ReturnType, substitutions);
@@ -1825,6 +1923,14 @@ public sealed class Scope
         }
 
         return score != int.MaxValue;
+    }
+
+    internal static bool HasNullableStringAnnotationDifference(string parameterType, string argumentType)
+    {
+        var parameter = TypeIdentity.Canonicalize(parameterType);
+        var argument = TypeIdentity.Canonicalize(argumentType);
+        return (parameter == "STRING" && argument == "STRING?")
+            || (parameter == "STRING?" && argument == "STRING");
     }
 
     private sealed record ArgumentMapping(

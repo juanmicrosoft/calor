@@ -12,10 +12,10 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "4aaad31b8b93bc449e04ebda6b184435057a4f96",
-      "resolvableOnMain": "4aaad31b8b93bc449e04ebda6b184435057a4f96",
+      "measuredCommit": "374f40ac12f4161fdc05c90ba754506c822d504a",
+      "resolvableOnMain": "374f40ac12f4161fdc05c90ba754506c822d504a",
       "basis": "identical-src-tree",
-      "note": "#1384: regenerated with the existing writer and actual CLI cross-check on combined N2/N3/N5 compiler4aaad31b, after normal merge of accepted8f9891a1. Preserve this measured ancestor with a normal merge. Every non-stamp coordinate, including the actual CLI block, equals the historical N5 a6a87f39 capture. Relative to accepted8f, resolved BCL members change MediatR's historical raw-bag denominator28->29 and raw rejects8->7; the actual production denominator remains34. FluentValidation Calor0411 sites7932->7931 because ToString(Environment.NewLine) resolves to the native STRING overload, retaining Assumed-not-Verified effects. Calor0425 diagnostics117, affected modules47, enforced326, exclusions and all other numeric coordinates remain unchanged. Prior measurements remain in git history; unrelated entries and completed research records are unchanged."
+      "note": "#1383/#1384: regenerated on the normal merged N4+N5 candidate 374f40ac. Native nullable STRING applicability keeps Calor0425 diagnostics117 and affected modules47 fixed while enforced modules move326->327 and exclusions38->37. N5 member-resolution changes remain integrated; the actual production denominator and all other coordinates are preserved except the previously documented N4 reachability delta. Preserve this measured ancestor with a normal merge; no release, activation, proof claim, or research record is restamped."
     },
     {
       "ledger": "higher-order-demand-ledger.json",

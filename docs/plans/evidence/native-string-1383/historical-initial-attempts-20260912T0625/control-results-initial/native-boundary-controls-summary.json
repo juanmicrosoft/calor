@@ -1,0 +1,503 @@
+{
+  "baselineCommit": "8f9891a1a07f786a76a293017959c3edf28412bf",
+  "candidateCommit": "bde9ee88627acb1fcdf62494b701b24856fa5881",
+  "cases": [
+    {
+      "name": "direct-nullable-input",
+      "baselineDiagnostics": [
+        {
+          "code": "Calor0208",
+          "span": [
+            131,
+            216
+          ],
+          "line": 8,
+          "column": 8,
+          "propagated": true,
+          "disposition": "CompilationError",
+          "boundary": "None",
+          "shape": "None",
+          "replacesNativeOverloadError": false,
+          "snippet": "\u00a7C{Take} \u00a7A \u00a7C{System.Environment.GetEnvironmentVariable} \u00a7A \"CALOR_N4_UNSET\" \u00a7/C \u00a7/C",
+          "message": "No overload of internal call 'Take' matches (STRING?). Candidates: Take(str) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Atake]"
+        }
+      ],
+      "candidateDiagnostics": [
+        {
+          "code": "Calor0274",
+          "span": [
+            143,
+            212
+          ],
+          "line": 8,
+          "column": 20,
+          "propagated": true,
+          "disposition": "CompilationError",
+          "boundary": "MethodArgument",
+          "shape": "ScalarString",
+          "replacesNativeOverloadError": true,
+          "snippet": "\u00a7C{System.Environment.GetEnvironmentVariable} \u00a7A \"CALOR_N4_UNSET\" \u00a7/C",
+          "message": "Argument to parameter 'value' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary."
+        }
+      ],
+      "baselineCalls": [
+        {
+          "kind": "expression",
+          "target": "Take",
+          "result": "OBJECT",
+          "args": [
+            [
+              0,
+              "string?",
+              "BoundCallExpression"
+            ]
+          ],
+          "matches": []
+        }
+      ],
+      "candidateCalls": [
+        {
+          "kind": "expression",
+          "target": "Take",
+          "result": "i32",
+          "args": [
+            [
+              0,
+              "string?",
+              "BoundCallExpression"
+            ]
+          ],
+          "matches": [
+            {
+              "signature": "Take(str)",
+              "return": "i32",
+              "parameters": [
+                [
+                  "value",
+                  "str"
+                ]
+              ],
+              "mappings": [
+                {
+                  "ArgumentIndex": 0,
+                  "ParameterIndex": 0,
+                  "EffectiveParameterType": "str",
+                  "IsExpandedParams": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "nonnull-to-nullable-target",
+      "baselineDiagnostics": [
+        {
+          "code": "Calor0208",
+          "span": [
+            132,
+            154
+          ],
+          "line": 8,
+          "column": 8,
+          "propagated": true,
+          "disposition": "CompilationError",
+          "boundary": "None",
+          "shape": "None",
+          "replacesNativeOverloadError": false,
+          "snippet": "\u00a7C{Take} \u00a7A \"safe\" \u00a7/C",
+          "message": "No overload of internal call 'Take' matches (STRING). Candidates: Take(?str) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Atake]"
+        }
+      ],
+      "candidateDiagnostics": [],
+      "baselineCalls": [
+        {
+          "kind": "expression",
+          "target": "Take",
+          "result": "OBJECT",
+          "args": [
+            [
+              0,
+              "STRING",
+              "BoundStringLiteral"
+            ]
+          ],
+          "matches": []
+        }
+      ],
+      "candidateCalls": [
+        {
+          "kind": "expression",
+          "target": "Take",
+          "result": "i32",
+          "args": [
+            [
+              0,
+              "STRING",
+              "BoundStringLiteral"
+            ]
+          ],
+          "matches": [
+            {
+              "signature": "Take(?str)",
+              "return": "i32",
+              "parameters": [
+                [
+                  "value",
+                  "?str"
+                ]
+              ],
+              "mappings": [
+                {
+                  "ArgumentIndex": 0,
+                  "ParameterIndex": 0,
+                  "EffectiveParameterType": "?str",
+                  "IsExpandedParams": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "already-applicable-object-alternative",
+      "baselineDiagnostics": [],
+      "candidateDiagnostics": [
+        {
+          "code": "Calor0274",
+          "span": [
+            204,
+            273
+          ],
+          "line": 10,
+          "column": 20,
+          "propagated": false,
+          "disposition": "AnalysisOnly",
+          "boundary": "MethodArgument",
+          "shape": "ScalarString",
+          "replacesNativeOverloadError": false,
+          "snippet": "\u00a7C{System.Environment.GetEnvironmentVariable} \u00a7A \"CALOR_N4_UNSET\" \u00a7/C",
+          "message": "Argument to parameter 'value' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary."
+        }
+      ],
+      "baselineCalls": [
+        {
+          "kind": "expression",
+          "target": "Take",
+          "result": "i32",
+          "args": [
+            [
+              0,
+              "string?",
+              "BoundCallExpression"
+            ]
+          ],
+          "matches": [
+            {
+              "signature": "Take(object)",
+              "return": "i32",
+              "parameters": [
+                [
+                  "value",
+                  "object"
+                ]
+              ],
+              "mappings": [
+                {
+                  "ArgumentIndex": 0,
+                  "ParameterIndex": 0,
+                  "EffectiveParameterType": "object",
+                  "IsExpandedParams": false
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "candidateCalls": [
+        {
+          "kind": "expression",
+          "target": "Take",
+          "result": "i32",
+          "args": [
+            [
+              0,
+              "string?",
+              "BoundCallExpression"
+            ]
+          ],
+          "matches": [
+            {
+              "signature": "Take(str)",
+              "return": "i32",
+              "parameters": [
+                [
+                  "value",
+                  "str"
+                ]
+              ],
+              "mappings": [
+                {
+                  "ArgumentIndex": 0,
+                  "ParameterIndex": 0,
+                  "EffectiveParameterType": "str",
+                  "IsExpandedParams": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "old-numeric-ambiguity-preserved",
+      "baselineDiagnostics": [
+        {
+          "code": "Calor0207",
+          "span": [
+            189,
+            206
+          ],
+          "line": 10,
+          "column": 8,
+          "propagated": true,
+          "disposition": "CompilationError",
+          "boundary": "None",
+          "shape": "None",
+          "replacesNativeOverloadError": false,
+          "snippet": "\u00a7C{Take} \u00a7A 1 \u00a7/C",
+          "message": "Call 'Take(INT)' is ambiguous between: Take(i64) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Atake], Take(f64) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Adouble]"
+        }
+      ],
+      "candidateDiagnostics": [
+        {
+          "code": "Calor0207",
+          "span": [
+            189,
+            206
+          ],
+          "line": 10,
+          "column": 8,
+          "propagated": true,
+          "disposition": "CompilationError",
+          "boundary": "None",
+          "shape": "None",
+          "replacesNativeOverloadError": false,
+          "snippet": "\u00a7C{Take} \u00a7A 1 \u00a7/C",
+          "message": "Call 'Take(INT)' is ambiguous between: Take(i64) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Atake], Take(f64) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Adouble]"
+        }
+      ],
+      "baselineCalls": [
+        {
+          "kind": "expression",
+          "target": "Take",
+          "result": "OBJECT",
+          "args": [
+            [
+              0,
+              "INT",
+              "BoundIntLiteral"
+            ]
+          ],
+          "matches": []
+        }
+      ],
+      "candidateCalls": [
+        {
+          "kind": "expression",
+          "target": "Take",
+          "result": "OBJECT",
+          "args": [
+            [
+              0,
+              "INT",
+              "BoundIntLiteral"
+            ]
+          ],
+          "matches": []
+        }
+      ]
+    },
+    {
+      "name": "old-nullable-string-ambiguity-handoff",
+      "baselineDiagnostics": [
+        {
+          "code": "Calor0207",
+          "span": [
+            461,
+            475
+          ],
+          "line": 20,
+          "column": 12,
+          "propagated": true,
+          "disposition": "CompilationError",
+          "boundary": "None",
+          "shape": "None",
+          "replacesNativeOverloadError": false,
+          "snippet": "\u00a7C{Take} value",
+          "message": "Call 'Take(STRING?)' is ambiguous between: NativeString.Take(any, INT) [calor://source/%3Cmemory%3E/module/m001/class/ast%3Ac001/method/ast%3Am003], NativeString.Take(any, BOOL) [calor://source/%3Cmemory%3E/module/m001/class/ast%3Ac001/method/ast%3Am004]"
+        }
+      ],
+      "candidateDiagnostics": [
+        {
+          "code": "Calor0274",
+          "span": [
+            470,
+            475
+          ],
+          "line": 20,
+          "column": 21,
+          "propagated": true,
+          "disposition": "CompilationError",
+          "boundary": "MethodArgument",
+          "shape": "ScalarString",
+          "replacesNativeOverloadError": true,
+          "snippet": "value",
+          "message": "Argument to parameter 'value' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary."
+        }
+      ],
+      "baselineCalls": [
+        {
+          "kind": "expression",
+          "target": "Take",
+          "result": "OBJECT",
+          "args": [
+            [
+              0,
+              "?str",
+              "BoundVariableExpression"
+            ]
+          ],
+          "matches": []
+        }
+      ],
+      "candidateCalls": [
+        {
+          "kind": "expression",
+          "target": "Take",
+          "result": "i32",
+          "args": [
+            [
+              0,
+              "?str",
+              "BoundVariableExpression"
+            ]
+          ],
+          "matches": [
+            {
+              "signature": "NativeString.Take(str)",
+              "return": "i32",
+              "parameters": [
+                [
+                  "value",
+                  "str"
+                ]
+              ],
+              "mappings": [
+                {
+                  "ArgumentIndex": 0,
+                  "ParameterIndex": 0,
+                  "EffectiveParameterType": "str",
+                  "IsExpandedParams": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "invisible-argument-suppression",
+      "baselineDiagnostics": [],
+      "candidateDiagnostics": [
+        {
+          "code": "Calor0274",
+          "span": [
+            181,
+            186
+          ],
+          "line": 7,
+          "column": 20,
+          "propagated": false,
+          "disposition": "AnalysisOnly",
+          "boundary": "MethodArgument",
+          "shape": "ScalarString",
+          "replacesNativeOverloadError": false,
+          "snippet": "value",
+          "message": "Argument to parameter 'value' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary."
+        }
+      ],
+      "baselineCalls": [
+        {
+          "kind": "expression",
+          "target": "Take",
+          "result": "OBJECT",
+          "args": [
+            [
+              0,
+              "?str",
+              "BoundVariableExpression"
+            ],
+            [
+              1,
+              "Invisible",
+              "BoundVariableExpression"
+            ]
+          ],
+          "matches": []
+        }
+      ],
+      "candidateCalls": [
+        {
+          "kind": "expression",
+          "target": "Take",
+          "result": "i32",
+          "args": [
+            [
+              0,
+              "?str",
+              "BoundVariableExpression"
+            ],
+            [
+              1,
+              "Invisible",
+              "BoundVariableExpression"
+            ]
+          ],
+          "matches": [
+            {
+              "signature": "Take(str, Invisible)",
+              "return": "i32",
+              "parameters": [
+                [
+                  "value",
+                  "str"
+                ],
+                [
+                  "other",
+                  "Invisible"
+                ]
+              ],
+              "mappings": [
+                {
+                  "ArgumentIndex": 0,
+                  "ParameterIndex": 0,
+                  "EffectiveParameterType": "str",
+                  "IsExpandedParams": false
+                },
+                {
+                  "ArgumentIndex": 1,
+                  "ParameterIndex": 1,
+                  "EffectiveParameterType": "Invisible",
+                  "IsExpandedParams": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

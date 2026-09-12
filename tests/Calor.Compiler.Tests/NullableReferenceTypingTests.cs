@@ -200,7 +200,7 @@ public class NullableReferenceTypingTests
     }
 
     [Fact]
-    public void NullableNativeArguments_KeepTheirPreActivationOverloadRejection()
+    public void NullableNativeArguments_KeepRejectionWithNullabilityOwnership()
     {
         const string source = """
             §M{m1:NullableTyping}
@@ -212,8 +212,62 @@ public class NullableReferenceTypingTests
             """;
         var (bound, diagnostics) = Bind(source);
         var call = Assert.IsType<BoundCallStatement>(bound.Functions[1].Body[0]);
-        Assert.True(diagnostics.Any(d => d.Code == DiagnosticCode.NoMatchingOverload),
+        Assert.True(diagnostics.Any(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+                && BindingDiagnosticPolicy.IsCompilationError(d)),
             $"Argument: {Assert.Single(call.Arguments).Type.DisplayString}; target: {call.ResolvedSymbol?.Parameters[0].TypeName}; {string.Join("; ", diagnostics)}");
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NoMatchingOverload);
+        Assert.NotNull(call.ResolvedSymbol);
+    }
+
+    [Fact]
+    public void NullableNativeTarget_PreservesNullAndNonNullRuntimeValues()
+    {
+        const string source = """
+            §M{m1:NullableTyping}
+              §F{take:Take:pub} (?str:value) -> ?str
+                §E{}
+                §R value
+              §F{probe:Probe:pub} (?str:value) -> ?str
+                §E{}
+                §R §C{Take} §A value §/C
+              §F{nonNull:NonNull:pub} (str:value) -> ?str
+                §E{}
+                §R §C{Take} §A value §/C
+            """;
+        var result = Program.Compile(source, "native-string-runtime.calr");
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics));
+        Assert.DoesNotContain("??", result.GeneratedCode);
+        Assert.DoesNotContain("Calor.Runtime.Option", result.GeneratedCode);
+        var type = Emit(result.GeneratedCode).GetType("NullableTyping.NullableTypingModule")!;
+        var probe = type.GetMethod("Probe")!;
+        Assert.Equal(typeof(string), probe.ReturnType);
+        Assert.Null(probe.Invoke(null, [null]));
+        Assert.Equal("live", probe.Invoke(null, ["live"]));
+        Assert.Equal("live", type.GetMethod("NonNull")!.Invoke(null, ["live"]));
+    }
+
+    [Fact]
+    public void PreviouslyAcceptedObjectAlternative_KeepsClrOverloadSelection_NotSafety()
+    {
+        const string source = """
+            §M{m1:NullableTyping}
+              §F{takeString:Take:pub} (str:value) -> i32
+                §E{}
+                §R 1
+              §F{takeObject:Take:pub} (object:value) -> i32
+                §E{}
+                §R 2
+              §F{probe:Probe:pub} (?str:value) -> i32
+                §E{}
+                §R §C{Take} §A value §/C
+            """;
+        var (_, diagnostics) = Bind(source);
+        Assert.True(BindingDiagnosticPolicy.IsAnalysisOnly(Assert.Single(diagnostics.Errors)));
+        var result = Program.Compile(source, "native-string-overload-runtime.calr");
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics));
+        var method = Emit(result.GeneratedCode).GetType("NullableTyping.NullableTypingModule")!.GetMethod("Probe")!;
+        Assert.Equal(1, method.Invoke(null, [null]));
+        Assert.Equal(1, method.Invoke(null, ["live"]));
     }
 
     [Theory]
