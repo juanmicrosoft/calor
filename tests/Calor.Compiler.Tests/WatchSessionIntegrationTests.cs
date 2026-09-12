@@ -95,11 +95,12 @@ public sealed class WatchSessionIntegrationTests : IDisposable
             + "    §R INT:" + answer.ToString(System.Globalization.CultureInfo.InvariantCulture) + "\n";
     }
 
-    private static string NullableLiteralTypeCheckerOnlyViolation() => """
+    private static string TransitionalNullableAssignmentViolation() => """
         §M{m001:N0}
           §F{f001:Probe:pub} () -> void
             §E{}
-            §B{x:?str} "safe"
+            §B{x:?str} null
+            §B{y:str} x
         """;
 
     private void WriteAllModules()
@@ -307,7 +308,7 @@ public sealed class WatchSessionIntegrationTests : IDisposable
         try
         {
             var source = Path.Combine(_root, "n0.calr");
-            File.WriteAllText(source, NullableLiteralTypeCheckerOnlyViolation());
+            File.WriteAllText(source, TransitionalNullableAssignmentViolation());
             Environment.SetEnvironmentVariable("CALOR_NO_TYPE_CHECK", "1");
 
             var results = await RunScriptAsync(rebuildCount: 2, drive: (session, step) =>

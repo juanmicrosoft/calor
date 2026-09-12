@@ -183,6 +183,16 @@ public sealed class BoundVariableExpression : BoundExpression
         VariableSymbol variable,
         IReadOnlyList<VariableSymbol>? resolvedSymbols = null,
         BoundType? typeOverride = null)
+        : this(span, variable, resolvedSymbols, typeOverride, referenceIdentity: null)
+    {
+    }
+
+    internal BoundVariableExpression(
+        TextSpan span,
+        VariableSymbol variable,
+        IReadOnlyList<VariableSymbol>? resolvedSymbols,
+        BoundType? typeOverride,
+        NominalBoundType? referenceIdentity)
         : base(span)
     {
         Variable = variable;
@@ -218,6 +228,10 @@ public sealed class BoundVariableExpression : BoundExpression
         Type = resolvedTypes.Length == 1
             ? BuildStringAnnotatedTypeOrDefault(variable, resolvedTypeName)
             : new NominalBoundType(resolvedTypeName, NullableAnnotation.Oblivious);
+        if (resolvedTypes.Length == 1 && referenceIdentity is not null && Type is NominalBoundType nominal)
+            Type = new NominalBoundType(
+                nominal.QualifiedName, nominal.NullableAnnotation,
+                referenceIdentity.Declaration, referenceIdentity.RoslynSymbol);
     }
 
     // S3 scope (§D6): flow the STRING annotation only. Handles both the
@@ -243,7 +257,7 @@ public sealed class BoundVariableExpression : BoundExpression
             return new NominalBoundType(resolvedTypeName, variable.NullableAnnotation);
         }
 
-        if (IsOptionOfStringType(resolvedTypeName)
+        if (IsNullableStringType(resolvedTypeName)
             && variable.NullableAnnotation == NullableAnnotation.Annotated)
         {
             return new NominalBoundType(resolvedTypeName, NullableAnnotation.Annotated);
@@ -311,43 +325,9 @@ public sealed class BoundVariableExpression : BoundExpression
         _ => false,
     };
 
-    // Matches the parser's expanded form (OPTION[inner=STRING]) and the
-    // canonicalized generic form (OPTION<STRING>), plus the raw surface
-    // prefix form (?string / ?str / ?STRING) that flows unexpanded through
-    // the inline-signature parameter path (TryParseInlineSignature calls
-    // ReadInlineTypeToken which does not apply ExpandType). Kept narrow —
-    // only patterns Binder.TryBuildStringTarget already recognizes.
-    private static bool IsOptionOfStringType(string typeName)
-    {
-        var trimmed = typeName.Trim();
-        if (trimmed.StartsWith("OPTION[inner=", StringComparison.Ordinal)
-            && trimmed.EndsWith("]", StringComparison.Ordinal))
-        {
-            var inner = trimmed["OPTION[inner=".Length..^1];
-            return IsScalarStringType(inner);
-        }
-        if (trimmed.StartsWith("OPTION<", StringComparison.Ordinal)
-            && trimmed.EndsWith(">", StringComparison.Ordinal))
-        {
-            var inner = trimmed["OPTION<".Length..^1];
-            return IsScalarStringType(inner);
-        }
-        // Surface prefix form: ?string, ?str, ?STRING (inline-signature
-        // parameters, field/property TypeNames — see Binder task #3).
-        if (trimmed.StartsWith("?", StringComparison.Ordinal)
-            && trimmed.Length > 1)
-        {
-            return IsScalarStringType(trimmed[1..]);
-        }
-        // Surface postfix form: string?, str?, STRING? (postfix-nullable
-        // spelling accepted by TryBuildStringTarget).
-        if (trimmed.EndsWith("?", StringComparison.Ordinal)
-            && trimmed.Length > 1)
-        {
-            return IsScalarStringType(trimmed[..^1]);
-        }
-        return false;
-    }
+    private static bool IsNullableStringType(string typeName) =>
+        AttributeHelper.TryUnwrapNullableAnnotation(typeName, out var referent)
+        && IsScalarStringType(referent);
 }
 
 /// <summary>

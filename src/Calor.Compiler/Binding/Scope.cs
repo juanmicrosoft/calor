@@ -127,6 +127,8 @@ public static class BindingDiagnosticPolicy
             Active(DiagnosticCode.InstanceMemberInStaticContext, "Illegal static-context member access is already a compilation error."),
             Active(DiagnosticCode.EffectRowMisplaced, "Effect-row declaration placement is already enforced."),
             Active(DiagnosticCode.EffectVariableScope, "Unbound effect-row variables are already enforced."),
+            new(DiagnosticCode.ReferenceOptionMismatch, BindingDiagnosticDisposition.CompilationError,
+                "Supported reference values and runtime Option wrappers are different representations; this is not nullable-state activation.", 1397),
             Analysis(DiagnosticCode.ExpectedTypeName, "Parser owns the user-facing missing-type error; binder recovery is not a new activation.", 1396),
             Analysis(DiagnosticCode.UndefinedReference, "Incomplete binding/resolution can report false positives; preserve the current analysis-only exception.", 1396),
             Analysis(DiagnosticCode.TypeMismatch, "Binder variable-use recovery is not full production type checking; cross-pass ownership must remain explicit.", 1397),
@@ -375,38 +377,8 @@ public static class TypeIdentity
     public static bool TryUnwrapOptionOrNullable(string typeName, out string elementType)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(typeName);
-        var type = typeName.Trim();
-
-        if (type.StartsWith("?", StringComparison.Ordinal) && type.Length > 1)
-        {
-            elementType = type[1..];
-            return true;
-        }
-
-        if (type.EndsWith("?", StringComparison.Ordinal) && type.Length > 1)
-        {
-            elementType = type[..^1];
-            return true;
-        }
-
-        const string expandedPrefix = "OPTION[inner=";
-        if (type.StartsWith(expandedPrefix, StringComparison.OrdinalIgnoreCase)
-            && type.EndsWith(']'))
-        {
-            elementType = type[expandedPrefix.Length..^1];
-            return true;
-        }
-
-        if (TrySplitGeneric(type, out var genericName, out var arguments)
-            && genericName.Equals("Option", StringComparison.OrdinalIgnoreCase)
-            && arguments.Count == 1)
-        {
-            elementType = arguments[0];
-            return true;
-        }
-
-        elementType = string.Empty;
-        return false;
+        return AttributeHelper.TryUnwrapNullableAnnotation(typeName, out elementType)
+            || AttributeHelper.TryUnwrapRuntimeOption(typeName, out elementType);
     }
 
     private static string StripLookupDecorators(string type)
@@ -443,7 +415,10 @@ public static class TypeIdentity
         ArgumentException.ThrowIfNullOrWhiteSpace(typeName);
         var type = typeName.Trim();
 
-        if (TryUnwrapOptionOrNullable(type, out var optionElement))
+        if (AttributeHelper.TryUnwrapNullableAnnotation(type, out var nullableReferent))
+            return $"{Canonicalize(nullableReferent)}?";
+
+        if (AttributeHelper.TryUnwrapRuntimeOption(type, out var optionElement))
             return $"OPTION<{Canonicalize(optionElement)}>";
 
         if (TryStripPostfix(type, out var elementType, out var postfix))
@@ -545,6 +520,8 @@ public static class TypeIdentity
 
         var trimmed = typeName.Trim().TrimEnd('?');
         if (trimmed.Length == 0) return false;
+        if (AttributeHelper.TryUnwrapNullableAnnotation(trimmed, out var referent))
+            return IsProvablyNonFunctionType(referent);
 
         // Arrays, pointers and tuples: shapes, not names, and none of them is a
         // delegate however the element type is spelled.
@@ -822,11 +799,22 @@ public static class TypeIdentity
     /// </remarks>
     public static string MapShortTypeNameToFullName(string shortName)
     {
-        // Calor surface syntax for the runtime's Option/Result types:
-        // ?T is Option<T>; T!E is Result<T,E>. Their combinators are
-        // manifest-entered as pure-modulo-arguments (delegate arguments are
-        // charged at the lambda definition site by the effect pass).
-        if (shortName.StartsWith('?') || shortName.StartsWith("Option<"))
+        if (string.IsNullOrWhiteSpace(shortName))
+            return shortName;
+        // Nullable annotations do not introduce a runtime Option receiver.
+        if (AttributeHelper.TryUnwrapNullableAnnotation(shortName, out var referent))
+        {
+            var canonical = Canonicalize(referent);
+            var mapped = MapShortTypeNameToFullName(referent);
+            var knownValue = IsBuiltinCanonicalName(canonical)
+                && canonical is not ("STRING" or "OBJECT" or "VOID" or "NEVER" or "OPTION");
+            return knownValue || canonical is "char" or "CHAR"
+                || NullableValueMetadataNames.Contains(mapped)
+                || mapped is "Calor.Runtime.Option`1" or "Calor.Runtime.Result`2"
+                    ? "System.Nullable`1"
+                    : mapped;
+        }
+        if (AttributeHelper.TryUnwrapRuntimeOption(shortName, out _))
             return "Calor.Runtime.Option`1";
         if (shortName.StartsWith("Result<"))
             return "Calor.Runtime.Result`2";
@@ -846,6 +834,10 @@ public static class TypeIdentity
                     "System.Collections.Generic.List`1",
                 "Dictionary" or "Dict" or "System.Collections.Generic.Dictionary" =>
                     "System.Collections.Generic.Dictionary`2",
+                "SortedDictionary" or "System.Collections.Generic.SortedDictionary" =>
+                    "System.Collections.Generic.SortedDictionary`2",
+                "ConcurrentDictionary" or "System.Collections.Concurrent.ConcurrentDictionary" =>
+                    "System.Collections.Concurrent.ConcurrentDictionary`2",
                 "HashSet" or "Set" or "System.Collections.Generic.HashSet" =>
                     "System.Collections.Generic.HashSet`1",
                 "Task" or "System.Threading.Tasks.Task" =>
@@ -858,6 +850,18 @@ public static class TypeIdentity
 
         return MapKnownShortTypeName(shortName);
     }
+
+    private static readonly FrozenSet<string> NullableValueMetadataNames = new[]
+    {
+        "System.Boolean", "System.Char", "System.SByte", "System.Byte",
+        "System.Int16", "System.UInt16", "System.Int32", "System.UInt32",
+        "System.Int64", "System.UInt64", "System.Single", "System.Double",
+        "System.Decimal", "System.IntPtr", "System.UIntPtr", "System.DateTime",
+        "System.DateTimeOffset", "System.DateOnly", "System.TimeOnly",
+        "System.TimeSpan", "System.Guid"
+    }.ToFrozenSet(StringComparer.Ordinal);
+
+    internal static bool IsKnownValueMetadataName(string name) => NullableValueMetadataNames.Contains(name);
 
     private static string MapKnownShortTypeName(string shortName) => shortName switch
     {
@@ -873,6 +877,10 @@ public static class TypeIdentity
         "Dictionary" => "System.Collections.Generic.Dictionary`2",
         "Dict" => "System.Collections.Generic.Dictionary`2",
         "System.Collections.Generic.Dictionary" => "System.Collections.Generic.Dictionary`2",
+        "SortedDictionary" => "System.Collections.Generic.SortedDictionary`2",
+        "System.Collections.Generic.SortedDictionary" => "System.Collections.Generic.SortedDictionary`2",
+        "ConcurrentDictionary" => "System.Collections.Concurrent.ConcurrentDictionary`2",
+        "System.Collections.Concurrent.ConcurrentDictionary" => "System.Collections.Concurrent.ConcurrentDictionary`2",
         "HashSet" => "System.Collections.Generic.HashSet`1",
         "Set" => "System.Collections.Generic.HashSet`1",
         "System.Collections.Generic.HashSet" => "System.Collections.Generic.HashSet`1",
@@ -1022,7 +1030,9 @@ public static class TypeIdentity
         Func<string, bool>? isDeclaredDelegate = null)
     {
         if (string.IsNullOrWhiteSpace(typeName)) return false;
-        var t = typeName.Trim().TrimEnd('?');
+        var t = typeName.Trim();
+        if (AttributeHelper.TryUnwrapNullableAnnotation(t, out var referent))
+            t = referent;
         if (isDeclaredDelegate != null)
         {
             var open = t.IndexOf('<');
@@ -1289,6 +1299,7 @@ public sealed class TypeSymbol : Symbol
 {
     public string QualifiedName { get; }
     public Visibility Visibility { get; }
+    public bool IsReferenceType { get; init; }
 
     /// <summary>
     /// v0.15 E1 slice 2b — true for a type declared with <c>§DEL</c>. This is
@@ -1315,6 +1326,7 @@ public sealed class TypeSymbol : Symbol
         QualifiedName = qualifiedName ?? throw new ArgumentNullException(nameof(qualifiedName));
         Visibility = visibility;
         IsDelegate = isDelegate;
+        IsReferenceType = isDelegate;
     }
 }
 

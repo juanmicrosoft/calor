@@ -392,33 +392,39 @@ public sealed class SymbolAndOverloadBindingTests
     }
 
     [Fact]
-    public void TypeIdentity_NormalizesAllOptionSpellingsRecursivelyForOverloads()
+    public void TypeIdentity_NormalizesNullableSpellingsWithoutConflatingRuntimeOption()
     {
         var spellings = new[]
         {
-            "?i32",
-            "i32?",
-            "Option<i32>",
-            "OPTION[inner=i32]",
+            "?str",
+            "string?",
+            "OPTION[inner=STRING]",
         };
 
         Assert.All(spellings, spelling =>
-            Assert.Equal("OPTION<INT>", TypeIdentity.Canonicalize(spelling)));
+            Assert.Equal("STRING?", TypeIdentity.Canonicalize(spelling)));
         Assert.Equal(
-            "OPTION<OPTION<INT>>",
-            TypeIdentity.Canonicalize("OPTION[inner=Option<i32>]"));
+            "OPTION<STRING>?",
+            TypeIdentity.Canonicalize("OPTION[inner=Option<str>]"));
+        Assert.Equal("OPTION<STRING?>", TypeIdentity.Canonicalize("Option<?str>"));
 
         var scope = new Scope();
         var expected = new FunctionSymbol(
             "Pick",
             "i32",
-            [new VariableSymbol("value", "?i32", false, true)]);
+            [new VariableSymbol("value", "?str", false, true)]);
         scope.DeclareOverload(expected);
 
         foreach (var spelling in spellings)
         {
             var resolution = scope.ResolveOverload("Pick", [spelling]);
             Assert.Same(expected, resolution.Function);
+        }
+
+        foreach (var spelling in new[] { "Option<str>", "Option[str]", "Calor.Runtime.Option<string>" })
+        {
+            Assert.Equal("OPTION<STRING>", TypeIdentity.Canonicalize(spelling));
+            Assert.Null(scope.ResolveOverload("Pick", [spelling]).Function);
         }
     }
 

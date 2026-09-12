@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Calor.Compiler.Binding;
@@ -22,6 +23,7 @@ public sealed class BinderErrorEmissionCatalogTests
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         PropertyNameCaseInsensitive = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -43,7 +45,7 @@ public sealed class BinderErrorEmissionCatalogTests
 
         var binderRoutes = routes.Where(route =>
             route.SiteId.StartsWith("src/Calor.Compiler/Binding/Binder.cs::", StringComparison.Ordinal)).ToArray();
-        Assert.Equal(23, binderRoutes.Count(route =>
+        Assert.Equal(24, binderRoutes.Count(route =>
             route.Sink is "DiagnosticBag.ReportError" or "DiagnosticBag.ReportErrorWithFix"));
         Assert.Equal(4, binderRoutes.Count(route => route.Sink == "DiagnosticBag.Report"));
         Assert.Equal(3, binderRoutes
@@ -56,6 +58,9 @@ public sealed class BinderErrorEmissionCatalogTests
         var actual = NormalizeJson(routes);
         var goldenPath = Path.Combine(root, "tests", "TestData", "Binding",
             "BinderErrorEmissionCatalog.golden.json");
+        if (Environment.GetEnvironmentVariable("CALOR_UPDATE_BINDER_ERROR_EMISSION_CATALOG") == "1")
+            File.WriteAllText(goldenPath, actual);
+
         var expected = NormalizeJson(
             JsonSerializer.Deserialize<GoldenEmissionRecord[]>(
                 File.ReadAllText(goldenPath), JsonOptions)

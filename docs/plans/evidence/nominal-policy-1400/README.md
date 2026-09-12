@@ -3,17 +3,23 @@
 **Issue:** [#1400](https://github.com/juanmicrosoft/calor/issues/1400), under
 [#1082](https://github.com/juanmicrosoft/calor/issues/1082).
 **Date:** 2026-09-12. **Status:** proposal, **Unadjudicated**.
-This is a non-shipping, pre-T1 observation checkpoint. It changes no compiler,
-converter, harness implementation, diagnostic routing, public policy or release.
+This is a non-shipping evidence checkpoint. The archived observations are
+pre-T1; the branch's later integration baseline includes accepted T1/N1.
+The D1 change relative to that merged baseline changes no compiler, converter,
+harness implementation, diagnostic routing, public policy or release.
 
 ## Recommendation for the parent
 
-**Defer Stage B adoption/activation at this checkpoint.** Keep the conservative
+**The pre-T1 proposal recommends deferring Stage B adoption/activation.** Keep the conservative
 candidate: a genuinely Oblivious, resolved, in-scope nominal reference is
 possibly null, not safe. The data do not justify a looser trust policy, but
 also do not substantiate the migration and identity gates needed to adopt
 the candidate now. This recommendation does **not** remove Stage B from 0.22,
 authorize a smaller release, or decide policy on the parent's behalf.
+After T1/N1 integration, this remains the dated proposal, not a new measured
+post-T1/N1 verdict. No post-T1 D1 prototype or fallout measurement is reported
+here, and the old representation defects below are not asserted to persist
+on the newer baseline.
 
 The decisive observations are:
 
@@ -24,7 +30,7 @@ The decisive observations are:
    on a BCL definition. Nullable-disabled code is not wholesale nullable or
    rejected: eight direct nominal constructor expressions in this same
    source inventory are known non-null.
-2. The current Calor target builder supplies names, not declaration/Roslyn
+2. The measured pre-T1 Calor target builder supplies names, not declaration/Roslyn
    identities. **384 heuristic nominal-target boundary observations**
    (95 MediatR, 289 FluentValidation) therefore have no justified D1
    policy result. They are not 384 resolved references, failures, or safe
@@ -35,7 +41,7 @@ The decisive observations are:
    in both original and generated C#, yet its converted parameter reference
    is `NotAnnotated`. Conversely, `var value = new Item(); return value`
    executes non-null but its converted local reference is `Oblivious`.
-   Treating either current annotation as a complete product fact would
+   Treating either measured annotation as a complete product fact would
    misclassify behavior. #1397/#1380/#1381/#1401 remain relevant.
 4. Serilog has a fresh, retained infrastructure failure. FluentValidation's
    original build/tests succeed, but this limited Roslyn reconstruction
@@ -66,7 +72,7 @@ statistical independence or a delivery promise.
 
 | Measurement | Exact source |
 |---|---|
-| Fresh released base | `88b5d38df97fd7e438882c956b9f9dcdc7a6cef5` |
+| Initial released measurement base | `88b5d38df97fd7e438882c956b9f9dcdc7a6cef5` |
 | Existing E1 corpus pipeline | `39348d8c7262bac90120c6d30c01c4476e97acde`; clean tracked diff; only N0 D1 capacity differs from base |
 | Final read-only observer and archive source | `d6061f9c90f0a75d67534a1225a2b94a924cfc9c`; clean tracked diff |
 | Product / SDK / host | 0.21.0; SDK 10.0.400; .NET runtime 10.0.11; macOS ARM64 |
@@ -74,13 +80,40 @@ statistical independence or a delivery promise.
 | MediatR corpus | `fb309026775ef953a64fb5339d074426c1ad2c37` |
 | Serilog corpus | `0597ddfbd4ec594d9c42edd745fe728a2198bad9` |
 | FluentValidation corpus | `71b3c60cb5a16e02cb7957e478ec3fb6b983a73c` |
+| Later integration baseline; **not** a measured D1 candidate | `3b513a632149290481161b195a71aa6cb0e251a8` |
 
 [Base-to-observer comparison](https://github.com/juanmicrosoft/calor/compare/88b5d38df97fd7e438882c956b9f9dcdc7a6cef5...d6061f9c90f0a75d67534a1225a2b94a924cfc9c)
 contains only this documentation/evidence source and the D1 capacity row.
-Production source behavior is the released base, **not** PR #1443 or #1445.
-At the dependency checkpoint both were open: T1 #1443 at
+Behavior in these archived measurements is the released base, **not** PR #1443
+or #1445. At the original measurement checkpoint both were open: T1 #1443 at
 `6b68a0398351d7cbf0abb58b0d968b86bfa8b0dd`, N3 #1445 at
-`1a1dd9533e2d1b46892897fda00bb7c8fa50eaff`. Their owners' work was not imported.
+`1a1dd9533e2d1b46892897fda00bb7c8fa50eaff`. Neither was imported into those captures.
+
+### Merged dependency reconciliation
+
+The parent subsequently accepted T1 #1397 via PR #1443 as
+`e299f2462b813a0c7e7049eb3a66f40b9f95e1c9`
+([adjudication](https://github.com/juanmicrosoft/calor/pull/1443#issuecomment-5643425153)).
+That checkpoint separates supported nullable references from runtime Option,
+retains bounded active Calor0275 initialization/return rejection, and keeps
+Calor0272/0273/0274 AnalysisOnly with the 19-code/34-route catalog.
+
+The actual fresh `origin/main` used for reconciliation was already
+`3b513a632149290481161b195a71aa6cb0e251a8`, which also includes accepted N1
+#1380 / PR #1451. Its identity repair and
+[separate N1 evidence](../nominal-identity-1380/README.md) are newer than
+the D1 captures; D1's 384 heuristic-target observations are not evidence
+against those later repairs. Main was merged normally into the D1 branch,
+preserving the measured ancestors. Its #1397/#1380 capacity rows and N1
+evidence link were retained verbatim; only D1's own current-capacity row
+is maintained here.
+
+N3 PR #1445 remained unmerged at reconciliation
+(`d09a47dd6ed93651fbdb03e8273a6122ac86d694`). The parent identifies #1398
+safe-consumption work as next. Neither unmerged N3 nor future #1398 behavior
+is assumed by D1. A post-T1/N1 D1 prototype or fallout run must be a separately
+pinned new candidate, preserving every attempt and the original reports.
+The present change is dependency/capacity reconciliation, not that measurement.
 
 The parent's continuation clarification retains array gap #1444 as a separate
 0.22 child, depending on #1397/#1382 and blocking #1402. Stage A remains scalar
@@ -101,9 +134,9 @@ Historical N0 `080ed5a`/`1ea8fe0` and E1 `954aef5f` records are untouched and
 are not relabeled as these measurements. The release's MediatR collection
 isolation remains identical on baseline/candidate, with no flake waiver.
 
-## Current corpus: all inputs and every declared attempt
+## Pinned pre-T1 corpus: all inputs and every declared attempt
 
-These are the **unchanged compiler's** C# baseline versus converted candidate
+These are the **pinned pre-T1 compiler's** C# baseline versus converted candidate
 legs. They are not a widened-nullability compiler comparison.
 
 | Subject | Inventory / excluded / attempted | Kept native + with-losses | Failed conversion/compilation / reverted | Each of two baseline and two candidate suite attempts |
@@ -128,7 +161,7 @@ the 12 per-attempt skipped test observations retained (three skipped tests
 per full four-subject leg). Serilog adds **two failed baseline attempts**,
 not zero-test successes. Its NU1301 SSL/socket restore failure, missing
 conversion stages and six configured exclusions remain distinct. This is
-one current invocation, not N0's three historical failed invocations.
+one D1 invocation, not N0's three historical failed invocations.
 The shell's project loop continued after the Serilog exit1 to measure
 FluentValidation; the loop's final exit does not override the retained
 per-project exits.
@@ -206,13 +239,13 @@ generator completeness and migration behavior are not established.
 The prospective rejection numerator and denominator are explicitly **null**,
 not 0/0.
 
-## Actual Calor observations and executed controls
+## Pinned pre-T1 Calor observations and executed controls
 
-The driver invokes the current target builder and current single predicate
+The driver invokes the measured pre-T1 target builder and single predicate
 read-only. All 177 converted texts parse using `TokenizeAllForParser()`.
 It records 2,567 explicit-initialization/native-return observations:
 86 Synthetic, 20 Synthetic2, 132 MediatR and 2,329 FluentValidation.
-The current predicate returns true for 259 of these (3 Synthetic, 256
+That predicate returns true for 259 of these (3 Synthetic, 256
 FluentValidation); those include non-D1 shapes and do **not** activate errors.
 Exact raw diagnostic codes, spans and binding contexts remain in E1.
 
@@ -272,12 +305,21 @@ The final PR stores the observer as non-shipping `.cs.txt`/`.csproj.txt`
 source archives, following N0's reproduction-artifact convention, not as
 new product C# or a solution project. The first CI head correctly rejected
 the original new `.cs` path under the Calor-first guard; no guard or allowlist
-was changed. The commands below materialize the archived source in a local
-reproduction directory. Use an isolated checkout of the final PR head,
-initialize only the three product corpus submodules, and keep scratch
-files under that checkout.
+was changed. The commands below reproduce the **pre-T1** observations, not
+the newer integrated compiler. Use a separate detached checkout of
+`c2684b461cdbe170f5d64ab45383abefa8f1f729`: it contains the source archives
+and confirmed provenance while retaining the original pre-T1 compiler.
+Do not switch the shared root worktree. Initialize only the three product
+corpus submodules and keep scratch files under that detached checkout.
+Fresh reproduction reports have their own actual commit/binary/run identities;
+they are not backfilled into the primary `39348d8c`/`d6061f9c` captures.
 
 ```bash
+test "$(git rev-parse HEAD)" = c2684b461cdbe170f5d64ab45383abefa8f1f729 &&
+  git diff --quiet && git diff --cached --quiet || {
+  echo "Use a clean, separate pinned pre-T1 reproduction checkout, not current main." >&2
+  exit 1
+}
 git submodule update --init -- bench/corpus/MediatR bench/corpus/serilog bench/corpus/FluentValidation
 mkdir -p .d1-work/runtime .d1-work/reports .d1-work/logs
 printf '<Project />\n' > .d1-work/runtime/Directory.Build.props
@@ -312,7 +354,8 @@ inventories, all declared attempts, metadata/constructor/null calibration,
 and 13 paired runtime outputs. The wider local harness suite was not
 claimed green: the previously reported unrelated
 `RoundTripPipelineSafetyTests` recovery diagnostic failure at line167 remains
-a known base/patch local issue, not silently waived.
+a known pre-T1 base/patch local issue, not silently waived or reclassified by
+the later integration. No post-T1 local reproduction of that failure is claimed.
 
 Initial observer development failures (bad project path, lock refresh, language
 version spelling, external source relocation, AST aliasing and optional

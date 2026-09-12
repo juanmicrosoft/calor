@@ -72,83 +72,25 @@ internal static class NullabilityChecker
         // Target already declared nullable — accepting null is by design.
         if (nominalTarget.NullableAnnotation == NullableAnnotation.Annotated) return false;
 
-        // v0.14 §S8 (task #7 Phase-C) — widened from scalar STRING to also
-        // accept user-declared reference types. Value types (INT/BOOL/…)
-        // still fall through since they can never be null. The source-shape
-        // check below matches on the nominal QualifiedName so a :Foo target
-        // vs a :?Foo source (both NominalBoundType, both named "Foo") fires
-        // symmetrically with the scalar STRING gate. STRING itself takes
-        // the fast path because Binder.TryBuildStringTarget promises the
-        // target name will canonicalize; user-refs preserve whatever the
-        // declaration wrote.
         var isString = IsScalarString(nominalTarget);
-        var isUserRef = !isString && IsUserReferenceType(nominalTarget);
+        var isUserRef = !isString && nominalTarget.IsKnownReferenceType;
         if (!isString && !isUserRef) return false;
 
         var sourceType = source.Type;
-        // User-ref path: source must also be a NominalBoundType with a
-        // matching QualifiedName (short-name, to bridge dotted namespace
-        // variants) — otherwise we would spuriously fire on unrelated
-        // assignments (e.g. Annotated Foo source assigned to non-null
-        // Bar target is a type error, not a nullability error, and
-        // out-of-scope for S8).
-        //
-        // §S8 D3 narrowing: unlike the scalar STRING path, user-ref
-        // sources fire ONLY when the source annotation is Annotated
-        // (explicitly `?Foo`). Oblivious sources — the default for
-        // any user-typed binding that has not yet been annotated —
-        // do NOT fire, because that would trip every legitimate
-        // §B{x:Foo} someUnannotatedCall pattern in existing corpora
-        // (LSP RenameHandler fixtures + compiler tests demonstrated
-        // this concretely on PR #1074 CI). Widening to Oblivious is a
-        // separate follow-on that needs coordinated annotation flow
-        // through Calor-native calls; until then, S8's semantics are
-        // "the user explicitly said the source might be null, and
-        // the target refuses null".
+        // Display spellings and annotation-sensitive equality are not the
+        // referent's identity. Both sides must resolve to the same reference.
+        // Nominal Oblivious remains excluded pending the separate policy gate.
         if (isUserRef)
         {
             if (sourceType is not NominalBoundType sourceNominal) return false;
-            if (!ShortNameEquals(sourceNominal.QualifiedName, nominalTarget.QualifiedName)) return false;
+            if (!sourceNominal.HasSameUnderlyingReferenceType(nominalTarget)) return false;
             return sourceNominal.NullableAnnotation == NullableAnnotation.Annotated;
         }
 
         // Scalar STRING path (S3/S4/S5) — unchanged.
         var sourceAnnotation = GetAnnotation(sourceType);
-        return sourceAnnotation != NullableAnnotation.NotAnnotated;
+        return sourceAnnotation is NullableAnnotation.Annotated or NullableAnnotation.Oblivious;
     }
-
-    /// <summary>
-    /// v0.14 §S8 predicate — a nominal type is a user-declared reference
-    /// type when it is neither a built-in scalar (STRING is handled by
-    /// <see cref="IsScalarString"/>) nor a value-type primitive (INT,
-    /// BOOL, …, whose <see cref="Binder.TryBuildStringTarget"/> guard
-    /// rejects them upstream). We approximate the classification by
-    /// rejecting the well-known value-type names — anything else is
-    /// treated as a reference type carrying a meaningful annotation.
-    /// Kept as a mirror of <c>Binder.IsBuiltInValueTypeName</c> to keep
-    /// the two gates consistent; if a name lands here that <c>Binder</c>
-    /// would have rejected, the predicate silently returns false and
-    /// no diagnostic fires.
-    /// </summary>
-    private static bool IsUserReferenceType(NominalBoundType type) => type.QualifiedName switch
-    {
-        "INT" or "int" or "i32" => false,
-        "LONG" or "long" or "i64" => false,
-        "SHORT" or "short" or "i16" => false,
-        "BYTE" or "byte" or "i8" => false,
-        "UINT" or "uint" or "u32" => false,
-        "ULONG" or "ulong" or "u64" => false,
-        "USHORT" or "ushort" or "u16" => false,
-        "UBYTE" or "ubyte" or "u8" => false,
-        "FLOAT" or "float" or "f32" => false,
-        "DOUBLE" or "double" or "f64" => false,
-        "DECIMAL" or "decimal" => false,
-        "BOOL" or "bool" => false,
-        "CHAR" or "char" => false,
-        "VOID" or "void" => false,
-        "" => false,
-        _ => true,
-    };
 
     /// <summary>
     /// S6 shape gate: target is an array whose element type is a
@@ -236,15 +178,29 @@ internal static class NullabilityChecker
 
     /// <summary>
     /// Reads the <c>NullableAnnotation</c> from any <c>BoundType</c>
-    /// subclass that carries one. Types without an explicit annotation
-    /// (e.g. primitives, unresolved) return <c>NotAnnotated</c> — value
-    /// types are never null.
+    /// subclass that carries one. Known primitive values are non-null;
+    /// unmodeled primitive references, functions and unresolved types return
+    /// null (unsupported), not a non-null claim or an invented Oblivious state.
     /// </summary>
-    private static NullableAnnotation GetAnnotation(BoundType type) => type switch
+    internal static NullableAnnotation? GetAnnotation(BoundType type) => type switch
     {
         NominalBoundType n => n.NullableAnnotation,
         GenericInstantiationBoundType g => g.NullableAnnotation,
         ArrayBoundType a => a.NullableAnnotation,
-        _ => NullableAnnotation.NotAnnotated,
+        PrimitiveBoundType p => GetPrimitiveAnnotation(p),
+        FunctionBoundType or UnresolvedBoundType => null,
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type.GetType().Name, "Unsupported BoundType kind."),
     };
+
+    private static NullableAnnotation? GetPrimitiveAnnotation(PrimitiveBoundType type)
+    {
+        if (string.IsNullOrWhiteSpace(type.Name))
+            return null;
+        var canonical = TypeIdentity.Canonicalize(type.Name);
+        return Binder.IsBuiltInValueTypeName(canonical)
+            || TypeIdentity.IsKnownValueMetadataName(type.Name)
+            || TypeIdentity.IsBuiltinCanonicalName(canonical) && canonical is not ("STRING" or "OBJECT" or "OPTION")
+                ? NullableAnnotation.NotAnnotated
+                : null;
+    }
 }

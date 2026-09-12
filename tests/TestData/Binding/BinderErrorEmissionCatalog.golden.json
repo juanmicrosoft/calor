@@ -273,6 +273,19 @@
     "reason": "Unbound effect-row variables are already enforced."
   },
   {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.CheckReferenceOptionRepresentation::DiagnosticBag.ReportError#01",
+    "member": "Calor.Compiler.Binding.Binder.CheckReferenceOptionRepresentation",
+    "sink": "DiagnosticBag.ReportError",
+    "helperPath": "DiagnosticBag.ReportError",
+    "possibleCodes": [
+      "Calor0275"
+    ],
+    "severity": "Error",
+    "disposition": "CompilationError",
+    "owningIssue": 1397,
+    "reason": "Supported reference values and runtime Option wrappers are different representations; this is not nullable-state activation."
+  },
+  {
     "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.DeclareParameters::DiagnosticBag.ReportDuplicateDefinitionWithFix#01",
     "member": "Calor.Compiler.Binding.Binder.DeclareParameters",
     "sink": "DiagnosticBag.ReportDuplicateDefinitionWithFix",
@@ -403,19 +416,6 @@
     "reason": "A failed best-effort member analysis is not a successful safety result or a new production gate."
   },
   {
-    "siteId": "src/Calor.Compiler/Binding/Scope.cs::BindingDiagnosticPolicy.PropagateCompilationErrors::DiagnosticBag.Add#01",
-    "member": "Calor.Compiler.Binding.BindingDiagnosticPolicy.PropagateCompilationErrors",
-    "sink": "DiagnosticBag.Add",
-    "helperPath": "BindingDiagnosticPolicy.PropagateCompilationErrors -> DiagnosticBag.Add",
-    "possibleCodes": [
-      "<forwarded-binding-compilation-errors>"
-    ],
-    "severity": "Forwarded",
-    "disposition": "CompilationErrorForwarder",
-    "owningIssue": 1396,
-    "reason": "User-facing propagation forwards only diagnostics accepted by BindingDiagnosticPolicy.IsCompilationError and de-duplicates them."
-  },
-  {
     "siteId": "src/Calor.Compiler/Binding/Metadata/MetadataBinder.cs::Metadata.MetadataBinderResult.ToDiagnostics::Diagnostic..ctor#01",
     "member": "Calor.Compiler.Binding.Metadata.MetadataBinderResult.ToDiagnostics",
     "sink": "Diagnostic..ctor",
@@ -427,5 +427,18 @@
     "disposition": "AnalysisOnly",
     "owningIssue": 1396,
     "reason": "MetadataBinderResult.ToDiagnostics accepts caller-selected severity; it is internal measurement/resolution evidence, not production enforcement."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Scope.cs::BindingDiagnosticPolicy.PropagateCompilationErrors::DiagnosticBag.Add#01",
+    "member": "Calor.Compiler.Binding.BindingDiagnosticPolicy.PropagateCompilationErrors",
+    "sink": "DiagnosticBag.Add",
+    "helperPath": "BindingDiagnosticPolicy.PropagateCompilationErrors -> DiagnosticBag.Add",
+    "possibleCodes": [
+      "<forwarded-binding-compilation-errors>"
+    ],
+    "severity": "Forwarded",
+    "disposition": "CompilationErrorForwarder",
+    "owningIssue": 1396,
+    "reason": "User-facing propagation forwards only diagnostics accepted by BindingDiagnosticPolicy.IsCompilationError and de-duplicates them."
   }
 ]

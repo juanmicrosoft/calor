@@ -31,6 +31,8 @@ public sealed class TypeChecker
                 _env.DefineType(name, new ExternalType(name));
             }
         }
+        _moduleDeclaredReferenceTypes.Clear();
+        _moduleDeclaredReferenceTypes.UnionWith(Parsing.AttributeHelper.GetDeclaredReferenceTypeNames(module));
 
         // Pass 0: refinement type definitions. These run second so a §RTYPE's base type can name
         // a module class, but RegisterRefinementType rejects an already-defined name — so it is
@@ -137,6 +139,7 @@ public sealed class TypeChecker
     /// allowed to take it, as it could before v0.12).
     /// </summary>
     private readonly HashSet<string> _moduleDeclaredTypes = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _moduleDeclaredReferenceTypes = new(StringComparer.Ordinal);
 
     /// <summary>Set during the signature pre-pass, which re-resolves annotations CheckFunction
     /// will resolve again — so only the second pass reports.</summary>
@@ -1190,7 +1193,7 @@ public sealed class TypeChecker
         // "requires numeric operands" made the checker refuse a working, documented program —
         // the MCP primer's own §M{m3:Files} module among them.
         if (binOp.Operator == BinaryOperator.Add
-            && (leftType.Equals(PrimitiveType.String) || rightType.Equals(PrimitiveType.String)))
+            && (IsStringReference(leftType) || IsStringReference(rightType)))
         {
             // C#'s string + T binds for any T via ToString(), and that is what the emitter
             // produces, so the other operand is unconstrained.
@@ -1310,7 +1313,7 @@ public sealed class TypeChecker
         // Same rule as the bool conditions: only complain when the receiver's type is actually
         // known. An unmodeled receiver — a `new` expression, an external call result — is the
         // checker's blind spot, not the program's error, and C# resolves the member itself.
-        if (targetType is ErrorType or ExternalType)
+        if (targetType is ErrorType or ExternalType or NullableReferenceType)
         {
             return ErrorType.Instance;
         }
@@ -1389,6 +1392,25 @@ public sealed class TypeChecker
 
     private CalorType ResolveTypeName(string typeName, Parsing.TextSpan span)
     {
+        if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(typeName, out var referentName))
+        {
+            var referent = PrimitiveType.FromName(Parsing.AttributeHelper.ToSurfaceSpelling(referentName));
+            CalorType? supportedReference = referent is not null
+                && (referent.Equals(PrimitiveType.String) || referent.Equals(PrimitiveType.Object))
+                    ? referent
+                    : _moduleDeclaredReferenceTypes.Contains(referentName)
+                        && _env.LookupType(referentName) is ExternalType nominal
+                        ? nominal
+                        : null;
+            if (supportedReference is not null)
+            {
+                return new NullableReferenceType(supportedReference,
+                    typeName.StartsWith("OPTION[inner=", StringComparison.OrdinalIgnoreCase));
+            }
+            // Other annotations retain the existing unsupported/unresolved behavior.
+            // In particular, this is not permission to model nullable value types as references.
+        }
+
         // Arrays, in BOTH spellings the compiler produces. `T[]` is what the C# converter and
         // §I/§O annotations emit; `[T]` is the collection-literal spelling in the syntax
         // reference. Neither resolved before, so `§I{[str]:args}` — a documented, working
@@ -1411,11 +1433,14 @@ public sealed class TypeChecker
             var argsStr = typeName[(bracketIndex + 1)..^1];
             var args = SplitGenericArgs(argsStr);
 
-            if (baseName.Equals("Option", StringComparison.OrdinalIgnoreCase) && args.Count == 1)
+            if (Parsing.AttributeHelper.TryUnwrapRuntimeOption(typeName, out var optionReferent))
             {
-                var innerType = ResolveTypeName(args[0], span);
+                var innerType = ResolveTypeName(optionReferent, span);
                 return new OptionType(innerType);
             }
+
+            if (baseName.Equals("Option", StringComparison.OrdinalIgnoreCase) && args.Count == 1)
+                return new OptionType(ResolveTypeName(args[0], span));
 
             if (baseName.Equals("Result", StringComparison.OrdinalIgnoreCase) && args.Count == 2)
             {
@@ -1434,9 +1459,9 @@ public sealed class TypeChecker
             var args = SplitGenericArgs(argsStr);
 
             // Handle Option<T> with angle brackets
-            if (baseName.Equals("Option", StringComparison.OrdinalIgnoreCase) && args.Count == 1)
+            if (Parsing.AttributeHelper.TryUnwrapRuntimeOption(typeName, out var optionReferent))
             {
-                var innerType = ResolveTypeName(args[0], span);
+                var innerType = ResolveTypeName(optionReferent, span);
                 return new OptionType(innerType);
             }
 
@@ -1564,7 +1589,12 @@ public sealed class TypeChecker
     /// user's error.
     /// </summary>
     private static bool IsKnownNonCollection(CalorType type)
-        => type is not ErrorType && type is not ExternalType;
+        => type is not ErrorType && type is not ExternalType
+            && type is not NullableReferenceType { ReferentType: ExternalType };
+
+    private static bool IsStringReference(CalorType type) =>
+        type.Equals(PrimitiveType.String)
+        || type is NullableReferenceType nullable && nullable.ReferentType.Equals(PrimitiveType.String);
 
     private static bool IsDefinitelyNotBool(CalorType type)
         => !type.Equals(PrimitiveType.Bool) && type is not ErrorType && type is not ExternalType;
@@ -1577,6 +1607,17 @@ public sealed class TypeChecker
     {
         if (target.Equals(source)) return true;
         if (source is ErrorType) return true; // Allow error types to be assigned anywhere
+        if (target is NullableReferenceType nullableTarget)
+        {
+            if (source is NullableReferenceType nullableSource)
+                return IsAssignable(nullableTarget.ReferentType, nullableSource.ReferentType);
+            if (nullableTarget.ReferentType.Equals(PrimitiveType.Object))
+                return true; // Boxing to object preserves the value; this does not unwrap Option.
+            if (source is OptionType or ResultType
+                || nullableTarget.ReferentType is ExternalType && source is PrimitiveType)
+                return false;
+            return IsAssignable(nullableTarget.ReferentType, source);
+        }
         // Nothing is known about an unmodeled external type, in either direction.
         if (target is ExternalType || source is ExternalType) return true;
         if (target.Equals(PrimitiveType.Float) && source.Equals(PrimitiveType.Int)) return true;
@@ -1584,6 +1625,11 @@ public sealed class TypeChecker
         // assigning object to a concrete type needs a cast in C#, so accepting it here would
         // green-light code the emitted C# rejects.
         if (target.Equals(PrimitiveType.Object)) return true;
+        if (source is NullableReferenceType nullableReference)
+        {
+            return !nullableReference.RequiresTransitionalAssignmentCheck
+                && IsAssignable(target, nullableReference.ReferentType);
+        }
         // char widens to an integer, as in C#. Not the reverse: `i32 -> char` is a narrowing
         // conversion C# requires an explicit cast for.
         if (target.Equals(PrimitiveType.Int) && source.Equals(PrimitiveType.Char)) return true;
