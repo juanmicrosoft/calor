@@ -1367,6 +1367,21 @@ public sealed class SafeConsumptionTypeCheckerTests
 
         var diagnostic = SingleErrorAt(result, 8);
         Assert.Contains("Null-coalescing requires", diagnostic.Message);
+
+        var divergentResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Pick:pub} (Func<i32,i32>:map) -> i32
+                §E{}
+                §R §C{map} §A 1 §/C
+              §F{f2:Pick:pub} (Func<str,str>:map) -> str
+                §E{}
+                §R §C{map} §A "x" §/C
+              §F{f3:Probe:pub} () -> i32
+                §E{}
+                §R §C{Pick} §A §LAM{l1:x:i32} (?? x 2) §/LAM{l1} §/C
+            """);
+        Assert.Single(divergentResult.Diagnostics.Errors.Where(
+            error => error.Message.Contains("Null-coalescing requires", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -1420,6 +1435,102 @@ public sealed class SafeConsumptionTypeCheckerTests
             """);
         Assert.Contains(namedResult.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
+    [Fact]
+    public void FailedContextualOverloads_ReportNoMatchingOverload()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Pick:pub} (Func<i32,i32>:map) -> i32
+                §E{}
+                §R §C{map} §A 1 §/C
+              §F{f2:Pick:pub} (Func<str,i32>:map) -> i32
+                §E{}
+                §R 1
+              §F{f3:Probe:pub} () -> i32
+                §E{}
+                §R §C{Pick} §A §LAM{l1:x:i32} "wrong" §/LAM{l1} §/C
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
+    [Fact]
+    public void GenericCalls_InferTypeArgumentsFromLambdaResults()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Make:pub}<T> (Func<T>:factory) -> T
+                §E{}
+                §R §C{factory} §/C
+              §F{f2:Probe:pub} () -> str
+                §E{}
+                §R §C{Make} §A §LAM{l1} 1 §/LAM{l1} §/C
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void StatementLambda_ForFuncRequiresAReturnValue()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Identity:pub} (i32:value) -> i32
+                §E{}
+                §R value
+              §F{f2:Probe:pub} () -> void
+                §E{}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §C{Identity} §A 1 §/C
+                §/LAM{l1}
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void MethodGroupRanking_DoesNotUseReturnTypeIdentity()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Value:pub} (f64:value) -> object
+                §E{}
+                §R value
+              §F{f2:Value:pub} (decimal:value) -> str
+                §E{}
+                §R "value"
+              §F{f3:Probe:pub} () -> void
+                §E{}
+                §B{factory:Func<char,object>} Value
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void ImplicitLambda_UsesAnonymousFunctionBetterConversion()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Pick:pub} (Func<object,i32>:map) -> str
+                §E{}
+                §R "object"
+              §F{f2:Pick:pub} (Func<str,i32>:map) -> i32
+                §E{}
+                §R 1
+              §F{f3:Probe:pub} () -> i32
+                §E{}
+                §R §C{Pick} §A §LAM{l1:x} 1 §/LAM{l1} §/C
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
     }
 
     [Theory]

@@ -1289,7 +1289,8 @@ public sealed class TypeChecker
             .ToArray();
         var argumentTypes = call.Arguments.Select((argument, index) =>
             RequiresTargetType(argument)
-                ? InferCallArgument(argument, expectedArgumentTypes[index])
+                ? InferInitialContextualArgument(
+                    argument, expectedArgumentTypes[index], contextualCandidates.Length > 0)
                 : preliminaryTypes[index]).ToArray();
         var candidates = functionCandidates
             .Select(candidate => TryResolveCallCandidate(candidate, call, argumentTypes))
@@ -1297,7 +1298,8 @@ public sealed class TypeChecker
             .Select(candidate => candidate!)
             .ToArray();
         if (candidates.Length == 0 && functionCandidates.Count > 0
-            && (call.ArgumentNames?.Any(name => !string.IsNullOrEmpty(name)) == true
+            && (call.Arguments.Any(RequiresTargetType)
+                || call.ArgumentNames?.Any(name => !string.IsNullOrEmpty(name)) == true
                 || call.ArgumentModifiers?.Any(modifier => !string.IsNullOrEmpty(modifier)) == true))
         {
             _diagnostics.ReportError(call.Span, DiagnosticCode.NoMatchingOverload,
@@ -1342,6 +1344,20 @@ public sealed class TypeChecker
         if (argument is LambdaExpressionNode && expectedType != null && ContainsTypeParameter(expectedType))
             return ErrorType.Instance;
         return InferExpressionType(argument, expectedType);
+    }
+
+    private CalorType InferInitialContextualArgument(
+        ExpressionNode argument,
+        CalorType? expectedType,
+        bool hasContextualCandidates)
+    {
+        if (expectedType != null || !hasContextualCandidates)
+            return InferCallArgument(argument, expectedType);
+
+        var checkpoint = _diagnostics.CreateCheckpoint();
+        var result = InferCallArgument(argument, null);
+        _diagnostics.RestoreCheckpoint(checkpoint);
+        return result;
     }
 
     private void ValidateSelectedContextualArguments(
@@ -1463,6 +1479,17 @@ public sealed class TypeChecker
                 CheckStatement(statement);
             }
             returnType = PrimitiveType.Void;
+            if (expectedFunction != null
+                && !expectedFunction.ReturnType.Equals(PrimitiveType.Void)
+                && !ContainsReturnStatement(lambda.StatementBody ?? Array.Empty<StatementNode>()))
+            {
+                if (!_suppressContextualDiagnostics)
+                {
+                    _diagnostics.ReportError(lambda.Span, DiagnosticCode.TypeMismatch,
+                        $"Lambda targeting {expectedFunction.SurfaceName} must return a value");
+                }
+                signatureValid = false;
+            }
         }
         signatureValid &= !_lambdaReturnInvalid;
         _currentReturnType = previousReturnType;
@@ -1480,6 +1507,16 @@ public sealed class TypeChecker
         ExpressionNode expression)
         => expectedFunction.ReturnType.Equals(PrimitiveType.Void)
             && expression is CallExpressionNode or ExpressionCallNode or NewExpressionNode;
+
+    private static bool ContainsReturnStatement(IReadOnlyList<StatementNode> statements)
+        => statements.Any(statement => statement switch
+        {
+            ReturnStatementNode => true,
+            IfStatementNode conditional => ContainsReturnStatement(conditional.ThenBody)
+                || conditional.ElseIfClauses.Any(clause => ContainsReturnStatement(clause.Body))
+                || conditional.ElseBody != null && ContainsReturnStatement(conditional.ElseBody),
+            _ => false
+        });
 
     private CalorType InferQuantifierType(
         IReadOnlyList<QuantifierVariableNode> variables,
@@ -1839,10 +1876,19 @@ public sealed class TypeChecker
         for (var i = 0; i < mappedArguments.Length; i++)
         {
             if (mappedArguments[i] is { } argument
+                && argument.Expression is not LambdaExpressionNode
                 && (argument.Expression is not ReferenceNode methodGroup
                     || _env.LookupFunctionCandidates(methodGroup.Name).Count == 0))
             {
                 InferTypeArguments(candidate.Type.ParameterTypes[i], argument.Type, substitutions);
+            }
+        }
+        for (var i = 0; i < mappedArguments.Length; i++)
+        {
+            if (mappedArguments[i] is { Expression: LambdaExpressionNode lambda })
+            {
+                InferTypeArgumentsFromLambda(
+                    candidate.Type.ParameterTypes[i], lambda, substitutions);
             }
         }
         for (var i = 0; i < mappedArguments.Length; i++)
@@ -1929,8 +1975,12 @@ public sealed class TypeChecker
                 {
                     return null;
                 }
-                conversionCosts[argument.SourceIndex] =
-                    GetMethodGroupConversionCost(delegateType, methodCandidates);
+                if (!TryGetMethodGroupConversionCost(
+                        delegateType, methodCandidates, out var methodGroupCost))
+                {
+                    return null;
+                }
+                conversionCosts[argument.SourceIndex] = methodGroupCost;
             }
             else if (!IsAssignable(parameterTypes[i], argument.Type))
             {
@@ -1972,6 +2022,7 @@ public sealed class TypeChecker
                 SubstituteTypeParameters(candidate.Type.ReturnType, substitutions)),
             conversionCosts,
             conversionTargets,
+            call.Arguments,
             expandedParamsArguments.Count > 0,
             mappedArguments.Select((argument, index) => (argument, index))
                 .Count(item => item.argument == null && candidate.OptionalParameters[item.index]));
@@ -2024,8 +2075,14 @@ public sealed class TypeChecker
                 if (TryGetDelegateFunctionType(left.ConversionTargets[i], out var leftDelegate)
                     && TryGetDelegateFunctionType(right.ConversionTargets[i], out var rightDelegate))
                 {
-                    var leftDelegateIsBetter = IsMoreSpecificDelegateType(leftDelegate, rightDelegate);
-                    var rightDelegateIsBetter = IsMoreSpecificDelegateType(rightDelegate, leftDelegate);
+                    var implicitLambda = left.ArgumentExpressions[i] is LambdaExpressionNode lambda
+                        && lambda.Parameters.All(parameter => parameter.TypeName is null);
+                    var leftDelegateIsBetter = implicitLambda
+                        ? IsBetterImplicitLambdaTarget(leftDelegate, rightDelegate)
+                        : IsMoreSpecificDelegateType(leftDelegate, rightDelegate);
+                    var rightDelegateIsBetter = implicitLambda
+                        ? IsBetterImplicitLambdaTarget(rightDelegate, leftDelegate)
+                        : IsMoreSpecificDelegateType(rightDelegate, leftDelegate);
                     if (rightDelegateIsBetter && !leftDelegateIsBetter)
                         return false;
                     strictlyBetter |= leftDelegateIsBetter && !rightDelegateIsBetter;
@@ -2065,10 +2122,27 @@ public sealed class TypeChecker
         return strictlyMoreSpecific || !left.ReturnType.Equals(right.ReturnType);
     }
 
+    private static bool IsBetterImplicitLambdaTarget(FunctionType left, FunctionType right)
+    {
+        if (left.ParameterTypes.Count != right.ParameterTypes.Count)
+            return false;
+        var strictlyBetter = false;
+        for (var i = 0; i < left.ParameterTypes.Count; i++)
+        {
+            if (!IsAssignable(left.ParameterTypes[i], right.ParameterTypes[i]))
+                return false;
+            strictlyBetter |= !left.ParameterTypes[i].Equals(right.ParameterTypes[i]);
+        }
+        if (!IsAssignable(right.ReturnType, left.ReturnType))
+            return false;
+        return strictlyBetter || !left.ReturnType.Equals(right.ReturnType);
+    }
+
     private sealed record ResolvedCallCandidate(
         FunctionType Type,
         IReadOnlyList<int> ConversionCosts,
         IReadOnlyList<CalorType> ConversionTargets,
+        IReadOnlyList<ExpressionNode> ArgumentExpressions,
         bool UsesExpandedParams,
         int OmittedOptionalCount);
 
@@ -2209,15 +2283,69 @@ public sealed class TypeChecker
         return true;
     }
 
-    private int GetMethodGroupConversionCost(
+    private void InferTypeArgumentsFromLambda(
+        CalorType delegateTemplate,
+        LambdaExpressionNode lambda,
+        IDictionary<string, CalorType> substitutions)
+    {
+        if (!TryGetDelegateFunctionType(delegateTemplate, out var targetTemplate)
+            || targetTemplate.ParameterTypes.Count != lambda.Parameters.Count)
+        {
+            return;
+        }
+
+        for (var i = 0; i < lambda.Parameters.Count; i++)
+        {
+            if (lambda.Parameters[i].TypeName is { } declaredTypeName)
+            {
+                InferTypeArguments(
+                    targetTemplate.ParameterTypes[i],
+                    ResolveTypeName(declaredTypeName, lambda.Parameters[i].Span),
+                    substitutions);
+            }
+        }
+
+        CalorType? bodyType = null;
+        var checkpoint = _diagnostics.CreateCheckpoint();
+        var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
+        _suppressContextualDiagnostics = true;
+        if (lambda.ExpressionBody != null)
+        {
+            bodyType = InferExpressionType(lambda.ExpressionBody);
+        }
+        else
+        {
+            bodyType = lambda.StatementBody?
+                .OfType<ReturnStatementNode>()
+                .Where(statement => statement.Expression != null)
+                .Select(statement => InferExpressionType(statement.Expression!))
+                .FirstOrDefault();
+        }
+        _suppressContextualDiagnostics = previousSuppressContextualDiagnostics;
+        _diagnostics.RestoreCheckpoint(checkpoint);
+        if (bodyType != null)
+            InferTypeArguments(targetTemplate.ReturnType, bodyType, substitutions);
+    }
+
+    private bool TryGetMethodGroupConversionCost(
         FunctionType target,
-        IReadOnlyList<FunctionCandidate> candidates)
-        => candidates
+        IReadOnlyList<FunctionCandidate> candidates,
+        out int cost)
+    {
+        var costs = candidates
             .Select(candidate => ResolveMethodCandidateAgainstTarget(target, candidate))
             .Where(candidate => IsMethodGroupCompatible(target, candidate))
             .Select(candidate => GetMethodGroupCandidateCost(target, candidate))
-            .DefaultIfEmpty(5)
-            .Min();
+            .ToArray();
+        if (costs.Length == 0)
+        {
+            cost = 0;
+            return false;
+        }
+        var minimumCost = costs.Min();
+        cost = minimumCost;
+        return costs.Count(candidateCost => candidateCost == minimumCost) == 1;
+    }
 
     private static FunctionCandidate ResolveMethodCandidateAgainstTarget(
         FunctionType target,
@@ -2252,7 +2380,6 @@ public sealed class TypeChecker
         var cost = 0;
         for (var i = 0; i < target.ParameterTypes.Count; i++)
             cost += GetImplicitConversionCost(candidate.Type.ParameterTypes[i], target.ParameterTypes[i]);
-        cost += candidate.Type.ReturnType.Equals(target.ReturnType) ? 0 : 2;
         return cost;
     }
 
@@ -3489,8 +3616,8 @@ public sealed class TypeChecker
         if (!TryGetDelegateFunctionType(target, out var targetFunction))
             return false;
 
-        return _env.LookupFunctionCandidates(name)
-            .Any(candidate => IsMethodGroupCompatible(targetFunction, candidate));
+        return TryGetMethodGroupConversionCost(
+            targetFunction, _env.LookupFunctionCandidates(name), out _);
     }
 
     private static bool TryGetDelegateFunctionType(CalorType type, out FunctionType function)
