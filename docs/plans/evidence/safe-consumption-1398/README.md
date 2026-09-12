@@ -164,6 +164,15 @@ Call argument expressions now share traversal before any return-model shortcut,
 including overloaded, generic, unknown and shadowed targets, without selecting
 an arbitrary signature. Fourteen new cases cover CLR signature/binary behavior,
 nested coalesce/conditional/throw checks, consumer diagnostics and scope leakage.
+The repaired source is pinned at `2f8ff6f76e43d9bb8e3fd0a14d11faeb18cb4c80`.
+Actual captures are [approved base](parent-hold/8f-api.json),
+[held head](parent-hold/fbfe-api.json), and
+[repaired source](parent-hold/2f8ff6f7-api.json). The repaired capture reports
+the original seven-parameter public constructor and exactly one `Calor0202`
+for each form under both option sets. The 89-case SafeConsumption selection,
+983 affected compiler cases (including the ordinary initialized corpus ratchet)
+and 35 editor state cases pass. No source-coverage golden changed in this repair.
+Inventory is 9,049 + 89 = 9,138, with the existing three compiler skips.
 
 Original held-head review records are preserved verbatim under
 [`reviews/fbfe8780`](reviews/fbfe8780/), extracted from original session events:
