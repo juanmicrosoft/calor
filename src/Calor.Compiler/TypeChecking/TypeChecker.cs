@@ -1299,6 +1299,8 @@ public sealed class TypeChecker
             .ToArray();
         if (candidates.Length == 0 && functionCandidates.Count > 0
             && (call.Arguments.Any(RequiresTargetType)
+                || call.Arguments.Any(argument => argument is ReferenceNode reference
+                    && _env.LookupFunctionCandidates(reference.Name).Count > 0)
                 || call.ArgumentNames?.Any(name => !string.IsNullOrEmpty(name)) == true
                 || call.ArgumentModifiers?.Any(modifier => !string.IsNullOrEmpty(modifier)) == true))
         {
@@ -1481,7 +1483,7 @@ public sealed class TypeChecker
             returnType = PrimitiveType.Void;
             if (expectedFunction != null
                 && !expectedFunction.ReturnType.Equals(PrimitiveType.Void)
-                && !ContainsReturnStatement(lambda.StatementBody ?? Array.Empty<StatementNode>()))
+                && !DefinitelyReturns(lambda.StatementBody ?? Array.Empty<StatementNode>()))
             {
                 if (!_suppressContextualDiagnostics)
                 {
@@ -1508,13 +1510,20 @@ public sealed class TypeChecker
         => expectedFunction.ReturnType.Equals(PrimitiveType.Void)
             && expression is CallExpressionNode or ExpressionCallNode or NewExpressionNode;
 
-    private static bool ContainsReturnStatement(IReadOnlyList<StatementNode> statements)
+    private static bool DefinitelyReturns(IReadOnlyList<StatementNode> statements)
         => statements.Any(statement => statement switch
         {
             ReturnStatementNode => true,
-            IfStatementNode conditional => ContainsReturnStatement(conditional.ThenBody)
-                || conditional.ElseIfClauses.Any(clause => ContainsReturnStatement(clause.Body))
-                || conditional.ElseBody != null && ContainsReturnStatement(conditional.ElseBody),
+            ThrowStatementNode or RethrowStatementNode => true,
+            IfStatementNode conditional => DefinitelyReturns(conditional.ThenBody)
+                && conditional.ElseIfClauses.All(clause => DefinitelyReturns(clause.Body))
+                && conditional.ElseBody != null
+                && DefinitelyReturns(conditional.ElseBody),
+            TryStatementNode tryStatement => tryStatement.FinallyBody != null
+                && DefinitelyReturns(tryStatement.FinallyBody)
+                || DefinitelyReturns(tryStatement.TryBody)
+                && tryStatement.CatchClauses.Count > 0
+                && tryStatement.CatchClauses.All(clause => DefinitelyReturns(clause.Body)),
             _ => false
         });
 
@@ -2250,7 +2259,7 @@ public sealed class TypeChecker
             FunctionCandidate Method,
             Dictionary<string, CalorType> Substitutions,
             FunctionType Target,
-            int Cost)>();
+            IReadOnlyList<int> Costs)>();
         foreach (var method in methodCandidates)
         {
             var resolvedMethod = ResolveMethodCandidateAgainstTarget(targetTemplate, method);
@@ -2269,13 +2278,16 @@ public sealed class TypeChecker
             if (!IsMethodGroupCompatible(resolvedTarget, resolvedMethod))
                 continue;
             applicable.Add((resolvedMethod, trial, resolvedTarget,
-                GetMethodGroupCandidateCost(resolvedTarget, resolvedMethod)));
+                GetMethodGroupCandidateCosts(resolvedTarget, resolvedMethod)));
         }
         if (applicable.Count == 0)
             return false;
 
-        var bestCost = applicable.Min(item => item.Cost);
-        var best = applicable.Where(item => item.Cost == bestCost).ToArray();
+        var best = applicable.Where((candidate, candidateIndex) => !applicable.Where(
+                (_, otherIndex) => otherIndex != candidateIndex).Any(other =>
+                IsBetterMethodGroupCandidate(
+                    other.Method, other.Costs, candidate.Method, candidate.Costs)))
+            .ToArray();
         if (best.Length != 1)
             return false;
         foreach (var (name, type) in best[0].Substitutions)
@@ -2309,22 +2321,97 @@ public sealed class TypeChecker
         var checkpoint = _diagnostics.CreateCheckpoint();
         var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
         _suppressContextualDiagnostics = true;
+        _env.EnterScope();
+        var currentSubstitutions =
+            new Dictionary<string, CalorType>(substitutions, StringComparer.Ordinal);
+        for (var i = 0; i < lambda.Parameters.Count; i++)
+        {
+            var parameterType = lambda.Parameters[i].TypeName is { } declaredTypeName
+                ? ResolveTypeName(declaredTypeName, lambda.Parameters[i].Span)
+                : SubstituteTypeParameters(targetTemplate.ParameterTypes[i], currentSubstitutions);
+            _env.DefineVariable(lambda.Parameters[i].Name, parameterType);
+        }
         if (lambda.ExpressionBody != null)
         {
             bodyType = InferExpressionType(lambda.ExpressionBody);
         }
         else
         {
-            bodyType = lambda.StatementBody?
-                .OfType<ReturnStatementNode>()
-                .Where(statement => statement.Expression != null)
-                .Select(statement => InferExpressionType(statement.Expression!))
-                .FirstOrDefault();
+            foreach (var expression in EnumerateReturnExpressions(
+                lambda.StatementBody ?? Array.Empty<StatementNode>()))
+            {
+                InferTypeArguments(
+                    targetTemplate.ReturnType,
+                    InferExpressionType(expression),
+                    substitutions);
+            }
         }
+        _env.ExitScope();
         _suppressContextualDiagnostics = previousSuppressContextualDiagnostics;
         _diagnostics.RestoreCheckpoint(checkpoint);
         if (bodyType != null)
             InferTypeArguments(targetTemplate.ReturnType, bodyType, substitutions);
+    }
+
+    private static IEnumerable<ExpressionNode> EnumerateReturnExpressions(
+        IReadOnlyList<StatementNode> statements)
+    {
+        foreach (var statement in statements)
+        {
+            switch (statement)
+            {
+                case ReturnStatementNode { Expression: not null } returnStatement:
+                    yield return returnStatement.Expression;
+                    break;
+                case IfStatementNode conditional:
+                    foreach (var expression in EnumerateReturnExpressions(conditional.ThenBody))
+                        yield return expression;
+                    foreach (var clause in conditional.ElseIfClauses)
+                    {
+                        foreach (var expression in EnumerateReturnExpressions(clause.Body))
+                            yield return expression;
+                    }
+                    if (conditional.ElseBody != null)
+                    {
+                        foreach (var expression in EnumerateReturnExpressions(conditional.ElseBody))
+                            yield return expression;
+                    }
+                    break;
+                case MatchStatementNode match:
+                    foreach (var matchCase in match.Cases)
+                    {
+                        foreach (var expression in EnumerateReturnExpressions(matchCase.Body))
+                            yield return expression;
+                    }
+                    break;
+                case TryStatementNode tryStatement:
+                    foreach (var expression in EnumerateReturnExpressions(tryStatement.TryBody))
+                        yield return expression;
+                    foreach (var clause in tryStatement.CatchClauses)
+                    {
+                        foreach (var expression in EnumerateReturnExpressions(clause.Body))
+                            yield return expression;
+                    }
+                    if (tryStatement.FinallyBody != null)
+                    {
+                        foreach (var expression in EnumerateReturnExpressions(tryStatement.FinallyBody))
+                            yield return expression;
+                    }
+                    break;
+                case ForStatementNode loop:
+                    foreach (var expression in EnumerateReturnExpressions(loop.Body))
+                        yield return expression;
+                    break;
+                case WhileStatementNode loop:
+                    foreach (var expression in EnumerateReturnExpressions(loop.Body))
+                        yield return expression;
+                    break;
+                case DoWhileStatementNode loop:
+                    foreach (var expression in EnumerateReturnExpressions(loop.Body))
+                        yield return expression;
+                    break;
+            }
+        }
     }
 
     private bool TryGetMethodGroupConversionCost(
@@ -2332,19 +2419,30 @@ public sealed class TypeChecker
         IReadOnlyList<FunctionCandidate> candidates,
         out int cost)
     {
-        var costs = candidates
+        var applicable = candidates
             .Select(candidate => ResolveMethodCandidateAgainstTarget(target, candidate))
             .Where(candidate => IsMethodGroupCompatible(target, candidate))
-            .Select(candidate => GetMethodGroupCandidateCost(target, candidate))
+            .Select(candidate => (
+                Candidate: candidate,
+                Costs: GetMethodGroupCandidateCosts(target, candidate)))
             .ToArray();
-        if (costs.Length == 0)
+        if (applicable.Length == 0)
         {
             cost = 0;
             return false;
         }
-        var minimumCost = costs.Min();
-        cost = minimumCost;
-        return costs.Count(candidateCost => candidateCost == minimumCost) == 1;
+        var best = applicable.Where((candidate, candidateIndex) => !applicable.Where(
+                (_, otherIndex) => otherIndex != candidateIndex).Any(other =>
+                IsBetterMethodGroupCandidate(
+                    other.Candidate, other.Costs, candidate.Candidate, candidate.Costs)))
+            .ToArray();
+        if (best.Length != 1)
+        {
+            cost = 0;
+            return false;
+        }
+        cost = best[0].Costs.Sum();
+        return true;
     }
 
     private static FunctionCandidate ResolveMethodCandidateAgainstTarget(
@@ -2373,14 +2471,28 @@ public sealed class TypeChecker
         };
     }
 
-    private static int GetMethodGroupCandidateCost(
+    private static IReadOnlyList<int> GetMethodGroupCandidateCosts(
         FunctionType target,
         FunctionCandidate candidate)
+        => target.ParameterTypes.Select((parameter, index) =>
+            GetImplicitConversionCost(candidate.Type.ParameterTypes[index], parameter)).ToArray();
+
+    private static bool IsBetterMethodGroupCandidate(
+        FunctionCandidate left,
+        IReadOnlyList<int> leftCosts,
+        FunctionCandidate right,
+        IReadOnlyList<int> rightCosts)
     {
-        var cost = 0;
-        for (var i = 0; i < target.ParameterTypes.Count; i++)
-            cost += GetImplicitConversionCost(candidate.Type.ParameterTypes[i], target.ParameterTypes[i]);
-        return cost;
+        var strictlyBetter = false;
+        for (var i = 0; i < leftCosts.Count; i++)
+        {
+            if (leftCosts[i] > rightCosts[i])
+                return false;
+            strictlyBetter |= leftCosts[i] < rightCosts[i];
+        }
+        if (strictlyBetter)
+            return true;
+        return left.TypeParameterNames.Count == 0 && right.TypeParameterNames.Count > 0;
     }
 
     private static CalorType SubstituteTypeParameters(
@@ -2476,6 +2588,7 @@ public sealed class TypeChecker
         var parameterIndices = new int[argumentCount];
         var assigned = new bool[argumentCount];
         var nextPositional = 0;
+        var seenOutOfPositionNamedArgument = false;
         for (var argumentIndex = 0; argumentIndex < argumentCount; argumentIndex++)
         {
             var name = argumentNames != null && argumentIndex < argumentNames.Count
@@ -2484,6 +2597,8 @@ public sealed class TypeChecker
             int parameterIndex;
             if (string.IsNullOrEmpty(name))
             {
+                if (seenOutOfPositionNamedArgument)
+                    return null;
                 while (nextPositional < assigned.Length && assigned[nextPositional])
                     nextPositional++;
                 parameterIndex = nextPositional++;
@@ -2497,6 +2612,9 @@ public sealed class TypeChecker
                 if (matches.Length != 1)
                     return null;
                 parameterIndex = matches[0];
+                while (nextPositional < assigned.Length && assigned[nextPositional])
+                    nextPositional++;
+                seenOutOfPositionNamedArgument |= parameterIndex != nextPositional;
             }
 
             if (parameterIndex < 0 || parameterIndex >= assigned.Length || assigned[parameterIndex])

@@ -1494,6 +1494,75 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void StatementLambda_ForFuncRequiresAllPathsToReturn()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{factory:Func<bool,i32>} §LAM{l1:flag:bool}
+                  §IF{if1} flag
+                    §R 1
+                §/LAM{l1}
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void GenericCalls_InferLambdaResultsInsideParameterScope()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Apply:pub}<T,U> (T:value, Func<T,U>:map) -> U
+                §E{}
+                §R §C{map} §A value §/C
+              §F{f2:Probe:pub} () -> i32
+                §E{}
+                §R §C{Apply} §A 1 §A §LAM{l1:x} x §/LAM{l1} §/C
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
+    public void MethodGroupRanking_RejectsParetoIncomparableCandidates()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Pick:pub} (i32:left, object:right) -> i32
+                §E{}
+                §R left
+              §F{f2:Pick:pub} (f64:left, str:right) -> i32
+                §E{}
+                §R right.Length
+              §F{f3:Take:pub} (Func<i32,str,i32>:picker) -> void
+                §E{}
+              §F{f4:Probe:pub} () -> void
+                §E{}
+                §C{Take} §A Pick §/C
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
+    [Fact]
+    public void DelegateCalls_RejectPositionalArgumentsAfterOutOfPositionNamedArguments()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (Func<i32,i32,i32>:combine) -> i32
+                §E{}
+                §R §C{combine} §A[arg2] 2 §A 1 §/C
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
+    [Fact]
     public void MethodGroupRanking_DoesNotUseReturnTypeIdentity()
     {
         var result = Check("""
