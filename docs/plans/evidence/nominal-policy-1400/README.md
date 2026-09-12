@@ -53,10 +53,13 @@ observer cannot substitute for activated production negatives and safe controls.
 The accepted slot was recorded in
 [issue comment](https://github.com/juanmicrosoft/calor/issues/1400#issuecomment-5643258138)
 and the N0 current capacity row **before measurement**:
-Copilot context `ada009ab-5eb3-41ac-82cc-68fa9b4e158a`,
-name `nominal-policy-1400`. The runtime agent registry did not expose the
-implementation model; model confirmation belongs to the parent, not an
-invented label. Bounded M AI implementation/measurement/classification capacity
+Copilot/GPT-6 Astra context `ada009ab-5eb3-41ac-82cc-68fa9b4e158a`,
+name `nominal-policy-1400`. The parent explicitly confirmed the actual model
+and context UUID on 2026-09-12T01:38:23-04:00. The runtime agent registry had
+not exposed the model during capture; archived classifications and earlier
+comments retain that capture-time limitation rather than being backfilled.
+The current capacity record now uses the parent's confirmed identity.
+Bounded M AI implementation/measurement/classification capacity
 and two separate final reviews were accepted, with provisional checkpoint/
 review target 2026-09-12. This is not human staffing, engineer-day equivalence,
 statistical independence or a delivery promise.
@@ -78,6 +81,18 @@ Production source behavior is the released base, **not** PR #1443 or #1445.
 At the dependency checkpoint both were open: T1 #1443 at
 `6b68a0398351d7cbf0abb58b0d968b86bfa8b0dd`, N3 #1445 at
 `1a1dd9533e2d1b46892897fda00bb7c8fa50eaff`. Their owners' work was not imported.
+
+The parent's continuation clarification retains array gap #1444 as a separate
+0.22 child, depending on #1397/#1382 and blocking #1402. Stage A remains scalar
+STRING only. Refreshed N3 reviews must assess that split before closure; this
+D1 checkpoint neither performs nor substitutes for those reviews. No nominal
+policy is adopted and no full-milestone requirement is removed.
+
+The independent inventory and pre-T1 observations here do not require importing
+unmerged T1 source. A later measurement that relies on repaired reference/
+Option typing or selected Calor argument mappings must first pin the merged
+#1397/#1382 baseline explicitly; unsupported arrays remain #1444's separate
+obligation. No T1, N3 or array repair is absorbed into this evidence slot.
 
 The [manifest](data/manifest.json) pins actual observer/compiler/harness/Roslyn
 binary hashes and both compressed and original artifact byte hashes.
