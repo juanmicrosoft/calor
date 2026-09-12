@@ -284,7 +284,7 @@ public sealed class SafeConsumptionRuntimeTests
         // Literal condition avoids manufacturing a scope solely to inspect the bottom type.
         var literalCondition = new ConditionalExpressionNode(conditional.Span,
             new BoolLiteralNode(conditional.Span, true), conditional.WhenTrue, conditional.WhenFalse);
-        Assert.IsType<NeverType>(infer.Invoke(checker, [literalCondition]));
+        Assert.IsType<NeverType>(infer.Invoke(checker, [literalCondition, null]));
         var result = Program.Compile(source, "never.calr");
         Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
         var method = Emit(result.GeneratedCode).GetType("Consumption.ConsumptionModule")!.GetMethod("Probe")!;

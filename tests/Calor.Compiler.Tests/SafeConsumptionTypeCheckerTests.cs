@@ -1,4 +1,5 @@
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.TypeChecking;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -734,6 +735,111 @@ public sealed class SafeConsumptionTypeCheckerTests
 
         var diagnostic = SingleErrorAt(result, 7);
         Assert.Contains("Null-coalescing requires", diagnostic.Message);
+    }
+
+    [Fact]
+    public void DuplicateNamedParameters_DoNotCrashTypeChecking()
+    {
+        var exception = Record.Exception(() => Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Take:pub} (i32:value, i32:value) -> i32
+                §E{}
+                §R value
+              §F{f2:Probe:pub} () -> i32
+                §E{}
+                §R §C{Take} §A[value] 1 §/C
+            """));
+
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void NullableCoalesce_UsesTheWiderUnderlyingType()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (?i32:left, ?f64:right) -> ?f64
+                §E{}
+                §R (?? left right)
+            """);
+
+        AssertNoErrors(result);
+    }
+
+    [Fact]
+    public void GenericExpandedParams_InferFromEveryElement()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:First:pub}<T> (T[]:values:params) -> T
+                §E{}
+                §R §IDX values 0
+              §F{f2:Probe:pub} () -> i32
+                §E{}
+                §R (?? §C{First} §A 1 §A 2 §/C 3)
+            """);
+
+        var diagnostic = SingleErrorAt(result, 7);
+        Assert.Contains("Null-coalescing requires", diagnostic.Message);
+    }
+
+    [Fact]
+    public void GenericCalls_InferFromMethodGroupArguments()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:GetInt:pub} () -> i32
+                §E{}
+                §R 1
+              §F{f2:Make:pub}<T> (Func<T>:factory) -> T
+                §E{}
+                §R §C{factory} §/C
+              §F{f3:Probe:pub} () -> i32
+                §E{}
+                §R (?? §C{Make} §A GetInt §/C 2)
+            """);
+
+        var diagnostic = SingleErrorAt(result, 10);
+        Assert.Contains("Null-coalescing requires", diagnostic.Message);
+    }
+
+    [Fact]
+    public void AnonymousObjectHolders_ExposeNestedExpressions()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> object
+                §E{}
+                §R §ANON Age = (?? 1 2) §/ANON
+            """);
+
+        var diagnostic = SingleErrorAt(result, 4);
+        Assert.Contains("Null-coalescing requires", diagnostic.Message);
+    }
+
+    [Fact]
+    public void MatchExpression_UsesExplicitObjectTarget()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (i32:value) -> void
+                §E{}
+                §B{mixed:object} §W{m:expr} value
+                  §K 0 → 1
+                  §K _ → "text"
+            """);
+
+        AssertNoErrors(result);
+    }
+
+    [Fact]
+    public void PublicFunctionTypeAndEnvironmentApis_RetainOriginalOverloads()
+    {
+        Assert.NotNull(typeof(FunctionType).GetConstructor(
+            [typeof(IReadOnlyList<CalorType>), typeof(CalorType)]));
+        Assert.NotNull(typeof(TypeEnvironment).GetMethod(
+            nameof(TypeEnvironment.DefineFunction),
+            [typeof(string), typeof(FunctionType)]));
     }
 
     [Theory]

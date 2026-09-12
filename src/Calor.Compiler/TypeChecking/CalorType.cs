@@ -402,10 +402,15 @@ public sealed class FunctionType : CalorType
         }
     }
 
+    public FunctionType(IReadOnlyList<CalorType> parameterTypes, CalorType returnType)
+        : this(parameterTypes, returnType, null)
+    {
+    }
+
     public FunctionType(
         IReadOnlyList<CalorType> parameterTypes,
         CalorType returnType,
-        IReadOnlyList<string>? parameterNames = null)
+        IReadOnlyList<string>? parameterNames)
     {
         ParameterTypes = parameterTypes ?? throw new ArgumentNullException(nameof(parameterTypes));
         ReturnType = returnType ?? throw new ArgumentNullException(nameof(returnType));
