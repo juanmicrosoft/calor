@@ -1283,22 +1283,32 @@ public sealed class TypeChecker
             .Where(candidate => TryResolveKnownArgumentTypes(
                 candidate, call, preliminaryTypes, out _, out _))
             .ToArray();
+        var expectedArgumentTypes = call.Arguments
+            .Select((_, index) => GetConsensusExpectedArgumentType(
+                contextualCandidates, call, preliminaryTypes, index))
+            .ToArray();
         var argumentTypes = call.Arguments.Select((argument, index) =>
             RequiresTargetType(argument)
-                ? InferCallArgument(argument, GetConsensusExpectedArgumentType(
-                    contextualCandidates, call, preliminaryTypes, index))
+                ? InferCallArgument(argument, expectedArgumentTypes[index])
                 : preliminaryTypes[index]).ToArray();
         var candidates = functionCandidates
             .Select(candidate => TryResolveCallCandidate(candidate, call, argumentTypes))
             .Where(candidate => candidate != null)
             .Select(candidate => candidate!)
             .ToArray();
+        if (candidates.Length == 0 && functionCandidates.Count > 0
+            && (call.ArgumentNames?.Any(name => !string.IsNullOrEmpty(name)) == true
+                || call.ArgumentModifiers?.Any(modifier => !string.IsNullOrEmpty(modifier)) == true))
+        {
+            _diagnostics.ReportError(call.Span, DiagnosticCode.NoMatchingOverload,
+                $"No overload of '{call.Target}' matches the supplied argument names, modifiers, and types");
+        }
         var bestCandidates = candidates
             .Where(candidate => !candidates.Any(other =>
                 !ReferenceEquals(candidate, other) && IsBetterConversion(other, candidate)))
             .ToArray();
         if (bestCandidates.Length == 1)
-            ValidateSelectedContextualArguments(call, bestCandidates[0]);
+            ValidateSelectedContextualArguments(call, bestCandidates[0], expectedArgumentTypes);
         return bestCandidates.Length > 0
             && bestCandidates.All(candidate => candidate.Type.ReturnType.Equals(bestCandidates[0].Type.ReturnType))
                 ? bestCandidates[0].Type.ReturnType
@@ -1322,7 +1332,13 @@ public sealed class TypeChecker
     private CalorType InferCallArgument(ExpressionNode argument, CalorType? expectedType)
     {
         if (argument is MatchExpressionNode && expectedType == null)
-            return ErrorType.Instance;
+        {
+            var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
+            _suppressContextualDiagnostics = true;
+            var result = InferExpressionType(argument);
+            _suppressContextualDiagnostics = previousSuppressContextualDiagnostics;
+            return result;
+        }
         if (argument is LambdaExpressionNode && expectedType != null && ContainsTypeParameter(expectedType))
             return ErrorType.Instance;
         return InferExpressionType(argument, expectedType);
@@ -1330,12 +1346,17 @@ public sealed class TypeChecker
 
     private void ValidateSelectedContextualArguments(
         CallExpressionNode call,
-        ResolvedCallCandidate candidate)
+        ResolvedCallCandidate candidate,
+        IReadOnlyList<CalorType?> initialExpectedTypes)
     {
         for (var i = 0; i < call.Arguments.Count; i++)
         {
-            if (RequiresTargetType(call.Arguments[i]))
+            if (RequiresTargetType(call.Arguments[i])
+                && (initialExpectedTypes[i] == null
+                    || !initialExpectedTypes[i]!.Equals(candidate.ConversionTargets[i])))
+            {
                 InferExpressionType(call.Arguments[i], candidate.ConversionTargets[i]);
+            }
         }
     }
 
@@ -1617,6 +1638,13 @@ public sealed class TypeChecker
             {
                 return false;
             }
+            var modifier = candidate.ParameterModifiers[parameterIndex]
+                & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In);
+            if (modifier != ParameterModifier.None
+                && !target.Equals(preliminaryTypes[argumentIndex]))
+            {
+                return false;
+            }
         }
         return true;
     }
@@ -1649,6 +1677,7 @@ public sealed class TypeChecker
             return false;
         var paramsIndex = paramsIndices.Length == 1 ? paramsIndices[0] : -1;
         var nextPositional = 0;
+        var seenOutOfPositionNamedArgument = false;
         for (var argumentIndex = 0; argumentIndex < call.Arguments.Count; argumentIndex++)
         {
             var argumentName = call.ArgumentNames != null && argumentIndex < call.ArgumentNames.Count
@@ -1665,9 +1694,14 @@ public sealed class TypeChecker
                 if (matches.Length != 1)
                     return false;
                 parameterIndex = matches[0];
+                while (nextPositional < assigned.Length && assigned[nextPositional])
+                    nextPositional++;
+                seenOutOfPositionNamedArgument |= parameterIndex != nextPositional;
             }
             else
             {
+                if (seenOutOfPositionNamedArgument)
+                    return false;
                 while (nextPositional < assigned.Length && assigned[nextPositional])
                     nextPositional++;
                 parameterIndex = nextPositional < assigned.Length ? nextPositional : paramsIndex;
@@ -1714,6 +1748,7 @@ public sealed class TypeChecker
         var expandedParamsArguments =
             new List<(CalorType Type, ExpressionNode Expression, int SourceIndex)>();
         var nextPositional = 0;
+        var seenOutOfPositionNamedArgument = false;
         for (var argumentIndex = 0; argumentIndex < argumentTypes.Count; argumentIndex++)
         {
             var argumentName = call.ArgumentNames != null && argumentIndex < call.ArgumentNames.Count
@@ -1730,9 +1765,17 @@ public sealed class TypeChecker
                 if (matchingParameters.Length != 1)
                     return null;
                 parameterIndex = matchingParameters[0];
+                while (nextPositional < mappedArguments.Length
+                    && mappedArguments[nextPositional] != null)
+                {
+                    nextPositional++;
+                }
+                seenOutOfPositionNamedArgument |= parameterIndex != nextPositional;
             }
             else
             {
+                if (seenOutOfPositionNamedArgument)
+                    return null;
                 while (nextPositional < mappedArguments.Length
                     && mappedArguments[nextPositional] != null)
                 {
@@ -1834,10 +1877,12 @@ public sealed class TypeChecker
                     argument.Type,
                     forceExpanded: true);
                 var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
+                var diagnosticCheckpoint = _diagnostics.CreateCheckpoint();
                 _suppressContextualDiagnostics = true;
                 var inferredArgumentType =
                     InferExpressionType(argument.Expression, expectedArgumentType);
                 _suppressContextualDiagnostics = previousSuppressContextualDiagnostics;
+                _diagnostics.RestoreCheckpoint(diagnosticCheckpoint);
                 if (inferredArgumentType is ErrorType)
                     return null;
                 mappedArguments[i] =
@@ -1856,10 +1901,12 @@ public sealed class TypeChecker
                 if (!RequiresTargetType(argument.Expression))
                     continue;
                 var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
+                var diagnosticCheckpoint = _diagnostics.CreateCheckpoint();
                 _suppressContextualDiagnostics = true;
                 var inferredArgumentType =
                     InferExpressionType(argument.Expression, contextualParamsArray.ElementType);
                 _suppressContextualDiagnostics = previousSuppressContextualDiagnostics;
+                _diagnostics.RestoreCheckpoint(diagnosticCheckpoint);
                 if (inferredArgumentType is ErrorType)
                     return null;
                 expandedParamsArguments[i] =
@@ -1886,6 +1933,13 @@ public sealed class TypeChecker
                     GetMethodGroupConversionCost(delegateType, methodCandidates);
             }
             else if (!IsAssignable(parameterTypes[i], argument.Type))
+            {
+                return null;
+            }
+            else if ((candidate.ParameterModifiers[i]
+                    & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In))
+                != ParameterModifier.None
+                && !parameterTypes[i].Equals(argument.Type))
             {
                 return null;
             }
@@ -1967,6 +2021,16 @@ public sealed class TypeChecker
             if (left.ConversionCosts[i] == right.ConversionCosts[i]
                 && !left.ConversionTargets[i].Equals(right.ConversionTargets[i]))
             {
+                if (TryGetDelegateFunctionType(left.ConversionTargets[i], out var leftDelegate)
+                    && TryGetDelegateFunctionType(right.ConversionTargets[i], out var rightDelegate))
+                {
+                    var leftDelegateIsBetter = IsMoreSpecificDelegateType(leftDelegate, rightDelegate);
+                    var rightDelegateIsBetter = IsMoreSpecificDelegateType(rightDelegate, leftDelegate);
+                    if (rightDelegateIsBetter && !leftDelegateIsBetter)
+                        return false;
+                    strictlyBetter |= leftDelegateIsBetter && !rightDelegateIsBetter;
+                    continue;
+                }
                 var leftTargetIsBetter = IsAssignable(
                     right.ConversionTargets[i], left.ConversionTargets[i]);
                 var rightTargetIsBetter = IsAssignable(
@@ -1983,6 +2047,22 @@ public sealed class TypeChecker
         if (left.UsesExpandedParams && !right.UsesExpandedParams)
             return false;
         return left.OmittedOptionalCount < right.OmittedOptionalCount;
+    }
+
+    private static bool IsMoreSpecificDelegateType(FunctionType left, FunctionType right)
+    {
+        if (left.ParameterTypes.Count != right.ParameterTypes.Count)
+            return false;
+        var strictlyMoreSpecific = false;
+        for (var i = 0; i < left.ParameterTypes.Count; i++)
+        {
+            if (!IsAssignable(right.ParameterTypes[i], left.ParameterTypes[i]))
+                return false;
+            strictlyMoreSpecific |= !left.ParameterTypes[i].Equals(right.ParameterTypes[i]);
+        }
+        if (!IsAssignable(right.ReturnType, left.ReturnType))
+            return false;
+        return strictlyMoreSpecific || !left.ReturnType.Equals(right.ReturnType);
     }
 
     private sealed record ResolvedCallCandidate(
@@ -2099,21 +2179,23 @@ public sealed class TypeChecker
             int Cost)>();
         foreach (var method in methodCandidates)
         {
-            if (method.Type.ParameterTypes.Count != targetTemplate.ParameterTypes.Count)
+            var resolvedMethod = ResolveMethodCandidateAgainstTarget(targetTemplate, method);
+            if (resolvedMethod.Type.ParameterTypes.Count != targetTemplate.ParameterTypes.Count)
                 continue;
 
             var trial = new Dictionary<string, CalorType>(substitutions, StringComparer.Ordinal);
             for (var i = 0; i < targetTemplate.ParameterTypes.Count; i++)
             {
-                InferTypeArguments(targetTemplate.ParameterTypes[i], method.Type.ParameterTypes[i], trial);
+                InferTypeArguments(
+                    targetTemplate.ParameterTypes[i], resolvedMethod.Type.ParameterTypes[i], trial);
             }
-            InferTypeArguments(targetTemplate.ReturnType, method.Type.ReturnType, trial);
+            InferTypeArguments(targetTemplate.ReturnType, resolvedMethod.Type.ReturnType, trial);
 
             var resolvedTarget = (FunctionType)SubstituteTypeParameters(targetTemplate, trial);
-            if (!IsMethodGroupCompatible(resolvedTarget, method))
+            if (!IsMethodGroupCompatible(resolvedTarget, resolvedMethod))
                 continue;
-            applicable.Add((method, trial, resolvedTarget,
-                GetMethodGroupCandidateCost(resolvedTarget, method)));
+            applicable.Add((resolvedMethod, trial, resolvedTarget,
+                GetMethodGroupCandidateCost(resolvedTarget, resolvedMethod)));
         }
         if (applicable.Count == 0)
             return false;
@@ -2131,10 +2213,37 @@ public sealed class TypeChecker
         FunctionType target,
         IReadOnlyList<FunctionCandidate> candidates)
         => candidates
+            .Select(candidate => ResolveMethodCandidateAgainstTarget(target, candidate))
             .Where(candidate => IsMethodGroupCompatible(target, candidate))
             .Select(candidate => GetMethodGroupCandidateCost(target, candidate))
             .DefaultIfEmpty(5)
             .Min();
+
+    private static FunctionCandidate ResolveMethodCandidateAgainstTarget(
+        FunctionType target,
+        FunctionCandidate candidate)
+    {
+        if (candidate.TypeParameterNames.Count == 0)
+            return candidate;
+
+        var substitutions = new Dictionary<string, CalorType>(StringComparer.Ordinal);
+        for (var i = 0; i < Math.Min(
+            target.ParameterTypes.Count, candidate.Type.ParameterTypes.Count); i++)
+        {
+            InferTypeArguments(
+                candidate.Type.ParameterTypes[i], target.ParameterTypes[i], substitutions);
+        }
+        if (!ContainsInferencePlaceholder(target.ReturnType))
+            InferTypeArguments(candidate.Type.ReturnType, target.ReturnType, substitutions);
+        return candidate with
+        {
+            Type = new FunctionType(
+                candidate.Type.ParameterTypes
+                    .Select(parameter => SubstituteTypeParameters(parameter, substitutions))
+                    .ToArray(),
+                SubstituteTypeParameters(candidate.Type.ReturnType, substitutions))
+        };
+    }
 
     private static int GetMethodGroupCandidateCost(
         FunctionType target,

@@ -1332,6 +1332,96 @@ public sealed class SafeConsumptionTypeCheckerTests
         AssertNoErrors(result);
     }
 
+    [Fact]
+    public void UncontextualizedMatch_StillTraversesNestedConsumers()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (i32:key) -> void
+                §E{}
+                §C{System.Console.WriteLine} §A §W{m:expr} key
+                  §K 0 → (?? 1 2)
+                  §K _ → "text"
+                §/C
+            """);
+
+        var diagnostic = SingleErrorAt(result, 5);
+        Assert.Contains("Null-coalescing requires", diagnostic.Message);
+    }
+
+    [Fact]
+    public void ContextualCandidateProbes_DiscardNestedDiagnostics()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Take:pub} (object:value) -> object
+                §E{}
+                §R value
+              §F{f2:Probe:pub} (i32:key) -> object
+                §E{}
+                §R §C{Take} §A §W{m:expr} key
+                  §K 0 → (?? 1 2)
+                  §K _ → "text"
+                §/C
+            """);
+
+        var diagnostic = SingleErrorAt(result, 8);
+        Assert.Contains("Null-coalescing requires", diagnostic.Message);
+    }
+
+    [Fact]
+    public void GenericMethodGroupCosts_UseSubstitutedSignatures()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Map:pub}<T> (T:value) -> T
+                §E{}
+                §R value
+              §F{f2:Map:pub} (object:value) -> object
+                §E{}
+                §R value
+              §F{f3:Use:pub} (Func<str,str>:map) -> i32
+                §E{}
+                §R 1
+              §F{f4:Use:pub} (Func<object,object>:map) -> str
+                §E{}
+                §R "wide"
+              §F{f5:Probe:pub} () -> str
+                §E{}
+                §R (?? §C{Use} §A Map §/C "fallback")
+            """);
+
+        var diagnostic = SingleErrorAt(result, 16);
+        Assert.Contains("Null-coalescing requires", diagnostic.Message);
+    }
+
+    [Fact]
+    public void DirectCalls_RejectByRefWideningAndInvalidNamedOrdering()
+    {
+        var refResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Mutate:pub} (f64:value:ref) -> void
+                §E{}
+              §F{f2:Probe:pub} (i32:value:ref) -> void
+                §E{}
+                §C{Mutate} §A{ref} value §/C
+            """);
+        Assert.Contains(refResult.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+
+        var namedResult = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Take:pub} (i32:left, i32:right) -> i32
+                §E{}
+                §R left
+              §F{f2:Probe:pub} () -> i32
+                §E{}
+                §R §C{Take} §A[right] 2 §A 1 §/C
+            """);
+        Assert.Contains(namedResult.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
     [Theory]
     [InlineData("§R §C{Take} §A (?? 1 2) §/C")]
     [InlineData("§C{Take} §A (?? 1 2) §/C\n    §R 0")]
