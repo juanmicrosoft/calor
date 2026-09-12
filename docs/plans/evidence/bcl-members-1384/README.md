@@ -151,8 +151,9 @@ existing ratchet record, and converted Calor hashes match between sources.
 The audit source/targets hashes are in the JSON. Standard builds omit this
 injection.
 
-The committed `N5CorpusAudit.cs` and `N5Audit.targets` are evidence-only inputs
-for the existing xUnit runner. Copy them to a scratch directory, retrieve the
+The committed `N5CorpusAudit.cs.txt` and `N5Audit.targets` are evidence-only
+inputs for the existing xUnit runner. Copy them to a scratch directory,
+renaming the text artifact to `N5CorpusAudit.cs` there, then retrieve the
 base versions of `Binding/Binder.cs`, `Binding/BoundNodes.cs` and
 `Binding/Metadata/MetadataBinder.cs` with `git show` into
 `n5-base-Binder.cs`, `n5-base-BoundNodes.cs`, `n5-base-MetadataBinder.cs` there,
@@ -194,3 +195,13 @@ rejected as evidence. Explicit rebuilds and the assembly-API assertion replaced
 that attempt. No .NET8 runtime/roll-forward, all-project runtime harness result,
 research collection or zero-unknown claim is inferred from these observations.
 Final-head review records and actual normal CI belong to the issue-scoped PR.
+
+The first final-head integration review blocked the evidence source's `.cs`
+extension under `docs/`: the repository's Calor-first guard correctly rejects
+new C# files outside its approved roots. It is now a `.cs.txt` evidence
+artifact, never compiled from the repository, with unchanged content/hash.
+The first CI compiler job separately caught a stale0425 entry in the
+commit-stamp index after the actual ledger regeneration. Only that product
+ledger's entry is updated to its measured a6a source; other entries are
+unchanged. Both first-head failures remain recorded on the PR and require
+fresh final-head reviews and CI, not an approval carried across the repair.
