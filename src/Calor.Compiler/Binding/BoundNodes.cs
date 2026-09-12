@@ -214,40 +214,21 @@ public sealed class BoundVariableExpression : BoundExpression
             .Distinct(StringComparer.Ordinal)
             .ToArray();
         var resolvedTypeName = resolvedTypes.Length == 1 ? variable.TypeName : "OBJECT";
-        // v0.14 nullability workstream (follow-up to #1057) — flow the
-        // variable's declared nullability into the reference expression's
-        // type. Without this, §B{r:string} someStringLocal trips Calor0272
-        // because the default Oblivious annotation is treated as
-        // possibly-null (§D3). Scope gate mirrors NullabilityChecker (§D6):
-        // only stamp when the resolved type is a scalar STRING, so
-        // non-STRING targets retain the conservative Oblivious default
-        // until later slices touch them. When resolution disagrees
-        // (resolvedTypes.Length > 1, falling through to "OBJECT"), also
-        // stay Oblivious since the declared annotation no longer maps to
-        // a single ground type.
+        // Keep the legacy display projection. Resolved reference identity and
+        // annotation are carried separately; ambiguous names do not supply one.
         Type = resolvedTypes.Length == 1
             ? BuildStringAnnotatedTypeOrDefault(variable, resolvedTypeName)
             : new NominalBoundType(resolvedTypeName, NullableAnnotation.Oblivious);
+        referenceIdentity ??= ResolvedSymbols.Count == 1 ? variable.InferredReferenceType : null;
         if (resolvedTypes.Length == 1 && referenceIdentity is not null && Type is NominalBoundType nominal)
             Type = new NominalBoundType(
-                nominal.QualifiedName, nominal.NullableAnnotation,
+                nominal.QualifiedName,
+                referenceIdentity.IsKnownReferenceType ? variable.NullableAnnotation : nominal.NullableAnnotation,
                 referenceIdentity.Declaration, referenceIdentity.RoslynSymbol);
     }
 
-    // S3 scope (§D6): flow the STRING annotation only. Handles both the
-    // canonical bare STRING form (§B{a:string}) and the parser's expanded
-    // OPTION-of-STRING form (§B{a:?string} → OPTION[inner=STRING]).
-    //
-    // For OPTION-of-STRING the surface DisplayString is preserved as-is
-    // (many callsites read .Type.DisplayString and expect the OPTION
-    // spelling), but the NullableAnnotation is stamped Annotated so
-    // NullabilityChecker.GetAnnotation and Binder.DescribeAnnotation
-    // observe the declared nullability. This is deliberately narrow —
-    // downstream Option-shaped consumers keep their existing behavior;
-    // only the annotation channel changes.
-    //
-    // Non-STRING and non-OPTION-of-STRING targets keep the conservative
-    // Oblivious default until later slices touch them.
+    // Historical display/annotation projection for constructor compatibility.
+    // This spelling-only helper is not a resolved reference-kind classifier.
     private static NominalBoundType BuildStringAnnotatedTypeOrDefault(
         VariableSymbol variable,
         string resolvedTypeName)
@@ -263,19 +244,8 @@ public sealed class BoundVariableExpression : BoundExpression
             return new NominalBoundType(resolvedTypeName, NullableAnnotation.Annotated);
         }
 
-        // v0.14 §S8 (task #7 Phase-C) — user-declared reference-type
-        // references also flow the declared annotation, so a §MT{...}
-        // (:?Foo:a) parameter reference at its use site reports as
-        // Annotated (and a :Foo parameter reports as NotAnnotated).
-        // Value types (INT/BOOL/…) fall through as Oblivious since they
-        // cannot carry a nullable annotation. The is-user-ref
-        // classification mirrors NullabilityChecker.IsUserReferenceType.
-        //
-        // Strip a leading/trailing '?' from the QualifiedName so the
-        // predicate's short-name compare (`?Foo` source vs `Foo` target)
-        // matches — the nullability channel already carries the annotation,
-        // so leaving `?` in the QualifiedName would double-encode it and
-        // break every user-ref shape check downstream.
+        // Preserve the existing decorator-stripped display for nominal names.
+        // The checker compares declaration/Roslyn identities, not this spelling.
         var canonical = resolvedTypeName;
         if (canonical.StartsWith('?')) canonical = canonical[1..];
         else if (canonical.EndsWith('?') && canonical.Length > 1) canonical = canonical[..^1];
@@ -287,10 +257,7 @@ public sealed class BoundVariableExpression : BoundExpression
         return new NominalBoundType(resolvedTypeName, NullableAnnotation.Oblivious);
     }
 
-    // Kept in sync with NullabilityChecker.IsUserReferenceType — anything
-    // that is not a known Calor value-type primitive is treated as a
-    // reference type carrying a meaningful annotation. STRING/string/str
-    // are handled by IsScalarStringType above.
+    // Legacy display projection only; absence here is not proof of reference kind.
     private static bool IsUserReferenceTypeName(string name) => name switch
     {
         "INT" or "int" or "i32" => false,
