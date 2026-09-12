@@ -1078,6 +1078,9 @@ public sealed class TypeChecker
     private CalorType InferThrowExpressionType(ThrowExpressionNode throwExpression)
     {
         var exceptionType = InferExpressionType(throwExpression.Exception);
+        if (throwExpression.Exception is NewExpressionNode constructed
+            && PrimitiveType.FromName(Parsing.AttributeHelper.ToSurfaceSpelling(constructed.TypeName)) is { } primitive)
+            exceptionType = primitive;
         if (!IsSupportedThrowException(throwExpression.Exception, exceptionType))
         {
             _diagnostics.ReportError(throwExpression.Exception.Span, DiagnosticCode.TypeMismatch,
@@ -1113,9 +1116,7 @@ public sealed class TypeChecker
             InferExpressionType(initializer.Value);
         }
 
-        return PrimitiveType.FromName(Parsing.AttributeHelper.ToSurfaceSpelling(newExpression.TypeName))
-            ?? _env.LookupType(newExpression.TypeName)
-            ?? new ExternalType(newExpression.TypeName);
+        return _env.LookupType(newExpression.TypeName) ?? new ExternalType(newExpression.TypeName);
     }
 
     private CalorType InferCallExpressionType(CallExpressionNode call)

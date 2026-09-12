@@ -187,7 +187,7 @@ public class BinderControlValueFamilyTests
         // expression is wrong) — Of() includes it, and the finding fires.
         const string source = @"
 §M{m001:Test}
-  §F{f001:Trap:pub} (i32:x) -> i32
+  §F{f001:Trap:pub} (?i32:x) -> i32
     §R (?? x (/ 10 0))";
 
         var result = Compiler.Program.Compile(source, "test.calr", new CompilationOptions
