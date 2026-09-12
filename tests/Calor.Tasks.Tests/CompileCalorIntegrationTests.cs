@@ -131,6 +131,34 @@ public class CompileCalorIntegrationTests : IDisposable
         Assert.Empty(task.GeneratedFiles);
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void NullableReferenceTyping_AgreesWithTaskAndRejectsWarmOptionMismatch(bool typeOff, bool transpile)
+    {
+        const string safe = """
+            §M{m1:NullableTyping}
+              §F{f1:Probe:pub} () -> ?str
+                §E{alloc}
+                §B{value:?str} "safe"
+                §R value
+            """;
+        var source = CreateSourceFile("NullableTyping.calr", safe);
+        var accepted = CreateTask(source);
+        accepted.TypeCheck = !typeOff;
+        accepted.TranspileOnly = transpile;
+        Assert.True(accepted.Execute());
+        Assert.Empty(((TestBuildEngine)accepted.BuildEngine).ErrorCodes);
+        File.WriteAllText(source, safe.Replace("§R value", "§R §SM value", StringComparison.Ordinal));
+        var rejected = CreateTask(source);
+        rejected.TypeCheck = !typeOff;
+        rejected.TranspileOnly = transpile;
+        Assert.False(rejected.Execute());
+        Assert.Contains("Calor0275", ((TestBuildEngine)rejected.BuildEngine).ErrorCodes);
+        Assert.Empty(rejected.GeneratedFiles);
+    }
+
     [Fact]
     public void FullLifecycle_BuildSkipEditCleanBuild()
     {

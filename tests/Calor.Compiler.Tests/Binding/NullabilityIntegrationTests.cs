@@ -279,6 +279,56 @@ public class NullabilityIntegrationTests
         });
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void N3_NativeStringParams_PreservesScalarMapAndTransitionalRejection(bool expression, bool nullable)
+    {
+        var converted = new Calor.Compiler.Migration.CSharpToCalorConverter().Convert($$"""
+            public static class Strings
+            {
+                public static int Take(params string[] values) { return 1; }
+                public static int Caller(string{{(nullable ? "?" : "")}} value)
+                {
+                    {{(expression ? "return " : "")}}Take("first", "second", value);
+                    {{(expression ? "" : "return 0;")}}
+                }
+            }
+            """);
+        Assert.Equal(!nullable, converted.Success);
+        if (nullable)
+            Assert.Contains(converted.Issues, issue => issue.Message.Contains("No overload", StringComparison.Ordinal));
+        var (bound, diagnostics) = BindSource(converted.CalorSource!);
+        var caller = bound.Functions.Single(f => f.Symbol.Name.EndsWith(".Caller", StringComparison.Ordinal));
+        var matches = expression
+            ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(caller.Body[0]).Expression).SelectedOverloadMatches
+            : Assert.IsType<BoundCallStatement>(caller.Body[0]).SelectedOverloadMatches;
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+        if (nullable)
+        {
+            Assert.Empty(matches);
+            Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NoMatchingOverload
+                && BindingDiagnosticPolicy.IsCompilationError(d));
+        }
+        else
+        {
+            Assert.DoesNotContain(diagnostics, d => BindingDiagnosticPolicy.IsCompilationError(d));
+            var match = Assert.Single(matches);
+            Assert.Equal(new[] { 0, 1, 2 }, match.Arguments.Select(a => a.ArgumentIndex));
+            Assert.All(match.Arguments, mapping =>
+            {
+                Assert.Equal(0, mapping.ParameterIndex);
+                Assert.True(mapping.IsExpandedParams);
+                Assert.Equal("STRING", TypeIdentity.Canonicalize(mapping.ParameterType));
+            });
+        }
+        var result = Program.Compile(converted.CalorSource!, "n3-native-string-params.calr",
+            new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
+        Assert.Equal(nullable, result.HasErrors);
+    }
+
     /// <summary>
     /// The canonical D3 repro from issue #875: binding
     /// <c>Environment.GetEnvironmentVariable</c>'s Annotated string return

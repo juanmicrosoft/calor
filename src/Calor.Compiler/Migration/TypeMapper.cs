@@ -390,18 +390,14 @@ public static class TypeMapper
     /// </summary>
     public static string CalorToCSharp(string calorType)
     {
-        if (string.IsNullOrEmpty(calorType))
+        if (string.IsNullOrWhiteSpace(calorType))
             return calorType;
 
-        // Handle expanded OPTION format: OPTION[inner=T] -> T?
-        if (calorType.StartsWith("OPTION[inner=", StringComparison.Ordinal))
+        // Nullable annotations include the historical OPTION[inner=...] parser spelling.
+        // Explicit Option<T> is handled as a runtime generic below.
+        if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(calorType, out var nullableReferent))
         {
-            var innerType = ExtractBracketValue(calorType, "OPTION[inner=");
-            if (innerType != null)
-            {
-                var mappedInner = CalorToCSharp(innerType);
-                return $"{mappedInner}?";
-            }
+            return $"{CalorToCSharp(nullableReferent)}?";
         }
 
         // Handle expanded RESULT format: RESULT[ok=T][err=E] -> Calor.Runtime.Result<T, E>
@@ -451,14 +447,6 @@ public static class TypeMapper
             }
         }
 
-        // Handle Option types ?T -> T?
-        if (calorType.StartsWith("?"))
-        {
-            var innerType = calorType[1..];
-            var mappedInner = CalorToCSharp(innerType);
-            return $"{mappedInner}?";
-        }
-
         // Handle array types [T] -> T[]
         if (calorType.StartsWith("[") && calorType.EndsWith("]"))
         {
@@ -494,14 +482,6 @@ public static class TypeMapper
             var pointeeType = calorType[..^1];
             var mappedPointee = CalorToCSharp(pointeeType);
             return $"{mappedPointee}*";
-        }
-
-        // Handle suffix nullable T? -> T_mapped? (e.g., str? -> string?, i32? -> int?)
-        if (calorType.EndsWith("?") && calorType.Length > 1)
-        {
-            var innerType = calorType[..^1];
-            var mappedInner = CalorToCSharp(innerType);
-            return $"{mappedInner}?";
         }
 
         // Handle generic types

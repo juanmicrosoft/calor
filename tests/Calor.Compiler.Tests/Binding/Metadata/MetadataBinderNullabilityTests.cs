@@ -64,6 +64,12 @@ public class MetadataBinderNullabilityTests
             Assert.Equal(form == "expanded", mapping.IsExpandedParams);
             Assert.Equal(form == "expanded",
                 mapping.TargetType.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_String);
+            if (form != "expanded")
+            {
+                var target = Assert.IsAssignableFrom<Microsoft.CodeAnalysis.IArrayTypeSymbol>(mapping.TargetType);
+                Assert.Equal(1, target.Rank);
+                Assert.Equal(Microsoft.CodeAnalysis.SpecialType.System_String, target.ElementType.SpecialType);
+            }
         });
     }
 

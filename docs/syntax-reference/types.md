@@ -118,48 +118,53 @@ Calor uses bracket notation `[T]` for array types, which aligns with common prog
 
 ---
 
-## Option Type (`?T`)
+## Nullable References (`?T`)
 
-Options represent values that may be absent.
+For supported reference types, `?str` and `?string` mean C# `string?`, and `?Foo`
+means a nullable `Foo` reference. They do **not** create a runtime `Option<T>`.
+Postfix spellings such as `str?` are also nullable annotations.
 
-### Syntax
-
-```
-?T                  // Option of T (may be null)
-```
-
-### Examples
-
-```
-§F{f001:Find:pub}
-  §I{str:key}
-  §O{?str}              // might return a string, might return nothing
-  // ...
-
-§F{f002:Process:pub}
-  §I{?i32:maybeValue}   // accepts null
-  §O{void}
-  // ...
+```calor
+§M{m1:NullableReferenceExample}
+  §F{f1:Identity:pub} (?str:value) -> ?str
+    §E{}
+    §R value
+  §F{f2:Greeting:pub} () -> ?str
+    §E{}
+    §B{greeting:?str} "hello"
+    §R greeting
 ```
 
-### Creating Option Values
+Nullable-reference typing is not a promise of complete null-safety enforcement.
+The staged `Calor0272`/`Calor0273`/`Calor0274` binder findings remain analysis-only;
+some older unsafe assignments still fail the TypeChecker first. General mutation
+is outside those receiving-boundary checks.
 
-```
-§SM value           // Some(value) - has a value
-§NN                 // None - no value
+Existing nullable-value spellings such as `?i32` emit C# `int?`, not a reference or
+an Option. This reference-typing repair does not expand their TypeChecker support.
+Unknown external types and arbitrary generic payloads also need separate analysis;
+absence of an error is not proof that they were resolved.
+
+## Runtime Option (`Option<T>`)
+
+An explicit `Option<T>` stores either a value or an absent case. `§SM value`
+constructs `Some(value)` and `§NN{T}` constructs a typed `None`. These are
+`Calor.Runtime.Option<T>` values, not nullable references.
+
+```calor
+§M{m1:OptionExample}
+  §F{f1:Greeting:pub} (bool:present) -> Option<str>
+    §E{alloc}
+    §IF{if1} present
+      §R §SM "hello"
+    §EL
+      §R §NN{str}
 ```
 
-### Example
-
-```
-§F{f001:FindUser:pub}
-  §I{i32:id}
-  §O{?User}
-  §IF{if1} (== id 0)
-    §R §NN
-  §EL
-    §R §SM user
-```
+Do not initialize `?str` with `§SM "hello"` or `§NN{str}`. Supported
+reference/Option representation mismatches are rejected (`Calor0202` from early
+typing or `Calor0275` from binding). Use explicit Option construction/consumption;
+the compiler does not insert an unwrap, fallback, or throw.
 
 ---
 

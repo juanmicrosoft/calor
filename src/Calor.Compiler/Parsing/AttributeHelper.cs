@@ -539,7 +539,7 @@ public static class AttributeHelper
             return $"ARRAY[element={inner}]";
         }
 
-        // Handle Option type: ?T -> OPTION[inner=T]
+        // Historical nullable-annotation encoding, not the runtime Option<T> type.
         if (compactType.StartsWith('?'))
         {
             var inner = ExpandType(compactType[1..]);
@@ -711,6 +711,122 @@ public static class AttributeHelper
     /// Splits generic type arguments respecting nested angle brackets.
     /// E.g., "str, List&lt;T&gt;" → ["str", "List&lt;T&gt;"]
     /// </summary>
+    /// <summary>
+    /// Reads a nullable annotation, including the parser's historical expanded spelling.
+    /// Explicit Option&lt;T&gt; and Option[T] are runtime values, not nullable annotations.
+    /// </summary>
+    public static bool TryUnwrapNullableAnnotation(string typeName, out string innerType)
+    {
+        if (string.IsNullOrWhiteSpace(typeName))
+        {
+            innerType = string.Empty;
+            return false;
+        }
+        var type = typeName.Trim();
+        const string expandedPrefix = "OPTION[inner=";
+        if (type.StartsWith(expandedPrefix, StringComparison.OrdinalIgnoreCase) && type.EndsWith(']'))
+            innerType = type[expandedPrefix.Length..^1];
+        else if (type.StartsWith('?') && type.Length > 1)
+            innerType = type[1..];
+        else if (type.EndsWith('?') && type.Length > 1)
+            innerType = type[..^1];
+        else
+        {
+            innerType = string.Empty;
+            return false;
+        }
+
+        return !string.IsNullOrWhiteSpace(innerType);
+    }
+
+    /// <summary>Reads explicit runtime Option types without accepting nullable annotations.</summary>
+    public static bool TryUnwrapRuntimeOption(string typeName, out string innerType)
+    {
+        if (string.IsNullOrWhiteSpace(typeName))
+        {
+            innerType = string.Empty;
+            return false;
+        }
+        var type = typeName.Trim();
+        var open = type.IndexOfAny(['<', '[']);
+        if (open > 0
+            && (type[..open].Equals("Option", StringComparison.OrdinalIgnoreCase)
+                || type[..open].Equals("Calor.Runtime.Option", StringComparison.Ordinal))
+            && type[^1] == (type[open] == '<' ? '>' : ']')
+            && !type[(open + 1)..].StartsWith("inner=", StringComparison.OrdinalIgnoreCase))
+        {
+            var arguments = SplitGenericArgs(type[(open + 1)..^1]);
+            if (arguments.Count == 1 && arguments[0].Length > 0)
+            {
+                innerType = arguments[0];
+                return true;
+            }
+        }
+
+        innerType = string.Empty;
+        return false;
+    }
+
+    /// <summary>
+    /// Reference declarations visible in this module. A value declaration with the same name
+    /// (including another preprocessor arm) prevents a reference classification.
+    /// </summary>
+    public static IReadOnlySet<string> GetDeclaredReferenceTypeNames(ModuleNode module)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        var references = new HashSet<string>(StringComparer.Ordinal);
+        var nonReferences = new HashSet<string>(StringComparer.Ordinal);
+        AddTypes(module.Classes, module.Interfaces, module.Enums, module.Delegates, null);
+        foreach (var indexed in module.IndexedTypes)
+            nonReferences.Add(indexed.Name);
+        foreach (var refinement in module.RefinementTypes)
+            nonReferences.Add(refinement.Name);
+        foreach (var block in module.TypePreprocessorBlocks)
+        for (var branch = block; branch is not null; branch = branch.ElseBranch)
+            AddTypes(branch.Classes, branch.Interfaces, branch.Enums, branch.Delegates, null);
+        references.ExceptWith(nonReferences);
+        return references;
+
+        void AddTypes(
+            IReadOnlyList<ClassDefinitionNode> classes,
+            IReadOnlyList<InterfaceDefinitionNode> interfaces,
+            IReadOnlyList<EnumDefinitionNode> enums,
+            IReadOnlyList<DelegateDefinitionNode> delegates,
+            string? enclosing)
+        {
+            string Qualify(string name) => enclosing is null ? name : $"{enclosing}.{name}";
+            foreach (var declaration in classes)
+            {
+                var name = Qualify(declaration.Name);
+                (declaration.IsStruct ? nonReferences : references).Add(name);
+                AddTypes(declaration.NestedClasses, declaration.NestedInterfaces,
+                    declaration.NestedEnums, declaration.NestedDelegates, name);
+            }
+            foreach (var declaration in interfaces) references.Add(Qualify(declaration.Name));
+            foreach (var declaration in delegates) references.Add(Qualify(declaration.Name));
+            foreach (var declaration in enums) nonReferences.Add(Qualify(declaration.Name));
+        }
+    }
+
+    /// <summary>
+    /// A known reference/Option representation mismatch, not a null-state predicate.
+    /// Object is deliberately excluded: the binder also uses it for unresolved expressions.
+    /// </summary>
+    public static bool IsReferenceOptionMismatch(
+        string targetType, string sourceType, IReadOnlySet<string> declaredReferences)
+    {
+        var targetOption = TryUnwrapRuntimeOption(targetType, out _);
+        var sourceOption = TryUnwrapRuntimeOption(sourceType, out _);
+        if (targetOption == sourceOption)
+            return false;
+
+        var reference = targetOption ? sourceType : targetType;
+        if (TryUnwrapNullableAnnotation(reference, out var referent))
+            reference = referent;
+        return reference is "str" or "string" or "STRING" or "System.String"
+            || declaredReferences.Contains(reference);
+    }
+
     private static List<string> SplitGenericArgs(string argsStr)
     {
         var args = new List<string>();

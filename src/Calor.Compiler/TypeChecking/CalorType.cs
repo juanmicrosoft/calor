@@ -142,9 +142,9 @@ public sealed class PrimitiveType : CalorType
             "F32" or "SINGLE" => Sized(Float, "f32"),
             "DECIMAL" => Decimal,
             "BOOL" or "BOOLEAN" => Bool,
-            "STRING" or "STR" => String,
+            "STRING" or "STR" or "SYSTEM.STRING" => String,
             "CHAR" => Char,
-            "OBJECT" => Object,
+            "OBJECT" or "SYSTEM.OBJECT" => Object,
             "UNIT" => Unit,
             _ => null
         };
@@ -204,7 +204,41 @@ public sealed class ArrayType : CalorType
 }
 
 /// <summary>
-/// Represents an Option[T] type.
+/// A supported nullable reference. This has no runtime Option wrapper or implicit unwrap.
+/// </summary>
+public sealed class NullableReferenceType : CalorType
+{
+    public CalorType ReferentType { get; }
+    public override string Name => $"?{ReferentType.Name}";
+    public override string SurfaceName => $"?{ReferentType.SurfaceName}";
+
+    // Preserve the old checker's rejection of expanded nullable locals until #1385 can
+    // take ownership. Raw inline annotations were previously unmodeled, not enforced.
+    internal bool RequiresTransitionalAssignmentCheck { get; }
+
+    public NullableReferenceType(CalorType referentType)
+        : this(referentType, requiresTransitionalAssignmentCheck: false)
+    {
+    }
+
+    internal NullableReferenceType(CalorType referentType, bool requiresTransitionalAssignmentCheck)
+    {
+        ReferentType = referentType ?? throw new ArgumentNullException(nameof(referentType));
+        if (referentType is not ExternalType
+            && !referentType.Equals(PrimitiveType.String)
+            && !referentType.Equals(PrimitiveType.Object))
+            throw new ArgumentException("A supported reference type is required.", nameof(referentType));
+        RequiresTransitionalAssignmentCheck = requiresTransitionalAssignmentCheck;
+    }
+
+    public override bool Equals(CalorType? other)
+        => other is NullableReferenceType nullable && ReferentType.Equals(nullable.ReferentType);
+
+    public override int GetHashCode() => HashCode.Combine("NullableReference", ReferentType);
+}
+
+/// <summary>
+/// Represents a runtime Option[T] type, distinct from a nullable reference.
 /// </summary>
 public sealed class OptionType : CalorType
 {

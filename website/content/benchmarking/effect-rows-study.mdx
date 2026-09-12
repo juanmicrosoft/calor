@@ -7,17 +7,20 @@ order: 8
 # Effect Rows Study: Proposed Method
 
 **Reader question:** How would the redesigned PP-W-rows study test effect
-enforcement, and what must happen before it can run?
+enforcement, and what remains unresolved while it is paused?
 
-**Current status, 2026-09-10: pilot budget approved; collection not admitted.**
-The [recorded financial decision](/docs/benchmarking/results/#redesigned-pp-w-rows-deferred)
-sets a **USD250 total, pilot-only** ceiling and accepts the registered stopping
-rules and negative/null publication. Operational readiness remains a separate
-gate. No redesigned confirmatory result exists.
+**Current status, 2026-09-11: paused by the user.**
+The [recorded pause](/docs/benchmarking/results/#redesigned-pp-w-rows-deferred)
+preserves two consumed invalid/censored attempts and 442 untouched scheduled
+identities. Neither the pilot nor confirmation has completed, and no benefit
+or null result exists. The existing total ceiling is **USD1,000**; the
+USD51.04 held in two reservations is not measured spend. Actual charges are
+unknown, and the permanent-retention exception has not been applied.
+This page gives no permission to resume.
 
 The historical [M0 decision](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/docs/plans/safe-delegation-m0/decision.md)
 records formal M0 as **UNADJUDICATED** and the maintainer action as an
-**administrative stop**. The separate pilot financial decision does not
+**administrative stop**. Later separate financial decisions do not
 re-arm M0 or establish scientific benefit.
 See [current evidence status](/docs/benchmarking/evidence-status/) for the
 distinction.
@@ -50,7 +53,7 @@ Those instruments cannot supply this study's result.
 The [frozen arm definitions, §3](https://github.com/juanmicrosoft/calor/blob/16880d006db760d7b47d829fd4282b033c3158a0/docs/plans/2026-09-05-ppw-rows-fixture-redesign.md#3-arm-definitions-re-registered)
 specify one 0.18 release compiler: arm A uses `--permissive-effects`; arm B
 uses strict enforcement with no waiver flag. This is the frozen 0.18-era
-design, not a claim that milestone 0.21 selects an experimental compiler pin.
+design, not a claim that product release 0.21 selects an experimental compiler pin.
 An approved supersession would be needed to change that design.
 
 The control still has effect rows. In the registered policy, permissive mode
@@ -91,8 +94,9 @@ evidence are recorded separately in [#1256](https://github.com/juanmicrosoft/cal
 [#1266](https://github.com/juanmicrosoft/calor/issues/1266),
 [#1257](https://github.com/juanmicrosoft/calor/issues/1257), and
 [#1258](https://github.com/juanmicrosoft/calor/issues/1258). Those engineering
-gates do not admit collection. No redesigned agent collection or benefit
-result exists.
+gates are not study results. The later interrupted attempts and pause are
+recorded in the [current handoff](https://github.com/juanmicrosoft/calor/issues/1254#issuecomment-5637070487),
+not in these earlier buildability findings.
 
 The [pre-collection requirements, §7](https://github.com/juanmicrosoft/calor/blob/16880d006db760d7b47d829fd4282b033c3158a0/docs/plans/2026-09-05-ppw-rows-fixture-redesign.md#7-what-must-exist-before-collection)
 require checked tasks and frozen visible/held-out suites. The separate
@@ -128,25 +132,27 @@ are registered intent:
    confirmatory collection at a reduced, inadequately powered size. A properly
    powered null is published as a refutation of the registered claim.
 
-The last step is a stage-2 off-ramp, not the current pilot budget/not-run hold.
-Pilot-only financial approval does not fund confirmation.
+The last step is a stage-2 off-ramp, not the current pause after invalid/censored
+attempts. Confirmation still needs its own prospective design and affordability
+decision under the remaining total ceiling; it is not automatic.
 
 ## Financial approval is not collection admission
 
-The [authorization receipt](https://github.com/juanmicrosoft/calor/pull/1387)
-records real financial approval. Because the user quote left the stage choice
-unselected, its interpretation is the narrower pilot-only scope. **USD250 is
-the total ceiling**, not a per-task, per-arm, or per-run allowance. No cap
-increase or protocol weakening is authorized.
+The [historical authorization receipt](https://github.com/juanmicrosoft/calor/pull/1387)
+records the **2026-09-10 USD250 pilot-only decision (superseded ceiling)**.
+Its **BUDGET_NOT_RUN** assessment was an earlier pre-execution hold, not
+the state of today's consumed attempts.
 
-Before experimental model calls, the instrument must establish
-[trustworthy enforced spending controls](https://github.com/juanmicrosoft/calor/issues/1378),
-compatible reviewed pins, and a defensible plan for the entire unchanged
-registered pilot within that ceiling. The current recorded assessment is
-**BUDGET_NOT_RUN**, not not-buildable, a pilot null/negative, or
-**UNDERPOWERED-CARRIED**. Historical planning costs do not prove that a valid
-cheaper plan is impossible. Do not shrink the pilot or alter its model,
-client, or stops to make it fit.
+The [central pause handoff](https://github.com/juanmicrosoft/calor/issues/1254#issuecomment-5637070487)
+records the current single USD1,000 ceiling. Two USD25.52 reservations remain
+held, USD51.04 total, with actual charges unknown. The authorized
+permanent-retention exception has not been applied. The
+[paused draft checkpoint](https://github.com/juanmicrosoft/calor/pull/1438#issuecomment-5637787747)
+does not supply final methods approval, completed implementation, or operator
+permission. A new explicit instruction and all remaining review/readiness
+gates are required before any continuation. Neither product publication nor
+this status correction changes the protocol, replaces the consumed attempts,
+or creates a new budget.
 
 ## Tooling is not collection evidence
 
@@ -158,8 +164,8 @@ tests and registration work belong to
 These engineering artifacts are not experimental observations or financial
 enforcement evidence by themselves.
 
-No redesigned collection or empirical benefit follows from this
-documentation. Scientific owners retain gate adjudication and ledger changes.
+This page documents a paused study; it authorizes neither collection nor a
+scientific verdict. Scientific owners retain gate adjudication and ledger changes.
 Any later result must identify
 its epoch, pins (recorded versions and configuration), stage, denominators,
 exclusions, and uncertainty rather than

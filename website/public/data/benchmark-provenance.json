@@ -1,11 +1,11 @@
 {
-  "sourceCommit": "1caf9138",
-  "sourceDeclaredVersion": "0.19.0",
+  "sourceCommit": "be488238",
+  "sourceDeclaredVersion": "0.20.0",
   "corpus": "tests/TestData/Benchmarks",
   "method": "Deterministic static-analysis calculators",
   "programCount": 217,
   "metricNames": ["TokenEconomics", "GenerationAccuracy", "Comprehension", "EditPrecision", "ErrorDetection", "InformationDensity", "RefactoringStability", "Correctness"],
-  "limitation": "The exact measurement binary and working-tree state were not independently recorded. Source pairs are not all behaviorally equivalent; the reported confidence intervals do not establish sampling uncertainty or a language advantage. See issue #1276.",
+  "limitation": "The reports record the source revision before the release version bump, not an independently attested measurement binary. The 30 repetitions are deterministic, not independent samples. Source pairs are not all behaviorally equivalent; the reported intervals establish no measured language, agent-productivity, correctness, or safety advantage. See issue #1276.",
   "agentTasks": {
     "sourceCommit": "107462e",
     "sourceDeclaredVersion": "0.2.3",

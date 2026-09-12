@@ -140,6 +140,19 @@
         "ContainsValue": [],
         "Keys": [],
         "Values": []
+      },
+      "getters": {
+        "Count": [],
+        "Keys": ["alloc"],
+        "Values": ["alloc"]
+      }
+    },
+    {
+      "type": "System.Collections.Generic.SortedDictionary`2",
+      "getters": {
+        "Count": [],
+        "Keys": ["alloc"],
+        "Values": ["alloc"]
       }
     },
     {

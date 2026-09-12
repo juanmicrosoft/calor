@@ -17,11 +17,12 @@ measured language advantage. Comprehension is
 1.84x, error detection is 1.49x, token economics is 1.42x, and information
 density is 0.97x—the category whose normalized ratio favors C#.
 
-The recorded source revision is `1caf9138`. Its `Directory.Build.props` declares
-compiler `0.19.0`; the JSON's `version: "1.0"` identifies the data format, not the
+The snapshot was recorded on **2026-09-11** from source revision `be488238`.
+Its `Directory.Build.props` declares compiler `0.20.0`, before the release
+version bump; the JSON's `version: "1.0"` identifies the data format, not the
 compiler release. The corpus is `tests/TestData/Benchmarks`. The exact compiler
 binary used for the measurement was not independently recorded. These are
-fixed-source results, rerun for the 0.20 release. They are not a live measure of
+fixed-source results, rerun for the 0.21.0 release. They are not a live measure of
 coding-agent performance. The separate agent-study snapshots below were not rerun.
 
 These measurements need important caveats:
@@ -35,8 +36,8 @@ These measurements need important caveats:
 - The metrics are deterministic static analyses. The exporter reports both
   zero-width intervals from singleton category aggregates and pooled intervals
   from repeated program scores. Thirty repetitions are not independent samples.
-  Neither interval establishes sampling uncertainty over the corpus, agent
-  productivity, or safety.
+  Neither interval establishes sampling uncertainty over the corpus or a
+  measured language, agent-productivity, correctness, or safety advantage.
 - These C#-versus-Calor micro-benchmarks are not the v0.12 release gates.
   PP-A1 covered adoption readiness, while PP-W5 measured toolchain tax and
   concluded only that no large tax was detected—not that parity was proven.
@@ -55,47 +56,56 @@ The [research evidence status](/docs/benchmarking/evidence-status/) explains
 why the proposed follow-on adopter study stopped unadjudicated.
 
 <span id="redesigned-pp-w-rows-deferred" />
+<span id="redesigned-pp-w-rows-approved-pilot-budget-collection-on-hold" />
 
-### Redesigned PP-W-rows: approved pilot budget, collection on hold
+### Redesigned PP-W-rows: paused, not complete
 
-**Financial approval, 2026-09-10: USD250 total, pilot only.** The
+**Current status, 2026-09-11: paused by the user.** The
+[central pause handoff](https://github.com/juanmicrosoft/calor/issues/1254#issuecomment-5637070487)
+records **two consumed invalid/censored attempts** and **442 untouched
+scheduled identities** out of 444. Neither the pilot nor confirmation has
+completed. These interrupted attempts do not supply an effect-row benefit,
+negative, or null result. They must not be erased, replaced, or described as
+an entirely unrun redesigned study.
+
+**The single total experiment ceiling is USD1,000.** Two reservations of
+USD25.52 each remain held: **USD51.04 total**. Actual provider charges are
+**unknown**; the held amount is not measured spend or reconciled charges.
+The conditionally authorized permanent-retention exception has **not been
+applied**. Its implementation and final reviews remain unfinished in
+[the accounting issue](https://github.com/juanmicrosoft/calor/issues/1436)
+and [paused draft checkpoint](https://github.com/juanmicrosoft/calor/pull/1438#issuecomment-5637787747).
+
+**There is no permission to resume.** A new explicit instruction and the
+remaining implementation, review, and operator-readiness gates are required.
+This product release neither resumes collection nor changes the protocol,
+consumed attempts, unknown costs, or existing ceiling. Confirmation would
+still need its own prospective design and affordability decision; it is not
+automatic.
+
+**Earlier decision, 2026-09-10: USD250 total, pilot only (superseded ceiling).** The
 [recorded user decision](https://github.com/juanmicrosoft/calor/issues/1259#issuecomment-5618103570)
-and [authorization receipt](https://github.com/juanmicrosoft/calor/pull/1387)
-accept the registered stopping rules and publication of negative or null
-results. The quote left pilot-versus-two-stage scope unselected; the recorded
-interpretation uses the narrower pilot-only scope. The ceiling is total, not
-per task, arm, or run. It does not fund stage 2 or permit exceeding the cap or
-weakening the protocol.
-
-**Operational collection is not admitted.** Financial approval does not yet
-permit the runner to make experimental model calls. Readiness requires
-[trustworthy spending enforcement](https://github.com/juanmicrosoft/calor/issues/1378),
-compatible reviewed execution pins, and a defensible plan for the entire
-unchanged registered pilot within the ceiling. The receipt's current
-assessment is **BUDGET_NOT_RUN**: no defensible full-pilot plan established.
-A historical planning estimate is not a cost lower bound or proof that a
-cheaper valid plan is impossible. Shrinking the pilot or changing its model,
-client, or stopping rules is not an authorized way to fit the cap.
-
-This budget/not-run hold is not a failed buildability gate, a pilot null or
-negative result, or the conditional stage-2 **UNDERPOWERED-CARRIED** off-ramp.
-No redesigned agent collection or benefit result exists; no future run date
-is promised.
+and [historical authorization receipt](https://github.com/juanmicrosoft/calor/pull/1387)
+accepted the registered stopping rules and publication of negative or null
+results under a conservative pilot-only interpretation. Its dated
+**BUDGET_NOT_RUN** assessment described an earlier pre-execution hold, not
+the current pause after consumed attempts. Historical planning estimates
+were not cost lower bounds. Neither that hold nor today's pause is a pilot
+null or the conditional stage-2 **UNDERPOWERED-CARRIED** outcome.
 
 **Historical M0 disposition, 2026-09-09: unchanged.**
 The [M0 decision](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/docs/plans/safe-delegation-m0/decision.md)
 records formal M0 as **UNADJUDICATED**, with a separate maintainer
 **administrative stop**. It deferred this narrower proposal pending a
-separate explicit decision. The later pilot-only financial approval does
+separate explicit decision. Later PP-W financial decisions do
 not re-arm M0, supply its missing human or participant approvals, or establish
 that effect rows help, fail, or cannot be studied.
 
 **Local buildability passed on 2026-09-10.** The
 [reviewed gate closure](https://github.com/juanmicrosoft/calor/pull/1348)
 records Exit A under the frozen v0.18 release criteria. This deterministic
-engineering check is not an agent observation. Subsequent task preparation,
-registration, and instrument work do not establish operational readiness or
-a benefit result.
+engineering check is not an agent observation. Subsequent engineering work
+does not turn the two interrupted attempts into a completed study or benefit result.
 
 The [proposed methodology](/docs/benchmarking/effect-rows-study/) explains
 the old design defect: the unwanted behavior was already visibly forbidden,
@@ -103,21 +113,15 @@ so avoiding it did not require effect enforcement. The redesigned question
 concerns violations hidden behind an abstraction while visible tests pass.
 Historical zero escapes do not answer that question.
 
-The [authoritative benefit ledger](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/bench/phase0-agent-native/effect-rows-benefit-ledger.json)
-still records the old registration as `UNDERPOWERED`, `epochRun: false`,
-and `legA`/`legB: null`. Null means uncollected, not zero violations.
-This publication neither creates `w-rows-001` nor changes its ledger or gate.
-The pilot's size and execution registration are separate from this old
-ledger; neither the new budget nor completed engineering gates populate its
-uncollected result fields.
+The [historical benefit ledger](https://github.com/juanmicrosoft/calor/blob/bc71fe1e/bench/phase0-agent-native/effect-rows-benefit-ledger.json)
+records the old registration as `UNDERPOWERED`, `epochRun: false`, and
+`legA`/`legB: null`. Null means uncollected for that historical registration,
+not zero violations. It is not the record of the two consumed redesigned
+attempts. This publication changes neither ledger nor scientific gate.
 
-The completed [buildability gate #1255](https://github.com/juanmicrosoft/calor/issues/1255)
-and financial [authorization #1259](https://github.com/juanmicrosoft/calor/issues/1259)
-do not replace operational admission. The scientific and instrument gates
-retain their owners. Later agent-result publication must follow their actual
-adjudication: a registered pilot stop, unaffordable
-confirmation, or an adjudicated confirmatory result—including a powered null.
-The current hold is a not-run record, not one of those observed outcomes.
+Later agent-result publication must follow actual adjudication by the
+scientific owners. The current pause is not a completed pilot, unaffordable
+confirmation verdict, or confirmatory result.
 
 ### Historical PP-E1: effect-row toolchain cost
 
@@ -182,22 +186,23 @@ redesign separates visible requirements from a held-out effect-observing test
 and adds eight task-qualification rules. At the 2026-09-09 M0 closeout, no
 candidate had established both R1 (a convenient effect-hiding API) and R4
 (the laundering solution passes visible tests). The local buildability gate
-subsequently passed on 2026-09-10, as recorded above. Later financial
-approval and engineering progress remain distinct from admitted collection.
+subsequently passed on 2026-09-10, as recorded above. The two later consumed
+attempts and the user-directed pause are separate from these practice results.
 
 On 2026-09-09, M0 recorded these missing prerequisites and the lack of a
 suitable isolated evaluator. Formal M0 status is **UNADJUDICATED**; the
-maintainer action was an **administrative stop**. No redesigned pilot or
-confirmatory collection was authorized. The registered `w-rows-001` epoch
-therefore remains unrun, not a null result.
+maintainer action was an **administrative stop**. At that closeout, no redesigned
+pilot or confirmatory collection was authorized. The old `w-rows-001` epoch
+remains unrun, not a null result; this does not erase the later redesigned attempts.
 
 Keep these statements separate:
 
 - The 1.32x dashboard is a deterministic source/structure comparison.
 - The 0.15 proof point did not detect a large toolchain tax.
 - The historical PP-W-rows registration did not run a confirmatory epoch.
-- The redesigned pilot has financial approval but collection is not admitted;
-  no new safety-benefit evidence exists.
+- The redesigned study is paused after two invalid/censored attempts, with
+  442 untouched identities; neither stage has completed and no benefit or null
+  result exists.
 - The redesign and M0 records contain no protected three-arm adopter
   comparison, independent methods adjudication, or safety/economic advantage
   result.

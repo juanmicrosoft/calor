@@ -18,11 +18,11 @@ transfer and independent container/element predicates remain required by #1444,
 inside0.22, depending on #1397/#1382 and blocking #1402. This resolves the proposed
 split for planning/review; it neither closes N3 nor establishes array safety.
 
-Current work is planning/capacity documentation only. Code integration waits for
-the parent-provided accepted T1 merge SHA; then merge actual main without rewriting
-measurement ancestry, reconcile shared interfaces and actual catalog/manifest/
-corpus results, and obtain fresh final-head reviews and CI. Preserve released0.21
-and the separately merged MediatR test-collection isolation/configuration controls.
+The parent accepted T1 as merge `e299f2462b813a0c7e7049eb3a66f40b9f95e1c9`
+and explicitly started N3 integration. Actual main is merged into this existing
+branch without rewriting either measurement history, including T1's `b2c43561`
+ancestor. Released0.21 and the separately merged MediatR test-collection
+isolation/configuration controls are inherited unchanged.
 The reported pre-existing E1 recovery-diagnostic test167 failure on both released
 bases is not an N3 fix or safe result; any encounter must retain its actual outcome.
 
@@ -38,6 +38,42 @@ parameters/locals and native/BCL method inputs. Behavior starts only after
 #1397/N3 acceptance and a separate parent instruction, on a separate branch/PR.
 No initialization/return-policy expansion, general-flow redesign or activation
 is included. The provisional checkpoint/reviewSep12 is not a delivery promise.
+
+### Actual combined-tree reconciliation
+
+The Binder conflict retains T1's `TryUnwrapNullableAnnotation` loop and
+`TypeIdentity.MapShortTypeNameToFullName` behavior inside N3's existing array-aware
+metadata lookup; explicit runtime `Option<T>` is not stripped. T1's initializer/
+return275, lambda return context, type identities and transitional0202/0208
+rejections remain intact. Changes to `BoundNodes` relative to accepted T1 affect
+only call mapping properties, not its variable annotation handling.
+
+The existing source-catalog and corpus generators were executed against the
+combined tree, not replaced by arithmetic or a copied golden. The actual catalog
+has33 routes with275 retained; regeneration changed canonical ordering only.
+The normal ratchets passed. The [integration audit](../plans/evidence/n3-mapping-2026-09-11/integration-e299-audit.json)
+pins the tested production file hashes: all six T1 source rows are retained
+exactly, while the only delta from accepted T1 is the previously audited
+`JsonValueFormatter`52→56 count/hash. All other source, opacity, outcome and
+propagation fields remain unchanged. This is a new combined-tree observation,
+not a restamp of the historical captures or a new safe classification.
+
+Four added converted-source/public-API controls cover native scalar params in
+both call forms. Non-null strings retain the winning expanded scalar map.
+Nullable native strings still reject during conversion validation/binding until
+#1383; they are not converted into274 acceptance or counted safe. The first
+fixture attempt incorrectly expected conversion success for those two negative
+rows; its failures are retained, and the tests now require the actual rejection.
+Existing BCL expanded controls assert `ScalarString` on the nullable later input;
+normal/named-array metadata controls additionally require an actual rank-one
+array target. No source-array annotation/predicate repair from1444 is included.
+
+The combined affected selection passed532 compiler/runtime/taint/corpus and49
+editor tests. There are80 N3 compiler additions relative to accepted T1 and2
+editor additions; manifest totals8882/499 retain existing skip counts and
+harness291. Exact total execution is enforced by final CI's existing TRX gates,
+not inferred from these targeted selections. Two new final-head review contexts
+and final CI remain required before parent adjudication.
 
 ## Data flow
 

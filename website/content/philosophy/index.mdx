@@ -68,16 +68,19 @@ clean, non-vacuous proof can remove an emitted runtime check.
 
 Calor is a **verification-first language** that happens to be agent-friendly—not just an "agent DSL." The explicit syntax serves verification: contracts in a structured format can be parsed and proven by Z3.
 
-The static benchmark published with v0.20.0 was rerun for 30 repetitions from
-source `1caf9138`, which still declared compiler v0.19.0. It reports:
+The static benchmark published with v0.21.0 was recorded on 2026-09-11 for
+30 repetitions from source `be488238`, which still declared compiler v0.20.0
+before the release version bump. It reports:
 
 - **1.49x Error Detection** — more explicit detection signals under the calculator
 - **1.84x Comprehension** — more explicit structural signals
 - **1.42x Token Economics** — a token/character/line composite; Calor still uses more raw tokens on small programs
 - **0.97x Information Density** — the single C# win
 
-Source pairs are not all behaviorally equivalent. These metrics do not establish
-a language advantage, proof coverage, or production defect rates. Read
+Source pairs are not all behaviorally equivalent, and the deterministic
+repetitions are not independent samples. These metrics do not establish a
+measured language, agent-productivity, correctness, or safety advantage,
+proof coverage, or production defect rates. Read
 the [results caveats](/docs/benchmarking/results/) alongside the numbers.
 
 ---

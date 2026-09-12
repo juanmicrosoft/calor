@@ -9,7 +9,7 @@
   "BoundListCreation|List\u003Ci32\u003E": 1,
   "BoundMatchExpression|STRING": 5,
   "BoundNewExpression|List": 1,
-  "BoundNoneLiteral|OPTION[inner=INT]": 1,
+  "BoundNoneLiteral|Option\u003CINT\u003E": 1,
   "BoundOkExpression|Result\u003CINT, OBJECT\u003E": 1,
   "BoundSetCreation|HashSet\u003Cstr\u003E": 1,
   "BoundSomeExpression|Option\u003CINT\u003E": 1,

@@ -5200,6 +5200,8 @@ public sealed class EffectEnforcementPass
                     GetConstructedTypeName(creation)),
                 ThisExpressionNode => EffectResolver.NormalizeParameterType(
                     _context.OwnerClass?.Name ?? "?"),
+                BaseExpressionNode => EffectResolver.NormalizeParameterType(
+                    _context.OwnerClass?.BaseClass ?? "?"),
                 LambdaExpressionNode => "Func",
                 BinaryOperationNode binary => CommonType(
                     InferExpressionType(binary.Left),
@@ -5209,6 +5211,7 @@ public sealed class EffectEnforcementPass
                     InferExpressionType(conditional.WhenFalse)),
                 CallExpressionNode call => InferCallReturnType(call),
                 FieldAccessNode field => InferFieldAccessType(field),
+                NullConditionalNode conditional => InferMemberType(conditional.Target, conditional.MemberName),
                 _ => "?"
             };
         }
@@ -5225,31 +5228,37 @@ public sealed class EffectEnforcementPass
         }
 
         private string InferFieldAccessType(FieldAccessNode field)
+            => InferMemberType(field.Target, field.FieldName);
+
+        private string InferMemberType(ExpressionNode target, string memberName)
         {
-            var targetType = InferExpressionType(field.Target);
+            var targetType = InferExpressionType(target);
             var shortType = StripGenericArguments(targetType);
             if (shortType == null || !_context.ClassesByName.TryGetValue(shortType, out var cls))
                 return "?";
 
-            var property = FindClassProperty(cls, field.FieldName)?.Property;
+            var property = FindClassProperty(cls, memberName)?.Property;
             if (property != null)
                 return EffectResolver.NormalizeParameterType(property.TypeName);
 
             var classField = cls.Fields.FirstOrDefault(candidate =>
-                candidate.Name.Equals(field.FieldName, StringComparison.Ordinal));
+                candidate.Name.Equals(memberName, StringComparison.Ordinal));
             return classField == null
                 ? "?"
                 : EffectResolver.NormalizeParameterType(classField.TypeName);
         }
 
         private EffectSet InferFromFieldAccess(FieldAccessNode field)
+            => InferFromMemberAccess(field.Target, field.FieldName, field.Span);
+
+        private EffectSet InferFromMemberAccess(ExpressionNode target, string memberName, TextSpan span)
         {
-            var effects = InferFromExpression(field.Target);
-            var targetType = InferExpressionType(field.Target);
+            var effects = InferFromExpression(target);
+            var targetType = InferExpressionType(target);
             var shortType = StripGenericArguments(targetType);
             if (shortType != null && _context.ClassesByName.TryGetValue(shortType, out var cls))
             {
-                var resolved = FindClassProperty(cls, field.FieldName);
+                var resolved = FindClassProperty(cls, memberName);
                 var getter = resolved?.Property.Getter;
                 if (getter == null)
                     return effects;
@@ -5263,15 +5272,15 @@ public sealed class EffectEnforcementPass
 
             var manifestType = MapShortTypeNameToFullName(targetType);
             var resolution = _context.Resolver.Resolve(ResolverKey(
-                GetReferencePath(field.Target),
+                GetReferencePath(target),
                 manifestType,
-                field.FieldName,
+                memberName,
                 null,
                 EffectMemberKind.Getter));
             return resolution.Status == EffectResolutionStatus.Unknown
                 ? effects.Union(UnknownResolvedOperation(
-                    $"{manifestType}.get_{field.FieldName}",
-                    field.Span))
+                    $"{manifestType}.get_{memberName}",
+                    span))
                 : effects.Union(resolution.Effects);
         }
 
@@ -5553,7 +5562,8 @@ public sealed class EffectEnforcementPass
                 ThrowExpressionNode throwExpr => EffectSet.From("throw").Union(InferFromExpression(throwExpr.Exception)),
                 InterpolatedStringNode interp => InferFromInterpolatedString(interp),
                 NullCoalesceNode coalesce => InferFromExpression(coalesce.Left).Union(InferFromExpression(coalesce.Right)),
-                NullConditionalNode nullCond => InferFromExpression(nullCond.Target),
+                NullConditionalNode nullCond =>
+                    InferFromMemberAccess(nullCond.Target, nullCond.MemberName, nullCond.Span),
                 RangeExpressionNode range =>
                     (range.Start != null ? InferFromExpression(range.Start) : EffectSet.Empty)
                     .Union(range.End != null ? InferFromExpression(range.End) : EffectSet.Empty),
