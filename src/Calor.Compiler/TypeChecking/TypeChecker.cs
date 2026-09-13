@@ -1731,9 +1731,16 @@ public sealed class TypeChecker
 
     private const string DefaultCaseKey = "default";
 
-    private static string? GetCaseKey(ExpressionNode expression)
+    private static string? GetCaseKey(
+        ExpressionNode expression,
+        bool normalizeIntegralAsChar = false)
         => expression switch
         {
+            IntLiteralNode literal
+                when normalizeIntegralAsChar
+                    && literal.Sign == IntegerLiteralSign.Positive
+                    && literal.Magnitude <= char.MaxValue
+                => $"char:{literal.Magnitude}",
             IntLiteralNode literal =>
                 $"int:{literal.Sign}:{literal.Magnitude}",
             StringLiteralNode literal => $"string:{literal.Value}",
@@ -1744,11 +1751,10 @@ public sealed class TypeChecker
             {
                 Operation: CharOp.CharLiteral,
                 Arguments: [StringLiteralNode { Value.Length: 1 } literal]
-            } => $"char:{Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(
-                literal.Value[0], quote: true)}",
+            } => $"char:{(int)literal.Value[0]}",
             ReferenceNode { Name.Length: >= 3 } reference
-                when reference.Name[0] == '\'' && reference.Name[^1] == '\''
-                => $"char:{reference.Name}",
+                when TryParseCharacterCase(reference.Name, out var character)
+                => $"char:{(int)character}",
             ReferenceNode { Name: "null" } => "null",
             ReferenceNode { Name: "true" } => "bool:True",
             ReferenceNode { Name: "false" } => "bool:False",
@@ -1756,13 +1762,30 @@ public sealed class TypeChecker
             _ => null
         };
 
-    private static string? GetCaseKey(PatternNode pattern)
+    private static string? GetCaseKey(
+        PatternNode pattern,
+        bool normalizeIntegralAsChar)
         => pattern switch
         {
-            LiteralPatternNode literal => GetCaseKey(literal.Literal),
-            ConstantPatternNode constant => GetCaseKey(constant.Value),
+            LiteralPatternNode literal =>
+                GetCaseKey(literal.Literal, normalizeIntegralAsChar),
+            ConstantPatternNode constant =>
+                GetCaseKey(constant.Value, normalizeIntegralAsChar),
             _ => null
         };
+
+    private static bool TryParseCharacterCase(string text, out char character)
+    {
+        var expression = Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression(text);
+        if (expression is Microsoft.CodeAnalysis.CSharp.Syntax.LiteralExpressionSyntax literal
+            && literal.Token.Value is char value)
+        {
+            character = value;
+            return true;
+        }
+        character = default;
+        return false;
+    }
 
     private ControlFlowResult AnalyzeStatementControlFlow(
         StatementNode statement,
@@ -1860,6 +1883,8 @@ public sealed class TypeChecker
         HashSet<StatementNode> activeStatements)
     {
         var scope = new object();
+        var normalizeIntegralAsChar =
+            InferExpressionType(match.Target).Equals(PrimitiveType.Char);
         var caseResolvers =
             new Dictionary<string, ControlFlowResolver>(
                 StringComparer.Ordinal);
@@ -1868,12 +1893,12 @@ public sealed class TypeChecker
             var key = matchCase.Pattern is WildcardPatternNode && matchCase.Guard == null
                 ? DefaultCaseKey
                 : matchCase.Guard == null
-                    ? GetCaseKey(matchCase.Pattern)
+                    ? GetCaseKey(matchCase.Pattern, normalizeIntegralAsChar)
                     : null;
             if (key == null || caseResolvers.ContainsKey(key))
                 continue;
             var targetCase = matchCase;
-            caseResolvers[key] = new ControlFlowResolver(
+            var resolver = new ControlFlowResolver(
                 scope,
                 active => AnalyzeControlFlow(
                     targetCase.Body,
@@ -1881,6 +1906,17 @@ public sealed class TypeChecker
                     labelResolvers,
                     caseResolvers,
                     active));
+            caseResolvers[key] = resolver;
+            if (normalizeIntegralAsChar
+                && key.StartsWith("char:", StringComparison.Ordinal)
+                && ulong.TryParse(
+                    key.AsSpan("char:".Length),
+                    System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var characterCode))
+            {
+                caseResolvers[$"int:{IntegerLiteralSign.Positive}:{characterCode}"] = resolver;
+            }
         }
 
         var outcomes = LocalFlow(ControlFlowOutcome.None);
@@ -1965,10 +2001,29 @@ public sealed class TypeChecker
             return protectedOutcomes;
 
         var finallyOutcomes = AnalyzeControlFlow(
-            tryStatement.FinallyBody, insideMatch,
+            tryStatement.FinallyBody, insideMatch: false,
             inheritedLabelResolvers: null,
             matchResolvers: null,
             activeStatements: new HashSet<StatementNode>(activeStatements));
+        var escapingFinallyOutcomes = finallyOutcomes.Local
+            & (ControlFlowOutcome.Return
+                | ControlFlowOutcome.Continue
+                | ControlFlowOutcome.LoopExit
+                | ControlFlowOutcome.MatchExit);
+        if (escapingFinallyOutcomes != ControlFlowOutcome.None)
+        {
+            if (!_suppressContextualDiagnostics)
+            {
+                _diagnostics.ReportError(
+                    tryStatement.FinallyBody[0].Span,
+                    DiagnosticCode.TypeMismatch,
+                    "Control cannot leave a finally block");
+            }
+            finallyOutcomes = new ControlFlowResult(
+                finallyOutcomes.Local & ~escapingFinallyOutcomes
+                    | ControlFlowOutcome.FallThrough,
+                finallyOutcomes.Transfers);
+        }
         if ((finallyOutcomes.Local & ControlFlowOutcome.FallThrough) == 0)
             return finallyOutcomes;
         return new ControlFlowResult(
