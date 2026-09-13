@@ -2148,6 +2148,9 @@ public sealed class TypeChecker
         var normalizeIntegralAsChar = matchTargetType.Equals(PrimitiveType.Char)
             || matchTargetType is NullableValueType nullable
                 && nullable.UnderlyingType.Equals(PrimitiveType.Char);
+        var normalizeCharAsIntegral = matchTargetType.Equals(PrimitiveType.Int)
+            || matchTargetType is NullableValueType nullableIntegral
+                && nullableIntegral.UnderlyingType.Equals(PrimitiveType.Int);
         var caseResolvers =
             new Dictionary<string, ControlFlowResolver>(
                 StringComparer.Ordinal);
@@ -2171,7 +2174,7 @@ public sealed class TypeChecker
                     active,
                     insideCatch));
             caseResolvers[key] = resolver;
-            if (normalizeIntegralAsChar
+            if ((normalizeIntegralAsChar || normalizeCharAsIntegral)
                 && key.StartsWith("char:", StringComparison.Ordinal)
                 && ulong.TryParse(
                     key.AsSpan("char:".Length),
@@ -2179,7 +2182,22 @@ public sealed class TypeChecker
                     System.Globalization.CultureInfo.InvariantCulture,
                     out var characterCode))
             {
-                caseResolvers[$"int:{IntegerLiteralSign.Positive}:{characterCode}"] = resolver;
+                caseResolvers.TryAdd(
+                    $"int:{IntegerLiteralSign.Positive}:{characterCode}",
+                    resolver);
+            }
+            if (normalizeCharAsIntegral
+                && key.StartsWith(
+                    $"int:{IntegerLiteralSign.Positive}:",
+                    StringComparison.Ordinal)
+                && ulong.TryParse(
+                    key.AsSpan($"int:{IntegerLiteralSign.Positive}:".Length),
+                    System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var integralCode)
+                && integralCode <= char.MaxValue)
+            {
+                caseResolvers.TryAdd($"char:{integralCode}", resolver);
             }
         }
 

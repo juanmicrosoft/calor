@@ -2008,6 +2008,27 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void StatementLambda_GotoCaseConvertsCharacterLabelToIntegralValue()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (i32:input) -> void
+                §E{}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §W{m1} input
+                    §K 1
+                      §GOTO{CASE:98}
+                    §K 'b'
+                      §R 2
+                    §K _
+                      §R 0
+                §/LAM{l1}
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
     public void StatementLambda_NestedMatchUsesCachedLocalTargetType()
     {
         var result = Check("""
