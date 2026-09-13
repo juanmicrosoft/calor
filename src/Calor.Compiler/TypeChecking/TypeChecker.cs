@@ -1544,30 +1544,41 @@ public sealed class TypeChecker
     private static bool ContainsLoopExit(IReadOnlyList<StatementNode> statements)
     {
         var localLabels = EnumerateLoopLocalLabels(statements).ToHashSet(StringComparer.Ordinal);
-        return ContainsLoopExit(statements, localLabels);
+        return ContainsLoopExit(statements, localLabels, insideMatch: false);
     }
 
     private static bool ContainsLoopExit(
         IReadOnlyList<StatementNode> statements,
-        IReadOnlySet<string> localLabels)
+        IReadOnlySet<string> localLabels,
+        bool insideMatch)
         => statements.Any(statement => statement switch
         {
             BreakStatementNode => true,
+            GotoStatementNode { CaseLabel: not null } => !insideMatch,
+            GotoStatementNode { IsDefault: true } => !insideMatch,
             GotoStatementNode gotoStatement => !localLabels.Contains(gotoStatement.Label),
-            IfStatementNode conditional => ContainsLoopExit(conditional.ThenBody, localLabels)
-                || conditional.ElseIfClauses.Any(clause => ContainsLoopExit(clause.Body, localLabels))
-                || conditional.ElseBody != null && ContainsLoopExit(conditional.ElseBody, localLabels),
+            IfStatementNode conditional => ContainsLoopExit(
+                    conditional.ThenBody, localLabels, insideMatch)
+                || conditional.ElseIfClauses.Any(
+                    clause => ContainsLoopExit(clause.Body, localLabels, insideMatch))
+                || conditional.ElseBody != null
+                    && ContainsLoopExit(conditional.ElseBody, localLabels, insideMatch),
             MatchStatementNode match => match.Cases.Any(
-                matchCase => ContainsLoopExit(matchCase.Body, localLabels)),
-            TryStatementNode tryStatement => ContainsLoopExit(tryStatement.TryBody, localLabels)
+                matchCase => ContainsLoopExit(matchCase.Body, localLabels, insideMatch: true)),
+            TryStatementNode tryStatement => ContainsLoopExit(
+                    tryStatement.TryBody, localLabels, insideMatch)
                 || tryStatement.CatchClauses.Any(
-                    clause => ContainsLoopExit(clause.Body, localLabels))
+                    clause => ContainsLoopExit(clause.Body, localLabels, insideMatch))
                 || tryStatement.FinallyBody != null
-                    && ContainsLoopExit(tryStatement.FinallyBody, localLabels),
-            UsingStatementNode usingStatement => ContainsLoopExit(usingStatement.Body, localLabels),
-            UnsafeBlockNode unsafeBlock => ContainsLoopExit(unsafeBlock.Body, localLabels),
-            FixedStatementNode fixedStatement => ContainsLoopExit(fixedStatement.Body, localLabels),
-            SyncBlockNode syncBlock => ContainsLoopExit(syncBlock.Body, localLabels),
+                    && ContainsLoopExit(tryStatement.FinallyBody, localLabels, insideMatch),
+            UsingStatementNode usingStatement => ContainsLoopExit(
+                usingStatement.Body, localLabels, insideMatch),
+            UnsafeBlockNode unsafeBlock => ContainsLoopExit(
+                unsafeBlock.Body, localLabels, insideMatch),
+            FixedStatementNode fixedStatement => ContainsLoopExit(
+                fixedStatement.Body, localLabels, insideMatch),
+            SyncBlockNode syncBlock => ContainsLoopExit(
+                syncBlock.Body, localLabels, insideMatch),
             _ => false
         });
 
