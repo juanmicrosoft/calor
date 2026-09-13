@@ -1518,81 +1518,155 @@ public sealed class TypeChecker
 
     private static bool DefinitelyReturns(IReadOnlyList<StatementNode> statements)
     {
+        var outcomes = AnalyzeControlFlow(
+            statements,
+            new Dictionary<string, int>(StringComparer.Ordinal),
+            insideMatch: false);
+        return (outcomes & (ControlFlowOutcome.FallThrough | ControlFlowOutcome.LoopExit)) == 0;
+    }
+
+    [Flags]
+    private enum ControlFlowOutcome
+    {
+        None = 0,
+        FallThrough = 1,
+        Return = 2,
+        LoopExit = 4,
+        Continue = 8
+    }
+
+    private static ControlFlowOutcome AnalyzeControlFlow(
+        IReadOnlyList<StatementNode> statements,
+        IReadOnlyDictionary<string, int> localLabels,
+        bool insideMatch)
+    {
+        var outcomes = ControlFlowOutcome.FallThrough;
         foreach (var statement in statements)
         {
-            var terminates = statement switch
-            {
-                ReturnStatementNode => true,
-                ThrowStatementNode or RethrowStatementNode => true,
-                IfStatementNode conditional => DefinitelyReturns(conditional.ThenBody)
-                    && conditional.ElseIfClauses.All(clause => DefinitelyReturns(clause.Body))
-                    && conditional.ElseBody != null
-                    && DefinitelyReturns(conditional.ElseBody),
-                MatchStatementNode match => match.Cases.Count > 0
-                    && match.Cases.Any(matchCase =>
-                        matchCase.Pattern is WildcardPatternNode && matchCase.Guard == null)
-                    && match.Cases.All(matchCase => DefinitelyReturns(matchCase.Body)),
-                WhileStatementNode { Condition: BoolLiteralNode { Value: true } } loop
-                    => DefinitelyReturns(loop.Body) || !ContainsLoopExit(loop.Body),
-                DoWhileStatementNode { Condition: BoolLiteralNode { Value: true } } loop
-                    => DefinitelyReturns(loop.Body) || !ContainsLoopExit(loop.Body),
-                DoWhileStatementNode loop => DefinitelyReturns(loop.Body),
-                TryStatementNode tryStatement => tryStatement.FinallyBody != null
-                    && DefinitelyReturns(tryStatement.FinallyBody)
-                    || DefinitelyReturns(tryStatement.TryBody)
-                    && tryStatement.CatchClauses.All(clause => DefinitelyReturns(clause.Body)),
-                _ => false
-            };
-            if (terminates)
-                return true;
-            if (statement is BreakStatementNode or ContinueStatementNode or GotoStatementNode)
-                return false;
+            if ((outcomes & ControlFlowOutcome.FallThrough) == 0)
+                break;
+            outcomes = outcomes & ~ControlFlowOutcome.FallThrough
+                | AnalyzeStatementControlFlow(statement, localLabels, insideMatch);
         }
-        return false;
+        return outcomes;
     }
 
-    private static bool ContainsLoopExit(IReadOnlyList<StatementNode> statements)
-    {
-        var localLabels = EnumerateLoopLocalLabels(statements).ToHashSet(StringComparer.Ordinal);
-        return ContainsLoopExit(statements, localLabels, insideMatch: false);
-    }
-
-    private static bool ContainsLoopExit(
-        IReadOnlyList<StatementNode> statements,
-        IReadOnlySet<string> localLabels,
+    private static ControlFlowOutcome AnalyzeStatementControlFlow(
+        StatementNode statement,
+        IReadOnlyDictionary<string, int> localLabels,
         bool insideMatch)
-        => statements.Any(statement => statement switch
+        => statement switch
         {
-            BreakStatementNode => !insideMatch,
-            GotoStatementNode { CaseLabel: not null } => !insideMatch,
-            GotoStatementNode { IsDefault: true } => !insideMatch,
-            GotoStatementNode gotoStatement => !localLabels.Contains(gotoStatement.Label),
-            IfStatementNode conditional => ContainsLoopExit(
-                    conditional.ThenBody, localLabels, insideMatch)
-                || conditional.ElseIfClauses.Any(
-                    clause => ContainsLoopExit(clause.Body, localLabels, insideMatch))
-                || conditional.ElseBody != null
-                    && ContainsLoopExit(conditional.ElseBody, localLabels, insideMatch),
-            MatchStatementNode match => match.Cases.Any(
-                matchCase => ContainsLoopExit(matchCase.Body, localLabels, insideMatch: true)),
-            TryStatementNode tryStatement => ContainsLoopExit(
-                    tryStatement.TryBody, localLabels, insideMatch)
-                || tryStatement.CatchClauses.Any(
-                    clause => ContainsLoopExit(clause.Body, localLabels, insideMatch))
-                || tryStatement.FinallyBody != null
-                    && ContainsLoopExit(tryStatement.FinallyBody, localLabels, insideMatch),
-            UsingStatementNode usingStatement => ContainsLoopExit(
+            ReturnStatementNode or ThrowStatementNode or RethrowStatementNode
+                => ControlFlowOutcome.Return,
+            BreakStatementNode => insideMatch
+                ? ControlFlowOutcome.FallThrough
+                : ControlFlowOutcome.LoopExit,
+            ContinueStatementNode => ControlFlowOutcome.Continue,
+            GotoStatementNode { CaseLabel: not null } => insideMatch
+                ? ControlFlowOutcome.None
+                : ControlFlowOutcome.LoopExit,
+            GotoStatementNode { IsDefault: true } => insideMatch
+                ? ControlFlowOutcome.None
+                : ControlFlowOutcome.LoopExit,
+            GotoStatementNode gotoStatement => localLabels.TryGetValue(
+                    gotoStatement.Label, out var targetStart)
+                && targetStart <= gotoStatement.Span.Start
+                ? ControlFlowOutcome.None
+                : ControlFlowOutcome.LoopExit,
+            IfStatementNode conditional => AnalyzeConditionalControlFlow(
+                conditional, localLabels, insideMatch),
+            MatchStatementNode match => AnalyzeMatchControlFlow(match, localLabels),
+            WhileStatementNode loop => AnalyzeLoopControlFlow(
+                loop.Body,
+                loop.Condition is BoolLiteralNode { Value: true },
+                executesAtLeastOnce: false),
+            DoWhileStatementNode loop => AnalyzeLoopControlFlow(
+                loop.Body,
+                loop.Condition is BoolLiteralNode { Value: true },
+                executesAtLeastOnce: true),
+            TryStatementNode tryStatement => AnalyzeTryControlFlow(
+                tryStatement, localLabels, insideMatch),
+            UsingStatementNode usingStatement => AnalyzeControlFlow(
                 usingStatement.Body, localLabels, insideMatch),
-            UnsafeBlockNode unsafeBlock => ContainsLoopExit(
+            UnsafeBlockNode unsafeBlock => AnalyzeControlFlow(
                 unsafeBlock.Body, localLabels, insideMatch),
-            FixedStatementNode fixedStatement => ContainsLoopExit(
+            FixedStatementNode fixedStatement => AnalyzeControlFlow(
                 fixedStatement.Body, localLabels, insideMatch),
-            SyncBlockNode syncBlock => ContainsLoopExit(
+            SyncBlockNode syncBlock => AnalyzeControlFlow(
                 syncBlock.Body, localLabels, insideMatch),
-            _ => false
-        });
+            _ => ControlFlowOutcome.FallThrough
+        };
 
-    private static IEnumerable<string> EnumerateLoopLocalLabels(
+    private static ControlFlowOutcome AnalyzeConditionalControlFlow(
+        IfStatementNode conditional,
+        IReadOnlyDictionary<string, int> localLabels,
+        bool insideMatch)
+    {
+        var outcomes = AnalyzeControlFlow(conditional.ThenBody, localLabels, insideMatch);
+        foreach (var clause in conditional.ElseIfClauses)
+            outcomes |= AnalyzeControlFlow(clause.Body, localLabels, insideMatch);
+        outcomes |= conditional.ElseBody != null
+            ? AnalyzeControlFlow(conditional.ElseBody, localLabels, insideMatch)
+            : ControlFlowOutcome.FallThrough;
+        return outcomes;
+    }
+
+    private static ControlFlowOutcome AnalyzeMatchControlFlow(
+        MatchStatementNode match,
+        IReadOnlyDictionary<string, int> localLabels)
+    {
+        var outcomes = match.Cases.Aggregate(
+            ControlFlowOutcome.None,
+            (current, matchCase) => current
+                | AnalyzeControlFlow(matchCase.Body, localLabels, insideMatch: true));
+        var exhaustive = match.Cases.Count > 0
+            && match.Cases.Any(matchCase =>
+                matchCase.Pattern is WildcardPatternNode && matchCase.Guard == null);
+        return exhaustive ? outcomes : outcomes | ControlFlowOutcome.FallThrough;
+    }
+
+    private static ControlFlowOutcome AnalyzeLoopControlFlow(
+        IReadOnlyList<StatementNode> body,
+        bool conditionIsAlwaysTrue,
+        bool executesAtLeastOnce)
+    {
+        var labels = EnumerateLoopLocalLabels(body)
+            .GroupBy(label => label.Name, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Min(label => label.Start),
+                StringComparer.Ordinal);
+        var bodyOutcomes = AnalyzeControlFlow(body, labels, insideMatch: false);
+        var outcomes = bodyOutcomes & ControlFlowOutcome.Return;
+        if ((bodyOutcomes & ControlFlowOutcome.LoopExit) != 0
+            || !conditionIsAlwaysTrue
+                && (!executesAtLeastOnce
+                    || (bodyOutcomes
+                        & (ControlFlowOutcome.FallThrough | ControlFlowOutcome.Continue)) != 0))
+        {
+            outcomes |= ControlFlowOutcome.FallThrough;
+        }
+        return outcomes;
+    }
+
+    private static ControlFlowOutcome AnalyzeTryControlFlow(
+        TryStatementNode tryStatement,
+        IReadOnlyDictionary<string, int> localLabels,
+        bool insideMatch)
+    {
+        var protectedOutcomes = AnalyzeControlFlow(tryStatement.TryBody, localLabels, insideMatch);
+        foreach (var clause in tryStatement.CatchClauses)
+            protectedOutcomes |= AnalyzeControlFlow(clause.Body, localLabels, insideMatch);
+        if (tryStatement.FinallyBody == null)
+            return protectedOutcomes;
+
+        var finallyOutcomes = AnalyzeControlFlow(
+            tryStatement.FinallyBody, localLabels, insideMatch);
+        return (finallyOutcomes & ControlFlowOutcome.FallThrough) != 0
+            ? protectedOutcomes | (finallyOutcomes & ~ControlFlowOutcome.FallThrough)
+            : finallyOutcomes;
+    }
+
+    private static IEnumerable<(string Name, int Start)> EnumerateLoopLocalLabels(
         IReadOnlyList<StatementNode> statements)
     {
         foreach (var statement in statements)
@@ -1600,7 +1674,7 @@ public sealed class TypeChecker
             switch (statement)
             {
                 case LabelStatementNode label:
-                    yield return label.Label;
+                    yield return (label.Label, label.Span.Start);
                     break;
                 case IfStatementNode conditional:
                     foreach (var label in EnumerateLoopLocalLabels(conditional.ThenBody))
