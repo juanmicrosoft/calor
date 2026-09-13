@@ -1,3 +1,5 @@
+using Calor.Compiler.Ast;
+
 namespace Calor.Compiler.TypeChecking;
 
 /// <summary>
@@ -238,6 +240,26 @@ public sealed class NullableReferenceType : CalorType
 }
 
 /// <summary>
+/// A nullable value type such as <c>?i32</c>. This is not a runtime <see cref="OptionType"/>.
+/// </summary>
+public sealed class NullableValueType : CalorType
+{
+    public CalorType UnderlyingType { get; }
+    public override string Name => $"?{UnderlyingType.Name}";
+    public override string SurfaceName => $"?{UnderlyingType.SurfaceName}";
+
+    public NullableValueType(CalorType underlyingType)
+    {
+        UnderlyingType = underlyingType ?? throw new ArgumentNullException(nameof(underlyingType));
+    }
+
+    public override bool Equals(CalorType? other)
+        => other is NullableValueType nullable && UnderlyingType.Equals(nullable.UnderlyingType);
+
+    public override int GetHashCode() => HashCode.Combine("NullableValue", UnderlyingType);
+}
+
+/// <summary>
 /// Represents a runtime Option[T] type, distinct from a nullable reference.
 /// </summary>
 public sealed class OptionType : CalorType
@@ -363,6 +385,9 @@ public sealed class UnionVariant
 public sealed class FunctionType : CalorType
 {
     public IReadOnlyList<CalorType> ParameterTypes { get; }
+    public IReadOnlyList<string>? ParameterNames { get; }
+    public IReadOnlyList<ParameterModifier>? ParameterModifiers { get; }
+    public string? DelegateName { get; }
     public CalorType ReturnType { get; }
     public override string Name
     {
@@ -382,14 +407,49 @@ public sealed class FunctionType : CalorType
     }
 
     public FunctionType(IReadOnlyList<CalorType> parameterTypes, CalorType returnType)
+        : this(parameterTypes, returnType, null)
+    {
+    }
+
+    public FunctionType(
+        IReadOnlyList<CalorType> parameterTypes,
+        CalorType returnType,
+        IReadOnlyList<string>? parameterNames)
+        : this(parameterTypes, returnType, parameterNames, null)
+    {
+    }
+
+    public FunctionType(
+        IReadOnlyList<CalorType> parameterTypes,
+        CalorType returnType,
+        IReadOnlyList<string>? parameterNames,
+        IReadOnlyList<ParameterModifier>? parameterModifiers)
+        : this(parameterTypes, returnType, parameterNames, parameterModifiers, null)
+    {
+    }
+
+    public FunctionType(
+        IReadOnlyList<CalorType> parameterTypes,
+        CalorType returnType,
+        IReadOnlyList<string>? parameterNames,
+        IReadOnlyList<ParameterModifier>? parameterModifiers,
+        string? delegateName)
     {
         ParameterTypes = parameterTypes ?? throw new ArgumentNullException(nameof(parameterTypes));
         ReturnType = returnType ?? throw new ArgumentNullException(nameof(returnType));
+        ParameterNames = parameterNames;
+        ParameterModifiers = parameterModifiers;
+        DelegateName = delegateName;
     }
 
     public override bool Equals(CalorType? other)
     {
         if (other is not FunctionType ft) return false;
+        if (DelegateName != null || ft.DelegateName != null)
+        {
+            if (!string.Equals(DelegateName, ft.DelegateName, StringComparison.Ordinal))
+                return false;
+        }
         if (!ReturnType.Equals(ft.ReturnType)) return false;
         if (ParameterTypes.Count != ft.ParameterTypes.Count) return false;
         return ParameterTypes.Zip(ft.ParameterTypes).All(pair => pair.First.Equals(pair.Second));
@@ -399,6 +459,7 @@ public sealed class FunctionType : CalorType
     {
         var hash = new HashCode();
         hash.Add("Function");
+        hash.Add(DelegateName, StringComparer.Ordinal);
         hash.Add(ReturnType);
         foreach (var p in ParameterTypes)
             hash.Add(p);
@@ -434,6 +495,40 @@ public sealed class RefinedType : CalorType
     }
 
     public override int GetHashCode() => HashCode.Combine("Refined", BaseType, PredicateText);
+}
+
+/// <summary>
+/// Represents the null literal. It is only assignable to nullable targets and unmodeled external
+/// references, never to a known non-null value.
+/// </summary>
+public sealed class NullType : CalorType
+{
+    public static readonly NullType Instance = new();
+
+    public override string Name => "<null>";
+    public override string SurfaceName => "null";
+
+    private NullType() { }
+
+    public override bool Equals(CalorType? other) => other is NullType;
+    public override int GetHashCode() => "<null>".GetHashCode();
+}
+
+/// <summary>
+/// Represents a non-returning expression, such as a throw expression. It is assignable to any
+/// successful target without reclassifying checker errors or unmodeled expressions as non-null.
+/// </summary>
+public sealed class NeverType : CalorType
+{
+    public static readonly NeverType Instance = new();
+
+    public override string Name => "NEVER";
+    public override string SurfaceName => "never";
+
+    private NeverType() { }
+
+    public override bool Equals(CalorType? other) => other is NeverType;
+    public override int GetHashCode() => "NEVER".GetHashCode();
 }
 
 /// <summary>

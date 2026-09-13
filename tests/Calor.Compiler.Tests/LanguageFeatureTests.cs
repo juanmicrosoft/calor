@@ -604,12 +604,13 @@ public class LanguageFeatureTests
         var source = """
             §M{m001:Test}
               §F{f001:Run:pub}
-                  §I{i32:a}
+                  §I{?i32:a}
                   §I{i32:b}
                   §O{i32}
                   §R (?? a (+ b 1))
             """;
         var code = CompileToCode(source);
+        Assert.Contains("int? a", code);
         Assert.Contains("return a ?? checked(b + 1);", code);
     }
 

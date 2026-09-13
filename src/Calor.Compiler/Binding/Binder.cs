@@ -1506,6 +1506,7 @@ public sealed class Binder
         using var _ = PushScope(_scope.CreateChild());
 
         var condition = BindExpression(whileStmt.Condition);
+        DeclareSuccessfulConditionPatterns(whileStmt.Condition, condition);
         var body = BindStatements(whileStmt.Body);
 
         return new BoundWhileStatement(whileStmt.Span, condition, body);
@@ -1518,6 +1519,7 @@ public sealed class Binder
         IReadOnlyList<BoundStatement> thenBody;
         {
             using var _ = PushScope(_scope.CreateChild());
+            DeclareSuccessfulConditionPatterns(ifStmt.Condition, condition);
             thenBody = BindStatements(ifStmt.ThenBody);
         }
 
@@ -1526,6 +1528,7 @@ public sealed class Binder
         {
             var elseIfCondition = BindExpression(elseIf.Condition);
             using var _ = PushScope(_scope.CreateChild());
+            DeclareSuccessfulConditionPatterns(elseIf.Condition, elseIfCondition);
             var elseIfBody = BindStatements(elseIf.Body);
             elseIfClauses.Add(new BoundElseIfClause(elseIf.Span, elseIfCondition, elseIfBody));
         }
@@ -2599,14 +2602,36 @@ public sealed class Binder
     private BoundExpression BindIsPattern(IsPatternNode isPattern)
     {
         var operand = BindExpression(isPattern.Operand);
-        if (isPattern.VariableName != null)
-            DeclarePatternVariable(isPattern.Span, isPattern.VariableName,
-                isPattern.TargetType == "var" ? operand.Type.DisplayString : isPattern.TargetType);
         return new BoundIsPatternExpression(
             isPattern.Span,
             operand,
             isPattern.TargetType,
-            isPattern.VariableName);
+            isPattern.VariableName)
+        {
+            Binding = isPattern.VariableName is null ? null : CreateLocalVariable(
+                isPattern.VariableName,
+                isPattern.TargetType == "var" ? operand.Type.DisplayString : isPattern.TargetType,
+                isMutable: false, isParameter: false, ParameterModifier.None, isPattern.Span, "pattern",
+                nullableAnnotation: isPattern.TargetType == "var"
+                    ? NullabilityChecker.GetAnnotation(operand.Type) ?? BoundTypes.NullableAnnotation.Oblivious
+                    : BoundTypes.NullableAnnotation.NotAnnotated)
+        };
+    }
+
+    private void DeclareSuccessfulConditionPatterns(ExpressionNode condition, BoundExpression boundCondition)
+    {
+        if (condition is BinaryOperationNode { Operator: BinaryOperator.And } conjunction
+            && boundCondition is BoundBinaryExpression binary)
+        {
+            DeclareSuccessfulConditionPatterns(conjunction.Left, binary.Left);
+            DeclareSuccessfulConditionPatterns(conjunction.Right, binary.Right);
+        }
+        if (condition is IsPatternNode { VariableName: not null } pattern
+            && boundCondition is BoundIsPatternExpression { Binding: not null } boundPattern)
+        {
+            DeclarePatternVariable(pattern.Span, pattern.VariableName, boundPattern.Binding.TypeName,
+                boundPattern.Binding.NullableAnnotation, boundPattern.Binding);
+        }
     }
 
     private BoundExpression BindNewExpression(NewExpressionNode newExpr)
@@ -2867,16 +2892,23 @@ public sealed class Binder
 
     private BoundExpression BindNullCoalesce(NullCoalesceNode coalesce)
     {
-        // S7 batch-3: migrated left/right BoundExpression.TypeName reads
-        // to .Type.DisplayString. Byte-identical per V-1's corpus pin.
         var left = BindExpression(coalesce.Left);
         var right = BindExpression(coalesce.Right);
-        var leftValueType = UnwrapOptionOrNullable(left.Type.DisplayString);
-        return Structural(
-            coalesce,
-            GetCommonType(leftValueType, right.Type.DisplayString),
+        var leftValueType = Parsing.AttributeHelper.TryUnwrapNullableAnnotation(left.Type.DisplayString, out var referent)
+            ? NormalizeTypeName(referent) : left.Type.DisplayString;
+        var resultName = ExpressionResultTypes.IsNever(left.Type) ? "NEVER"
+            : coalesce.Left is ReferenceNode { Name: "null" } ? right.Type.DisplayString
+            : coalesce.Right is ReferenceNode { Name: "null" } ? leftValueType
+            : GetCommonType(leftValueType, right.Type.DisplayString);
+        return new BoundStructuralExpression(
+            coalesce.Span,
+            nameof(NullCoalesceNode),
+            resultName,
             [left, right],
-            deferredChildren: [right]);
+            metadata: null,
+            deferredChildren: [right],
+            typeAnnotation: BoundTypes.NullableAnnotation.Oblivious,
+            resultType: ExpressionResultTypes.Coalesce(resultName, left.Type, right.Type));
     }
 
     private BoundExpression BindNullConditional(NullConditionalNode conditional)
@@ -3087,6 +3119,8 @@ public sealed class Binder
             using var _ = PushScope(_scope.CreateChild());
             var pattern = BindPattern(matchCase.Pattern);
             var guard = matchCase.Guard != null ? BindExpression(matchCase.Guard) : null;
+            if (matchCase.Guard != null && guard != null)
+                DeclareSuccessfulConditionPatterns(matchCase.Guard, guard);
             var body = BindStatements(matchCase.Body);
             var result = body.LastOrDefault() is BoundReturnStatement { Expression: not null } returnStatement
                 ? returnStatement.Expression
@@ -3102,14 +3136,14 @@ public sealed class Binder
         return boundCases;
     }
 
-    private BoundPattern BindPattern(PatternNode pattern)
+    private BoundPattern BindPattern(PatternNode pattern, bool allowBindings = true)
     {
         switch (pattern)
         {
             case WildcardPatternNode:
                 return Pattern(pattern);
             case VariablePatternNode variable:
-                if (!variable.Name.Contains('.', StringComparison.Ordinal))
+                if (allowBindings && !variable.Name.Contains('.', StringComparison.Ordinal))
                     DeclarePatternVariable(variable.IdentifierSpan, variable.Name, "OBJECT");
                 return Pattern(
                     variable,
@@ -3119,16 +3153,18 @@ public sealed class Binder
                         ["IsConstant"] = variable.Name.Contains('.', StringComparison.Ordinal),
                     });
             case VarPatternNode variable:
-                DeclarePatternVariable(variable.IdentifierSpan, variable.Name, "OBJECT");
+                if (allowBindings)
+                    DeclarePatternVariable(variable.IdentifierSpan, variable.Name, "OBJECT");
                 return Pattern(
                     variable,
                     metadata: new Dictionary<string, object?> { ["Name"] = variable.Name });
             case TypePatternNode typePattern:
-                if (typePattern.BindingName != null)
+                if (allowBindings && typePattern.BindingName != null)
                     DeclarePatternVariable(
                         typePattern.BindingSpan ?? typePattern.Span,
                         typePattern.BindingName,
-                        typePattern.TypeName);
+                        typePattern.TypeName,
+                        BoundTypes.NullableAnnotation.NotAnnotated);
                 return Pattern(
                     typePattern,
                     metadata: new Dictionary<string, object?>
@@ -3146,18 +3182,18 @@ public sealed class Binder
                     metadata: new Dictionary<string, object?> { ["Operator"] = relational.Operator },
                     expressions: [BindExpression(relational.Value)]);
             case SomePatternNode some:
-                return Pattern(some, patterns: [BindPattern(some.InnerPattern)]);
+                return Pattern(some, patterns: [BindPattern(some.InnerPattern, allowBindings)]);
             case NonePatternNode:
                 return Pattern(pattern);
             case OkPatternNode ok:
-                return Pattern(ok, patterns: [BindPattern(ok.InnerPattern)]);
+                return Pattern(ok, patterns: [BindPattern(ok.InnerPattern, allowBindings)]);
             case ErrPatternNode err:
-                return Pattern(err, patterns: [BindPattern(err.InnerPattern)]);
+                return Pattern(err, patterns: [BindPattern(err.InnerPattern, allowBindings)]);
             case PositionalPatternNode positional:
                 return Pattern(
                     positional,
                     metadata: new Dictionary<string, object?> { ["TypeName"] = positional.TypeName },
-                    patterns: positional.Patterns.Select(BindPattern).ToArray());
+                    patterns: positional.Patterns.Select(child => BindPattern(child, allowBindings)).ToArray());
             case PropertyPatternNode property:
                 return Pattern(
                     property,
@@ -3166,11 +3202,11 @@ public sealed class Binder
                         ["TypeName"] = property.TypeName,
                         ["PropertyNames"] = property.Matches.Select(match => match.PropertyName).ToArray(),
                     },
-                    patterns: property.Matches.Select(match => BindPattern(match.Pattern)).ToArray());
+                    patterns: property.Matches.Select(match => BindPattern(match.Pattern, allowBindings)).ToArray());
             case ListPatternNode list:
-                var listPatterns = list.Patterns.Select(BindPattern).ToList();
+                var listPatterns = list.Patterns.Select(child => BindPattern(child, allowBindings)).ToList();
                 if (list.SlicePattern != null)
-                    listPatterns.Insert(Math.Min(list.SliceIndex, listPatterns.Count), BindPattern(list.SlicePattern));
+                    listPatterns.Insert(Math.Min(list.SliceIndex, listPatterns.Count), BindPattern(list.SlicePattern, allowBindings));
                 return Pattern(
                     list,
                     metadata: new Dictionary<string, object?>
@@ -3180,11 +3216,11 @@ public sealed class Binder
                     },
                     patterns: listPatterns);
             case NegatedPatternNode negated:
-                return Pattern(negated, patterns: [BindPattern(negated.Inner)]);
+                return Pattern(negated, patterns: [BindPattern(negated.Inner, allowBindings: false)]);
             case OrPatternNode orPattern:
-                return Pattern(orPattern, patterns: [BindPattern(orPattern.Left), BindPattern(orPattern.Right)]);
+                return Pattern(orPattern, patterns: [BindPattern(orPattern.Left, allowBindings: false), BindPattern(orPattern.Right, allowBindings: false)]);
             case AndPatternNode andPattern:
-                return Pattern(andPattern, patterns: [BindPattern(andPattern.Left), BindPattern(andPattern.Right)]);
+                return Pattern(andPattern, patterns: [BindPattern(andPattern.Left, allowBindings), BindPattern(andPattern.Right, allowBindings)]);
             default:
                 return Pattern(
                     pattern,
@@ -3195,20 +3231,23 @@ public sealed class Binder
         }
     }
 
-    private void DeclarePatternVariable(Parsing.TextSpan span, string name, string typeName)
+    private void DeclarePatternVariable(Parsing.TextSpan span, string name, string typeName,
+        BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious,
+        VariableSymbol? binding = null)
     {
         if (_scope.LookupLocal(name) is VariableSymbol existing
             && string.Equals(existing.TypeName, typeName, StringComparison.OrdinalIgnoreCase))
             return;
 
-        var symbol = CreateLocalVariable(
+        var symbol = binding ?? CreateLocalVariable(
             name,
             typeName,
             isMutable: false,
             isParameter: false,
             ParameterModifier.None,
             span,
-            "pattern");
+            "pattern",
+            nullableAnnotation: nullableAnnotation);
         if (!_scope.TryDeclare(symbol))
         {
             _diagnostics.ReportError(
@@ -3543,7 +3582,15 @@ public sealed class Binder
     private BoundBinaryExpression BindBinaryOperation(BinaryOperationNode binOp)
     {
         var left = BindExpression(binOp.Left);
-        var right = BindExpression(binOp.Right);
+        BoundExpression right;
+        if (binOp.Operator == BinaryOperator.And)
+        {
+            using var _ = PushScope(_scope.CreateChild());
+            DeclareSuccessfulConditionPatterns(binOp.Left, left);
+            right = BindExpression(binOp.Right);
+        }
+        else
+            right = BindExpression(binOp.Right);
 
         // Determine result type based on operator (S7 batch-3: .Type.DisplayString shim).
         var resultType = GetBinaryOperationResultType(binOp.Operator, left.Type.DisplayString, right.Type.DisplayString);
@@ -4669,7 +4716,12 @@ public sealed class Binder
     private BoundExpression BindConditionalExpression(ConditionalExpressionNode condExpr)
     {
         var condition = BindExpression(condExpr.Condition);
-        var whenTrue = BindExpression(condExpr.WhenTrue);
+        BoundExpression whenTrue;
+        using (PushScope(_scope.CreateChild()))
+        {
+            DeclareSuccessfulConditionPatterns(condExpr.Condition, condition);
+            whenTrue = BindExpression(condExpr.WhenTrue);
+        }
         var whenFalse = BindExpression(condExpr.WhenFalse);
 
         return new BoundConditionalExpression(
@@ -4774,13 +4826,6 @@ public sealed class Binder
             || typeName.Equals("ValueTask", StringComparison.OrdinalIgnoreCase)
             ? "VOID"
             : "OBJECT";
-    }
-
-    private static string UnwrapOptionOrNullable(string typeName)
-    {
-        return TypeIdentity.TryUnwrapOptionOrNullable(typeName, out var elementType)
-            ? elementType
-            : typeName;
     }
 
     private static string GetIndexedElementType(string typeName)

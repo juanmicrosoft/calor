@@ -1,5 +1,6 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.TypeChecking;
 
@@ -10,6 +11,14 @@ public sealed class TypeChecker
 {
     private readonly DiagnosticBag _diagnostics;
     private readonly TypeEnvironment _env;
+    private readonly Dictionary<IsPatternNode, CalorType> _patternBindingTypes = new();
+    private readonly Dictionary<MatchStatementNode, CalorType> _matchTargetTypes = new();
+    private readonly HashSet<string> _moduleDeclaredValueTypes = new(StringComparer.OrdinalIgnoreCase);
+    private CalorType? _currentReturnType;
+    private bool _validateReturnAssignments;
+    private bool _suppressContextualDiagnostics;
+    private bool _lambdaReturnInvalid;
+    private List<CalorType>? _inferredLambdaReturnTypes;
 
     public TypeChecker(DiagnosticBag diagnostics)
     {
@@ -19,6 +28,10 @@ public sealed class TypeChecker
 
     public void Check(ModuleNode module)
     {
+        _patternBindingTypes.Clear();
+        _moduleDeclaredValueTypes.Clear();
+        foreach (var enumType in DeclaredEnumTypeNames(module.Classes, module.Enums))
+            _moduleDeclaredValueTypes.Add(enumType);
         // Pass -1: the module's OWN type declarations, before anything resolves a type name —
         // including a §RTYPE base type. Without this the checker treats a class the user declared
         // eight lines above as an unknown external type and warns that it "may be a typo": a false
@@ -45,6 +58,10 @@ public sealed class TypeChecker
         }
 
         // First pass: register all type definitions
+        foreach (var delegateDefinition in module.Delegates)
+        {
+            RegisterDelegate(delegateDefinition);
+        }
         foreach (var func in module.Functions)
         {
             RegisterFunction(func);
@@ -132,6 +149,26 @@ public sealed class TypeChecker
 
     private static string Qualify(string? enclosing, string name)
         => enclosing is null ? name : $"{enclosing}.{name}";
+
+    private static IEnumerable<string> DeclaredEnumTypeNames(
+        IReadOnlyList<ClassDefinitionNode> classes,
+        IReadOnlyList<EnumDefinitionNode> enums,
+        string? enclosing = null)
+    {
+        foreach (var enumDefinition in enums)
+            yield return Qualify(enclosing, enumDefinition.Name);
+        foreach (var classDefinition in classes)
+        {
+            var name = Qualify(enclosing, classDefinition.Name);
+            if (classDefinition.IsStruct)
+                yield return name;
+            foreach (var nested in DeclaredEnumTypeNames(
+                classDefinition.NestedClasses, classDefinition.NestedEnums, name))
+            {
+                yield return nested;
+            }
+        }
+    }
 
     /// <summary>
     /// Names seeded by Pass -1. Lets RegisterRefinementType tell "this name is another refinement"
@@ -235,7 +272,50 @@ public sealed class TypeChecker
         _env.ExitScope();
 
         var funcType = new FunctionType(paramTypes, returnType);
-        _env.DefineFunction(func.Name, funcType);
+        _env.DefineFunction(GetCallableLookupName(func.Name), new FunctionCandidate(
+            funcType,
+            func.Parameters.Select(parameter => parameter.Name).ToArray(),
+            func.Parameters.Select(parameter => parameter.Modifier).ToArray(),
+            func.Parameters.Select(parameter => parameter.DefaultValue != null).ToArray(),
+            GetTypeParameterNames(func)));
+    }
+
+    private void RegisterDelegate(DelegateDefinitionNode delegateDefinition)
+    {
+        _suppressDiagnostics = true;
+        var parameterTypes = delegateDefinition.Parameters
+            .Select(parameter => ResolveTypeName(parameter.TypeName, parameter.Span))
+            .ToArray();
+        var returnType = delegateDefinition.Output != null
+            ? ResolveTypeName(delegateDefinition.Output.TypeName, delegateDefinition.Output.Span)
+            : PrimitiveType.Void;
+        _suppressDiagnostics = false;
+        _env.DefineType(delegateDefinition.Name, new FunctionType(
+            parameterTypes,
+            returnType,
+            delegateDefinition.Parameters.Select(parameter => parameter.Name).ToArray(),
+            delegateDefinition.Parameters.Select(parameter => parameter.Modifier).ToArray(),
+            delegateDefinition.Name));
+    }
+
+    private static string GetCallableLookupName(string name)
+    {
+        var open = name.IndexOf('<');
+        return open > 0 && name.EndsWith('>') ? name[..open] : name;
+    }
+
+    private static IReadOnlyList<string> GetTypeParameterNames(FunctionNode function)
+    {
+        var names = function.TypeParameters.Select(parameter => parameter.Name).ToList();
+        var open = function.Name.IndexOf('<');
+        if (open > 0 && function.Name.EndsWith('>'))
+        {
+            names.AddRange(function.Name[(open + 1)..^1]
+                .Split(',')
+                .Select(name => name.Trim())
+                .Where(name => name.Length > 0));
+        }
+        return names;
     }
 
     private void CheckFunction(FunctionNode func)
@@ -243,6 +323,13 @@ public sealed class TypeChecker
         _env.EnterScope();
 
         RegisterTypeParameters(func);
+        var previousReturnType = _currentReturnType;
+        var previousSuppressDiagnostics = _suppressDiagnostics;
+        _suppressDiagnostics = true;
+        _currentReturnType = func.Output != null
+            ? ResolveTypeName(func.Output.TypeName, func.Output.Span)
+            : PrimitiveType.Void;
+        _suppressDiagnostics = previousSuppressDiagnostics;
 
         // Add parameters to scope
         foreach (var param in func.Parameters)
@@ -257,6 +344,7 @@ public sealed class TypeChecker
             CheckStatement(stmt);
         }
 
+        _currentReturnType = previousReturnType;
         _env.ExitScope();
     }
 
@@ -276,6 +364,9 @@ public sealed class TypeChecker
             case WhileStatementNode whileStmt:
                 CheckWhileStatement(whileStmt);
                 break;
+            case DoWhileStatementNode doWhileStmt:
+                CheckDoWhileStatement(doWhileStmt);
+                break;
             case IfStatementNode ifStmt:
                 CheckIfStatement(ifStmt);
                 break;
@@ -284,6 +375,22 @@ public sealed class TypeChecker
                 break;
             case MatchStatementNode match:
                 CheckMatchStatement(match);
+                break;
+            case TryStatementNode tryStatement:
+                CheckTryStatement(tryStatement);
+                break;
+            case UsingStatementNode usingStatement:
+                CheckUsingStatement(usingStatement);
+                break;
+            case UnsafeBlockNode unsafeBlock:
+                CheckScopedStatements(unsafeBlock.Body);
+                break;
+            case FixedStatementNode fixedStatement:
+                CheckFixedStatement(fixedStatement);
+                break;
+            case SyncBlockNode syncBlock:
+                _ = InferExpressionType(syncBlock.LockExpression);
+                CheckScopedStatements(syncBlock.Body);
                 break;
             // Collection mutation statements
             case CollectionPushNode push:
@@ -314,8 +421,19 @@ public sealed class TypeChecker
     }
 
     private void CheckCallStatement(CallStatementNode call)
+        => InferCallExpressionType(new CallExpressionNode(
+            call.Span,
+            call.Target,
+            call.Arguments,
+            call.ArgumentNames,
+            call.ArgumentModifiers,
+            call.TypeArguments,
+            call.CalleeSpan,
+            call.ReceiverSpan));
+
+    private void CheckCallArguments(IReadOnlyList<ExpressionNode> arguments)
     {
-        foreach (var arg in call.Arguments)
+        foreach (var arg in arguments)
         {
             InferExpressionType(arg);
         }
@@ -325,7 +443,22 @@ public sealed class TypeChecker
     {
         if (ret.Expression != null)
         {
-            InferExpressionType(ret.Expression);
+            var returnType = InferExpressionType(ret.Expression, _currentReturnType);
+            _inferredLambdaReturnTypes?.Add(returnType);
+            if ((_validateReturnAssignments || ret.Expression is CallExpressionNode)
+                && _currentReturnType != null
+                && !ContainsInferencePlaceholder(_currentReturnType)
+                && !ContainsInferencePlaceholder(returnType)
+                && !IsAssignable(_currentReturnType, returnType))
+            {
+                _lambdaReturnInvalid = true;
+                if (!_suppressContextualDiagnostics)
+                {
+                    _diagnostics.ReportError(ret.Expression.Span, DiagnosticCode.TypeMismatch,
+                        $"Return type {returnType.SurfaceName} is not assignable to "
+                        + _currentReturnType.SurfaceName);
+                }
+            }
         }
     }
 
@@ -379,10 +512,80 @@ public sealed class TypeChecker
         }
 
         _env.EnterScope();
+        DefineTrueConditionPatternVariables(whileStmt.Condition);
         foreach (var stmt in whileStmt.Body)
         {
             CheckStatement(stmt);
         }
+        _env.ExitScope();
+    }
+
+    private void CheckDoWhileStatement(DoWhileStatementNode doWhileStmt)
+    {
+        CheckScopedStatements(doWhileStmt.Body);
+        var condType = InferExpressionType(doWhileStmt.Condition);
+        if (IsDefinitelyNotBool(condType))
+        {
+            _diagnostics.ReportError(doWhileStmt.Condition.Span, DiagnosticCode.TypeMismatch,
+                $"DO-WHILE condition must be bool, got {condType.SurfaceName}");
+        }
+    }
+
+    private void CheckTryStatement(TryStatementNode tryStatement)
+    {
+        CheckScopedStatements(tryStatement.TryBody);
+        foreach (var clause in tryStatement.CatchClauses)
+        {
+            _env.EnterScope();
+            if (clause.VariableName != null && clause.ExceptionType != null)
+            {
+                _env.DefineVariable(
+                    clause.VariableName,
+                    ResolveTypeName(clause.ExceptionType, clause.Span));
+            }
+            if (clause.Filter != null)
+                _ = InferExpressionType(clause.Filter);
+            foreach (var statement in clause.Body)
+                CheckStatement(statement);
+            _env.ExitScope();
+        }
+        if (tryStatement.FinallyBody != null)
+            CheckScopedStatements(tryStatement.FinallyBody);
+    }
+
+    private void CheckUsingStatement(UsingStatementNode usingStatement)
+    {
+        var resourceType = InferExpressionType(usingStatement.Resource);
+        _env.EnterScope();
+        if (usingStatement.VariableName != null)
+        {
+            var variableType = usingStatement.VariableType != null
+                ? ResolveTypeName(usingStatement.VariableType, usingStatement.Span)
+                : resourceType;
+            _env.DefineVariable(usingStatement.VariableName, variableType);
+        }
+        foreach (var statement in usingStatement.Body)
+            CheckStatement(statement);
+        _env.ExitScope();
+    }
+
+    private void CheckFixedStatement(FixedStatementNode fixedStatement)
+    {
+        _ = InferExpressionType(fixedStatement.Initializer);
+        _env.EnterScope();
+        _env.DefineVariable(
+            fixedStatement.PointerName,
+            ResolveTypeName(fixedStatement.PointerType, fixedStatement.PointerTypeSpan));
+        foreach (var statement in fixedStatement.Body)
+            CheckStatement(statement);
+        _env.ExitScope();
+    }
+
+    private void CheckScopedStatements(IReadOnlyList<StatementNode> statements)
+    {
+        _env.EnterScope();
+        foreach (var statement in statements)
+            CheckStatement(statement);
         _env.ExitScope();
     }
 
@@ -396,6 +599,7 @@ public sealed class TypeChecker
         }
 
         _env.EnterScope();
+        DefineTrueConditionPatternVariables(ifStmt.Condition);
         foreach (var stmt in ifStmt.ThenBody)
         {
             CheckStatement(stmt);
@@ -412,6 +616,7 @@ public sealed class TypeChecker
             }
 
             _env.EnterScope();
+            DefineTrueConditionPatternVariables(elseIf.Condition);
             foreach (var stmt in elseIf.Body)
             {
                 CheckStatement(stmt);
@@ -436,11 +641,25 @@ public sealed class TypeChecker
 
         if (bind.Initializer != null)
         {
-            var initType = InferExpressionType(bind.Initializer);
-
             if (bind.TypeName != null)
             {
                 varType = ResolveTypeName(bind.TypeName, bind.Span);
+                CalorType initType;
+                if (bind.Initializer is ReferenceNode functionReference
+                    && TryGetDelegateFunctionType(varType, out _)
+                    && _env.LookupFunctionCandidates(functionReference.Name) is { Count: > 0 })
+                {
+                    initType = varType;
+                    if (!IsFunctionReferenceAssignable(varType, functionReference.Name))
+                    {
+                        _diagnostics.ReportError(bind.Span, DiagnosticCode.TypeMismatch,
+                            $"Method group '{functionReference.Name}' is not compatible with {varType.SurfaceName}");
+                    }
+                }
+                else
+                {
+                    initType = InferExpressionType(bind.Initializer, varType);
+                }
                 if (!IsAssignable(varType, initType))
                 {
                     _diagnostics.ReportError(bind.Span, DiagnosticCode.TypeMismatch,
@@ -449,6 +668,7 @@ public sealed class TypeChecker
             }
             else
             {
+                var initType = InferExpressionType(bind.Initializer);
                 varType = initType;
             }
         }
@@ -472,6 +692,7 @@ public sealed class TypeChecker
     private void CheckMatchStatement(MatchStatementNode match)
     {
         var targetType = InferExpressionType(match.Target);
+        _matchTargetTypes[match] = targetType;
 
         foreach (var matchCase in match.Cases)
         {
@@ -481,6 +702,7 @@ public sealed class TypeChecker
             if (matchCase.Guard != null)
             {
                 var guardType = InferExpressionType(matchCase.Guard);
+                DefineTrueConditionPatternVariables(matchCase.Guard);
                 if (IsDefinitelyNotBool(guardType))
                 {
                     _diagnostics.ReportError(matchCase.Guard.Span, DiagnosticCode.TypeMismatch,
@@ -752,7 +974,7 @@ public sealed class TypeChecker
         _env.ExitScope();
     }
 
-    private void CheckPattern(PatternNode pattern, CalorType expectedType)
+    private void CheckPattern(PatternNode pattern, CalorType expectedType, bool bindVariables = true)
     {
         switch (pattern)
         {
@@ -761,7 +983,10 @@ public sealed class TypeChecker
                 break;
 
             case VariablePatternNode varPat:
-                _env.DefineVariable(varPat.Name, expectedType);
+                if (bindVariables)
+                {
+                    _env.DefineVariable(varPat.Name, expectedType);
+                }
                 break;
 
             case LiteralPatternNode litPat:
@@ -776,7 +1001,7 @@ public sealed class TypeChecker
             case SomePatternNode somePat:
                 if (expectedType is OptionType optType)
                 {
-                    CheckPattern(somePat.InnerPattern, optType.InnerType);
+                    CheckPattern(somePat.InnerPattern, optType.InnerType, bindVariables);
                 }
                 else
                 {
@@ -796,7 +1021,7 @@ public sealed class TypeChecker
             case OkPatternNode okPat:
                 if (expectedType is ResultType resType)
                 {
-                    CheckPattern(okPat.InnerPattern, resType.OkType);
+                    CheckPattern(okPat.InnerPattern, resType.OkType, bindVariables);
                 }
                 else
                 {
@@ -808,7 +1033,7 @@ public sealed class TypeChecker
             case ErrPatternNode errPat:
                 if (expectedType is ResultType errResType)
                 {
-                    CheckPattern(errPat.InnerPattern, errResType.ErrType);
+                    CheckPattern(errPat.InnerPattern, errResType.ErrType, bindVariables);
                 }
                 else
                 {
@@ -819,31 +1044,35 @@ public sealed class TypeChecker
             // `§VAR{d}` — the `var d` pattern. Binds like VariablePatternNode; it reached the
             // default arm below and hard-errored, so every switch arm using it was rejected.
             case VarPatternNode varPatNode:
-                _env.DefineVariable(varPatNode.Name, expectedType);
+                if (bindVariables)
+                {
+                    _env.DefineVariable(varPatNode.Name, expectedType);
+                }
                 break;
 
             // `§K{Type:name}` — a type test with an optional binding. The bound name takes the
             // tested type, which the checker may not model; ExternalType is the honest answer.
             case TypePatternNode typePat:
-                if (!string.IsNullOrEmpty(typePat.BindingName))
+                var typePatternType = InferTypePatternBindingType(typePat.TypeName, typePat.TypeNameSpan, typePat.Span);
+                if (bindVariables && !string.IsNullOrEmpty(typePat.BindingName))
                 {
-                    _env.DefineVariable(typePat.BindingName!, ResolveTypeName(typePat.TypeName, typePat.Span));
+                    _env.DefineVariable(typePat.BindingName!, typePatternType);
                 }
                 break;
 
             // Composites: recurse so nested bindings land in scope.
             case AndPatternNode andPat:
-                CheckPattern(andPat.Left, expectedType);
-                CheckPattern(andPat.Right, expectedType);
+                CheckPattern(andPat.Left, expectedType, bindVariables);
+                CheckPattern(andPat.Right, expectedType, bindVariables);
                 break;
 
             case OrPatternNode orPat:
-                CheckPattern(orPat.Left, expectedType);
-                CheckPattern(orPat.Right, expectedType);
+                CheckPattern(orPat.Left, expectedType, bindVariables: false);
+                CheckPattern(orPat.Right, expectedType, bindVariables: false);
                 break;
 
             case NegatedPatternNode negPat:
-                CheckPattern(negPat.Inner, expectedType);
+                CheckPattern(negPat.Inner, expectedType, bindVariables: false);
                 break;
 
             case ListPatternNode listPat:
@@ -853,7 +1082,7 @@ public sealed class TypeChecker
                         : ErrorType.Instance;
                 foreach (var sub in listPat.Patterns)
                 {
-                    CheckPattern(sub, elementType);
+                    CheckPattern(sub, elementType, bindVariables);
                 }
                 break;
 
@@ -868,7 +1097,7 @@ public sealed class TypeChecker
         }
     }
 
-    private CalorType InferExpressionType(ExpressionNode expr)
+    private CalorType InferExpressionType(ExpressionNode expr, CalorType? expectedType = null)
     {
         return expr switch
         {
@@ -876,6 +1105,9 @@ public sealed class TypeChecker
             FloatLiteralNode => PrimitiveType.Float,
             BoolLiteralNode => PrimitiveType.Bool,
             StringLiteralNode => PrimitiveType.String,
+            NullCoalesceNode coalesce => InferNullCoalesceType(coalesce),
+            ConditionalExpressionNode conditional => InferConditionalExpressionType(conditional),
+            ThrowExpressionNode throwExpression => InferThrowExpressionType(throwExpression),
             CharOperationNode operation => operation.Operation switch
             {
                 CharOp.IsLetter or CharOp.IsDigit or CharOp.IsWhiteSpace
@@ -884,6 +1116,7 @@ public sealed class TypeChecker
                 _ => PrimitiveType.Char
             },
             ReferenceNode refNode => InferReferenceType(refNode),
+            UnaryOperationNode unary => InferUnaryOperationType(unary),
             BinaryOperationNode binOp => InferBinaryOperationType(binOp),
             SomeExpressionNode some => InferSomeType(some),
             NoneExpressionNode none => InferNoneType(none),
@@ -891,7 +1124,14 @@ public sealed class TypeChecker
             ErrExpressionNode err => InferErrType(err),
             RecordCreationNode rec => InferRecordCreationType(rec),
             FieldAccessNode field => InferFieldAccessType(field),
-            MatchExpressionNode match => InferMatchExpressionType(match),
+            MatchExpressionNode match => InferMatchExpressionType(match, expectedType),
+            NewExpressionNode newExpression => InferNewExpressionType(newExpression),
+            CallExpressionNode call => InferCallExpressionType(call),
+            ExpressionCallNode call => InferExpressionCallType(call),
+            InterpolatedStringNode interpolated => InferInterpolatedStringType(interpolated),
+            LambdaExpressionNode lambda => InferLambdaType(lambda, expectedType),
+            ForallExpressionNode forall => InferQuantifierType(forall.BoundVariables, forall.Body),
+            ExistsExpressionNode exists => InferQuantifierType(exists.BoundVariables, exists.Body),
             // Collection expression types
             ListCreationNode list => InferListCreationType(list),
             DictionaryCreationNode dict => InferDictionaryCreationType(dict),
@@ -900,8 +1140,2399 @@ public sealed class TypeChecker
             CollectionCountNode count => InferCollectionCountType(count),
             ArrayAccessNode arrayAccess => InferArrayAccessType(arrayAccess),
             TypeOperationNode typeOp => InferTypeOperationType(typeOp),
+            IsPatternNode isPattern => InferIsPatternType(isPattern),
+            _ => InferUnknownExpressionType(expr)
+        };
+    }
+
+    private CalorType InferNullCoalesceType(NullCoalesceNode coalesce)
+    {
+        var leftType = InferExpressionType(coalesce.Left);
+        var rightType = InferExpressionType(coalesce.Right);
+
+        if (leftType is NeverType)
+        {
+            return NeverType.Instance;
+        }
+
+        if (leftType is NullType)
+        {
+            return rightType is NeverType ? NeverType.Instance : rightType;
+        }
+
+        if (leftType is OptionType)
+        {
+            _diagnostics.ReportError(coalesce.Left.Span, DiagnosticCode.TypeMismatch,
+                $"Null-coalescing does not unwrap runtime {leftType.SurfaceName}; use Option.Unwrap explicitly");
+            return ErrorType.Instance;
+        }
+        if (IsPrimitiveValueType(leftType) || leftType is ResultType
+            || leftType.Equals(PrimitiveType.Void) || leftType.Equals(PrimitiveType.Unit))
+        {
+            _diagnostics.ReportError(coalesce.Left.Span, DiagnosticCode.TypeMismatch,
+                $"Null-coalescing requires a reference or nullable value operand, got {leftType.SurfaceName}");
+            return ErrorType.Instance;
+        }
+
+        if (rightType is ErrorType)
+            return ErrorType.Instance;
+
+        if (leftType is NullableReferenceType nullableReference)
+        {
+            if (rightType is NeverType)
+            {
+                return nullableReference.ReferentType;
+            }
+
+            if (rightType is NullType)
+            {
+                return nullableReference;
+            }
+
+            if (rightType is NullableReferenceType rightNullable
+                && IsAssignable(nullableReference.ReferentType, rightNullable.ReferentType))
+            {
+                return new NullableReferenceType(
+                    nullableReference.ReferentType,
+                    nullableReference.RequiresTransitionalAssignmentCheck
+                        || rightNullable.RequiresTransitionalAssignmentCheck);
+            }
+
+            if (IsAssignable(nullableReference.ReferentType, rightType))
+            {
+                return nullableReference.ReferentType;
+            }
+
+            if (rightType is not ErrorType)
+            {
+                _diagnostics.ReportError(coalesce.Right.Span, DiagnosticCode.TypeMismatch,
+                    $"Null-coalescing fallback type {rightType.SurfaceName} is not assignable to {nullableReference.ReferentType.SurfaceName}");
+            }
+            return ErrorType.Instance;
+        }
+
+        if (leftType is NullableValueType nullableValue)
+        {
+            if (rightType is NeverType)
+            {
+                return nullableValue.UnderlyingType;
+            }
+
+            if (rightType is NullType)
+            {
+                return nullableValue;
+            }
+
+            if (rightType is NullableValueType rightNullable
+                && IsAssignable(nullableValue.UnderlyingType, rightNullable.UnderlyingType))
+            {
+                return nullableValue;
+            }
+            if (rightType is NullableValueType widerNullable
+                && IsAssignable(widerNullable.UnderlyingType, nullableValue.UnderlyingType))
+            {
+                return widerNullable;
+            }
+
+            if (IsAssignable(nullableValue.UnderlyingType, rightType))
+            {
+                return nullableValue.UnderlyingType;
+            }
+            if (IsAssignable(rightType, nullableValue.UnderlyingType))
+            {
+                return rightType;
+            }
+
+            if (rightType is not ErrorType)
+            {
+                _diagnostics.ReportError(coalesce.Right.Span, DiagnosticCode.TypeMismatch,
+                    $"Null-coalescing fallback type {rightType.SurfaceName} is not assignable to {nullableValue.UnderlyingType.SurfaceName}");
+            }
+            return ErrorType.Instance;
+        }
+
+        if (leftType is ErrorType || leftType is ExternalType)
+        {
+            return ErrorType.Instance;
+        }
+
+        if (IsObliviousReferenceType(leftType))
+        {
+            if (rightType is NeverType or NullType)
+            {
+                return leftType;
+            }
+
+            if (rightType is ErrorType)
+            {
+                return ErrorType.Instance;
+            }
+
+            if (IsAssignable(leftType, rightType))
+            {
+                return leftType;
+            }
+
+            if (IsAssignable(rightType, leftType))
+            {
+                return rightType;
+            }
+
+            _diagnostics.ReportError(coalesce.Right.Span, DiagnosticCode.TypeMismatch,
+                $"Null-coalescing fallback type {rightType.SurfaceName} is not assignable to {leftType.SurfaceName}");
+            return ErrorType.Instance;
+        }
+
+        return ErrorType.Instance;
+    }
+
+    private CalorType InferConditionalExpressionType(ConditionalExpressionNode conditional)
+    {
+        var conditionType = InferExpressionType(conditional.Condition);
+        if (IsDefinitelyNotBool(conditionType))
+        {
+            _diagnostics.ReportError(conditional.Condition.Span, DiagnosticCode.TypeMismatch,
+                $"Conditional expression condition must be bool, got {conditionType.SurfaceName}");
+        }
+
+        _env.EnterScope();
+        DefineTrueConditionPatternVariables(conditional.Condition);
+        var trueType = InferExpressionType(conditional.WhenTrue);
+        _env.ExitScope();
+
+        var falseType = InferExpressionType(conditional.WhenFalse);
+        return CommonConditionalType(conditional.Span, trueType, falseType);
+    }
+
+    private CalorType InferThrowExpressionType(ThrowExpressionNode throwExpression)
+    {
+        var exceptionType = InferExpressionType(throwExpression.Exception);
+        if (throwExpression.Exception is NewExpressionNode constructed
+            && PrimitiveType.FromName(Parsing.AttributeHelper.ToSurfaceSpelling(constructed.TypeName)) is { } primitive)
+            exceptionType = primitive;
+        if (!IsSupportedThrowException(throwExpression.Exception, exceptionType))
+        {
+            _diagnostics.ReportError(throwExpression.Exception.Span, DiagnosticCode.TypeMismatch,
+                $"Throw expression requires an exception value, got {exceptionType.SurfaceName}");
+        }
+        return NeverType.Instance;
+    }
+
+    private CalorType InferUnaryOperationType(UnaryOperationNode unary)
+    {
+        var operandType = InferExpressionType(unary.Operand);
+        return unary.Operator switch
+        {
+            UnaryOperator.Not => PrimitiveType.Bool,
+            UnaryOperator.Negate => IsNumericType(operandType) ? operandType : ErrorType.Instance,
+            UnaryOperator.BitwiseNot => operandType.Equals(PrimitiveType.Int) ? PrimitiveType.Int : ErrorType.Instance,
+            UnaryOperator.PreIncrement or UnaryOperator.PreDecrement
+                or UnaryOperator.PostIncrement or UnaryOperator.PostDecrement
+                => IsNumericType(operandType) ? operandType : ErrorType.Instance,
             _ => ErrorType.Instance
         };
+    }
+
+    private CalorType InferNewExpressionType(NewExpressionNode newExpression)
+    {
+        foreach (var argument in newExpression.Arguments)
+        {
+            InferExpressionType(argument);
+        }
+
+        foreach (var initializer in newExpression.Initializers)
+        {
+            InferExpressionType(initializer.Value);
+        }
+
+        return _env.LookupType(newExpression.TypeName) ?? new ExternalType(newExpression.TypeName);
+    }
+
+    private CalorType InferCallExpressionType(CallExpressionNode call)
+    {
+        var functionCandidates = _env.LookupFunctionCandidates(call.Target);
+        if (_env.LookupVariable(call.Target) is { } variableType
+            && TryGetDelegateFunctionType(variableType, out var variableFunction))
+        {
+            var delegateArgumentTypes = InferDelegateArgumentTypes(
+                variableFunction, call.Arguments, call.ArgumentNames);
+            return ValidateDelegateCall(
+                    variableFunction,
+                    delegateArgumentTypes,
+                    call.Arguments,
+                    call.ArgumentNames,
+                    call.ArgumentModifiers,
+                    call.Span)
+                ? variableFunction.ReturnType
+                : ErrorType.Instance;
+        }
+
+        var preliminaryTypes = call.Arguments
+            .Select(argument => RequiresTargetType(argument)
+                ? ErrorType.Instance
+                : InferExpressionType(argument))
+            .ToArray();
+        var contextualCandidates = functionCandidates
+            .Where(candidate => TryResolveKnownArgumentTypes(
+                candidate, call, preliminaryTypes, out _, out _))
+            .ToArray();
+        var expectedArgumentTypes = call.Arguments
+            .Select((_, index) => GetConsensusExpectedArgumentType(
+                contextualCandidates, call, preliminaryTypes, index))
+            .ToArray();
+        var argumentTypes = call.Arguments.Select((argument, index) =>
+            RequiresTargetType(argument)
+                ? InferInitialContextualArgument(
+                    argument, expectedArgumentTypes[index], contextualCandidates.Length > 0)
+                : preliminaryTypes[index]).ToArray();
+        var candidates = functionCandidates
+            .Select(candidate => TryResolveCallCandidate(candidate, call, argumentTypes))
+            .Where(candidate => candidate != null)
+            .Select(candidate => candidate!)
+            .ToArray();
+        if (candidates.Length == 0 && functionCandidates.Count > 0
+            && (call.Arguments.Any(RequiresTargetType)
+                || call.Arguments.Any(argument => argument is ReferenceNode reference
+                    && _env.LookupFunctionCandidates(reference.Name).Count > 0)
+                || call.ArgumentNames?.Any(name => !string.IsNullOrEmpty(name)) == true
+                || call.ArgumentModifiers?.Any(modifier => !string.IsNullOrEmpty(modifier)) == true))
+        {
+            _diagnostics.ReportError(call.Span, DiagnosticCode.NoMatchingOverload,
+                $"No overload of '{call.Target}' matches the supplied argument names, modifiers, and types");
+        }
+        var bestCandidates = candidates
+            .Where(candidate => !candidates.Any(other =>
+                !ReferenceEquals(candidate, other) && IsBetterConversion(other, candidate)))
+            .ToArray();
+        if (bestCandidates.Length == 1)
+            ValidateSelectedContextualArguments(call, bestCandidates[0], expectedArgumentTypes);
+        return bestCandidates.Length > 0
+            && bestCandidates.All(candidate => candidate.Type.ReturnType.Equals(bestCandidates[0].Type.ReturnType))
+                ? bestCandidates[0].Type.ReturnType
+                : ErrorType.Instance;
+    }
+
+    private CalorType InferExpressionCallType(ExpressionCallNode call)
+    {
+        var targetType = InferExpressionType(call.TargetExpression);
+        if (!TryGetDelegateFunctionType(targetType, out var function))
+        {
+            return ErrorType.Instance;
+        }
+
+        var argumentTypes = InferDelegateArgumentTypes(function, call.Arguments, null);
+        return ValidateDelegateCall(function, argumentTypes, call.Arguments, null, null, call.Span)
+            ? function.ReturnType
+            : ErrorType.Instance;
+    }
+
+    private CalorType InferCallArgument(ExpressionNode argument, CalorType? expectedType)
+    {
+        if (argument is MatchExpressionNode && expectedType == null)
+        {
+            var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
+            _suppressContextualDiagnostics = true;
+            var result = InferExpressionType(argument);
+            _suppressContextualDiagnostics = previousSuppressContextualDiagnostics;
+            return result;
+        }
+        if (argument is LambdaExpressionNode && expectedType != null && ContainsTypeParameter(expectedType))
+            return ErrorType.Instance;
+        return InferExpressionType(argument, expectedType);
+    }
+
+    private CalorType InferInitialContextualArgument(
+        ExpressionNode argument,
+        CalorType? expectedType,
+        bool hasContextualCandidates)
+    {
+        if (expectedType != null || !hasContextualCandidates)
+            return InferCallArgument(argument, expectedType);
+
+        var checkpoint = _diagnostics.CreateCheckpoint();
+        var result = InferCallArgument(argument, null);
+        _diagnostics.RestoreCheckpoint(checkpoint);
+        return result;
+    }
+
+    private void ValidateSelectedContextualArguments(
+        CallExpressionNode call,
+        ResolvedCallCandidate candidate,
+        IReadOnlyList<CalorType?> initialExpectedTypes)
+    {
+        for (var i = 0; i < call.Arguments.Count; i++)
+        {
+            if (RequiresTargetType(call.Arguments[i])
+                && (initialExpectedTypes[i] == null
+                    || !initialExpectedTypes[i]!.Equals(candidate.ConversionTargets[i])))
+            {
+                InferExpressionType(call.Arguments[i], candidate.ConversionTargets[i]);
+            }
+        }
+    }
+
+    private static bool RequiresTargetType(ExpressionNode argument)
+        => argument is MatchExpressionNode or LambdaExpressionNode;
+
+    private IReadOnlyList<CalorType> InferDelegateArgumentTypes(
+        FunctionType function,
+        IReadOnlyList<ExpressionNode> arguments,
+        IReadOnlyList<string?>? argumentNames)
+    {
+        var parameterIndices = TryMapDelegateArgumentIndices(function, arguments.Count, argumentNames);
+        return arguments.Select((argument, index) =>
+        {
+            var expectedType = parameterIndices != null
+                ? function.ParameterTypes[parameterIndices[index]]
+                : null;
+            return InferCallArgument(argument, expectedType);
+        }).ToArray();
+    }
+
+    private CalorType InferInterpolatedStringType(InterpolatedStringNode interpolated)
+    {
+        foreach (var part in interpolated.Parts.OfType<InterpolatedStringExpressionNode>())
+        {
+            InferExpressionType(part.Expression);
+        }
+        return PrimitiveType.String;
+    }
+
+    private CalorType InferLambdaType(LambdaExpressionNode lambda, CalorType? expectedType)
+    {
+        var expectedFunction = expectedType != null
+            && TryGetDelegateFunctionType(expectedType, out var function)
+                ? function
+                : null;
+        var signatureValid = true;
+        if (expectedFunction != null && lambda.Parameters.Count != expectedFunction.ParameterTypes.Count)
+        {
+            if (!_suppressContextualDiagnostics)
+            {
+                _diagnostics.ReportError(lambda.Span, DiagnosticCode.TypeMismatch,
+                    $"Lambda has {lambda.Parameters.Count} parameter(s), but target delegate expects "
+                    + expectedFunction.ParameterTypes.Count);
+            }
+            signatureValid = false;
+        }
+        _env.EnterScope();
+        var parameterTypes = lambda.Parameters.Select((parameter, index) =>
+        {
+            var declaredTypeName = parameter.TypeName;
+            var declaredType = declaredTypeName is not null
+                ? ResolveTypeName(declaredTypeName, parameter.Span)
+                : expectedFunction != null && index < expectedFunction.ParameterTypes.Count
+                    ? expectedFunction.ParameterTypes[index]
+                    : ErrorType.Instance;
+            if (declaredTypeName is not null && expectedFunction != null
+                && index < expectedFunction.ParameterTypes.Count
+                && !declaredType.Equals(expectedFunction.ParameterTypes[index]))
+            {
+                if (!_suppressContextualDiagnostics)
+                {
+                    _diagnostics.ReportError(parameter.Span, DiagnosticCode.TypeMismatch,
+                        $"Lambda parameter type {declaredType.SurfaceName} does not match target type "
+                        + expectedFunction.ParameterTypes[index].SurfaceName);
+                }
+                signatureValid = false;
+            }
+            _env.DefineVariable(parameter.Name, declaredType);
+            return declaredType;
+        }).ToArray();
+
+        var previousReturnType = _currentReturnType;
+        var previousValidateReturnAssignments = _validateReturnAssignments;
+        var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
+        var previousLambdaReturnInvalid = _lambdaReturnInvalid;
+        var previousInferredLambdaReturnTypes = _inferredLambdaReturnTypes;
+        if (expectedFunction == null)
+            _suppressContextualDiagnostics = true;
+        _lambdaReturnInvalid = false;
+        _inferredLambdaReturnTypes = null;
+        _currentReturnType = expectedFunction?.ReturnType;
+        _validateReturnAssignments = expectedFunction != null;
+        CalorType returnType;
+        if (lambda.ExpressionBody != null)
+        {
+            returnType = InferExpressionType(lambda.ExpressionBody, expectedFunction?.ReturnType);
+            if (expectedFunction != null && !IsVoidCompatibleLambdaExpression(expectedFunction, lambda.ExpressionBody)
+                && !ContainsInferencePlaceholder(expectedFunction.ReturnType)
+                && !ContainsInferencePlaceholder(returnType)
+                && !IsAssignable(expectedFunction.ReturnType, returnType))
+            {
+                if (!_suppressContextualDiagnostics)
+                {
+                    _diagnostics.ReportError(lambda.ExpressionBody.Span, DiagnosticCode.TypeMismatch,
+                        $"Lambda return type {returnType.SurfaceName} is not assignable to "
+                        + expectedFunction.ReturnType.SurfaceName);
+                }
+                signatureValid = false;
+            }
+        }
+        else
+        {
+            foreach (var statement in lambda.StatementBody ?? Array.Empty<StatementNode>())
+            {
+                CheckStatement(statement);
+            }
+            returnType = PrimitiveType.Void;
+            var definitelyReturns = DefinitelyReturns(
+                lambda.StatementBody ?? Array.Empty<StatementNode>());
+            if (expectedFunction != null
+                && !expectedFunction.ReturnType.Equals(PrimitiveType.Void)
+                && !definitelyReturns)
+            {
+                if (!_suppressContextualDiagnostics)
+                {
+                    _diagnostics.ReportError(lambda.Span, DiagnosticCode.TypeMismatch,
+                        $"Lambda targeting {expectedFunction.SurfaceName} must return a value");
+                }
+                signatureValid = false;
+            }
+        }
+        signatureValid &= !_lambdaReturnInvalid;
+        _currentReturnType = previousReturnType;
+        _validateReturnAssignments = previousValidateReturnAssignments;
+        _suppressContextualDiagnostics = previousSuppressContextualDiagnostics;
+        _lambdaReturnInvalid = previousLambdaReturnInvalid;
+        _inferredLambdaReturnTypes = previousInferredLambdaReturnTypes;
+        _env.ExitScope();
+        _ = parameterTypes;
+        _ = returnType;
+        return expectedFunction is not null && signatureValid ? expectedFunction : ErrorType.Instance;
+    }
+
+    private static bool IsVoidCompatibleLambdaExpression(
+        FunctionType expectedFunction,
+        ExpressionNode expression)
+        => expectedFunction.ReturnType.Equals(PrimitiveType.Void)
+            && expression is CallExpressionNode or ExpressionCallNode or NewExpressionNode;
+
+    private bool DefinitelyReturns(IReadOnlyList<StatementNode> statements)
+    {
+        var outcomes = AnalyzeControlFlow(
+            statements,
+            insideMatch: false);
+        var invalidTransfers = outcomes.All
+            & (ControlFlowOutcome.LoopExit
+                | ControlFlowOutcome.Continue
+                | ControlFlowOutcome.MatchExit);
+        if (invalidTransfers != ControlFlowOutcome.None
+            && statements.Count > 0
+            && !_suppressContextualDiagnostics)
+        {
+            _diagnostics.ReportError(
+                statements[0].Span,
+                DiagnosticCode.TypeMismatch,
+                "break and continue must target an enclosing loop or match");
+        }
+        return (outcomes.All
+            & (ControlFlowOutcome.FallThrough
+                | ControlFlowOutcome.LoopExit
+                | ControlFlowOutcome.Continue)) == 0;
+    }
+
+    [Flags]
+    private enum ControlFlowOutcome
+    {
+        None = 0,
+        FallThrough = 1,
+        Return = 2,
+        LoopExit = 4,
+        Continue = 8,
+        MatchExit = 16,
+        Throw = 32
+    }
+
+    private sealed record ControlFlowResolver(
+        object Scope,
+        Func<HashSet<StatementNode>, ControlFlowResult> Resolve);
+
+    private sealed record ControlFlowResult(
+        ControlFlowOutcome Local,
+        IReadOnlyDictionary<object, ControlFlowOutcome> Transfers)
+    {
+        public ControlFlowOutcome All => Transfers.Values.Aggregate(Local, (all, next) => all | next);
+    }
+
+    private static ControlFlowResult LocalFlow(ControlFlowOutcome outcomes)
+        => new(outcomes, new Dictionary<object, ControlFlowOutcome>());
+
+    private static Dictionary<object, ControlFlowOutcome> MergeTransfers(
+        params IReadOnlyDictionary<object, ControlFlowOutcome>[] sources)
+    {
+        var merged = new Dictionary<object, ControlFlowOutcome>();
+        foreach (var source in sources)
+        {
+            foreach (var (scope, outcomes) in source)
+            {
+                merged[scope] = merged.GetValueOrDefault(scope) | outcomes;
+            }
+        }
+        return merged;
+    }
+
+    private static ControlFlowResult TransferTo(
+        ControlFlowOutcome local,
+        IReadOnlyDictionary<object, ControlFlowOutcome> existingTransfers,
+        ControlFlowResolver resolver,
+        ControlFlowResult target)
+    {
+        var transfers = MergeTransfers(existingTransfers, target.Transfers);
+        transfers[resolver.Scope] = transfers.GetValueOrDefault(resolver.Scope) | target.Local;
+        return new ControlFlowResult(local, transfers);
+    }
+
+    private static ControlFlowResult AbsorbTransfers(
+        ControlFlowResult result,
+        object scope)
+    {
+        if (!result.Transfers.TryGetValue(scope, out var outcomes))
+            return result;
+        var remaining = MergeTransfers(result.Transfers);
+        remaining.Remove(scope);
+        return new ControlFlowResult(result.Local | outcomes, remaining);
+    }
+
+    private ControlFlowResult AnalyzeControlFlow(
+        IReadOnlyList<StatementNode> statements,
+        bool insideMatch,
+        IReadOnlyDictionary<string, ControlFlowResolver>?
+            inheritedLabelResolvers = null,
+        IReadOnlyDictionary<string, ControlFlowResolver>?
+            matchResolvers = null,
+        HashSet<StatementNode>? activeStatements = null,
+        bool insideCatch = false)
+    {
+        var scope = new object();
+        var labelResolvers = inheritedLabelResolvers != null
+            ? new Dictionary<string, ControlFlowResolver>(
+                inheritedLabelResolvers, StringComparer.Ordinal)
+            : new Dictionary<string, ControlFlowResolver>(
+                StringComparer.Ordinal);
+        foreach (var item in statements
+                     .Select((statement, index) => (statement, index))
+                     .Where(item => item.statement is LabelStatementNode)
+                     .GroupBy(item => ((LabelStatementNode)item.statement).Label,
+                         StringComparer.Ordinal)
+                     .Select(group => group.First()))
+        {
+            var targetIndex = item.index;
+            labelResolvers[((LabelStatementNode)item.statement).Label] =
+                new ControlFlowResolver(
+                    scope,
+                    active => AnalyzeControlFlowFrom(
+                        statements,
+                        labelResolvers,
+                        matchResolvers,
+                        targetIndex,
+                        insideMatch,
+                        active,
+                        insideCatch));
+        }
+        var result = AnalyzeControlFlowFrom(
+            statements,
+            labelResolvers,
+            matchResolvers,
+            startIndex: 0,
+            insideMatch,
+            activeStatements ?? new HashSet<StatementNode>(),
+            insideCatch);
+        return AbsorbTransfers(result, scope);
+    }
+
+    private ControlFlowResult AnalyzeControlFlowFrom(
+        IReadOnlyList<StatementNode> statements,
+        IReadOnlyDictionary<string, ControlFlowResolver>
+            labelResolvers,
+        IReadOnlyDictionary<string, ControlFlowResolver>?
+            matchResolvers,
+        int startIndex,
+        bool insideMatch,
+        HashSet<StatementNode> activeStatements,
+        bool insideCatch)
+    {
+        var localOutcomes = ControlFlowOutcome.FallThrough;
+        var transfers = new Dictionary<object, ControlFlowOutcome>();
+        for (var index = startIndex; index < statements.Count; index++)
+        {
+            if ((localOutcomes & ControlFlowOutcome.FallThrough) == 0)
+                break;
+            var statement = statements[index];
+            if (!activeStatements.Add(statement))
+            {
+                return new ControlFlowResult(
+                    localOutcomes & ~ControlFlowOutcome.FallThrough,
+                    transfers);
+            }
+            var priorOutcomes = localOutcomes & ~ControlFlowOutcome.FallThrough;
+            if (statement is GotoStatementNode
+                {
+                    CaseLabel: null,
+                    IsDefault: false
+                } gotoStatement
+                && labelResolvers.TryGetValue(gotoStatement.Label, out var labelResolver))
+            {
+                var target = labelResolver.Resolve(
+                    new HashSet<StatementNode>(activeStatements));
+                return TransferTo(
+                    priorOutcomes,
+                    transfers,
+                    labelResolver,
+                    target);
+            }
+            if (statement is GotoStatementNode { CaseLabel: not null } gotoCase
+                && GetCaseKey(gotoCase.CaseLabel) is { } caseKey
+                && matchResolvers?.TryGetValue(caseKey, out var caseResolver) == true)
+            {
+                var target = caseResolver.Resolve(
+                    new HashSet<StatementNode>(activeStatements));
+                return TransferTo(
+                    priorOutcomes,
+                    transfers,
+                    caseResolver,
+                    target);
+            }
+            if (statement is GotoStatementNode { IsDefault: true }
+                && matchResolvers?.TryGetValue(DefaultCaseKey, out var defaultResolver) == true)
+            {
+                var target = defaultResolver.Resolve(
+                    new HashSet<StatementNode>(activeStatements));
+                return TransferTo(
+                    priorOutcomes,
+                    transfers,
+                    defaultResolver,
+                    target);
+            }
+            if (statement is GotoStatementNode { CaseLabel: not null } or
+                GotoStatementNode { IsDefault: true })
+            {
+                if (!_suppressContextualDiagnostics)
+                {
+                    _diagnostics.ReportError(
+                        statement.Span,
+                        DiagnosticCode.TypeMismatch,
+                        "goto case/default must target an unguarded case in the enclosing match");
+                }
+            }
+            else if (statement is GotoStatementNode)
+            {
+                if (!_suppressContextualDiagnostics)
+                {
+                    _diagnostics.ReportError(
+                        statement.Span,
+                        DiagnosticCode.TypeMismatch,
+                        "goto must target a label in the current control-flow scope");
+                }
+            }
+            var statementResult = AnalyzeStatementControlFlow(
+                statement,
+                insideMatch,
+                labelResolvers,
+                matchResolvers,
+                activeStatements,
+                insideCatch);
+            localOutcomes = priorOutcomes | statementResult.Local;
+            transfers = MergeTransfers(transfers, statementResult.Transfers);
+        }
+        return new ControlFlowResult(localOutcomes, transfers);
+    }
+
+    private const string DefaultCaseKey = "default";
+
+    private static string? GetCaseKey(
+        ExpressionNode expression,
+        bool normalizeIntegralAsChar = false)
+        => expression switch
+        {
+            IntLiteralNode literal
+                when normalizeIntegralAsChar
+                    && literal.Sign == IntegerLiteralSign.Positive
+                    && literal.Magnitude <= char.MaxValue
+                => $"char:{literal.Magnitude}",
+            IntLiteralNode literal =>
+                $"int:{literal.Sign}:{literal.Magnitude}",
+            StringLiteralNode literal => $"string:{literal.Value}",
+            BoolLiteralNode literal => $"bool:{literal.Value}",
+            FloatLiteralNode literal => $"float:{literal.Value:R}:{literal.IsDecimal}:{literal.IsSingle}",
+            DecimalLiteralNode literal => $"decimal:{literal.Value}",
+            CharOperationNode
+            {
+                Operation: CharOp.CharLiteral,
+                Arguments: [StringLiteralNode { Value.Length: 1 } literal]
+            } => $"char:{(int)literal.Value[0]}",
+            ReferenceNode { Name.Length: >= 3 } reference
+                when TryParseCharacterCase(reference.Name, out var character)
+                => $"char:{(int)character}",
+            ReferenceNode { Name: "null" } => "null",
+            ReferenceNode { Name: "true" } => "bool:True",
+            ReferenceNode { Name: "false" } => "bool:False",
+            ReferenceNode reference => $"reference:{reference.Name}",
+            _ => null
+        };
+
+    private static string? GetCaseKey(
+        PatternNode pattern,
+        bool normalizeIntegralAsChar)
+        => pattern switch
+        {
+            LiteralPatternNode literal =>
+                GetCaseKey(literal.Literal, normalizeIntegralAsChar),
+            ConstantPatternNode constant =>
+                GetCaseKey(constant.Value, normalizeIntegralAsChar),
+            _ => null
+        };
+
+    private static bool TryParseCharacterCase(string text, out char character)
+    {
+        var expression = Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseExpression(text);
+        if (expression is Microsoft.CodeAnalysis.CSharp.Syntax.LiteralExpressionSyntax literal
+            && literal.Token.Value is char value)
+        {
+            character = value;
+            return true;
+        }
+        character = default;
+        return false;
+    }
+
+    private ControlFlowResult AnalyzeRethrowControlFlow(
+        RethrowStatementNode rethrow,
+        bool insideCatch)
+    {
+        if (!insideCatch && !_suppressContextualDiagnostics)
+        {
+            _diagnostics.ReportError(
+                rethrow.Span,
+                DiagnosticCode.TypeMismatch,
+                "rethrow must be used within a catch block");
+        }
+        return LocalFlow(ControlFlowOutcome.Throw);
+    }
+
+    private ControlFlowResult AnalyzeStatementControlFlow(
+        StatementNode statement,
+        bool insideMatch,
+        IReadOnlyDictionary<string, ControlFlowResolver>
+            labelResolvers,
+        IReadOnlyDictionary<string, ControlFlowResolver>?
+            matchResolvers,
+        HashSet<StatementNode> activeStatements,
+        bool insideCatch)
+        => statement switch
+        {
+            ReturnStatementNode
+                => LocalFlow(ControlFlowOutcome.Return),
+            ThrowStatementNode
+                => LocalFlow(ControlFlowOutcome.Throw),
+            RethrowStatementNode rethrow => AnalyzeRethrowControlFlow(
+                rethrow, insideCatch),
+            BreakStatementNode => insideMatch
+                ? LocalFlow(ControlFlowOutcome.MatchExit)
+                : LocalFlow(ControlFlowOutcome.LoopExit),
+            ContinueStatementNode => LocalFlow(ControlFlowOutcome.Continue),
+            GotoStatementNode { CaseLabel: not null } => insideMatch
+                ? LocalFlow(ControlFlowOutcome.MatchExit)
+                : LocalFlow(ControlFlowOutcome.LoopExit),
+            GotoStatementNode { IsDefault: true } => insideMatch
+                ? LocalFlow(ControlFlowOutcome.MatchExit)
+                : LocalFlow(ControlFlowOutcome.LoopExit),
+            GotoStatementNode => LocalFlow(ControlFlowOutcome.LoopExit),
+            IfStatementNode conditional => AnalyzeConditionalControlFlow(
+                conditional, insideMatch, labelResolvers, matchResolvers, activeStatements,
+                insideCatch),
+            MatchStatementNode match => AnalyzeMatchControlFlow(
+                match, labelResolvers, activeStatements, insideCatch),
+            WhileStatementNode loop => AnalyzeLoopControlFlow(
+                loop.Body,
+                loop.Condition is BoolLiteralNode { Value: true },
+                executesAtLeastOnce: false,
+                labelResolvers,
+                matchResolvers,
+                activeStatements,
+                insideCatch),
+            DoWhileStatementNode loop => AnalyzeLoopControlFlow(
+                loop.Body,
+                loop.Condition is BoolLiteralNode { Value: true },
+                executesAtLeastOnce: true,
+                labelResolvers,
+                matchResolvers,
+                activeStatements,
+                insideCatch),
+            TryStatementNode tryStatement => AnalyzeTryControlFlow(
+                tryStatement, insideMatch, labelResolvers, matchResolvers, activeStatements,
+                insideCatch),
+            UsingStatementNode usingStatement => AnalyzeControlFlow(
+                usingStatement.Body, insideMatch, labelResolvers, matchResolvers,
+                new HashSet<StatementNode>(activeStatements), insideCatch),
+            UnsafeBlockNode unsafeBlock => AnalyzeControlFlow(
+                unsafeBlock.Body, insideMatch, labelResolvers, matchResolvers,
+                new HashSet<StatementNode>(activeStatements), insideCatch),
+            FixedStatementNode fixedStatement => AnalyzeControlFlow(
+                fixedStatement.Body, insideMatch, labelResolvers, matchResolvers,
+                new HashSet<StatementNode>(activeStatements), insideCatch),
+            SyncBlockNode syncBlock => AnalyzeControlFlow(
+                syncBlock.Body, insideMatch, labelResolvers, matchResolvers,
+                new HashSet<StatementNode>(activeStatements), insideCatch),
+            _ => LocalFlow(ControlFlowOutcome.FallThrough)
+        };
+
+    private ControlFlowResult AnalyzeConditionalControlFlow(
+        IfStatementNode conditional,
+        bool insideMatch,
+        IReadOnlyDictionary<string, ControlFlowResolver>
+            labelResolvers,
+        IReadOnlyDictionary<string, ControlFlowResolver>?
+            matchResolvers,
+        HashSet<StatementNode> activeStatements,
+        bool insideCatch)
+    {
+        var outcomes = AnalyzeControlFlow(
+            conditional.ThenBody, insideMatch, labelResolvers, matchResolvers,
+            new HashSet<StatementNode>(activeStatements), insideCatch);
+        foreach (var clause in conditional.ElseIfClauses)
+        {
+            var clauseOutcomes = AnalyzeControlFlow(
+                clause.Body, insideMatch, labelResolvers, matchResolvers,
+                new HashSet<StatementNode>(activeStatements), insideCatch);
+            outcomes = new ControlFlowResult(
+                outcomes.Local | clauseOutcomes.Local,
+                MergeTransfers(outcomes.Transfers, clauseOutcomes.Transfers));
+        }
+        var elseOutcomes = conditional.ElseBody != null
+            ? AnalyzeControlFlow(
+                conditional.ElseBody, insideMatch, labelResolvers, matchResolvers,
+                new HashSet<StatementNode>(activeStatements), insideCatch)
+            : LocalFlow(ControlFlowOutcome.FallThrough);
+        return new ControlFlowResult(
+            outcomes.Local | elseOutcomes.Local,
+            MergeTransfers(outcomes.Transfers, elseOutcomes.Transfers));
+    }
+
+    private ControlFlowResult AnalyzeMatchControlFlow(
+        MatchStatementNode match,
+        IReadOnlyDictionary<string, ControlFlowResolver>
+            labelResolvers,
+        HashSet<StatementNode> activeStatements,
+        bool insideCatch)
+    {
+        var scope = new object();
+        var matchTargetType = _matchTargetTypes.GetValueOrDefault(match, ErrorType.Instance);
+        var normalizeIntegralAsChar = matchTargetType.Equals(PrimitiveType.Char)
+            || matchTargetType is NullableValueType nullable
+                && nullable.UnderlyingType.Equals(PrimitiveType.Char);
+        var caseResolvers =
+            new Dictionary<string, ControlFlowResolver>(
+                StringComparer.Ordinal);
+        foreach (var matchCase in match.Cases)
+        {
+            var key = matchCase.Pattern is WildcardPatternNode && matchCase.Guard == null
+                ? DefaultCaseKey
+                : matchCase.Guard == null
+                    ? GetCaseKey(matchCase.Pattern, normalizeIntegralAsChar)
+                    : null;
+            if (key == null || caseResolvers.ContainsKey(key))
+                continue;
+            var targetCase = matchCase;
+            var resolver = new ControlFlowResolver(
+                scope,
+                active => AnalyzeControlFlow(
+                    targetCase.Body,
+                    insideMatch: true,
+                    labelResolvers,
+                    caseResolvers,
+                    active,
+                    insideCatch));
+            caseResolvers[key] = resolver;
+            if (normalizeIntegralAsChar
+                && key.StartsWith("char:", StringComparison.Ordinal)
+                && ulong.TryParse(
+                    key.AsSpan("char:".Length),
+                    System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var characterCode))
+            {
+                caseResolvers[$"int:{IntegerLiteralSign.Positive}:{characterCode}"] = resolver;
+            }
+        }
+
+        var outcomes = LocalFlow(ControlFlowOutcome.None);
+        foreach (var matchCase in match.Cases)
+        {
+            var caseOutcomes = AnalyzeControlFlow(
+                    matchCase.Body,
+                    insideMatch: true,
+                    labelResolvers,
+                    caseResolvers,
+                    new HashSet<StatementNode>(activeStatements),
+                    insideCatch);
+            outcomes = new ControlFlowResult(
+                outcomes.Local | caseOutcomes.Local,
+                MergeTransfers(outcomes.Transfers, caseOutcomes.Transfers));
+        }
+        outcomes = AbsorbTransfers(outcomes, scope);
+        var exhaustive = match.Cases.Count > 0
+            && match.Cases.Any(matchCase =>
+                matchCase.Pattern is WildcardPatternNode && matchCase.Guard == null);
+        var localOutcomes = outcomes.Local;
+        if ((localOutcomes & ControlFlowOutcome.MatchExit) != 0)
+        {
+            localOutcomes = localOutcomes & ~ControlFlowOutcome.MatchExit
+                | ControlFlowOutcome.FallThrough;
+        }
+        if (!exhaustive)
+            localOutcomes |= ControlFlowOutcome.FallThrough;
+        return new ControlFlowResult(localOutcomes, outcomes.Transfers);
+    }
+
+    private ControlFlowResult AnalyzeLoopControlFlow(
+        IReadOnlyList<StatementNode> body,
+        bool conditionIsAlwaysTrue,
+        bool executesAtLeastOnce,
+        IReadOnlyDictionary<string, ControlFlowResolver>
+            labelResolvers,
+        IReadOnlyDictionary<string, ControlFlowResolver>?
+            matchResolvers,
+        HashSet<StatementNode> activeStatements,
+        bool insideCatch)
+    {
+        var bodyOutcomes = AnalyzeControlFlow(
+            body,
+            insideMatch: false,
+            labelResolvers,
+            matchResolvers,
+            new HashSet<StatementNode>(activeStatements),
+            insideCatch);
+        var localOutcomes = bodyOutcomes.Local;
+        var outcomes = localOutcomes
+            & (ControlFlowOutcome.Return | ControlFlowOutcome.Throw);
+        if ((localOutcomes & ControlFlowOutcome.LoopExit) != 0
+            || !conditionIsAlwaysTrue
+                && (!executesAtLeastOnce
+                    || (localOutcomes
+                        & (ControlFlowOutcome.FallThrough | ControlFlowOutcome.Continue)) != 0))
+        {
+            outcomes |= ControlFlowOutcome.FallThrough;
+        }
+        return new ControlFlowResult(outcomes, bodyOutcomes.Transfers);
+    }
+
+    private ControlFlowResult AnalyzeTryControlFlow(
+        TryStatementNode tryStatement,
+        bool insideMatch,
+        IReadOnlyDictionary<string, ControlFlowResolver>
+            labelResolvers,
+        IReadOnlyDictionary<string, ControlFlowResolver>?
+            matchResolvers,
+        HashSet<StatementNode> activeStatements,
+        bool insideCatch)
+    {
+        var protectedOutcomes = AnalyzeControlFlow(
+            tryStatement.TryBody, insideMatch, labelResolvers, matchResolvers,
+            new HashSet<StatementNode>(activeStatements), insideCatch);
+        foreach (var clause in tryStatement.CatchClauses)
+        {
+            var catchOutcomes = AnalyzeControlFlow(
+                clause.Body, insideMatch, labelResolvers, matchResolvers,
+                new HashSet<StatementNode>(activeStatements), insideCatch: true);
+            protectedOutcomes = new ControlFlowResult(
+                protectedOutcomes.Local | catchOutcomes.Local,
+                MergeTransfers(protectedOutcomes.Transfers, catchOutcomes.Transfers));
+        }
+        if (tryStatement.FinallyBody == null)
+            return protectedOutcomes;
+
+        var finallyOutcomes = AnalyzeControlFlow(
+            tryStatement.FinallyBody, insideMatch: false,
+            inheritedLabelResolvers: null,
+            matchResolvers: null,
+            activeStatements: new HashSet<StatementNode>(activeStatements),
+            insideCatch: false);
+        var escapingFinallyOutcomes = finallyOutcomes.Local
+            & (ControlFlowOutcome.Return
+                | ControlFlowOutcome.Continue
+                | ControlFlowOutcome.LoopExit
+                | ControlFlowOutcome.MatchExit);
+        if (escapingFinallyOutcomes != ControlFlowOutcome.None)
+        {
+            if (!_suppressContextualDiagnostics)
+            {
+                _diagnostics.ReportError(
+                    tryStatement.FinallyBody[0].Span,
+                    DiagnosticCode.TypeMismatch,
+                    "Control cannot leave a finally block");
+            }
+            finallyOutcomes = new ControlFlowResult(
+                finallyOutcomes.Local & ~escapingFinallyOutcomes
+                    | ControlFlowOutcome.FallThrough,
+                finallyOutcomes.Transfers);
+        }
+        if ((finallyOutcomes.Local & ControlFlowOutcome.FallThrough) == 0)
+            return finallyOutcomes;
+        return new ControlFlowResult(
+            protectedOutcomes.Local
+                | (finallyOutcomes.Local & ~ControlFlowOutcome.FallThrough),
+            MergeTransfers(protectedOutcomes.Transfers, finallyOutcomes.Transfers));
+    }
+
+    private CalorType InferQuantifierType(
+        IReadOnlyList<QuantifierVariableNode> variables,
+        ExpressionNode body)
+    {
+        _env.EnterScope();
+        foreach (var variable in variables)
+        {
+            _env.DefineVariable(variable.Name, ResolveTypeName(variable.TypeName, variable.Span));
+        }
+        var bodyType = InferExpressionType(body);
+        _env.ExitScope();
+        if (IsDefinitelyNotBool(bodyType))
+        {
+            _diagnostics.ReportError(body.Span, DiagnosticCode.TypeMismatch,
+                $"Quantifier body must be bool, got {bodyType.SurfaceName}");
+        }
+        return PrimitiveType.Bool;
+    }
+
+    private CalorType InferUnknownExpressionType(ExpressionNode expression)
+    {
+        TraverseAstHolder(expression, new HashSet<object>(ReferenceEqualityComparer.Instance));
+        return ErrorType.Instance;
+    }
+
+    private void TraverseAstHolder(object holder, HashSet<object> visited)
+    {
+        if (!visited.Add(holder))
+            return;
+
+        foreach (var property in holder.GetType().GetProperties())
+        {
+            if (property.GetIndexParameters().Length != 0)
+                continue;
+            var value = property.GetValue(holder);
+            if (value is ExpressionNode child && !ReferenceEquals(child, holder))
+            {
+                InferExpressionType(child);
+            }
+            else if (value is AstNode astNode && !ReferenceEquals(astNode, holder))
+            {
+                TraverseAstHolder(astNode, visited);
+            }
+            else if (value != null
+                && value.GetType().Assembly == typeof(AstNode).Assembly
+                && value.GetType().Namespace == typeof(AstNode).Namespace)
+            {
+                TraverseAstHolder(value, visited);
+            }
+            else if (value is System.Collections.IEnumerable children and not string)
+            {
+                foreach (var nested in children)
+                {
+                    if (nested is ExpressionNode nestedExpression)
+                        InferExpressionType(nestedExpression);
+                    else if (nested is AstNode nestedAst)
+                        TraverseAstHolder(nestedAst, visited);
+                    else if (nested != null
+                        && nested.GetType().Assembly == typeof(AstNode).Assembly
+                        && nested.GetType().Namespace == typeof(AstNode).Namespace)
+                        TraverseAstHolder(nested, visited);
+                }
+            }
+        }
+    }
+
+    private CalorType? GetConsensusExpectedArgumentType(
+        IReadOnlyList<FunctionCandidate> candidates,
+        CallExpressionNode call,
+        IReadOnlyList<CalorType> preliminaryTypes,
+        int argumentIndex)
+    {
+        CalorType? expected = null;
+        var found = false;
+        foreach (var candidate in candidates)
+        {
+            if (!TryResolveKnownArgumentTypes(
+                    candidate, call, preliminaryTypes, out var parameterIndices, out var parameterTypes))
+                continue;
+
+            var parameterIndex = parameterIndices[argumentIndex];
+            var candidateExpected = EffectiveParameterType(
+                candidate,
+                parameterTypes[parameterIndex],
+                parameterIndex,
+                preliminaryTypes[argumentIndex],
+                RequiresTargetType(call.Arguments[argumentIndex]));
+            if (ContainsTypeParameter(candidateExpected))
+                return null;
+            if (!found)
+            {
+                expected = candidateExpected;
+                found = true;
+            }
+            else if (!expected!.Equals(candidateExpected))
+            {
+                return null;
+            }
+        }
+        return found ? expected : null;
+    }
+
+    private bool TryResolveKnownArgumentTypes(
+        FunctionCandidate candidate,
+        CallExpressionNode call,
+        IReadOnlyList<CalorType> preliminaryTypes,
+        out int[] parameterIndices,
+        out CalorType[] parameterTypes)
+    {
+        parameterTypes = [];
+        if (!TryMapCallArgumentIndices(candidate, call, out parameterIndices))
+            return false;
+
+        var substitutions = new Dictionary<string, CalorType>(StringComparer.Ordinal);
+        for (var argumentIndex = 0; argumentIndex < preliminaryTypes.Count; argumentIndex++)
+        {
+            if (RequiresTargetType(call.Arguments[argumentIndex]))
+                continue;
+            var parameterIndex = parameterIndices[argumentIndex];
+            var template = EffectiveParameterType(
+                candidate,
+                candidate.Type.ParameterTypes[parameterIndex],
+                parameterIndex,
+                preliminaryTypes[argumentIndex],
+                forceExpanded: false);
+            if (call.Arguments[argumentIndex] is not ReferenceNode reference
+                || _env.LookupFunctionCandidates(reference.Name).Count == 0)
+                InferTypeArguments(template, preliminaryTypes[argumentIndex], substitutions);
+        }
+
+        parameterTypes = candidate.Type.ParameterTypes
+            .Select(parameter => SubstituteTypeParameters(parameter, substitutions))
+            .ToArray();
+        for (var argumentIndex = 0; argumentIndex < preliminaryTypes.Count; argumentIndex++)
+        {
+            if (RequiresTargetType(call.Arguments[argumentIndex]))
+                continue;
+            var parameterIndex = parameterIndices[argumentIndex];
+            var target = EffectiveParameterType(
+                candidate,
+                parameterTypes[parameterIndex],
+                parameterIndex,
+                preliminaryTypes[argumentIndex],
+                forceExpanded: false);
+            if (call.Arguments[argumentIndex] is ReferenceNode methodGroup
+                && _env.LookupFunctionCandidates(methodGroup.Name) is { Count: > 0 } methodCandidates)
+            {
+                if (!TryGetDelegateFunctionType(target, out var delegateType)
+                    || !methodCandidates.Any(method => IsMethodGroupCompatible(delegateType, method)))
+                {
+                    return false;
+                }
+            }
+            else if (!IsAssignable(target, preliminaryTypes[argumentIndex]))
+            {
+                return false;
+            }
+            var modifier = candidate.ParameterModifiers[parameterIndex]
+                & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In);
+            if (modifier != ParameterModifier.None
+                && !target.Equals(preliminaryTypes[argumentIndex]))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static CalorType EffectiveParameterType(
+        FunctionCandidate candidate,
+        CalorType parameterType,
+        int parameterIndex,
+        CalorType argumentType,
+        bool forceExpanded)
+        => candidate.ParameterModifiers[parameterIndex].HasFlag(ParameterModifier.Params)
+            && parameterType is ArrayType array
+            && (forceExpanded || !IsAssignable(parameterType, argumentType))
+                ? array.ElementType
+                : parameterType;
+
+    private static bool TryMapCallArgumentIndices(
+        FunctionCandidate candidate,
+        CallExpressionNode call,
+        out int[] parameterIndices)
+    {
+        parameterIndices = new int[call.Arguments.Count];
+        var assigned = new bool[candidate.Type.ParameterTypes.Count];
+        var paramsIndices = candidate.ParameterModifiers
+            .Select((modifier, index) => (modifier, index))
+            .Where(item => item.modifier.HasFlag(ParameterModifier.Params))
+            .Select(item => item.index)
+            .ToArray();
+        if (paramsIndices.Length > 1)
+            return false;
+        var paramsIndex = paramsIndices.Length == 1 ? paramsIndices[0] : -1;
+        var nextPositional = 0;
+        var seenOutOfPositionNamedArgument = false;
+        for (var argumentIndex = 0; argumentIndex < call.Arguments.Count; argumentIndex++)
+        {
+            var argumentName = call.ArgumentNames != null && argumentIndex < call.ArgumentNames.Count
+                ? call.ArgumentNames[argumentIndex]
+                : null;
+            int parameterIndex;
+            if (!string.IsNullOrEmpty(argumentName))
+            {
+                var matches = candidate.ParameterNames
+                    .Select((name, index) => (name, index))
+                    .Where(item => item.name.Equals(argumentName, StringComparison.Ordinal))
+                    .Select(item => item.index)
+                    .ToArray();
+                if (matches.Length != 1)
+                    return false;
+                parameterIndex = matches[0];
+                while (nextPositional < assigned.Length && assigned[nextPositional])
+                    nextPositional++;
+                seenOutOfPositionNamedArgument |= parameterIndex != nextPositional;
+            }
+            else
+            {
+                if (seenOutOfPositionNamedArgument)
+                    return false;
+                while (nextPositional < assigned.Length && assigned[nextPositional])
+                    nextPositional++;
+                parameterIndex = nextPositional < assigned.Length ? nextPositional : paramsIndex;
+                if (paramsIndex >= 0 && parameterIndex >= paramsIndex)
+                    parameterIndex = paramsIndex;
+                else
+                    nextPositional++;
+            }
+
+            if (parameterIndex < 0 || parameterIndex >= assigned.Length
+                || assigned[parameterIndex] && parameterIndex != paramsIndex
+                || !ArgumentModifierMatches(
+                    candidate.ParameterModifiers[parameterIndex],
+                    call.ArgumentModifiers != null && argumentIndex < call.ArgumentModifiers.Count
+                        ? call.ArgumentModifiers[argumentIndex]
+                        : null))
+            {
+                return false;
+            }
+            parameterIndices[argumentIndex] = parameterIndex;
+            assigned[parameterIndex] = true;
+        }
+        return assigned.Select((isAssigned, index) => (isAssigned, index))
+            .All(item => item.isAssigned
+                || candidate.OptionalParameters[item.index]
+                || item.index == paramsIndex);
+    }
+
+    private ResolvedCallCandidate? TryResolveCallCandidate(
+        FunctionCandidate candidate,
+        CallExpressionNode call,
+        IReadOnlyList<CalorType> argumentTypes)
+    {
+        var mappedArguments =
+            new (CalorType Type, ExpressionNode Expression, int SourceIndex)?[candidate.Type.ParameterTypes.Count];
+        var paramsIndices = candidate.ParameterModifiers
+            .Select((modifier, index) => (modifier, index))
+            .Where(item => item.modifier.HasFlag(ParameterModifier.Params))
+            .Select(item => item.index)
+            .ToArray();
+        if (paramsIndices.Length > 1)
+            return null;
+        var paramsIndex = paramsIndices.Length == 1 ? paramsIndices[0] : -1;
+        var expandedParamsArguments =
+            new List<(CalorType Type, ExpressionNode Expression, int SourceIndex)>();
+        var nextPositional = 0;
+        var seenOutOfPositionNamedArgument = false;
+        for (var argumentIndex = 0; argumentIndex < argumentTypes.Count; argumentIndex++)
+        {
+            var argumentName = call.ArgumentNames != null && argumentIndex < call.ArgumentNames.Count
+                ? call.ArgumentNames[argumentIndex]
+                : null;
+            int parameterIndex;
+            if (!string.IsNullOrEmpty(argumentName))
+            {
+                var matchingParameters = candidate.ParameterNames
+                    .Select((name, index) => (name, index))
+                    .Where(item => item.name.Equals(argumentName, StringComparison.Ordinal))
+                    .Select(item => item.index)
+                    .ToArray();
+                if (matchingParameters.Length != 1)
+                    return null;
+                parameterIndex = matchingParameters[0];
+                while (nextPositional < mappedArguments.Length
+                    && mappedArguments[nextPositional] != null)
+                {
+                    nextPositional++;
+                }
+                seenOutOfPositionNamedArgument |= parameterIndex != nextPositional;
+            }
+            else
+            {
+                if (seenOutOfPositionNamedArgument)
+                    return null;
+                while (nextPositional < mappedArguments.Length
+                    && mappedArguments[nextPositional] != null)
+                {
+                    nextPositional++;
+                }
+                parameterIndex = nextPositional++;
+                if (paramsIndex >= 0 && parameterIndex >= paramsIndex
+                    && (parameterIndex >= mappedArguments.Length
+                        || argumentTypes.Count - argumentIndex > mappedArguments.Length - paramsIndex
+                        || RequiresTargetType(call.Arguments[argumentIndex])
+                        || !IsAssignable(candidate.Type.ParameterTypes[paramsIndex], argumentTypes[argumentIndex])))
+                {
+                    if (call.ArgumentModifiers != null
+                        && argumentIndex < call.ArgumentModifiers.Count
+                        && !string.IsNullOrEmpty(call.ArgumentModifiers[argumentIndex]))
+                    {
+                        return null;
+                    }
+                    expandedParamsArguments.Add(
+                        (argumentTypes[argumentIndex], call.Arguments[argumentIndex], argumentIndex));
+                    nextPositional = paramsIndex;
+                    continue;
+                }
+            }
+
+            if (parameterIndex < 0 || parameterIndex >= mappedArguments.Length
+                || mappedArguments[parameterIndex] != null
+                || !ArgumentModifierMatches(
+                    candidate.ParameterModifiers[parameterIndex],
+                    call.ArgumentModifiers != null && argumentIndex < call.ArgumentModifiers.Count
+                        ? call.ArgumentModifiers[argumentIndex]
+                        : null))
+            {
+                return null;
+            }
+
+            mappedArguments[parameterIndex] =
+                (argumentTypes[argumentIndex], call.Arguments[argumentIndex], argumentIndex);
+        }
+
+        if (mappedArguments.Select((argument, index) => (argument, index))
+            .Any(item => item.argument == null
+                && !candidate.OptionalParameters[item.index]
+                && item.index != paramsIndex))
+        {
+            return null;
+        }
+
+        var substitutions = new Dictionary<string, CalorType>(StringComparer.Ordinal);
+        if (call.TypeArguments != null)
+        {
+            if (call.TypeArguments.Count != candidate.TypeParameterNames.Count)
+                return null;
+            for (var i = 0; i < call.TypeArguments.Count; i++)
+            {
+                substitutions[candidate.TypeParameterNames[i]] =
+                    ResolveTypeName(call.TypeArguments[i], call.Span);
+            }
+        }
+
+        for (var i = 0; i < mappedArguments.Length; i++)
+        {
+            if (mappedArguments[i] is { } argument
+                && argument.Expression is not LambdaExpressionNode
+                && (argument.Expression is not ReferenceNode methodGroup
+                    || _env.LookupFunctionCandidates(methodGroup.Name).Count == 0))
+            {
+                InferTypeArguments(candidate.Type.ParameterTypes[i], argument.Type, substitutions);
+            }
+        }
+        for (var i = 0; i < mappedArguments.Length; i++)
+        {
+            if (mappedArguments[i] is { Expression: LambdaExpressionNode lambda })
+            {
+                InferTypeArgumentsFromLambda(
+                    candidate.Type.ParameterTypes[i], lambda, substitutions);
+            }
+        }
+        for (var i = 0; i < mappedArguments.Length; i++)
+        {
+            if (mappedArguments[i] is { Expression: ReferenceNode methodGroup }
+                && _env.LookupFunctionCandidates(methodGroup.Name) is { Count: > 0 } methodCandidates)
+            {
+                InferTypeArgumentsFromMethodGroup(
+                    candidate.Type.ParameterTypes[i], methodCandidates, substitutions);
+            }
+        }
+        if (expandedParamsArguments.Count > 0
+            && candidate.Type.ParameterTypes[paramsIndex] is ArrayType paramsTemplate)
+        {
+            foreach (var argument in expandedParamsArguments)
+            {
+                InferTypeArguments(paramsTemplate.ElementType, argument.Type, substitutions);
+            }
+        }
+
+        for (var i = 0; i < mappedArguments.Length; i++)
+        {
+            if (mappedArguments[i] is { } argument
+                && RequiresTargetType(argument.Expression))
+            {
+                var substitutedParameter =
+                    SubstituteTypeParameters(candidate.Type.ParameterTypes[i], substitutions);
+                var expectedArgumentType = EffectiveParameterType(
+                    candidate,
+                    substitutedParameter,
+                    i,
+                    argument.Type,
+                    forceExpanded: true);
+                var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
+                var diagnosticCheckpoint = _diagnostics.CreateCheckpoint();
+                _suppressContextualDiagnostics = true;
+                var inferredArgumentType =
+                    InferExpressionType(argument.Expression, expectedArgumentType);
+                _suppressContextualDiagnostics = previousSuppressContextualDiagnostics;
+                _diagnostics.RestoreCheckpoint(diagnosticCheckpoint);
+                if (inferredArgumentType is ErrorType)
+                    return null;
+                mappedArguments[i] =
+                    (inferredArgumentType, argument.Expression, argument.SourceIndex);
+            }
+        }
+
+        var parameterTypes = candidate.Type.ParameterTypes
+            .Select(parameter => SubstituteTypeParameters(parameter, substitutions))
+            .ToArray();
+        if (paramsIndex >= 0 && parameterTypes[paramsIndex] is ArrayType contextualParamsArray)
+        {
+            for (var i = 0; i < expandedParamsArguments.Count; i++)
+            {
+                var argument = expandedParamsArguments[i];
+                if (!RequiresTargetType(argument.Expression))
+                    continue;
+                var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
+                var diagnosticCheckpoint = _diagnostics.CreateCheckpoint();
+                _suppressContextualDiagnostics = true;
+                var inferredArgumentType =
+                    InferExpressionType(argument.Expression, contextualParamsArray.ElementType);
+                _suppressContextualDiagnostics = previousSuppressContextualDiagnostics;
+                _diagnostics.RestoreCheckpoint(diagnosticCheckpoint);
+                if (inferredArgumentType is ErrorType)
+                    return null;
+                expandedParamsArguments[i] =
+                    (inferredArgumentType, argument.Expression, argument.SourceIndex);
+            }
+        }
+        var conversionCosts = new int[argumentTypes.Count];
+        var conversionTargets = new CalorType[argumentTypes.Count];
+        for (var i = 0; i < mappedArguments.Length; i++)
+        {
+            if (mappedArguments[i] is not { } argument)
+                continue;
+
+            conversionTargets[argument.SourceIndex] = parameterTypes[i];
+            if (argument.Expression is ReferenceNode methodGroup
+                && _env.LookupFunctionCandidates(methodGroup.Name) is { Count: > 0 } methodCandidates)
+            {
+                if (!TryGetDelegateFunctionType(parameterTypes[i], out var delegateType)
+                    || methodCandidates.All(overload => !IsMethodGroupCompatible(delegateType, overload)))
+                {
+                    return null;
+                }
+                if (!TryGetMethodGroupConversionCost(
+                        delegateType, methodCandidates, out var methodGroupCost))
+                {
+                    return null;
+                }
+                conversionCosts[argument.SourceIndex] = methodGroupCost;
+            }
+            else if (!IsAssignable(parameterTypes[i], argument.Type))
+            {
+                return null;
+            }
+            else if ((candidate.ParameterModifiers[i]
+                    & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In))
+                != ParameterModifier.None
+                && !parameterTypes[i].Equals(argument.Type))
+            {
+                return null;
+            }
+            else
+            {
+                conversionCosts[argument.SourceIndex] =
+                    GetImplicitConversionCost(parameterTypes[i], argument.Type);
+            }
+        }
+
+        if (expandedParamsArguments.Count > 0)
+        {
+            if (paramsIndex < 0 || parameterTypes[paramsIndex] is not ArrayType paramsArray
+                || expandedParamsArguments.Any(argument =>
+                    !IsAssignable(paramsArray.ElementType, argument.Type)))
+            {
+                return null;
+            }
+            foreach (var argument in expandedParamsArguments)
+            {
+                conversionCosts[argument.SourceIndex] =
+                    GetImplicitConversionCost(paramsArray.ElementType, argument.Type);
+                conversionTargets[argument.SourceIndex] = paramsArray.ElementType;
+            }
+        }
+
+        return new ResolvedCallCandidate(
+            new FunctionType(
+                parameterTypes,
+                SubstituteTypeParameters(candidate.Type.ReturnType, substitutions)),
+            conversionCosts,
+            conversionTargets,
+            call.Arguments,
+            expandedParamsArguments.Count > 0,
+            mappedArguments.Select((argument, index) => (argument, index))
+                .Count(item => item.argument == null && candidate.OptionalParameters[item.index]));
+    }
+
+    private static int GetImplicitConversionCost(CalorType target, CalorType source)
+    {
+        if (target.Equals(source))
+            return 0;
+        if (source is ErrorType)
+            return 5;
+        if (target is NullableValueType nullableTarget)
+        {
+            var sourceType = source is NullableValueType nullableSource
+                ? nullableSource.UnderlyingType
+                : source;
+            return 1 + GetImplicitConversionCost(nullableTarget.UnderlyingType, sourceType);
+        }
+        if (target is NullableReferenceType nullableReference)
+            return 1 + GetImplicitConversionCost(nullableReference.ReferentType, source);
+        if (target.Equals(PrimitiveType.Float) && source.Equals(PrimitiveType.Int)
+            || target.Equals(PrimitiveType.Decimal) && source.Equals(PrimitiveType.Int)
+            || target.Equals(PrimitiveType.Int) && source.Equals(PrimitiveType.Char))
+        {
+            return 1;
+        }
+        if ((target.Equals(PrimitiveType.Float) || target.Equals(PrimitiveType.Decimal))
+            && source.Equals(PrimitiveType.Char))
+        {
+            return 2;
+        }
+        if (target.Equals(PrimitiveType.Object))
+            return source.Equals(PrimitiveType.String) ? 2 : 3;
+        return 2;
+    }
+
+    private static bool IsBetterConversion(ResolvedCallCandidate left, ResolvedCallCandidate right)
+    {
+        if (left.ConversionCosts.Count != right.ConversionCosts.Count)
+            return false;
+        var strictlyBetter = false;
+        for (var i = 0; i < left.ConversionCosts.Count; i++)
+        {
+            if (left.ConversionCosts[i] > right.ConversionCosts[i])
+                return false;
+            strictlyBetter |= left.ConversionCosts[i] < right.ConversionCosts[i];
+            if (left.ConversionCosts[i] == right.ConversionCosts[i]
+                && !left.ConversionTargets[i].Equals(right.ConversionTargets[i]))
+            {
+                if (TryGetDelegateFunctionType(left.ConversionTargets[i], out var leftDelegate)
+                    && TryGetDelegateFunctionType(right.ConversionTargets[i], out var rightDelegate))
+                {
+                    var implicitLambda = left.ArgumentExpressions[i] is LambdaExpressionNode lambda
+                        && lambda.Parameters.All(parameter => parameter.TypeName is null);
+                    var leftDelegateIsBetter = implicitLambda
+                        ? IsBetterImplicitLambdaTarget(leftDelegate, rightDelegate)
+                        : IsMoreSpecificDelegateType(leftDelegate, rightDelegate);
+                    var rightDelegateIsBetter = implicitLambda
+                        ? IsBetterImplicitLambdaTarget(rightDelegate, leftDelegate)
+                        : IsMoreSpecificDelegateType(rightDelegate, leftDelegate);
+                    if (rightDelegateIsBetter && !leftDelegateIsBetter)
+                        return false;
+                    strictlyBetter |= leftDelegateIsBetter && !rightDelegateIsBetter;
+                    continue;
+                }
+                var leftTargetIsBetter = IsAssignable(
+                    right.ConversionTargets[i], left.ConversionTargets[i]);
+                var rightTargetIsBetter = IsAssignable(
+                    left.ConversionTargets[i], right.ConversionTargets[i]);
+                if (rightTargetIsBetter && !leftTargetIsBetter)
+                    return false;
+                strictlyBetter |= leftTargetIsBetter && !rightTargetIsBetter;
+            }
+        }
+        if (strictlyBetter)
+            return true;
+        if (!left.UsesExpandedParams && right.UsesExpandedParams)
+            return true;
+        if (left.UsesExpandedParams && !right.UsesExpandedParams)
+            return false;
+        return left.OmittedOptionalCount < right.OmittedOptionalCount;
+    }
+
+    private static bool IsMoreSpecificDelegateType(FunctionType left, FunctionType right)
+    {
+        if (left.ParameterTypes.Count != right.ParameterTypes.Count)
+            return false;
+        var strictlyMoreSpecific = false;
+        for (var i = 0; i < left.ParameterTypes.Count; i++)
+        {
+            if (!IsAssignable(right.ParameterTypes[i], left.ParameterTypes[i]))
+                return false;
+            strictlyMoreSpecific |= !left.ParameterTypes[i].Equals(right.ParameterTypes[i]);
+        }
+        if (!IsAssignable(right.ReturnType, left.ReturnType))
+            return false;
+        return strictlyMoreSpecific || !left.ReturnType.Equals(right.ReturnType);
+    }
+
+    private static bool IsBetterImplicitLambdaTarget(FunctionType left, FunctionType right)
+    {
+        if (left.ParameterTypes.Count != right.ParameterTypes.Count)
+            return false;
+        var strictlyBetter = false;
+        for (var i = 0; i < left.ParameterTypes.Count; i++)
+        {
+            if (!IsAssignable(left.ParameterTypes[i], right.ParameterTypes[i]))
+                return false;
+            strictlyBetter |= !left.ParameterTypes[i].Equals(right.ParameterTypes[i]);
+        }
+        if (!IsAssignable(right.ReturnType, left.ReturnType))
+            return false;
+        return strictlyBetter || !left.ReturnType.Equals(right.ReturnType);
+    }
+
+    private sealed record ResolvedCallCandidate(
+        FunctionType Type,
+        IReadOnlyList<int> ConversionCosts,
+        IReadOnlyList<CalorType> ConversionTargets,
+        IReadOnlyList<ExpressionNode> ArgumentExpressions,
+        bool UsesExpandedParams,
+        int OmittedOptionalCount);
+
+    private static bool ContainsTypeParameter(CalorType type)
+        => type switch
+        {
+            TypeParameterType => true,
+            GenericInstanceType generic => generic.TypeArguments.Any(ContainsTypeParameter),
+            NullableReferenceType nullable => ContainsTypeParameter(nullable.ReferentType),
+            NullableValueType nullable => ContainsTypeParameter(nullable.UnderlyingType),
+            ArrayType array => ContainsTypeParameter(array.ElementType),
+            FunctionType function => function.ParameterTypes.Any(ContainsTypeParameter)
+                || ContainsTypeParameter(function.ReturnType),
+            _ => false
+        };
+
+    private static bool ContainsInferencePlaceholder(CalorType type)
+        => type is TypeVariable || ContainsTypeParameter(type)
+            || type switch
+            {
+                GenericInstanceType generic => generic.TypeArguments.Any(ContainsInferencePlaceholder),
+                OptionType option => ContainsInferencePlaceholder(option.InnerType),
+                ResultType result => ContainsInferencePlaceholder(result.OkType)
+                    || ContainsInferencePlaceholder(result.ErrType),
+                NullableReferenceType nullable => ContainsInferencePlaceholder(nullable.ReferentType),
+                NullableValueType nullable => ContainsInferencePlaceholder(nullable.UnderlyingType),
+                ArrayType array => ContainsInferencePlaceholder(array.ElementType),
+                FunctionType function => function.ParameterTypes.Any(ContainsInferencePlaceholder)
+                    || ContainsInferencePlaceholder(function.ReturnType),
+                _ => false
+            };
+
+    private static bool ArgumentModifierMatches(ParameterModifier parameterModifier, string? argumentModifier)
+    {
+        var expected = parameterModifier & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In);
+        var actual = argumentModifier switch
+        {
+            null or "" => ParameterModifier.None,
+            "ref" => ParameterModifier.Ref,
+            "out" => ParameterModifier.Out,
+            "in" => ParameterModifier.In,
+            _ => (ParameterModifier)(-1)
+        };
+        return expected == actual;
+    }
+
+    private static void InferTypeArguments(
+        CalorType parameter,
+        CalorType argument,
+        IDictionary<string, CalorType> substitutions)
+    {
+        if (parameter is TypeParameterType typeParameter)
+        {
+            if (!substitutions.TryGetValue(typeParameter.Name, out var existing))
+            {
+                substitutions[typeParameter.Name] = argument;
+            }
+            else if (IsAssignable(existing, argument))
+            {
+                substitutions[typeParameter.Name] = existing;
+            }
+            else if (IsAssignable(argument, existing))
+            {
+                substitutions[typeParameter.Name] = argument;
+            }
+            else
+            {
+                substitutions[typeParameter.Name] = ErrorType.Instance;
+            }
+            return;
+        }
+        if (parameter is GenericInstanceType parameterGeneric
+            && argument is GenericInstanceType argumentGeneric
+            && parameterGeneric.BaseName.Equals(argumentGeneric.BaseName, StringComparison.OrdinalIgnoreCase)
+            && parameterGeneric.TypeArguments.Count == argumentGeneric.TypeArguments.Count)
+        {
+            for (var i = 0; i < parameterGeneric.TypeArguments.Count; i++)
+                InferTypeArguments(parameterGeneric.TypeArguments[i], argumentGeneric.TypeArguments[i], substitutions);
+        }
+        else if (parameter is NullableReferenceType parameterNullable
+            && argument is NullableReferenceType argumentNullable)
+        {
+            InferTypeArguments(parameterNullable.ReferentType, argumentNullable.ReferentType, substitutions);
+        }
+        else if (parameter is NullableValueType parameterValue
+            && argument is NullableValueType argumentValue)
+        {
+            InferTypeArguments(parameterValue.UnderlyingType, argumentValue.UnderlyingType, substitutions);
+        }
+        else if (parameter is ArrayType parameterArray && argument is ArrayType argumentArray)
+        {
+            InferTypeArguments(parameterArray.ElementType, argumentArray.ElementType, substitutions);
+        }
+    }
+
+    private bool InferTypeArgumentsFromMethodGroup(
+        CalorType delegateTemplate,
+        IReadOnlyList<FunctionCandidate> methodCandidates,
+        IDictionary<string, CalorType> substitutions)
+    {
+        if (!TryGetDelegateFunctionType(delegateTemplate, out var targetTemplate))
+            return false;
+
+        var applicable = new List<(
+            FunctionCandidate Method,
+            Dictionary<string, CalorType> Substitutions,
+            FunctionType Target,
+            IReadOnlyList<int> Costs)>();
+        foreach (var method in methodCandidates)
+        {
+            var resolvedMethod = ResolveMethodCandidateAgainstTarget(targetTemplate, method);
+            if (resolvedMethod.Type.ParameterTypes.Count != targetTemplate.ParameterTypes.Count)
+                continue;
+
+            var trial = new Dictionary<string, CalorType>(substitutions, StringComparer.Ordinal);
+            for (var i = 0; i < targetTemplate.ParameterTypes.Count; i++)
+            {
+                InferTypeArguments(
+                    targetTemplate.ParameterTypes[i], resolvedMethod.Type.ParameterTypes[i], trial);
+            }
+            InferTypeArguments(targetTemplate.ReturnType, resolvedMethod.Type.ReturnType, trial);
+
+            var resolvedTarget = (FunctionType)SubstituteTypeParameters(targetTemplate, trial);
+            if (!IsMethodGroupCompatible(resolvedTarget, resolvedMethod))
+                continue;
+            applicable.Add((resolvedMethod, trial, resolvedTarget,
+                GetMethodGroupCandidateCosts(resolvedTarget, resolvedMethod)));
+        }
+        if (applicable.Count == 0)
+            return false;
+
+        var best = applicable.Where((candidate, candidateIndex) => !applicable.Where(
+                (_, otherIndex) => otherIndex != candidateIndex).Any(other =>
+                IsBetterMethodGroupCandidate(
+                    other.Method, other.Costs, candidate.Method, candidate.Costs)))
+            .ToArray();
+        if (best.Length != 1)
+            return false;
+        foreach (var (name, type) in best[0].Substitutions)
+            substitutions[name] = type;
+        return true;
+    }
+
+    private void InferTypeArgumentsFromLambda(
+        CalorType delegateTemplate,
+        LambdaExpressionNode lambda,
+        IDictionary<string, CalorType> substitutions)
+    {
+        if (!TryGetDelegateFunctionType(delegateTemplate, out var targetTemplate)
+            || targetTemplate.ParameterTypes.Count != lambda.Parameters.Count)
+        {
+            return;
+        }
+
+        for (var i = 0; i < lambda.Parameters.Count; i++)
+        {
+            if (lambda.Parameters[i].TypeName is { } declaredTypeName)
+            {
+                InferTypeArguments(
+                    targetTemplate.ParameterTypes[i],
+                    ResolveTypeName(declaredTypeName, lambda.Parameters[i].Span),
+                    substitutions);
+            }
+        }
+
+        var checkpoint = _diagnostics.CreateCheckpoint();
+        var previousSuppressContextualDiagnostics = _suppressContextualDiagnostics;
+        var previousReturnType = _currentReturnType;
+        var previousValidateReturnAssignments = _validateReturnAssignments;
+        var previousInferredLambdaReturnTypes = _inferredLambdaReturnTypes;
+        _suppressContextualDiagnostics = true;
+        _currentReturnType = null;
+        _validateReturnAssignments = false;
+        _inferredLambdaReturnTypes = new List<CalorType>();
+        _env.EnterScope();
+        var currentSubstitutions =
+            new Dictionary<string, CalorType>(substitutions, StringComparer.Ordinal);
+        for (var i = 0; i < lambda.Parameters.Count; i++)
+        {
+            var parameterType = lambda.Parameters[i].TypeName is { } declaredTypeName
+                ? ResolveTypeName(declaredTypeName, lambda.Parameters[i].Span)
+                : SubstituteTypeParameters(targetTemplate.ParameterTypes[i], currentSubstitutions);
+            _env.DefineVariable(lambda.Parameters[i].Name, parameterType);
+        }
+        if (lambda.ExpressionBody != null)
+        {
+            _inferredLambdaReturnTypes.Add(InferExpressionType(lambda.ExpressionBody));
+        }
+        else
+        {
+            foreach (var statement in lambda.StatementBody ?? Array.Empty<StatementNode>())
+            {
+                CheckStatement(statement);
+            }
+        }
+        _env.ExitScope();
+        foreach (var returnType in _inferredLambdaReturnTypes)
+            InferTypeArguments(targetTemplate.ReturnType, returnType, substitutions);
+        _inferredLambdaReturnTypes = previousInferredLambdaReturnTypes;
+        _currentReturnType = previousReturnType;
+        _validateReturnAssignments = previousValidateReturnAssignments;
+        _suppressContextualDiagnostics = previousSuppressContextualDiagnostics;
+        _diagnostics.RestoreCheckpoint(checkpoint);
+    }
+
+    private bool TryGetMethodGroupConversionCost(
+        FunctionType target,
+        IReadOnlyList<FunctionCandidate> candidates,
+        out int cost)
+    {
+        var applicable = candidates
+            .Select(candidate => ResolveMethodCandidateAgainstTarget(target, candidate))
+            .Where(candidate => IsMethodGroupCompatible(target, candidate))
+            .Select(candidate => (
+                Candidate: candidate,
+                Costs: GetMethodGroupCandidateCosts(target, candidate)))
+            .ToArray();
+        if (applicable.Length == 0)
+        {
+            cost = 0;
+            return false;
+        }
+        var best = applicable.Where((candidate, candidateIndex) => !applicable.Where(
+                (_, otherIndex) => otherIndex != candidateIndex).Any(other =>
+                IsBetterMethodGroupCandidate(
+                    other.Candidate, other.Costs, candidate.Candidate, candidate.Costs)))
+            .ToArray();
+        if (best.Length != 1)
+        {
+            cost = 0;
+            return false;
+        }
+        cost = best[0].Costs.Sum();
+        return true;
+    }
+
+    private static FunctionCandidate ResolveMethodCandidateAgainstTarget(
+        FunctionType target,
+        FunctionCandidate candidate)
+    {
+        if (candidate.TypeParameterNames.Count == 0)
+            return candidate;
+
+        var substitutions = new Dictionary<string, CalorType>(StringComparer.Ordinal);
+        for (var i = 0; i < Math.Min(
+            target.ParameterTypes.Count, candidate.Type.ParameterTypes.Count); i++)
+        {
+            InferTypeArguments(
+                candidate.Type.ParameterTypes[i], target.ParameterTypes[i], substitutions);
+        }
+        if (!ContainsInferencePlaceholder(target.ReturnType))
+            InferTypeArguments(candidate.Type.ReturnType, target.ReturnType, substitutions);
+        return candidate with
+        {
+            Type = new FunctionType(
+                candidate.Type.ParameterTypes
+                    .Select(parameter => SubstituteTypeParameters(parameter, substitutions))
+                    .ToArray(),
+                SubstituteTypeParameters(candidate.Type.ReturnType, substitutions))
+        };
+    }
+
+    private static IReadOnlyList<int> GetMethodGroupCandidateCosts(
+        FunctionType target,
+        FunctionCandidate candidate)
+        => target.ParameterTypes.Select((parameter, index) =>
+            GetImplicitConversionCost(candidate.Type.ParameterTypes[index], parameter)).ToArray();
+
+    private static bool IsBetterMethodGroupCandidate(
+        FunctionCandidate left,
+        IReadOnlyList<int> leftCosts,
+        FunctionCandidate right,
+        IReadOnlyList<int> rightCosts)
+    {
+        var strictlyBetter = false;
+        for (var i = 0; i < leftCosts.Count; i++)
+        {
+            if (leftCosts[i] > rightCosts[i])
+                return false;
+            strictlyBetter |= leftCosts[i] < rightCosts[i];
+        }
+        if (strictlyBetter)
+            return true;
+        return left.TypeParameterNames.Count == 0 && right.TypeParameterNames.Count > 0;
+    }
+
+    private static CalorType SubstituteTypeParameters(
+        CalorType type,
+        IReadOnlyDictionary<string, CalorType> substitutions)
+        => type switch
+        {
+            TypeParameterType parameter when substitutions.TryGetValue(parameter.Name, out var replacement)
+                => replacement,
+            GenericInstanceType generic => new GenericInstanceType(
+                generic.BaseName,
+                generic.TypeArguments.Select(argument => SubstituteTypeParameters(argument, substitutions)).ToArray()),
+            NullableReferenceType nullable => new NullableReferenceType(
+                SubstituteTypeParameters(nullable.ReferentType, substitutions),
+                nullable.RequiresTransitionalAssignmentCheck),
+            NullableValueType nullable => new NullableValueType(
+                SubstituteTypeParameters(nullable.UnderlyingType, substitutions)),
+            ArrayType array => new ArrayType(
+                SubstituteTypeParameters(array.ElementType, substitutions)),
+            FunctionType function => new FunctionType(
+                function.ParameterTypes.Select(parameter => SubstituteTypeParameters(parameter, substitutions)).ToArray(),
+                SubstituteTypeParameters(function.ReturnType, substitutions),
+                function.ParameterNames,
+                function.ParameterModifiers,
+                function.DelegateName),
+            _ => type
+        };
+
+    private bool ValidateDelegateCall(
+        FunctionType function,
+        IReadOnlyList<CalorType> argumentTypes,
+        IReadOnlyList<ExpressionNode> arguments,
+        IReadOnlyList<string?>? argumentNames,
+        IReadOnlyList<string?>? argumentModifiers,
+        TextSpan callSpan)
+    {
+        if (function.ParameterTypes.Count != argumentTypes.Count)
+        {
+            _diagnostics.ReportError(callSpan, DiagnosticCode.NoMatchingOverload,
+                $"Delegate expects {function.ParameterTypes.Count} argument(s), but received {argumentTypes.Count}");
+            return false;
+        }
+
+        var parameterIndices = TryMapDelegateArgumentIndices(function, argumentTypes.Count, argumentNames);
+        if (parameterIndices == null)
+        {
+            _diagnostics.ReportError(callSpan, DiagnosticCode.NoMatchingOverload,
+                "Delegate arguments do not map uniquely to parameters");
+            return false;
+        }
+
+        var valid = true;
+        for (var argumentIndex = 0; argumentIndex < argumentTypes.Count; argumentIndex++)
+        {
+            var parameterIndex = parameterIndices[argumentIndex];
+            var expectedModifier = function.ParameterModifiers != null
+                && parameterIndex < function.ParameterModifiers.Count
+                    ? function.ParameterModifiers[parameterIndex]
+                    : ParameterModifier.None;
+            var actualModifier = argumentModifiers != null && argumentIndex < argumentModifiers.Count
+                ? argumentModifiers[argumentIndex]
+                : null;
+            if (!ArgumentModifierMatches(expectedModifier, actualModifier))
+            {
+                _diagnostics.ReportError(arguments[argumentIndex].Span, DiagnosticCode.NoMatchingOverload,
+                    $"Argument modifier does not match delegate parameter {parameterIndex + 1}");
+                valid = false;
+                continue;
+            }
+            var requiresIdentity = (expectedModifier
+                & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In)) != 0;
+            var typeMatches = requiresIdentity
+                ? function.ParameterTypes[parameterIndex].Equals(argumentTypes[argumentIndex])
+                : IsAssignable(function.ParameterTypes[parameterIndex], argumentTypes[argumentIndex]);
+            if (!typeMatches)
+            {
+                _diagnostics.ReportError(arguments[argumentIndex].Span, DiagnosticCode.TypeMismatch,
+                    $"Argument type {argumentTypes[argumentIndex].SurfaceName} is not assignable to "
+                    + function.ParameterTypes[parameterIndex].SurfaceName);
+                valid = false;
+            }
+        }
+        return valid;
+    }
+
+    private static int[]? TryMapDelegateArgumentIndices(
+        FunctionType function,
+        int argumentCount,
+        IReadOnlyList<string?>? argumentNames)
+    {
+        if (function.ParameterTypes.Count != argumentCount)
+            return null;
+
+        var parameterIndices = new int[argumentCount];
+        var assigned = new bool[argumentCount];
+        var nextPositional = 0;
+        var seenOutOfPositionNamedArgument = false;
+        for (var argumentIndex = 0; argumentIndex < argumentCount; argumentIndex++)
+        {
+            var name = argumentNames != null && argumentIndex < argumentNames.Count
+                ? argumentNames[argumentIndex]
+                : null;
+            int parameterIndex;
+            if (string.IsNullOrEmpty(name))
+            {
+                if (seenOutOfPositionNamedArgument)
+                    return null;
+                while (nextPositional < assigned.Length && assigned[nextPositional])
+                    nextPositional++;
+                parameterIndex = nextPositional++;
+            }
+            else
+            {
+                var matches = function.ParameterNames?.Select((parameterName, index) => (parameterName, index))
+                    .Where(item => item.parameterName.Equals(name, StringComparison.Ordinal))
+                    .Select(item => item.index)
+                    .ToArray() ?? Array.Empty<int>();
+                if (matches.Length != 1)
+                    return null;
+                parameterIndex = matches[0];
+                while (nextPositional < assigned.Length && assigned[nextPositional])
+                    nextPositional++;
+                seenOutOfPositionNamedArgument |= parameterIndex != nextPositional;
+            }
+
+            if (parameterIndex < 0 || parameterIndex >= assigned.Length || assigned[parameterIndex])
+                return null;
+            parameterIndices[argumentIndex] = parameterIndex;
+            assigned[parameterIndex] = true;
+        }
+        return parameterIndices;
+    }
+
+    private bool IsMethodGroupCompatible(FunctionType target, FunctionCandidate candidate)
+    {
+        if (target.ParameterTypes.Count != candidate.Type.ParameterTypes.Count)
+            return false;
+        for (var i = 0; i < target.ParameterTypes.Count; i++)
+        {
+            var targetModifier = target.ParameterModifiers != null && i < target.ParameterModifiers.Count
+                ? target.ParameterModifiers[i] & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In)
+                : ParameterModifier.None;
+            var candidateModifier = candidate.ParameterModifiers[i]
+                & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In);
+            if (targetModifier != candidateModifier)
+                return false;
+        }
+
+        var substitutions = new Dictionary<string, CalorType>(StringComparer.Ordinal);
+        for (var i = 0; i < target.ParameterTypes.Count; i++)
+        {
+            InferTypeArguments(candidate.Type.ParameterTypes[i], target.ParameterTypes[i], substitutions);
+        }
+
+        var candidateParameters = candidate.Type.ParameterTypes
+            .Select(parameter => SubstituteTypeParameters(parameter, substitutions))
+            .ToArray();
+        var candidateReturn = SubstituteTypeParameters(candidate.Type.ReturnType, substitutions);
+        return candidateParameters.Zip(target.ParameterTypes)
+                .All(pair => IsMethodGroupParameterCompatible(pair.First, pair.Second))
+            && IsMethodGroupReturnCompatible(target.ReturnType, candidateReturn);
+    }
+
+    private bool IsMethodGroupParameterCompatible(CalorType target, CalorType source)
+    {
+        if (target.Equals(source))
+            return true;
+        if (TryGetDelegateFunctionType(target, out var targetDelegate)
+            && TryGetDelegateFunctionType(source, out var sourceDelegate))
+        {
+            return IsDelegateReferenceCompatible(targetDelegate, sourceDelegate);
+        }
+        if (IsPrimitiveValueType(source)
+            || source is NullableValueType
+            || _moduleDeclaredValueTypes.Contains(source.Name)
+            || IsPrimitiveValueType(target)
+            || target is NullableValueType
+            || _moduleDeclaredValueTypes.Contains(target.Name))
+        {
+            return false;
+        }
+        return IsAssignable(target, source);
+    }
+
+    private bool IsDelegateReferenceCompatible(FunctionType target, FunctionType source)
+    {
+        if (target.DelegateName != null || source.DelegateName != null)
+        {
+            return target.DelegateName != null
+                && target.DelegateName.Equals(source.DelegateName, StringComparison.Ordinal);
+        }
+        if (target.ParameterTypes.Count != source.ParameterTypes.Count)
+            return false;
+        for (var i = 0; i < target.ParameterTypes.Count; i++)
+        {
+            if (!IsMethodGroupParameterCompatible(
+                source.ParameterTypes[i], target.ParameterTypes[i]))
+            {
+                return false;
+            }
+        }
+        return IsMethodGroupReturnCompatible(target.ReturnType, source.ReturnType);
+    }
+
+    private bool IsMethodGroupReturnCompatible(CalorType target, CalorType source)
+    {
+        if (target.Equals(source) || source is NeverType)
+            return true;
+        if (TryGetDelegateFunctionType(target, out var targetDelegate)
+            && TryGetDelegateFunctionType(source, out var sourceDelegate))
+        {
+            return IsDelegateReferenceCompatible(targetDelegate, sourceDelegate);
+        }
+        if (source is PrimitiveType primitive
+            && !primitive.Equals(PrimitiveType.String)
+            && !primitive.Equals(PrimitiveType.Object))
+        {
+            return false;
+        }
+        if (source is NullableValueType || _moduleDeclaredValueTypes.Contains(source.Name))
+            return false;
+        return IsAssignable(target, source);
+    }
+
+    private CalorType InferIsPatternType(IsPatternNode isPattern)
+    {
+        var operandType = InferExpressionType(isPattern.Operand);
+        var targetType = isPattern.TargetType == "var"
+            ? operandType
+            : InferTypePatternBindingType(isPattern.TargetType, isPattern.TargetTypeSpan, isPattern.Span);
+        _patternBindingTypes[isPattern] = targetType;
+        if (isPattern.TargetType == "var")
+            return PrimitiveType.Bool;
+
+        if (!CanPossiblyMatchPattern(operandType, targetType))
+        {
+            _diagnostics.ReportError(isPattern.Span, DiagnosticCode.TypeMismatch,
+                $"Pattern type {targetType.SurfaceName} is not compatible with input type {operandType.SurfaceName}");
+        }
+
+        return PrimitiveType.Bool;
+    }
+
+    private CalorType CommonConditionalType(Parsing.TextSpan span, CalorType trueType, CalorType falseType)
+    {
+        if (trueType is NeverType && falseType is NeverType) return NeverType.Instance;
+        if (trueType is NeverType) return falseType;
+        if (falseType is NeverType) return trueType;
+        if (trueType is ErrorType || falseType is ErrorType) return ErrorType.Instance;
+        if (trueType.Equals(falseType)) return trueType;
+        if (trueType is TypeVariable) return falseType;
+        if (falseType is TypeVariable) return trueType;
+
+        if (trueType is OptionType trueOption && falseType is OptionType falseOption)
+        {
+            return new OptionType(CommonConditionalType(span, trueOption.InnerType, falseOption.InnerType));
+        }
+
+        if (trueType is ResultType trueResult && falseType is ResultType falseResult)
+        {
+            return new ResultType(
+                CommonConditionalType(span, trueResult.OkType, falseResult.OkType),
+                CommonConditionalType(span, trueResult.ErrType, falseResult.ErrType));
+        }
+
+        if (TryUnifyNullableReferences(trueType, falseType, out var nullableReference))
+        {
+            return nullableReference;
+        }
+
+        if (TryUnifyNullableValues(trueType, falseType, out var nullableValue))
+        {
+            return nullableValue;
+        }
+
+        if (IsAssignable(trueType, falseType)) return trueType;
+        if (IsAssignable(falseType, trueType)) return falseType;
+
+        // C# permits unlike arms when their enclosing target is object.
+        // Preserve a real common type; a narrower target still fails assignment.
+        return PrimitiveType.Object;
+    }
+
+    private static bool TryUnifyNullableReferences(
+        CalorType left,
+        CalorType right,
+        out NullableReferenceType nullable)
+    {
+        var leftNullable = left as NullableReferenceType;
+        var rightNullable = right as NullableReferenceType;
+        var leftReferent = leftNullable?.ReferentType ?? left;
+        var rightReferent = rightNullable?.ReferentType ?? right;
+
+        if (left is NullType && (right.Equals(PrimitiveType.String) || right.Equals(PrimitiveType.Object)))
+        {
+            nullable = new NullableReferenceType(right);
+            return true;
+        }
+        if (right is NullType && (left.Equals(PrimitiveType.String) || left.Equals(PrimitiveType.Object)))
+        {
+            nullable = new NullableReferenceType(left);
+            return true;
+        }
+
+        if ((leftNullable != null || rightNullable != null)
+            && left is not NullType
+            && right is not NullType
+            && IsAssignable(leftReferent, rightReferent))
+        {
+            nullable = new NullableReferenceType(
+                leftReferent,
+                (leftNullable?.RequiresTransitionalAssignmentCheck ?? false)
+                    || (rightNullable?.RequiresTransitionalAssignmentCheck ?? false));
+            return true;
+        }
+
+        if (leftNullable != null && right is NullType)
+        {
+            nullable = leftNullable;
+            return true;
+        }
+
+        if (rightNullable != null && left is NullType)
+        {
+            nullable = rightNullable;
+            return true;
+        }
+
+        nullable = null!;
+        return false;
+    }
+
+    private static bool TryUnifyNullableValues(CalorType left, CalorType right, out NullableValueType nullable)
+    {
+        var leftNullable = left as NullableValueType;
+        var rightNullable = right as NullableValueType;
+        var leftUnderlying = leftNullable?.UnderlyingType ?? left;
+        var rightUnderlying = rightNullable?.UnderlyingType ?? right;
+
+        if ((leftNullable != null || rightNullable != null)
+            && left is not NullType
+            && right is not NullType)
+        {
+            if (IsAssignable(leftUnderlying, rightUnderlying))
+            {
+                nullable = new NullableValueType(leftUnderlying);
+                return true;
+            }
+            if (IsAssignable(rightUnderlying, leftUnderlying))
+            {
+                nullable = new NullableValueType(rightUnderlying);
+                return true;
+            }
+        }
+
+        if (leftNullable != null && right is NullType)
+        {
+            nullable = leftNullable;
+            return true;
+        }
+
+        if (rightNullable != null && left is NullType)
+        {
+            nullable = rightNullable;
+            return true;
+        }
+
+        if (left is NullType && IsPrimitiveValueType(right))
+        {
+            nullable = new NullableValueType(right);
+            return true;
+        }
+
+        if (right is NullType && IsPrimitiveValueType(left))
+        {
+            nullable = new NullableValueType(left);
+            return true;
+        }
+
+        nullable = null!;
+        return false;
+    }
+
+    private void DefineTrueConditionPatternVariables(ExpressionNode condition)
+    {
+        if (condition is BinaryOperationNode { Operator: BinaryOperator.And } conjunction)
+        {
+            DefineTrueConditionPatternVariables(conjunction.Left);
+            DefineTrueConditionPatternVariables(conjunction.Right);
+        }
+        if (condition is IsPatternNode { VariableName: { Length: > 0 } name } isPattern)
+        {
+            // The condition was already checked; transfer its type without repeating diagnostics.
+            _env.DefineVariable(name, _patternBindingTypes[isPattern]);
+        }
+    }
+
+    private CalorType InferTypePatternBindingType(
+        string typeName,
+        Parsing.TextSpan typeNameSpan,
+        Parsing.TextSpan fallbackSpan)
+    {
+        var span = typeNameSpan == Parsing.TextSpan.Empty ? fallbackSpan : typeNameSpan;
+        var type = ResolveTypeName(typeName, span);
+        return type switch
+        {
+            NullableReferenceType nullable => nullable.ReferentType,
+            NullableValueType nullable => nullable.UnderlyingType,
+            _ => type
+        };
+    }
+
+    private static bool CanPossiblyMatchPattern(CalorType inputType, CalorType patternType)
+    {
+        if (inputType is ErrorType or ExternalType or NeverType or NullType) return true;
+        if (patternType is ErrorType or ExternalType or NeverType) return true;
+        if (inputType.Equals(PrimitiveType.Object) || patternType.Equals(PrimitiveType.Object)) return true;
+
+        var input = inputType switch
+        {
+            NullableReferenceType nullable => nullable.ReferentType,
+            NullableValueType nullable => nullable.UnderlyingType,
+            _ => inputType
+        };
+        var pattern = patternType switch
+        {
+            NullableReferenceType nullable => nullable.ReferentType,
+            NullableValueType nullable => nullable.UnderlyingType,
+            _ => patternType
+        };
+
+        return input.Equals(pattern)
+            || IsAssignable(input, pattern)
+            || IsAssignable(pattern, input);
+    }
+
+    private static bool IsSupportedThrowException(ExpressionNode exception, CalorType exceptionType)
+    {
+        if (exception is StringLiteralNode or InterpolatedStringNode
+            or IntLiteralNode or BoolLiteralNode or FloatLiteralNode
+            or DecimalLiteralNode or CharOperationNode)
+        {
+            return true;
+        }
+
+        // Nominal inheritance and unmodeled external expressions are validated
+        // by generated C#. A modeled call/new value is not exempt just because
+        // of its syntax; e.g. a known str-returning call cannot be thrown.
+        return exceptionType is ErrorType or ExternalType or NullType or NeverType;
     }
 
     private CalorType InferListCreationType(ListCreationNode list)
@@ -1119,10 +3750,21 @@ public sealed class TypeChecker
 
     private static bool IsValueType(CalorType type)
     {
-        return type.Equals(PrimitiveType.Int)
-            || type.Equals(PrimitiveType.Float)
-            || type.Equals(PrimitiveType.Bool);
+        return IsPrimitiveValueType(type);
     }
+
+    private static CalorType? ResolveNullableValueReferent(string typeName)
+    {
+        var referent = PrimitiveType.FromName(Parsing.AttributeHelper.ToSurfaceSpelling(typeName));
+        return referent is not null && IsPrimitiveValueType(referent) ? referent : null;
+    }
+
+    private static bool IsPrimitiveValueType(CalorType type)
+        => type.Equals(PrimitiveType.Int)
+            || type.Equals(PrimitiveType.Float)
+            || type.Equals(PrimitiveType.Bool)
+            || type.Equals(PrimitiveType.Char)
+            || type.Equals(PrimitiveType.Decimal);
 
     private CalorType InferReferenceType(ReferenceNode refNode)
     {
@@ -1130,6 +3772,16 @@ public sealed class TypeChecker
         if (type != null)
         {
             return type;
+        }
+
+        var functionType = _env.LookupFunction(refNode.Name);
+        if (functionType != null)
+        {
+            return functionType;
+        }
+        if (_env.LookupFunctionCandidates(refNode.Name).Count > 0)
+        {
+            return ErrorType.Instance;
         }
 
         // A dotted reference whose head is not a local is a MEMBER ACCESS, not a variable:
@@ -1142,7 +3794,12 @@ public sealed class TypeChecker
         // C# expression keywords that reach the checker as bare references. `default` is the one
         // observed (generic code emits `default`); the others are listed because they arrive by
         // the same route and reporting any of them as an undefined VARIABLE is simply wrong.
-        if (refNode.Name is "default" or "null" or "this" or "base" or "value")
+        if (refNode.Name == "null")
+        {
+            return NullType.Instance;
+        }
+
+        if (refNode.Name is "default" or "this" or "base" or "value")
         {
             return ErrorType.Instance;
         }
@@ -1168,7 +3825,16 @@ public sealed class TypeChecker
     private CalorType InferBinaryOperationType(BinaryOperationNode binOp)
     {
         var leftType = InferExpressionType(binOp.Left);
-        var rightType = InferExpressionType(binOp.Right);
+        CalorType rightType;
+        if (binOp.Operator == BinaryOperator.And)
+        {
+            _env.EnterScope();
+            DefineTrueConditionPatternVariables(binOp.Left);
+            rightType = InferExpressionType(binOp.Right);
+            _env.ExitScope();
+        }
+        else
+            rightType = InferExpressionType(binOp.Right);
 
         // Comparison operators return BOOL
         if (binOp.Operator is BinaryOperator.Equal or BinaryOperator.NotEqual
@@ -1323,12 +3989,14 @@ public sealed class TypeChecker
         return ErrorType.Instance;
     }
 
-    private CalorType InferMatchExpressionType(MatchExpressionNode match)
+    private CalorType InferMatchExpressionType(MatchExpressionNode match, CalorType? expectedType)
     {
         var targetType = InferExpressionType(match.Target);
 
         // Unify the types of all case bodies
         CalorType? unifiedType = null;
+        var reportedTargetMismatch = false;
+        var hasTargetMismatch = false;
         foreach (var matchCase in match.Cases)
         {
             // Each arm gets its own scope with the pattern's bindings in it, exactly as
@@ -1342,6 +4010,7 @@ public sealed class TypeChecker
             if (matchCase.Guard != null)
             {
                 var guardType = InferExpressionType(matchCase.Guard);
+                DefineTrueConditionPatternVariables(matchCase.Guard);
                 if (IsDefinitelyNotBool(guardType))
                 {
                     _diagnostics.ReportError(matchCase.Guard.Span, DiagnosticCode.TypeMismatch,
@@ -1355,39 +4024,61 @@ public sealed class TypeChecker
                 CalorType caseType;
                 if (lastStmt is ReturnStatementNode ret && ret.Expression != null)
                 {
-                    caseType = InferExpressionType(ret.Expression);
+                    caseType = InferExpressionType(ret.Expression, expectedType);
                 }
                 else
                 {
                     caseType = PrimitiveType.Unit;
                 }
 
-                if (unifiedType == null)
+                if (expectedType != null)
                 {
-                    unifiedType = caseType;
+                    if (!reportedTargetMismatch && !IsAssignable(expectedType, caseType))
+                    {
+                        hasTargetMismatch = true;
+                        if (!_suppressContextualDiagnostics)
+                        {
+                            _diagnostics.ReportError(match.Span, DiagnosticCode.TypeMismatch,
+                                $"Match arm type {caseType.SurfaceName} is not assignable to "
+                                + expectedType.SurfaceName);
+                        }
+                        reportedTargetMismatch = true;
+                    }
+                    unifiedType = expectedType;
                 }
-                else if (!unifiedType.Equals(caseType) && caseType is not ErrorType && unifiedType is not ErrorType)
+                else
                 {
-                    if (IsNumeric(unifiedType) && IsNumeric(caseType) && IsAssignable(unifiedType, caseType))
-                    {
-                        // The existing common type already accommodates this arm.
-                    }
-                    else if (IsNumeric(unifiedType) && IsNumeric(caseType) && IsAssignable(caseType, unifiedType))
-                    {
-                        unifiedType = caseType;
-                    }
-                    else
-                    {
-                        _diagnostics.ReportError(match.Span, DiagnosticCode.TypeMismatch,
-                            $"Match expression branches have incompatible types: {unifiedType.SurfaceName} and {caseType.SurfaceName}");
-                    }
+                    unifiedType = unifiedType == null
+                        ? caseType
+                        : CommonMatchType(match.Span, unifiedType, caseType);
                 }
             }
 
             _env.ExitScope();
         }
 
-        return unifiedType ?? PrimitiveType.Unit;
+        return hasTargetMismatch ? ErrorType.Instance : unifiedType ?? PrimitiveType.Unit;
+    }
+
+    private CalorType CommonMatchType(Parsing.TextSpan span, CalorType left, CalorType right)
+    {
+        if (left is NeverType) return right;
+        if (right is NeverType) return left;
+        if (left is ErrorType || right is ErrorType) return ErrorType.Instance;
+        if (left.Equals(right)) return left;
+        if (TryUnifyNullableReferences(left, right, out var nullableReference))
+            return nullableReference;
+        if (TryUnifyNullableValues(left, right, out var nullableValue))
+            return nullableValue;
+        if (IsAssignable(left, right)) return left;
+        if (IsAssignable(right, left)) return right;
+
+        if (!_suppressContextualDiagnostics)
+        {
+            _diagnostics.ReportError(span, DiagnosticCode.TypeMismatch,
+                $"Match expression branches have incompatible types: {left.SurfaceName} and {right.SurfaceName}");
+        }
+        return ErrorType.Instance;
     }
 
     private CalorType ResolveTypeName(string typeName, Parsing.TextSpan span)
@@ -1407,8 +4098,16 @@ public sealed class TypeChecker
                 return new NullableReferenceType(supportedReference,
                     typeName.StartsWith("OPTION[inner=", StringComparison.OrdinalIgnoreCase));
             }
-            // Other annotations retain the existing unsupported/unresolved behavior.
-            // In particular, this is not permission to model nullable value types as references.
+
+            var valueReferent = ResolveNullableValueReferent(referentName);
+            if (valueReferent is not null)
+            {
+                return new NullableValueType(valueReferent);
+            }
+
+            // Other annotations retain the existing unsupported/unresolved behavior. In
+            // particular, this is not permission to model arbitrary nullable payloads as
+            // references or runtime Options.
         }
 
         // Arrays, in BOTH spellings the compiler produces. `T[]` is what the C# converter and
@@ -1596,8 +4295,12 @@ public sealed class TypeChecker
         type.Equals(PrimitiveType.String)
         || type is NullableReferenceType nullable && nullable.ReferentType.Equals(PrimitiveType.String);
 
+    private static bool IsObliviousReferenceType(CalorType type)
+        => type.Equals(PrimitiveType.String) || type.Equals(PrimitiveType.Object);
+
     private static bool IsDefinitelyNotBool(CalorType type)
-        => !type.Equals(PrimitiveType.Bool) && type is not ErrorType && type is not ExternalType;
+        => !type.Equals(PrimitiveType.Bool) && type is not ErrorType && type is not ExternalType
+            && type is not NeverType;
 
     private static bool IsNumeric(CalorType type)
         => type.Equals(PrimitiveType.Int) || type.Equals(PrimitiveType.Float)
@@ -1606,11 +4309,21 @@ public sealed class TypeChecker
     private static bool IsAssignable(CalorType target, CalorType source)
     {
         if (target.Equals(source)) return true;
+        if (source is NeverType) return true;
         if (source is ErrorType) return true; // Allow error types to be assigned anywhere
+        if (source is NullType)
+        {
+            // Reference nullability remains analysis-only; introducing a real
+            // null type must not activate the previously accepted literal flow.
+            return target is NullableReferenceType or NullableValueType or ExternalType or ErrorType
+                || target.Equals(PrimitiveType.String) || target.Equals(PrimitiveType.Object);
+        }
         if (target is NullableReferenceType nullableTarget)
         {
             if (source is NullableReferenceType nullableSource)
                 return IsAssignable(nullableTarget.ReferentType, nullableSource.ReferentType);
+            if (source is NullType)
+                return true;
             if (nullableTarget.ReferentType.Equals(PrimitiveType.Object))
                 return true; // Boxing to object preserves the value; this does not unwrap Option.
             if (source is OptionType or ResultType
@@ -1618,6 +4331,14 @@ public sealed class TypeChecker
                 return false;
             return IsAssignable(nullableTarget.ReferentType, source);
         }
+        if (target is NullableValueType nullableValueTarget)
+        {
+            return source is NullableValueType nullableValueSource
+                ? IsAssignable(nullableValueTarget.UnderlyingType, nullableValueSource.UnderlyingType)
+                : IsAssignable(nullableValueTarget.UnderlyingType, source);
+        }
+        if (TryGetDelegateFunctionType(target, out var targetFunction) && source is FunctionType sourceFunction)
+            return targetFunction.Equals(sourceFunction);
         // Nothing is known about an unmodeled external type, in either direction.
         if (target is ExternalType || source is ExternalType) return true;
         if (target.Equals(PrimitiveType.Float) && source.Equals(PrimitiveType.Int)) return true;
@@ -1630,6 +4351,11 @@ public sealed class TypeChecker
             return !nullableReference.RequiresTransitionalAssignmentCheck
                 && IsAssignable(target, nullableReference.ReferentType);
         }
+        if (source is NullableValueType)
+        {
+            return false;
+        }
+
         // char widens to an integer, as in C#. Not the reverse: `i32 -> char` is a narrowing
         // conversion C# requires an explicit cast for.
         if (target.Equals(PrimitiveType.Int) && source.Equals(PrimitiveType.Char)) return true;
@@ -1640,6 +4366,57 @@ public sealed class TypeChecker
         if (source is RefinedType refinedSource && IsAssignable(target, refinedSource.BaseType)) return true;
         return false;
     }
+
+    private bool IsFunctionReferenceAssignable(CalorType target, string name)
+    {
+        if (!TryGetDelegateFunctionType(target, out var targetFunction))
+            return false;
+
+        return TryGetMethodGroupConversionCost(
+            targetFunction, _env.LookupFunctionCandidates(name), out _);
+    }
+
+    private static bool TryGetDelegateFunctionType(CalorType type, out FunctionType function)
+    {
+        if (type is FunctionType direct)
+        {
+            function = direct;
+            return true;
+        }
+
+        if (type is GenericInstanceType generic
+            && generic.BaseName.Equals("Func", StringComparison.OrdinalIgnoreCase)
+            && generic.TypeArguments.Count >= 1)
+        {
+            var parameterCount = generic.TypeArguments.Count - 1;
+            function = new FunctionType(
+                generic.TypeArguments.Take(parameterCount).ToArray(),
+                generic.TypeArguments[^1],
+                StandardDelegateParameterNames(parameterCount, "arg"));
+            return true;
+        }
+
+        if (type is GenericInstanceType action
+            && action.BaseName.Equals("Action", StringComparison.OrdinalIgnoreCase))
+        {
+            function = new FunctionType(
+                action.TypeArguments,
+                PrimitiveType.Void,
+                StandardDelegateParameterNames(action.TypeArguments.Count, "obj"));
+            return true;
+        }
+
+        function = null!;
+        return false;
+    }
+
+    private static IReadOnlyList<string> StandardDelegateParameterNames(int parameterCount, string singleName)
+        => parameterCount switch
+        {
+            0 => Array.Empty<string>(),
+            1 => [singleName],
+            _ => Enumerable.Range(1, parameterCount).Select(index => $"arg{index}").ToArray()
+        };
 
     private static bool IsNumericType(CalorType type)
     {
@@ -1654,12 +4431,19 @@ public sealed class TypeChecker
 /// <summary>
 /// Manages type bindings during type checking.
 /// </summary>
+public sealed record FunctionCandidate(
+    FunctionType Type,
+    IReadOnlyList<string> ParameterNames,
+    IReadOnlyList<ParameterModifier> ParameterModifiers,
+    IReadOnlyList<bool> OptionalParameters,
+    IReadOnlyList<string> TypeParameterNames);
+
 public sealed class TypeEnvironment
 {
     private readonly Stack<Dictionary<string, CalorType>> _variableScopes = new();
     private readonly Stack<Dictionary<string, CalorType>> _typeScopes = new();
     private readonly Dictionary<string, CalorType> _globalTypes = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, FunctionType> _functions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<FunctionCandidate>> _functions = new(StringComparer.OrdinalIgnoreCase);
 
     public TypeEnvironment()
     {
@@ -1721,13 +4505,32 @@ public sealed class TypeEnvironment
         return _globalTypes.TryGetValue(name, out var globalType) ? globalType : null;
     }
 
-    public void DefineFunction(string name, FunctionType type)
+    public void DefineFunction(string name, FunctionCandidate candidate)
     {
-        _functions[name] = type;
+        if (!_functions.TryGetValue(name, out var overloads))
+        {
+            overloads = new List<FunctionCandidate>();
+            _functions[name] = overloads;
+        }
+        overloads.Add(candidate);
     }
+
+    public void DefineFunction(string name, FunctionType type)
+        => DefineFunction(name, new FunctionCandidate(
+            type,
+            Enumerable.Range(0, type.ParameterTypes.Count).Select(index => $"arg{index}").ToArray(),
+            Enumerable.Repeat(ParameterModifier.None, type.ParameterTypes.Count).ToArray(),
+            Enumerable.Repeat(false, type.ParameterTypes.Count).ToArray(),
+            Array.Empty<string>()));
 
     public FunctionType? LookupFunction(string name)
     {
-        return _functions.TryGetValue(name, out var type) ? type : null;
+        var overloads = LookupFunctionCandidates(name);
+        return overloads.Count == 1 ? overloads[0].Type : null;
     }
+
+    public IReadOnlyList<FunctionCandidate> LookupFunctionCandidates(string name)
+        => _functions.TryGetValue(name, out var overloads)
+            ? overloads
+            : Array.Empty<FunctionCandidate>();
 }

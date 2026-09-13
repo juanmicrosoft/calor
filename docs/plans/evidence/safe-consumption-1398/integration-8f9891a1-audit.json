@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "observationDateUtc": "2026-09-12T09:31:24Z",
+  "observer": "Copilot/GPT-6 Astra context 6f01554f-c9dc-4a17-9499-61659b8fe622",
+  "approvedMainCommit": "8f9891a1a07f786a76a293017959c3edf28412bf",
+  "measuredSourceCommit": "37195a7c2069af2ec6e87048b79678ee3a1f9af5",
+  "measurementContext": "Normal merge of approved N3 into T2. Subsequent edits add only tests, inventory and evidence; original c43, rejected2d and N3 records remain separately pinned.",
+  "productionSourceSha256": {
+    "src/Calor.Compiler/Binding/Binder.cs": "ba258da4e8083b2a4f65bf158dc843de645735a3ba92d7ee7dd8c9694d2502fe",
+    "src/Calor.Compiler/Binding/BoundNodes.cs": "9aff68dc7656e91b52c257627775544bb696c821eab2e83f822e0d1515020fc3",
+    "src/Calor.Compiler/TypeChecking/TypeChecker.cs": "1df5fd477dc56dcc4308eba3028190a9307667d9d427ab8a536886e6e02f28d0",
+    "src/Calor.Compiler/TypeChecking/CalorType.cs": "234acc9255f27a7db16c9f35300da0afe1625486d24e37f9a315b1abf5e7ceab"
+  },
+  "runtime": {
+    "sdk": "10.0.400",
+    "runtime": "10.0.11",
+    "platform": "macOS arm64",
+    "packageVersion": "0.21.0"
+  },
+  "records": 364,
+  "binderAttempts": 35179,
+  "sourceExpressions": 88158,
+  "propagatedBindingErrors": 109,
+  "rawBindingErrors": {
+    "approvedN3Main": 4925,
+    "mergedBeforeRemeasurement": 4921,
+    "measured": 4920
+  },
+  "changedRowsFromApprovedMain": [
+    "FluentValidation/src/FluentValidation.Tests/NotEqualValidatorTests.cs",
+    "FluentValidation/src/FluentValidation/Internal/RuleBase.cs",
+    "FluentValidation/src/FluentValidation/Internal/RuleComponent.cs",
+    "FluentValidation/src/FluentValidation/Resources/LanguageManager.cs",
+    "serilog/src/Serilog/Formatting/Json/JsonValueFormatter.cs"
+  ],
+  "additionalDeltaFromMergedBaseline": {
+    "file": "serilog/src/Serilog/Formatting/Json/JsonValueFormatter.cs",
+    "sourceHash": "3f6fa1f940815933c4aa948d41eac450a783530453bc31af1ee1a2a76e3e9d87",
+    "selectedSourceHash": "84be8c16764d9f5a982d8aa51e182e2254e4a2adf40612d02176e8140b77a769",
+    "beforeCount": 55,
+    "afterCount": 54,
+    "beforeIdentityHash": "963206acd3677219969931fd33a7ef1c325946dff7d23a1d915fe31c8c7830d6",
+    "afterIdentityHash": "1745721931b9875a68e3e68f76553642c609741a543948b48424c6ea52e13f87",
+    "removedDiagnostic": {
+      "code": "Calor0274",
+      "message": "Argument to parameter 'str' declares non-nullable 'string' but the value may be null (source annotation: 'Oblivious'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary.",
+      "start": 10755,
+      "end": 10774,
+      "calorLine": 247,
+      "calorColumn": 34,
+      "expression": "(?? (str value) \"\")",
+      "target": "FormatStringValue",
+      "sourceLine": 541,
+      "sourceStatement": "FormatStringValue(value.ToString() ?? \"\", output);",
+      "propagated": false
+    },
+    "reconstruction": "Captured all54 actual merged diagnostics. SHA256 of their ordinal-sorted Code:Start:End:Message identities joined with newline equals afterIdentityHash. Adding exactly the recorded removed identity reconstructs the approved N3 beforeIdentityHash. No fresh execution of the N3-only baseline is claimed.",
+    "reconstructionPassed": true,
+    "remainingN3StatementDiagnosticStarts": [4078, 6807],
+    "remainingN3StatementDiagnosticIdentitiesUnchanged": true
+  },
+  "allOtherMergedBaselineFieldsUnchanged": true,
+  "regenerationScope": "Only existing ConversionLeg_IncompleteCount_MatchesBaseline with CALOR_UPDATE_BINDER_BASELINE=1. Compared every property of all364 records; exactly BindingErrorCount and BindingErrorIdentityHash in the named row changed. No source/coverage/opacity/loss/conversion/propagation allowance changed.",
+  "ordinaryIntegratedValidation": {
+    "compilerSelectedPassed": 969,
+    "compilerSelectedFailed": 0,
+    "includesOrdinaryCorpusRatchet": true,
+    "editorDocumentStatePassed": 35,
+    "newT2Tests": 75,
+    "compilerInventory": 9124,
+    "compilerSkippedBudget": 3,
+    "editorInventory": 506,
+    "harnessInventory": 291
+  },
+  "limits": "Raw analysis evidence, not a global safety or Stage A/B activation claim.0272/0273/0274 remain AnalysisOnly;0275 and transitional rejection remain. Guarded wildcard statement emission and unresolved native applicability are not repaired by this integration. No release or research operation."
+}

@@ -1,0 +1,424 @@
+{
+  "audit": {
+    "issue": 1398,
+    "task": "T2 product corpus diagnostic audit",
+    "currentDateTime": "2026-09-12T02:20:24.249-04:00",
+    "currentWorktree": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/consumption-1398",
+    "currentBranch": "fix/1398-safe-consumption",
+    "currentHead": "2d6e153062458513d7010dba92b0031e5e6d2412",
+    "baselineWorktree": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/t2-corpus-baseline-1398",
+    "baselineHead": "3b513a632149290481161b195a71aa6cb0e251a8",
+    "runtime": {
+      "dotnetVersion": "10.0.400",
+      "os": "Darwin Juans-MacBook-Pro.local 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:19:08 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6050 arm64"
+    },
+    "corpus": {
+      "FluentValidation": "71b3c60cb5a16e02cb7957e478ec3fb6b983a73c",
+      "MediatR": "fb309026775ef953a64fb5339d074426c1ad2c37",
+      "serilog": "0597ddfbd4ec594d9c42edd745fe728a2198bad9"
+    },
+    "limits": [
+      "No compiler, test, manifest, policy, scoping/capacity, release, website, changelog, or unrelated documentation edits.",
+      "Regeneration was used only as measurement; the changed binder-source-coverage.json was restored because baseline acceptance is blocked.",
+      "Diagnostics were reproduced from actual N1 and T2 assemblies with a session-local helper under /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/safe-consumption-1398-audit/DiagnosticProbe."
+    ]
+  },
+  "baselineAcceptance": {
+    "accepted": false,
+    "reason": "Current T2 measurement introduces undefined-variable binding diagnostics for pattern variables that should be in scope in supported conjunctions/true branches. The defective rows must not be blessed into binder-source-coverage.json."
+  },
+  "commands": [
+    {
+      "name": "current ratchet before measurement",
+      "command": "cd /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/consumption-1398 && dotnet test tests/Calor.Compiler.Tests/ --filter \"FullyQualifiedName~BinderIncompleteRatchetTests.ConversionLeg_IncompleteCount_MatchesBaseline\" --no-restore --logger \"console;verbosity=minimal\"",
+      "result": "failed",
+      "exitCode": 1,
+      "firstFailure": "FluentValidation/src/FluentValidation.Tests/NotEqualValidatorTests.cs BindingErrorIdentityHash bfccd6b797d3ad802ead70c350bee7c7fc8bd40aa7afafc08f085ae20c3f646d -> 37c14a9d6978f476e772e207ac8ac498bc6e6eb731813e458000b87474b19161"
+    },
+    {
+      "name": "current measurement regeneration",
+      "command": "cd /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/consumption-1398 && CALOR_UPDATE_BINDER_BASELINE=1 dotnet test tests/Calor.Compiler.Tests/ --filter \"FullyQualifiedName~BinderIncompleteRatchetTests.ConversionLeg_IncompleteCount_MatchesBaseline\" --no-restore --logger \"console;verbosity=minimal\"",
+      "result": "passed",
+      "exitCode": 0,
+      "note": "Measurement wrote binder-source-coverage.json; binder-incomplete-baseline.json was unchanged. The measured coverage file was copied to the session artifact directory, then restored in the worktree after defect audit."
+    },
+    {
+      "name": "baseline diagnostic probe",
+      "command": "dotnet run --project /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/safe-consumption-1398-audit/DiagnosticProbe/DiagnosticProbe.csproj -p:CalorRoot=/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/t2-corpus-baseline-1398 -- /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/t2-corpus-baseline-1398 /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/safe-consumption-1398-audit/baseline-diagnostics.json <8 changed files>",
+      "result": "passed",
+      "exitCode": 0,
+      "note": "The first baseline build failed on missing Z3 assets; after that observed failure, verified T2 z3/ and runtimes/ assets were copied into the detached baseline worktree."
+    },
+    {
+      "name": "current diagnostic probe",
+      "command": "dotnet run --project /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/safe-consumption-1398-audit/DiagnosticProbe/DiagnosticProbe.csproj -p:CalorRoot=/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/consumption-1398 -- /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/consumption-1398 /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/safe-consumption-1398-audit/current-diagnostics.json <8 changed files>",
+      "result": "passed",
+      "exitCode": 0
+    },
+    {
+      "name": "repeat ratchet after rejected baseline update",
+      "command": "cd /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/consumption-1398 && dotnet test tests/Calor.Compiler.Tests/ --filter \"FullyQualifiedName~BinderIncompleteRatchetTests.ConversionLeg_IncompleteCount_MatchesBaseline\" --no-restore --logger \"console;verbosity=minimal\"",
+      "result": "failed",
+      "exitCode": 1,
+      "note": "No successful repeat-ratchet result exists because the measured coverage update was rejected after auditing real pattern-scope binding defects. The worktree intentionally keeps the approved N1 source coverage baseline."
+    }
+  ],
+  "conversionBaselineTotals": {
+    "incomplete": {
+      "baseline": 0,
+      "currentMeasured": 0
+    },
+    "legacySourceOrderAttempted": {
+      "baseline": 18005,
+      "currentMeasured": 18005
+    },
+    "roslynSelectedAttempted": {
+      "baseline": 35179,
+      "currentMeasured": 35179
+    },
+    "filesSeen": {
+      "baseline": 364,
+      "currentMeasured": 364
+    },
+    "convertedAndBound": {
+      "baseline": 364,
+      "currentMeasured": 364
+    },
+    "convertExceptions": {
+      "baseline": 0,
+      "currentMeasured": 0
+    },
+    "emptyOutput": {
+      "baseline": 0,
+      "currentMeasured": 0
+    },
+    "outputParseFailures": {
+      "baseline": 0,
+      "currentMeasured": 0
+    }
+  },
+  "preserveCoverageTotals": {
+    "filesSeen": {
+      "baseline": 364,
+      "currentMeasured": 364
+    },
+    "opaqueBoundaries": {
+      "baseline": 114,
+      "currentMeasured": 114
+    },
+    "opaqueExpressions": {
+      "baseline": 6866,
+      "currentMeasured": 6866
+    },
+    "opaqueUnmapped": {
+      "baseline": 0,
+      "currentMeasured": 0
+    },
+    "opaqueIdentityCount": {
+      "baseline": 114,
+      "currentMeasured": 114
+    },
+    "unconvertedFiles": {
+      "baseline": 0,
+      "currentMeasured": 0
+    },
+    "unconvertedIdentityCount": {
+      "baseline": 0,
+      "currentMeasured": 0
+    },
+    "convertExceptions": {
+      "baseline": 0,
+      "currentMeasured": 0
+    },
+    "emptyOutput": {
+      "baseline": 0,
+      "currentMeasured": 0
+    },
+    "outputParseFailures": {
+      "baseline": 0,
+      "currentMeasured": 0
+    }
+  },
+  "nativeSourceCoverageTotals": {
+    "recordCount": {
+      "baseline": 364,
+      "currentMeasured": 364
+    },
+    "addedRows": 0,
+    "removedRows": 0,
+    "changedRows": 8,
+    "binderAttempts": {
+      "baseline": 35179,
+      "currentMeasured": 35179
+    },
+    "sourceExpressions": {
+      "baseline": 88158,
+      "currentMeasured": 88158
+    },
+    "exactExpressionSourceSpans": {
+      "baseline": 32227,
+      "currentMeasured": 32227
+    },
+    "opaqueSourceExpressions": {
+      "baseline": 3597,
+      "currentMeasured": 3597
+    },
+    "opaqueBoundaries": {
+      "baseline": 76,
+      "currentMeasured": 76
+    },
+    "serializedOpaqueBoundaries": {
+      "baseline": 93,
+      "currentMeasured": 93
+    },
+    "bindingErrorCount": {
+      "baseline": 4922,
+      "currentMeasured": 4924
+    },
+    "propagatedBindingErrorCount": {
+      "baseline": 109,
+      "currentMeasured": 109
+    },
+    "unmappedSourceExpressions": {
+      "baseline": 52334,
+      "currentMeasured": 52334
+    },
+    "exactExpressionsWithOpaqueDescendants": {
+      "baseline": 28,
+      "currentMeasured": 28
+    }
+  },
+  "diagnosticDeltaTotalsForChangedRows": {
+    "baselineDiagnostics": 294,
+    "currentDiagnostics": 296,
+    "removedIdentities": 5,
+    "addedIdentities": 7,
+    "codeCounts": {
+      "baseline": {
+        "Calor0200": 217,
+        "Calor0201": 2,
+        "Calor0202": 1,
+        "Calor0208": 1,
+        "Calor0250": 2,
+        "Calor0272": 3,
+        "Calor0273": 68
+      },
+      "current": {
+        "Calor0200": 223,
+        "Calor0201": 2,
+        "Calor0202": 1,
+        "Calor0208": 1,
+        "Calor0250": 2,
+        "Calor0272": 1,
+        "Calor0273": 66
+      }
+    }
+  },
+  "changedRows": [
+    {
+      "file": "FluentValidation/src/FluentValidation.Tests/NotEqualValidatorTests.cs",
+      "sourceHash": "778ca344a7146359ebcf35695f1609cae422558798163557001c824aaaf5628e",
+      "selectedSourceHash": "778ca344a7146359ebcf35695f1609cae422558798163557001c824aaaf5628e",
+      "sourceEvidence": "Lines 166-167: public override string ToString() { return _value == null ? null : _value.Value.ToString(); }",
+      "coverageFieldDeltas": {
+        "BindingErrorIdentityHash": {
+          "baseline": "bfccd6b797d3ad802ead70c350bee7c7fc8bd40aa7afafc08f085ae20c3f646d",
+          "currentMeasured": "37c14a9d6978f476e772e207ac8ac498bc6e6eb731813e458000b87474b19161"
+        }
+      },
+      "diagnosticsRemoved": [
+        {
+          "identity": "Calor0273:10018:10062:Return declares non-nullable 'string' but the returned value may be null (source annotation: 'Oblivious'). Change the return type to '?string' or add an explicit non-null check at the interop boundary.",
+          "calorLine": "\u00a7R (? (== _value null) null (str _value.Value))"
+        }
+      ],
+      "diagnosticsAdded": [
+        {
+          "identity": "Calor0273:10018:10062:Return declares non-nullable 'string' but the returned value may be null (source annotation: 'Annotated'). Change the return type to '?string' or add an explicit non-null check at the interop boundary.",
+          "calorLine": "\u00a7R (? (== _value null) null (str _value.Value))"
+        }
+      ],
+      "auditVerdict": "Diagnostic identity changed only because the nullable source annotation in the message became Annotated rather than Oblivious. Count and source/coverage fields are unchanged; acceptable if isolated."
+    },
+    {
+      "file": "FluentValidation/src/FluentValidation/Internal/RuleBase.cs",
+      "sourceHash": "4d31865a98825f42054e109fd77a2e3be703b43b01d8c32392661559b41e2833",
+      "selectedSourceHash": "4d31865a98825f42054e109fd77a2e3be703b43b01d8c32392661559b41e2833",
+      "sourceEvidence": "Line 210: public string GetDisplayName(ValidationContext<T> context) => _displayNameFactory?.Invoke(context) ?? _displayName ?? _propertyDisplayName;",
+      "coverageFieldDeltas": {
+        "BindingErrorCount": {
+          "baseline": 41,
+          "currentMeasured": 40
+        },
+        "BindingErrorIdentityHash": {
+          "baseline": "0d35bd1681f3aefd40762e2e7e744a0d272350297638ccb462166255463a82d5",
+          "currentMeasured": "36a71d52a733788369d2fadc83f3a4ea9fe465d592044c1a73aa7b3f4382bcee"
+        }
+      },
+      "diagnosticsRemoved": [
+        {
+          "identity": "Calor0273:5751:5846:Return declares non-nullable 'string' but the returned value may be null (source annotation: 'Oblivious'). Change the return type to '?string' or add an explicit non-null check at the interop boundary.",
+          "calorLine": "\u00a7R (?? \u00a7C (?. _displayNameFactory \"Invoke\") \u00a7A context \u00a7/C (?? _displayName _propertyDisplayName))"
+        }
+      ],
+      "diagnosticsAdded": [],
+      "auditVerdict": "Expected improvement from expression-local coalesce/nullable annotations; the null-coalescing chain supplies a fallback. Acceptable if isolated."
+    },
+    {
+      "file": "FluentValidation/src/FluentValidation/Internal/RuleComponent.cs",
+      "sourceHash": "6d601d04ed618e5644015d38fc1d00ebac4329e733634936dcdd0c86e63eb1f1",
+      "selectedSourceHash": "6d601d04ed618e5644015d38fc1d00ebac4329e733634936dcdd0c86e63eb1f1",
+      "sourceEvidence": "Lines 165 and 177: string rawTemplate = _errorMessageFactory?.Invoke(context, value) ?? _errorMessage; return context.MessageFormatter.BuildMessage(rawTemplate);",
+      "coverageFieldDeltas": {
+        "BindingErrorCount": {
+          "baseline": 18,
+          "currentMeasured": 16
+        },
+        "BindingErrorIdentityHash": {
+          "baseline": "f9665c7dd49b8fbd86a85a1bcf9cb6762a5f5ec8606d2dbd47a3f6d05779f821",
+          "currentMeasured": "1c9e6494d2f32bd5e7a1b443ebc94e602e3f8e7e7ed5703618ff848e43411bb6"
+        }
+      },
+      "diagnosticsRemoved": [
+        {
+          "identity": "Calor0272:5287:5367:Binding 'rawTemplate' declares non-nullable 'string' but its initializer may be null (source annotation: 'Oblivious'). Change the target to '?string' or add an explicit non-null check at the interop boundary.",
+          "calorLine": "\u00a7B{~rawTemplate:str} (?? \u00a7C (?. _errorMessageFactory \"Invoke\") \u00a7A context \u00a7A value \u00a7/C _errorMessage)"
+        },
+        {
+          "identity": "Calor0272:5791:5872:Binding 'message' declares non-nullable 'string' but its initializer may be null (source annotation: 'Oblivious'). Change the target to '?string' or add an explicit non-null check at the interop boundary.",
+          "calorLine": "\u00a7B{~message:str} (?? \u00a7C (?. _errorMessageFactory \"Invoke\") \u00a7A null \u00a7A `default` \u00a7/C _errorMessage)"
+        }
+      ],
+      "diagnosticsAdded": [],
+      "auditVerdict": "Expected improvement from expression-local coalesce/nullable annotations. Acceptable if isolated."
+    },
+    {
+      "file": "FluentValidation/src/FluentValidation/Resources/LanguageManager.cs",
+      "sourceHash": "15cc24a504b4bbfec566c97d4ea2e21eeb9105f822906a4c8a8254e73a0619d5",
+      "selectedSourceHash": "15cc24a504b4bbfec566c97d4ea2e21eeb9105f822906a4c8a8254e73a0619d5",
+      "sourceEvidence": "GetString uses a nullable lookup value and returns value ?? \"\".",
+      "coverageFieldDeltas": {
+        "BindingErrorCount": {
+          "baseline": 82,
+          "currentMeasured": 81
+        },
+        "BindingErrorIdentityHash": {
+          "baseline": "7643203273a19326e91253aeb8ebf3fa1b1911c6b0704de817fa6b5d7efa3c5d",
+          "currentMeasured": "d328f2b618046eb5e90935a7704a6927827a1c1831ffd5f2bdca86b14b868bea"
+        }
+      },
+      "diagnosticsRemoved": [
+        {
+          "identity": "Calor0273:7750:7763:Return declares non-nullable 'string' but the returned value may be null (source annotation: 'Oblivious'). Change the return type to '?string' or add an explicit non-null check at the interop boundary.",
+          "calorLine": "\u00a7R (?? value \"\")"
+        }
+      ],
+      "diagnosticsAdded": [],
+      "auditVerdict": "Expected improvement from expression-local coalesce/nullable annotations. Acceptable if isolated."
+    },
+    {
+      "file": "FluentValidation/src/FluentValidation/Validators/EmptyValidator.cs",
+      "sourceHash": "3923276738c1551d06fb39323f257fe172c20dbfffe786c08577ade6520fdec8",
+      "selectedSourceHash": "3923276738c1551d06fb39323f257fe172c20dbfffe786c08577ade6520fdec8",
+      "sourceEvidence": "Lines 36 and 44: if (value is string s && string.IsNullOrWhiteSpace(s)) and if (value is IEnumerable e && IsEmpty(e))",
+      "coverageFieldDeltas": {
+        "BindingErrorCount": {
+          "baseline": 4,
+          "currentMeasured": 6
+        },
+        "BindingErrorIdentityHash": {
+          "baseline": "02342b796845774d9e21131a59a17f837756864a3115082e97611c8f118bb7ec",
+          "currentMeasured": "63ea5aed561cda8d66c6673fe6e035283c3d948e502e12ba48a04e5512a8cd22"
+        }
+      },
+      "diagnosticsRemoved": [],
+      "diagnosticsAdded": [
+        {
+          "identity": "Calor0200:523:524:Undefined variable 's'",
+          "calorLine": "\u00a7IF{if006} (&& (is value str s) (isblank s))"
+        },
+        {
+          "identity": "Calor0200:686:687:Undefined variable 'e'",
+          "calorLine": "\u00a7IF{if008} (&& (is value Seq e) \u00a7C{IsEmpty} \u00a7A e \u00a7/C)"
+        }
+      ],
+      "auditVerdict": "Defect. The pattern variables declared by the left side of a supported && condition are required by the right side and should not become undefined."
+    },
+    {
+      "file": "FluentValidation/src/FluentValidation/Validators/NotEmptyValidator.cs",
+      "sourceHash": "675d1d063d6d1b170b193ecca962e10b1c9556db412d10359e6ff50719686511",
+      "selectedSourceHash": "675d1d063d6d1b170b193ecca962e10b1c9556db412d10359e6ff50719686511",
+      "sourceEvidence": "Lines 36 and 44: if (value is string s && string.IsNullOrWhiteSpace(s)) and if (value is IEnumerable e && IsEmpty(e))",
+      "coverageFieldDeltas": {
+        "BindingErrorCount": {
+          "baseline": 4,
+          "currentMeasured": 6
+        },
+        "BindingErrorIdentityHash": {
+          "baseline": "bcc6fa77f6a99978f01d834dc03ed9a17618481d12bedeb91403e4a87f505b51",
+          "currentMeasured": "1e2409ff5edf8e076c131266284f134729435f91b9a367e3749fb45e0ad48e95"
+        }
+      },
+      "diagnosticsRemoved": [],
+      "diagnosticsAdded": [
+        {
+          "identity": "Calor0200:619:620:Undefined variable 's'",
+          "calorLine": "\u00a7IF{if006} (&& (is value str s) (isblank s))"
+        },
+        {
+          "identity": "Calor0200:784:785:Undefined variable 'e'",
+          "calorLine": "\u00a7IF{if008} (&& (is value Seq e) \u00a7C{IsEmpty} \u00a7A e \u00a7/C)"
+        }
+      ],
+      "auditVerdict": "Defect. Same supported && pattern-variable scope regression as EmptyValidator.cs."
+    },
+    {
+      "file": "serilog/src/Serilog/Core/Logger.cs",
+      "sourceHash": "13316f5297d3e7dd215f51ccda1c787040bef86f7ac002a6820774a53a2f86b1",
+      "selectedSourceHash": "9604465388f52ef136085599a813fc268f005ad5b737a40f9658f1b2965a4cfb",
+      "sourceEvidence": "Lines 136-140: if (_overrideMap != null && propertyName == Constants.SourceContextPropertyName && value is string context) { _overrideMap.GetEffectiveLevel(context, out minimumLevel, out levelSwitch); }",
+      "coverageFieldDeltas": {
+        "BindingErrorCount": {
+          "baseline": 88,
+          "currentMeasured": 89
+        },
+        "BindingErrorIdentityHash": {
+          "baseline": "a1ed56e8dce6d7d6eb38cfcd6dc9bd2d3c806711aa1bb147dace0950e2f8c4d1",
+          "currentMeasured": "c08b5965e52b5ba5827d00aca2703552ef6ce7d144506377d63fb649b4f4d079"
+        }
+      },
+      "diagnosticsRemoved": [],
+      "diagnosticsAdded": [
+        {
+          "identity": "Calor0200:4277:4284:Undefined variable 'context'",
+          "calorLine": "\u00a7C{_overrideMap.GetEffectiveLevel} \u00a7A context \u00a7A{out} minimumLevel \u00a7A{out} levelSwitch \u00a7/C"
+        }
+      ],
+      "auditVerdict": "Defect. The pattern variable introduced by value is string context should be in scope in the true branch body."
+    },
+    {
+      "file": "serilog/src/Serilog/Events/EventProperty.cs",
+      "sourceHash": "a4431ee1bbff21e9ea9c37de6d2d916456db0eb220bc348dfe4866447f1cf8ed",
+      "selectedSourceHash": "a4431ee1bbff21e9ea9c37de6d2d916456db0eb220bc348dfe4866447f1cf8ed",
+      "sourceEvidence": "Line 70: return obj is EventProperty other && Equals(other);",
+      "coverageFieldDeltas": {
+        "BindingErrorCount": {
+          "baseline": 4,
+          "currentMeasured": 5
+        },
+        "BindingErrorIdentityHash": {
+          "baseline": "d0c668b728c43088159c7f4789ef8712225563f640220f9e1c628ff7b3af6c61",
+          "currentMeasured": "77c81c957a572d52fd738feae234757a4d6be59c44ca983a58be0dd295dbbca1"
+        }
+      },
+      "diagnosticsRemoved": [],
+      "diagnosticsAdded": [
+        {
+          "identity": "Calor0200:1142:1147:Undefined variable 'other'",
+          "calorLine": "\u00a7R (&& (is obj EventProperty other) \u00a7C{Equals} \u00a7A other \u00a7/C)"
+        }
+      ],
+      "auditVerdict": "Defect. The pattern variable declared by the left operand of && should be available to the right operand."
+    }
+  ]
+}

@@ -178,10 +178,9 @@ public class BinderConversionPatternFamilyTests
     }
 
     [Fact]
-    public void PatternVariable_IsDeclaredInScope_UsableAfterTest()
+    public void PatternVariable_IsNotDefinitelyAssignedAfterStandaloneTest()
     {
-        // Review M3: `x is str s` DECLARES s. Pre-fix, s was retained into the bound
-        // node while every later use was a hard Undefined-variable error.
+        // A discarded test gives no successful-branch evidence: x could be null.
         var test = new IsPatternNode(S, new ReferenceNode(S, "x"), "str", "s");
         var use = new ReturnStatementNode(S, new ReferenceNode(S, "s"));
         var func = new FunctionNode(S, "f001", "Probe", Visibility.Public,
@@ -192,7 +191,7 @@ public class BinderConversionPatternFamilyTests
             Array.Empty<UsingDirectiveNode>(), new[] { func }, new AttributeCollection());
         var diagnostics = new DiagnosticBag();
         new Binder(diagnostics).Bind(module);
-        Assert.DoesNotContain(diagnostics,
+        Assert.Contains(diagnostics,
             d => d.Code == DiagnosticCode.UndefinedReference && d.Message.Contains("'s'"));
     }
 
