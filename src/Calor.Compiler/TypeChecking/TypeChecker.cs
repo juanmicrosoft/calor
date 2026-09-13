@@ -364,6 +364,9 @@ public sealed class TypeChecker
             case WhileStatementNode whileStmt:
                 CheckWhileStatement(whileStmt);
                 break;
+            case DoWhileStatementNode doWhileStmt:
+                CheckDoWhileStatement(doWhileStmt);
+                break;
             case IfStatementNode ifStmt:
                 CheckIfStatement(ifStmt);
                 break;
@@ -372,6 +375,22 @@ public sealed class TypeChecker
                 break;
             case MatchStatementNode match:
                 CheckMatchStatement(match);
+                break;
+            case TryStatementNode tryStatement:
+                CheckTryStatement(tryStatement);
+                break;
+            case UsingStatementNode usingStatement:
+                CheckUsingStatement(usingStatement);
+                break;
+            case UnsafeBlockNode unsafeBlock:
+                CheckScopedStatements(unsafeBlock.Body);
+                break;
+            case FixedStatementNode fixedStatement:
+                CheckFixedStatement(fixedStatement);
+                break;
+            case SyncBlockNode syncBlock:
+                _ = InferExpressionType(syncBlock.LockExpression);
+                CheckScopedStatements(syncBlock.Body);
                 break;
             // Collection mutation statements
             case CollectionPushNode push:
@@ -498,6 +517,75 @@ public sealed class TypeChecker
         {
             CheckStatement(stmt);
         }
+        _env.ExitScope();
+    }
+
+    private void CheckDoWhileStatement(DoWhileStatementNode doWhileStmt)
+    {
+        CheckScopedStatements(doWhileStmt.Body);
+        var condType = InferExpressionType(doWhileStmt.Condition);
+        if (IsDefinitelyNotBool(condType))
+        {
+            _diagnostics.ReportError(doWhileStmt.Condition.Span, DiagnosticCode.TypeMismatch,
+                $"DO-WHILE condition must be bool, got {condType.SurfaceName}");
+        }
+    }
+
+    private void CheckTryStatement(TryStatementNode tryStatement)
+    {
+        CheckScopedStatements(tryStatement.TryBody);
+        foreach (var clause in tryStatement.CatchClauses)
+        {
+            _env.EnterScope();
+            if (clause.VariableName != null && clause.ExceptionType != null)
+            {
+                _env.DefineVariable(
+                    clause.VariableName,
+                    ResolveTypeName(clause.ExceptionType, clause.Span));
+            }
+            if (clause.Filter != null)
+                _ = InferExpressionType(clause.Filter);
+            foreach (var statement in clause.Body)
+                CheckStatement(statement);
+            _env.ExitScope();
+        }
+        if (tryStatement.FinallyBody != null)
+            CheckScopedStatements(tryStatement.FinallyBody);
+    }
+
+    private void CheckUsingStatement(UsingStatementNode usingStatement)
+    {
+        var resourceType = InferExpressionType(usingStatement.Resource);
+        _env.EnterScope();
+        if (usingStatement.VariableName != null)
+        {
+            var variableType = usingStatement.VariableType != null
+                ? ResolveTypeName(usingStatement.VariableType, usingStatement.Span)
+                : resourceType;
+            _env.DefineVariable(usingStatement.VariableName, variableType);
+        }
+        foreach (var statement in usingStatement.Body)
+            CheckStatement(statement);
+        _env.ExitScope();
+    }
+
+    private void CheckFixedStatement(FixedStatementNode fixedStatement)
+    {
+        _ = InferExpressionType(fixedStatement.Initializer);
+        _env.EnterScope();
+        _env.DefineVariable(
+            fixedStatement.PointerName,
+            ResolveTypeName(fixedStatement.PointerType, fixedStatement.PointerTypeSpan));
+        foreach (var statement in fixedStatement.Body)
+            CheckStatement(statement);
+        _env.ExitScope();
+    }
+
+    private void CheckScopedStatements(IReadOnlyList<StatementNode> statements)
+    {
+        _env.EnterScope();
+        foreach (var statement in statements)
+            CheckStatement(statement);
         _env.ExitScope();
     }
 

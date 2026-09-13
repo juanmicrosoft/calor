@@ -2033,6 +2033,30 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void StatementLambda_TryMatchUsesCachedTargetType()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{cw}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §TR{t1}
+                    §W{m1} 'a'
+                      §K 'a'
+                        §GOTO{CASE:98}
+                      §K 'b'
+                        §R 2
+                      §K _
+                        §R 0
+                  §FI
+                    §P "finally"
+                §/LAM{l1}
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
     public void StatementLambda_GotoCaseCannotTargetGuardedArm()
     {
         var result = Check("""
