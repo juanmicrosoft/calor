@@ -121,6 +121,101 @@ public class CrossFileResolutionTests
     }
 
     [Fact]
+    public void ResolveProjectCall_UsesNullableStringCompatibilityAcrossFiles()
+    {
+        var workspace = new WorkspaceState();
+        var definitionsState = workspace.GetOrCreate(
+            DocumentUri.From("file:///utils.calr"),
+            """
+            §M{m001:Utils}
+              §F{f001:Take:pub} (str:value) -> str
+                §E{}
+                §R value
+            """);
+        var use = """
+            §M{m002:Main}
+              §F{f002:Run:pub} (?str:value) -> str
+                §E{}
+                §R §C{Take} §A value §/C
+            """;
+        var useState = workspace.GetOrCreate(
+            DocumentUri.From("file:///main.calr"),
+            use);
+        var call = SymbolFinder.FindBoundCallAtOffset(
+            useState.BoundModule,
+            use.IndexOf("Take", StringComparison.Ordinal));
+
+        var resolved = workspace.ResolveProjectCall(call);
+
+        Assert.Same(definitionsState, resolved.Doc);
+        Assert.Equal(
+            Assert.Single(definitionsState.BoundModule!.Functions).SymbolId,
+            resolved.Symbol?.Id);
+    }
+
+    [Fact]
+    public void ResolveProjectCall_DoesNotApplyNullableStringCompatibilityToConstructors()
+    {
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(
+            DocumentUri.From("file:///models.calr"),
+            """
+            §M{m001:Models}
+              §CL{c001:Box:pub}
+                §CTOR{ctor001:pub} (str:value)
+            """);
+        var use = """
+            §M{m002:Main}
+              §F{f002:Run:pub} (?str:value) -> Box
+                §E{}
+                §R §NEW{Box} §A value §/NEW
+            """;
+        var useState = workspace.GetOrCreate(
+            DocumentUri.From("file:///main.calr"),
+            use);
+        var creation = Assert.IsType<BoundNewExpression>(
+            SymbolFinder.FindBoundCallAtOffset(
+                useState.BoundModule,
+                use.IndexOf("Box}", StringComparison.Ordinal)));
+
+        var resolved = workspace.ResolveProjectCall(creation);
+
+        Assert.Null(resolved.Doc);
+        Assert.Null(resolved.Symbol);
+    }
+
+    [Fact]
+    public void ResolveProjectCall_DoesNotApplyNullableStringCompatibilityToBaseInitializers()
+    {
+        var workspace = new WorkspaceState();
+        workspace.GetOrCreate(
+            DocumentUri.From("file:///base.calr"),
+            """
+            §M{m001:Models}
+              §CL{c001:Base:pub}
+                §CTOR{ctor001:pub} (str:value)
+            """);
+        var use = """
+            §M{m002:Main}
+              §CL{c002:Derived:Base:pub}
+                §CTOR{ctor002:pub} (?str:value)
+                  §BASE
+                    §A value
+            """;
+        var useState = workspace.GetOrCreate(
+            DocumentUri.From("file:///derived.calr"),
+            use);
+        var initializer = SymbolFinder.FindBoundCallAtOffset(
+            useState.BoundModule,
+            use.IndexOf("§BASE", StringComparison.Ordinal));
+
+        var resolved = workspace.ResolveProjectCall(initializer);
+
+        Assert.Null(resolved.Doc);
+        Assert.Null(resolved.Symbol);
+    }
+
+    [Fact]
     public void EquivalentWorkspaceRoots_ProducePortableStableSymbolIds()
     {
         const string source = """

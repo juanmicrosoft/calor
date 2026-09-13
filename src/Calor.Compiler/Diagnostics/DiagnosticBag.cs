@@ -28,6 +28,17 @@ public sealed class DiagnosticBag : IEnumerable<Diagnostic>
     public int Count => _diagnostics.Count;
     public bool HasErrors => _diagnostics.Any(d => d.IsError);
 
+    internal (int Diagnostics, int Fixes) CreateCheckpoint()
+        => (_diagnostics.Count, _diagnosticsWithFixes.Count);
+
+    internal void RestoreCheckpoint((int Diagnostics, int Fixes) checkpoint)
+    {
+        if (_diagnostics.Count > checkpoint.Diagnostics)
+            _diagnostics.RemoveRange(checkpoint.Diagnostics, _diagnostics.Count - checkpoint.Diagnostics);
+        if (_diagnosticsWithFixes.Count > checkpoint.Fixes)
+            _diagnosticsWithFixes.RemoveRange(checkpoint.Fixes, _diagnosticsWithFixes.Count - checkpoint.Fixes);
+    }
+
     /// <summary>
     /// Diagnostics that have associated fixes.
     /// </summary>
