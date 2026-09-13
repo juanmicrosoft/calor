@@ -25,6 +25,67 @@ namespace Calor.Compiler.Binding;
 /// </summary>
 internal static class NullabilityChecker
 {
+    [Flags]
+    internal enum ArrayMismatch
+    {
+        None = 0,
+        Container = 1,
+        Elements = 2
+    }
+
+    internal static ArrayBoundType? GetMethodInputArrayType(BoundExpression source) =>
+        source.MethodInputArrayType ?? source.Type as ArrayBoundType;
+
+    internal static bool IsPossiblyNullAssignedTo(
+        BoundExpression source,
+        BoundType target,
+        BindingReceivingBoundary boundary,
+        out ArrayMismatch mismatch)
+    {
+        mismatch = ArrayMismatch.None;
+        if (boundary != BindingReceivingBoundary.MethodArgument || target is not ArrayBoundType receiving)
+            return IsPossiblyNullAssignedTo(source, target);
+
+        var supplied = GetMethodInputArrayType(source);
+        if (supplied is null || supplied.Rank != receiving.Rank)
+            return false;
+
+        CompareArrayAnnotations(supplied, receiving, ref mismatch);
+
+        return mismatch != ArrayMismatch.None;
+    }
+
+    private static void CompareArrayAnnotations(
+        ArrayBoundType supplied,
+        ArrayBoundType receiving,
+        ref ArrayMismatch mismatch)
+    {
+        if (supplied.Rank != receiving.Rank)
+            return;
+
+        if (receiving.NullableAnnotation == NullableAnnotation.NotAnnotated
+            && supplied.NullableAnnotation is NullableAnnotation.Annotated or NullableAnnotation.Oblivious)
+            mismatch |= ArrayMismatch.Container;
+
+        if (receiving.ElementType is ArrayBoundType receivingNested
+            && supplied.ElementType is ArrayBoundType suppliedNested)
+        {
+            CompareArrayAnnotations(suppliedNested, receivingNested, ref mismatch);
+            return;
+        }
+
+        if (receiving.ElementType is NominalBoundType targetElement
+            && supplied.ElementType is NominalBoundType sourceElement
+            && IsKnownArrayString(targetElement) && IsKnownArrayString(sourceElement)
+            && targetElement.NullableAnnotation == NullableAnnotation.NotAnnotated
+            && sourceElement.NullableAnnotation is NullableAnnotation.Annotated or NullableAnnotation.Oblivious)
+            mismatch |= ArrayMismatch.Elements;
+    }
+
+    private static bool IsKnownArrayString(NominalBoundType type) =>
+        type.RoslynSymbol?.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_String
+        || IsScalarString(type);
+
     /// <summary>
     /// Returns true iff a value produced by <paramref name="source"/> may
     /// be null AND the <paramref name="target"/> BoundType is a

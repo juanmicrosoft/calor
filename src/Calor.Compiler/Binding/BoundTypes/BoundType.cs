@@ -194,6 +194,7 @@ public sealed class GenericInstantiationBoundType : BoundType
 /// <summary>Kind 4: array (single-rank or multi-dim). Rank is 1-based.</summary>
 public sealed class ArrayBoundType : BoundType
 {
+    internal IArrayTypeSymbol? RoslynSymbol { get; init; }
     public BoundType ElementType { get; }
     public int Rank { get; }
     public NullableAnnotation NullableAnnotation { get; }

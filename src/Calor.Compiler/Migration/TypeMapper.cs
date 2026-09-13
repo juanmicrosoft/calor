@@ -306,7 +306,7 @@ public static class TypeMapper
         {
             var innerType = csharpType[..^1];
             var mappedInner = CSharpToCalor(innerType);
-            return $"?{mappedInner}";
+            return mappedInner.EndsWith(']') ? $"{mappedInner}?" : $"?{mappedInner}";
         }
 
         // Handle Nullable<T> -> ?T (but not open generic Nullable<>)
@@ -326,7 +326,7 @@ public static class TypeMapper
         {
             var elementType = csharpType[..^2];
             var mappedElement = CSharpToCalor(elementType);
-            return $"{mappedElement}[]";
+            return $"{ArrayElementSpelling(mappedElement)}[]";
         }
 
         // Handle Calor-style array notation [T] → T_mapped[] (normalize to postfix)
@@ -334,7 +334,7 @@ public static class TypeMapper
         {
             var elementType = csharpType[1..^1];
             var mappedElement = CSharpToCalor(elementType);
-            return $"{mappedElement}[]";
+            return $"{ArrayElementSpelling(mappedElement)}[]";
         }
 
         // Handle multi-dim arrays T[,] -> T_mapped[,], T[,,] -> T_mapped[,,]
@@ -347,7 +347,7 @@ public static class TypeMapper
                 {
                     var elementType = csharpType[..bracketStart];
                     var mappedElement = CSharpToCalor(elementType);
-                    return $"{mappedElement}{suffix}";
+                    return $"{ArrayElementSpelling(mappedElement)}{suffix}";
                 }
             }
         }
@@ -384,6 +384,10 @@ public static class TypeMapper
         // Direct mapping
         return CSharpToCalorMap.TryGetValue(csharpType, out var result) ? result : csharpType;
     }
+
+    // A leading '?' would annotate the whole array after the rank suffix is appended.
+    private static string ArrayElementSpelling(string element) =>
+        element.StartsWith('?') ? $"{element[1..]}?" : element;
 
     /// <summary>
     /// Converts an Calor type name to a C# type name.

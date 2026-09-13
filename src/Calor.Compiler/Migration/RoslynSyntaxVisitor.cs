@@ -12166,8 +12166,23 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         // Fall back to type cast operation for ambiguous cases
-        var calorType = TypeMapper.CSharpToCalor(targetType);
+        var calorType = TypeMapper.CSharpToCalor(StripArrayReferenceNullableAnnotations(cast.Type));
         return new TypeOperationNode(span, TypeOp.Cast, innerExpr, calorType);
+    }
+
+    private string StripArrayReferenceNullableAnnotations(TypeSyntax type)
+    {
+        if (type is NullableTypeSyntax nullable
+            && _semanticModel?.GetTypeInfo(nullable).Type?.IsReferenceType == true)
+            return StripArrayReferenceNullableAnnotations(nullable.ElementType);
+
+        if (type is ArrayTypeSyntax array)
+        {
+            var element = StripArrayReferenceNullableAnnotations(array.ElementType);
+            return element + string.Concat(array.RankSpecifiers.Select(rank => rank.ToString()));
+        }
+
+        return type.ToString();
     }
 
     private static bool LooksLikeCharExpression(ExpressionSyntax expr, string exprStr)

@@ -39,6 +39,9 @@ public abstract class BoundExpression : BoundNode
     /// </summary>
     public abstract BoundType Type { get; }
 
+    // Method-input preservation must not silently widen initializer/return policy.
+    internal ArrayBoundType? MethodInputArrayType { get; init; }
+
     public virtual IReadOnlyList<BoundExpression> Children => Array.Empty<BoundExpression>();
     public virtual IReadOnlyList<BoundExpression> DeferredChildren => Array.Empty<BoundExpression>();
     public override IEnumerable<BoundNode> ChildNodes => Children;
@@ -198,6 +201,8 @@ public sealed class BoundVariableExpression : BoundExpression
         Variable = variable;
         ResolvedSymbols = resolvedSymbols
             ?? [variable];
+        if (ResolvedSymbols.Count == 1 && typeOverride is not UnresolvedBoundType)
+            MethodInputArrayType = variable.MethodInputArrayType;
         if (typeOverride != null)
         {
             // The caller has already decided this reference's type and the

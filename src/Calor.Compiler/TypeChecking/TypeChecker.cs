@@ -4477,6 +4477,8 @@ public sealed class TypeChecker
     private static bool IsAssignable(CalorType target, CalorType source)
     {
         if (target.Equals(source)) return true;
+        if (target is ArrayType targetArray && source is ArrayType sourceArray)
+            return HaveSameArrayRuntimeType(targetArray, sourceArray);
         if (source is NeverType) return true;
         if (source is ErrorType) return true; // Allow error types to be assigned anywhere
         if (source is NullType)
@@ -4533,6 +4535,19 @@ public sealed class TypeChecker
         // Refined type is a subtype of its base type (erasure)
         if (source is RefinedType refinedSource && IsAssignable(target, refinedSource.BaseType)) return true;
         return false;
+    }
+
+    private static bool HaveSameArrayRuntimeType(ArrayType target, ArrayType source)
+    {
+        var targetElement = target.ElementType is NullableReferenceType targetNullable
+            ? targetNullable.ReferentType
+            : target.ElementType;
+        var sourceElement = source.ElementType is NullableReferenceType sourceNullable
+            ? sourceNullable.ReferentType
+            : source.ElementType;
+        return targetElement is ArrayType nestedTarget && sourceElement is ArrayType nestedSource
+            ? HaveSameArrayRuntimeType(nestedTarget, nestedSource)
+            : targetElement.Equals(sourceElement);
     }
 
     private bool IsFunctionReferenceAssignable(CalorType target, string name)
