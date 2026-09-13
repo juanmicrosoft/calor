@@ -1924,6 +1924,48 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void StatementLambda_GotoBooleanCaseFollowsReturningTarget()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (bool:input) -> void
+                §E{}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §W{m1} input
+                    §K false
+                      §GOTO{CASE:true}
+                    §K true
+                      §R 2
+                    §K _
+                      §R 0
+                §/LAM{l1}
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
+    public void StatementLambda_GotoCaseUsesConvertedIntegralValue()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (u32:input) -> void
+                §E{}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §W{m1} input
+                    §K UINT:1
+                      §GOTO{CASE:2}
+                    §K UINT:2
+                      §R 2
+                    §K _
+                      §R 0
+                §/LAM{l1}
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
     public void StatementLambda_GotoCaseCannotTargetGuardedArm()
     {
         var result = Check("""
@@ -1938,6 +1980,28 @@ public sealed class SafeConsumptionTypeCheckerTests
                       §R 2
                     §K _
                       §R 0
+                §/LAM{l1}
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void VoidStatementLambda_ReportsGuardedGotoCaseTarget()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{action:Action<i32>} §LAM{l1:x:i32}
+                  §W{m1} x
+                    §K 1
+                      §GOTO{CASE:2}
+                    §K 2 §WHEN false
+                      §P "two"
+                    §K _
+                      §P "other"
                 §/LAM{l1}
             """);
 
@@ -1991,6 +2055,27 @@ public sealed class SafeConsumptionTypeCheckerTests
                 §E{}
                 §B{factory:Func<i32>} §LAM{l1}
                   §CN
+                §/LAM{l1}
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void StatementLambda_GotoCannotLeaveFinally()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{cw}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §TR{t1}
+                    §P "try"
+                  §FI
+                    §GOTO{done}
+                  §LABEL{done}
+                  §R 1
                 §/LAM{l1}
             """);
 

@@ -1486,9 +1486,11 @@ public sealed class TypeChecker
                 CheckStatement(statement);
             }
             returnType = PrimitiveType.Void;
+            var definitelyReturns = DefinitelyReturns(
+                lambda.StatementBody ?? Array.Empty<StatementNode>());
             if (expectedFunction != null
                 && !expectedFunction.ReturnType.Equals(PrimitiveType.Void)
-                && !DefinitelyReturns(lambda.StatementBody ?? Array.Empty<StatementNode>()))
+                && !definitelyReturns)
             {
                 if (!_suppressContextualDiagnostics)
                 {
@@ -1516,7 +1518,7 @@ public sealed class TypeChecker
         => expectedFunction.ReturnType.Equals(PrimitiveType.Void)
             && expression is CallExpressionNode or ExpressionCallNode or NewExpressionNode;
 
-    private static bool DefinitelyReturns(IReadOnlyList<StatementNode> statements)
+    private bool DefinitelyReturns(IReadOnlyList<StatementNode> statements)
     {
         var outcomes = AnalyzeControlFlow(
             statements,
@@ -1588,7 +1590,7 @@ public sealed class TypeChecker
         return new ControlFlowResult(result.Local | outcomes, remaining);
     }
 
-    private static ControlFlowResult AnalyzeControlFlow(
+    private ControlFlowResult AnalyzeControlFlow(
         IReadOnlyList<StatementNode> statements,
         bool insideMatch,
         IReadOnlyDictionary<string, ControlFlowResolver>?
@@ -1632,7 +1634,7 @@ public sealed class TypeChecker
         return AbsorbTransfers(result, scope);
     }
 
-    private static ControlFlowResult AnalyzeControlFlowFrom(
+    private ControlFlowResult AnalyzeControlFlowFrom(
         IReadOnlyList<StatementNode> statements,
         IReadOnlyDictionary<string, ControlFlowResolver>
             labelResolvers,
@@ -1694,6 +1696,27 @@ public sealed class TypeChecker
                     defaultResolver,
                     target);
             }
+            if (statement is GotoStatementNode { CaseLabel: not null } or
+                GotoStatementNode { IsDefault: true })
+            {
+                if (!_suppressContextualDiagnostics)
+                {
+                    _diagnostics.ReportError(
+                        statement.Span,
+                        DiagnosticCode.TypeMismatch,
+                        "goto case/default must target an unguarded case in the enclosing match");
+                }
+            }
+            else if (statement is GotoStatementNode)
+            {
+                if (!_suppressContextualDiagnostics)
+                {
+                    _diagnostics.ReportError(
+                        statement.Span,
+                        DiagnosticCode.TypeMismatch,
+                        "goto must target a label in the current control-flow scope");
+                }
+            }
             var statementResult = AnalyzeStatementControlFlow(
                 statement,
                 insideMatch,
@@ -1712,7 +1735,7 @@ public sealed class TypeChecker
         => expression switch
         {
             IntLiteralNode literal =>
-                $"int:{literal.Sign}:{literal.Magnitude}:{literal.Signedness}",
+                $"int:{literal.Sign}:{literal.Magnitude}",
             StringLiteralNode literal => $"string:{literal.Value}",
             BoolLiteralNode literal => $"bool:{literal.Value}",
             FloatLiteralNode literal => $"float:{literal.Value:R}:{literal.IsDecimal}:{literal.IsSingle}",
@@ -1727,6 +1750,8 @@ public sealed class TypeChecker
                 when reference.Name[0] == '\'' && reference.Name[^1] == '\''
                 => $"char:{reference.Name}",
             ReferenceNode { Name: "null" } => "null",
+            ReferenceNode { Name: "true" } => "bool:True",
+            ReferenceNode { Name: "false" } => "bool:False",
             ReferenceNode reference => $"reference:{reference.Name}",
             _ => null
         };
@@ -1739,7 +1764,7 @@ public sealed class TypeChecker
             _ => null
         };
 
-    private static ControlFlowResult AnalyzeStatementControlFlow(
+    private ControlFlowResult AnalyzeStatementControlFlow(
         StatementNode statement,
         bool insideMatch,
         IReadOnlyDictionary<string, ControlFlowResolver>
@@ -1797,7 +1822,7 @@ public sealed class TypeChecker
             _ => LocalFlow(ControlFlowOutcome.FallThrough)
         };
 
-    private static ControlFlowResult AnalyzeConditionalControlFlow(
+    private ControlFlowResult AnalyzeConditionalControlFlow(
         IfStatementNode conditional,
         bool insideMatch,
         IReadOnlyDictionary<string, ControlFlowResolver>
@@ -1828,7 +1853,7 @@ public sealed class TypeChecker
             MergeTransfers(outcomes.Transfers, elseOutcomes.Transfers));
     }
 
-    private static ControlFlowResult AnalyzeMatchControlFlow(
+    private ControlFlowResult AnalyzeMatchControlFlow(
         MatchStatementNode match,
         IReadOnlyDictionary<string, ControlFlowResolver>
             labelResolvers,
@@ -1886,7 +1911,7 @@ public sealed class TypeChecker
         return new ControlFlowResult(localOutcomes, outcomes.Transfers);
     }
 
-    private static ControlFlowResult AnalyzeLoopControlFlow(
+    private ControlFlowResult AnalyzeLoopControlFlow(
         IReadOnlyList<StatementNode> body,
         bool conditionIsAlwaysTrue,
         bool executesAtLeastOnce,
@@ -1915,7 +1940,7 @@ public sealed class TypeChecker
         return new ControlFlowResult(outcomes, bodyOutcomes.Transfers);
     }
 
-    private static ControlFlowResult AnalyzeTryControlFlow(
+    private ControlFlowResult AnalyzeTryControlFlow(
         TryStatementNode tryStatement,
         bool insideMatch,
         IReadOnlyDictionary<string, ControlFlowResolver>
@@ -1940,8 +1965,10 @@ public sealed class TypeChecker
             return protectedOutcomes;
 
         var finallyOutcomes = AnalyzeControlFlow(
-            tryStatement.FinallyBody, insideMatch, labelResolvers, matchResolvers,
-            new HashSet<StatementNode>(activeStatements));
+            tryStatement.FinallyBody, insideMatch,
+            inheritedLabelResolvers: null,
+            matchResolvers: null,
+            activeStatements: new HashSet<StatementNode>(activeStatements));
         if ((finallyOutcomes.Local & ControlFlowOutcome.FallThrough) == 0)
             return finallyOutcomes;
         return new ControlFlowResult(
