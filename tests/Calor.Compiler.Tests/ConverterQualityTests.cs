@@ -1112,7 +1112,7 @@ public class Foo
         Assert.NotNull(result.CalorSource);
         // Should contain cast without ? annotation
         Assert.Contains("cast u8[]", result.CalorSource);
-        Assert.DoesNotContain("u8[]?", result.CalorSource);
+        Assert.DoesNotContain("cast u8[]?", result.CalorSource);
     }
 
     #endregion

@@ -12167,6 +12167,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         // Fall back to type cast operation for ambiguous cases
         var calorType = TypeMapper.CSharpToCalor(targetType);
+        if (calorType.EndsWith("]?", StringComparison.Ordinal))
+            calorType = calorType[..^1];
         return new TypeOperationNode(span, TypeOp.Cast, innerExpr, calorType);
     }
 
