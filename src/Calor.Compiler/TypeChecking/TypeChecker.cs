@@ -1532,65 +1532,144 @@ public sealed class TypeChecker
         Return = 2,
         LoopExit = 4,
         Continue = 8,
-        MatchExit = 16
+        MatchExit = 16,
+        TransferredFallThrough = 32,
+        TransferredReturn = 64,
+        TransferredLoopExit = 128,
+        TransferredContinue = 256,
+        TransferredMatchExit = 512
     }
 
     private static ControlFlowOutcome AnalyzeControlFlow(
         IReadOnlyList<StatementNode> statements,
-        bool insideMatch)
+        bool insideMatch,
+        IReadOnlyDictionary<string, Func<HashSet<StatementNode>, ControlFlowOutcome>>?
+            inheritedLabelResolvers = null,
+        IReadOnlyDictionary<string, Func<HashSet<StatementNode>, ControlFlowOutcome>>?
+            matchResolvers = null,
+        HashSet<StatementNode>? activeStatements = null)
     {
-        var labelIndices = statements
-            .Select((statement, index) => (statement, index))
-            .Where(item => item.statement is LabelStatementNode)
-            .GroupBy(item => ((LabelStatementNode)item.statement).Label, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.First().index, StringComparer.Ordinal);
+        var labelResolvers = inheritedLabelResolvers != null
+            ? new Dictionary<string, Func<HashSet<StatementNode>, ControlFlowOutcome>>(
+                inheritedLabelResolvers, StringComparer.Ordinal)
+            : new Dictionary<string, Func<HashSet<StatementNode>, ControlFlowOutcome>>(
+                StringComparer.Ordinal);
+        foreach (var item in statements
+                     .Select((statement, index) => (statement, index))
+                     .Where(item => item.statement is LabelStatementNode)
+                     .GroupBy(item => ((LabelStatementNode)item.statement).Label,
+                         StringComparer.Ordinal)
+                     .Select(group => group.First()))
+        {
+            var targetIndex = item.index;
+            labelResolvers[((LabelStatementNode)item.statement).Label] = active =>
+                AnalyzeControlFlowFrom(
+                    statements,
+                    labelResolvers,
+                    matchResolvers,
+                    targetIndex,
+                    insideMatch,
+                    active);
+        }
         return AnalyzeControlFlowFrom(
-            statements, labelIndices, startIndex: 0, insideMatch, new HashSet<int>());
+            statements,
+            labelResolvers,
+            matchResolvers,
+            startIndex: 0,
+            insideMatch,
+            activeStatements ?? new HashSet<StatementNode>());
     }
 
     private static ControlFlowOutcome AnalyzeControlFlowFrom(
         IReadOnlyList<StatementNode> statements,
-        IReadOnlyDictionary<string, int> labelIndices,
+        IReadOnlyDictionary<string, Func<HashSet<StatementNode>, ControlFlowOutcome>>
+            labelResolvers,
+        IReadOnlyDictionary<string, Func<HashSet<StatementNode>, ControlFlowOutcome>>?
+            matchResolvers,
         int startIndex,
         bool insideMatch,
-        HashSet<int> activeIndices)
+        HashSet<StatementNode> activeStatements)
     {
         var outcomes = ControlFlowOutcome.FallThrough;
         for (var index = startIndex; index < statements.Count; index++)
         {
             if ((outcomes & ControlFlowOutcome.FallThrough) == 0)
                 break;
-            if (!activeIndices.Add(index))
-                return outcomes & ~ControlFlowOutcome.FallThrough;
             var statement = statements[index];
-            ControlFlowOutcome statementOutcomes;
+            if (!activeStatements.Add(statement))
+                return outcomes & ~ControlFlowOutcome.FallThrough;
+            var priorOutcomes = outcomes & ~ControlFlowOutcome.FallThrough;
             if (statement is GotoStatementNode
                 {
                     CaseLabel: null,
                     IsDefault: false
                 } gotoStatement
-                && labelIndices.TryGetValue(gotoStatement.Label, out var targetIndex))
+                && labelResolvers.TryGetValue(gotoStatement.Label, out var labelResolver))
             {
-                statementOutcomes = AnalyzeControlFlowFrom(
-                    statements,
-                    labelIndices,
-                    targetIndex,
+                return priorOutcomes
+                    | labelResolver(new HashSet<StatementNode>(activeStatements));
+            }
+            if (statement is GotoStatementNode { CaseLabel: not null } gotoCase
+                && GetCaseKey(gotoCase.CaseLabel) is { } caseKey
+                && matchResolvers?.TryGetValue(caseKey, out var caseResolver) == true)
+            {
+                return priorOutcomes
+                    | caseResolver(new HashSet<StatementNode>(activeStatements));
+            }
+            if (statement is GotoStatementNode { IsDefault: true }
+                && matchResolvers?.TryGetValue(DefaultCaseKey, out var defaultResolver) == true)
+            {
+                return priorOutcomes
+                    | defaultResolver(new HashSet<StatementNode>(activeStatements));
+            }
+            outcomes = priorOutcomes
+                | AnalyzeStatementControlFlow(
+                    statement,
                     insideMatch,
-                    new HashSet<int>(activeIndices));
-            }
-            else
-            {
-                statementOutcomes = AnalyzeStatementControlFlow(statement, insideMatch);
-            }
-            outcomes = outcomes & ~ControlFlowOutcome.FallThrough
-                | statementOutcomes;
+                    labelResolvers,
+                    matchResolvers,
+                    activeStatements);
         }
         return outcomes;
     }
 
+    private const string DefaultCaseKey = "default";
+    private const ControlFlowOutcome BaseOutcomes =
+        ControlFlowOutcome.FallThrough
+        | ControlFlowOutcome.Return
+        | ControlFlowOutcome.LoopExit
+        | ControlFlowOutcome.Continue
+        | ControlFlowOutcome.MatchExit;
+    private static ControlFlowOutcome EncodeTransferredOutcomes(ControlFlowOutcome outcomes)
+        => (ControlFlowOutcome)((int)outcomes << 5);
+
+    private static ControlFlowOutcome DecodeTransferredOutcomes(ControlFlowOutcome outcomes)
+        => (ControlFlowOutcome)((int)outcomes >> 5);
+
+    private static string? GetCaseKey(ExpressionNode expression)
+        => expression switch
+        {
+            IntLiteralNode literal =>
+                $"int:{literal.Sign}:{literal.Magnitude}:{literal.Signedness}",
+            StringLiteralNode literal => $"string:{literal.Value}",
+            BoolLiteralNode literal => $"bool:{literal.Value}",
+            FloatLiteralNode literal => $"float:{literal.Value:R}:{literal.IsDecimal}:{literal.IsSingle}",
+            DecimalLiteralNode literal => $"decimal:{literal.Value}",
+            ReferenceNode reference => $"reference:{reference.Name}",
+            _ => null
+        };
+
+    private static string? GetCaseKey(PatternNode pattern)
+        => pattern is LiteralPatternNode literal ? GetCaseKey(literal.Literal) : null;
+
     private static ControlFlowOutcome AnalyzeStatementControlFlow(
         StatementNode statement,
-        bool insideMatch)
+        bool insideMatch,
+        IReadOnlyDictionary<string, Func<HashSet<StatementNode>, ControlFlowOutcome>>
+            labelResolvers,
+        IReadOnlyDictionary<string, Func<HashSet<StatementNode>, ControlFlowOutcome>>?
+            matchResolvers,
+        HashSet<StatementNode> activeStatements)
         => statement switch
         {
             ReturnStatementNode or ThrowStatementNode or RethrowStatementNode
@@ -1607,48 +1686,100 @@ public sealed class TypeChecker
                 : ControlFlowOutcome.LoopExit,
             GotoStatementNode => ControlFlowOutcome.LoopExit,
             IfStatementNode conditional => AnalyzeConditionalControlFlow(
-                conditional, insideMatch),
-            MatchStatementNode match => AnalyzeMatchControlFlow(match),
+                conditional, insideMatch, labelResolvers, matchResolvers, activeStatements),
+            MatchStatementNode match => AnalyzeMatchControlFlow(
+                match, labelResolvers, activeStatements),
             WhileStatementNode loop => AnalyzeLoopControlFlow(
                 loop.Body,
                 loop.Condition is BoolLiteralNode { Value: true },
-                executesAtLeastOnce: false),
+                executesAtLeastOnce: false,
+                labelResolvers,
+                matchResolvers,
+                activeStatements),
             DoWhileStatementNode loop => AnalyzeLoopControlFlow(
                 loop.Body,
                 loop.Condition is BoolLiteralNode { Value: true },
-                executesAtLeastOnce: true),
+                executesAtLeastOnce: true,
+                labelResolvers,
+                matchResolvers,
+                activeStatements),
             TryStatementNode tryStatement => AnalyzeTryControlFlow(
-                tryStatement, insideMatch),
+                tryStatement, insideMatch, labelResolvers, matchResolvers, activeStatements),
             UsingStatementNode usingStatement => AnalyzeControlFlow(
-                usingStatement.Body, insideMatch),
+                usingStatement.Body, insideMatch, labelResolvers, matchResolvers,
+                new HashSet<StatementNode>(activeStatements)),
             UnsafeBlockNode unsafeBlock => AnalyzeControlFlow(
-                unsafeBlock.Body, insideMatch),
+                unsafeBlock.Body, insideMatch, labelResolvers, matchResolvers,
+                new HashSet<StatementNode>(activeStatements)),
             FixedStatementNode fixedStatement => AnalyzeControlFlow(
-                fixedStatement.Body, insideMatch),
+                fixedStatement.Body, insideMatch, labelResolvers, matchResolvers,
+                new HashSet<StatementNode>(activeStatements)),
             SyncBlockNode syncBlock => AnalyzeControlFlow(
-                syncBlock.Body, insideMatch),
+                syncBlock.Body, insideMatch, labelResolvers, matchResolvers,
+                new HashSet<StatementNode>(activeStatements)),
             _ => ControlFlowOutcome.FallThrough
         };
 
     private static ControlFlowOutcome AnalyzeConditionalControlFlow(
         IfStatementNode conditional,
-        bool insideMatch)
+        bool insideMatch,
+        IReadOnlyDictionary<string, Func<HashSet<StatementNode>, ControlFlowOutcome>>
+            labelResolvers,
+        IReadOnlyDictionary<string, Func<HashSet<StatementNode>, ControlFlowOutcome>>?
+            matchResolvers,
+        HashSet<StatementNode> activeStatements)
     {
-        var outcomes = AnalyzeControlFlow(conditional.ThenBody, insideMatch);
+        var outcomes = AnalyzeControlFlow(
+            conditional.ThenBody, insideMatch, labelResolvers, matchResolvers,
+            new HashSet<StatementNode>(activeStatements));
         foreach (var clause in conditional.ElseIfClauses)
-            outcomes |= AnalyzeControlFlow(clause.Body, insideMatch);
+        {
+            outcomes |= AnalyzeControlFlow(
+                clause.Body, insideMatch, labelResolvers, matchResolvers,
+                new HashSet<StatementNode>(activeStatements));
+        }
         outcomes |= conditional.ElseBody != null
-            ? AnalyzeControlFlow(conditional.ElseBody, insideMatch)
+            ? AnalyzeControlFlow(
+                conditional.ElseBody, insideMatch, labelResolvers, matchResolvers,
+                new HashSet<StatementNode>(activeStatements))
             : ControlFlowOutcome.FallThrough;
         return outcomes;
     }
 
-    private static ControlFlowOutcome AnalyzeMatchControlFlow(MatchStatementNode match)
+    private static ControlFlowOutcome AnalyzeMatchControlFlow(
+        MatchStatementNode match,
+        IReadOnlyDictionary<string, Func<HashSet<StatementNode>, ControlFlowOutcome>>
+            labelResolvers,
+        HashSet<StatementNode> activeStatements)
     {
+        var caseResolvers =
+            new Dictionary<string, Func<HashSet<StatementNode>, ControlFlowOutcome>>(
+                StringComparer.Ordinal);
+        foreach (var matchCase in match.Cases)
+        {
+            var key = matchCase.Pattern is WildcardPatternNode && matchCase.Guard == null
+                ? DefaultCaseKey
+                : GetCaseKey(matchCase.Pattern);
+            if (key == null || caseResolvers.ContainsKey(key))
+                continue;
+            var targetCase = matchCase;
+            caseResolvers[key] = active => AnalyzeControlFlow(
+                targetCase.Body,
+                insideMatch: true,
+                labelResolvers,
+                caseResolvers,
+                active);
+        }
+
         var outcomes = match.Cases.Aggregate(
             ControlFlowOutcome.None,
             (current, matchCase) => current
-                | AnalyzeControlFlow(matchCase.Body, insideMatch: true));
+                | AnalyzeControlFlow(
+                    matchCase.Body,
+                    insideMatch: true,
+                    labelResolvers,
+                    caseResolvers,
+                    new HashSet<StatementNode>(activeStatements)));
         var exhaustive = match.Cases.Count > 0
             && match.Cases.Any(matchCase =>
                 matchCase.Pattern is WildcardPatternNode && matchCase.Guard == null);
@@ -1663,33 +1794,64 @@ public sealed class TypeChecker
     private static ControlFlowOutcome AnalyzeLoopControlFlow(
         IReadOnlyList<StatementNode> body,
         bool conditionIsAlwaysTrue,
-        bool executesAtLeastOnce)
+        bool executesAtLeastOnce,
+        IReadOnlyDictionary<string, Func<HashSet<StatementNode>, ControlFlowOutcome>>
+            labelResolvers,
+        IReadOnlyDictionary<string, Func<HashSet<StatementNode>, ControlFlowOutcome>>?
+            matchResolvers,
+        HashSet<StatementNode> activeStatements)
     {
-        var bodyOutcomes = AnalyzeControlFlow(body, insideMatch: false);
-        var outcomes = bodyOutcomes & ControlFlowOutcome.Return;
-        if ((bodyOutcomes & ControlFlowOutcome.LoopExit) != 0
+        var loopLabelResolvers =
+            new Dictionary<string, Func<HashSet<StatementNode>, ControlFlowOutcome>>(
+                StringComparer.Ordinal);
+        foreach (var (label, resolver) in labelResolvers)
+        {
+            loopLabelResolvers[label] = active =>
+                EncodeTransferredOutcomes(resolver(active));
+        }
+        var bodyOutcomes = AnalyzeControlFlow(
+            body,
+            insideMatch: false,
+            loopLabelResolvers,
+            matchResolvers,
+            new HashSet<StatementNode>(activeStatements));
+        var localOutcomes = bodyOutcomes & BaseOutcomes;
+        var outcomes = localOutcomes & ControlFlowOutcome.Return;
+        if ((localOutcomes & ControlFlowOutcome.LoopExit) != 0
             || !conditionIsAlwaysTrue
                 && (!executesAtLeastOnce
-                    || (bodyOutcomes
+                    || (localOutcomes
                         & (ControlFlowOutcome.FallThrough | ControlFlowOutcome.Continue)) != 0))
         {
             outcomes |= ControlFlowOutcome.FallThrough;
         }
-        return outcomes;
+        return outcomes | DecodeTransferredOutcomes(bodyOutcomes);
     }
 
     private static ControlFlowOutcome AnalyzeTryControlFlow(
         TryStatementNode tryStatement,
-        bool insideMatch)
+        bool insideMatch,
+        IReadOnlyDictionary<string, Func<HashSet<StatementNode>, ControlFlowOutcome>>
+            labelResolvers,
+        IReadOnlyDictionary<string, Func<HashSet<StatementNode>, ControlFlowOutcome>>?
+            matchResolvers,
+        HashSet<StatementNode> activeStatements)
     {
-        var protectedOutcomes = AnalyzeControlFlow(tryStatement.TryBody, insideMatch);
+        var protectedOutcomes = AnalyzeControlFlow(
+            tryStatement.TryBody, insideMatch, labelResolvers, matchResolvers,
+            new HashSet<StatementNode>(activeStatements));
         foreach (var clause in tryStatement.CatchClauses)
-            protectedOutcomes |= AnalyzeControlFlow(clause.Body, insideMatch);
+        {
+            protectedOutcomes |= AnalyzeControlFlow(
+                clause.Body, insideMatch, labelResolvers, matchResolvers,
+                new HashSet<StatementNode>(activeStatements));
+        }
         if (tryStatement.FinallyBody == null)
             return protectedOutcomes;
 
         var finallyOutcomes = AnalyzeControlFlow(
-            tryStatement.FinallyBody, insideMatch);
+            tryStatement.FinallyBody, insideMatch, labelResolvers, matchResolvers,
+            new HashSet<StatementNode>(activeStatements));
         return (finallyOutcomes & ControlFlowOutcome.FallThrough) != 0
             ? protectedOutcomes | (finallyOutcomes & ~ControlFlowOutcome.FallThrough)
             : finallyOutcomes;

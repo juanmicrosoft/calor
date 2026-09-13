@@ -1760,6 +1760,44 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void StatementLambda_ForwardGotoDoesNotResumeAtSkippedReturn()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{cw}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §GOTO{done}
+                  §R 1
+                  §LABEL{done}
+                  §P "done"
+                §/LAM{l1}
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void StatementLambda_NestedGotoFollowsEnclosingReturnTarget()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{factory:Func<bool,i32>} §LAM{l1:flag:bool}
+                  §IF{if1} flag
+                    §GOTO{done}
+                  §R 1
+                  §LABEL{done}
+                  §R 2
+                §/LAM{l1}
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
     public void StatementLambda_GotoCaseInsideLoopMatchDoesNotExitLoop()
     {
         var result = Check("""
@@ -1773,6 +1811,27 @@ public sealed class SafeConsumptionTypeCheckerTests
                         §GOTO{CASE:2}
                       §K 2
                         §P "loop"
+                §/LAM{l1}
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
+    public void StatementLambda_GotoCaseFollowsReturningTarget()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §W{m1} 1
+                    §K 1
+                      §GOTO{CASE:2}
+                    §K 2
+                      §R 2
+                    §K _
+                      §R 0
                 §/LAM{l1}
             """);
 
