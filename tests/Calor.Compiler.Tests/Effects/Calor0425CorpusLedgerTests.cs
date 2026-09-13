@@ -1539,11 +1539,12 @@ public class Calor0425CorpusLedgerTests
         Assert.True(enforcedNow >= EnforcedAfterR2,
             $"ModulesEnforced fell to {enforcedNow}, below the {EnforcedAfterR2} R2 left it at.");
         // #1191 later exposes PropertyToken and StreetNumberComparer to effects.
+        // #1383 additionally resolves LogEventProperty's non-null -> nullable input.
         // This does not change any historical R2/R3 measurement or verdict.
-        const int EnforcedAfterConditionalPreservation = 326;
-        Assert.True(enforcedNow == EnforcedAfterConditionalPreservation,
-            $"ModulesEnforced is {enforcedNow}, not the {EnforcedAfterConditionalPreservation} recorded for "
-            + "#1191. This is an EXACT pin: a move — in either direction — regenerates "
+        const int EnforcedAfterNativeStringCompatibility = 327;
+        Assert.True(enforcedNow == EnforcedAfterNativeStringCompatibility,
+            $"ModulesEnforced is {enforcedNow}, not the {EnforcedAfterNativeStringCompatibility} recorded for "
+            + "#1383. This is an EXACT pin: a move — in either direction — regenerates "
             + "the ledger IN THIS PR with the change named, and updates §3.1's outcome record. It "
             + "does not reopen PP-R1 leg 1, which is closed as a MISS on R2's own 15.");
     }

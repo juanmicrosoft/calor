@@ -1,0 +1,919 @@
+{
+  "probeVersion": "strict-v2-program-compile-and-cli",
+  "baselineGitHead": "8f9891a1a07f786a76a293017959c3edf28412bf",
+  "candidateGitHead": "7698718b1d65471c07b4e459e29335fc6a84a90c",
+  "cases": [
+    {
+      "name": "direct-nullable-input-expression",
+      "sourceHashMatches": true,
+      "baseline": {
+        "sourceSha256": "c3c1beff87eee63f75e7129f5a495bdf8216c4232b6e0fce961a3d337d4f6bda",
+        "rawBinderDiagnostics": [
+          {
+            "code": "Calor0208",
+            "span": [
+              131,
+              216
+            ],
+            "line": 8,
+            "column": 8,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} \u00a7A \u00a7C{System.Environment.GetEnvironmentVariable} \u00a7A \"CALOR_N4_UNSET\" \u00a7/C \u00a7/C",
+            "message": "No overload of internal call 'Take' matches (STRING?). Candidates: Take(str) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Atake]"
+          }
+        ],
+        "rawPropagatedDiagnostics": [
+          {
+            "code": "Calor0208",
+            "span": [
+              131,
+              216
+            ],
+            "line": 8,
+            "column": 8,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} \u00a7A \u00a7C{System.Environment.GetEnvironmentVariable} \u00a7A \"CALOR_N4_UNSET\" \u00a7/C \u00a7/C",
+            "message": "No overload of internal call 'Take' matches (STRING?). Candidates: Take(str) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Atake]"
+          }
+        ],
+        "defaultProgramCompileHasErrors": true,
+        "defaultProgramCompileDiagnostics": [
+          {
+            "code": "Calor0208",
+            "span": [
+              131,
+              216
+            ],
+            "line": 8,
+            "column": 8,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} \u00a7A \u00a7C{System.Environment.GetEnvironmentVariable} \u00a7A \"CALOR_N4_UNSET\" \u00a7/C \u00a7/C",
+            "message": "No overload of internal call 'Take' matches (STRING?). Candidates: Take(str) [calor://source/direct-nullable-input-expression.calr/module/m1/function/ast%3Atake]"
+          }
+        ],
+        "defaultCliExitCode": 1,
+        "defaultCliInvocation": "dotnet /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/n4-corpus-baseline/src/Calor.Compiler/bin/Debug/net10.0/calor.dll -i /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/direct-nullable-input-expression/module.calr -o /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/direct-nullable-input-expression/out.g.cs",
+        "defaultCliWorkingDirectory": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/n4-corpus-baseline",
+        "defaultCliDiagnostics": [
+          "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/direct-nullable-input-expression/module.calr(8,8): error Calor0208: No overload of internal call 'Take' matches (STRING?). Candidates: Take(str) [calor://source/path%3Abaseline%2Fdirect-nullable-input-expression%2Fmodule.calr/module/m1/function/ast%3Atake]"
+        ]
+      },
+      "candidate": {
+        "sourceSha256": "c3c1beff87eee63f75e7129f5a495bdf8216c4232b6e0fce961a3d337d4f6bda",
+        "rawBinderDiagnostics": [
+          {
+            "code": "Calor0274",
+            "span": [
+              143,
+              212
+            ],
+            "line": 8,
+            "column": 20,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "MethodArgument",
+            "shape": "ScalarString",
+            "replacesNativeOverloadError": true,
+            "snippet": "\u00a7C{System.Environment.GetEnvironmentVariable} \u00a7A \"CALOR_N4_UNSET\" \u00a7/C",
+            "message": "Argument to parameter 'value' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary."
+          }
+        ],
+        "rawPropagatedDiagnostics": [
+          {
+            "code": "Calor0274",
+            "span": [
+              143,
+              212
+            ],
+            "line": 8,
+            "column": 20,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "MethodArgument",
+            "shape": "ScalarString",
+            "replacesNativeOverloadError": true,
+            "snippet": "\u00a7C{System.Environment.GetEnvironmentVariable} \u00a7A \"CALOR_N4_UNSET\" \u00a7/C",
+            "message": "Argument to parameter 'value' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary."
+          }
+        ],
+        "defaultProgramCompileHasErrors": true,
+        "defaultProgramCompileDiagnostics": [
+          {
+            "code": "Calor0274",
+            "span": [
+              143,
+              212
+            ],
+            "line": 8,
+            "column": 20,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "MethodArgument",
+            "shape": "ScalarString",
+            "replacesNativeOverloadError": true,
+            "snippet": "\u00a7C{System.Environment.GetEnvironmentVariable} \u00a7A \"CALOR_N4_UNSET\" \u00a7/C",
+            "message": "Argument to parameter 'value' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary."
+          }
+        ],
+        "defaultCliExitCode": 1,
+        "defaultCliInvocation": "dotnet /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/native-string-1383/src/Calor.Compiler/bin/Debug/net10.0/calor.dll -i /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/direct-nullable-input-expression/module.calr -o /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/direct-nullable-input-expression/out.g.cs",
+        "defaultCliWorkingDirectory": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/native-string-1383",
+        "defaultCliDiagnostics": [
+          "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/direct-nullable-input-expression/module.calr(8,20): error Calor0274: Argument to parameter 'value' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary."
+        ]
+      }
+    },
+    {
+      "name": "direct-nullable-input-statement",
+      "sourceHashMatches": true,
+      "baseline": {
+        "sourceSha256": "1308ebc5da6cd9de515d3f9206acb4f4124495e18a9e24cb913902adca92d9ba",
+        "rawBinderDiagnostics": [
+          {
+            "code": "Calor0208",
+            "span": [
+              128,
+              213
+            ],
+            "line": 8,
+            "column": 5,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} \u00a7A \u00a7C{System.Environment.GetEnvironmentVariable} \u00a7A \"CALOR_N4_UNSET\" \u00a7/C \u00a7/C",
+            "message": "No overload of internal call 'Take' matches (STRING?). Candidates: Take(str) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Atake]"
+          }
+        ],
+        "rawPropagatedDiagnostics": [
+          {
+            "code": "Calor0208",
+            "span": [
+              128,
+              213
+            ],
+            "line": 8,
+            "column": 5,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} \u00a7A \u00a7C{System.Environment.GetEnvironmentVariable} \u00a7A \"CALOR_N4_UNSET\" \u00a7/C \u00a7/C",
+            "message": "No overload of internal call 'Take' matches (STRING?). Candidates: Take(str) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Atake]"
+          }
+        ],
+        "defaultProgramCompileHasErrors": true,
+        "defaultProgramCompileDiagnostics": [
+          {
+            "code": "Calor0208",
+            "span": [
+              128,
+              213
+            ],
+            "line": 8,
+            "column": 5,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} \u00a7A \u00a7C{System.Environment.GetEnvironmentVariable} \u00a7A \"CALOR_N4_UNSET\" \u00a7/C \u00a7/C",
+            "message": "No overload of internal call 'Take' matches (STRING?). Candidates: Take(str) [calor://source/direct-nullable-input-statement.calr/module/m1/function/ast%3Atake]"
+          }
+        ],
+        "defaultCliExitCode": 1,
+        "defaultCliInvocation": "dotnet /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/n4-corpus-baseline/src/Calor.Compiler/bin/Debug/net10.0/calor.dll -i /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/direct-nullable-input-statement/module.calr -o /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/direct-nullable-input-statement/out.g.cs",
+        "defaultCliWorkingDirectory": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/n4-corpus-baseline",
+        "defaultCliDiagnostics": [
+          "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/direct-nullable-input-statement/module.calr(8,5): error Calor0208: No overload of internal call 'Take' matches (STRING?). Candidates: Take(str) [calor://source/path%3Abaseline%2Fdirect-nullable-input-statement%2Fmodule.calr/module/m1/function/ast%3Atake]"
+        ]
+      },
+      "candidate": {
+        "sourceSha256": "1308ebc5da6cd9de515d3f9206acb4f4124495e18a9e24cb913902adca92d9ba",
+        "rawBinderDiagnostics": [
+          {
+            "code": "Calor0274",
+            "span": [
+              140,
+              209
+            ],
+            "line": 8,
+            "column": 17,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "MethodArgument",
+            "shape": "ScalarString",
+            "replacesNativeOverloadError": true,
+            "snippet": "\u00a7C{System.Environment.GetEnvironmentVariable} \u00a7A \"CALOR_N4_UNSET\" \u00a7/C",
+            "message": "Argument to parameter 'value' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary."
+          }
+        ],
+        "rawPropagatedDiagnostics": [
+          {
+            "code": "Calor0274",
+            "span": [
+              140,
+              209
+            ],
+            "line": 8,
+            "column": 17,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "MethodArgument",
+            "shape": "ScalarString",
+            "replacesNativeOverloadError": true,
+            "snippet": "\u00a7C{System.Environment.GetEnvironmentVariable} \u00a7A \"CALOR_N4_UNSET\" \u00a7/C",
+            "message": "Argument to parameter 'value' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary."
+          }
+        ],
+        "defaultProgramCompileHasErrors": true,
+        "defaultProgramCompileDiagnostics": [
+          {
+            "code": "Calor0274",
+            "span": [
+              140,
+              209
+            ],
+            "line": 8,
+            "column": 17,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "MethodArgument",
+            "shape": "ScalarString",
+            "replacesNativeOverloadError": true,
+            "snippet": "\u00a7C{System.Environment.GetEnvironmentVariable} \u00a7A \"CALOR_N4_UNSET\" \u00a7/C",
+            "message": "Argument to parameter 'value' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary."
+          }
+        ],
+        "defaultCliExitCode": 1,
+        "defaultCliInvocation": "dotnet /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/native-string-1383/src/Calor.Compiler/bin/Debug/net10.0/calor.dll -i /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/direct-nullable-input-statement/module.calr -o /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/direct-nullable-input-statement/out.g.cs",
+        "defaultCliWorkingDirectory": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/native-string-1383",
+        "defaultCliDiagnostics": [
+          "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/direct-nullable-input-statement/module.calr(8,17): error Calor0274: Argument to parameter 'value' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary."
+        ]
+      }
+    },
+    {
+      "name": "nonnull-to-nullable-target-expression",
+      "sourceHashMatches": true,
+      "baseline": {
+        "sourceSha256": "b1d01c6cd22dcc2a5b0ebf4ea5149499aff77de6d9c5e473e1884ff91f88f9bf",
+        "rawBinderDiagnostics": [
+          {
+            "code": "Calor0208",
+            "span": [
+              132,
+              154
+            ],
+            "line": 8,
+            "column": 8,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} \u00a7A \"safe\" \u00a7/C",
+            "message": "No overload of internal call 'Take' matches (STRING). Candidates: Take(?str) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Atake]"
+          }
+        ],
+        "rawPropagatedDiagnostics": [
+          {
+            "code": "Calor0208",
+            "span": [
+              132,
+              154
+            ],
+            "line": 8,
+            "column": 8,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} \u00a7A \"safe\" \u00a7/C",
+            "message": "No overload of internal call 'Take' matches (STRING). Candidates: Take(?str) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Atake]"
+          }
+        ],
+        "defaultProgramCompileHasErrors": true,
+        "defaultProgramCompileDiagnostics": [
+          {
+            "code": "Calor0208",
+            "span": [
+              132,
+              154
+            ],
+            "line": 8,
+            "column": 8,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} \u00a7A \"safe\" \u00a7/C",
+            "message": "No overload of internal call 'Take' matches (STRING). Candidates: Take(?str) [calor://source/nonnull-to-nullable-target-expression.calr/module/m1/function/ast%3Atake]"
+          }
+        ],
+        "defaultCliExitCode": 1,
+        "defaultCliInvocation": "dotnet /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/n4-corpus-baseline/src/Calor.Compiler/bin/Debug/net10.0/calor.dll -i /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/nonnull-to-nullable-target-expression/module.calr -o /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/nonnull-to-nullable-target-expression/out.g.cs",
+        "defaultCliWorkingDirectory": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/n4-corpus-baseline",
+        "defaultCliDiagnostics": [
+          "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/nonnull-to-nullable-target-expression/module.calr(8,8): error Calor0208: No overload of internal call 'Take' matches (STRING). Candidates: Take(?str) [calor://source/path%3Abaseline%2Fnonnull-to-nullable-target-expression%2Fmodule.calr/module/m1/function/ast%3Atake]"
+        ]
+      },
+      "candidate": {
+        "sourceSha256": "b1d01c6cd22dcc2a5b0ebf4ea5149499aff77de6d9c5e473e1884ff91f88f9bf",
+        "rawBinderDiagnostics": [],
+        "rawPropagatedDiagnostics": [],
+        "defaultProgramCompileHasErrors": false,
+        "defaultProgramCompileDiagnostics": [],
+        "defaultCliExitCode": 0,
+        "defaultCliInvocation": "dotnet /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/native-string-1383/src/Calor.Compiler/bin/Debug/net10.0/calor.dll -i /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/nonnull-to-nullable-target-expression/module.calr -o /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/nonnull-to-nullable-target-expression/out.g.cs",
+        "defaultCliWorkingDirectory": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/native-string-1383",
+        "defaultCliDiagnostics": []
+      }
+    },
+    {
+      "name": "nonnull-to-nullable-target-statement",
+      "sourceHashMatches": true,
+      "baseline": {
+        "sourceSha256": "4a3a49ab101b7acd1115d27e1d7515b0d1b3b7799d28a9215eee79cb080e9fda",
+        "rawBinderDiagnostics": [
+          {
+            "code": "Calor0208",
+            "span": [
+              129,
+              151
+            ],
+            "line": 8,
+            "column": 5,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} \u00a7A \"safe\" \u00a7/C",
+            "message": "No overload of internal call 'Take' matches (STRING). Candidates: Take(?str) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Atake]"
+          }
+        ],
+        "rawPropagatedDiagnostics": [
+          {
+            "code": "Calor0208",
+            "span": [
+              129,
+              151
+            ],
+            "line": 8,
+            "column": 5,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} \u00a7A \"safe\" \u00a7/C",
+            "message": "No overload of internal call 'Take' matches (STRING). Candidates: Take(?str) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Atake]"
+          }
+        ],
+        "defaultProgramCompileHasErrors": true,
+        "defaultProgramCompileDiagnostics": [
+          {
+            "code": "Calor0208",
+            "span": [
+              129,
+              151
+            ],
+            "line": 8,
+            "column": 5,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} \u00a7A \"safe\" \u00a7/C",
+            "message": "No overload of internal call 'Take' matches (STRING). Candidates: Take(?str) [calor://source/nonnull-to-nullable-target-statement.calr/module/m1/function/ast%3Atake]"
+          }
+        ],
+        "defaultCliExitCode": 1,
+        "defaultCliInvocation": "dotnet /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/n4-corpus-baseline/src/Calor.Compiler/bin/Debug/net10.0/calor.dll -i /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/nonnull-to-nullable-target-statement/module.calr -o /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/nonnull-to-nullable-target-statement/out.g.cs",
+        "defaultCliWorkingDirectory": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/n4-corpus-baseline",
+        "defaultCliDiagnostics": [
+          "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/nonnull-to-nullable-target-statement/module.calr(8,5): error Calor0208: No overload of internal call 'Take' matches (STRING). Candidates: Take(?str) [calor://source/path%3Abaseline%2Fnonnull-to-nullable-target-statement%2Fmodule.calr/module/m1/function/ast%3Atake]"
+        ]
+      },
+      "candidate": {
+        "sourceSha256": "4a3a49ab101b7acd1115d27e1d7515b0d1b3b7799d28a9215eee79cb080e9fda",
+        "rawBinderDiagnostics": [],
+        "rawPropagatedDiagnostics": [],
+        "defaultProgramCompileHasErrors": false,
+        "defaultProgramCompileDiagnostics": [],
+        "defaultCliExitCode": 0,
+        "defaultCliInvocation": "dotnet /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/native-string-1383/src/Calor.Compiler/bin/Debug/net10.0/calor.dll -i /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/nonnull-to-nullable-target-statement/module.calr -o /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/nonnull-to-nullable-target-statement/out.g.cs",
+        "defaultCliWorkingDirectory": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/native-string-1383",
+        "defaultCliDiagnostics": []
+      }
+    },
+    {
+      "name": "already-applicable-object-alternative",
+      "sourceHashMatches": true,
+      "baseline": {
+        "sourceSha256": "e9cde5aed8c3da47080fcff21fa84dc2313b8916ce975aa4a41905e3cb4d648e",
+        "rawBinderDiagnostics": [],
+        "rawPropagatedDiagnostics": [],
+        "defaultProgramCompileHasErrors": false,
+        "defaultProgramCompileDiagnostics": [],
+        "defaultCliExitCode": 0,
+        "defaultCliInvocation": "dotnet /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/n4-corpus-baseline/src/Calor.Compiler/bin/Debug/net10.0/calor.dll -i /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/already-applicable-object-alternative/module.calr -o /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/already-applicable-object-alternative/out.g.cs",
+        "defaultCliWorkingDirectory": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/n4-corpus-baseline",
+        "defaultCliDiagnostics": []
+      },
+      "candidate": {
+        "sourceSha256": "e9cde5aed8c3da47080fcff21fa84dc2313b8916ce975aa4a41905e3cb4d648e",
+        "rawBinderDiagnostics": [
+          {
+            "code": "Calor0274",
+            "span": [
+              204,
+              273
+            ],
+            "line": 10,
+            "column": 20,
+            "propagatedOrError": false,
+            "disposition": "AnalysisOnly",
+            "boundary": "MethodArgument",
+            "shape": "ScalarString",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{System.Environment.GetEnvironmentVariable} \u00a7A \"CALOR_N4_UNSET\" \u00a7/C",
+            "message": "Argument to parameter 'value' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary."
+          }
+        ],
+        "rawPropagatedDiagnostics": [],
+        "defaultProgramCompileHasErrors": false,
+        "defaultProgramCompileDiagnostics": [],
+        "defaultCliExitCode": 0,
+        "defaultCliInvocation": "dotnet /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/native-string-1383/src/Calor.Compiler/bin/Debug/net10.0/calor.dll -i /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/already-applicable-object-alternative/module.calr -o /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/already-applicable-object-alternative/out.g.cs",
+        "defaultCliWorkingDirectory": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/native-string-1383",
+        "defaultCliDiagnostics": []
+      }
+    },
+    {
+      "name": "old-numeric-ambiguity-preserved",
+      "sourceHashMatches": true,
+      "baseline": {
+        "sourceSha256": "3479eb5859b514e87c780e62af3d966e498c4608563984a25415cbea62adaa1a",
+        "rawBinderDiagnostics": [
+          {
+            "code": "Calor0207",
+            "span": [
+              189,
+              206
+            ],
+            "line": 10,
+            "column": 8,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} \u00a7A 1 \u00a7/C",
+            "message": "Call 'Take(INT)' is ambiguous between: Take(i64) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Atake], Take(f64) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Adouble]"
+          }
+        ],
+        "rawPropagatedDiagnostics": [
+          {
+            "code": "Calor0207",
+            "span": [
+              189,
+              206
+            ],
+            "line": 10,
+            "column": 8,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} \u00a7A 1 \u00a7/C",
+            "message": "Call 'Take(INT)' is ambiguous between: Take(i64) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Atake], Take(f64) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Adouble]"
+          }
+        ],
+        "defaultProgramCompileHasErrors": true,
+        "defaultProgramCompileDiagnostics": [
+          {
+            "code": "Calor0207",
+            "span": [
+              189,
+              206
+            ],
+            "line": 10,
+            "column": 8,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} \u00a7A 1 \u00a7/C",
+            "message": "Call 'Take(INT)' is ambiguous between: Take(i64) [calor://source/old-numeric-ambiguity-preserved.calr/module/m1/function/ast%3Atake], Take(f64) [calor://source/old-numeric-ambiguity-preserved.calr/module/m1/function/ast%3Adouble]"
+          }
+        ],
+        "defaultCliExitCode": 1,
+        "defaultCliInvocation": "dotnet /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/n4-corpus-baseline/src/Calor.Compiler/bin/Debug/net10.0/calor.dll -i /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/old-numeric-ambiguity-preserved/module.calr -o /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/old-numeric-ambiguity-preserved/out.g.cs",
+        "defaultCliWorkingDirectory": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/n4-corpus-baseline",
+        "defaultCliDiagnostics": [
+          "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/old-numeric-ambiguity-preserved/module.calr(10,8): error Calor0207: Call 'Take(INT)' is ambiguous between: Take(i64) [calor://source/path%3Abaseline%2Fold-numeric-ambiguity-preserved%2Fmodule.calr/module/m1/function/ast%3Atake], Take(f64) [calor://source/path%3Abaseline%2Fold-numeric-ambiguity-preserved%2Fmodule.calr/module/m1/function/ast%3Adouble]"
+        ]
+      },
+      "candidate": {
+        "sourceSha256": "3479eb5859b514e87c780e62af3d966e498c4608563984a25415cbea62adaa1a",
+        "rawBinderDiagnostics": [
+          {
+            "code": "Calor0207",
+            "span": [
+              189,
+              206
+            ],
+            "line": 10,
+            "column": 8,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} \u00a7A 1 \u00a7/C",
+            "message": "Call 'Take(INT)' is ambiguous between: Take(i64) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Atake], Take(f64) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Adouble]"
+          }
+        ],
+        "rawPropagatedDiagnostics": [
+          {
+            "code": "Calor0207",
+            "span": [
+              189,
+              206
+            ],
+            "line": 10,
+            "column": 8,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} \u00a7A 1 \u00a7/C",
+            "message": "Call 'Take(INT)' is ambiguous between: Take(i64) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Atake], Take(f64) [calor://source/%3Cmemory%3E/module/m1/function/ast%3Adouble]"
+          }
+        ],
+        "defaultProgramCompileHasErrors": true,
+        "defaultProgramCompileDiagnostics": [
+          {
+            "code": "Calor0207",
+            "span": [
+              189,
+              206
+            ],
+            "line": 10,
+            "column": 8,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} \u00a7A 1 \u00a7/C",
+            "message": "Call 'Take(INT)' is ambiguous between: Take(i64) [calor://source/old-numeric-ambiguity-preserved.calr/module/m1/function/ast%3Atake], Take(f64) [calor://source/old-numeric-ambiguity-preserved.calr/module/m1/function/ast%3Adouble]"
+          }
+        ],
+        "defaultCliExitCode": 1,
+        "defaultCliInvocation": "dotnet /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/native-string-1383/src/Calor.Compiler/bin/Debug/net10.0/calor.dll -i /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/old-numeric-ambiguity-preserved/module.calr -o /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/old-numeric-ambiguity-preserved/out.g.cs",
+        "defaultCliWorkingDirectory": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/native-string-1383",
+        "defaultCliDiagnostics": [
+          "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/old-numeric-ambiguity-preserved/module.calr(10,8): error Calor0207: Call 'Take(INT)' is ambiguous between: Take(i64) [calor://source/path%3Acandidate%2Fold-numeric-ambiguity-preserved%2Fmodule.calr/module/m1/function/ast%3Atake], Take(f64) [calor://source/path%3Acandidate%2Fold-numeric-ambiguity-preserved%2Fmodule.calr/module/m1/function/ast%3Adouble]"
+        ]
+      }
+    },
+    {
+      "name": "old-nullable-string-ambiguity-handoff",
+      "sourceHashMatches": true,
+      "baseline": {
+        "sourceSha256": "84f3b68704bee830dd55d52e439b3a12a742eb9e484a9fd5c0a09c29eb14c72f",
+        "rawBinderDiagnostics": [
+          {
+            "code": "Calor0207",
+            "span": [
+              461,
+              475
+            ],
+            "line": 20,
+            "column": 12,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} value",
+            "message": "Call 'Take(STRING?)' is ambiguous between: NativeString.Take(any, INT) [calor://source/%3Cmemory%3E/module/m001/class/ast%3Ac001/method/ast%3Am003], NativeString.Take(any, BOOL) [calor://source/%3Cmemory%3E/module/m001/class/ast%3Ac001/method/ast%3Am004]"
+          }
+        ],
+        "rawPropagatedDiagnostics": [
+          {
+            "code": "Calor0207",
+            "span": [
+              461,
+              475
+            ],
+            "line": 20,
+            "column": 12,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} value",
+            "message": "Call 'Take(STRING?)' is ambiguous between: NativeString.Take(any, INT) [calor://source/%3Cmemory%3E/module/m001/class/ast%3Ac001/method/ast%3Am003], NativeString.Take(any, BOOL) [calor://source/%3Cmemory%3E/module/m001/class/ast%3Ac001/method/ast%3Am004]"
+          }
+        ],
+        "defaultProgramCompileHasErrors": true,
+        "defaultProgramCompileDiagnostics": [
+          {
+            "code": "Calor0207",
+            "span": [
+              461,
+              475
+            ],
+            "line": 20,
+            "column": 12,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "None",
+            "shape": "None",
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7C{Take} value",
+            "message": "Call 'Take(STRING?)' is ambiguous between: NativeString.Take(any, INT) [calor://source/old-nullable-string-ambiguity-handoff.calr/module/m001/class/ast%3Ac001/method/ast%3Am003], NativeString.Take(any, BOOL) [calor://source/old-nullable-string-ambiguity-handoff.calr/module/m001/class/ast%3Ac001/method/ast%3Am004]"
+          }
+        ],
+        "defaultCliExitCode": 1,
+        "defaultCliInvocation": "dotnet /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/n4-corpus-baseline/src/Calor.Compiler/bin/Debug/net10.0/calor.dll -i /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/old-nullable-string-ambiguity-handoff/module.calr -o /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/old-nullable-string-ambiguity-handoff/out.g.cs",
+        "defaultCliWorkingDirectory": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/n4-corpus-baseline",
+        "defaultCliDiagnostics": [
+          "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/old-nullable-string-ambiguity-handoff/module.calr(20,12): error Calor0207: Call 'Take(STRING?)' is ambiguous between: NativeString.Take(any, INT) [calor://source/path%3Abaseline%2Fold-nullable-string-ambiguity-handoff%2Fmodule.calr/module/m001/class/ast%3Ac001/method/ast%3Am003], NativeString.Take(any, BOOL) [calor://source/path%3Abaseline%2Fold-nullable-string-ambiguity-handoff%2Fmodule.calr/module/m001/class/ast%3Ac001/method/ast%3Am004]"
+        ]
+      },
+      "candidate": {
+        "sourceSha256": "84f3b68704bee830dd55d52e439b3a12a742eb9e484a9fd5c0a09c29eb14c72f",
+        "rawBinderDiagnostics": [
+          {
+            "code": "Calor0274",
+            "span": [
+              470,
+              475
+            ],
+            "line": 20,
+            "column": 21,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "MethodArgument",
+            "shape": "ScalarString",
+            "replacesNativeOverloadError": true,
+            "snippet": "value",
+            "message": "Argument to parameter 'value' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary."
+          }
+        ],
+        "rawPropagatedDiagnostics": [
+          {
+            "code": "Calor0274",
+            "span": [
+              470,
+              475
+            ],
+            "line": 20,
+            "column": 21,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "MethodArgument",
+            "shape": "ScalarString",
+            "replacesNativeOverloadError": true,
+            "snippet": "value",
+            "message": "Argument to parameter 'value' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary."
+          }
+        ],
+        "defaultProgramCompileHasErrors": true,
+        "defaultProgramCompileDiagnostics": [
+          {
+            "code": "Calor0274",
+            "span": [
+              470,
+              475
+            ],
+            "line": 20,
+            "column": 21,
+            "propagatedOrError": true,
+            "disposition": "CompilationError",
+            "boundary": "MethodArgument",
+            "shape": "ScalarString",
+            "replacesNativeOverloadError": true,
+            "snippet": "value",
+            "message": "Argument to parameter 'value' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary."
+          }
+        ],
+        "defaultCliExitCode": 1,
+        "defaultCliInvocation": "dotnet /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/native-string-1383/src/Calor.Compiler/bin/Debug/net10.0/calor.dll -i /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/old-nullable-string-ambiguity-handoff/module.calr -o /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/old-nullable-string-ambiguity-handoff/out.g.cs",
+        "defaultCliWorkingDirectory": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/native-string-1383",
+        "defaultCliDiagnostics": [
+          "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/old-nullable-string-ambiguity-handoff/module.calr(20,21): error Calor0274: Argument to parameter 'value' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary."
+        ]
+      }
+    },
+    {
+      "name": "invisible-argument-suppression",
+      "sourceHashMatches": true,
+      "baseline": {
+        "sourceSha256": "5a398159a4d3fe378c34996b09b5da5ee9e20202a0a728a2dd3c924bce4289c8",
+        "rawBinderDiagnostics": [],
+        "rawPropagatedDiagnostics": [],
+        "defaultProgramCompileHasErrors": true,
+        "defaultProgramCompileDiagnostics": [
+          {
+            "code": "Calor0200",
+            "span": [
+              22,
+              24
+            ],
+            "line": 2,
+            "column": 3,
+            "propagatedOrError": false,
+            "disposition": "NonBinderOrUnrouted",
+            "boundary": null,
+            "shape": null,
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7F",
+            "message": "Type 'Invisible' is not known to the Calor type checker. If it is a .NET type used through interop this is expected and the C# compiler will check it; if it is a typo, nothing else will catch it on this path."
+          },
+          {
+            "code": "Calor0200",
+            "span": [
+              95,
+              97
+            ],
+            "line": 5,
+            "column": 3,
+            "propagatedOrError": false,
+            "disposition": "NonBinderOrUnrouted",
+            "boundary": null,
+            "shape": null,
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7F",
+            "message": "Type 'Invisible' is not known to the Calor type checker. If it is a .NET type used through interop this is expected and the C# compiler will check it; if it is a typo, nothing else will catch it on this path."
+          },
+          {
+            "code": "Calor1002",
+            "span": [
+              0,
+              0
+            ],
+            "line": 14,
+            "column": 46,
+            "propagatedOrError": true,
+            "disposition": "NonBinderOrUnrouted",
+            "boundary": null,
+            "shape": null,
+            "replacesNativeOverloadError": false,
+            "snippet": "",
+            "message": "Generated C# failed compilation (CS0246): The type or namespace name 'Invisible' could not be found (are you missing a using directive or an assembly reference?)"
+          },
+          {
+            "code": "Calor1002",
+            "span": [
+              0,
+              0
+            ],
+            "line": 21,
+            "column": 49,
+            "propagatedOrError": true,
+            "disposition": "NonBinderOrUnrouted",
+            "boundary": null,
+            "shape": null,
+            "replacesNativeOverloadError": false,
+            "snippet": "",
+            "message": "Generated C# failed compilation (CS0246): The type or namespace name 'Invisible' could not be found (are you missing a using directive or an assembly reference?)"
+          }
+        ],
+        "defaultCliExitCode": 1,
+        "defaultCliInvocation": "dotnet /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/n4-corpus-baseline/src/Calor.Compiler/bin/Debug/net10.0/calor.dll -i /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/invisible-argument-suppression/module.calr -o /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/invisible-argument-suppression/out.g.cs",
+        "defaultCliWorkingDirectory": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/n4-corpus-baseline",
+        "defaultCliDiagnostics": [
+          "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/invisible-argument-suppression/module.calr(2,3): warning Calor0200: Type 'Invisible' is not known to the Calor type checker. If it is a .NET type used through interop this is expected and the C# compiler will check it; if it is a typo, nothing else will catch it on this path.",
+          "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/invisible-argument-suppression/module.calr(5,3): warning Calor0200: Type 'Invisible' is not known to the Calor type checker. If it is a .NET type used through interop this is expected and the C# compiler will check it; if it is a typo, nothing else will catch it on this path.",
+          "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/invisible-argument-suppression/module.g.cs(14,46): error Calor1002: Generated C# failed compilation (CS0246): The type or namespace name 'Invisible' could not be found (are you missing a using directive or an assembly reference?)",
+          "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/baseline/invisible-argument-suppression/module.g.cs(21,49): error Calor1002: Generated C# failed compilation (CS0246): The type or namespace name 'Invisible' could not be found (are you missing a using directive or an assembly reference?)"
+        ]
+      },
+      "candidate": {
+        "sourceSha256": "5a398159a4d3fe378c34996b09b5da5ee9e20202a0a728a2dd3c924bce4289c8",
+        "rawBinderDiagnostics": [
+          {
+            "code": "Calor0274",
+            "span": [
+              181,
+              186
+            ],
+            "line": 7,
+            "column": 20,
+            "propagatedOrError": false,
+            "disposition": "AnalysisOnly",
+            "boundary": "MethodArgument",
+            "shape": "ScalarString",
+            "replacesNativeOverloadError": false,
+            "snippet": "value",
+            "message": "Argument to parameter 'value' declares non-nullable 'string' but the value may be null (source annotation: 'Annotated'). Change the parameter type to '?string' or add an explicit non-null check at the interop boundary."
+          }
+        ],
+        "rawPropagatedDiagnostics": [],
+        "defaultProgramCompileHasErrors": true,
+        "defaultProgramCompileDiagnostics": [
+          {
+            "code": "Calor0200",
+            "span": [
+              22,
+              24
+            ],
+            "line": 2,
+            "column": 3,
+            "propagatedOrError": false,
+            "disposition": "NonBinderOrUnrouted",
+            "boundary": null,
+            "shape": null,
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7F",
+            "message": "Type 'Invisible' is not known to the Calor type checker. If it is a .NET type used through interop this is expected and the C# compiler will check it; if it is a typo, nothing else will catch it on this path."
+          },
+          {
+            "code": "Calor0200",
+            "span": [
+              95,
+              97
+            ],
+            "line": 5,
+            "column": 3,
+            "propagatedOrError": false,
+            "disposition": "NonBinderOrUnrouted",
+            "boundary": null,
+            "shape": null,
+            "replacesNativeOverloadError": false,
+            "snippet": "\u00a7F",
+            "message": "Type 'Invisible' is not known to the Calor type checker. If it is a .NET type used through interop this is expected and the C# compiler will check it; if it is a typo, nothing else will catch it on this path."
+          },
+          {
+            "code": "Calor1002",
+            "span": [
+              0,
+              0
+            ],
+            "line": 14,
+            "column": 46,
+            "propagatedOrError": true,
+            "disposition": "NonBinderOrUnrouted",
+            "boundary": null,
+            "shape": null,
+            "replacesNativeOverloadError": false,
+            "snippet": "",
+            "message": "Generated C# failed compilation (CS0246): The type or namespace name 'Invisible' could not be found (are you missing a using directive or an assembly reference?)"
+          },
+          {
+            "code": "Calor1002",
+            "span": [
+              0,
+              0
+            ],
+            "line": 21,
+            "column": 49,
+            "propagatedOrError": true,
+            "disposition": "NonBinderOrUnrouted",
+            "boundary": null,
+            "shape": null,
+            "replacesNativeOverloadError": false,
+            "snippet": "",
+            "message": "Generated C# failed compilation (CS0246): The type or namespace name 'Invisible' could not be found (are you missing a using directive or an assembly reference?)"
+          }
+        ],
+        "defaultCliExitCode": 1,
+        "defaultCliInvocation": "dotnet /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/native-string-1383/src/Calor.Compiler/bin/Debug/net10.0/calor.dll -i /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/invisible-argument-suppression/module.calr -o /Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/invisible-argument-suppression/out.g.cs",
+        "defaultCliWorkingDirectory": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/native-string-1383",
+        "defaultCliDiagnostics": [
+          "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/invisible-argument-suppression/module.calr(2,3): warning Calor0200: Type 'Invisible' is not known to the Calor type checker. If it is a .NET type used through interop this is expected and the C# compiler will check it; if it is a typo, nothing else will catch it on this path.",
+          "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/invisible-argument-suppression/module.calr(5,3): warning Calor0200: Type 'Invisible' is not known to the Calor type checker. If it is a .NET type used through interop this is expected and the C# compiler will check it; if it is a typo, nothing else will catch it on this path.",
+          "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/invisible-argument-suppression/module.g.cs(14,46): error Calor1002: Generated C# failed compilation (CS0246): The type or namespace name 'Invisible' could not be found (are you missing a using directive or an assembly reference?)",
+          "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/tmp/native-controls-v2/candidate/invisible-argument-suppression/module.g.cs(21,49): error Calor1002: Generated C# failed compilation (CS0246): The type or namespace name 'Invisible' could not be found (are you missing a using directive or an assembly reference?)"
+        ]
+      }
+    }
+  ]
+}

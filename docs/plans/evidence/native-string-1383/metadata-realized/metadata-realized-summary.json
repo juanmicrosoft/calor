@@ -1,0 +1,73 @@
+{
+  "baseline": {
+    "gitHead": "8f9891a1a07f786a76a293017959c3edf28412bf",
+    "binderBlob": "36a6a79b06257ab01a6a405270e581878696bddd",
+    "scopeBlob": "2f3e5ecc083b8301cea096ae4a3c1f1040f81eb0",
+    "loadedCompilerAssembly": {
+      "Name": "calor",
+      "Version": "0.21.0.0",
+      "Location": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/metadata-realized-probe/bin/Debug/net10.0/calor.dll",
+      "Sha256": "e0c26efc29f7c70ede0206d72a799dd02d6d10ef5d38005ce98e06f80235ed5b",
+      "InformationalVersion": "0.21.0",
+      "FileExists": true
+    },
+    "generatedCompilerReferencePoolCount": 184,
+    "metadataContextCompilationReferenceCount": 168,
+    "metadataContextReferenceSetSha256": "10f43cd51bd432ddbe066398f55be4c631b411995b88aba98055907961ffbab1",
+    "poolMinusContextCount": 16,
+    "poolMinusContextFileNames": [
+      "Calor.Compiler.Tests.dll",
+      "Calor.Runtime.dll",
+      "DiffPlex.dll",
+      "Microsoft.ApplicationInsights.dll",
+      "Microsoft.CodeAnalysis.CSharp.dll",
+      "Microsoft.CodeAnalysis.dll",
+      "Microsoft.Extensions.FileSystemGlobbing.dll",
+      "Microsoft.VisualBasic.Core.dll",
+      "Microsoft.Win32.Primitives.dll",
+      "Microsoft.Win32.Registry.dll",
+      "Microsoft.Z3.dll",
+      "System.CommandLine.dll",
+      "System.dll",
+      "Ulid.dll",
+      "WindowsBase.dll",
+      "calor.dll"
+    ]
+  },
+  "candidate": {
+    "gitHead": "7698718b1d65471c07b4e459e29335fc6a84a90c",
+    "binderBlob": "124d551927ec8819a268fb5814dec57f48cba5c6",
+    "scopeBlob": "f8e2189a7795be7a9fb84bdb70c38db728b7360b",
+    "loadedCompilerAssembly": {
+      "Name": "calor",
+      "Version": "0.21.0.0",
+      "Location": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/n4-corpus-evidence/metadata-realized-probe/bin/Debug/net10.0/calor.dll",
+      "Sha256": "735fa2eccf16a5be45bc9cb6a36718fd118ef50ae65d2267ea8b94a3a620036f",
+      "InformationalVersion": "0.21.0",
+      "FileExists": true
+    },
+    "generatedCompilerReferencePoolCount": 184,
+    "metadataContextCompilationReferenceCount": 168,
+    "metadataContextReferenceSetSha256": "10f43cd51bd432ddbe066398f55be4c631b411995b88aba98055907961ffbab1",
+    "poolMinusContextCount": 16,
+    "poolMinusContextFileNames": [
+      "Calor.Compiler.Tests.dll",
+      "Calor.Runtime.dll",
+      "DiffPlex.dll",
+      "Microsoft.ApplicationInsights.dll",
+      "Microsoft.CodeAnalysis.CSharp.dll",
+      "Microsoft.CodeAnalysis.dll",
+      "Microsoft.Extensions.FileSystemGlobbing.dll",
+      "Microsoft.VisualBasic.Core.dll",
+      "Microsoft.Win32.Primitives.dll",
+      "Microsoft.Win32.Registry.dll",
+      "Microsoft.Z3.dll",
+      "System.CommandLine.dll",
+      "System.dll",
+      "Ulid.dll",
+      "WindowsBase.dll",
+      "calor.dll"
+    ]
+  },
+  "selectedReferenceSetsEqual": true
+}

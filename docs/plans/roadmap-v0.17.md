@@ -258,10 +258,23 @@ that a `dotnet test` can re-run is worth more per unit of evidence than one that
   one additional unresolved receiver and nine unknown-call sites behind
   explicit interop; these reductions do not establish new native analysis or
   proven purity. Calor0425 stays **117** across **326** enforced modules.
-  The exact current pin follows this later measurement; R2's frozen **MISS**
+  The exact pin at that checkpoint followed this measurement; R2's frozen **MISS**
   and v0.17's historical **324** remain intact.
   Source/opacity limits are recorded in
   [the #1191 measurement amendment](../../bench/phase0-agent-native/binder-expression-measurement.md).
+- **Later product measurement, v0.22 #1383 (not a revised study outcome).**
+  At implementation `f642b11aa5249dc1f9369195af25dcc881ce9f43`,
+  measured through `bde9ee88627acb1fcdf62494b701b24856fa5881`, native
+  non-null STRING input to a nullable-accepting parameter resolves in
+  `Serilog/Events/LogEventProperty.cs`. Its old0208 no longer stops binding.
+  The effect-pass denominator moves **326 -> 327**, exclusions **38 -> 37**;
+  Calor0425 remains **117** diagnostics across **47** modules. This is not a
+  newly clean compilation: the default CLI proceeds to existing effect errors.
+  Serilog's Calor0411 upper-bound count moves **551 -> 555** across **61 -> 62**
+  modules. Source/coverage/opacity coordinates stay fixed; diagnostic and
+  propagated-error changes are explicitly recorded, not relabeled as safety.
+  The exact current pin follows this product checkpoint. R2's frozen **MISS**,
+  its recovery of **15**, v0.17's **324** and #1191's **326** remain historical.
 - **R2 — the change itself.** Scoped by measurement, not by guess: R1 runs
   first and its answer picks the target. The pre-registered acceptance is a **move in
   `ModulesEnforced`**, published per subject against gate 9's existing floors (250 aggregate;

@@ -58,7 +58,9 @@ public class BindingDiagnosticPolicyTests
         }
         foreach (var rule in BindingDiagnosticPolicy.ReceivingRules)
         {
-            Assert.Equal(BindingDiagnosticDisposition.AnalysisOnly, rule.Policy.Disposition);
+            Assert.Equal(rule.Context.ReplacesNativeOverloadError
+                ? BindingDiagnosticDisposition.CompilationError
+                : BindingDiagnosticDisposition.AnalysisOnly, rule.Policy.Disposition);
             Assert.False(string.IsNullOrWhiteSpace(rule.Policy.Justification));
             Assert.True(rule.Policy.OwningIssue > 0);
         }

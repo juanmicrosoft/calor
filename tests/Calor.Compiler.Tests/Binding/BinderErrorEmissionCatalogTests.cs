@@ -41,6 +41,7 @@ public sealed class BinderErrorEmissionCatalogTests
         Assert.Empty(routes.Where(route =>
             route.Disposition is not "CompilationError"
                 and not "AnalysisOnly"
+                and not "ReceivingContextDependent"
                 and not "CompilationErrorForwarder"));
 
         var binderRoutes = routes.Where(route =>
@@ -463,6 +464,17 @@ public sealed class BinderErrorEmissionCatalogTests
                 "Error-capable binder diagnostic source site is not in BindingDiagnosticPolicy.Catalog.");
         }
 
+        var overrides = BindingDiagnosticPolicy.ReceivingRules
+            .Where(receiving => receiving.Code == codes[0]
+                && receiving.Policy.Disposition != policy.Disposition)
+            .Select(receiving => new GoldenReceivingOverride(
+                receiving.Context.Boundary.ToString(),
+                receiving.Context.Shape.ToString(),
+                receiving.Context.ReplacesNativeOverloadError,
+                receiving.Policy.Disposition.ToString(),
+                receiving.Policy.OwningIssue,
+                receiving.Policy.Justification))
+            .ToArray();
         return new GoldenEmissionRecord(
             route.SiteId,
             route.Member,
@@ -470,9 +482,10 @@ public sealed class BinderErrorEmissionCatalogTests
             route.HelperPath,
             codes,
             route.Severity,
-            policy.Disposition.ToString(),
+            overrides.Length == 0 ? policy.Disposition.ToString() : "ReceivingContextDependent",
             policy.OwningIssue,
-            policy.Justification);
+            policy.Justification,
+            overrides.Length == 0 ? null : overrides);
     }
 
     private static string NormalizeJson(IReadOnlyList<GoldenEmissionRecord> records) =>
@@ -498,6 +511,15 @@ public sealed class BinderErrorEmissionCatalogTests
         string Severity,
         string Disposition,
         int? OwningIssue,
+        string Reason,
+        GoldenReceivingOverride[]? ReceivingOverrides = null);
+
+    private sealed record GoldenReceivingOverride(
+        string Boundary,
+        string Shape,
+        bool ReplacesNativeOverloadError,
+        string Disposition,
+        int OwningIssue,
         string Reason);
 
     private sealed record DiagnosticEmissionRoute(

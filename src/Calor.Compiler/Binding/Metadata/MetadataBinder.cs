@@ -55,14 +55,21 @@ internal sealed class MetadataBinder
     public MetadataBinderResult ResolveCall(
         ITypeSymbol receiverType,
         string methodName,
-        IReadOnlyList<MetadataArgument> arguments)
+        IReadOnlyList<MetadataArgument> arguments) =>
+        ResolveCall(receiverType, methodName, arguments, preserveArrayAnnotations: false);
+
+    internal MetadataBinderResult ResolveCall(
+        ITypeSymbol receiverType,
+        string methodName,
+        IReadOnlyList<MetadataArgument> arguments,
+        bool preserveArrayAnnotations)
     {
         if (receiverType is null) throw new ArgumentNullException(nameof(receiverType));
         if (methodName is null) throw new ArgumentNullException(nameof(methodName));
 
         // Primary path: TryResolveOverload from the S1 mechanism, extended
         // with System.Linq usings and a smarter static-vs-instance heuristic.
-        var resolved = TryResolveWithLinq(receiverType, methodName, arguments, out var reason);
+        var resolved = TryResolveWithLinq(receiverType, methodName, arguments, preserveArrayAnnotations, out var reason);
         if (resolved is { } selected)
         {
             return selected;
@@ -70,7 +77,7 @@ internal sealed class MetadataBinder
 
         // Fallback: static-only retry when the primary path chose instance
         // syntax on a mixed group but no instance overload matched the arity.
-        var staticFallback = TryResolveStaticOnly(receiverType, methodName, arguments);
+        var staticFallback = TryResolveStaticOnly(receiverType, methodName, arguments, preserveArrayAnnotations);
         if (staticFallback is { } staticSelected)
         {
             return staticSelected;
@@ -89,7 +96,7 @@ internal sealed class MetadataBinder
         foreach (var declaringType in MetadataMemberLookup.DeclaringTypes(
                      _context.HostCompilationForBinder, receiverType, methodName))
         {
-            var inherited = TryResolveWithLinq(declaringType, methodName, arguments, out _);
+            var inherited = TryResolveWithLinq(declaringType, methodName, arguments, preserveArrayAnnotations, out _);
             if (inherited is { } inheritedSelected)
             {
                 return inheritedSelected;
@@ -168,6 +175,49 @@ internal sealed class MetadataBinder
             .FirstOrDefault();
     }
 
+    /// <summary>
+    /// Resolves a readable property or field using the actual access form.
+    /// Roslyn owns inheritance, hiding, accessibility and static/instance rules.
+    /// The declaration symbol, rather than the probe's flow state, owns nullability.
+    /// </summary>
+    public ISymbol? ResolveMemberRead(
+        INamedTypeSymbol receiverType, string memberName, bool isStatic, out string? reason)
+    {
+        var receiverName = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var receiver = isStatic ? receiverName : $"(({receiverName})default!)";
+        var tree = CSharpSyntaxTree.ParseText(
+            "#nullable enable\nclass __CalorMemberReadProbe { void Probe() {\n" +
+            $"var __value = {receiver}.@{memberName};\n" +
+            "} }");
+        var compilation = _context.HostCompilationForBinder.AddSyntaxTrees(tree);
+        var model = compilation.GetSemanticModel(tree);
+        var errors = model.GetDiagnostics().Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).ToArray();
+        if (errors.Length != 0)
+        {
+            reason = string.Join("; ", errors.Select(d => $"{d.Id}: {d.GetMessage()}"));
+            return null;
+        }
+
+        var value = tree.GetRoot().DescendantNodes().OfType<VariableDeclaratorSyntax>()
+            .Single().Initializer!.Value;
+        if (value is not MemberAccessExpressionSyntax access
+            || !SymbolEqualityComparer.Default.Equals(model.GetTypeInfo(access.Expression).Type, receiverType))
+        {
+            reason = $"Receiver '{receiverName}' does not resolve to the supplied type identity in this metadata context.";
+            return null;
+        }
+        var symbol = model.GetSymbolInfo(value).Symbol;
+        if (symbol is IPropertySymbol { IsIndexer: false, GetMethod: not null }
+            or IFieldSymbol)
+        {
+            reason = null;
+            return symbol;
+        }
+
+        reason = $"'{receiverName}.{memberName}' is not a readable property or field.";
+        return null;
+    }
+
     // -------- helpers --------
 
     /// <summary>
@@ -179,6 +229,7 @@ internal sealed class MetadataBinder
         ITypeSymbol receiverType,
         string methodName,
         IReadOnlyList<MetadataArgument> arguments,
+        bool preserveArrayAnnotations,
         out string? unresolvedReason)
     {
         var receiverFq = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
@@ -211,7 +262,7 @@ internal sealed class MetadataBinder
             return null;
         }
 
-        var source = BuildSyntheticSource(receiverExpr, methodName, arguments);
+        var source = BuildSyntheticSource(receiverExpr, methodName, arguments, preserveArrayAnnotations);
         return QueryInvocation(source, out unresolvedReason);
     }
 
@@ -224,20 +275,22 @@ internal sealed class MetadataBinder
     private MetadataBinderResult? TryResolveStaticOnly(
         ITypeSymbol receiverType,
         string methodName,
-        IReadOnlyList<MetadataArgument> arguments)
+        IReadOnlyList<MetadataArgument> arguments,
+        bool preserveArrayAnnotations)
     {
         var receiverFq = receiverType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-        var source = BuildSyntheticSource(receiverFq, methodName, arguments);
+        var source = BuildSyntheticSource(receiverFq, methodName, arguments, preserveArrayAnnotations);
         return QueryInvocation(source, out _);
     }
 
-    internal static string[] BuildArgumentExpressions(IReadOnlyList<MetadataArgument> arguments)
+    internal static string[] BuildArgumentExpressions(
+        IReadOnlyList<MetadataArgument> arguments, bool preserveArrayAnnotations = false)
     {
         var exprs = new string[arguments.Count];
         for (int i = 0; i < arguments.Count; i++)
         {
             var argument = arguments[i];
-            var argFq = argument.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var argFq = argument.Type.ToDisplayString(ArgumentTypeFormat(argument.Type, preserveArrayAnnotations));
             exprs[i] = arguments[i].RefKind switch
             {
                 RefKind.Out => $"out __arg{i}",
@@ -247,25 +300,47 @@ internal sealed class MetadataBinder
             };
             if (argument.Name is { Length: > 0 } name)
                 exprs[i] = $"@{name}: {exprs[i]}";
+            exprs[i] = InArrayNullableContext(exprs[i], argument.Type, preserveArrayAnnotations);
         }
         return exprs;
     }
 
-    internal static string BuildArgumentLocals(IReadOnlyList<MetadataArgument> arguments) =>
+    internal static string BuildArgumentLocals(
+        IReadOnlyList<MetadataArgument> arguments, bool preserveArrayAnnotations = false) =>
         string.Concat(arguments.Select((argument, index) =>
             argument.RefKind == RefKind.None
                 ? ""
-                : $"{argument.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)} __arg{index} = default!;\n"));
+                : InArrayNullableContext(
+                    $"{argument.Type.ToDisplayString(ArgumentTypeFormat(argument.Type, preserveArrayAnnotations))} __arg{index} = default!;\n",
+                    argument.Type, preserveArrayAnnotations)));
+
+    private static string InArrayNullableContext(string syntax, ITypeSymbol type, bool preserveArrayAnnotations) =>
+        preserveArrayAnnotations && type is IArrayTypeSymbol && HasObliviousReferenceAnnotation(type)
+            ? $"\n#nullable disable\n{syntax}\n#nullable enable\n"
+            : syntax;
+
+    private static bool HasObliviousReferenceAnnotation(ITypeSymbol type) =>
+        type.IsReferenceType && type.NullableAnnotation == Microsoft.CodeAnalysis.NullableAnnotation.None
+        || type is IArrayTypeSymbol array && HasObliviousReferenceAnnotation(array.ElementType)
+        || type is INamedTypeSymbol named && named.TypeArguments.Any(HasObliviousReferenceAnnotation);
+
+    private static SymbolDisplayFormat ArgumentTypeFormat(ITypeSymbol type, bool preserveArrayAnnotations) =>
+        preserveArrayAnnotations && type is IArrayTypeSymbol
+            ? SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(
+                SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions
+                | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier)
+            : SymbolDisplayFormat.FullyQualifiedFormat;
 
     private static string BuildSyntheticSource(
-        string receiverExpr, string methodName, IReadOnlyList<MetadataArgument> arguments)
+        string receiverExpr, string methodName, IReadOnlyList<MetadataArgument> arguments,
+        bool preserveArrayAnnotations)
     {
         return "#nullable enable\n" +
             "using System.Linq;\n" +
             "using System.Collections.Generic;\n" +
             "class __CalorS4Synth { static void __Probe() {\n" +
-            BuildArgumentLocals(arguments) +
-            $"    _ = {receiverExpr}.{methodName}({string.Join(", ", BuildArgumentExpressions(arguments))});\n" +
+            BuildArgumentLocals(arguments, preserveArrayAnnotations) +
+            $"    _ = {receiverExpr}.{methodName}({string.Join(", ", BuildArgumentExpressions(arguments, preserveArrayAnnotations))});\n" +
             "} }\n";
     }
 
@@ -387,6 +462,7 @@ internal readonly struct MetadataBinderResult
     public string? UnresolvedReason { get; }
     public bool IsResolved => Symbol is not null;
     public IReadOnlyList<MetadataCallArgument> Arguments { get; }
+    internal BoundType? LegacyReturnType { get; init; }
 
     private MetadataBinderResult(
         IMethodSymbol? symbol,
@@ -516,7 +592,10 @@ internal readonly struct MetadataBinderResult
             return new ArrayBoundType(
                 elementType: elementBound,
                 rank: arraySymbol.Rank,
-                nullableAnnotation: MapAnnotation(arraySymbol.NullableAnnotation));
+                nullableAnnotation: MapAnnotation(arraySymbol.NullableAnnotation))
+            {
+                RoslynSymbol = arraySymbol
+            };
         }
 
         // v0.14 §S7 — preserve per-argument NullableAnnotation on generic

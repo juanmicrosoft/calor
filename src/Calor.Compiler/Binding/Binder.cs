@@ -198,8 +198,8 @@ public sealed class Binder
         var binder = GetOrCreateMetadataBinder();
         if (binder is null) return null;
 
-        // Resolve receiver type via MetadataContext (reachable through binder).
-        var ctx = Metadata.MetadataContext.Create();
+        // Member reads and their receiving calls must use the same actual reference set.
+        var ctx = binder.Context;
         var receiverType = ctx.TryResolveType(receiverName);
         if (receiverType is null) return null;
 
@@ -217,6 +217,7 @@ public sealed class Binder
         var metaArgs = new Metadata.MetadataArgument[args.Count];
         for (var i = 0; i < args.Count; i++)
         {
+            var arrayType = NullabilityChecker.GetMethodInputArrayType(args[i]);
             var display = args[i].Type.DisplayString;
             // Strip only recognized nullable annotations for metadata lookup.
             // Explicit runtime Option<T> retains its distinct representation.
@@ -225,7 +226,9 @@ public sealed class Binder
             {
                 trimmed = referent;
             }
-            var t = ResolveBclArgumentType(ctx, trimmed) ?? ctx.TryResolveType("System.Object");
+            var t = arrayType is not null
+                ? GetMetadataArrayInputType(ctx, arrayType)
+                : ResolveBclArgumentType(ctx, trimmed) ?? ctx.TryResolveType("System.Object");
             if (t is null) return null;
             var modifier = argumentModifiers != null && i < argumentModifiers.Count
                 ? argumentModifiers[i]
@@ -244,6 +247,14 @@ public sealed class Binder
         var result = binder.ResolveCall(receiverType, methodName, metaArgs);
         if (!result.IsResolved) return null;
 
+        if (result.Symbol!.IsGenericMethod && metaArgs.Any(argument => argument.Type is Microsoft.CodeAnalysis.IArrayTypeSymbol))
+        {
+            var preserved = binder.ResolveCall(receiverType, methodName, metaArgs, preserveArrayAnnotations: true);
+            if (!Microsoft.CodeAnalysis.SymbolEqualityComparer.Default.Equals(result.Symbol, preserved.Symbol))
+                return null;
+            // Accurate method-input facts must not implicitly expand initialization/return policy.
+            result = preserved with { LegacyReturnType = result.GetReturnBoundTypeEx() };
+        }
         return result;
     }
 
@@ -268,6 +279,31 @@ public sealed class Binder
             indices[mapping.ArgumentIndex] = mapping.Parameter.Ordinal - receiverOffset;
         }
         return indices;
+    }
+
+    private static Microsoft.CodeAnalysis.ITypeSymbol? GetMetadataArrayInputType(
+        Metadata.MetadataContext context, BoundTypes.BoundType type)
+    {
+        Microsoft.CodeAnalysis.ITypeSymbol? symbol = type switch
+        {
+            BoundTypes.ArrayBoundType { RoslynSymbol: { } arraySymbol } => arraySymbol,
+            BoundTypes.ArrayBoundType array => GetMetadataArrayInputType(context, array.ElementType) is { } element
+                ? context.HostCompilationForBinder.CreateArrayTypeSymbol(element, array.Rank, element.NullableAnnotation)
+                : null,
+            BoundTypes.NominalBoundType { RoslynSymbol: { } nominalSymbol } => nominalSymbol,
+            BoundTypes.NominalBoundType nominal when TypeIdentity.Canonicalize(nominal.QualifiedName) == "STRING" =>
+                context.TryResolveType("System.String"),
+            BoundTypes.PrimitiveBoundType primitive when IsBuiltInValueTypeName(primitive.Name) =>
+                context.TryResolveType(TypeIdentity.MapShortTypeNameToFullName(primitive.Name)),
+            _ => null
+        };
+        var annotation = NullabilityChecker.GetAnnotation(type) switch
+        {
+            BoundTypes.NullableAnnotation.Annotated => Microsoft.CodeAnalysis.NullableAnnotation.Annotated,
+            BoundTypes.NullableAnnotation.NotAnnotated => Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated,
+            _ => Microsoft.CodeAnalysis.NullableAnnotation.None
+        };
+        return symbol?.WithNullableAnnotation(annotation);
     }
 
     private static Microsoft.CodeAnalysis.ITypeSymbol? ResolveBclArgumentType(
@@ -317,10 +353,10 @@ public sealed class Binder
             {
                 var parameter = match.Function.Parameters[mapping.ParameterIndex];
                 if (parameter.Modifier.HasFlag(ParameterModifier.Out)
-                    || !TryBuildStringTarget(mapping.ParameterType, out var target, match.Function))
+                    || !TryBuildMethodArgumentTarget(mapping.ParameterType, out var target, match.Function))
                     continue;
                 ValidateCallArgument(arguments[mapping.ArgumentIndex], parameter.Name, target!,
-                    mapping.IsExpandedParams, reported);
+                    mapping.IsExpandedParams, reported, resolution.ReplacesNativeOverloadError);
             }
         }
     }
@@ -330,24 +366,46 @@ public sealed class Binder
         string parameterName,
         BoundTypes.BoundType target,
         bool isExpandedParams,
-        HashSet<(Parsing.TextSpan Span, string ParameterName, string TargetShape)> reported)
+        HashSet<(Parsing.TextSpan Span, string ParameterName, string TargetShape)> reported,
+        bool replacesNativeOverloadError = false)
     {
-        if (!NullabilityChecker.IsPossiblyNullAssignedTo(argument, target))
+        if (!NullabilityChecker.IsPossiblyNullAssignedTo(
+                argument, target, BindingReceivingBoundary.MethodArgument, out var arrayMismatch))
             return;
 
         var (targetShapeLabel, fixHintTargetLabel) = DescribeStringTargetShape(target);
+        if (target is BoundTypes.ArrayBoundType)
+            targetShapeLabel = $"'{target.DisplayString}'";
         if (!reported.Add((argument.Span, parameterName, targetShapeLabel)))
             return;
         var receivingPosition = isExpandedParams ? "Expanded argument to element of params parameter" : "Argument to parameter";
         var parameterPart = isExpandedParams ? "parameter element" : "parameter";
+        var message = $"{receivingPosition} '{parameterName}' declares non-nullable {targetShapeLabel} " +
+            $"but the value may be null (source annotation: '{DescribeAnnotation(argument)}'). " +
+            $"Change the {parameterPart} type to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.";
+        if (arrayMismatch != NullabilityChecker.ArrayMismatch.None)
+        {
+            var components = arrayMismatch switch
+            {
+                NullabilityChecker.ArrayMismatch.Container => "array container",
+                NullabilityChecker.ArrayMismatch.Elements => "STRING array elements",
+                _ => "array container and STRING elements"
+            };
+            var supplied = NullabilityChecker.GetMethodInputArrayType(argument)!;
+            message = $"{receivingPosition} '{parameterName}' requires non-null {components} of {targetShapeLabel}, " +
+                $"but the supplied {components} may be null (container annotation: '{supplied.NullableAnnotation}', " +
+                $"element annotation: '{NullabilityChecker.GetAnnotation(supplied.ElementType)?.ToString() ?? "unsupported"}'). " +
+                "Change the affected receiving annotation or explicitly validate the relevant container/elements.";
+        }
+        var context = BindingDiagnosticContext.For(BindingReceivingBoundary.MethodArgument, target);
+        if (replacesNativeOverloadError && context.Shape == BindingReceivingShape.ScalarString)
+            context = context with { ReplacesNativeOverloadError = true };
         _diagnostics.Report(
             argument.Span,
             DiagnosticCode.NullableArgumentToNonNullableParameter,
-            $"{receivingPosition} '{parameterName}' declares non-nullable {targetShapeLabel} " +
-            $"but the value may be null (source annotation: '{DescribeAnnotation(argument)}'). " +
-            $"Change the {parameterPart} type to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
+            message,
             SemanticsVersion.NullabilitySeverityFor(),
-            BindingDiagnosticContext.For(BindingReceivingBoundary.MethodArgument, target));
+            context);
     }
 
     private static BoundTypes.BoundType? TryBuildBclArgumentTarget(Microsoft.CodeAnalysis.ITypeSymbol type)
@@ -355,19 +413,12 @@ public sealed class Binder
         if (type.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_String)
             return new BoundTypes.NominalBoundType("STRING", Metadata.MetadataBinderResult.MapAnnotation(type.NullableAnnotation));
 
+        if (type is Microsoft.CodeAnalysis.IArrayTypeSymbol)
+            return Metadata.MetadataBinderResult.ToBoundType(type);
+
         var nominal = Metadata.MetadataBinderResult.ToNominalBoundType(type);
         if (nominal.IsKnownReferenceType)
             return nominal;
-
-        if (type is Microsoft.CodeAnalysis.IArrayTypeSymbol { Rank: 1 } array
-            && array.ElementType.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_String)
-        {
-            return new BoundTypes.ArrayBoundType(
-                new BoundTypes.NominalBoundType("STRING",
-                    Metadata.MetadataBinderResult.MapAnnotation(array.ElementType.NullableAnnotation)),
-                rank: array.Rank,
-                nullableAnnotation: Metadata.MetadataBinderResult.MapAnnotation(array.NullableAnnotation));
-        }
 
         if (type is Microsoft.CodeAnalysis.INamedTypeSymbol { IsGenericType: true } generic
             && generic.TypeArguments.Length == 1
@@ -1042,7 +1093,8 @@ public sealed class Binder
         BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious,
         BoundTypes.FunctionBoundType? functionType = null,
         BoundTypes.NominalBoundType? inferredReferenceType = null,
-        bool isTypeInferred = false)
+        bool isTypeInferred = false,
+        BoundTypes.ArrayBoundType? methodInputArrayType = null)
     {
         var symbol = new VariableSymbol(
             id,
@@ -1063,7 +1115,9 @@ public sealed class Binder
             functionType)
         {
             InferredReferenceType = inferredReferenceType,
-            IsTypeInferred = isTypeInferred
+            IsTypeInferred = isTypeInferred,
+            MethodInputArrayType = methodInputArrayType
+                ?? (isParameter && TryBuildMethodInputArrayType(typeName, out var arrayType) ? arrayType : null)
         };
         TrackSymbol(symbol);
         return symbol;
@@ -1081,7 +1135,8 @@ public sealed class Binder
         BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious,
         BoundTypes.FunctionBoundType? functionType = null,
         BoundTypes.NominalBoundType? inferredReferenceType = null,
-        bool isTypeInferred = false)
+        bool isTypeInferred = false,
+        BoundTypes.ArrayBoundType? methodInputArrayType = null)
     {
         var context = _declarationContext.IsNone ? _moduleSymbolId : _declarationContext;
         return CreateVariable(
@@ -1096,7 +1151,8 @@ public sealed class Binder
             nullableAnnotation: nullableAnnotation,
             functionType: functionType,
             inferredReferenceType: inferredReferenceType,
-            isTypeInferred: isTypeInferred);
+            isTypeInferred: isTypeInferred,
+            methodInputArrayType: methodInputArrayType);
     }
 
     private SymbolId CreateDeclarationId(
@@ -1389,7 +1445,8 @@ public sealed class Binder
             args,
             call.ArgumentNames,
             call.ArgumentModifiers,
-            call.TypeArguments);
+            call.TypeArguments,
+            allowNullableStringCompatibility: true);
         var bclResolution = resolution.Kind == OverloadResolutionKind.NotFound
             ? TryResolveBclCall(call.Target, args, call.ArgumentNames, call.ArgumentModifiers)
             : null;
@@ -1501,6 +1558,7 @@ public sealed class Binder
         using var _ = PushScope(_scope.CreateChild());
 
         var condition = BindExpression(whileStmt.Condition);
+        DeclareSuccessfulConditionPatterns(whileStmt.Condition, condition);
         var body = BindStatements(whileStmt.Body);
 
         return new BoundWhileStatement(whileStmt.Span, condition, body);
@@ -1513,6 +1571,7 @@ public sealed class Binder
         IReadOnlyList<BoundStatement> thenBody;
         {
             using var _ = PushScope(_scope.CreateChild());
+            DeclareSuccessfulConditionPatterns(ifStmt.Condition, condition);
             thenBody = BindStatements(ifStmt.ThenBody);
         }
 
@@ -1521,6 +1580,7 @@ public sealed class Binder
         {
             var elseIfCondition = BindExpression(elseIf.Condition);
             using var _ = PushScope(_scope.CreateChild());
+            DeclareSuccessfulConditionPatterns(elseIf.Condition, elseIfCondition);
             var elseIfBody = BindStatements(elseIf.Body);
             elseIfClauses.Add(new BoundElseIfClause(elseIf.Span, elseIfCondition, elseIfBody));
         }
@@ -1654,7 +1714,8 @@ public sealed class Binder
             nullableAnnotation: declaredAnnotation,
             functionType: bindFunctionType,
             inferredReferenceType: inferredReferenceType,
-            isTypeInferred: bind.TypeName is null);
+            isTypeInferred: bind.TypeName is null,
+            methodInputArrayType: GetLocalMethodInputArrayType(bind.TypeName, initializer));
 
         if (!_scope.TryDeclare(variable))
         {
@@ -1756,6 +1817,172 @@ public sealed class Binder
         // own nor a function-typed initializer still HAS a function type; its row
         // is simply Unknown. Slice b left this null.
         return TryBuildFunctionType(bind.TypeName ?? typeName, row: null, binders: null);
+    }
+
+    private BoundTypes.ArrayBoundType? GetLocalMethodInputArrayType(
+        string? declaredType, BoundExpression? initializer)
+    {
+        if (declaredType is null)
+            return initializer is not null ? NullabilityChecker.GetMethodInputArrayType(initializer) : null;
+        if (!TryBuildMethodInputArrayType(declaredType, out var declared))
+            return null;
+        if (initializer is BoundArrayCreation or BoundMultiDimArrayCreation
+            && NullabilityChecker.GetMethodInputArrayType(initializer) is { } created
+            && created.Rank == declared!.Rank
+            && declared.ElementType is BoundTypes.NominalBoundType receiving
+            && created.ElementType is BoundTypes.NominalBoundType supplied
+            && (receiving.HasSameUnderlyingReferenceType(supplied)
+                || TypeIdentity.Canonicalize(receiving.QualifiedName) == "STRING"
+                    && TypeIdentity.Canonicalize(supplied.QualifiedName) == "STRING"))
+        {
+            var annotation = receiving.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated
+                || supplied.NullableAnnotation == BoundTypes.NullableAnnotation.NotAnnotated
+                ? receiving.NullableAnnotation : supplied.NullableAnnotation;
+            var element = new BoundTypes.NominalBoundType(
+                receiving.QualifiedName, annotation, receiving.Declaration, receiving.RoslynSymbol);
+            return new BoundTypes.ArrayBoundType(element, declared.Rank, declared.NullableAnnotation);
+        }
+        return declared;
+    }
+
+    private bool TryBuildMethodArgumentTarget(
+        string declaredType,
+        out BoundTypes.BoundType? target,
+        FunctionSymbol declaringFunction)
+    {
+        if (TryBuildMethodInputArrayType(declaredType, out var array, declaringFunction))
+        {
+            target = array;
+            return true;
+        }
+        return TryBuildStringTarget(declaredType, out target, declaringFunction);
+    }
+
+    private bool TryBuildMethodInputArrayType(
+        string declaredType,
+        out BoundTypes.ArrayBoundType? array,
+        FunctionSymbol? declaringFunction = null)
+    {
+        array = null;
+        if (!TrySplitArrayTypeSpelling(declaredType, out var elementName, out var rank, out var annotation))
+            return false;
+
+        BoundTypes.BoundType element;
+        if (TryBuildMethodInputArrayType(elementName, out var nested, declaringFunction))
+            element = nested!;
+        else if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(elementName, out var nullableElement)
+            && TypeIdentity.Canonicalize(nullableElement) == "STRING")
+            element = new BoundTypes.NominalBoundType(
+                "STRING", BoundTypes.NullableAnnotation.Annotated);
+        else if (IsBuiltInValueTypeName(TypeIdentity.Canonicalize(elementName)))
+            element = new BoundTypes.PrimitiveBoundType(TypeIdentity.Canonicalize(elementName));
+        else if (TryBuildStringTarget(elementName, out var reference, declaringFunction)
+            && reference is BoundTypes.NominalBoundType)
+            element = reference;
+        else
+            element = new BoundTypes.UnresolvedBoundType($"Unsupported declared array element '{elementName}'");
+
+        array = new BoundTypes.ArrayBoundType(element, rank, annotation);
+        return true;
+    }
+
+    // Lexical decomposition only. Bound shapes are built from declarations, never
+    // from a bound display; the legacy resolver also uses the pieces for built-ins.
+    private static bool TrySplitArrayTypeSpelling(
+        string spelling,
+        out string element,
+        out int rank,
+        out BoundTypes.NullableAnnotation annotation)
+    {
+        var type = spelling.Trim();
+        annotation = BoundTypes.NullableAnnotation.NotAnnotated;
+        var wholeAnnotation = type.StartsWith('?') || type.EndsWith('?')
+            || type.StartsWith("OPTION[inner=", StringComparison.OrdinalIgnoreCase)
+                && IsWholeBracketedType(type, type.IndexOf('['));
+        if (wholeAnnotation && Parsing.AttributeHelper.TryUnwrapNullableAnnotation(type, out var referent))
+        {
+            type = referent.Trim();
+            annotation = BoundTypes.NullableAnnotation.Annotated;
+        }
+        rank = 1;
+        element = string.Empty;
+        const string expanded = "ARRAY[element=";
+        if (type.EndsWith(']') && type.LastIndexOf('[') is var open && open > 0
+            && type[(open + 1)..^1].All(character => character == ','))
+        {
+            rank = type.Length - open - 1;
+            element = type[..open].Trim();
+        }
+        else if (type.StartsWith(expanded, StringComparison.Ordinal)
+            && IsWholeBracketedType(type, type.IndexOf('[')))
+            element = type[expanded.Length..^1].Trim();
+        else if (type.StartsWith('[') && IsWholeBracketedType(type, 0))
+            element = type[1..^1].Trim();
+        return element.Length > 0;
+    }
+
+    private static bool IsWholeBracketedType(string type, int open)
+    {
+        var depth = 0;
+        for (var index = open; index < type.Length; index++)
+        {
+            if (type[index] == '[') depth++;
+            else if (type[index] == ']' && --depth == 0) return index == type.Length - 1;
+        }
+        return false;
+    }
+
+    private bool HaveSameMethodInputArrayReferent(string parameterType, string argumentType)
+    {
+        if (!TryBuildMethodInputArrayType(parameterType, out var parameter)
+            || !TryBuildMethodInputArrayType(argumentType, out var argument))
+            return false;
+        return HaveSameArrayReferent(parameter!, argument!)
+            || HaveSameBuiltinArrayReferent(parameterType, argumentType);
+    }
+
+    private static bool HaveSameBuiltinArrayReferent(string parameterType, string argumentType)
+    {
+        if (!TrySplitArrayTypeSpelling(parameterType, out var parameterElement, out var parameterRank, out _)
+            || !TrySplitArrayTypeSpelling(argumentType, out var argumentElement, out var argumentRank, out _)
+            || parameterRank != argumentRank)
+            return false;
+
+        static string CanonicalElement(string element)
+        {
+            if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(element, out var inner)
+                && TypeIdentity.Canonicalize(inner) is "STRING" or "System.String")
+                return "STRING";
+            var canonical = TypeIdentity.Canonicalize(element);
+            return canonical == "System.String" ? "STRING" : canonical;
+        }
+
+        var receiving = CanonicalElement(parameterElement);
+        var supplied = CanonicalElement(argumentElement);
+        return (receiving == "STRING" || IsBuiltInValueTypeName(receiving))
+            && string.Equals(receiving, supplied, StringComparison.Ordinal);
+    }
+
+    private static bool HaveSameArrayReferent(
+        BoundTypes.ArrayBoundType parameter,
+        BoundTypes.ArrayBoundType argument)
+    {
+        if (parameter.Rank != argument.Rank)
+            return false;
+        return (parameter.ElementType, argument.ElementType) switch
+        {
+            (BoundTypes.ArrayBoundType parameterArray, BoundTypes.ArrayBoundType argumentArray)
+                => HaveSameArrayReferent(parameterArray, argumentArray),
+            (BoundTypes.PrimitiveBoundType parameterPrimitive,
+                BoundTypes.PrimitiveBoundType argumentPrimitive)
+                => parameterPrimitive.Equals(argumentPrimitive),
+            (BoundTypes.NominalBoundType parameterNominal,
+                BoundTypes.NominalBoundType argumentNominal)
+                => TypeIdentity.Canonicalize(parameterNominal.QualifiedName) == "STRING"
+                    && TypeIdentity.Canonicalize(argumentNominal.QualifiedName) == "STRING"
+                    || parameterNominal.HasSameUnderlyingReferenceType(argumentNominal),
+            _ => false
+        };
     }
 
     private bool TryBuildStringTarget(
@@ -2479,9 +2706,11 @@ public sealed class Binder
                 : "'base' is unavailable outside an instance member");
     }
 
-    private BoundExpression BindFieldAccess(FieldAccessNode fieldAccess)
+    private BoundExpression BindFieldAccess(FieldAccessNode fieldAccess, BoundExpression? boundTarget = null)
     {
-        var target = BindExpression(fieldAccess.Target);
+        var target = boundTarget
+            ?? TryBindMetadataTypeReceiver(fieldAccess.Target)
+            ?? BindExpression(fieldAccess.Target);
         var resolvedFields = fieldAccess.Target switch
         {
             ThisExpressionNode => ResolveAccessibleMembers(_currentClass, fieldAccess.FieldName),
@@ -2506,6 +2735,44 @@ public sealed class Binder
                     field.TypeName, field.NullableAnnotation, identity?.Declaration, identity?.RoslynSymbol);
         }
 
+        // Native this/base resolution remains authoritative; N2 owns its annotation transfer.
+        if (fields.Length == 0
+            && target.Type is BoundTypes.NominalBoundType
+            {
+                RoslynSymbol: { IsReferenceType: true, IsGenericType: false } receiverType
+            })
+        {
+            var metadataBinder = GetOrCreateMetadataBinder();
+            string? reason = "The metadata context is unavailable.";
+            var member = metadataBinder?.ResolveMemberRead(
+                receiverType, fieldAccess.FieldName, target is BoundTypeReferenceExpression, out reason);
+            var memberType = member switch
+            {
+                Microsoft.CodeAnalysis.IPropertySymbol property => property.Type,
+                Microsoft.CodeAnalysis.IFieldSymbol metadataField => metadataField.Type,
+                _ => null
+            };
+            if (memberType is Microsoft.CodeAnalysis.INamedTypeSymbol
+                { IsReferenceType: true, IsGenericType: false })
+            {
+                return new BoundFieldAccessExpression(
+                    fieldAccess.Span, target, fieldAccess.FieldName, typeName: null,
+                    fieldNameSpan: fieldAccess.FieldNameSpan,
+                    resolvedType: Metadata.MetadataBinderResult.ToNominalBoundType(memberType))
+                {
+                    ResolvedMetadataMember = member
+                };
+            }
+
+            reason ??= "The member result is outside supported scalar reference reads.";
+            _diagnostics.ReportInfo(fieldAccess.Span, DiagnosticCode.SignatureUnresolved,
+                $"Metadata member resolution incomplete: {reason}");
+            return new BoundFieldAccessExpression(
+                fieldAccess.Span, target, fieldAccess.FieldName, typeName: null,
+                fieldNameSpan: fieldAccess.FieldNameSpan,
+                resolvedType: new BoundTypes.UnresolvedBoundType(reason));
+        }
+
         return new BoundFieldAccessExpression(
             fieldAccess.Span,
             target,
@@ -2516,6 +2783,30 @@ public sealed class Binder
             fields,
             resolvedType);
     }
+
+    private BoundTypeReferenceExpression? TryBindMetadataTypeReceiver(ExpressionNode expression)
+    {
+        var name = DottedReferenceName(expression);
+        if (name is null)
+            return null;
+        var head = name.Split('.')[0];
+        if (_scope.LookupAll(head).Count != 0 || ResolveAccessibleMembers(_currentClass, head).Count != 0)
+            return null;
+        var type = TryBuildReferenceType(
+            name, _currentClassName, _currentNamespaceIdentity,
+            _currentMemberTypeParameters?.Select(parameter => parameter.Name));
+        return type?.RoslynSymbol is not null
+            ? new BoundTypeReferenceExpression(expression.Span, name, type)
+            : null;
+    }
+
+    private static string? DottedReferenceName(ExpressionNode expression) => expression switch
+    {
+        ReferenceNode reference => reference.Name,
+        FieldAccessNode field when DottedReferenceName(field.Target) is { } prefix =>
+            $"{prefix}.{field.FieldName}",
+        _ => null
+    };
 
     private BoundExpression BindTypeOperation(TypeOperationNode typeOp)
     {
@@ -2530,14 +2821,36 @@ public sealed class Binder
     private BoundExpression BindIsPattern(IsPatternNode isPattern)
     {
         var operand = BindExpression(isPattern.Operand);
-        if (isPattern.VariableName != null)
-            DeclarePatternVariable(isPattern.Span, isPattern.VariableName,
-                isPattern.TargetType == "var" ? operand.Type.DisplayString : isPattern.TargetType);
         return new BoundIsPatternExpression(
             isPattern.Span,
             operand,
             isPattern.TargetType,
-            isPattern.VariableName);
+            isPattern.VariableName)
+        {
+            Binding = isPattern.VariableName is null ? null : CreateLocalVariable(
+                isPattern.VariableName,
+                isPattern.TargetType == "var" ? operand.Type.DisplayString : isPattern.TargetType,
+                isMutable: false, isParameter: false, ParameterModifier.None, isPattern.Span, "pattern",
+                nullableAnnotation: isPattern.TargetType == "var"
+                    ? NullabilityChecker.GetAnnotation(operand.Type) ?? BoundTypes.NullableAnnotation.Oblivious
+                    : BoundTypes.NullableAnnotation.NotAnnotated)
+        };
+    }
+
+    private void DeclareSuccessfulConditionPatterns(ExpressionNode condition, BoundExpression boundCondition)
+    {
+        if (condition is BinaryOperationNode { Operator: BinaryOperator.And } conjunction
+            && boundCondition is BoundBinaryExpression binary)
+        {
+            DeclareSuccessfulConditionPatterns(conjunction.Left, binary.Left);
+            DeclareSuccessfulConditionPatterns(conjunction.Right, binary.Right);
+        }
+        if (condition is IsPatternNode { VariableName: not null } pattern
+            && boundCondition is BoundIsPatternExpression { Binding: not null } boundPattern)
+        {
+            DeclarePatternVariable(pattern.Span, pattern.VariableName, boundPattern.Binding.TypeName,
+                boundPattern.Binding.NullableAnnotation, boundPattern.Binding);
+        }
     }
 
     private BoundExpression BindNewExpression(NewExpressionNode newExpr)
@@ -2633,28 +2946,67 @@ public sealed class Binder
 
     private BoundExpression BindArrayCreation(ArrayCreationNode array)
     {
+        var size = array.Size == null ? null : BindExpression(array.Size);
+        var initializer = BindExpressions(array.Initializer);
         return new BoundArrayCreation(
             array.Span,
             array.Id,
             array.Name,
             array.ElementType,
-            array.Size == null ? null : BindExpression(array.Size),
-            BindExpressions(array.Initializer),
-            array.Attributes);
+            size,
+            initializer,
+            array.Attributes)
+        {
+            MethodInputArrayType = BuildCreatedArrayInputType(
+                array.ElementType, 1, size is null ? [] : [size], initializer)
+        };
     }
 
     private BoundExpression BindMultiDimArrayCreation(MultiDimArrayCreationNode array)
     {
+        var dimensions = BindExpressions(array.DimensionSizes);
+        var rows = array.Initializer
+            .Select(row => (IReadOnlyList<BoundExpression>)BindExpressions(row))
+            .ToArray();
         return new BoundMultiDimArrayCreation(
             array.Span,
             array.Id,
             array.Name,
             array.ElementType,
             array.Rank,
-            BindExpressions(array.DimensionSizes),
-            array.Initializer
-                .Select(row => (IReadOnlyList<BoundExpression>)BindExpressions(row))
-                .ToArray());
+            dimensions,
+            rows)
+        {
+            MethodInputArrayType = BuildCreatedArrayInputType(
+                array.ElementType, array.Rank, dimensions, rows.SelectMany(row => row).ToArray())
+        };
+    }
+
+    private BoundTypes.ArrayBoundType? BuildCreatedArrayInputType(
+        string elementType,
+        int rank,
+        IReadOnlyList<BoundExpression> dimensions,
+        IReadOnlyList<BoundExpression> initializer)
+    {
+        if (!TryBuildMethodInputArrayType($"{elementType}[{new string(',', rank - 1)}]", out var declared))
+            return null;
+        var element = declared!.ElementType;
+        if (element is BoundTypes.NominalBoundType reference
+            && (reference.IsKnownReferenceType || TypeIdentity.Canonicalize(reference.QualifiedName) == "STRING")
+            && reference.NullableAnnotation != BoundTypes.NullableAnnotation.Annotated)
+        {
+            var annotations = initializer.Select(value => NullabilityChecker.GetAnnotation(value.Type)).ToArray();
+            var annotation = annotations.Contains(BoundTypes.NullableAnnotation.Annotated)
+                || initializer.Count == 0 && dimensions.Count > 0
+                    && !dimensions.Any(dimension => dimension is BoundIntLiteral { Value: 0 })
+                ? BoundTypes.NullableAnnotation.Annotated
+                : annotations.Any(value => value != BoundTypes.NullableAnnotation.NotAnnotated)
+                    ? BoundTypes.NullableAnnotation.Oblivious
+                    : reference.NullableAnnotation;
+            element = new BoundTypes.NominalBoundType(
+                reference.QualifiedName, annotation, reference.Declaration, reference.RoslynSymbol);
+        }
+        return new BoundTypes.ArrayBoundType(element, rank, BoundTypes.NullableAnnotation.NotAnnotated);
     }
 
     private BoundExpression BindArrayLength(ArrayLengthNode arrayLength)
@@ -2798,16 +3150,23 @@ public sealed class Binder
 
     private BoundExpression BindNullCoalesce(NullCoalesceNode coalesce)
     {
-        // S7 batch-3: migrated left/right BoundExpression.TypeName reads
-        // to .Type.DisplayString. Byte-identical per V-1's corpus pin.
         var left = BindExpression(coalesce.Left);
         var right = BindExpression(coalesce.Right);
-        var leftValueType = UnwrapOptionOrNullable(left.Type.DisplayString);
-        return Structural(
-            coalesce,
-            GetCommonType(leftValueType, right.Type.DisplayString),
+        var leftValueType = Parsing.AttributeHelper.TryUnwrapNullableAnnotation(left.Type.DisplayString, out var referent)
+            ? NormalizeTypeName(referent) : left.Type.DisplayString;
+        var resultName = ExpressionResultTypes.IsNever(left.Type) ? "NEVER"
+            : coalesce.Left is ReferenceNode { Name: "null" } ? right.Type.DisplayString
+            : coalesce.Right is ReferenceNode { Name: "null" } ? leftValueType
+            : GetCommonType(leftValueType, right.Type.DisplayString);
+        return new BoundStructuralExpression(
+            coalesce.Span,
+            nameof(NullCoalesceNode),
+            resultName,
             [left, right],
-            deferredChildren: [right]);
+            metadata: null,
+            deferredChildren: [right],
+            typeAnnotation: BoundTypes.NullableAnnotation.Oblivious,
+            resultType: ExpressionResultTypes.Coalesce(resultName, left.Type, right.Type));
     }
 
     private BoundExpression BindNullConditional(NullConditionalNode conditional)
@@ -3018,6 +3377,8 @@ public sealed class Binder
             using var _ = PushScope(_scope.CreateChild());
             var pattern = BindPattern(matchCase.Pattern);
             var guard = matchCase.Guard != null ? BindExpression(matchCase.Guard) : null;
+            if (matchCase.Guard != null && guard != null)
+                DeclareSuccessfulConditionPatterns(matchCase.Guard, guard);
             var body = BindStatements(matchCase.Body);
             var result = body.LastOrDefault() is BoundReturnStatement { Expression: not null } returnStatement
                 ? returnStatement.Expression
@@ -3033,14 +3394,14 @@ public sealed class Binder
         return boundCases;
     }
 
-    private BoundPattern BindPattern(PatternNode pattern)
+    private BoundPattern BindPattern(PatternNode pattern, bool allowBindings = true)
     {
         switch (pattern)
         {
             case WildcardPatternNode:
                 return Pattern(pattern);
             case VariablePatternNode variable:
-                if (!variable.Name.Contains('.', StringComparison.Ordinal))
+                if (allowBindings && !variable.Name.Contains('.', StringComparison.Ordinal))
                     DeclarePatternVariable(variable.IdentifierSpan, variable.Name, "OBJECT");
                 return Pattern(
                     variable,
@@ -3050,16 +3411,18 @@ public sealed class Binder
                         ["IsConstant"] = variable.Name.Contains('.', StringComparison.Ordinal),
                     });
             case VarPatternNode variable:
-                DeclarePatternVariable(variable.IdentifierSpan, variable.Name, "OBJECT");
+                if (allowBindings)
+                    DeclarePatternVariable(variable.IdentifierSpan, variable.Name, "OBJECT");
                 return Pattern(
                     variable,
                     metadata: new Dictionary<string, object?> { ["Name"] = variable.Name });
             case TypePatternNode typePattern:
-                if (typePattern.BindingName != null)
+                if (allowBindings && typePattern.BindingName != null)
                     DeclarePatternVariable(
                         typePattern.BindingSpan ?? typePattern.Span,
                         typePattern.BindingName,
-                        typePattern.TypeName);
+                        typePattern.TypeName,
+                        BoundTypes.NullableAnnotation.NotAnnotated);
                 return Pattern(
                     typePattern,
                     metadata: new Dictionary<string, object?>
@@ -3077,18 +3440,18 @@ public sealed class Binder
                     metadata: new Dictionary<string, object?> { ["Operator"] = relational.Operator },
                     expressions: [BindExpression(relational.Value)]);
             case SomePatternNode some:
-                return Pattern(some, patterns: [BindPattern(some.InnerPattern)]);
+                return Pattern(some, patterns: [BindPattern(some.InnerPattern, allowBindings)]);
             case NonePatternNode:
                 return Pattern(pattern);
             case OkPatternNode ok:
-                return Pattern(ok, patterns: [BindPattern(ok.InnerPattern)]);
+                return Pattern(ok, patterns: [BindPattern(ok.InnerPattern, allowBindings)]);
             case ErrPatternNode err:
-                return Pattern(err, patterns: [BindPattern(err.InnerPattern)]);
+                return Pattern(err, patterns: [BindPattern(err.InnerPattern, allowBindings)]);
             case PositionalPatternNode positional:
                 return Pattern(
                     positional,
                     metadata: new Dictionary<string, object?> { ["TypeName"] = positional.TypeName },
-                    patterns: positional.Patterns.Select(BindPattern).ToArray());
+                    patterns: positional.Patterns.Select(child => BindPattern(child, allowBindings)).ToArray());
             case PropertyPatternNode property:
                 return Pattern(
                     property,
@@ -3097,11 +3460,11 @@ public sealed class Binder
                         ["TypeName"] = property.TypeName,
                         ["PropertyNames"] = property.Matches.Select(match => match.PropertyName).ToArray(),
                     },
-                    patterns: property.Matches.Select(match => BindPattern(match.Pattern)).ToArray());
+                    patterns: property.Matches.Select(match => BindPattern(match.Pattern, allowBindings)).ToArray());
             case ListPatternNode list:
-                var listPatterns = list.Patterns.Select(BindPattern).ToList();
+                var listPatterns = list.Patterns.Select(child => BindPattern(child, allowBindings)).ToList();
                 if (list.SlicePattern != null)
-                    listPatterns.Insert(Math.Min(list.SliceIndex, listPatterns.Count), BindPattern(list.SlicePattern));
+                    listPatterns.Insert(Math.Min(list.SliceIndex, listPatterns.Count), BindPattern(list.SlicePattern, allowBindings));
                 return Pattern(
                     list,
                     metadata: new Dictionary<string, object?>
@@ -3111,11 +3474,11 @@ public sealed class Binder
                     },
                     patterns: listPatterns);
             case NegatedPatternNode negated:
-                return Pattern(negated, patterns: [BindPattern(negated.Inner)]);
+                return Pattern(negated, patterns: [BindPattern(negated.Inner, allowBindings: false)]);
             case OrPatternNode orPattern:
-                return Pattern(orPattern, patterns: [BindPattern(orPattern.Left), BindPattern(orPattern.Right)]);
+                return Pattern(orPattern, patterns: [BindPattern(orPattern.Left, allowBindings: false), BindPattern(orPattern.Right, allowBindings: false)]);
             case AndPatternNode andPattern:
-                return Pattern(andPattern, patterns: [BindPattern(andPattern.Left), BindPattern(andPattern.Right)]);
+                return Pattern(andPattern, patterns: [BindPattern(andPattern.Left, allowBindings), BindPattern(andPattern.Right, allowBindings)]);
             default:
                 return Pattern(
                     pattern,
@@ -3126,20 +3489,23 @@ public sealed class Binder
         }
     }
 
-    private void DeclarePatternVariable(Parsing.TextSpan span, string name, string typeName)
+    private void DeclarePatternVariable(Parsing.TextSpan span, string name, string typeName,
+        BoundTypes.NullableAnnotation nullableAnnotation = BoundTypes.NullableAnnotation.Oblivious,
+        VariableSymbol? binding = null)
     {
         if (_scope.LookupLocal(name) is VariableSymbol existing
             && string.Equals(existing.TypeName, typeName, StringComparison.OrdinalIgnoreCase))
             return;
 
-        var symbol = CreateLocalVariable(
+        var symbol = binding ?? CreateLocalVariable(
             name,
             typeName,
             isMutable: false,
             isParameter: false,
             ParameterModifier.None,
             span,
-            "pattern");
+            "pattern",
+            nullableAnnotation: nullableAnnotation);
         if (!_scope.TryDeclare(symbol))
         {
             _diagnostics.ReportError(
@@ -3368,6 +3734,32 @@ public sealed class Binder
 
         if (symbols.Count == 0)
         {
+            BoundExpression? unresolvedMember = null;
+            // The lexer also accepts a dotted reference as one token. Route the
+            // resolved external form through the same member binder as explicit dots.
+            var lastDot = refNode.Name.LastIndexOf('.');
+            if (lastDot > 0)
+            {
+                var receiverName = refNode.Name[..lastDot];
+                var receiverSpan = new Parsing.TextSpan(
+                    refNode.Span.Start, lastDot, refNode.Span.Line, refNode.Span.Column);
+                var receiverNode = new ReferenceNode(receiverSpan, receiverName);
+                BoundExpression? receiver = TryBindMetadataTypeReceiver(receiverNode);
+                if (receiver is null && _scope.Lookup(receiverName) is VariableSymbol)
+                    receiver = BindReferenceExpression(receiverNode);
+                if (receiver?.Type is BoundTypes.NominalBoundType { RoslynSymbol: not null })
+                {
+                    var memberSpan = new Parsing.TextSpan(
+                        refNode.Span.Start + lastDot + 1, refNode.Name.Length - lastDot - 1,
+                        refNode.Span.Line, refNode.Span.Column + lastDot + 1);
+                    var member = BindFieldAccess(new FieldAccessNode(
+                        refNode.Span, receiverNode, refNode.Name[(lastDot + 1)..], memberSpan), receiver);
+                    if (member.Type is not BoundTypes.UnresolvedBoundType)
+                        return member;
+                    unresolvedMember = member;
+                }
+            }
+
             var similarName = _scope.FindSimilarName(refNode.Name);
             if (similarName != null)
             {
@@ -3390,6 +3782,8 @@ public sealed class Binder
                 _diagnostics.ReportError(refNode.Span, DiagnosticCode.UndefinedReference,
                     $"Undefined variable '{refNode.Name}'");
             }
+            if (unresolvedMember is not null)
+                return unresolvedMember;
             // Return a dummy variable to continue analysis
             return new BoundVariableExpression(
                 refNode.Span,
@@ -3446,7 +3840,15 @@ public sealed class Binder
     private BoundBinaryExpression BindBinaryOperation(BinaryOperationNode binOp)
     {
         var left = BindExpression(binOp.Left);
-        var right = BindExpression(binOp.Right);
+        BoundExpression right;
+        if (binOp.Operator == BinaryOperator.And)
+        {
+            using var _ = PushScope(_scope.CreateChild());
+            DeclareSuccessfulConditionPatterns(binOp.Left, left);
+            right = BindExpression(binOp.Right);
+        }
+        else
+            right = BindExpression(binOp.Right);
 
         // Determine result type based on operator (S7 batch-3: .Type.DisplayString shim).
         var resultType = GetBinaryOperationResultType(binOp.Operator, left.Type.DisplayString, right.Type.DisplayString);
@@ -3500,7 +3902,8 @@ public sealed class Binder
             args,
             callExpr.ArgumentNames,
             callExpr.ArgumentModifiers,
-            callExpr.TypeArguments);
+            callExpr.TypeArguments,
+            allowNullableStringCompatibility: true);
         var returnType = resolution.ResolvedReturnType ?? "OBJECT";
 
         var (resolvedTypeName, resolvedMethodName) = GetResolvedCallIdentity(
@@ -3524,6 +3927,9 @@ public sealed class Binder
             ? TryResolveBclCall(callExpr.Target, args, callExpr.ArgumentNames, callExpr.ArgumentModifiers)
             : null;
         var annotatedReturn = bclResolution?.GetReturnBoundTypeEx();
+        var methodInputArrayReturn = annotatedReturn as BoundTypes.ArrayBoundType;
+        if (bclResolution?.LegacyReturnType is { } legacyReturn)
+            annotatedReturn = legacyReturn;
 
         // v0.14 §F-3B (nullability): thread the declared return-type
         // annotation from a resolved pure-Calor callee onto BoundCallExpression.Type.
@@ -3582,7 +3988,10 @@ public sealed class Binder
             receiver: receiver)
         {
             ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count),
-            SelectedOverloadMatches = resolution.Matches
+            SelectedOverloadMatches = resolution.Matches,
+            MethodInputArrayType = methodInputArrayReturn ?? (resolution.Matches.Count == 1
+                && TryBuildMethodInputArrayType(resolution.Matches[0].ReturnType, out var nativeArray,
+                    resolution.Matches[0].Function) ? nativeArray : null)
         };
     }
 
@@ -3896,8 +4305,11 @@ public sealed class Binder
         IReadOnlyList<BoundExpression> arguments,
         IReadOnlyList<string?>? argumentNames,
         IReadOnlyList<string?>? argumentModifiers,
-        IReadOnlyList<string>? typeArguments)
+        IReadOnlyList<string>? typeArguments,
+        bool allowNullableStringCompatibility = false)
     {
+        // Synthetic constructor targets can also occur in ordinary call nodes.
+        allowNullableStringCompatibility &= !target.EndsWith("..ctor", StringComparison.Ordinal);
         var argumentTypes = arguments
             .Select(argument =>
                 argument is BoundVariableExpression { Variable.Id.IsNone: true }
@@ -3911,7 +4323,8 @@ public sealed class Binder
                 argumentTypes,
                 argumentNames,
                 argumentModifiers,
-                typeArguments);
+                typeArguments,
+                allowNullableStringCompatibility);
             if (resolution.Kind == OverloadResolutionKind.NotFound)
                 continue;
 
@@ -3928,6 +4341,19 @@ public sealed class Binder
             var hasUnresolvedArguments = argumentTypes.Any(type =>
                 string.Equals(type, "<unresolved>", StringComparison.Ordinal)
                 || IsNominalTypeInvisibleToThisModule(type));
+            if (allowNullableStringCompatibility && !hasUnresolvedArguments
+                && resolution.Kind == OverloadResolutionKind.Resolved
+                && resolution.Matches.Any(match => match.Arguments.Any(mapping =>
+                    Scope.HasNullableStringAnnotationDifference(
+                        mapping.ParameterType, argumentTypes[mapping.ArgumentIndex]))))
+            {
+                // Preserve actual prior rejection, not a guess based on the new
+                // winner: an OBJECT overload may already have accepted this call.
+                var previous = ResolveAccessibleOverload(
+                    lookupName, argumentTypes, argumentNames, argumentModifiers, typeArguments);
+                if (previous.Kind is OverloadResolutionKind.NoMatch or OverloadResolutionKind.Ambiguous)
+                    resolution = resolution.WithReplacedNativeOverloadError();
+            }
             if (!hasUnresolvedArguments
                 && resolution.Kind == OverloadResolutionKind.NoMatch)
             {
@@ -3959,7 +4385,8 @@ public sealed class Binder
         IReadOnlyList<string> argumentTypes,
         IReadOnlyList<string?>? argumentNames,
         IReadOnlyList<string?>? argumentModifiers,
-        IReadOnlyList<string>? typeArguments)
+        IReadOnlyList<string>? typeArguments,
+        bool allowNullableStringCompatibility = false)
     {
         var candidates = _scope.GetOverloads(lookupName)
             .ToArray();
@@ -3982,7 +4409,8 @@ public sealed class Binder
             argumentNames,
             argumentModifiers,
             typeArguments,
-            GetImplicitConversionCost);
+            GetImplicitConversionCost,
+            allowNullableStringCompatibility);
     }
 
     /// <summary>
@@ -4010,6 +4438,16 @@ public sealed class Binder
             return 0;
         if (string.Equals(argument, "<unresolved>", StringComparison.Ordinal))
             return null;
+
+        var parameterIsArray = TrySplitArrayTypeSpelling(parameterType, out _, out _, out _);
+        var argumentIsArray = TrySplitArrayTypeSpelling(argumentType, out _, out _, out _);
+        if (parameterIsArray || argumentIsArray)
+        {
+            if (parameterIsArray && argumentIsArray)
+                return HaveSameMethodInputArrayReferent(parameterType, argumentType) ? 0 : null;
+            if (parameterIsArray || parameter != "OBJECT")
+                return null;
+        }
 
         if (parameter == "OBJECT" && argument != "VOID")
             return 50;
@@ -4552,7 +4990,12 @@ public sealed class Binder
     private BoundExpression BindConditionalExpression(ConditionalExpressionNode condExpr)
     {
         var condition = BindExpression(condExpr.Condition);
-        var whenTrue = BindExpression(condExpr.WhenTrue);
+        BoundExpression whenTrue;
+        using (PushScope(_scope.CreateChild()))
+        {
+            DeclareSuccessfulConditionPatterns(condExpr.Condition, condition);
+            whenTrue = BindExpression(condExpr.WhenTrue);
+        }
         var whenFalse = BindExpression(condExpr.WhenFalse);
 
         return new BoundConditionalExpression(
@@ -4657,13 +5100,6 @@ public sealed class Binder
             || typeName.Equals("ValueTask", StringComparison.OrdinalIgnoreCase)
             ? "VOID"
             : "OBJECT";
-    }
-
-    private static string UnwrapOptionOrNullable(string typeName)
-    {
-        return TypeIdentity.TryUnwrapOptionOrNullable(typeName, out var elementType)
-            ? elementType
-            : typeName;
     }
 
     private static string GetIndexedElementType(string typeName)

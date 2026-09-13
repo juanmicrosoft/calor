@@ -204,8 +204,10 @@ public class Calor0270CorpusVolumeTests
     /// receiver in KeyValuePairSettings.cs behind explicit query interop:
     /// 299 -> 298, with serilog 33 -> 32. This is not newly resolved native
     /// analysis; all 364 parsed modules remain in the denominator.</para>
-    private const int AggregateDiagnostics = 298;
-    private const int AggregateModulesWithDiagnostics = 35;
+    // #1384: 15 explicit unsupported metadata-member Infos; no receiver is
+    // classified safe and existing packed-reference errors remain unchanged.
+    private const int AggregateDiagnostics = 313;
+    private const int AggregateModulesWithDiagnostics = 37;
     private const int PreK1AggregateModulesBound = 364;
 
     /// <summary>

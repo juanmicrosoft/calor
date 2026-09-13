@@ -1,0 +1,358 @@
+{
+  "Repo": "/Users/juanrivera/.copilot/session-state/cea41f9d-a634-40dd-ad65-279680749d85/files/worktrees/native-string-1383",
+  "Commit": "bde9ee88627acb1fcdf62494b701b24856fa5881",
+  "File": "bench/corpus/serilog/src/Serilog/Events/LogEventProperty.cs",
+  "SourceSha256": "ac398230b91da5c0bac90aedd7ec51503546a321783b2c62c195a8c26a1365fc",
+  "Conversion": {
+    "Success": false,
+    "CalorLength": 1568,
+    "Losses": [],
+    "Issues": [
+      {
+        "Severity": 2,
+        "Message": "Round-tripped C# failed compilation (CS0246): The type or namespace name \u0027LogEventPropertyValue\u0027 could not be found (are you missing a using directive or an assembly reference?)",
+        "Line": 16
+      },
+      {
+        "Severity": 2,
+        "Message": "Round-tripped C# failed compilation (CS0246): The type or namespace name \u0027LogEventPropertyValue\u0027 could not be found (are you missing a using directive or an assembly reference?)",
+        "Line": 18
+      },
+      {
+        "Severity": 2,
+        "Message": "Round-tripped C# failed compilation (CS0246): The type or namespace name \u0027EventProperty\u0027 could not be found (are you missing a using directive or an assembly reference?)",
+        "Line": 34
+      },
+      {
+        "Severity": 2,
+        "Message": "Round-tripped C# failed compilation (CS0246): The type or namespace name \u0027NotNullWhenAttribute\u0027 could not be found (are you missing a using directive or an assembly reference?)",
+        "Line": 53
+      },
+      {
+        "Severity": 2,
+        "Message": "Round-tripped C# failed compilation (CS0246): The type or namespace name \u0027NotNullWhen\u0027 could not be found (are you missing a using directive or an assembly reference?)",
+        "Line": 53
+      },
+      {
+        "Severity": 2,
+        "Message": "Round-tripped C# failed compilation (CS0119): \u0027CalorAttributeArgument\u0027 is a type, which is not valid in the given context",
+        "Line": 53
+      },
+      {
+        "Severity": 2,
+        "Message": "Round-tripped C# failed compilation (CS0246): The type or namespace name \u0027MethodImplAttribute\u0027 could not be found (are you missing a using directive or an assembly reference?)",
+        "Line": 60
+      },
+      {
+        "Severity": 2,
+        "Message": "Round-tripped C# failed compilation (CS0246): The type or namespace name \u0027MethodImpl\u0027 could not be found (are you missing a using directive or an assembly reference?)",
+        "Line": 60
+      },
+      {
+        "Severity": 2,
+        "Message": "Round-tripped C# failed compilation (CS0103): The name \u0027MethodImplOptions\u0027 does not exist in the current context",
+        "Line": 60
+      },
+      {
+        "Severity": 2,
+        "Message": "Round-tripped C# failed compilation (CS0103): The name \u0027Guard\u0027 does not exist in the current context",
+        "Line": 21
+      },
+      {
+        "Severity": 2,
+        "Message": "Round-tripped C# failed compilation (CS0103): The name \u0027EventProperty\u0027 does not exist in the current context",
+        "Line": 37
+      },
+      {
+        "Severity": 2,
+        "Message": "Round-tripped C# failed compilation (CS0103): The name \u0027Guard\u0027 does not exist in the current context",
+        "Line": 64
+      }
+    ]
+  },
+  "ParseDiagnostics": [],
+  "BinderExpressionsBound": 27,
+  "Diagnostics": [
+    {
+      "Code": "Calor0200",
+      "Severity": "Error",
+      "Start": 583,
+      "End": 601,
+      "Length": 18,
+      "Line": 17,
+      "Column": 37,
+      "Message": "Undefined variable \u0027EventProperty.None\u0027",
+      "Boundary": "None",
+      "Shape": "None",
+      "ReplacesNativeOverloadError": false,
+      "Disposition": "AnalysisOnly",
+      "Propagated": false,
+      "Snippet": "EventProperty.None",
+      "RelatedCalls": []
+    },
+    {
+      "Code": "Calor0200",
+      "Severity": "Error",
+      "Start": 693,
+      "End": 706,
+      "Length": 13,
+      "Line": 19,
+      "Column": 22,
+      "Message": "Undefined variable \u0027property.Name\u0027",
+      "Boundary": "None",
+      "Shape": "None",
+      "ReplacesNativeOverloadError": false,
+      "Disposition": "AnalysisOnly",
+      "Propagated": false,
+      "Snippet": "property.Name",
+      "RelatedCalls": []
+    },
+    {
+      "Code": "Calor0200",
+      "Severity": "Error",
+      "Start": 729,
+      "End": 743,
+      "Length": 14,
+      "Line": 20,
+      "Column": 23,
+      "Message": "Undefined variable \u0027property.Value\u0027",
+      "Boundary": "None",
+      "Shape": "None",
+      "ReplacesNativeOverloadError": false,
+      "Disposition": "AnalysisOnly",
+      "Propagated": false,
+      "Snippet": "property.Value",
+      "RelatedCalls": []
+    }
+  ],
+  "PropagatedDiagnostics": [],
+  "EffectRan": true,
+  "EffectFaulted": false,
+  "EffectDiagnostics": [
+    {
+      "Code": "Calor0411",
+      "Severity": 1,
+      "Start": 1319,
+      "End": 1345,
+      "Line": 34,
+      "Column": 9,
+      "Message": "Unknown external call to \u0027Guard.AgainstNull\u0027. Add effect declaration in a .calor-effects.json manifest.",
+      "Snippet": "\u00A7C{Guard.AgainstNull} name"
+    },
+    {
+      "Code": "Calor0411",
+      "Severity": 1,
+      "Start": 381,
+      "End": 408,
+      "Line": 11,
+      "Column": 9,
+      "Message": "Unknown external call to \u0027Guard.AgainstNull\u0027. Add effect declaration in a .calor-effects.json manifest.",
+      "Snippet": "\u00A7C{Guard.AgainstNull} value"
+    },
+    {
+      "Code": "Calor0411",
+      "Severity": 1,
+      "Start": 693,
+      "End": 706,
+      "Line": 19,
+      "Column": 22,
+      "Message": "Unknown external call to \u0027EventProperty.get_Name\u0027. Add effect declaration in a .calor-effects.json manifest.",
+      "Snippet": "property.Name"
+    },
+    {
+      "Code": "Calor0411",
+      "Severity": 1,
+      "Start": 729,
+      "End": 743,
+      "Line": 20,
+      "Column": 23,
+      "Message": "Unknown external call to \u0027EventProperty.get_Value\u0027. Add effect declaration in a .calor-effects.json manifest.",
+      "Snippet": "property.Value"
+    },
+    {
+      "Code": "Calor0410",
+      "Severity": 0,
+      "Start": 1295,
+      "End": 1297,
+      "Line": 33,
+      "Column": 9,
+      "Message": "Function \u0027EnsureValidName\u0027 uses effect \u0027unknown\u0027 but does not declare it",
+      "Snippet": "\u00A7E"
+    },
+    {
+      "Code": "Calor0422",
+      "Severity": 0,
+      "Start": 314,
+      "End": 503,
+      "Line": 10,
+      "Column": 7,
+      "Message": "The constructor \u0027LogEventProperty.ctor003\u0027 uses effect(s) \u0027unknown\u0027, but this declaration has no \u00A7E effect-contract surface. Only intrinsic initialization mutation/allocation (\u0027mut\u0027, \u0027alloc\u0027) is permitted. Move effectful work to a method with an explicit \u00A7E declaration.",
+      "Snippet": "\u00A7CTOR{ctor003:pub} (str:name, LogEventPropertyValue:value)\\n        \u00A7C{Guard.AgainstNull} value\\n        \u00A7C{EnsureValidName} name\\n        \u00A7ASSIGN Name name\\n        \u00A7ASSIGN Value value\\n\\n      "
+    },
+    {
+      "Code": "Calor0422",
+      "Severity": 0,
+      "Start": 503,
+      "End": 920,
+      "Line": 16,
+      "Column": 7,
+      "Message": "The constructor \u0027LogEventProperty.ctor004\u0027 uses effect(s) \u0027unknown\u0027, but this declaration has no \u00A7E effect-contract surface. Only intrinsic initialization mutation/allocation (\u0027mut\u0027, \u0027alloc\u0027) is permitted. Move effectful work to a method with an explicit \u00A7E declaration.",
+      "Snippet": "\u00A7CTOR{ctor004:int} (EventProperty:property)\\n        \u00A7IF{if005} (equals property EventProperty.None)\\n          \u00A7TH \u00A7NEW{ArgumentNullException} \u00A7A (nameof property) \u00A7/NEW\\n        \u00A7ASSIGN Name property.Name\\n        \u00A7ASSIGN Value property.Value\\n\\n      // Test name to determine if it is a valid property name.\\n      // @param name \u2014 The name to check.\\n      // @returns true if the name is valid; otherwise, false.\\n      "
+    }
+  ],
+  "Calls": [
+    {
+      "Kind": "statement",
+      "Target": "Guard.AgainstNull",
+      "Start": 1319,
+      "End": 1345,
+      "ResultOrVoid": "void",
+      "Arguments": [
+        {
+          "Index": 0,
+          "Start": 1341,
+          "End": 1345,
+          "Type": "str",
+          "Kind": "BoundVariableExpression"
+        }
+      ],
+      "ArgumentNames": null,
+      "ArgumentModifiers": null,
+      "TypeArguments": null,
+      "SelectedOverloadMatches": [],
+      "ResolvedTypeName": "Guard",
+      "ResolvedMethodName": "AgainstNull",
+      "ResolvedParameterTypes": [
+        "str"
+      ]
+    },
+    {
+      "Kind": "expression",
+      "Target": "IsValidName",
+      "Start": 1377,
+      "End": 1397,
+      "ResultOrVoid": "BOOL",
+      "Arguments": [
+        {
+          "Index": 0,
+          "Start": 1393,
+          "End": 1397,
+          "Type": "str",
+          "Kind": "BoundVariableExpression"
+        }
+      ],
+      "ArgumentNames": null,
+      "ArgumentModifiers": null,
+      "TypeArguments": null,
+      "SelectedOverloadMatches": [
+        {
+          "FunctionName": "Serilog.Events.LogEventProperty.IsValidName",
+          "DisplaySignature": "Serilog.Events.LogEventProperty.IsValidName(OPTION[inner=STRING])",
+          "ReturnType": "BOOL",
+          "TypeParameters": [],
+          "ContainingTypeName": "Serilog.Events.LogEventProperty",
+          "Parameters": [
+            {
+              "Index": 0,
+              "Name": "name",
+              "TypeName": "OPTION[inner=STRING]",
+              "Modifier": "None",
+              "IsOptional": false,
+              "DefaultValue": null
+            }
+          ],
+          "Mappings": [
+            {
+              "ArgumentIndex": 0,
+              "ParameterIndex": 0,
+              "EffectiveParameterType": "OPTION[inner=STRING]",
+              "IsExpandedParams": false
+            }
+          ]
+        }
+      ],
+      "ResolvedTypeName": null,
+      "ResolvedMethodName": null,
+      "ResolvedParameterTypes": [
+        "OPTION[inner=STRING]"
+      ]
+    },
+    {
+      "Kind": "statement",
+      "Target": "Guard.AgainstNull",
+      "Start": 381,
+      "End": 408,
+      "ResultOrVoid": "void",
+      "Arguments": [
+        {
+          "Index": 0,
+          "Start": 403,
+          "End": 408,
+          "Type": "LogEventPropertyValue",
+          "Kind": "BoundVariableExpression"
+        }
+      ],
+      "ArgumentNames": null,
+      "ArgumentModifiers": null,
+      "TypeArguments": null,
+      "SelectedOverloadMatches": [],
+      "ResolvedTypeName": "Guard",
+      "ResolvedMethodName": "AgainstNull",
+      "ResolvedParameterTypes": [
+        "LogEventPropertyValue"
+      ]
+    },
+    {
+      "Kind": "statement",
+      "Target": "EnsureValidName",
+      "Start": 417,
+      "End": 441,
+      "ResultOrVoid": "void",
+      "Arguments": [
+        {
+          "Index": 0,
+          "Start": 437,
+          "End": 441,
+          "Type": "str",
+          "Kind": "BoundVariableExpression"
+        }
+      ],
+      "ArgumentNames": null,
+      "ArgumentModifiers": null,
+      "TypeArguments": null,
+      "SelectedOverloadMatches": [
+        {
+          "FunctionName": "Serilog.Events.LogEventProperty.EnsureValidName",
+          "DisplaySignature": "Serilog.Events.LogEventProperty.EnsureValidName(str)",
+          "ReturnType": "VOID",
+          "TypeParameters": [],
+          "ContainingTypeName": "Serilog.Events.LogEventProperty",
+          "Parameters": [
+            {
+              "Index": 0,
+              "Name": "name",
+              "TypeName": "str",
+              "Modifier": "None",
+              "IsOptional": false,
+              "DefaultValue": null
+            }
+          ],
+          "Mappings": [
+            {
+              "ArgumentIndex": 0,
+              "ParameterIndex": 0,
+              "EffectiveParameterType": "str",
+              "IsExpandedParams": false
+            }
+          ]
+        }
+      ],
+      "ResolvedTypeName": null,
+      "ResolvedMethodName": null,
+      "ResolvedParameterTypes": [
+        "str"
+      ]
+    }
+  ],
+  "CalorSource": "\u00A7M{m001:Leg2:overflow=unchecked}\n  \u00A7NS{ns001:Serilog.Events:file}\n    // A property associated with a LogEvent.\n    \u00A7CL{c002:LogEventProperty:pub}\n      // The name of the property.\n      \u00A7PROP{p006:Name:str:pub:get}\n      // The value of the property.\n      \u00A7PROP{p007:Value:LogEventPropertyValue:pub:get}\n\n      \u00A7CTOR{ctor003:pub} (str:name, LogEventPropertyValue:value)\n        \u00A7C{Guard.AgainstNull} value\n        \u00A7C{EnsureValidName} name\n        \u00A7ASSIGN Name name\n        \u00A7ASSIGN Value value\n\n      \u00A7CTOR{ctor004:int} (EventProperty:property)\n        \u00A7IF{if005} (equals property EventProperty.None)\n          \u00A7TH \u00A7NEW{ArgumentNullException} \u00A7A (nameof property) \u00A7/NEW\n        \u00A7ASSIGN Name property.Name\n        \u00A7ASSIGN Value property.Value\n\n      // Test name to determine if it is a valid property name.\n      // @param name \u2014 The name to check.\n      // @returns true if the name is valid; otherwise, false.\n      \u00A7MT{m008:IsValidName:pub:stat}\n        \u00A7I{?str:name}[@NotNullWhen(true)]\n        \u00A7O{bool}\n        \u00A7R (! (isblank name))\n\n      // @throws ArgumentNullException \u2014 When name is null\n      // @throws ArgumentException \u2014 When name is empty or only contains whitespace\n      \u00A7MT{m009:EnsureValidName:int:stat}[@MethodImpl(MethodImplOptions.AggressiveInlining)] (str:name)\n        \u00A7E{throw,alloc}\n        \u00A7C{Guard.AgainstNull} name\n        \u00A7B{_preIsValidName011} \u00A7C{IsValidName} name\n        \u00A7IF{if010} (! _preIsValidName011)\n          \u00A7TH \u00A7NEW{ArgumentException} \u00A7A \u0022Property ${(nameof name)} must not be empty or whitespace.\u0022 \u00A7A (nameof name) \u00A7/NEW\n\n\n\n"
+}
