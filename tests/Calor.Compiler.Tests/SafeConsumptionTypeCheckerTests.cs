@@ -1987,6 +1987,27 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void StatementLambda_GotoCaseConvertsIntegralValueToNullableCharacter()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (?char:input) -> void
+                §E{}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §W{m1} input
+                    §K 'a'
+                      §GOTO{CASE:98}
+                    §K 'b'
+                      §R 2
+                    §K _
+                      §R 0
+                §/LAM{l1}
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
     public void StatementLambda_GotoCaseCannotTargetGuardedArm()
     {
         var result = Check("""
@@ -2121,6 +2142,24 @@ public sealed class SafeConsumptionTypeCheckerTests
 
         Assert.Contains(result.Diagnostics.Errors,
             diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void StatementLambda_ThrowCanTerminateFinally()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §TR{t1}
+                    §P "try"
+                  §FI
+                    §TH STR:"boom"
+                §/LAM{l1}
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
     }
 
     [Fact]

@@ -1537,7 +1537,8 @@ public sealed class TypeChecker
         Return = 2,
         LoopExit = 4,
         Continue = 8,
-        MatchExit = 16
+        MatchExit = 16,
+        Throw = 32
     }
 
     private sealed record ControlFlowResolver(
@@ -1797,8 +1798,10 @@ public sealed class TypeChecker
         HashSet<StatementNode> activeStatements)
         => statement switch
         {
-            ReturnStatementNode or ThrowStatementNode or RethrowStatementNode
+            ReturnStatementNode
                 => LocalFlow(ControlFlowOutcome.Return),
+            ThrowStatementNode or RethrowStatementNode
+                => LocalFlow(ControlFlowOutcome.Throw),
             BreakStatementNode => insideMatch
                 ? LocalFlow(ControlFlowOutcome.MatchExit)
                 : LocalFlow(ControlFlowOutcome.LoopExit),
@@ -1883,8 +1886,10 @@ public sealed class TypeChecker
         HashSet<StatementNode> activeStatements)
     {
         var scope = new object();
-        var normalizeIntegralAsChar =
-            InferExpressionType(match.Target).Equals(PrimitiveType.Char);
+        var matchTargetType = InferExpressionType(match.Target);
+        var normalizeIntegralAsChar = matchTargetType.Equals(PrimitiveType.Char)
+            || matchTargetType is NullableValueType nullable
+                && nullable.UnderlyingType.Equals(PrimitiveType.Char);
         var caseResolvers =
             new Dictionary<string, ControlFlowResolver>(
                 StringComparer.Ordinal);
@@ -1964,7 +1969,8 @@ public sealed class TypeChecker
             matchResolvers,
             new HashSet<StatementNode>(activeStatements));
         var localOutcomes = bodyOutcomes.Local;
-        var outcomes = localOutcomes & ControlFlowOutcome.Return;
+        var outcomes = localOutcomes
+            & (ControlFlowOutcome.Return | ControlFlowOutcome.Throw);
         if ((localOutcomes & ControlFlowOutcome.LoopExit) != 0
             || !conditionIsAlwaysTrue
                 && (!executesAtLeastOnce
