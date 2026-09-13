@@ -1903,6 +1903,49 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void StatementLambda_GotoNullCaseFollowsReturningTarget()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} (?str:input) -> void
+                §E{}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §W{m1} input
+                    §K "x"
+                      §GOTO{CASE:null}
+                    §K null
+                      §R 2
+                    §K _
+                      §R 0
+                §/LAM{l1}
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
+    public void StatementLambda_GotoCaseCannotTargetGuardedArm()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §W{m1} 1
+                    §K 1
+                      §GOTO{CASE:2}
+                    §K 2 §WHEN false
+                      §R 2
+                    §K _
+                      §R 0
+                §/LAM{l1}
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
     public void StatementLambda_BreakInsideLoopMatchDoesNotExitLoop()
     {
         var result = Check("""
@@ -1932,6 +1975,22 @@ public sealed class SafeConsumptionTypeCheckerTests
                     §K _
                       §BK
                       §R 1
+                §/LAM{l1}
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void StatementLambda_ContinueOutsideLoopDoesNotCompleteLambda()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §CN
                 §/LAM{l1}
             """);
 

@@ -1522,7 +1522,9 @@ public sealed class TypeChecker
             statements,
             insideMatch: false);
         return (outcomes.All
-            & (ControlFlowOutcome.FallThrough | ControlFlowOutcome.LoopExit)) == 0;
+            & (ControlFlowOutcome.FallThrough
+                | ControlFlowOutcome.LoopExit
+                | ControlFlowOutcome.Continue)) == 0;
     }
 
     [Flags]
@@ -1724,12 +1726,18 @@ public sealed class TypeChecker
             ReferenceNode { Name.Length: >= 3 } reference
                 when reference.Name[0] == '\'' && reference.Name[^1] == '\''
                 => $"char:{reference.Name}",
+            ReferenceNode { Name: "null" } => "null",
             ReferenceNode reference => $"reference:{reference.Name}",
             _ => null
         };
 
     private static string? GetCaseKey(PatternNode pattern)
-        => pattern is LiteralPatternNode literal ? GetCaseKey(literal.Literal) : null;
+        => pattern switch
+        {
+            LiteralPatternNode literal => GetCaseKey(literal.Literal),
+            ConstantPatternNode constant => GetCaseKey(constant.Value),
+            _ => null
+        };
 
     private static ControlFlowResult AnalyzeStatementControlFlow(
         StatementNode statement,
@@ -1834,7 +1842,9 @@ public sealed class TypeChecker
         {
             var key = matchCase.Pattern is WildcardPatternNode && matchCase.Guard == null
                 ? DefaultCaseKey
-                : GetCaseKey(matchCase.Pattern);
+                : matchCase.Guard == null
+                    ? GetCaseKey(matchCase.Pattern)
+                    : null;
             if (key == null || caseResolvers.ContainsKey(key))
                 continue;
             var targetCase = matchCase;
