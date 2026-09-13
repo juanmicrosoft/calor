@@ -1548,6 +1548,10 @@ public sealed class TypeChecker
             TryStatementNode tryStatement => ContainsBreak(tryStatement.TryBody)
                 || tryStatement.CatchClauses.Any(clause => ContainsBreak(clause.Body))
                 || tryStatement.FinallyBody != null && ContainsBreak(tryStatement.FinallyBody),
+            UsingStatementNode usingStatement => ContainsBreak(usingStatement.Body),
+            UnsafeBlockNode unsafeBlock => ContainsBreak(unsafeBlock.Body),
+            FixedStatementNode fixedStatement => ContainsBreak(fixedStatement.Body),
+            SyncBlockNode syncBlock => ContainsBreak(syncBlock.Body),
             _ => false
         });
 
@@ -2662,6 +2666,11 @@ public sealed class TypeChecker
     {
         if (target.Equals(source) || source is NeverType)
             return true;
+        if (TryGetDelegateFunctionType(target, out var targetDelegate)
+            && TryGetDelegateFunctionType(source, out var sourceDelegate))
+        {
+            return IsDelegateReferenceCompatible(targetDelegate, sourceDelegate);
+        }
         if (source is PrimitiveType primitive
             && !primitive.Equals(PrimitiveType.String)
             && !primitive.Equals(PrimitiveType.Object))
