@@ -2008,6 +2008,31 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void StatementLambda_NestedMatchUsesCachedLocalTargetType()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{factory:Func<bool,i32>} §LAM{l1:flag:bool}
+                  §IF{i1} flag
+                    §B{c:char} 'a'
+                    §W{m1} c
+                      §K 'a'
+                        §GOTO{CASE:98}
+                      §K 'b'
+                        §R 1
+                      §K _
+                        §R 0
+                  §EL
+                    §R 2
+                §/LAM{l1}
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
     public void StatementLambda_GotoCaseCannotTargetGuardedArm()
     {
         var result = Check("""
@@ -2097,6 +2122,54 @@ public sealed class SafeConsumptionTypeCheckerTests
                 §E{}
                 §B{factory:Func<i32>} §LAM{l1}
                   §CN
+                §/LAM{l1}
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void VoidStatementLambda_ContinueOutsideLoopIsInvalid()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{action:Action<i32>} §LAM{l1:x:i32}
+                  §CN
+                §/LAM{l1}
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void VoidStatementLambda_BreakOutsideLoopIsInvalid()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{action:Action<i32>} §LAM{l1:x:i32}
+                  §BK
+                §/LAM{l1}
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void StatementLambda_RethrowOutsideCatchIsInvalid()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §RT
                 §/LAM{l1}
             """);
 
