@@ -1920,26 +1920,34 @@ public sealed class Binder
         return false;
     }
 
-    private static bool HaveSameBuiltinArrayReferent(string parameterType, string argumentType)
+    private bool HaveSameMethodInputArrayReferent(string parameterType, string argumentType)
     {
-        if (!TrySplitArrayTypeSpelling(parameterType, out var parameterElement, out var parameterRank, out _)
-            || !TrySplitArrayTypeSpelling(argumentType, out var argumentElement, out var argumentRank, out _)
-            || parameterRank != argumentRank)
+        if (!TryBuildMethodInputArrayType(parameterType, out var parameter)
+            || !TryBuildMethodInputArrayType(argumentType, out var argument))
             return false;
+        return HaveSameArrayReferent(parameter!, argument!);
+    }
 
-        static string CanonicalElement(string element)
+    private static bool HaveSameArrayReferent(
+        BoundTypes.ArrayBoundType parameter,
+        BoundTypes.ArrayBoundType argument)
+    {
+        if (parameter.Rank != argument.Rank)
+            return false;
+        return (parameter.ElementType, argument.ElementType) switch
         {
-            if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(element, out var inner)
-                && TypeIdentity.Canonicalize(inner) is "STRING" or "System.String")
-                return "STRING";
-            var canonical = TypeIdentity.Canonicalize(element);
-            return canonical == "System.String" ? "STRING" : canonical;
-        }
-
-        var receiving = CanonicalElement(parameterElement);
-        var supplied = CanonicalElement(argumentElement);
-        return (receiving == "STRING" || IsBuiltInValueTypeName(receiving))
-            && string.Equals(receiving, supplied, StringComparison.Ordinal);
+            (BoundTypes.ArrayBoundType parameterArray, BoundTypes.ArrayBoundType argumentArray)
+                => HaveSameArrayReferent(parameterArray, argumentArray),
+            (BoundTypes.PrimitiveBoundType parameterPrimitive,
+                BoundTypes.PrimitiveBoundType argumentPrimitive)
+                => parameterPrimitive.Equals(argumentPrimitive),
+            (BoundTypes.NominalBoundType parameterNominal,
+                BoundTypes.NominalBoundType argumentNominal)
+                => TypeIdentity.Canonicalize(parameterNominal.QualifiedName) == "STRING"
+                    && TypeIdentity.Canonicalize(argumentNominal.QualifiedName) == "STRING"
+                    || parameterNominal.HasSameUnderlyingReferenceType(argumentNominal),
+            _ => false
+        };
     }
 
     private bool TryBuildStringTarget(
@@ -4240,10 +4248,15 @@ public sealed class Binder
         if (string.Equals(argument, "<unresolved>", StringComparison.Ordinal))
             return null;
 
-        // Array reference annotations do not change their built-in CLR referent.
-        // Keep rank, element representation and all non-array scoring intact.
-        if (HaveSameBuiltinArrayReferent(parameterType, argumentType))
-            return 0;
+        var parameterIsArray = TrySplitArrayTypeSpelling(parameterType, out _, out _, out _);
+        var argumentIsArray = TrySplitArrayTypeSpelling(argumentType, out _, out _, out _);
+        if (parameterIsArray || argumentIsArray)
+        {
+            if (parameterIsArray && argumentIsArray)
+                return HaveSameMethodInputArrayReferent(parameterType, argumentType) ? 0 : null;
+            if (parameterIsArray || parameter != "OBJECT")
+                return null;
+        }
 
         if (parameter == "OBJECT" && argument != "VOID")
             return 50;

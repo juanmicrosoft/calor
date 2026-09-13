@@ -322,6 +322,60 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     }
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void A4_KnownNativeNominalArray_UsesActualElementIdentityWithoutWideningPayloadPolicy(
+        bool nullableContainer, bool nullableElements)
+    {
+        var converted = new CSharpToCalorConverter().Convert($$"""
+            #nullable enable
+            public class Foo { }
+            public static class NominalArrays {
+                public static int Take(Foo[] items) { return 1; }
+                public static int Caller(Foo{{(nullableElements ? "?" : "")}}[]{{(nullableContainer ? "?" : "")}} values) {
+                    var first = values;
+                    var second = first;
+                    return Take(items: second);
+                }
+            }
+            """, "a4-nominal-array.cs");
+        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        var (module, diagnostics) = Bind(converted.CalorSource!);
+        var caller = module.Functions.Single(f => f.Symbol.Name.EndsWith(".Caller", StringComparison.Ordinal));
+        var call = Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(caller.Body[^1]).Expression);
+        Assert.Single(call.SelectedOverloadMatches);
+        var array = Assert.IsType<ArrayBoundType>(NullabilityChecker.GetMethodInputArrayType(Assert.Single(call.Arguments)));
+        Assert.True(Assert.IsType<NominalBoundType>(array.ElementType).IsKnownReferenceType);
+        Assert.Equal(nullableContainer, diagnostics.Any(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+    }
+
+    [Theory]
+    [InlineData("Foo[,]", "Foo[]")]
+    [InlineData("Foo[]", "Foo")]
+    [InlineData("Foo", "Foo[]")]
+    public void A4_ArrayAndRankIdentity_AreNotErasedByNativeClassConversion(string sourceType, string targetType)
+    {
+        var source = $$"""
+            §M{m1:ArrayRanks}
+              §CL{c1:Foo:pub}
+                §FLD{i32:Value:pub}
+              §F{take:Take:pub} ({{targetType}}:items) -> i32
+                §R 1
+              §F{caller:Caller:pub} ({{sourceType}}:value) -> i32
+                §R §C{Take} §A value §/C
+            """;
+        var (module, diagnostics) = Bind(source);
+        var call = Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(
+            module.Functions.Single(f => f.Symbol.Name == "Caller").Body[^1]).Expression);
+        Assert.Empty(call.SelectedOverloadMatches);
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.NoMatchingOverload
+            && BindingDiagnosticPolicy.IsCompilationError(d));
+    }
+
+    [Theory]
     [InlineData("Option<str[]>", "str[]")]
     [InlineData("str[]", "Option<str[]>")]
     [InlineData("i32?[]", "i32[]")]
