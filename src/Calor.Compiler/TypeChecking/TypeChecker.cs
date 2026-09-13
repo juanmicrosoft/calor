@@ -19,6 +19,8 @@ public sealed class TypeChecker
     private bool _suppressContextualDiagnostics;
     private bool _lambdaReturnInvalid;
     private List<CalorType>? _inferredLambdaReturnTypes;
+    private int _lambdaBodyDepth;
+    private readonly Stack<List<Diagnostic>> _flowCacheDiagnostics = new();
 
     public TypeChecker(DiagnosticBag diagnostics)
     {
@@ -365,10 +367,10 @@ public sealed class TypeChecker
                 CheckWhileStatement(whileStmt);
                 break;
             case DoWhileStatementNode doWhileStmt:
-                CheckForFlowCache(() => CheckDoWhileStatement(doWhileStmt));
+                CheckStructuralStatement(() => CheckDoWhileStatement(doWhileStmt));
                 break;
             case ForeachStatementNode foreachStmt:
-                CheckForFlowCache(() => CheckForeachStatement(foreachStmt));
+                CheckStructuralStatement(() => CheckForeachStatement(foreachStmt));
                 break;
             case IfStatementNode ifStmt:
                 CheckIfStatement(ifStmt);
@@ -381,19 +383,19 @@ public sealed class TypeChecker
                 break;
             case TryStatementNode tryStatement:
                 ValidateCatchFilters(tryStatement);
-                CheckForFlowCache(() => CheckTryStatement(tryStatement));
+                CheckStructuralStatement(() => CheckTryStatement(tryStatement));
                 break;
             case UsingStatementNode usingStatement:
-                CheckForFlowCache(() => CheckUsingStatement(usingStatement));
+                CheckStructuralStatement(() => CheckUsingStatement(usingStatement));
                 break;
             case UnsafeBlockNode unsafeBlock:
-                CheckForFlowCache(() => CheckScopedStatements(unsafeBlock.Body));
+                CheckStructuralStatement(() => CheckScopedStatements(unsafeBlock.Body));
                 break;
             case FixedStatementNode fixedStatement:
-                CheckForFlowCache(() => CheckFixedStatement(fixedStatement));
+                CheckStructuralStatement(() => CheckFixedStatement(fixedStatement));
                 break;
             case SyncBlockNode syncBlock:
-                CheckForFlowCache(() =>
+                CheckStructuralStatement(() =>
                 {
                     _ = InferExpressionType(syncBlock.LockExpression);
                     CheckScopedStatements(syncBlock.Body);
@@ -594,13 +596,40 @@ public sealed class TypeChecker
         }
     }
 
+    private void CheckStructuralStatement(Action check)
+    {
+        if (_lambdaBodyDepth > 0)
+            check();
+        else
+            CheckForFlowCache(check);
+    }
+
     private void CheckForFlowCache(Action check)
     {
         var checkpoint = _diagnostics.CreateCheckpoint();
         var previousLambdaReturnInvalid = _lambdaReturnInvalid;
         var inferredReturnCount = _inferredLambdaReturnTypes?.Count ?? 0;
-        check();
+        var preservedDiagnostics = new List<Diagnostic>();
+        _flowCacheDiagnostics.Push(preservedDiagnostics);
+        try
+        {
+            check();
+        }
+        finally
+        {
+            _flowCacheDiagnostics.Pop();
+        }
         _diagnostics.RestoreCheckpoint(checkpoint);
+        foreach (var diagnostic in preservedDiagnostics)
+            _diagnostics.Add(diagnostic);
+        if (_flowCacheDiagnostics.TryPeek(out var parentDiagnostics))
+        {
+            foreach (var diagnostic in preservedDiagnostics)
+            {
+                if (!parentDiagnostics.Contains(diagnostic))
+                    parentDiagnostics.Add(diagnostic);
+            }
+        }
         _lambdaReturnInvalid = previousLambdaReturnInvalid;
         if (_inferredLambdaReturnTypes != null
             && _inferredLambdaReturnTypes.Count > inferredReturnCount)
@@ -608,6 +637,27 @@ public sealed class TypeChecker
             _inferredLambdaReturnTypes.RemoveRange(
                 inferredReturnCount,
                 _inferredLambdaReturnTypes.Count - inferredReturnCount);
+        }
+    }
+
+    private void ReportControlFlowError(TextSpan span, string message)
+    {
+        var diagnostic = new Diagnostic(
+            DiagnosticCode.TypeMismatch,
+            message,
+            span,
+            filePath: _diagnostics.CurrentFilePath);
+        _diagnostics.Add(diagnostic);
+    }
+
+    private void PreserveFlowCacheDiagnosticsSince(int diagnosticCount)
+    {
+        if (!_flowCacheDiagnostics.TryPeek(out var preservedDiagnostics))
+            return;
+        foreach (var diagnostic in _diagnostics.Skip(diagnosticCount))
+        {
+            if (!preservedDiagnostics.Contains(diagnostic))
+                preservedDiagnostics.Add(diagnostic);
         }
     }
 
@@ -1572,6 +1622,7 @@ public sealed class TypeChecker
 
     private CalorType InferLambdaType(LambdaExpressionNode lambda, CalorType? expectedType)
     {
+        var flowCacheDiagnosticStart = _diagnostics.Count;
         var expectedFunction = expectedType != null
             && TryGetDelegateFunctionType(expectedType, out var function)
                 ? function
@@ -1624,43 +1675,51 @@ public sealed class TypeChecker
         _currentReturnType = expectedFunction?.ReturnType;
         _validateReturnAssignments = expectedFunction != null;
         CalorType returnType;
-        if (lambda.ExpressionBody != null)
+        _lambdaBodyDepth++;
+        try
         {
-            returnType = InferExpressionType(lambda.ExpressionBody, expectedFunction?.ReturnType);
-            if (expectedFunction != null && !IsVoidCompatibleLambdaExpression(expectedFunction, lambda.ExpressionBody)
-                && !ContainsInferencePlaceholder(expectedFunction.ReturnType)
-                && !ContainsInferencePlaceholder(returnType)
-                && !IsAssignable(expectedFunction.ReturnType, returnType))
+            if (lambda.ExpressionBody != null)
             {
-                if (!_suppressContextualDiagnostics)
+                returnType = InferExpressionType(lambda.ExpressionBody, expectedFunction?.ReturnType);
+                if (expectedFunction != null && !IsVoidCompatibleLambdaExpression(expectedFunction, lambda.ExpressionBody)
+                    && !ContainsInferencePlaceholder(expectedFunction.ReturnType)
+                    && !ContainsInferencePlaceholder(returnType)
+                    && !IsAssignable(expectedFunction.ReturnType, returnType))
                 {
-                    _diagnostics.ReportError(lambda.ExpressionBody.Span, DiagnosticCode.TypeMismatch,
-                        $"Lambda return type {returnType.SurfaceName} is not assignable to "
-                        + expectedFunction.ReturnType.SurfaceName);
+                    if (!_suppressContextualDiagnostics)
+                    {
+                        _diagnostics.ReportError(lambda.ExpressionBody.Span, DiagnosticCode.TypeMismatch,
+                            $"Lambda return type {returnType.SurfaceName} is not assignable to "
+                            + expectedFunction.ReturnType.SurfaceName);
+                    }
+                    signatureValid = false;
                 }
-                signatureValid = false;
+            }
+            else
+            {
+                foreach (var statement in lambda.StatementBody ?? Array.Empty<StatementNode>())
+                {
+                    CheckStatement(statement);
+                }
+                returnType = PrimitiveType.Void;
+                var definitelyReturns = DefinitelyReturns(
+                    lambda.StatementBody ?? Array.Empty<StatementNode>());
+                if (expectedFunction != null
+                    && !expectedFunction.ReturnType.Equals(PrimitiveType.Void)
+                    && !definitelyReturns)
+                {
+                    if (!_suppressContextualDiagnostics)
+                    {
+                        _diagnostics.ReportError(lambda.Span, DiagnosticCode.TypeMismatch,
+                            $"Lambda targeting {expectedFunction.SurfaceName} must return a value");
+                    }
+                    signatureValid = false;
+                }
             }
         }
-        else
+        finally
         {
-            foreach (var statement in lambda.StatementBody ?? Array.Empty<StatementNode>())
-            {
-                CheckStatement(statement);
-            }
-            returnType = PrimitiveType.Void;
-            var definitelyReturns = DefinitelyReturns(
-                lambda.StatementBody ?? Array.Empty<StatementNode>());
-            if (expectedFunction != null
-                && !expectedFunction.ReturnType.Equals(PrimitiveType.Void)
-                && !definitelyReturns)
-            {
-                if (!_suppressContextualDiagnostics)
-                {
-                    _diagnostics.ReportError(lambda.Span, DiagnosticCode.TypeMismatch,
-                        $"Lambda targeting {expectedFunction.SurfaceName} must return a value");
-                }
-                signatureValid = false;
-            }
+            _lambdaBodyDepth--;
         }
         signatureValid &= !_lambdaReturnInvalid;
         _currentReturnType = previousReturnType;
@@ -1669,6 +1728,7 @@ public sealed class TypeChecker
         _lambdaReturnInvalid = previousLambdaReturnInvalid;
         _inferredLambdaReturnTypes = previousInferredLambdaReturnTypes;
         _env.ExitScope();
+        PreserveFlowCacheDiagnosticsSince(flowCacheDiagnosticStart);
         _ = parameterTypes;
         _ = returnType;
         return expectedFunction is not null && signatureValid ? expectedFunction : ErrorType.Instance;
@@ -1692,9 +1752,8 @@ public sealed class TypeChecker
         if (invalidTransfers != ControlFlowOutcome.None
             && statements.Count > 0)
         {
-            _diagnostics.ReportError(
+            ReportControlFlowError(
                 statements[0].Span,
-                DiagnosticCode.TypeMismatch,
                 "break and continue must target an enclosing loop or match");
         }
         return (outcomes.All
@@ -1878,16 +1937,14 @@ public sealed class TypeChecker
             if (statement is GotoStatementNode { CaseLabel: not null } or
                 GotoStatementNode { IsDefault: true })
             {
-                _diagnostics.ReportError(
+                ReportControlFlowError(
                     statement.Span,
-                    DiagnosticCode.TypeMismatch,
                     "goto case/default must target an unguarded case in the enclosing match");
             }
             else if (statement is GotoStatementNode)
             {
-                _diagnostics.ReportError(
+                ReportControlFlowError(
                     statement.Span,
-                    DiagnosticCode.TypeMismatch,
                     "goto must target a label in the current control-flow scope");
             }
             var statementResult = AnalyzeStatementControlFlow(
@@ -1967,9 +2024,8 @@ public sealed class TypeChecker
     {
         if (!insideCatch)
         {
-            _diagnostics.ReportError(
+            ReportControlFlowError(
                 rethrow.Span,
-                DiagnosticCode.TypeMismatch,
                 "rethrow must be used within a catch block");
         }
         return LocalFlow(ControlFlowOutcome.Throw);
@@ -2245,9 +2301,8 @@ public sealed class TypeChecker
                 | ControlFlowOutcome.MatchExit);
         if (escapingFinallyOutcomes != ControlFlowOutcome.None)
         {
-            _diagnostics.ReportError(
+            ReportControlFlowError(
                 tryStatement.FinallyBody[0].Span,
-                DiagnosticCode.TypeMismatch,
                 "Control cannot leave a finally block");
             finallyOutcomes = new ControlFlowResult(
                 finallyOutcomes.Local & ~escapingFinallyOutcomes
@@ -3071,16 +3126,24 @@ public sealed class TypeChecker
                 : SubstituteTypeParameters(targetTemplate.ParameterTypes[i], currentSubstitutions);
             _env.DefineVariable(lambda.Parameters[i].Name, parameterType);
         }
-        if (lambda.ExpressionBody != null)
+        _lambdaBodyDepth++;
+        try
         {
-            _inferredLambdaReturnTypes.Add(InferExpressionType(lambda.ExpressionBody));
-        }
-        else
-        {
-            foreach (var statement in lambda.StatementBody ?? Array.Empty<StatementNode>())
+            if (lambda.ExpressionBody != null)
             {
-                CheckStatement(statement);
+                _inferredLambdaReturnTypes.Add(InferExpressionType(lambda.ExpressionBody));
             }
+            else
+            {
+                foreach (var statement in lambda.StatementBody ?? Array.Empty<StatementNode>())
+                {
+                    CheckStatement(statement);
+                }
+            }
+        }
+        finally
+        {
+            _lambdaBodyDepth--;
         }
         _env.ExitScope();
         foreach (var returnType in _inferredLambdaReturnTypes)

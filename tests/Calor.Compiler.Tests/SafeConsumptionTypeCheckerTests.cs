@@ -2251,6 +2251,52 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void NestedLambdaInsideTry_PreservesControlFlowDiagnostic()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{cw}
+                §B{outer:Action<i32>} §LAM{l1:x:i32}
+                  §TR{t1}
+                    §B{inner:Action<i32>} §LAM{l2:y:i32}
+                      §RT
+                    §/LAM{l2}
+                  §FI
+                    §P "finally"
+                §/LAM{l1}
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch
+                && diagnostic.Message.Contains(
+                    "rethrow must be used within a catch block",
+                    StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ContextualLambdaReturnInsideTry_IsValidated()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Make:pub}<T> (Func<T>:factory) -> T
+                §E{}
+                §R §C{factory} §/C
+              §F{f2:Probe:pub} () -> i32
+                §E{cw}
+                §R §C{Make} §A §LAM{l1}
+                  §TR{t1}
+                    §R "bad"
+                  §FI
+                    §P "done"
+                §/LAM{l1} §/C
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
     public void VoidStatementLambda_CatchFilterMustBeBoolean()
     {
         var result = Check("""
