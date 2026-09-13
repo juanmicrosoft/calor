@@ -2202,6 +2202,74 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void VoidStatementLambda_RethrowInsideForIsInvalid()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{action:Action<i32>} §LAM{l1:x:i32}
+                  §L{loop:i:0:1:1}
+                    §RT
+                §/LAM{l1}
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void UncontextualizedLambda_RethrowOutsideCatchIsInvalid()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §C{System.Threading.Tasks.Task.Run} §A §LAM{l1}
+                  §RT
+                §/LAM{l1} §/C
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void UncontextualizedLambda_ContinueOutsideLoopIsInvalid()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §C{System.Threading.Tasks.Task.Run} §A §LAM{l1}
+                  §CN
+                §/LAM{l1} §/C
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void VoidStatementLambda_CatchFilterMustBeBoolean()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{cw}
+                §B{action:Action<i32>} §LAM{l1:x:i32}
+                  §TR{t1}
+                    §P "try"
+                  §CA{Exception:ex} §WHEN 1
+                    §P "catch"
+                §/LAM{l1}
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
     public void StatementLambda_GotoCannotLeaveFinally()
     {
         var result = Check("""

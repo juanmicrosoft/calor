@@ -365,7 +365,10 @@ public sealed class TypeChecker
                 CheckWhileStatement(whileStmt);
                 break;
             case DoWhileStatementNode doWhileStmt:
-                CheckDoWhileStatement(doWhileStmt);
+                CheckForFlowCache(() => CheckDoWhileStatement(doWhileStmt));
+                break;
+            case ForeachStatementNode foreachStmt:
+                CheckForFlowCache(() => CheckForeachStatement(foreachStmt));
                 break;
             case IfStatementNode ifStmt:
                 CheckIfStatement(ifStmt);
@@ -377,20 +380,24 @@ public sealed class TypeChecker
                 CheckMatchStatement(match);
                 break;
             case TryStatementNode tryStatement:
-                CheckTryStatement(tryStatement);
+                ValidateCatchFilters(tryStatement);
+                CheckForFlowCache(() => CheckTryStatement(tryStatement));
                 break;
             case UsingStatementNode usingStatement:
-                CheckUsingStatement(usingStatement);
+                CheckForFlowCache(() => CheckUsingStatement(usingStatement));
                 break;
             case UnsafeBlockNode unsafeBlock:
-                CheckScopedStatements(unsafeBlock.Body);
+                CheckForFlowCache(() => CheckScopedStatements(unsafeBlock.Body));
                 break;
             case FixedStatementNode fixedStatement:
-                CheckFixedStatement(fixedStatement);
+                CheckForFlowCache(() => CheckFixedStatement(fixedStatement));
                 break;
             case SyncBlockNode syncBlock:
-                _ = InferExpressionType(syncBlock.LockExpression);
-                CheckScopedStatements(syncBlock.Body);
+                CheckForFlowCache(() =>
+                {
+                    _ = InferExpressionType(syncBlock.LockExpression);
+                    CheckScopedStatements(syncBlock.Body);
+                });
                 break;
             // Collection mutation statements
             case CollectionPushNode push:
@@ -544,13 +551,64 @@ public sealed class TypeChecker
                     ResolveTypeName(clause.ExceptionType, clause.Span));
             }
             if (clause.Filter != null)
-                _ = InferExpressionType(clause.Filter);
+            {
+                var filterType = InferExpressionType(clause.Filter);
+                if (IsDefinitelyNotBool(filterType))
+                {
+                    _diagnostics.ReportError(
+                        clause.Filter.Span,
+                        DiagnosticCode.TypeMismatch,
+                        $"Catch filter must be bool, got {filterType.SurfaceName}");
+                }
+            }
             foreach (var statement in clause.Body)
                 CheckStatement(statement);
             _env.ExitScope();
         }
         if (tryStatement.FinallyBody != null)
             CheckScopedStatements(tryStatement.FinallyBody);
+    }
+
+    private void ValidateCatchFilters(TryStatementNode tryStatement)
+    {
+        foreach (var clause in tryStatement.CatchClauses)
+        {
+            if (clause.Filter == null)
+                continue;
+            _env.EnterScope();
+            if (clause.VariableName != null && clause.ExceptionType != null)
+            {
+                _env.DefineVariable(
+                    clause.VariableName,
+                    ResolveTypeName(clause.ExceptionType, clause.Span));
+            }
+            var filterType = InferExpressionType(clause.Filter);
+            if (IsDefinitelyNotBool(filterType))
+            {
+                _diagnostics.ReportError(
+                    clause.Filter.Span,
+                    DiagnosticCode.TypeMismatch,
+                    $"Catch filter must be bool, got {filterType.SurfaceName}");
+            }
+            _env.ExitScope();
+        }
+    }
+
+    private void CheckForFlowCache(Action check)
+    {
+        var checkpoint = _diagnostics.CreateCheckpoint();
+        var previousLambdaReturnInvalid = _lambdaReturnInvalid;
+        var inferredReturnCount = _inferredLambdaReturnTypes?.Count ?? 0;
+        check();
+        _diagnostics.RestoreCheckpoint(checkpoint);
+        _lambdaReturnInvalid = previousLambdaReturnInvalid;
+        if (_inferredLambdaReturnTypes != null
+            && _inferredLambdaReturnTypes.Count > inferredReturnCount)
+        {
+            _inferredLambdaReturnTypes.RemoveRange(
+                inferredReturnCount,
+                _inferredLambdaReturnTypes.Count - inferredReturnCount);
+        }
     }
 
     private void CheckUsingStatement(UsingStatementNode usingStatement)
@@ -565,6 +623,20 @@ public sealed class TypeChecker
             _env.DefineVariable(usingStatement.VariableName, variableType);
         }
         foreach (var statement in usingStatement.Body)
+            CheckStatement(statement);
+        _env.ExitScope();
+    }
+
+    private void CheckForeachStatement(ForeachStatementNode foreachStatement)
+    {
+        _ = InferExpressionType(foreachStatement.Collection);
+        _env.EnterScope();
+        _env.DefineVariable(
+            foreachStatement.VariableName,
+            ResolveTypeName(foreachStatement.VariableType, foreachStatement.VariableTypeSpan));
+        if (foreachStatement.IndexVariableName != null)
+            _env.DefineVariable(foreachStatement.IndexVariableName, PrimitiveType.Int);
+        foreach (var statement in foreachStatement.Body)
             CheckStatement(statement);
         _env.ExitScope();
     }
@@ -1618,8 +1690,7 @@ public sealed class TypeChecker
                 | ControlFlowOutcome.Continue
                 | ControlFlowOutcome.MatchExit);
         if (invalidTransfers != ControlFlowOutcome.None
-            && statements.Count > 0
-            && !_suppressContextualDiagnostics)
+            && statements.Count > 0)
         {
             _diagnostics.ReportError(
                 statements[0].Span,
@@ -1807,23 +1878,17 @@ public sealed class TypeChecker
             if (statement is GotoStatementNode { CaseLabel: not null } or
                 GotoStatementNode { IsDefault: true })
             {
-                if (!_suppressContextualDiagnostics)
-                {
-                    _diagnostics.ReportError(
-                        statement.Span,
-                        DiagnosticCode.TypeMismatch,
-                        "goto case/default must target an unguarded case in the enclosing match");
-                }
+                _diagnostics.ReportError(
+                    statement.Span,
+                    DiagnosticCode.TypeMismatch,
+                    "goto case/default must target an unguarded case in the enclosing match");
             }
             else if (statement is GotoStatementNode)
             {
-                if (!_suppressContextualDiagnostics)
-                {
-                    _diagnostics.ReportError(
-                        statement.Span,
-                        DiagnosticCode.TypeMismatch,
-                        "goto must target a label in the current control-flow scope");
-                }
+                _diagnostics.ReportError(
+                    statement.Span,
+                    DiagnosticCode.TypeMismatch,
+                    "goto must target a label in the current control-flow scope");
             }
             var statementResult = AnalyzeStatementControlFlow(
                 statement,
@@ -1900,7 +1965,7 @@ public sealed class TypeChecker
         RethrowStatementNode rethrow,
         bool insideCatch)
     {
-        if (!insideCatch && !_suppressContextualDiagnostics)
+        if (!insideCatch)
         {
             _diagnostics.ReportError(
                 rethrow.Span,
@@ -1959,6 +2024,12 @@ public sealed class TypeChecker
                 matchResolvers,
                 activeStatements,
                 insideCatch),
+            ForStatementNode loop => AnalyzeFiniteLoopControlFlow(
+                loop.Body, labelResolvers, matchResolvers, activeStatements, insideCatch),
+            ForeachStatementNode loop => AnalyzeFiniteLoopControlFlow(
+                loop.Body, labelResolvers, matchResolvers, activeStatements, insideCatch),
+            DictionaryForeachNode loop => AnalyzeFiniteLoopControlFlow(
+                loop.Body, labelResolvers, matchResolvers, activeStatements, insideCatch),
             TryStatementNode tryStatement => AnalyzeTryControlFlow(
                 tryStatement, insideMatch, labelResolvers, matchResolvers, activeStatements,
                 insideCatch),
@@ -2117,6 +2188,25 @@ public sealed class TypeChecker
         return new ControlFlowResult(outcomes, bodyOutcomes.Transfers);
     }
 
+    private ControlFlowResult AnalyzeFiniteLoopControlFlow(
+        IReadOnlyList<StatementNode> body,
+        IReadOnlyDictionary<string, ControlFlowResolver> labelResolvers,
+        IReadOnlyDictionary<string, ControlFlowResolver>? matchResolvers,
+        HashSet<StatementNode> activeStatements,
+        bool insideCatch)
+    {
+        var bodyOutcomes = AnalyzeControlFlow(
+            body,
+            insideMatch: false,
+            labelResolvers,
+            matchResolvers,
+            new HashSet<StatementNode>(activeStatements),
+            insideCatch);
+        var outcomes = ControlFlowOutcome.FallThrough
+            | (bodyOutcomes.Local & (ControlFlowOutcome.Return | ControlFlowOutcome.Throw));
+        return new ControlFlowResult(outcomes, bodyOutcomes.Transfers);
+    }
+
     private ControlFlowResult AnalyzeTryControlFlow(
         TryStatementNode tryStatement,
         bool insideMatch,
@@ -2155,13 +2245,10 @@ public sealed class TypeChecker
                 | ControlFlowOutcome.MatchExit);
         if (escapingFinallyOutcomes != ControlFlowOutcome.None)
         {
-            if (!_suppressContextualDiagnostics)
-            {
-                _diagnostics.ReportError(
-                    tryStatement.FinallyBody[0].Span,
-                    DiagnosticCode.TypeMismatch,
-                    "Control cannot leave a finally block");
-            }
+            _diagnostics.ReportError(
+                tryStatement.FinallyBody[0].Span,
+                DiagnosticCode.TypeMismatch,
+                "Control cannot leave a finally block");
             finallyOutcomes = new ControlFlowResult(
                 finallyOutcomes.Local & ~escapingFinallyOutcomes
                     | ControlFlowOutcome.FallThrough,
