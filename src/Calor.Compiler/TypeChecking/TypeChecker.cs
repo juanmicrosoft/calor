@@ -1517,29 +1517,39 @@ public sealed class TypeChecker
             && expression is CallExpressionNode or ExpressionCallNode or NewExpressionNode;
 
     private static bool DefinitelyReturns(IReadOnlyList<StatementNode> statements)
-        => statements.Any(statement => statement switch
+    {
+        foreach (var statement in statements)
         {
-            ReturnStatementNode => true,
-            ThrowStatementNode or RethrowStatementNode => true,
-            IfStatementNode conditional => DefinitelyReturns(conditional.ThenBody)
-                && conditional.ElseIfClauses.All(clause => DefinitelyReturns(clause.Body))
-                && conditional.ElseBody != null
-                && DefinitelyReturns(conditional.ElseBody),
-            MatchStatementNode match => match.Cases.Count > 0
-                && match.Cases.Any(matchCase =>
-                    matchCase.Pattern is WildcardPatternNode && matchCase.Guard == null)
-                && match.Cases.All(matchCase => DefinitelyReturns(matchCase.Body)),
-            WhileStatementNode { Condition: BoolLiteralNode { Value: true } } loop
-                => DefinitelyReturns(loop.Body) || !ContainsLoopExit(loop.Body),
-            DoWhileStatementNode { Condition: BoolLiteralNode { Value: true } } loop
-                => DefinitelyReturns(loop.Body) || !ContainsLoopExit(loop.Body),
-            DoWhileStatementNode loop => DefinitelyReturns(loop.Body),
-            TryStatementNode tryStatement => tryStatement.FinallyBody != null
-                && DefinitelyReturns(tryStatement.FinallyBody)
-                || DefinitelyReturns(tryStatement.TryBody)
-                && tryStatement.CatchClauses.All(clause => DefinitelyReturns(clause.Body)),
-            _ => false
-        });
+            var terminates = statement switch
+            {
+                ReturnStatementNode => true,
+                ThrowStatementNode or RethrowStatementNode => true,
+                IfStatementNode conditional => DefinitelyReturns(conditional.ThenBody)
+                    && conditional.ElseIfClauses.All(clause => DefinitelyReturns(clause.Body))
+                    && conditional.ElseBody != null
+                    && DefinitelyReturns(conditional.ElseBody),
+                MatchStatementNode match => match.Cases.Count > 0
+                    && match.Cases.Any(matchCase =>
+                        matchCase.Pattern is WildcardPatternNode && matchCase.Guard == null)
+                    && match.Cases.All(matchCase => DefinitelyReturns(matchCase.Body)),
+                WhileStatementNode { Condition: BoolLiteralNode { Value: true } } loop
+                    => DefinitelyReturns(loop.Body) || !ContainsLoopExit(loop.Body),
+                DoWhileStatementNode { Condition: BoolLiteralNode { Value: true } } loop
+                    => DefinitelyReturns(loop.Body) || !ContainsLoopExit(loop.Body),
+                DoWhileStatementNode loop => DefinitelyReturns(loop.Body),
+                TryStatementNode tryStatement => tryStatement.FinallyBody != null
+                    && DefinitelyReturns(tryStatement.FinallyBody)
+                    || DefinitelyReturns(tryStatement.TryBody)
+                    && tryStatement.CatchClauses.All(clause => DefinitelyReturns(clause.Body)),
+                _ => false
+            };
+            if (terminates)
+                return true;
+            if (statement is BreakStatementNode or ContinueStatementNode or GotoStatementNode)
+                return false;
+        }
+        return false;
+    }
 
     private static bool ContainsLoopExit(IReadOnlyList<StatementNode> statements)
     {

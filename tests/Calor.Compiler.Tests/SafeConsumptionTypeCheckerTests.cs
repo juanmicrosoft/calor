@@ -1689,6 +1689,24 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void StatementLambda_ReturnAfterReachableLoopExitIsUnreachable()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §WH{w1} true
+                    §BK
+                    §R 1
+                §/LAM{l1}
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
     public void StatementLambda_UnconditionalLoopWithGotoMustReturn()
     {
         var result = Check("""
