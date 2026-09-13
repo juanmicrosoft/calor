@@ -1530,9 +1530,9 @@ public sealed class TypeChecker
                     matchCase.Pattern is WildcardPatternNode && matchCase.Guard == null)
                 && match.Cases.All(matchCase => DefinitelyReturns(matchCase.Body)),
             WhileStatementNode { Condition: BoolLiteralNode { Value: true } } loop
-                => !ContainsLoopExit(loop.Body),
+                => DefinitelyReturns(loop.Body) || !ContainsLoopExit(loop.Body),
             DoWhileStatementNode { Condition: BoolLiteralNode { Value: true } } loop
-                => !ContainsLoopExit(loop.Body),
+                => DefinitelyReturns(loop.Body) || !ContainsLoopExit(loop.Body),
             DoWhileStatementNode loop => DefinitelyReturns(loop.Body),
             TryStatementNode tryStatement => tryStatement.FinallyBody != null
                 && DefinitelyReturns(tryStatement.FinallyBody)
@@ -1553,7 +1553,7 @@ public sealed class TypeChecker
         bool insideMatch)
         => statements.Any(statement => statement switch
         {
-            BreakStatementNode => true,
+            BreakStatementNode => !insideMatch,
             GotoStatementNode { CaseLabel: not null } => !insideMatch,
             GotoStatementNode { IsDefault: true } => !insideMatch,
             GotoStatementNode gotoStatement => !localLabels.Contains(gotoStatement.Label),
