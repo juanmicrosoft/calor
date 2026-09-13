@@ -387,6 +387,7 @@ public sealed class FunctionType : CalorType
     public IReadOnlyList<CalorType> ParameterTypes { get; }
     public IReadOnlyList<string>? ParameterNames { get; }
     public IReadOnlyList<ParameterModifier>? ParameterModifiers { get; }
+    public string? DelegateName { get; }
     public CalorType ReturnType { get; }
     public override string Name
     {
@@ -423,16 +424,32 @@ public sealed class FunctionType : CalorType
         CalorType returnType,
         IReadOnlyList<string>? parameterNames,
         IReadOnlyList<ParameterModifier>? parameterModifiers)
+        : this(parameterTypes, returnType, parameterNames, parameterModifiers, null)
+    {
+    }
+
+    public FunctionType(
+        IReadOnlyList<CalorType> parameterTypes,
+        CalorType returnType,
+        IReadOnlyList<string>? parameterNames,
+        IReadOnlyList<ParameterModifier>? parameterModifiers,
+        string? delegateName)
     {
         ParameterTypes = parameterTypes ?? throw new ArgumentNullException(nameof(parameterTypes));
         ReturnType = returnType ?? throw new ArgumentNullException(nameof(returnType));
         ParameterNames = parameterNames;
         ParameterModifiers = parameterModifiers;
+        DelegateName = delegateName;
     }
 
     public override bool Equals(CalorType? other)
     {
         if (other is not FunctionType ft) return false;
+        if (DelegateName != null || ft.DelegateName != null)
+        {
+            if (!string.Equals(DelegateName, ft.DelegateName, StringComparison.Ordinal))
+                return false;
+        }
         if (!ReturnType.Equals(ft.ReturnType)) return false;
         if (ParameterTypes.Count != ft.ParameterTypes.Count) return false;
         return ParameterTypes.Zip(ft.ParameterTypes).All(pair => pair.First.Equals(pair.Second));
@@ -442,6 +459,7 @@ public sealed class FunctionType : CalorType
     {
         var hash = new HashCode();
         hash.Add("Function");
+        hash.Add(DelegateName, StringComparer.Ordinal);
         hash.Add(ReturnType);
         foreach (var p in ParameterTypes)
             hash.Add(p);

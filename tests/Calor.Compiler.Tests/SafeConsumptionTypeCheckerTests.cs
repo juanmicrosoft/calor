@@ -1637,6 +1637,23 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void StatementLambda_DoWhileWithReturningBodyDefinitelyReturns()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §DO{d1}
+                    §R 1
+                  §/DO{d1} false
+                §/LAM{l1}
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
     public void StatementLambda_UnconditionalLoopWithNestedBreakMustReturn()
     {
         var result = Check("""
@@ -1718,6 +1735,28 @@ public sealed class SafeConsumptionTypeCheckerTests
             """);
 
         Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
+    public void MethodGroupParameters_RejectDistinctNamedDelegates()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §DEL{d1:First:pub}
+                §I{str:value}
+                §O{void}
+              §DEL{d2:Second:pub}
+                §I{str:value}
+                §O{void}
+              §F{f1:Use:pub} (First:callback) -> void
+                §E{}
+              §F{f2:Probe:pub} () -> void
+                §E{}
+                §B{action:Action<Second>} Use
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
     }
 
     [Fact]

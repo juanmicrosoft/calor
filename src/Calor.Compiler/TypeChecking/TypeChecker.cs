@@ -293,7 +293,8 @@ public sealed class TypeChecker
             parameterTypes,
             returnType,
             delegateDefinition.Parameters.Select(parameter => parameter.Name).ToArray(),
-            delegateDefinition.Parameters.Select(parameter => parameter.Modifier).ToArray()));
+            delegateDefinition.Parameters.Select(parameter => parameter.Modifier).ToArray(),
+            delegateDefinition.Name));
     }
 
     private static string GetCallableLookupName(string name)
@@ -1532,6 +1533,7 @@ public sealed class TypeChecker
                 => !ContainsLoopExit(loop.Body),
             DoWhileStatementNode { Condition: BoolLiteralNode { Value: true } } loop
                 => !ContainsLoopExit(loop.Body),
+            DoWhileStatementNode loop => DefinitelyReturns(loop.Body),
             TryStatementNode tryStatement => tryStatement.FinallyBody != null
                 && DefinitelyReturns(tryStatement.FinallyBody)
                 || DefinitelyReturns(tryStatement.TryBody)
@@ -2566,7 +2568,8 @@ public sealed class TypeChecker
                 function.ParameterTypes.Select(parameter => SubstituteTypeParameters(parameter, substitutions)).ToArray(),
                 SubstituteTypeParameters(function.ReturnType, substitutions),
                 function.ParameterNames,
-                function.ParameterModifiers),
+                function.ParameterModifiers,
+                function.DelegateName),
             _ => type
         };
 
@@ -2728,6 +2731,11 @@ public sealed class TypeChecker
 
     private bool IsDelegateReferenceCompatible(FunctionType target, FunctionType source)
     {
+        if (target.DelegateName != null || source.DelegateName != null)
+        {
+            return target.DelegateName != null
+                && target.DelegateName.Equals(source.DelegateName, StringComparison.Ordinal);
+        }
         if (target.ParameterTypes.Count != source.ParameterTypes.Count)
             return false;
         for (var i = 0; i < target.ParameterTypes.Count; i++)
