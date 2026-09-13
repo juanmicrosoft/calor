@@ -1620,6 +1620,23 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void StatementLambda_UnconditionalDoWhileCanDefinitelyNotReturn()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{cw}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §DO{d1}
+                    §P "loop"
+                  §/DO{d1} true
+                §/LAM{l1}
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
     public void StatementLambda_UnconditionalLoopWithNestedBreakMustReturn()
     {
         var result = Check("""

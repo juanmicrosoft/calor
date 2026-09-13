@@ -1530,6 +1530,8 @@ public sealed class TypeChecker
                 && match.Cases.All(matchCase => DefinitelyReturns(matchCase.Body)),
             WhileStatementNode { Condition: BoolLiteralNode { Value: true } } loop
                 => !ContainsBreak(loop.Body),
+            DoWhileStatementNode { Condition: BoolLiteralNode { Value: true } } loop
+                => !ContainsBreak(loop.Body),
             TryStatementNode tryStatement => tryStatement.FinallyBody != null
                 && DefinitelyReturns(tryStatement.FinallyBody)
                 || DefinitelyReturns(tryStatement.TryBody)
