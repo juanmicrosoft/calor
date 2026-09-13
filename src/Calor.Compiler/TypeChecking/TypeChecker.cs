@@ -1529,9 +1529,9 @@ public sealed class TypeChecker
                     matchCase.Pattern is WildcardPatternNode && matchCase.Guard == null)
                 && match.Cases.All(matchCase => DefinitelyReturns(matchCase.Body)),
             WhileStatementNode { Condition: BoolLiteralNode { Value: true } } loop
-                => !ContainsBreak(loop.Body),
+                => !ContainsLoopExit(loop.Body),
             DoWhileStatementNode { Condition: BoolLiteralNode { Value: true } } loop
-                => !ContainsBreak(loop.Body),
+                => !ContainsLoopExit(loop.Body),
             TryStatementNode tryStatement => tryStatement.FinallyBody != null
                 && DefinitelyReturns(tryStatement.FinallyBody)
                 || DefinitelyReturns(tryStatement.TryBody)
@@ -1539,21 +1539,21 @@ public sealed class TypeChecker
             _ => false
         });
 
-    private static bool ContainsBreak(IReadOnlyList<StatementNode> statements)
+    private static bool ContainsLoopExit(IReadOnlyList<StatementNode> statements)
         => statements.Any(statement => statement switch
         {
-            BreakStatementNode => true,
-            IfStatementNode conditional => ContainsBreak(conditional.ThenBody)
-                || conditional.ElseIfClauses.Any(clause => ContainsBreak(clause.Body))
-                || conditional.ElseBody != null && ContainsBreak(conditional.ElseBody),
-            MatchStatementNode match => match.Cases.Any(matchCase => ContainsBreak(matchCase.Body)),
-            TryStatementNode tryStatement => ContainsBreak(tryStatement.TryBody)
-                || tryStatement.CatchClauses.Any(clause => ContainsBreak(clause.Body))
-                || tryStatement.FinallyBody != null && ContainsBreak(tryStatement.FinallyBody),
-            UsingStatementNode usingStatement => ContainsBreak(usingStatement.Body),
-            UnsafeBlockNode unsafeBlock => ContainsBreak(unsafeBlock.Body),
-            FixedStatementNode fixedStatement => ContainsBreak(fixedStatement.Body),
-            SyncBlockNode syncBlock => ContainsBreak(syncBlock.Body),
+            BreakStatementNode or GotoStatementNode => true,
+            IfStatementNode conditional => ContainsLoopExit(conditional.ThenBody)
+                || conditional.ElseIfClauses.Any(clause => ContainsLoopExit(clause.Body))
+                || conditional.ElseBody != null && ContainsLoopExit(conditional.ElseBody),
+            MatchStatementNode match => match.Cases.Any(matchCase => ContainsLoopExit(matchCase.Body)),
+            TryStatementNode tryStatement => ContainsLoopExit(tryStatement.TryBody)
+                || tryStatement.CatchClauses.Any(clause => ContainsLoopExit(clause.Body))
+                || tryStatement.FinallyBody != null && ContainsLoopExit(tryStatement.FinallyBody),
+            UsingStatementNode usingStatement => ContainsLoopExit(usingStatement.Body),
+            UnsafeBlockNode unsafeBlock => ContainsLoopExit(unsafeBlock.Body),
+            FixedStatementNode fixedStatement => ContainsLoopExit(fixedStatement.Body),
+            SyncBlockNode syncBlock => ContainsLoopExit(syncBlock.Body),
             _ => false
         });
 
