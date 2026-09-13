@@ -213,9 +213,10 @@ public class LocalReferenceAnnotationTests
     }
 
     [Theory]
-    [InlineData("Foo")]
-    [InlineData("?Foo")]
-    public void UnmodeledNominalConditional_IsNotUpgradedToNonNull(string rightType)
+    [InlineData("Foo", NullableAnnotation.NotAnnotated)]
+    [InlineData("?Foo", NullableAnnotation.Annotated)]
+    public void ModeledNominalConditional_RetainsBranchAnnotationAndIdentity(
+        string rightType, NullableAnnotation expected)
     {
         var source = $$"""
             §M{m1:ConditionalLimit}
@@ -229,10 +230,10 @@ public class LocalReferenceAnnotationTests
         Assert.IsType<BoundConditionalExpression>(bindings[0].Initializer);
         foreach (var binding in bindings)
         {
-            Assert.Equal(NullableAnnotation.Oblivious, binding.Variable.NullableAnnotation);
-            Assert.Null(binding.Variable.InferredReferenceType);
+            Assert.Equal(expected, binding.Variable.NullableAnnotation);
+            Assert.True(Assert.IsType<NominalBoundType>(binding.Variable.InferredReferenceType).IsKnownReferenceType);
         }
-        Assert.Equal(NullableAnnotation.Oblivious,
+        Assert.Equal(expected,
             Assert.IsType<NominalBoundType>(bindings[1].Initializer!.Type).NullableAnnotation);
     }
 

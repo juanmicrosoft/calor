@@ -273,8 +273,7 @@ public class NullableReferenceTypingTests
     [Theory]
     [InlineData("?str", "42")]
     [InlineData("i32", "\"value\"")]
-    [InlineData("?i32", "42")]
-    public void GenuineMismatchesAndUnimplementedNullableValues_DoNotBecomeUniversallyAssignable(
+    public void GenuineMismatches_DoNotBecomeUniversallyAssignable(
         string target, string expression)
     {
         var result = Program.Compile($$"""
@@ -284,6 +283,19 @@ public class NullableReferenceTypingTests
                 §B{value:{{target}}} {{expression}}
             """, "nullable-typing.calr");
         Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.TypeMismatch && d.Span.Line == 4);
+    }
+
+    [Fact]
+    public void NullableValueTypes_AcceptImplicitUnderlyingValueConversion()
+    {
+        var result = Program.Compile("""
+            §M{m1:NullableTyping}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{value:?i32} 42
+            """, "nullable-typing.calr");
+
+        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics));
     }
 
     [Theory]

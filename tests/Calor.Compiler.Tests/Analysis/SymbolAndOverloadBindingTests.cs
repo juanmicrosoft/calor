@@ -65,7 +65,7 @@ public sealed class SymbolAndOverloadBindingTests
     }
 
     [Fact]
-    public void SomeNullCoalesce_InfersPayloadType_AndResolvesOverload()
+    public void SomeNullCoalesce_DoesNotUnwrapPayload_OrResolvePayloadOverload()
     {
         const string source = """
             §M{m1:Test}
@@ -78,16 +78,13 @@ public sealed class SymbolAndOverloadBindingTests
             """;
 
         var bound = ParseAndBind(source, out var diagnostics);
-        var pickInt = bound.Functions.Single(function =>
-            function.Symbol.Name == "Pick"
-            && TypeIdentity.Canonicalize(function.Symbol.ReturnType) == "INT");
         var use = bound.Functions.Single(function => function.Symbol.Name == "Use");
         var call = Assert.IsType<BoundCallExpression>(
             Assert.IsType<BoundReturnStatement>(Assert.Single(use.Body)).Expression);
 
-        Assert.DoesNotContain(diagnostics, IsOverloadDiagnostic);
-        Assert.Equal("INT", Assert.Single(call.Arguments).Type.DisplayString);
-        Assert.Same(pickInt.Symbol, call.ResolvedSymbol);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+        Assert.Equal("OBJECT", Assert.Single(call.Arguments).Type.DisplayString);
+        Assert.Null(call.ResolvedSymbol);
     }
 
     [Fact]

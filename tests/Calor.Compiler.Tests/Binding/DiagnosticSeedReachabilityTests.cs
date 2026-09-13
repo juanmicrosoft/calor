@@ -69,9 +69,10 @@ public class DiagnosticSeedReachabilityTests
     [MemberData(nameof(Wrappers))]
     public void SeedInsideWrapper_ReachesTheDivisionChecker(string wrapper, string statement)
     {
+        var inputType = wrapper == "coalesce-fallback" ? "?i32" : "i32";
         var source = $$"""
             §M{m001:Test}
-              §F{f001:Probe:pub} (i32:x) -> OBJECT
+              §F{f001:Probe:pub} ({{inputType}}:x) -> OBJECT
                 {{statement}}
             """;
 
