@@ -1726,6 +1726,31 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void StatementLambda_GotoAcrossDeeplyNestedLoopsMustReturn()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{cw}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §WH{w1} true
+                    §WH{w2} true
+                      §WH{w3} true
+                        §WH{w4} true
+                          §WH{w5} true
+                            §WH{w6} true
+                              §WH{w7} true
+                                §GOTO{done}
+                  §LABEL{done}
+                  §P "done"
+                §/LAM{l1}
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            diagnostic => diagnostic.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
     public void StatementLambda_UnconditionalLoopWithInternalGotoDoesNotReturn()
     {
         var result = Check("""
@@ -1736,6 +1761,24 @@ public sealed class SafeConsumptionTypeCheckerTests
                   §WH{w1} true
                     §LABEL{again}
                     §GOTO{again}
+                §/LAM{l1}
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
+    public void StatementLambda_ForwardGotoWithinLoopRemainsInsideLoop()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{cw}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §WH{w1} true
+                    §GOTO{again}
+                    §LABEL{again}
+                    §P "loop"
                 §/LAM{l1}
             """);
 
@@ -1829,6 +1872,27 @@ public sealed class SafeConsumptionTypeCheckerTests
                     §K 1
                       §GOTO{CASE:2}
                     §K 2
+                      §R 2
+                    §K _
+                      §R 0
+                §/LAM{l1}
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
+    public void StatementLambda_GotoCharacterCaseFollowsReturningTarget()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §W{m1} 'a'
+                    §K 'a'
+                      §GOTO{CASE:'b'}
+                    §K 'b'
                       §R 2
                     §K _
                       §R 0
