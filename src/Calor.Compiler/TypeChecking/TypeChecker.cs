@@ -1540,22 +1540,99 @@ public sealed class TypeChecker
         });
 
     private static bool ContainsLoopExit(IReadOnlyList<StatementNode> statements)
+    {
+        var localLabels = EnumerateLoopLocalLabels(statements).ToHashSet(StringComparer.Ordinal);
+        return ContainsLoopExit(statements, localLabels);
+    }
+
+    private static bool ContainsLoopExit(
+        IReadOnlyList<StatementNode> statements,
+        IReadOnlySet<string> localLabels)
         => statements.Any(statement => statement switch
         {
-            BreakStatementNode or GotoStatementNode => true,
-            IfStatementNode conditional => ContainsLoopExit(conditional.ThenBody)
-                || conditional.ElseIfClauses.Any(clause => ContainsLoopExit(clause.Body))
-                || conditional.ElseBody != null && ContainsLoopExit(conditional.ElseBody),
-            MatchStatementNode match => match.Cases.Any(matchCase => ContainsLoopExit(matchCase.Body)),
-            TryStatementNode tryStatement => ContainsLoopExit(tryStatement.TryBody)
-                || tryStatement.CatchClauses.Any(clause => ContainsLoopExit(clause.Body))
-                || tryStatement.FinallyBody != null && ContainsLoopExit(tryStatement.FinallyBody),
-            UsingStatementNode usingStatement => ContainsLoopExit(usingStatement.Body),
-            UnsafeBlockNode unsafeBlock => ContainsLoopExit(unsafeBlock.Body),
-            FixedStatementNode fixedStatement => ContainsLoopExit(fixedStatement.Body),
-            SyncBlockNode syncBlock => ContainsLoopExit(syncBlock.Body),
+            BreakStatementNode => true,
+            GotoStatementNode gotoStatement => !localLabels.Contains(gotoStatement.Label),
+            IfStatementNode conditional => ContainsLoopExit(conditional.ThenBody, localLabels)
+                || conditional.ElseIfClauses.Any(clause => ContainsLoopExit(clause.Body, localLabels))
+                || conditional.ElseBody != null && ContainsLoopExit(conditional.ElseBody, localLabels),
+            MatchStatementNode match => match.Cases.Any(
+                matchCase => ContainsLoopExit(matchCase.Body, localLabels)),
+            TryStatementNode tryStatement => ContainsLoopExit(tryStatement.TryBody, localLabels)
+                || tryStatement.CatchClauses.Any(
+                    clause => ContainsLoopExit(clause.Body, localLabels))
+                || tryStatement.FinallyBody != null
+                    && ContainsLoopExit(tryStatement.FinallyBody, localLabels),
+            UsingStatementNode usingStatement => ContainsLoopExit(usingStatement.Body, localLabels),
+            UnsafeBlockNode unsafeBlock => ContainsLoopExit(unsafeBlock.Body, localLabels),
+            FixedStatementNode fixedStatement => ContainsLoopExit(fixedStatement.Body, localLabels),
+            SyncBlockNode syncBlock => ContainsLoopExit(syncBlock.Body, localLabels),
             _ => false
         });
+
+    private static IEnumerable<string> EnumerateLoopLocalLabels(
+        IReadOnlyList<StatementNode> statements)
+    {
+        foreach (var statement in statements)
+        {
+            switch (statement)
+            {
+                case LabelStatementNode label:
+                    yield return label.Label;
+                    break;
+                case IfStatementNode conditional:
+                    foreach (var label in EnumerateLoopLocalLabels(conditional.ThenBody))
+                        yield return label;
+                    foreach (var clause in conditional.ElseIfClauses)
+                    {
+                        foreach (var label in EnumerateLoopLocalLabels(clause.Body))
+                            yield return label;
+                    }
+                    if (conditional.ElseBody != null)
+                    {
+                        foreach (var label in EnumerateLoopLocalLabels(conditional.ElseBody))
+                            yield return label;
+                    }
+                    break;
+                case MatchStatementNode match:
+                    foreach (var matchCase in match.Cases)
+                    {
+                        foreach (var label in EnumerateLoopLocalLabels(matchCase.Body))
+                            yield return label;
+                    }
+                    break;
+                case TryStatementNode tryStatement:
+                    foreach (var label in EnumerateLoopLocalLabels(tryStatement.TryBody))
+                        yield return label;
+                    foreach (var clause in tryStatement.CatchClauses)
+                    {
+                        foreach (var label in EnumerateLoopLocalLabels(clause.Body))
+                            yield return label;
+                    }
+                    if (tryStatement.FinallyBody != null)
+                    {
+                        foreach (var label in EnumerateLoopLocalLabels(tryStatement.FinallyBody))
+                            yield return label;
+                    }
+                    break;
+                case UsingStatementNode usingStatement:
+                    foreach (var label in EnumerateLoopLocalLabels(usingStatement.Body))
+                        yield return label;
+                    break;
+                case UnsafeBlockNode unsafeBlock:
+                    foreach (var label in EnumerateLoopLocalLabels(unsafeBlock.Body))
+                        yield return label;
+                    break;
+                case FixedStatementNode fixedStatement:
+                    foreach (var label in EnumerateLoopLocalLabels(fixedStatement.Body))
+                        yield return label;
+                    break;
+                case SyncBlockNode syncBlock:
+                    foreach (var label in EnumerateLoopLocalLabels(syncBlock.Body))
+                        yield return label;
+                    break;
+            }
+        }
+    }
 
     private CalorType InferQuantifierType(
         IReadOnlyList<QuantifierVariableNode> variables,

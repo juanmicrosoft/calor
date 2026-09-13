@@ -1674,6 +1674,23 @@ public sealed class SafeConsumptionTypeCheckerTests
     }
 
     [Fact]
+    public void StatementLambda_UnconditionalLoopWithInternalGotoDoesNotReturn()
+    {
+        var result = Check("""
+            §M{m1:SafeConsumption}
+              §F{f1:Probe:pub} () -> void
+                §E{}
+                §B{factory:Func<i32>} §LAM{l1}
+                  §WH{w1} true
+                    §LABEL{again}
+                    §GOTO{again}
+                §/LAM{l1}
+            """);
+
+        Assert.Empty(result.Diagnostics.Errors);
+    }
+
+    [Fact]
     public void MethodGroupParameters_SupportReferenceDelegateVariance()
     {
         var result = Check("""
