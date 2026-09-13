@@ -487,6 +487,31 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     }
 
     [Theory]
+    [InlineData("string?[][]", "string[][]", false, true)]
+    [InlineData("string[]?[]", "string[][]", true, false)]
+    [InlineData("string?[]?[]?", "string[][]", true, true)]
+    [InlineData("string[][]", "string?[]?[]?", false, false)]
+    public void A4_JaggedArrays_RecursivelyCompareContainerAndStringElementAnnotations(
+        string sourceType, string targetType, bool container, bool elements)
+    {
+        var source = $$"""
+            #nullable enable
+            public static class ArraySignatureFixture {
+                public static {{sourceType}} Produce() => throw new System.Exception();
+                public static void Receive({{targetType}} input) { }
+                public static void Probe() { Receive(Produce()); }
+            }
+            """;
+        var (supplied, receiving) = BindRoslynArrayFixture(source);
+        var mismatch = NullabilityChecker.IsPossiblyNullAssignedTo(
+            new ArrayFixtureExpression(supplied), receiving, BindingReceivingBoundary.MethodArgument, out var components);
+
+        Assert.Equal(container || elements, mismatch);
+        Assert.Equal(container, components.HasFlag(NullabilityChecker.ArrayMismatch.Container));
+        Assert.Equal(elements, components.HasFlag(NullabilityChecker.ArrayMismatch.Elements));
+    }
+
+    [Theory]
     [InlineData("System.Collections.Generic.List<string?>", "System.Collections.Generic.List<string>", false, false)]
     [InlineData("System.Collections.Generic.List<string?>", "System.Collections.Generic.List<string>", true, false)]
     [InlineData("System.Collections.Generic.List<string?>", "System.Collections.Generic.List<string>", false, true)]

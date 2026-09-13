@@ -1115,5 +1115,25 @@ public class Foo
         Assert.DoesNotContain("cast u8[]?", result.CalorSource);
     }
 
+    [Fact]
+    public void JaggedArrayCast_StripsReferenceAnnotationsAtEveryArrayLevel()
+    {
+        var csharp = @"
+#nullable enable
+public class Foo
+{
+    public object Bar(object value)
+    {
+        return (string[]?[])value;
+    }
+}";
+        var converter = new CSharpToCalorConverter(new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
+        var result = converter.Convert(csharp, "Test.cs");
+        Assert.True(result.Success, GetErrorMessage(result));
+        Assert.NotNull(result.CalorSource);
+        Assert.Contains("cast str[][]", result.CalorSource);
+        Assert.DoesNotContain("cast str[]?[]", result.CalorSource);
+    }
+
     #endregion
 }

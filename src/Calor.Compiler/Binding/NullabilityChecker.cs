@@ -50,9 +50,29 @@ internal static class NullabilityChecker
         if (supplied is null || supplied.Rank != receiving.Rank)
             return false;
 
+        CompareArrayAnnotations(supplied, receiving, ref mismatch);
+
+        return mismatch != ArrayMismatch.None;
+    }
+
+    private static void CompareArrayAnnotations(
+        ArrayBoundType supplied,
+        ArrayBoundType receiving,
+        ref ArrayMismatch mismatch)
+    {
+        if (supplied.Rank != receiving.Rank)
+            return;
+
         if (receiving.NullableAnnotation == NullableAnnotation.NotAnnotated
             && supplied.NullableAnnotation is NullableAnnotation.Annotated or NullableAnnotation.Oblivious)
             mismatch |= ArrayMismatch.Container;
+
+        if (receiving.ElementType is ArrayBoundType receivingNested
+            && supplied.ElementType is ArrayBoundType suppliedNested)
+        {
+            CompareArrayAnnotations(suppliedNested, receivingNested, ref mismatch);
+            return;
+        }
 
         if (receiving.ElementType is NominalBoundType targetElement
             && supplied.ElementType is NominalBoundType sourceElement
@@ -60,8 +80,6 @@ internal static class NullabilityChecker
             && targetElement.NullableAnnotation == NullableAnnotation.NotAnnotated
             && sourceElement.NullableAnnotation is NullableAnnotation.Annotated or NullableAnnotation.Oblivious)
             mismatch |= ArrayMismatch.Elements;
-
-        return mismatch != ArrayMismatch.None;
     }
 
     private static bool IsKnownArrayString(NominalBoundType type) =>
