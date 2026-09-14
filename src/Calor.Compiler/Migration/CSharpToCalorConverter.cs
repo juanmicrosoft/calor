@@ -195,9 +195,30 @@ public sealed class ConversionOptions
     /// <summary>Output kind used for semantic and generated-C# validation.</summary>
     public OutputKind OutputKind { get; set; } = OutputKind.DynamicallyLinkedLibrary;
 
+    /// <summary>
+    /// Evaluated project nullable context used by semantic conversion. Per-file
+    /// <c>#nullable</c> directives continue to override this compilation default.
+    /// </summary>
+    public NullableContextOptions? NullableContextOptions { get; set; }
+
     /// <summary>Additional metadata references, including extern aliases.</summary>
     public IReadOnlyCollection<ConversionReference> References { get; set; } =
         Array.Empty<ConversionReference>();
+
+    /// <summary>
+    /// Whether <see cref="References"/> is the evaluated compilation's complete
+    /// reference set. Project migration sets this to avoid mixing reference
+    /// assemblies with the converter host's implementation assemblies.
+    /// </summary>
+    public bool ReferencesAreComplete { get; set; }
+
+    /// <summary>
+    /// Other syntax trees from the evaluated project compilation. These let
+    /// per-file conversion resolve symbols declared in sibling source files.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyCollection<SyntaxTree> AdditionalSemanticSyntaxTrees { get; set; } =
+        Array.Empty<SyntaxTree>();
 
     /// <summary>When true, wraps unsupported constructs in §CSHARP blocks instead of emitting broken Calor.</summary>
     public bool PassthroughOnError { get; set; } = false;
@@ -305,6 +326,9 @@ public sealed class CSharpToCalorConverter
                 LanguageVersion = parseOptions.LanguageVersion.ToString(),
                 DocumentationMode = parseOptions.DocumentationMode.ToString(),
                 SourceCodeKind = parseOptions.Kind.ToString(),
+                NullableContextOptions =
+                    _options.NullableContextOptions?.ToString() ?? "Unspecified",
+                ReferencesAreComplete = _options.ReferencesAreComplete,
                 DefinedSymbols = parseOptions.PreprocessorSymbolNames
                     .OrderBy(symbol => symbol, StringComparer.Ordinal)
                     .ToArray(),
@@ -476,10 +500,16 @@ public sealed class CSharpToCalorConverter
             SemanticModel? semanticModel = null;
             try
             {
+                var semanticTrees = new[] { syntaxTree }
+                    .Concat(_options.AdditionalSemanticSyntaxTrees.Where(tree =>
+                        !IsSameSyntaxTree(tree, syntaxTree)));
                 var compilation = CSharpCompilation.Create("ConversionAnalysis",
-                    new[] { syntaxTree },
+                    semanticTrees,
                     GetSemanticMetadataReferences(),
-                    new CSharpCompilationOptions(effectiveOutputKind));
+                    new CSharpCompilationOptions(effectiveOutputKind)
+                        .WithNullableContextOptions(
+                            _options.NullableContextOptions
+                            ?? NullableContextOptions.Disable));
                 semanticModel = compilation.GetSemanticModel(syntaxTree);
             }
             catch
@@ -495,7 +525,8 @@ public sealed class CSharpToCalorConverter
                 var visitor = new RoslynSyntaxVisitor(
                     context,
                     semanticModel,
-                    cancellationToken);
+                    cancellationToken,
+                    _options.NullableContextOptions.HasValue);
                 calorAst = visitor.Convert(root, moduleName);
             }
             catch (OperationCanceledException)
@@ -655,6 +686,8 @@ public sealed class CSharpToCalorConverter
                     _options.ValidateRoundTripCSharp,
                     parseOptions,
                     effectiveOutputKind,
+                    _options.NullableContextOptions
+                        ?? NullableContextOptions.Disable,
                     cancellationToken);
             }
             foreach (var diagnostic in activeErrorDirectives)
@@ -1095,6 +1128,8 @@ public sealed class CSharpToCalorConverter
                 _options.ValidateRoundTripCSharp,
                 parseOptions,
                 outputKind,
+                _options.NullableContextOptions
+                    ?? NullableContextOptions.Disable,
                 cancellationToken);
             return new ConversionResult
             {
@@ -1363,7 +1398,12 @@ public sealed class CSharpToCalorConverter
                         reference => new GeneratedCSharpReference(
                             reference.Path,
                             reference.Aliases)),
-                    OutputKind = outputKind
+                    OutputKind = outputKind,
+                    NullableContextOptions = Enum.TryParse<NullableContextOptions>(
+                        context.Metadata.NullableContextOptions,
+                        out var nullableContext)
+                        ? nullableContext
+                        : NullableContextOptions.Disable
                 });
             return validation.SyntaxErrors.Count == 0 && validation.CompilationErrors.Count == 0;
         }
@@ -1591,6 +1631,7 @@ public sealed class CSharpToCalorConverter
         bool validateGeneratedCSharp,
         CSharpParseOptions parseOptions,
         OutputKind outputKind,
+        NullableContextOptions nullableContextOptions,
         CancellationToken cancellationToken)
     {
         CompilationResult compileResult;
@@ -1656,7 +1697,8 @@ public sealed class CSharpToCalorConverter
                         reference => new GeneratedCSharpReference(
                             reference.Path,
                             reference.Aliases)),
-                    OutputKind = outputKind
+                    OutputKind = outputKind,
+                    NullableContextOptions = nullableContextOptions
                 });
             foreach (var diagnostic in validation.SyntaxErrors.Concat(validation.CompilationErrors))
             {
@@ -1717,16 +1759,39 @@ public sealed class CSharpToCalorConverter
     }
 
     private MetadataReference[] GetSemanticMetadataReferences()
-        => GetBasicMetadataReferences()
-            .Concat(_options.References
-                .Where(reference => File.Exists(reference.Path))
-                .Select(reference => MetadataReference.CreateFromFile(
-                    Path.GetFullPath(reference.Path),
-                    reference.Aliases.Count == 0
-                        ? MetadataReferenceProperties.Assembly
-                        : MetadataReferenceProperties.Assembly.WithAliases(
-                            reference.Aliases.ToImmutableArray()))))
+    {
+        var configured = _options.References
+            .Where(reference => File.Exists(reference.Path))
+            .Select(reference => MetadataReference.CreateFromFile(
+                Path.GetFullPath(reference.Path),
+                reference.Aliases.Count == 0
+                    ? MetadataReferenceProperties.Assembly
+                    : MetadataReferenceProperties.Assembly.WithAliases(
+                        reference.Aliases.ToImmutableArray())))
             .ToArray();
+        return _options.ReferencesAreComplete
+            ? configured
+            : GetBasicMetadataReferences().Concat(configured).ToArray();
+    }
+
+    private static bool IsSameSyntaxTree(SyntaxTree left, SyntaxTree right)
+    {
+        if (ReferenceEquals(left, right))
+            return true;
+        if (string.IsNullOrWhiteSpace(left.FilePath)
+            || string.IsNullOrWhiteSpace(right.FilePath))
+        {
+            return false;
+        }
+
+        var comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        return string.Equals(
+            Path.GetFullPath(left.FilePath),
+            Path.GetFullPath(right.FilePath),
+            comparison);
+    }
 
     private static string DeriveModuleName(string? sourceFile, CompilationUnitSyntax root)
     {
