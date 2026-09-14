@@ -58,7 +58,9 @@ uninstrumented compiler built from the same accepted source pin. All 30 API
 observations matched instrumented-current acceptance, diagnostics, and emitted
 bytes. Private-profile discovery, the 168-reference profile, and the warm-up
 source also matched exactly. The two compiler binaries intentionally have
-different hashes because one contains the non-shipping observer.
+different hashes because one contains the non-shipping observer. The archived
+provenance records the clean detached Git head and tree, compiler-source tree,
+SDK, host, build command, control-source hashes, and resulting compiler hash.
 
 The separate CLI controls agree with the API boundary: the explicit nullable
 return succeeds under current behavior and rejects under both shadow modes,
@@ -144,4 +146,5 @@ are identical across all three configurations.
 Run `python3 ../../source/reduce.py <raw-root> .` from this directory to
 regenerate the artifact set. The reducer deletes and recreates only its output
 directory, uses gzip timestamp zero, validates source/mode pins, and produces a
-byte-stable manifest.
+byte-stable manifest. Manifest source labels are relative to the raw evidence
+root, so relocating an identical raw tree does not change the manifest.

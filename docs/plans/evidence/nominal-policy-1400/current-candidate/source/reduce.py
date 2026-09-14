@@ -42,9 +42,13 @@ def stable_id(prefix: str, value: Any) -> str:
 
 
 class Archive:
-    def __init__(self, output: Path) -> None:
+    def __init__(self, output: Path, raw_root: Path) -> None:
         self.output = output
+        self.raw_root = raw_root
         self.artifacts: list[dict[str, Any]] = []
+
+    def source_label(self, source: Path) -> str:
+        return str(source.resolve().relative_to(self.raw_root))
 
     def save_bytes(
         self,
@@ -79,7 +83,11 @@ class Archive:
         return destination
 
     def save_file(self, source: Path, relative: Path) -> Path:
-        return self.save_bytes(relative, source.read_bytes(), source=str(source))
+        return self.save_bytes(
+            relative,
+            source.read_bytes(),
+            source=self.source_label(source),
+        )
 
     def save_json(self, value: Any, relative: Path, *, source: str) -> Path:
         return self.save_bytes(relative, canonical_bytes(value), source=source)
@@ -113,7 +121,7 @@ class Archive:
         self.artifacts.append(
             {
                 "path": str(destination.relative_to(self.output)),
-                "source": str(source),
+                "source": self.source_label(source),
                 "storedSha256": sha256(packed),
                 "storedBytes": len(packed),
                 "compression": "deterministic-tar+gzip-mtime-0",
@@ -477,8 +485,16 @@ def summarize_migration(raw_root: Path) -> dict[str, Any]:
 def summarize_neutrality(raw_root: Path) -> dict[str, Any]:
     uninstrumented_path = raw_root / "uninstrumented-api.json"
     instrumented_path = raw_root / "current" / "api.json"
+    provenance = read_json(raw_root / "uninstrumented-provenance.json")
     uninstrumented = read_json(uninstrumented_path)
     instrumented = read_json(instrumented_path)
+    assert provenance["acceptedSourceCommit"] == SOURCE_COMMIT
+    assert provenance["gitHead"] == SOURCE_COMMIT
+    assert provenance["trackedWorktreeClean"]
+    assert (
+        provenance["compilerSha256"]
+        == uninstrumented["compilerSha256"]
+    )
 
     def observable_rows(api: dict[str, Any]) -> list[dict[str, Any]]:
         return [
@@ -508,6 +524,7 @@ def summarize_neutrality(raw_root: Path) -> dict[str, Any]:
         ),
         "uninstrumentedApiSha256": sha256(uninstrumented_path.read_bytes()),
         "instrumentedCurrentApiSha256": sha256(instrumented_path.read_bytes()),
+        "provenance": provenance,
     }
     assert result["discoveryEqual"]
     assert result["privateProfileEqual"]
@@ -573,6 +590,10 @@ def archive_raw_inputs(raw_root: Path, archive: Archive) -> None:
         Path("controls") / "uninstrumented-api.json",
     )
     archive.save_file(
+        raw_root / "uninstrumented-provenance.json",
+        Path("controls") / "uninstrumented-provenance.json",
+    )
+    archive.save_file(
         raw_root / "instrumentation-neutrality.json",
         Path("controls") / "instrumentation-neutrality.json",
     )
@@ -605,7 +626,7 @@ def main() -> None:
     output.mkdir(parents=True)
     if readme is not None:
         (output / "README.md").write_bytes(readme)
-    archive = Archive(output)
+    archive = Archive(output, raw_root)
 
     boundaries, references, capture_counts = collect_captures(raw_root)
     e1, statuses = summarize_e1(raw_root)
