@@ -1,6 +1,7 @@
 # D1 current-candidate measurement and source-artifact design
 
-**Design checkpoint:** 2026-09-12. **Execution status:** parent STARTed at
+**Design checkpoint:** 2026-09-12. **Execution status:** completed measurement
+and reduction; parent adjudication pending. Parent STARTed at
 2026-09-12T05:52:23-04:00 after accepted N2 `63220eab` and N3/main `8f9891a1`.
 Both pins are retained by normal integration `791e4f44`.
 **Owner:** Copilot / GPT-6 Astra, `nominal-policy-1400`,
@@ -9,8 +10,8 @@ Both pins are retained by normal integration `791e4f44`.
 2026-09-12T03:36:50-04:00; recorded before behavior in
 [the issue](https://github.com/juanmicrosoft/calor/issues/1400#issuecomment-5644506295)
 and N0. Provisional checkpoint/two-review target 2026-09-12 depends on those
-merges. Compiler/migration source archives are being pinned before execution;
-this plan is not a result record.
+merges. Compiler/migration source archives were pinned before execution. The
+[completed run](runs/2026-09-12-8f9891a1/README.md) is the result record.
 
 ## 1. Question and bounded scope
 
