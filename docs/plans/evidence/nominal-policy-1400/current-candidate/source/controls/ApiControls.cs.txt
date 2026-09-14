@@ -1,0 +1,150 @@
+using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Calor.Compiler;
+using Calor.Compiler.Binding;
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Binder = Calor.Compiler.Binding.Binder;
+using CompilationOptions = Calor.Compiler.CompilationOptions;
+
+var output = Path.GetFullPath(args[0]);
+if (File.Exists(output)) throw new IOException("Refusing completed control output overwrite.");
+var cases = new List<(string Id, string Source, string Origin)>();
+string Header(string name) => $"§M{{m1:{name}}}\n  §CL{{c1:Item:pub}}\n  §CL{{c2:H:pub}}\n";
+cases.Add(("annotated-return", Header("NullableReturn") +
+    "    §MT{f1:Return:pub:static} (?Item:value) -> Item\n      §E{}\n      §R value\n", "ExplicitAnnotated"));
+cases.Add(("constructor-return", Header("ConstructorReturn") +
+    "    §MT{f1:Make:pub:static} () -> Item\n      §E{}\n      §R §NEW{Item}\n", "KnownNonNullExpression"));
+cases.Add(("string-literal", "§M{m1:StringLiteral}\n  §F{f1:Make:pub} () -> str\n    §E{}\n    §R STR:\"safe\"\n",
+    "KnownNonNullExpressionOutsideNominal"));
+foreach (var nullable in new[] { false, true })
+foreach (var statement in new[] { false, true })
+{
+    var id = $"{(nullable ? "nullable" : "safe")}-native-{(statement ? "statement" : "expression")}";
+    var source = Header("NativeInput") +
+        "    §MT{f1:Consume:pub:static} (Item:value) -> i32\n      §E{}\n      §R 0\n" +
+        $"    §MT{{f2:Probe:pub:static}} ({(nullable ? "?" : "")}Item:value) -> i32\n      §E{{}}\n" +
+        (statement ? "      §C{H.Consume} §A value §/C\n      §R 0\n"
+            : "      §R §C{H.Consume} §A value §/C\n");
+    cases.Add((id, source, nullable ? "ExplicitAnnotated" : "DeclaredNotAnnotated"));
+}
+foreach (var depth in new[] { 0, 1, 2 })
+foreach (var statement in new[] { false, true })
+{
+    var expression = "§C{System.IO.Directory.GetParent} §A STR:\"/\" §/C";
+    var source = "§M{m1:NativeInputDepth}\n  §CL{c1:H:pub}\n" +
+        "    §MT{f1:Consume:pub:static} (System.IO.DirectoryInfo:value) -> i32\n      §E{}\n      §R 0\n" +
+        "    §MT{f2:Probe:pub:static} () -> i32\n      §E{fs:r}\n";
+    for (var local = 0; local < depth; local++)
+    {
+        source += $"      §B{{a{local}}} {expression}\n";
+        expression = $"a{local}";
+    }
+    source += statement ? $"      §C{{H.Consume}} §A {expression} §/C\n      §R 0\n"
+        : $"      §R §C{{H.Consume}} §A {expression} §/C\n";
+    cases.Add(($"nullable-bcl-native-depth{depth}-{(statement ? "statement" : "expression")}", source, "ExplicitAnnotatedBclProducer"));
+}
+
+// Discover eligible unannotated returns in the actual default private profile,
+// not in the emitter's public reference pool or a custom injected compilation.
+const string warmSource = "§M{m1:PrivateProfile}\n  §F{f1:Read:pub} () -> System.IO.DirectoryInfo\n    §E{fs:r}\n    §R §C{System.IO.Directory.GetParent} §A STR:\"/\" §/C\n";
+var diagnostics = new DiagnosticBag();
+var module = new Parser(new Lexer(warmSource, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+var binder = new Binder(diagnostics, "private-profile-discovery.calr");
+binder.Bind(module);
+var metadata = typeof(Binder).GetField("_metadataBinder", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(binder)
+    ?? throw new InvalidOperationException("Actual private metadata Binder was not instantiated.");
+var context = metadata.GetType().GetProperty("Context", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!.GetValue(metadata)!;
+var host = (CSharpCompilation)(context.GetType().GetProperty("HostCompilationForBinder", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(context)
+    ?? throw new InvalidOperationException("Actual host compilation unavailable."));
+var profile = host.References.Select((reference, index) =>
+{
+    var path = (reference as PortableExecutableReference)?.FilePath;
+    return new {
+        index, path,
+        assembly = (host.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol)?.Identity.ToString(),
+        sha256 = path is not null && File.Exists(path) ? Hash(File.ReadAllBytes(path)) : null,
+        aliases = reference.Properties.Aliases.ToArray(),
+    };
+}).ToArray();
+var eligible = new List<IMethodSymbol>();
+var inspectedMethods = 0;
+foreach (var assembly in host.References.Select(host.GetAssemblyOrModuleSymbol).OfType<IAssemblySymbol>())
+foreach (var type in Types(assembly.GlobalNamespace))
+{
+    if (type.DeclaredAccessibility != Accessibility.Public || type.IsGenericType) continue;
+    foreach (var method in type.GetMembers().OfType<IMethodSymbol>())
+    {
+        inspectedMethods++;
+        if (!method.IsStatic || method.MethodKind != MethodKind.Ordinary || method.IsGenericMethod
+            || method.DeclaredAccessibility != Accessibility.Public || method.ReturnsByRef || method.ReturnsByRefReadonly
+            || method.ReturnType is not INamedTypeSymbol { IsReferenceType: true, IsGenericType: false } returned
+            || returned.SpecialType == SpecialType.System_String
+            || returned.NullableAnnotation != Microsoft.CodeAnalysis.NullableAnnotation.None
+            || method.Parameters.Length > 2
+            || method.Parameters.Any(p => p.RefKind != RefKind.None || !SimpleArgument(p.Type.SpecialType)))
+            continue;
+        eligible.Add(method);
+    }
+}
+var selected = eligible.OrderBy(method => method.ToDisplayString(), StringComparer.Ordinal).Take(8).ToArray();
+for (var index = 0; index < selected.Length; index++)
+{
+    var method = selected[index];
+    var target = method.ContainingType.ToDisplayString() + "." + method.Name;
+    var arguments = string.Concat(method.Parameters.Select(p => " §A " + (p.Type.SpecialType switch {
+        SpecialType.System_String => "STR:\"value\"",
+        SpecialType.System_Boolean => "BOOL:false",
+        SpecialType.System_Int32 => "INT:0",
+        _ => throw new InvalidOperationException("Unsupported discovery input."),
+    })));
+    cases.Add(($"actual-metadata-oblivious-{index}", $"§M{{m1:ActualMetadataOblivious}}\n  §F{{f1:Read:pub}} () -> {method.ReturnType.ToDisplayString()}\n    §E{{}}\n    §R §C{{{target}}}{arguments} §/C\n",
+        "ActualPrivateMetadataNoneDefinitionCandidate; selected binding must still be proven"));
+}
+var observations = new List<object>();
+foreach (var fixture in cases)
+foreach (var effects in new[] { true, false })
+{
+    var result = Calor.Compiler.Program.Compile(fixture.Source, fixture.Id + ".calr",
+        new CompilationOptions { EnforceEffects = effects, StatusWriter = TextWriter.Null });
+    observations.Add(new {
+        id = fixture.Id, source = fixture.Source, sourceSha256 = Hash(Encoding.UTF8.GetBytes(fixture.Source)),
+        declaredOrigin = fixture.Origin,
+        api = effects ? "default-effect-enforcement; StatusWriter=Null" : "effects-disabled; StatusWriter=Null",
+        enforceEffects = effects, accepted = !result.HasErrors,
+        diagnostics = result.Diagnostics.Select(d => new {
+            d.Code, d.Message, severity = d.Severity.ToString(), d.Span.Start, d.Span.Length, d.BindingContext,
+        }).ToArray(),
+        generatedCode = result.GeneratedCode,
+        generatedCodeSha256 = result.GeneratedCode is null ? null : Hash(Encoding.UTF8.GetBytes(result.GeneratedCode)),
+    });
+}
+Directory.CreateDirectory(Path.GetDirectoryName(output)!);
+using var stream = new FileStream(output, FileMode.CreateNew, FileAccess.Write);
+JsonSerializer.Serialize(stream, new {
+    compilerSha256 = Hash(File.ReadAllBytes(typeof(Binder).Assembly.Location)),
+    privateProfile = profile, warmSource, warmSourceSha256 = Hash(Encoding.UTF8.GetBytes(warmSource)),
+    discovery = new {
+        inspectedMethods, eligibleMethods = eligible.Count,
+        filter = "Public top-level type; public static ordinary nongeneric method; nongeneric named reference return with actual None annotation, excluding STRING; <=2 supplied string/int32/bool inputs; first8 ordinal signature order, no execution.",
+        selected = selected.Select(m => new { signature = m.ToDisplayString(), assembly = m.ContainingAssembly.Identity.ToString(),
+            returnAnnotation = m.ReturnType.NullableAnnotation.ToString(),
+            definitionAnnotation = m.OriginalDefinition.ReturnType.NullableAnnotation.ToString() }).ToArray(),
+        limitation = "Bounded discovery only; zero eligible methods is not zero unknown references or general safety.",
+    },
+    observations,
+    limits = new[] { "BCL operations are compiled/bound, never executed.", "Carrier/declaration annotations are not flow guarantees.", "Actual compiler-capture maps and private membership must substantiate selected discovery cases." },
+}, new JsonSerializerOptions { WriteIndented = true });
+
+static bool SimpleArgument(SpecialType type) => type is SpecialType.System_String or SpecialType.System_Int32 or SpecialType.System_Boolean;
+static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+static IEnumerable<INamedTypeSymbol> Types(INamespaceSymbol space)
+{
+    foreach (var type in space.GetTypeMembers()) yield return type;
+    foreach (var child in space.GetNamespaceMembers())
+        foreach (var type in Types(child)) yield return type;
+}

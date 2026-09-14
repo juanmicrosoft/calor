@@ -1,0 +1,956 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using Calor.Compiler.Ast;
+using Calor.Compiler.Binding.BoundTypes;
+using Calor.Compiler.Binding.Metadata;
+using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Parsing;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Diagnostic = Calor.Compiler.Diagnostics.Diagnostic;
+using CompilationOptions = Calor.Compiler.CompilationOptions;
+
+namespace Calor.Compiler.Binding;
+
+public static class D1NominalPolicyCapture
+{
+    private const string MeasurementMode = "__D1_MEASUREMENT_MODE__";
+    private const string AcceptedSourceCommit = "8f9891a1a07f786a76a293017959c3edf28412bf";
+    private static readonly AsyncLocal<CaptureScope?> Current = new();
+    private static readonly AsyncLocal<SourceScope?> CurrentSource = new();
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    private static long _sequence;
+
+    public static IDisposable? BeginSource(
+        string source, string? filePath, string phase, CompilationOptions? options)
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("D1_CAPTURE_DIR")))
+            return null;
+        var scope = new SourceScope(new Dictionary<string, object?>
+        {
+            ["phase"] = phase,
+            ["filePath"] = filePath,
+            ["sourceSha256"] = Sha256Bytes(Encoding.UTF8.GetBytes(source)),
+            ["source"] = source,
+            ["options"] = options is null ? null : new Dictionary<string, object?>
+            {
+                ["enforceEffects"] = options.EnforceEffects,
+                ["contractMode"] = options.ContractMode.ToString(),
+                ["deferGeneratedOutputValidation"] = options.DeferGeneratedOutputValidation,
+                ["statusWriterType"] = options.StatusWriter?.GetType().FullName,
+            },
+        }, CurrentSource.Value);
+        CurrentSource.Value = scope;
+        return scope;
+    }
+
+    private sealed class SourceScope(Dictionary<string, object?> record, SourceScope? previous) : IDisposable
+    {
+        internal Dictionary<string, object?> Record { get; } = record;
+        public void Dispose() => CurrentSource.Value = previous;
+    }
+
+    internal static CaptureScope? BeginBind(ModuleNode module, string sourceIdentity)
+    {
+        ArgumentNullException.ThrowIfNull(module);
+        var captureDir = Environment.GetEnvironmentVariable("D1_CAPTURE_DIR");
+        if (string.IsNullOrWhiteSpace(captureDir))
+            return null;
+
+        var started = DateTimeOffset.UtcNow;
+        var sequence = Interlocked.Increment(ref _sequence);
+        var invocationSeed = string.Join(
+            "|",
+            MeasurementMode,
+            AcceptedSourceCommit,
+            Environment.ProcessId.ToString(CultureInfo.InvariantCulture),
+            sequence.ToString(CultureInfo.InvariantCulture),
+            started.ToString("O", CultureInfo.InvariantCulture),
+            sourceIdentity,
+            module.Id,
+            module.Name);
+        var scope = new CaptureScope(
+            Path.GetFullPath(captureDir),
+            "d1-" + ShortHash(invocationSeed, 20) + "-" + sequence.ToString(CultureInfo.InvariantCulture),
+            sequence,
+            started,
+            sourceIdentity,
+            module.Id,
+            module.Name,
+            Current.Value);
+        Current.Value = scope;
+        return scope;
+    }
+
+    internal static void CompleteBind(
+        CaptureScope? scope,
+        BoundModule module,
+        DiagnosticBag diagnostics,
+        Metadata.MetadataBinder? metadataBinder)
+    {
+        if (scope is null)
+            return;
+        ArgumentNullException.ThrowIfNull(module);
+        ArgumentNullException.ThrowIfNull(diagnostics);
+
+        var hostCompilation = metadataBinder?.Context.HostCompilationForBinder;
+        var finished = DateTimeOffset.UtcNow;
+        var compilerAssembly = typeof(Binder).Assembly;
+        var compilerLocation = compilerAssembly.Location;
+        var privateProfile = DescribePrivateReferenceProfile(hostCompilation);
+
+        object payload;
+        lock (scope.Gate)
+        {
+            payload = new Dictionary<string, object?>
+            {
+                ["schema"] = "calor.d1.nominal-policy.compiler-capture.v1",
+                ["acceptedSourceCommit"] = AcceptedSourceCommit,
+                ["measurementMode"] = MeasurementMode,
+                ["invocationId"] = scope.InvocationId,
+                ["invocationSequence"] = scope.Sequence,
+                ["startedAtUtc"] = scope.StartedAtUtc,
+                ["finishedAtUtc"] = finished,
+                ["processId"] = Environment.ProcessId,
+                ["sourceIdentity"] = scope.SourceIdentity,
+                ["sourceContext"] = scope.SourceContext,
+                ["callerChain"] = scope.CallerChain,
+                ["sourceContextAvailability"] = scope.SourceContext is null
+                    ? "UnavailableForThisDirectBinderInvocation" : "CapturedAtActualSourceEntry",
+                ["module"] = new Dictionary<string, object?>
+                {
+                    ["id"] = scope.ModuleId,
+                    ["name"] = scope.ModuleName,
+                    ["boundName"] = module.Name,
+                    ["span"] = DescribeSpan(module.Span),
+                },
+                ["compiler"] = new Dictionary<string, object?>
+                {
+                    ["assemblyLocation"] = compilerLocation,
+                    ["assemblyFullName"] = compilerAssembly.FullName,
+                    ["sha256"] = File.Exists(compilerLocation) ? Sha256File(compilerLocation) : null,
+                    ["sha256Availability"] = File.Exists(compilerLocation) ? "Present" : "AssemblyLocationMissing",
+                },
+                ["privateMetadataProfile"] = privateProfile,
+                ["policy"] = new Dictionary<string, object?>
+                {
+                    ["isShadow"] = IsShadowMode,
+                    ["isConservativeCarrier"] = IsConservativeMode,
+                    ["nominalReceivingShapeActivated"] = IsShadowMode,
+                    ["runtimePublicFlag"] = false,
+                },
+                ["predicateAttempts"] = scope.PredicateAttempts
+                    .Select(attempt => DescribePredicateAttempt(attempt, hostCompilation))
+                    .ToArray(),
+                ["bclResolutionAttempts"] = scope.BclResolutionAttempts
+                    .Select(attempt => DescribeBclResolutionAttempt(attempt, hostCompilation))
+                    .ToArray(),
+                ["callArgumentValidations"] = scope.CallArgumentValidations
+                    .Select(validation => DescribeCallArgumentValidation(validation, hostCompilation))
+                    .ToArray(),
+                ["boundTreeCensus"] = DescribeBoundTreeCensus(module, hostCompilation),
+                ["diagnostics"] = diagnostics.Select(diagnostic => DescribeDiagnostic(diagnostic)).ToArray(),
+            };
+        }
+
+        Directory.CreateDirectory(scope.CaptureDirectory);
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(payload, JsonOptions);
+        var output = Path.Combine(scope.CaptureDirectory, SafeFilePart(scope.InvocationId) + ".json");
+        using var stream = new FileStream(output, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        stream.Write(bytes);
+    }
+
+    internal static void CapturePredicateAttempt(BoundExpression source, BoundType target, bool result)
+    {
+        var scope = Current.Value;
+        if (scope is null)
+            return;
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(target);
+        lock (scope.Gate)
+        {
+            scope.PredicateAttempts.Add(new PredicateAttempt(
+                DateTimeOffset.UtcNow,
+                source,
+                target,
+                result));
+        }
+    }
+
+    internal static void CaptureBclResolutionAttempt(
+        string callTarget,
+        IReadOnlyList<BoundExpression> arguments,
+        IReadOnlyList<string?>? argumentNames,
+        IReadOnlyList<string?>? argumentModifiers,
+        Metadata.MetadataBinderResult result)
+    {
+        var scope = Current.Value;
+        if (scope is null)
+            return;
+        ArgumentException.ThrowIfNullOrWhiteSpace(callTarget);
+        ArgumentNullException.ThrowIfNull(arguments);
+        lock (scope.Gate)
+        {
+            scope.BclResolutionAttempts.Add(new BclResolutionAttempt(
+                DateTimeOffset.UtcNow,
+                callTarget,
+                arguments.ToArray(),
+                argumentNames?.ToArray(),
+                argumentModifiers?.ToArray(),
+                result));
+        }
+    }
+
+    internal static void CaptureCallArgumentValidation(
+        IReadOnlyList<BoundExpression> arguments,
+        OverloadResolutionResult resolution,
+        Metadata.MetadataBinderResult? bclResolution,
+        string callForm,
+        TextSpan callSpan,
+        string callTarget)
+    {
+        var scope = Current.Value;
+        if (scope is null)
+            return;
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentNullException.ThrowIfNull(resolution);
+        ArgumentException.ThrowIfNullOrWhiteSpace(callForm);
+        ArgumentException.ThrowIfNullOrWhiteSpace(callTarget);
+        lock (scope.Gate)
+        {
+            scope.CallArgumentValidations.Add(new CallArgumentValidation(
+                DateTimeOffset.UtcNow,
+                callForm,
+                callTarget,
+                callSpan,
+                arguments.ToArray(),
+                resolution,
+                bclResolution));
+        }
+    }
+
+    internal static bool TryGetBindingPolicyOverride(
+        string code,
+        BindingDiagnosticContext? context,
+        out BindingDiagnosticRule rule)
+    {
+        rule = null!;
+        if (!IsShadowMode || context is null || context.Shape != BindingReceivingShape.Nominal)
+            return false;
+
+        var expectedBoundary = code switch
+        {
+            DiagnosticCode.NullableToNonNullableBinding => BindingReceivingBoundary.Initializer,
+            DiagnosticCode.NullableReturnFromNonNullable => BindingReceivingBoundary.NativeReturn,
+            DiagnosticCode.NullableArgumentToNonNullableParameter => BindingReceivingBoundary.MethodArgument,
+            _ => BindingReceivingBoundary.None,
+        };
+        if (expectedBoundary == BindingReceivingBoundary.None || context.Boundary != expectedBoundary)
+            return false;
+
+        rule = new BindingDiagnosticRule(
+            code,
+            BindingDiagnosticDisposition.CompilationError,
+            $"D1 #1400 non-shipping {MeasurementMode} measurement: actual nominal receiving boundary only.",
+            1400);
+        return true;
+    }
+
+    internal sealed class CaptureScope : IDisposable
+    {
+        private readonly CaptureScope? _previous;
+        private bool _disposed;
+
+        internal object Gate { get; } = new();
+        internal string CaptureDirectory { get; }
+        internal string InvocationId { get; }
+        internal long Sequence { get; }
+        internal DateTimeOffset StartedAtUtc { get; }
+        internal string SourceIdentity { get; }
+        internal string ModuleId { get; }
+        internal string ModuleName { get; }
+        internal List<PredicateAttempt> PredicateAttempts { get; } = [];
+        internal List<BclResolutionAttempt> BclResolutionAttempts { get; } = [];
+        internal List<CallArgumentValidation> CallArgumentValidations { get; } = [];
+        internal object? SourceContext { get; } = CurrentSource.Value?.Record;
+        internal string[] CallerChain { get; } = new System.Diagnostics.StackTrace(false).GetFrames()
+            .Select(frame => frame.GetMethod())
+            .Select(method => $"{method?.DeclaringType?.FullName}.{method?.Name}")
+            .Take(24).ToArray();
+
+        internal CaptureScope(
+            string captureDirectory,
+            string invocationId,
+            long sequence,
+            DateTimeOffset startedAtUtc,
+            string sourceIdentity,
+            string moduleId,
+            string moduleName,
+            CaptureScope? previous)
+        {
+            CaptureDirectory = captureDirectory;
+            InvocationId = invocationId;
+            Sequence = sequence;
+            StartedAtUtc = startedAtUtc;
+            SourceIdentity = sourceIdentity;
+            ModuleId = moduleId;
+            ModuleName = moduleName;
+            _previous = previous;
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+            Current.Value = _previous;
+            _disposed = true;
+        }
+    }
+
+    private static bool IsShadowMode =>
+        string.Equals(MeasurementMode, "shadow-annotated", StringComparison.Ordinal)
+        || string.Equals(MeasurementMode, "shadow-conservative", StringComparison.Ordinal);
+
+    private static bool IsConservativeMode =>
+        MeasurementMode == "shadow-conservative";
+
+    internal sealed record PredicateAttempt(
+        DateTimeOffset CapturedAtUtc,
+        BoundExpression Source,
+        BoundType Target,
+        bool Result);
+
+    internal sealed record BclResolutionAttempt(
+        DateTimeOffset CapturedAtUtc,
+        string CallTarget,
+        IReadOnlyList<BoundExpression> Arguments,
+        IReadOnlyList<string?>? ArgumentNames,
+        IReadOnlyList<string?>? ArgumentModifiers,
+        Metadata.MetadataBinderResult Result);
+
+    internal sealed record CallArgumentValidation(
+        DateTimeOffset CapturedAtUtc,
+        string CallForm,
+        string CallTarget,
+        TextSpan CallSpan,
+        IReadOnlyList<BoundExpression> Arguments,
+        OverloadResolutionResult Resolution,
+        Metadata.MetadataBinderResult? BclResolution);
+
+    private static object DescribePredicateAttempt(PredicateAttempt attempt, CSharpCompilation? hostCompilation)
+    {
+        var sourceNominal = attempt.Source.Type as NominalBoundType;
+        var targetNominal = attempt.Target as NominalBoundType;
+        return new Dictionary<string, object?>
+        {
+            ["capturedAtUtc"] = attempt.CapturedAtUtc,
+            ["mode"] = MeasurementMode,
+            ["predicate"] = "NullabilityChecker.IsPossiblyNullAssignedTo",
+            ["result"] = attempt.Result,
+            ["source"] = DescribeExpression(attempt.Source, hostCompilation),
+            ["target"] = DescribeBoundType(attempt.Target, hostCompilation),
+            ["sourceAnnotation"] = SafeAnnotation(attempt.Source.Type),
+            ["targetAnnotation"] = SafeAnnotation(attempt.Target),
+            ["sourceIsKnownReferenceType"] = sourceNominal?.IsKnownReferenceType,
+            ["targetIsKnownReferenceType"] = targetNominal?.IsKnownReferenceType,
+            ["hasSameUnderlyingReferenceType"] = sourceNominal is not null && targetNominal is not null
+                ? sourceNominal.HasSameUnderlyingReferenceType(targetNominal)
+                : null,
+        };
+    }
+
+    private static object DescribeBclResolutionAttempt(BclResolutionAttempt attempt, CSharpCompilation? hostCompilation) =>
+        new Dictionary<string, object?>
+        {
+            ["capturedAtUtc"] = attempt.CapturedAtUtc,
+            ["callTarget"] = attempt.CallTarget,
+            ["argumentNames"] = attempt.ArgumentNames,
+            ["argumentModifiers"] = attempt.ArgumentModifiers,
+            ["arguments"] = attempt.Arguments.Select(argument => DescribeExpression(argument, hostCompilation)).ToArray(),
+            ["result"] = DescribeMetadataBinderResult(attempt.Result, hostCompilation),
+        };
+
+    private static object DescribeCallArgumentValidation(CallArgumentValidation validation, CSharpCompilation? hostCompilation) =>
+        new Dictionary<string, object?>
+        {
+            ["capturedAtUtc"] = validation.CapturedAtUtc,
+            ["callForm"] = validation.CallForm,
+            ["callTarget"] = validation.CallTarget,
+            ["callSpan"] = DescribeSpan(validation.CallSpan),
+            ["arguments"] = validation.Arguments.Select(argument => DescribeExpression(argument, hostCompilation)).ToArray(),
+            ["nativeOverloadResolution"] = DescribeOverloadResolution(validation.Resolution, hostCompilation),
+            ["metadataBinderResult"] = validation.BclResolution.HasValue
+                ? DescribeMetadataBinderResult(validation.BclResolution.Value, hostCompilation)
+                : new Dictionary<string, object?>
+                {
+                    ["isResolved"] = false,
+                    ["availability"] = "NoResolvedMetadataBinderResultAtValidationSite",
+                },
+        };
+
+    private static object DescribeBoundTreeCensus(BoundModule module, CSharpCompilation? hostCompilation)
+    {
+        var rows = new List<object>();
+        var seen = new HashSet<BoundNode>(ReferenceComparer<BoundNode>.Instance);
+        foreach (var function in module.Functions)
+        {
+            foreach (var statement in function.Body)
+                Visit(statement, function);
+        }
+        return rows;
+
+        void Visit(BoundNode node, BoundFunction function)
+        {
+            if (!seen.Add(node))
+                return;
+
+            switch (node)
+            {
+                case BoundBindStatement bind:
+                    rows.Add(new Dictionary<string, object?>
+                    {
+                        ["boundary"] = BindingReceivingBoundary.Initializer.ToString(),
+                        ["nodeKind"] = nameof(BoundBindStatement),
+                        ["span"] = DescribeSpan(bind.Span),
+                        ["enclosingFunction"] = DescribeFunction(function.Symbol, hostCompilation),
+                        ["variable"] = DescribeVariable(bind.Variable, hostCompilation),
+                        ["initializer"] = bind.Initializer is null ? null : DescribeExpression(bind.Initializer, hostCompilation),
+                        ["initializerPresent"] = bind.Initializer is not null,
+                    });
+                    break;
+                case BoundReturnStatement ret:
+                    rows.Add(new Dictionary<string, object?>
+                    {
+                        ["boundary"] = BindingReceivingBoundary.NativeReturn.ToString(),
+                        ["nodeKind"] = nameof(BoundReturnStatement),
+                        ["span"] = DescribeSpan(ret.Span),
+                        ["enclosingFunction"] = DescribeFunction(function.Symbol, hostCompilation),
+                        ["declaredReturnType"] = function.Symbol.ReturnType,
+                        ["expression"] = ret.Expression is null ? null : DescribeExpression(ret.Expression, hostCompilation),
+                        ["expressionPresent"] = ret.Expression is not null,
+                    });
+                    break;
+                case BoundCallStatement call:
+                    rows.Add(DescribeCallBoundary(call, function, hostCompilation));
+                    break;
+                case BoundCallExpression call:
+                    rows.Add(DescribeCallBoundary(call, function, hostCompilation));
+                    break;
+            }
+
+            foreach (var child in node.ChildNodes)
+                Visit(child, function);
+        }
+    }
+
+    private static object DescribeCallBoundary(BoundCallStatement call, BoundFunction function, CSharpCompilation? hostCompilation) =>
+        new Dictionary<string, object?>
+        {
+            ["boundary"] = BindingReceivingBoundary.MethodArgument.ToString(),
+            ["callForm"] = "statement",
+            ["nodeKind"] = nameof(BoundCallStatement),
+            ["span"] = DescribeSpan(call.Span),
+            ["calleeSpan"] = DescribeSpan(call.CalleeSpan),
+            ["receiverSpan"] = call.ReceiverSpan.HasValue ? DescribeSpan(call.ReceiverSpan.Value) : null,
+            ["enclosingFunction"] = DescribeFunction(function.Symbol, hostCompilation),
+            ["target"] = call.Target,
+            ["arguments"] = call.Arguments.Select(argument => DescribeExpression(argument, hostCompilation)).ToArray(),
+            ["argumentNames"] = call.ArgumentNames,
+            ["argumentModifiers"] = call.ArgumentModifiers,
+            ["typeArguments"] = call.TypeArguments,
+            ["resolvedTypeName"] = call.ResolvedTypeName,
+            ["resolvedMethodName"] = call.ResolvedMethodName,
+            ["resolvedParameterTypes"] = call.ResolvedParameterTypes,
+            ["argumentParameterIndices"] = call.ArgumentParameterIndices,
+            ["selectedOverloadMatches"] = call.SelectedOverloadMatches.Select(match => DescribeResolvedOverloadMatch(match, hostCompilation)).ToArray(),
+            ["resolvedSymbol"] = call.ResolvedSymbol is null ? null : DescribeFunction(call.ResolvedSymbol, hostCompilation),
+            ["resolvedSymbols"] = call.ResolvedSymbols.Select(symbol => DescribeFunction(symbol, hostCompilation)).ToArray(),
+            ["receiverSymbol"] = call.ReceiverSymbol is null ? null : DescribeVariable(call.ReceiverSymbol, hostCompilation),
+            ["receiverTypeSymbol"] = call.ReceiverTypeSymbol is null ? null : DescribeTypeSymbol(call.ReceiverTypeSymbol),
+            ["receiver"] = call.Receiver is null ? null : DescribeExpression(call.Receiver, hostCompilation),
+            ["isInaccessibleCall"] = call.IsInaccessibleCall,
+        };
+
+    private static object DescribeCallBoundary(BoundCallExpression call, BoundFunction function, CSharpCompilation? hostCompilation) =>
+        new Dictionary<string, object?>
+        {
+            ["boundary"] = BindingReceivingBoundary.MethodArgument.ToString(),
+            ["callForm"] = "expression",
+            ["nodeKind"] = nameof(BoundCallExpression),
+            ["span"] = DescribeSpan(call.Span),
+            ["calleeSpan"] = DescribeSpan(call.CalleeSpan),
+            ["receiverSpan"] = call.ReceiverSpan.HasValue ? DescribeSpan(call.ReceiverSpan.Value) : null,
+            ["enclosingFunction"] = DescribeFunction(function.Symbol, hostCompilation),
+            ["target"] = call.Target,
+            ["type"] = DescribeBoundType(call.Type, hostCompilation),
+            ["arguments"] = call.Arguments.Select(argument => DescribeExpression(argument, hostCompilation)).ToArray(),
+            ["argumentNames"] = call.ArgumentNames,
+            ["argumentModifiers"] = call.ArgumentModifiers,
+            ["typeArguments"] = call.TypeArguments,
+            ["resolvedTypeName"] = call.ResolvedTypeName,
+            ["resolvedMethodName"] = call.ResolvedMethodName,
+            ["resolvedParameterTypes"] = call.ResolvedParameterTypes,
+            ["argumentParameterIndices"] = call.ArgumentParameterIndices,
+            ["selectedOverloadMatches"] = call.SelectedOverloadMatches.Select(match => DescribeResolvedOverloadMatch(match, hostCompilation)).ToArray(),
+            ["resolvedSymbol"] = call.ResolvedSymbol is null ? null : DescribeFunction(call.ResolvedSymbol, hostCompilation),
+            ["resolvedSymbols"] = call.ResolvedSymbols.Select(symbol => DescribeFunction(symbol, hostCompilation)).ToArray(),
+            ["receiverSymbol"] = call.ReceiverSymbol is null ? null : DescribeVariable(call.ReceiverSymbol, hostCompilation),
+            ["receiverTypeSymbol"] = call.ReceiverTypeSymbol is null ? null : DescribeTypeSymbol(call.ReceiverTypeSymbol),
+            ["receiver"] = call.Receiver is null ? null : DescribeExpression(call.Receiver, hostCompilation),
+            ["isInaccessibleCall"] = call.IsInaccessibleCall,
+        };
+
+    private static object DescribeExpression(BoundExpression expression, CSharpCompilation? hostCompilation)
+    {
+        var result = new Dictionary<string, object?>
+        {
+            ["nodeKind"] = expression.GetType().Name,
+            ["span"] = DescribeSpan(expression.Span),
+            ["type"] = DescribeBoundType(expression.Type, hostCompilation),
+            ["childCount"] = expression.Children.Count,
+            ["deferredChildCount"] = expression.DeferredChildren.Count,
+        };
+
+        switch (expression)
+        {
+            case BoundVariableExpression variable:
+                result["variable"] = DescribeVariable(variable.Variable, hostCompilation);
+                result["resolvedSymbols"] = variable.ResolvedSymbols.Select(symbol => DescribeVariable(symbol, hostCompilation)).ToArray();
+                break;
+            case BoundCallExpression call:
+                result["callTarget"] = call.Target;
+                result["resolvedSymbol"] = call.ResolvedSymbol is null ? null : DescribeFunction(call.ResolvedSymbol, hostCompilation);
+                result["resolvedSymbols"] = call.ResolvedSymbols.Select(symbol => DescribeFunction(symbol, hostCompilation)).ToArray();
+                result["argumentParameterIndices"] = call.ArgumentParameterIndices;
+                result["selectedOverloadMatches"] = call.SelectedOverloadMatches.Select(match => DescribeResolvedOverloadMatch(match, hostCompilation)).ToArray();
+                break;
+            case BoundNewExpression created:
+                result["knownGuarantee"] = "ConstructorResultNonNull";
+                result["typeNameSpan"] = DescribeSpan(created.TypeNameSpan);
+                result["resolvedType"] = created.ResolvedType is null ? null : DescribeTypeSymbol(created.ResolvedType);
+                result["resolvedConstructor"] = created.ResolvedConstructor is null ? null : DescribeFunction(created.ResolvedConstructor, hostCompilation);
+                break;
+            case BoundStringLiteral:
+                result["knownGuarantee"] = "StringLiteralNonNull";
+                break;
+            case BoundNoneLiteral:
+                result["knownGuarantee"] = "NoneOrNullLiteral";
+                break;
+            case BoundStructuralExpression structural:
+                result["structuralNodeType"] = structural.NodeTypeName;
+                result["metadataKeys"] = structural.Metadata.Keys.OrderBy(key => key, StringComparer.Ordinal).ToArray();
+                break;
+        }
+        return result;
+    }
+
+    private static object DescribeBoundType(BoundType type, CSharpCompilation? hostCompilation)
+    {
+        var baseRow = new Dictionary<string, object?>
+        {
+            ["kind"] = type.GetType().Name,
+            ["displayString"] = type.DisplayString,
+            ["fullyQualifiedName"] = type.FullyQualifiedName,
+            ["annotation"] = SafeAnnotation(type),
+        };
+        switch (type)
+        {
+            case NominalBoundType nominal:
+                baseRow["qualifiedName"] = nominal.QualifiedName;
+                baseRow["nullableAnnotation"] = nominal.NullableAnnotation.ToString();
+                baseRow["isKnownReferenceType"] = nominal.IsKnownReferenceType;
+                baseRow["nativeDeclaration"] = nominal.Declaration is null ? null : DescribeTypeSymbol(nominal.Declaration);
+                baseRow["roslynSymbol"] = DescribeRoslynSymbol(nominal.RoslynSymbol, hostCompilation);
+                break;
+            case ArrayBoundType array:
+                baseRow["rank"] = array.Rank;
+                baseRow["nullableAnnotation"] = array.NullableAnnotation.ToString();
+                baseRow["elementType"] = DescribeBoundType(array.ElementType, hostCompilation);
+                break;
+            case GenericInstantiationBoundType generic:
+                baseRow["nullableAnnotation"] = generic.NullableAnnotation.ToString();
+                baseRow["definition"] = DescribeBoundType(generic.Definition, hostCompilation);
+                baseRow["typeArguments"] = generic.TypeArguments.Select(argument => DescribeBoundType(argument, hostCompilation)).ToArray();
+                break;
+            case PrimitiveBoundType primitive:
+                baseRow["name"] = primitive.Name;
+                baseRow["bits"] = primitive.Bits;
+                baseRow["signed"] = primitive.Signed;
+                break;
+            case FunctionBoundType function:
+                baseRow["parameterTypes"] = function.ParameterTypes.Select(parameter => DescribeBoundType(parameter, hostCompilation)).ToArray();
+                baseRow["returnType"] = DescribeBoundType(function.ReturnType, hostCompilation);
+                baseRow["row"] = function.Row.ToString();
+                baseRow["parameterRows"] = function.ParameterRows.Select(row => row.ToString()).ToArray();
+                break;
+            case UnresolvedBoundType unresolved:
+                baseRow["reason"] = unresolved.Reason;
+                break;
+        }
+        return baseRow;
+    }
+
+    private static string? SafeAnnotation(BoundType type) =>
+        NullabilityChecker.GetAnnotation(type)?.ToString();
+
+    private static object DescribeOverloadResolution(OverloadResolutionResult resolution, CSharpCompilation? hostCompilation) =>
+        new Dictionary<string, object?>
+        {
+            ["kind"] = resolution.Kind.ToString(),
+            ["function"] = resolution.Function is null ? null : DescribeFunction(resolution.Function, hostCompilation),
+            ["resolvedReturnType"] = resolution.ResolvedReturnType,
+            ["candidates"] = resolution.Candidates.Select(candidate => DescribeFunction(candidate, hostCompilation)).ToArray(),
+            ["functions"] = resolution.Functions.Select(function => DescribeFunction(function, hostCompilation)).ToArray(),
+            ["matches"] = resolution.Matches.Select(match => DescribeResolvedOverloadMatch(match, hostCompilation)).ToArray(),
+        };
+
+    private static object DescribeResolvedOverloadMatch(ResolvedOverloadMatch match, CSharpCompilation? hostCompilation) =>
+        new Dictionary<string, object?>
+        {
+            ["function"] = DescribeFunction(match.Function, hostCompilation),
+            ["returnType"] = match.ReturnType,
+            ["arguments"] = match.Arguments.Select(mapping => new Dictionary<string, object?>
+            {
+                ["argumentIndex"] = mapping.ArgumentIndex,
+                ["parameterIndex"] = mapping.ParameterIndex,
+                ["parameterType"] = mapping.ParameterType,
+                ["isExpandedParams"] = mapping.IsExpandedParams,
+            }).ToArray(),
+        };
+
+    private static object DescribeMetadataBinderResult(Metadata.MetadataBinderResult result, CSharpCompilation? hostCompilation) =>
+        new Dictionary<string, object?>
+        {
+            ["isResolved"] = result.IsResolved,
+            ["unresolvedReason"] = result.UnresolvedReason,
+            ["selectedFunctionId"] = result.Symbol is null ? null : DescribeRoslynSymbol(result.Symbol, hostCompilation),
+            ["returnType"] = result.Symbol is null ? null : DescribeRoslynType(result.Symbol.ReturnType, hostCompilation),
+            ["originalDefinitionReturnType"] = result.Symbol is null ? null : DescribeRoslynType(result.Symbol.OriginalDefinition.ReturnType, hostCompilation),
+            ["arguments"] = result.Arguments.Select(argument => new Dictionary<string, object?>
+            {
+                ["argumentIndex"] = argument.ArgumentIndex,
+                ["parameter"] = DescribeRoslynParameter(argument.Parameter, hostCompilation),
+                ["targetType"] = DescribeRoslynType(argument.TargetType, hostCompilation),
+                ["isExpandedParams"] = argument.IsExpandedParams,
+            }).ToArray(),
+        };
+
+    private static object DescribeFunction(FunctionSymbol function, CSharpCompilation? hostCompilation) =>
+        new Dictionary<string, object?>
+        {
+            ["id"] = function.Id.Value,
+            ["name"] = function.Name,
+            ["identityKey"] = function.IdentityKey,
+            ["returnType"] = function.ReturnType,
+            ["returnFunctionType"] = function.ReturnFunctionType is null ? null : DescribeBoundType(function.ReturnFunctionType, hostCompilation),
+            ["genericArity"] = function.GenericArity,
+            ["typeParameters"] = function.TypeParameters,
+            ["signatureKey"] = function.SignatureKey,
+            ["displaySignature"] = function.DisplaySignature,
+            ["visibility"] = function.Visibility.ToString(),
+            ["containingTypeName"] = function.ContainingTypeName,
+            ["declarationSpan"] = DescribeSpan(function.DeclarationSpan),
+            ["definitionSpan"] = DescribeSpan(function.DefinitionSpan),
+            ["parameters"] = function.Parameters.Select(parameter => DescribeVariable(parameter, hostCompilation)).ToArray(),
+            ["conditionalAlternative"] = function.ConditionalAlternative is null
+                ? null
+                : new Dictionary<string, object?>
+                {
+                    ["groupId"] = function.ConditionalAlternative.Value.GroupId,
+                    ["branchIndex"] = function.ConditionalAlternative.Value.BranchIndex,
+                },
+        };
+
+    private static object DescribeVariable(VariableSymbol variable, CSharpCompilation? hostCompilation) =>
+        new Dictionary<string, object?>
+        {
+            ["id"] = variable.Id.Value,
+            ["name"] = variable.Name,
+            ["identityKey"] = variable.IdentityKey,
+            ["typeName"] = variable.TypeName,
+            ["isMutable"] = variable.IsMutable,
+            ["isParameter"] = variable.IsParameter,
+            ["isField"] = variable.IsField,
+            ["isProperty"] = variable.IsProperty,
+            ["isStatic"] = variable.IsStatic,
+            ["modifier"] = variable.Modifier.ToString(),
+            ["isOptional"] = variable.IsOptional,
+            ["visibility"] = variable.Visibility.ToString(),
+            ["declaringTypeName"] = variable.DeclaringTypeName,
+            ["nullableAnnotation"] = variable.NullableAnnotation.ToString(),
+            ["isTypeInferred"] = variable.IsTypeInferred,
+            ["inferredReferenceType"] = variable.InferredReferenceType is null
+                ? null
+                : DescribeBoundType(variable.InferredReferenceType, hostCompilation),
+            ["functionType"] = variable.FunctionType is null ? null : DescribeBoundType(variable.FunctionType, hostCompilation),
+            ["declarationSpan"] = DescribeSpan(variable.DeclarationSpan),
+            ["definitionSpan"] = DescribeSpan(variable.DefinitionSpan),
+            ["conditionalAlternative"] = variable.ConditionalAlternative is null
+                ? null
+                : new Dictionary<string, object?>
+                {
+                    ["groupId"] = variable.ConditionalAlternative.Value.GroupId,
+                    ["branchIndex"] = variable.ConditionalAlternative.Value.BranchIndex,
+                },
+        };
+
+    private static object DescribeTypeSymbol(TypeSymbol symbol) =>
+        new Dictionary<string, object?>
+        {
+            ["id"] = symbol.Id.Value,
+            ["name"] = symbol.Name,
+            ["identityKey"] = symbol.IdentityKey,
+            ["qualifiedName"] = symbol.QualifiedName,
+            ["visibility"] = symbol.Visibility.ToString(),
+            ["isReferenceType"] = symbol.IsReferenceType,
+            ["isDelegate"] = symbol.IsDelegate,
+            ["declarationSpan"] = DescribeSpan(symbol.DeclarationSpan),
+            ["definitionSpan"] = DescribeSpan(symbol.DefinitionSpan),
+        };
+
+    private static object? DescribeRoslynParameter(IParameterSymbol? parameter, CSharpCompilation? hostCompilation)
+    {
+        if (parameter is null)
+            return null;
+        ITypeSymbol? originalType = null;
+        if (parameter.ContainingSymbol is IMethodSymbol method
+            && parameter.Ordinal >= 0
+            && parameter.Ordinal < method.OriginalDefinition.Parameters.Length)
+        {
+            originalType = method.OriginalDefinition.Parameters[parameter.Ordinal].Type;
+        }
+        return new Dictionary<string, object?>
+        {
+            ["symbol"] = DescribeRoslynSymbol(parameter, hostCompilation),
+            ["name"] = parameter.Name,
+            ["ordinal"] = parameter.Ordinal,
+            ["refKind"] = parameter.RefKind.ToString(),
+            ["type"] = DescribeRoslynType(parameter.Type, hostCompilation),
+            ["originalDefinitionType"] = DescribeRoslynType(originalType, hostCompilation),
+            ["containingSymbol"] = DescribeRoslynSymbol(parameter.ContainingSymbol, hostCompilation),
+        };
+    }
+
+    private static object? DescribeRoslynType(ITypeSymbol? type, CSharpCompilation? hostCompilation)
+    {
+        if (type is null)
+            return null;
+        var row = new Dictionary<string, object?>
+        {
+            ["symbol"] = DescribeRoslynSymbol(type, hostCompilation),
+            ["typeKind"] = type.TypeKind.ToString(),
+            ["nullableAnnotation"] = type.NullableAnnotation.ToString(),
+            ["specialType"] = type.SpecialType.ToString(),
+            ["isReferenceType"] = type.IsReferenceType,
+            ["isValueType"] = type.IsValueType,
+            ["originalDefinition"] = type is INamedTypeSymbol named
+                ? DescribeRoslynSymbol(named.OriginalDefinition, hostCompilation)
+                : null,
+        };
+        if (type is IArrayTypeSymbol array)
+        {
+            row["rank"] = array.Rank;
+            row["elementType"] = DescribeRoslynType(array.ElementType, hostCompilation);
+        }
+        if (type is INamedTypeSymbol { IsGenericType: true } generic)
+        {
+            row["typeArguments"] = generic.TypeArguments.Select(argument => DescribeRoslynType(argument, hostCompilation)).ToArray();
+        }
+        return row;
+    }
+
+    private static object? DescribeRoslynSymbol(ISymbol? symbol, CSharpCompilation? hostCompilation)
+    {
+        if (symbol is null)
+            return null;
+        return new Dictionary<string, object?>
+        {
+            ["kind"] = symbol.Kind.ToString(),
+            ["name"] = symbol.Name,
+            ["metadataName"] = symbol.MetadataName,
+            ["display"] = symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            ["assemblyIdentity"] = symbol.ContainingAssembly?.Identity.GetDisplayName(),
+            ["assemblyMembership"] = DescribeAssemblyMembership(symbol.ContainingAssembly, hostCompilation),
+        };
+    }
+
+    private static object DescribeAssemblyMembership(IAssemblySymbol? assembly, CSharpCompilation? hostCompilation)
+    {
+        if (assembly is null)
+        {
+            return new Dictionary<string, object?>
+            {
+                ["state"] = "Unavailable",
+                ["reason"] = "SymbolHasNoContainingAssembly",
+            };
+        }
+        if (hostCompilation is null)
+        {
+            return new Dictionary<string, object?>
+            {
+                ["state"] = "Unavailable",
+                ["reason"] = "HostCompilationForBinderNotInstantiated",
+                ["assemblyIdentity"] = assembly.Identity.GetDisplayName(),
+            };
+        }
+
+        var index = 0;
+        foreach (var reference in hostCompilation.References)
+        {
+            var referenced = hostCompilation.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
+            if (referenced is not null && SymbolEqualityComparer.Default.Equals(referenced, assembly))
+            {
+                return new Dictionary<string, object?>
+                {
+                    ["state"] = "MatchedHostReference",
+                    ["referenceIndex"] = index,
+                    ["referenceDisplay"] = reference.Display,
+                    ["assemblyIdentity"] = referenced.Identity.GetDisplayName(),
+                };
+            }
+            index++;
+        }
+
+        return new Dictionary<string, object?>
+        {
+            ["state"] = "Unavailable",
+            ["reason"] = "NoHostReferenceMatchedBySymbolEqualityComparer",
+            ["assemblyIdentity"] = assembly.Identity.GetDisplayName(),
+        };
+    }
+
+    private static object DescribePrivateReferenceProfile(CSharpCompilation? hostCompilation)
+    {
+        if (hostCompilation is null)
+        {
+            return new Dictionary<string, object?>
+            {
+                ["state"] = "NotInstantiated",
+                ["profileHash"] = null,
+                ["references"] = Array.Empty<object>(),
+            };
+        }
+
+        var references = hostCompilation.References
+            .Select((reference, index) => DescribeMetadataReference(hostCompilation, reference, index))
+            .ToArray();
+        var hashInput = JsonSerializer.SerializeToUtf8Bytes(references, JsonOptions);
+        return new Dictionary<string, object?>
+        {
+            ["state"] = "Instantiated",
+            ["assemblyName"] = hostCompilation.AssemblyName,
+            ["nullableContextOptions"] = hostCompilation.Options.NullableContextOptions.ToString(),
+            ["referenceCount"] = references.Length,
+            ["profileHash"] = Sha256Bytes(hashInput),
+            ["references"] = references,
+        };
+    }
+
+    private static object DescribeMetadataReference(
+        CSharpCompilation hostCompilation,
+        MetadataReference reference,
+        int index)
+    {
+        var assembly = hostCompilation.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
+        string? filePath = null;
+        string hashAvailability;
+        string? hash = null;
+        if (reference is PortableExecutableReference pe && pe.FilePath is { Length: > 0 } path)
+        {
+            filePath = path;
+            if (File.Exists(path))
+            {
+                hashAvailability = "Present";
+                hash = Sha256File(path);
+            }
+            else
+            {
+                hashAvailability = "MissingFile";
+            }
+        }
+        else
+        {
+            hashAvailability = "NoFilePath";
+        }
+
+        return new Dictionary<string, object?>
+        {
+            ["index"] = index,
+            ["display"] = reference.Display,
+            ["filePath"] = filePath,
+            ["sha256"] = hash,
+            ["sha256Availability"] = hashAvailability,
+            ["assemblyIdentity"] = assembly?.Identity.GetDisplayName(),
+            ["properties"] = new Dictionary<string, object?>
+            {
+                ["kind"] = reference.Properties.Kind.ToString(),
+                ["aliases"] = reference.Properties.Aliases.IsDefault
+                    ? Array.Empty<string>()
+                    : reference.Properties.Aliases.ToArray(),
+                ["embedInteropTypes"] = reference.Properties.EmbedInteropTypes,
+            },
+        };
+    }
+
+    private static object DescribeDiagnostic(Diagnostic diagnostic) =>
+        new Dictionary<string, object?>
+        {
+            ["code"] = diagnostic.Code,
+            ["message"] = diagnostic.Message,
+            ["severity"] = diagnostic.Severity.ToString(),
+            ["span"] = DescribeSpan(diagnostic.Span),
+            ["filePath"] = diagnostic.FilePath,
+            ["bindingContext"] = DescribeBindingContext(diagnostic.BindingContext),
+            ["bindingPolicyIsCompilationError"] = BindingDiagnosticPolicy.IsCompilationError(diagnostic),
+        };
+
+    private static object? DescribeBindingContext(BindingDiagnosticContext? context) =>
+        context is null
+            ? null
+            : new Dictionary<string, object?>
+            {
+                ["boundary"] = context.Boundary.ToString(),
+                ["shape"] = context.Shape.ToString(),
+            };
+
+    private static object DescribeSpan(TextSpan span) =>
+        new Dictionary<string, object?>
+        {
+            ["start"] = span.Start,
+            ["length"] = span.Length,
+            ["end"] = span.End,
+            ["line"] = span.Line,
+            ["column"] = span.Column,
+        };
+
+    private static string SafeFilePart(string value)
+    {
+        var builder = new StringBuilder(value.Length);
+        foreach (var ch in value)
+            builder.Append(char.IsLetterOrDigit(ch) || ch is '-' or '_' or '.' ? ch : '_');
+        return builder.ToString();
+    }
+
+    private static string Sha256File(string path) =>
+        Sha256Bytes(File.ReadAllBytes(path));
+
+    private static string Sha256Bytes(byte[] bytes) =>
+        Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+
+    private static string ShortHash(string value, int length) =>
+        Sha256Bytes(Encoding.UTF8.GetBytes(value))[..length];
+
+    private sealed class ReferenceComparer<T> : IEqualityComparer<T> where T : class
+    {
+        internal static readonly ReferenceComparer<T> Instance = new();
+        public bool Equals(T? x, T? y) => ReferenceEquals(x, y);
+        public int GetHashCode(T obj) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj);
+    }
+}

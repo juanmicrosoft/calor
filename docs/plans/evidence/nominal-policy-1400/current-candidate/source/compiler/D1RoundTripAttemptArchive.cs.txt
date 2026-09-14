@@ -1,0 +1,118 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+
+namespace Calor.RoundTrip.Harness;
+
+internal static class D1RoundTripAttemptArchive
+{
+    private const string MeasurementMode = "__D1_MEASUREMENT_MODE__";
+    private const string AcceptedSourceCommit = "8f9891a1a07f786a76a293017959c3edf28412bf";
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
+    internal static void Archive(string workDir, string leg, int attempt, TestRunResult result)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(workDir);
+        ArgumentException.ThrowIfNullOrWhiteSpace(leg);
+        ArgumentNullException.ThrowIfNull(result);
+
+        var captureDir = Environment.GetEnvironmentVariable("D1_CAPTURE_DIR");
+        if (string.IsNullOrWhiteSpace(captureDir))
+            return;
+
+        var attemptId = string.Join(
+            "-",
+            "d1-trx",
+            MeasurementMode,
+            SafeFilePart(leg),
+            attempt.ToString(CultureInfo.InvariantCulture),
+            ShortHash(workDir + "|" + leg + "|" + attempt.ToString(CultureInfo.InvariantCulture), 16));
+        var destination = Path.Combine(
+            Path.GetFullPath(captureDir),
+            "roundtrip-attempts",
+            attemptId);
+        Directory.CreateDirectory(destination);
+
+        var copied = new List<object?>();
+        foreach (var relative in result.TrxFiles.OrderBy(path => path, StringComparer.Ordinal))
+        {
+            var source = Path.GetFullPath(Path.Combine(workDir, relative));
+            var workRoot = Path.GetFullPath(workDir);
+            var workRootPrefix = workRoot.EndsWith(Path.DirectorySeparatorChar)
+                ? workRoot
+                : workRoot + Path.DirectorySeparatorChar;
+            if (source != workRoot && !source.StartsWith(workRootPrefix, StringComparison.Ordinal))
+                throw new InvalidOperationException($"TRX path escapes workDir: {relative}");
+            if (!File.Exists(source))
+            {
+                copied.Add(new Dictionary<string, object?>
+                {
+                    ["relativePath"] = relative,
+                    ["state"] = "MissingAtArchiveHook",
+                });
+                continue;
+            }
+
+            var bytes = File.ReadAllBytes(source);
+            var fileName = SafeFilePart(relative);
+            var target = Path.Combine(destination, fileName);
+            using (var stream = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                stream.Write(bytes);
+            copied.Add(new Dictionary<string, object?>
+            {
+                ["relativePath"] = relative,
+                ["archivedFile"] = fileName,
+                ["sha256"] = Sha256Bytes(bytes),
+                ["byteLength"] = bytes.Length,
+                ["state"] = "Archived",
+            });
+        }
+
+        var manifest = new Dictionary<string, object?>
+        {
+            ["schema"] = "calor.d1.roundtrip-attempt-archive.v1",
+            ["acceptedSourceCommit"] = AcceptedSourceCommit,
+            ["measurementMode"] = MeasurementMode,
+            ["attemptId"] = attemptId,
+            ["archivedAtUtc"] = DateTimeOffset.UtcNow,
+            ["workDir"] = workDir,
+            ["leg"] = leg,
+            ["attempt"] = attempt,
+            ["command"] = result.Command,
+            ["exitCode"] = result.ExitCode,
+            ["totalTests"] = result.TotalTests,
+            ["passed"] = result.Passed,
+            ["failed"] = result.Failed,
+            ["skipped"] = result.Skipped,
+            ["usedConsoleFallback"] = result.UsedConsoleFallback,
+            ["trxFiles"] = copied,
+            ["parseErrors"] = result.ParseErrors,
+        };
+        var manifestBytes = JsonSerializer.SerializeToUtf8Bytes(manifest, JsonOptions);
+        using var manifestStream = new FileStream(
+            Path.Combine(destination, "manifest.json"),
+            FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None);
+        manifestStream.Write(manifestBytes);
+    }
+
+    private static string SafeFilePart(string value)
+    {
+        var builder = new StringBuilder(value.Length);
+        foreach (var ch in value)
+            builder.Append(char.IsLetterOrDigit(ch) || ch is '-' or '_' or '.' ? ch : '_');
+        return builder.ToString();
+    }
+
+    private static string Sha256Bytes(byte[] bytes) =>
+        Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+
+    private static string ShortHash(string value, int length) =>
+        Sha256Bytes(Encoding.UTF8.GetBytes(value))[..length];
+}
