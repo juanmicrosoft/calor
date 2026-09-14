@@ -597,7 +597,8 @@ public static class ReportGenerator
         => options.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public)
             .Where(property => property.GetIndexParameters().Length == 0
                 && property.Name is not ("CancellationToken" or "StatusWriter" or "Context"
-                    or "VerificationResults" or "VerificationAnalysisResult" or "ObligationResults"))
+                    or "VerificationResults" or "VerificationAnalysisResult" or "ObligationResults"
+                    or "AdditionalSemanticSyntaxTrees"))
             .OrderBy(property => property.Name, StringComparer.Ordinal)
             .ToDictionary(property => property.Name,
                 property => JsonSerializer.SerializeToElement(SnapshotValue(property.GetValue(options)), JsonOptions));

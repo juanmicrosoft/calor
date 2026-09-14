@@ -390,6 +390,25 @@ public static class TypeMapper
         element.StartsWith('?') ? $"{element[1..]}?" : element;
 
     /// <summary>
+    /// Adds a nullable-reference annotation to an already mapped Calor type
+    /// without changing value-nullable or <c>Option&lt;T&gt;</c> semantics.
+    /// </summary>
+    public static string AnnotateNullableReference(string calorType)
+    {
+        if (string.IsNullOrWhiteSpace(calorType)
+            || Parsing.AttributeHelper.TryUnwrapNullableAnnotation(
+                calorType,
+                out _))
+        {
+            return calorType;
+        }
+
+        return calorType.EndsWith(']')
+            ? $"{calorType}?"
+            : $"?{calorType}";
+    }
+
+    /// <summary>
     /// Converts an Calor type name to a C# type name.
     /// </summary>
     public static string CalorToCSharp(string calorType)

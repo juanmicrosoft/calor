@@ -16,6 +16,8 @@ public sealed class ProjectMigrator
 {
     private readonly MigrationPlanOptions _options;
     private IReadOnlyList<ProjectCompilationInputs>? _projectCompilationInputs;
+    private IReadOnlyDictionary<ProjectCompilationInputs, IReadOnlyList<Microsoft.CodeAnalysis.SyntaxTree>>?
+        _projectSemanticSyntaxTrees;
     private string? _projectCompilationInputError;
 
     /// <summary>
@@ -74,6 +76,12 @@ public sealed class ProjectMigrator
                             _options.Configuration,
                             _options.TargetFramework,
                             cancellationToken);
+                    _projectSemanticSyntaxTrees = _projectCompilationInputs
+                        .ToDictionary(
+                            input => input,
+                            input => BuildSemanticSyntaxTrees(
+                                input,
+                                input.SourcePaths));
                     _projectCompilationInputError = null;
                 }
                 catch (Exception ex) when (ex is IOException
@@ -81,6 +89,7 @@ public sealed class ProjectMigrator
                     or System.Text.Json.JsonException)
                 {
                     _projectCompilationInputs = null;
+                    _projectSemanticSyntaxTrees = null;
                     _projectCompilationInputError =
                         ex.Message;
                 }
@@ -478,6 +487,16 @@ public sealed class ProjectMigrator
                 .WithFeatures(_options.ParseFeatures);
             conversionOptions.TargetFramework = projectInput.TargetFramework;
             conversionOptions.OutputKind = projectInput.OutputKind;
+            conversionOptions.NullableContextOptions =
+                projectInput.NullableContextOptions;
+            conversionOptions.ReferencesAreComplete = true;
+            conversionOptions.AdditionalSemanticSyntaxTrees =
+                _projectSemanticSyntaxTrees != null
+                && _projectSemanticSyntaxTrees.TryGetValue(
+                    projectInput,
+                    out var semanticTrees)
+                    ? semanticTrees
+                    : Array.Empty<Microsoft.CodeAnalysis.SyntaxTree>();
             conversionOptions.References = BuildGeneratedReferences(projectInput)
                 .Select(reference => new ConversionReference(
                     reference.Path,
@@ -1094,10 +1113,7 @@ public sealed class ProjectMigrator
                 + "Specify a target framework explicitly; symbols are never unioned across frameworks.");
         }
 
-        return (candidates[0] with
-        {
-            TargetFramework = null
-        }, null);
+        return (candidates[0], null);
 
         static string ParseConfigurationIdentity(
             ProjectCompilationInputs input)
@@ -1127,6 +1143,41 @@ public sealed class ProjectMigrator
                     ? aliases
                     : Array.Empty<string>()))
             .ToList();
+
+    private IReadOnlyList<Microsoft.CodeAnalysis.SyntaxTree>
+        BuildSemanticSyntaxTrees(
+            ProjectCompilationInputs inputs,
+            IEnumerable<string> sourcePaths)
+    {
+        var parseOptions = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(
+            _options.LanguageVersion ?? inputs.LanguageVersion,
+            _options.DocumentationMode,
+            Microsoft.CodeAnalysis.SourceCodeKind.Regular,
+            inputs.PreprocessorSymbols
+                .Concat(_options.DefinedSymbols)
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .Distinct(StringComparer.Ordinal))
+            .WithFeatures(_options.ParseFeatures);
+        var trees = sourcePaths
+            .Where(File.Exists)
+            .Select(path => Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+                File.ReadAllText(path),
+                parseOptions,
+                path))
+            .ToList();
+        if (inputs.IncludeImplicitGlobalUsings)
+        {
+            trees.Insert(
+                0,
+                Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+                    GeneratedCSharpCompiler.GlobalUsingsPreamble,
+                    parseOptions,
+                    path: "<implicit-global-usings>"));
+        }
+
+        return trees;
+    }
+
 
     internal sealed record ProjectCompilationInputs(
         string? TargetFramework,

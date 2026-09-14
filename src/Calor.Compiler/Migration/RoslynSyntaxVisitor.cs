@@ -18,6 +18,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private readonly ConversionContext _context;
     private readonly SemanticModel? _semanticModel;
     private readonly CancellationToken _cancellationToken;
+    private readonly bool _hasEvaluatedNullableContext;
     private CSharpParseOptions _parseOptions = new(LanguageVersion.Preview);
     private readonly List<UsingDirectiveNode> _usings = new();
     private readonly List<InterfaceDefinitionNode> _interfaces = new();
@@ -44,6 +45,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private readonly HashSet<int> _conditionalInteropTypeStarts = new();
     private readonly HashSet<int> _conditionalInteropStatementStarts = new();
     private readonly HashSet<int> _compilerDirectiveInteropStatementStarts = new();
+    private readonly HashSet<int> _nullableResolutionWarningStarts = new();
     private bool _preserveWholeCompilationUnitForConditionalTopLevel;
     private string? _wholeCompilationUnitFeature;
     private string? _wholeCompilationUnitReason;
@@ -80,11 +82,25 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         ConversionContext context,
         SemanticModel? semanticModel,
         CancellationToken cancellationToken)
+        : this(
+            context,
+            semanticModel,
+            cancellationToken,
+            hasEvaluatedNullableContext: false)
+    {
+    }
+
+    public RoslynSyntaxVisitor(
+        ConversionContext context,
+        SemanticModel? semanticModel,
+        CancellationToken cancellationToken,
+        bool hasEvaluatedNullableContext)
         : base(SyntaxWalkerDepth.Node)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _semanticModel = semanticModel;
         _cancellationToken = cancellationToken;
+        _hasEvaluatedNullableContext = hasEvaluatedNullableContext;
     }
 
     public override void Visit(SyntaxNode? node)
@@ -125,6 +141,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _conditionalInteropTypeStarts.Clear();
         _conditionalInteropStatementStarts.Clear();
         _compilerDirectiveInteropStatementStarts.Clear();
+        _nullableResolutionWarningStarts.Clear();
         _preserveWholeCompilationUnitForConditionalTopLevel = false;
         _wholeCompilationUnitFeature = null;
         _wholeCompilationUnitReason = null;
@@ -1603,6 +1620,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         var feature = GetCompilerDirectiveFeature(directive);
         var code = directive.ToFullString().TrimEnd('\r', '\n');
+        if (_hasEvaluatedNullableContext
+            && directive is NullableDirectiveTriviaSyntax nullableDirective)
+        {
+            code = PreserveNullableWarningsWhileEnablingAnnotations(
+                nullableDirective);
+        }
         RecordCompilerDirectivePreservation(directive, code);
         var node = new CompilerDirectiveNode(
             GetTextSpan(directive),
@@ -1617,6 +1640,36 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (scope != null)
             AssociateNamespace(node, scope.FullName, scope.Id);
         return node;
+    }
+
+    private static string PreserveNullableWarningsWhileEnablingAnnotations(
+        NullableDirectiveTriviaSyntax directive)
+    {
+        var action = directive.SettingToken.ValueText;
+        var target = directive.TargetToken.ValueText;
+        var trailingTrivia = directive.EndOfDirectiveToken.LeadingTrivia
+            .ToFullString()
+            .TrimEnd('\r', '\n');
+        var trailing = string.IsNullOrWhiteSpace(trailingTrivia)
+            ? ""
+            : $" {trailingTrivia.TrimStart()}";
+
+        if (target == "annotations")
+            return $"#nullable enable annotations{trailing}";
+        if (target == "warnings")
+        {
+            return $"#nullable {action} warnings{trailing}"
+                + Environment.NewLine
+                + "#nullable enable annotations";
+        }
+        if (action is "disable" or "restore")
+        {
+            return $"#nullable {action} warnings{trailing}"
+                + Environment.NewLine
+                + "#nullable enable annotations";
+        }
+
+        return directive.ToFullString().TrimEnd('\r', '\n');
     }
 
     private static string GetCompilerDirectiveFeature(
@@ -2676,7 +2729,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var parameters = ConvertParameters(node.ParameterList);
 
             // Convert return type
-            var returnType = TypeMapper.CSharpToCalor(node.ReturnType.ToString());
+            var returnType = MapDeclarationType(node.ReturnType);
             var output = returnType != "void" ? new OutputNode(GetTextSpan(node.ReturnType), returnType) : null;
 
             var delegateNode = new DelegateDefinitionNode(
@@ -3784,7 +3837,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var name = node.Identifier.Text;
         var typeParameters = ConvertTypeParameters(node.TypeParameterList, node.ConstraintClauses);
         var parameters = ConvertParameters(node.ParameterList);
-        var returnType = TypeMapper.CSharpToCalor(node.ReturnType.ToString());
+        var returnType = MapDeclarationType(node.ReturnType);
         var output = returnType != "void" ? new OutputNode(GetTextSpan(node.ReturnType), returnType) : null;
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
 
@@ -3833,7 +3886,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _context.RecordFeatureUsage("extern-method");
         }
 
-        var returnType = TypeMapper.CSharpToCalor(returnTypeStr);
+        var returnType = isAsync
+            ? MapAsyncReturnType(node, returnTypeStr)
+            : MapDeclarationType(node.ReturnType);
         var output = returnType != "void" ? new OutputNode(GetTextSpan(node.ReturnType), returnType) : null;
         var body = modifiers.HasFlag(MethodModifiers.Extern)
             ? Array.Empty<StatementNode>()  // extern methods have no body
@@ -3903,7 +3958,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         var id = _context.GenerateId("m");
         var parameters = ConvertParameters(node.ParameterList);
-        var returnType = TypeMapper.CSharpToCalor(node.ReturnType.ToString());
+        var returnType = MapDeclarationType(node.ReturnType);
         var output = returnType != "void" ? new OutputNode(GetTextSpan(node.ReturnType), returnType) : null;
         var body = ConvertMethodBody(node.Body, node.ExpressionBody);
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
@@ -3937,7 +3992,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         var id = _context.GenerateId("m");
         var parameters = ConvertParameters(node.ParameterList);
-        var returnType = TypeMapper.CSharpToCalor(node.Type.ToString());
+        var returnType = MapDeclarationType(node.Type);
         var output = new OutputNode(GetTextSpan(node.Type), returnType);
         var body = ConvertMethodBody(node.Body, node.ExpressionBody);
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
@@ -4014,7 +4069,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var operatorToken = node.OperatorToken.Text;
         var visibility = GetVisibility(node.Modifiers);
         var parameters = ConvertParameters(node.ParameterList);
-        var returnType = TypeMapper.CSharpToCalor(node.ReturnType.ToString());
+        var returnType = MapDeclarationType(node.ReturnType);
         var output = new OutputNode(GetTextSpan(node.ReturnType), returnType);
         var body = ConvertMethodBody(node.Body, node.ExpressionBody);
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
@@ -4048,7 +4103,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var id = _context.GenerateId("op");
         var visibility = GetVisibility(node.Modifiers);
         var parameters = ConvertParameters(node.ParameterList);
-        var returnType = TypeMapper.CSharpToCalor(node.Type.ToString());
+        var returnType = MapDeclarationType(node.Type);
         var output = new OutputNode(GetTextSpan(node.Type), returnType);
         var body = ConvertMethodBody(node.Body, node.ExpressionBody);
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
@@ -4078,7 +4133,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         var fields = new List<ClassFieldNode>();
         var visibility = GetVisibility(node.Modifiers);
-        var typeName = TypeMapper.CSharpToCalor(node.Declaration.Type.ToString());
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
 
         var modifiers = MethodModifiers.None;
@@ -4095,6 +4149,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         foreach (var variable in node.Declaration.Variables)
         {
+            var typeName = MapDeclarationType(
+                node.Declaration.Type,
+                declaration: variable);
             var defaultValue = variable.Initializer != null
                 ? ConvertExpression(variable.Initializer.Value)
                 : null;
@@ -4129,12 +4186,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         var events = new List<EventDefinitionNode>();
         var visibility = GetVisibility(node.Modifiers);
-        var delegateType = TypeMapper.CSharpToCalor(node.Declaration.Type.ToString());
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
 
         foreach (var variable in node.Declaration.Variables)
         {
             var id = _context.GenerateId("evt");
+            var delegateType = MapDeclarationType(
+                node.Declaration.Type,
+                declaration: variable);
 
             events.Add(new EventDefinitionNode(
                 GetTextSpan(variable),
@@ -4157,7 +4216,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var id = _context.GenerateId("evt");
         var name = node.Identifier.ValueText;
         var visibility = GetVisibility(node.Modifiers);
-        var delegateType = TypeMapper.CSharpToCalor(node.Type.ToString());
+        var delegateType = MapDeclarationType(node.Type);
 
         IReadOnlyList<StatementNode>? addBody = null;
         IReadOnlyList<StatementNode>? removeBody = null;
@@ -4195,7 +4254,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.RecordFeatureUsage("property");
 
         var name = node.Identifier.Text;
-        var typeName = TypeMapper.CSharpToCalor(node.Type.ToString());
+        var typeName = MapDeclarationType(node.Type);
         var defaultVis = node.Parent is InterfaceDeclarationSyntax ? Visibility.Public : Visibility.Private;
         var visibility = GetVisibility(node.Modifiers, defaultVis);
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
@@ -4340,7 +4399,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         _context.RecordFeatureUsage("indexer");
 
-        var typeName = TypeMapper.CSharpToCalor(node.Type.ToString());
+        var typeName = MapDeclarationType(node.Type);
         var defaultVis = node.Parent is InterfaceDeclarationSyntax ? Visibility.Public : Visibility.Private;
         var visibility = GetVisibility(node.Modifiers, defaultVis);
         var csharpAttrs = ConvertAttributes(node.AttributeLists);
@@ -4359,11 +4418,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     defaultValue = ConvertExpression(p.Default.Value);
                 }
                 var paramAttrs = ConvertAttributes(p.AttributeLists);
-                var typeStr = p.Type?.ToString()?.Replace("@", "") ?? "any";
                 return new ParameterNode(
                     GetTextSpan(p),
                     p.Identifier.ValueText,
-                    TypeMapper.CSharpToCalor(typeStr),
+                    p.Type == null
+                        ? "any"
+                        : MapDeclarationType(p.Type),
                     modifier,
                     new AttributeCollection(),
                     paramAttrs,
@@ -7441,8 +7501,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var reassigned = new HashSet<string>();
         foreach (var assignment in scope.DescendantNodes().OfType<AssignmentExpressionSyntax>())
         {
-            if (assignment.Left is IdentifierNameSyntax id)
-                reassigned.Add(id.Identifier.ValueText);
+            foreach (var name in AssignedLocalNames(assignment.Left))
+                reassigned.Add(name);
         }
         foreach (var unary in scope.DescendantNodes().OfType<PostfixUnaryExpressionSyntax>())
         {
@@ -7454,7 +7514,48 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (unary.Operand is IdentifierNameSyntax id)
                 reassigned.Add(id.Identifier.ValueText);
         }
+        foreach (var argument in scope.DescendantNodes().OfType<ArgumentSyntax>())
+        {
+            if (!argument.RefOrOutKeyword.IsKind(SyntaxKind.RefKeyword)
+                && !argument.RefOrOutKeyword.IsKind(SyntaxKind.OutKeyword))
+            {
+                continue;
+            }
+
+            foreach (var name in AssignedLocalNames(argument.Expression))
+                reassigned.Add(name);
+        }
+        foreach (var reference in scope.DescendantNodes().OfType<RefExpressionSyntax>())
+        {
+            foreach (var name in AssignedLocalNames(reference.Expression))
+                reassigned.Add(name);
+        }
         return reassigned;
+
+        static IEnumerable<string> AssignedLocalNames(ExpressionSyntax target)
+        {
+            switch (target)
+            {
+                case IdentifierNameSyntax identifier:
+                    yield return identifier.Identifier.ValueText;
+                    break;
+                case ParenthesizedExpressionSyntax parenthesized:
+                    foreach (var name in AssignedLocalNames(parenthesized.Expression))
+                        yield return name;
+                    break;
+                case TupleExpressionSyntax tuple:
+                    foreach (var argument in tuple.Arguments)
+                    {
+                        foreach (var name in AssignedLocalNames(argument.Expression))
+                            yield return name;
+                    }
+                    break;
+                case RefExpressionSyntax reference:
+                    foreach (var name in AssignedLocalNames(reference.Expression))
+                        yield return name;
+                    break;
+            }
+        }
     }
 
     /// <summary>
@@ -7476,6 +7577,267 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return true;
     }
 
+    private static readonly SymbolDisplayFormat NullableTypeDisplayFormat =
+        SymbolDisplayFormat.MinimallyQualifiedFormat.WithMiscellaneousOptions(
+            SymbolDisplayFormat.MinimallyQualifiedFormat.MiscellaneousOptions
+            | SymbolDisplayMiscellaneousOptions
+                .IncludeNullableReferenceTypeModifier);
+
+    private string MapDeclarationType(
+        TypeSyntax typeSyntax,
+        ExpressionSyntax? initializer = null,
+        SyntaxNode? declaration = null)
+    {
+        var mapped = TypeMapper.CSharpToCalor(typeSyntax.ToString());
+        if (_semanticModel == null)
+            return mapped;
+        if (!ReferenceEquals(typeSyntax.SyntaxTree, _semanticModel.SyntaxTree))
+            return mapped;
+
+        ITypeSymbol? type;
+        try
+        {
+            type = GetDeclaredType(declaration ?? typeSyntax.Parent)
+                ?? _semanticModel.GetTypeInfo(
+                    typeSyntax,
+                    _cancellationToken).Type;
+        }
+        catch (ArgumentException)
+        {
+            return mapped;
+        }
+        if (type == null || type.TypeKind == TypeKind.Error)
+        {
+            RecordUnresolvedNullableSemantics(typeSyntax);
+            return mapped;
+        }
+
+        var nullableAnnotation = type.NullableAnnotation;
+        if (typeSyntax.IsVar)
+        {
+            if (initializer != null
+                && _semanticModel.GetTypeInfo(
+                    initializer,
+                    _cancellationToken).Type is { TypeKind: not TypeKind.Error }
+                    expressionType)
+            {
+                type = expressionType;
+                nullableAnnotation = expressionType.NullableAnnotation;
+            }
+            if (initializer is InvocationExpressionSyntax invocation
+                && _semanticModel.GetSymbolInfo(
+                    invocation,
+                    _cancellationToken).Symbol is IMethodSymbol invokedMethod
+                && nullableAnnotation
+                    != Microsoft.CodeAnalysis.NullableAnnotation.Annotated
+                && invokedMethod.ReturnType.NullableAnnotation
+                    == Microsoft.CodeAnalysis.NullableAnnotation.None)
+            {
+                nullableAnnotation = Microsoft.CodeAnalysis.NullableAnnotation.None;
+            }
+            mapped = TypeMapper.CSharpToCalor(
+                type.ToDisplayString(NullableTypeDisplayFormat));
+        }
+
+        if (type.IsReferenceType
+            && nullableAnnotation
+                == Microsoft.CodeAnalysis.NullableAnnotation.Annotated)
+        {
+            mapped = TypeMapper.AnnotateNullableReference(mapped);
+        }
+        else if (type.IsReferenceType
+            && nullableAnnotation == Microsoft.CodeAnalysis.NullableAnnotation.None
+            && (typeSyntax.IsVar
+                ? HasKnownNullableContext(typeSyntax)
+                : HasKnownDisabledAnnotationContext(typeSyntax))
+            && !HasUnsupportedNestedObliviousShape(type)
+            && !IsStableKnownNonNullInitializer(initializer, declaration))
+        {
+            mapped = TypeMapper.AnnotateNullableReference(mapped);
+        }
+        else if (type.IsReferenceType
+            && nullableAnnotation == Microsoft.CodeAnalysis.NullableAnnotation.None
+            && HasUnsupportedNestedObliviousShape(type))
+        {
+            RecordUnsupportedNestedObliviousShape(typeSyntax);
+        }
+
+        return mapped;
+    }
+
+    private void RecordUnresolvedNullableSemantics(TypeSyntax typeSyntax)
+    {
+        if (!HasKnownNullableContext(typeSyntax)
+            || !_nullableResolutionWarningStarts.Add(typeSyntax.SpanStart))
+        {
+            return;
+        }
+
+        var position = typeSyntax.GetLocation()
+            .GetLineSpan().StartLinePosition;
+        _context.AddWarning(
+            $"Nullable semantics for '{typeSyntax}' could not be resolved; preserving syntax-only type mapping.",
+            feature: "nullable-semantic-unresolved",
+            line: position.Line + 1,
+            column: position.Character + 1);
+    }
+
+    private void RecordUnsupportedNestedObliviousShape(TypeSyntax typeSyntax)
+    {
+        if (!_nullableResolutionWarningStarts.Add(typeSyntax.SpanStart))
+            return;
+
+        var position = typeSyntax.GetLocation()
+            .GetLineSpan().StartLinePosition;
+        _context.AddWarning(
+            $"Nested oblivious reference semantics for '{typeSyntax}' are not modeled; preserving syntax-only type mapping.",
+            feature: "nullable-oblivious-nested-shape",
+            line: position.Line + 1,
+            column: position.Character + 1);
+    }
+
+    private static bool HasUnsupportedNestedObliviousShape(ITypeSymbol type)
+        => type is IArrayTypeSymbol
+            || type is INamedTypeSymbol { TypeArguments.Length: > 0 };
+
+    private bool IsStableKnownNonNullInitializer(
+        ExpressionSyntax? initializer,
+        SyntaxNode? declaration)
+        => IsKnownNonNullExpression(initializer)
+            && (declaration is not VariableDeclaratorSyntax variable
+                || !_reassignedVariables.Contains(variable.Identifier.ValueText));
+
+    private ITypeSymbol? GetDeclaredType(SyntaxNode? declaration)
+        => declaration switch
+        {
+            VariableDeclaratorSyntax variable =>
+                _semanticModel!.GetDeclaredSymbol(
+                    variable,
+                    _cancellationToken) switch
+                {
+                    ILocalSymbol local => local.Type,
+                    IFieldSymbol field => field.Type,
+                    IEventSymbol @event => @event.Type,
+                    _ => null
+                },
+            ParameterSyntax parameter =>
+                (_semanticModel!.GetDeclaredSymbol(
+                    parameter,
+                    _cancellationToken) as IParameterSymbol)?.Type,
+            MethodDeclarationSyntax method =>
+                _semanticModel!.GetDeclaredSymbol(
+                    method,
+                    _cancellationToken)?.ReturnType,
+            OperatorDeclarationSyntax @operator =>
+                _semanticModel!.GetDeclaredSymbol(
+                    @operator,
+                    _cancellationToken)?.ReturnType,
+            ConversionOperatorDeclarationSyntax conversion =>
+                _semanticModel!.GetDeclaredSymbol(
+                    conversion,
+                    _cancellationToken)?.ReturnType,
+            DelegateDeclarationSyntax @delegate =>
+                (_semanticModel!.GetDeclaredSymbol(
+                    @delegate,
+                    _cancellationToken) as INamedTypeSymbol)?
+                    .DelegateInvokeMethod?.ReturnType,
+            PropertyDeclarationSyntax property =>
+                _semanticModel!.GetDeclaredSymbol(
+                    property,
+                    _cancellationToken)?.Type,
+            IndexerDeclarationSyntax indexer =>
+                _semanticModel!.GetDeclaredSymbol(
+                    indexer,
+                    _cancellationToken)?.Type,
+            EventDeclarationSyntax @event =>
+                _semanticModel!.GetDeclaredSymbol(
+                    @event,
+                    _cancellationToken)?.Type,
+            _ => null
+        };
+
+    private bool HasKnownDisabledAnnotationContext(TypeSyntax typeSyntax)
+    {
+        if (_hasEvaluatedNullableContext)
+            return true;
+
+        var nullableContext = _semanticModel!.GetNullableContext(
+            typeSyntax.SpanStart);
+        return !nullableContext.HasFlag(
+                NullableContext.AnnotationsEnabled)
+            && !nullableContext.HasFlag(
+                NullableContext.AnnotationsContextInherited);
+    }
+
+    private bool HasKnownNullableContext(TypeSyntax typeSyntax)
+    {
+        if (_hasEvaluatedNullableContext)
+            return true;
+
+        return !_semanticModel!.GetNullableContext(typeSyntax.SpanStart)
+            .HasFlag(NullableContext.AnnotationsContextInherited);
+    }
+
+    private string MapAsyncReturnType(
+        MethodDeclarationSyntax method,
+        string unwrappedReturnType)
+    {
+        var mapped = TypeMapper.CSharpToCalor(unwrappedReturnType);
+        if (_semanticModel?.GetDeclaredSymbol(
+                method,
+                _cancellationToken) is not IMethodSymbol symbol
+            || symbol.ReturnType is not INamedTypeSymbol named
+            || named.TypeArguments.Length != 1
+            || named.Name is not ("Task" or "ValueTask")
+            || named.ContainingNamespace.ToDisplayString()
+                != "System.Threading.Tasks")
+        {
+            return mapped;
+        }
+
+        var resultType = named.TypeArguments[0];
+        if (resultType.NullableAnnotation
+                == Microsoft.CodeAnalysis.NullableAnnotation.None
+            && HasUnsupportedNestedObliviousShape(resultType))
+        {
+            RecordUnsupportedNestedObliviousShape(method.ReturnType);
+            return mapped;
+        }
+        return resultType.IsReferenceType
+            && resultType.NullableAnnotation
+                == Microsoft.CodeAnalysis.NullableAnnotation.None
+            && HasKnownDisabledAnnotationContext(method.ReturnType)
+            ? TypeMapper.AnnotateNullableReference(mapped)
+            : mapped;
+    }
+
+    private bool IsKnownNonNullExpression(
+        ExpressionSyntax? expression)
+    {
+        if (expression == null)
+            return false;
+
+        while (expression is ParenthesizedExpressionSyntax parenthesized)
+            expression = parenthesized.Expression;
+
+        return expression is ObjectCreationExpressionSyntax
+            or ImplicitObjectCreationExpressionSyntax
+            or ArrayCreationExpressionSyntax
+            or ImplicitArrayCreationExpressionSyntax
+            or StackAllocArrayCreationExpressionSyntax
+            or CollectionExpressionSyntax
+            or AnonymousObjectCreationExpressionSyntax
+            or InterpolatedStringExpressionSyntax
+            or ThisExpressionSyntax
+            or BaseExpressionSyntax
+            or TypeOfExpressionSyntax
+            or LambdaExpressionSyntax
+            or AnonymousMethodExpressionSyntax
+            || expression is LiteralExpressionSyntax literal
+                && !literal.IsKind(SyntaxKind.NullLiteralExpression)
+                && !literal.IsKind(SyntaxKind.DefaultLiteralExpression);
+    }
+
     private BindStatementNode ConvertLocalDeclaration(LocalDeclarationStatementSyntax node)
     {
         _context.IncrementConverted();
@@ -7484,7 +7846,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var name = variable.Identifier.ValueText;
         var typeName = node.Declaration.Type.IsVar
             ? null
-            : TypeMapper.CSharpToCalor(node.Declaration.Type.ToString());
+            : MapDeclarationType(
+                node.Declaration.Type,
+                variable.Initializer?.Value,
+                variable);
         var isMutable = _reassignedVariables.Contains(name);
 
         // v0.17 R4(a) / #1128 — a `var` bound to a CALL loses its type, and with
@@ -7524,15 +7889,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 && !declared.IsAnonymousType
                 && !declared.IsTupleType)
             {
-                var mapped = TypeMapper.CSharpToCalor(
-                    declared.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat
-                        .MinimallyQualifiedFormat));
+                var mapped = MapDeclarationType(
+                    node.Declaration.Type,
+                    variable.Initializer.Value,
+                    variable);
                 if (!string.IsNullOrWhiteSpace(mapped)
-                    && !mapped.Contains('?')
                     && IsSpellableInBindingHeader(mapped))
                 {
                     typeName = mapped;
                 }
+            }
+            else
+            {
+                RecordUnresolvedNullableSemantics(node.Declaration.Type);
             }
         }
         else if (typeName == null
@@ -7594,15 +7963,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     private IReadOnlyList<BindStatementNode> ConvertLocalDeclarationMultiple(LocalDeclarationStatementSyntax node)
     {
         var results = new List<BindStatementNode>();
-        var typeName = node.Declaration.Type.IsVar
-            ? null
-            : TypeMapper.CSharpToCalor(node.Declaration.Type.ToString());
-
         foreach (var variable in node.Declaration.Variables)
         {
             _context.IncrementConverted();
             var name = variable.Identifier.ValueText;
             var isMutable = _reassignedVariables.Contains(name);
+            var typeName = node.Declaration.Type.IsVar
+                ? null
+                : MapDeclarationType(
+                    node.Declaration.Type,
+                    variable.Initializer?.Value,
+                    variable);
             var initializer = variable.Initializer != null
                 ? ConvertExpression(variable.Initializer.Value)
                 : new ReferenceNode(GetTextSpan(node), "default");
@@ -7786,7 +8157,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var finalName = variable.Identifier.ValueText;
         var finalTypeName = node.Declaration.Type.IsVar
             ? null
-            : TypeMapper.CSharpToCalor(node.Declaration.Type.ToString());
+            : MapDeclarationType(
+                node.Declaration.Type,
+                variable.Initializer?.Value,
+                variable);
         var finalIsMutable = _reassignedVariables.Contains(finalName);
 
         var chainInvocation = (InvocationExpressionSyntax)variable.Initializer!.Value;
@@ -12931,7 +13305,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 return new ParameterNode(
                     GetTextSpan(p),
                     p.Identifier.ValueText,
-                    TypeMapper.CSharpToCalor(p.Type?.ToString() ?? "any"),
+                    p.Type == null
+                        ? "any"
+                        : MapDeclarationType(p.Type),
                     modifier,
                     new AttributeCollection(),
                     paramAttrs,
