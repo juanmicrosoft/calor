@@ -1158,13 +1158,24 @@ public sealed class ProjectMigrator
                 .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
                 .Distinct(StringComparer.Ordinal))
             .WithFeatures(_options.ParseFeatures);
-        return sourcePaths
+        var trees = sourcePaths
             .Where(File.Exists)
             .Select(path => Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
                 File.ReadAllText(path),
                 parseOptions,
                 path))
-            .ToArray();
+            .ToList();
+        if (inputs.IncludeImplicitGlobalUsings)
+        {
+            trees.Insert(
+                0,
+                Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+                    GeneratedCSharpCompiler.GlobalUsingsPreamble,
+                    parseOptions,
+                    path: "<implicit-global-usings>"));
+        }
+
+        return trees;
     }
 
 

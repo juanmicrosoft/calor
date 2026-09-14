@@ -711,6 +711,7 @@ public sealed class Issue1401NullableContextConversionTests
                   <PropertyGroup>
                     <TargetFramework>net10.0</TargetFramework>
                     <Nullable>enable</Nullable>
+                    <ImplicitUsings>enable</ImplicitUsings>
                   </PropertyGroup>
                 </Project>
                 """);
@@ -719,7 +720,7 @@ public sealed class Issue1401NullableContextConversionTests
                 """
                 public static class Api
                 {
-                    public static string? Read() => null;
+                    public static Task<string?> Read() => Task.FromResult<string?>(null);
                 }
                 """);
             await File.WriteAllTextAsync(
@@ -756,7 +757,7 @@ public sealed class Issue1401NullableContextConversionTests
             Assert.DoesNotContain(
                 consumer.Issues,
                 issue => issue.Feature == "nullable-semantic-unresolved");
-            Assert.Contains("§B{?str:value}", consumer.ConvertedSource);
+            Assert.Contains("§B{Task<?str>:value}", consumer.ConvertedSource);
         }
         finally
         {
