@@ -92,13 +92,22 @@ class Archive:
     def save_json(self, value: Any, relative: Path, *, source: str) -> Path:
         return self.save_bytes(relative, canonical_bytes(value), source=source)
 
-    def save_capture_bundle(self, source: Path, relative: Path) -> Path:
+    def save_tree_bundle(
+        self,
+        source: Path,
+        relative: Path,
+        *,
+        pattern: str = "*",
+    ) -> Path:
         members = []
         tar_buffer = io.BytesIO()
         with tarfile.open(fileobj=tar_buffer, mode="w", format=tarfile.PAX_FORMAT) as tar:
-            for path in sorted(source.glob("*.json")):
+            for path in sorted(source.rglob(pattern)):
+                if not path.is_file():
+                    continue
                 raw = path.read_bytes()
-                info = tarfile.TarInfo(path.name)
+                member_path = str(path.relative_to(source))
+                info = tarfile.TarInfo(member_path)
                 info.size = len(raw)
                 info.mtime = 0
                 info.mode = 0o644
@@ -109,7 +118,7 @@ class Archive:
                 tar.addfile(info, io.BytesIO(raw))
                 members.append(
                     {
-                        "path": path.name,
+                        "path": member_path,
                         "rawSha256": sha256(raw),
                         "rawBytes": len(raw),
                     }
@@ -129,6 +138,9 @@ class Archive:
             }
         )
         return destination
+
+    def save_capture_bundle(self, source: Path, relative: Path) -> Path:
+        return self.save_tree_bundle(source, relative, pattern="*.json")
 
 
 def normalized_source_context(capture: dict[str, Any]) -> dict[str, Any]:
@@ -548,10 +560,10 @@ def archive_raw_inputs(raw_root: Path, archive: Archive) -> None:
             archive.save_file(path, Path("attempts") / mode / name)
         for path in sorted((mode_root / "e1-run1").glob("exit-*.json")):
             archive.save_file(path, Path("attempts") / mode / path.name)
-        for path in sorted((mode_root / "e1-run1" / "captures" / "roundtrip-attempts").rglob("*")):
-            if path.is_file():
-                relative = path.relative_to(mode_root / "e1-run1" / "captures")
-                archive.save_file(path, Path("attempts") / mode / relative)
+        archive.save_tree_bundle(
+            mode_root / "e1-run1" / "captures" / "roundtrip-attempts",
+            Path("attempts") / mode / "roundtrip-attempts.tar.gz",
+        )
         for name in (
             "build.log",
             "api-build.log",

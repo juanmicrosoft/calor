@@ -133,8 +133,10 @@ are identical across all three configurations.
 - `e1/` preserves every original JSON and Markdown report byte-for-byte under
   deterministic gzip.
 - `attempts/` preserves the original per-invocation capture JSON in deterministic
-  tarballs, completion records, exits, logs, and archived TRX attempts,
-  including the symmetric Serilog failure.
+  tarballs, completion records, exits, logs, and deterministic per-mode
+  round-trip-attempt tarballs containing the archived TRX attempts and their
+  manifests, including the symmetric Serilog failure. Bundling the attempt
+  trees keeps repository checkout paths within Windows limits.
 - `controls/` preserves the uninstrumented neutrality control, all three
   successful API capture bundles with private-reference membership evidence,
   API/CLI results, and source-context evidence.
