@@ -1165,4 +1165,172 @@ public class ConverterReachTests
         Assert.Empty(UnknownTypedLambdaHeaders(rt.Calor));
         AssertRoundTripCompiles(rt);
     }
+
+    [Fact]
+    public void StageA_NonNullCoalesceToString_RunsProductionCompileWithoutCalor0274()
+    {
+        const string csharp = """
+            #nullable enable
+            using System.IO;
+
+            public static class Formatter
+            {
+                private static void WriteQuotedJsonString(string value, TextWriter state)
+                {
+                    state.Write(value);
+                }
+
+                public static void Write(object? value, TextWriter state)
+                {
+                    WriteQuotedJsonString((value ?? "null").ToString()!, state);
+                }
+            }
+            """;
+
+        var rt = ConvertAndParse(csharp, "StageAJsonValueFormatter");
+        AssertParsesClean(rt);
+        Assert.Contains("§CS{(value ?? \"null\").ToString()!}", rt.Calor);
+
+        var compilation = Compiler.Program.Compile(
+            rt.Calor,
+            "converted.calr",
+            new Compiler.CompilationOptions
+            {
+                EnforceEffects = false,
+                UnknownCallPolicy = Compiler.Effects.UnknownCallPolicy.Permissive,
+                DeferGeneratedOutputValidation = true,
+            });
+
+        Assert.DoesNotContain(compilation.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+        Assert.False(compilation.HasErrors,
+            string.Join("\n", compilation.Diagnostics.Errors.Select(diagnostic => diagnostic.ToString())));
+        var validation = TestHelpers.RoslynCompile(compilation.GeneratedCode);
+        Assert.True(validation.SyntaxSuccess && validation.CompilationSuccess,
+            string.Join("\n", validation.SyntaxErrors.Concat(validation.CompilationErrors)));
+    }
+
+    [Fact]
+    public void StageA_NullForgivingOperand_DoesNotDuplicatePostIncrementSideEffect()
+    {
+        const string csharp = """
+            #nullable enable
+
+            public static class Values
+            {
+                public static string Read(string[] values, ref int index)
+                {
+                    return values[index++]!;
+                }
+            }
+            """;
+
+        var rt = ConvertAndParse(csharp, "StageANullForgivingSideEffect");
+        AssertParsesClean(rt);
+        Assert.Contains("§CS{values[index++]!}", rt.Calor);
+        Assert.Single(Regex.Matches(rt.Calor, Regex.Escape("index++")));
+        Assert.DoesNotContain("§SET{index}", rt.Calor);
+
+        var compilation = Compiler.Program.Compile(
+            rt.Calor,
+            "converted.calr",
+            new Compiler.CompilationOptions
+            {
+                EnforceEffects = false,
+                UnknownCallPolicy = Compiler.Effects.UnknownCallPolicy.Permissive,
+                DeferGeneratedOutputValidation = true,
+            });
+
+        Assert.False(compilation.HasErrors,
+            string.Join("\n", compilation.Diagnostics.Errors.Select(diagnostic => diagnostic.ToString())));
+        Assert.Single(Regex.Matches(compilation.GeneratedCode, Regex.Escape("index++")));
+        var validation = TestHelpers.RoslynCompile(compilation.GeneratedCode);
+        Assert.True(validation.SyntaxSuccess && validation.CompilationSuccess,
+            string.Join("\n", validation.SyntaxErrors.Concat(validation.CompilationErrors)));
+    }
+
+    [Fact]
+    public void StageA_OpaqueCurrentClassOverload_RunsProductionCompileWithoutCalor0208()
+    {
+        const string csharp = """
+            #nullable enable
+            using System;
+            using System.IO;
+
+            public class LogEventPropertyValue
+            {
+                public override string ToString() => ToString(null, null);
+
+                public string ToString(string? format, IFormatProvider? formatProvider)
+                {
+                    using var output = new StringWriter();
+                    return output.ToString();
+                }
+            }
+            """;
+
+        var rt = ConvertAndParse(csharp, "StageALogEventPropertyValue");
+        AssertParsesClean(rt);
+        Assert.Contains("§MT{", rt.Calor);
+        Assert.Contains("§CSHARP{", rt.Calor);
+        Assert.Contains("using var output", rt.Calor);
+
+        var compilation = Compiler.Program.Compile(
+            rt.Calor,
+            "converted.calr",
+            new Compiler.CompilationOptions
+            {
+                EnforceEffects = false,
+                UnknownCallPolicy = Compiler.Effects.UnknownCallPolicy.Permissive,
+                DeferGeneratedOutputValidation = true,
+            });
+
+        Assert.DoesNotContain(compilation.Diagnostics, diagnostic =>
+            diagnostic.Code is DiagnosticCode.NoMatchingOverload or DiagnosticCode.AmbiguousOverload);
+        Assert.False(compilation.HasErrors,
+            string.Join("\n", compilation.Diagnostics.Errors.Select(diagnostic => diagnostic.ToString())));
+        Assert.Contains("ToString(null, null)", compilation.GeneratedCode);
+        Assert.Contains("using var output", compilation.GeneratedCode);
+        var validation = TestHelpers.RoslynCompile(compilation.GeneratedCode);
+        Assert.True(validation.SyntaxSuccess && validation.CompilationSuccess,
+            string.Join("\n", validation.SyntaxErrors.Concat(validation.CompilationErrors)));
+    }
+
+    [Fact]
+    public void StageA_NoOpaqueOverload_StillReportsCalor0208()
+    {
+        const string csharp = """
+            using System.IO;
+
+            public class Value
+            {
+                public string Format() => "";
+                public string Probe() => Format(null, null);
+
+                public string Other()
+                {
+                    using var output = new StringWriter();
+                    return output.ToString();
+                }
+            }
+            """;
+
+        var rt = ConvertAndParse(csharp, "StageANegativeControl");
+        AssertParsesClean(rt);
+        Assert.Contains("§CSHARP{", rt.Calor);
+        Assert.Contains("string Other()", rt.Calor);
+
+        var compilation = Compiler.Program.Compile(
+            rt.Calor,
+            "converted.calr",
+            new Compiler.CompilationOptions
+            {
+                EnforceEffects = false,
+                UnknownCallPolicy = Compiler.Effects.UnknownCallPolicy.Permissive,
+                DeferGeneratedOutputValidation = true,
+            });
+
+        Assert.Contains(compilation.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
 }

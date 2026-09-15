@@ -1,5 +1,7 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Diagnostics;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Calor.Compiler.Binding;
 
@@ -97,6 +99,7 @@ public sealed class Binder
     private readonly Dictionary<string, DelegateDefinitionNode> _delegateDefinitions = new(StringComparer.Ordinal);
     private readonly Dictionary<VariableSymbol, VariableSymbol> _flowNarrowingSources = new();
     private readonly Dictionary<string, HashSet<string>> _topLevelFunctionLookupNames = new(StringComparer.Ordinal);
+    private readonly Dictionary<CSharpInteropBlockNode, IReadOnlySet<string>> _interopMethodNames = new();
     private readonly Dictionary<SymbolId, Symbol> _symbolsById = new();
     private readonly Dictionary<string, int> _declarationIdOccurrences = new(StringComparer.Ordinal);
     private IReadOnlySet<string> _declaredReferenceTypes = new HashSet<string>(StringComparer.Ordinal);
@@ -4708,6 +4711,12 @@ public sealed class Binder
             if (resolution.Kind == OverloadResolutionKind.NotFound)
                 continue;
 
+            if (resolution.Kind is OverloadResolutionKind.NoMatch or OverloadResolutionKind.Ambiguous
+                && CurrentClassHasOpaqueMethodDeclaration(target))
+            {
+                return OverloadResolutionResult.NotFound();
+            }
+
             // v0.17 R2 — an argument whose type this module CANNOT SEE is in the
             // same epistemic position as `<unresolved>`: the binder cannot prove
             // the call is wrong, so reporting Calor0208 is a false positive, not
@@ -4759,6 +4768,51 @@ public sealed class Binder
         }
 
         return OverloadResolutionResult.NotFound();
+    }
+
+    private bool CurrentClassHasOpaqueMethodDeclaration(string target)
+    {
+        if (_currentClass == null)
+            return false;
+
+        var methodName = target.StartsWith("this.", StringComparison.Ordinal)
+            ? target["this.".Length..]
+            : target;
+        if (methodName.Contains('.', StringComparison.Ordinal))
+            return false;
+
+        return EnumerateCurrentClassInteropBlocks(_currentClass)
+            .Any(block => GetInteropMethodNames(block).Contains(methodName));
+    }
+
+    private static IEnumerable<CSharpInteropBlockNode> EnumerateCurrentClassInteropBlocks(
+        ClassDefinitionNode cls)
+    {
+        foreach (var block in cls.InteropBlocks)
+            yield return block;
+        foreach (var branch in EnumeratePreprocessorBranches(cls))
+        {
+            foreach (var block in branch.InteropBlocks)
+                yield return block;
+        }
+    }
+
+    private IReadOnlySet<string> GetInteropMethodNames(CSharpInteropBlockNode block)
+    {
+        if (_interopMethodNames.TryGetValue(block, out var names))
+            return names;
+
+        var wrapper = $"class __CalorInteropHost\n{{\n{block.CSharpCode}\n}}";
+        var root = CSharpSyntaxTree.ParseText(wrapper).GetCompilationUnitRoot();
+        names = root.Members
+            .OfType<ClassDeclarationSyntax>()
+            .SelectMany(declaration => declaration.Members.OfType<MethodDeclarationSyntax>())
+            .Where(method => method.ExplicitInterfaceSpecifier == null)
+            .Select(method => method.Identifier.ValueText)
+            .Where(name => !string.IsNullOrEmpty(name))
+            .ToHashSet(StringComparer.Ordinal);
+        _interopMethodNames.Add(block, names);
+        return names;
     }
 
     private string GetOverloadArgumentType(BoundExpression argument, string? argumentModifier)
