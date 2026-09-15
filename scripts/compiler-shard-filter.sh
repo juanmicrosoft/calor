@@ -13,17 +13,19 @@
 # must not be read as #1150 being solved.
 #
 # WHY A SCRIPT rather than the filters inlined at each call site: the suite runs in
-# TWO places — `tests (compiler)` in test.yml and the `Collect component coverage`
-# step in quality-ratchets — and both must split the same way. Two inlined copies
+# compiler test and coverage gates in test.yml and publish-nuget.yml, and all
+# must split the same way. Inlined copies
 # would drift, and a drifted partition fails silently: the halves stop being
 # complementary, tests get skipped or double-run, and nothing says so. One source,
-# two callers.
+# shared callers.
 #
 # THE SPLIT is by test-class initial, balanced from real counts rather than guessed:
 # these letters select 3,996 tests and their complement 3,982, of 7,978.
 #
 # Usage:
 #   eval "$(bash scripts/compiler-shard-filter.sh)"   # sets SHARD1_FILTER, SHARD2_FILTER
+# or:
+#   filter="$(bash scripts/compiler-shard-filter.sh --part 1)"  # raw filter, no eval
 # or:
 #   bash scripts/compiler-shard-filter.sh --self-test
 
@@ -40,6 +42,28 @@ build_filters() {
     SHARD1_FILTER="$include"
     SHARD2_FILTER="$exclude"
 }
+
+usage() {
+    echo "Usage: $0 [--self-test | --part 1|2]" >&2
+    exit 2
+}
+
+if [ "$#" -gt 0 ]; then
+    case "$1" in
+        --self-test) [ "$#" -eq 1 ] || usage ;;
+        --part)
+            [ "$#" -eq 2 ] || usage
+            build_filters
+            case "$2" in
+                1) printf '%s\n' "$SHARD1_FILTER" ;;
+                2) printf '%s\n' "$SHARD2_FILTER" ;;
+                *) usage ;;
+            esac
+            exit 0
+            ;;
+        *) usage ;;
+    esac
+fi
 
 if [ "${1:-}" = "--self-test" ]; then
     build_filters
@@ -59,6 +83,26 @@ if [ "${1:-}" = "--self-test" ]; then
     letters="$(printf '%s' "$SHARD1_LETTERS" | wc -w | tr -d ' ')"
     [ "$clauses" = "$letters" ] \
         || { echo "FAIL: $clauses clauses for $letters letters — word splitting is broken"; fail=1; }
+
+    [ "$(bash "$0" --part 1)" = "$SHARD1_FILTER" ] \
+        && [ "$(bash "$0" --part 2)" = "$SHARD2_FILTER" ] \
+        || { echo "FAIL: raw filter interface differs from the shared partition"; fail=1; }
+    expected_assignments="$(printf 'SHARD1_FILTER=%q\nSHARD2_FILTER=%q\n' "$SHARD1_FILTER" "$SHARD2_FILTER")"
+    [ "$(bash "$0")" = "$expected_assignments" ] \
+        || { echo "FAIL: legacy assignment output changed"; fail=1; }
+    for invalid in 0 3 invalid ""; do
+        if bash "$0" --part "$invalid" >/dev/null 2>&1; then
+            echo "FAIL: accepted invalid part '$invalid'"
+            fail=1
+        fi
+    done
+    if bash "$0" --part >/dev/null 2>&1 \
+        || bash "$0" --part 1 extra >/dev/null 2>&1 \
+        || bash "$0" --self-test extra >/dev/null 2>&1 \
+        || bash "$0" --unknown >/dev/null 2>&1; then
+        echo "FAIL: accepted invalid arguments"
+        fail=1
+    fi
 
     [ "$fail" = "0" ] && echo "compiler-shard-filter self-test passed ($clauses clauses, negation exact)."
     exit "$fail"

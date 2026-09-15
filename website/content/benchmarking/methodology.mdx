@@ -26,8 +26,8 @@ The **published static dashboard** is narrower than the full framework: it uses
 Optional LLM suites are separate artifacts and do not contribute to the 1.32x
 headline.
 
-Recorded on 2026-09-11 for release v0.21.0, its source is `be488238`, which
-declares compiler `0.20.0` before the release version bump. The exact executed
+Recorded on 2026-09-15 for release v0.22.0, its source is `c2a8816d`, which
+declares compiler `0.21.0` before the release version bump. The exact executed
 measurement binary was not independently recorded. The corpus is
 `tests/TestData/Benchmarks`. See the [snapshot provenance and limits](/docs/benchmarking/results/#read-the-results-carefully).
 
@@ -39,7 +39,7 @@ the field.
 
 | Artifact | Date and source | Denominator | Execution and configuration | Headline use |
 |:---------|:----------------|:------------|:----------------------------|:-------------|
-| [Eight-metric static dashboard](/docs/benchmarking/results/) | 2026-09-11; [source `be488238`](https://github.com/juanmicrosoft/calor/commit/be488238), declaring compiler `0.20.0` before the v0.21.0 bump | 217 source pairs | Deterministic calculators repeated 30 times. No LLM. No independently attested measurement binary. | Supplies the legacy 1.32x composite. It establishes no measured language, agent-productivity, correctness, or safety advantage. |
+| [Eight-metric static dashboard](/docs/benchmarking/results/) | 2026-09-15; [source `c2a8816d`](https://github.com/juanmicrosoft/calor/commit/c2a8816d), declaring compiler `0.21.0` before the v0.22.0 bump | 217 source pairs | Deterministic calculators repeated 30 times. No LLM. No independently attested measurement binary. | Supplies the legacy 1.32x composite. It establishes no measured language, agent-productivity, correctness, or safety advantage. |
 | [Correctness estimation mode](/docs/benchmarking/metrics/correctness/) inside the static dashboard | Same artifact and 217 pairs | 217 source pairs | Historical heuristic scoring because no LLM provider was configured. It does not execute generated programs as an agent study. | Included as one of the eight legacy dashboard metrics. |
 | Historical [Safety estimation](/docs/benchmarking/metrics/safety/) | 2026-02-17; [artifact revision `e02684e1`](https://github.com/juanmicrosoft/calor/blob/e02684e132cd86044ece331bf4c34a9eaaf0e8d6/website/public/data/benchmark-results.json), recording source `59799d1` | 40 programs | Historical heuristic estimate; no agent execution. Current provider-backed runners do not silently fall back to it. | Supplies the separate historical 1.59x Safety headline; not part of the 1.32x dashboard. |
 | Historical [Effect Discipline estimation](/docs/benchmarking/metrics/effect-discipline/) | 2026-02-17; [artifact revision `e02684e1`](https://github.com/juanmicrosoft/calor/blob/e02684e132cd86044ece331bf4c34a9eaaf0e8d6/website/public/data/benchmark-results.json), recording source `59799d1` | 40 programs | Historical structural estimate; no agent execution. Current provider-backed runners do not silently fall back to it. | Supplies a separate historical 1.00x tie; not part of the 1.32x dashboard. |

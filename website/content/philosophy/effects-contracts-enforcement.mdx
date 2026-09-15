@@ -262,13 +262,13 @@ the reviewer.
 | Bug Category | Traditional Detection | Calor Detection |
 |:-------------|:---------------------|:----------------|
 | Undeclared side effect | Code review (maybe) | Compile error |
-| Possibly-null value crossing a supported receiving boundary | Runtime null-reference exception | Candidate binding Error at initialization, native return, or method input |
+| Possibly-null value crossing a supported receiving boundary | Runtime null-reference exception | Calor 0.22 binding Error at initialization, native return, or method input |
 | Invalid state transition | Integration test (if lucky) | Contract violation when the contract covers it |
 | Effect leaking through abstraction | Production incident | Compile error with call chain |
 | Contract violation | Silent corruption | Immediate, traced exception |
 
 The [nullability guide](/docs/guides/nullability-and-dotnet-interop/) defines
-the current candidate's bounded support. It does not promise whole-program
+Calor 0.22's bounded support. It does not promise whole-program
 null safety: mutable assignment/rebinding and constructor-input enforcement
 remain excluded. Missing interop annotations (`Oblivious`) are conservatively
 possibly null; available annotations are trusted, not proved. Type/effect

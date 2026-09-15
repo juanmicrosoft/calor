@@ -16,13 +16,16 @@ direction-normalized ratio of **1.32x**. This is not a
 measured language advantage. Comprehension is
 1.84x, error detection is 1.49x, token economics is 1.42x, and information
 density is 0.97x—the category whose normalized ratio favors C#.
+Seven category ratios favor Calor and one favors C#. The Calor parser accepted
+217 of 217 inputs; the Roslyn syntax parser accepted 217 of 217 C# inputs.
+These are parse checks, not evidence that the pairs compute the same result.
 
-The snapshot was recorded on **2026-09-11** from source revision `be488238`.
-Its `Directory.Build.props` declares compiler `0.20.0`, before the release
+The snapshot was recorded on **2026-09-15** from source revision `c2a8816d`.
+Its `Directory.Build.props` declares compiler `0.21.0`, before the release
 version bump; the JSON's `version: "1.0"` identifies the data format, not the
 compiler release. The corpus is `tests/TestData/Benchmarks`. The exact compiler
 binary used for the measurement was not independently recorded. These are
-fixed-source results, rerun for the 0.21.0 release. They are not a live measure of
+fixed-source results, rerun for the 0.22.0 release. They are not a live measure of
 coding-agent performance. The separate agent-study snapshots below were not rerun.
 
 These measurements need important caveats:

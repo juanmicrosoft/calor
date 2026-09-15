@@ -111,13 +111,13 @@ lowering. Disabling runtime contracts is a separate, explicit mode choice.
 
 ### Nullability checks are not solver proofs
 
-The current Stage B candidate rejects possibly-null values at specified
+Calor 0.22 rejects possibly-null values at specified
 initialization, native-return, and resolved method-input boundaries. It covers
 scalar strings, supported arrays and one-level string generic payloads, and
 identity-proven nominal references. Mutable assignment/rebinding and constructor
 input enforcement remain excluded. See the
 [support table and migration guide](/docs/guides/nullability-and-dotnet-interop/#supported-receiving-boundaries).
-This is candidate behavior, not a claim that 0.22 has shipped.
+These checks enforce supported receiving boundaries, not every use of a reference.
 
 The production checks trust available interop annotations and conservatively
 treat truly missing (`Oblivious`) annotations as possibly null. They do not prove

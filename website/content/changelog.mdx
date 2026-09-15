@@ -10,6 +10,64 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-09-15
+
+### Added
+
+- **Nullability checks at three receiving boundaries.** Supported possibly-null
+  values now stop compilation at initialization (`Calor0272`), native return
+  (`Calor0273`), and resolved method input (`Calor0274`). Checks cover scalar
+  strings, supported arrays, whitelisted immediate string generic payloads,
+  and identity-proven reference types. Type/effect opt-outs and transpile-only
+  do not disable these active binding checks.
+- **A practical nullability migration guide.** Complete examples explain nullable
+  references versus runtime `Option<T>`, explicit defaults, coalescing throws,
+  typed patterns, .NET annotations, and the boundaries that remain unchecked.
+  See [Nullability and .NET Interop](/docs/guides/nullability-and-dotnet-interop/).
+- **Reviewed conversion evidence.** The Stage B comparison retains all 289
+  configured input identities, diagnostic details, fallback outcomes, and
+  attempt histories. Successful fallback C# is not counted as native Calor
+  execution or proof of null safety.
+
+### Fixed
+
+- **Nullable-reference metadata survives supported consumers.** BCL/native and
+  delegate returns, locals, members, casts, conditional results, and coalescing
+  preserve the supported annotations. Nullable references do not implicitly
+  convert to or unwrap runtime `Option<T>`.
+- **Method arguments use the selected parameter mapping.** Named arguments and
+  supported call forms report the relevant nullability diagnostic instead of
+  losing annotation differences during overload selection.
+- **Guard facts account for captured mutations.** Callable aliases, loop paths,
+  branches, exception filters, and shadowed captured fields no longer restore
+  the stale non-null facts covered by these repairs. Unused lambdas do not
+  execute their writes. Loop analysis also preserves hard diagnostics.
+- **Array allocation preserves declared annotations.** Sized and rectangular
+  allocations retain a non-null container and their declared element types.
+  This restores the converted FizzBuzz Range example without accepting
+  explicitly nullable elements at non-null receiving boundaries.
+- **C# conversion preserves explicit behavior choices.** Nullable context and
+  null-forgiving expressions are retained. Calls with an unsupported same-name
+  current-class overload stay opaque. Conversion does not invent defaults,
+  throws, or implicit unwraps.
+
+### Known limits
+
+This is bounded receiving-boundary enforcement, not whole-program null safety.
+General assignment/rebinding, member writes, and constructor inputs remain
+outside its scope. Generic outer-container nullability and arbitrary generic
+payloads are not actively checked. Array annotations do not prove every slot
+initialized; newly allocated reference slots can still contain null.
+
+Some valid C# early-return guard patterns need explicit manual consumption
+after conversion. The measured MediatR ObjectDetails case is documented with
+an executable migration; its rejection is not a claim of a null bug in the
+original C#. The converter does not choose that migration automatically.
+
+D3/D12/D14 safeguards, which conservatively demote proofs and retain runtime
+guards, remain unchanged. #875 remains open. The separate PP-W-rows experiment
+remains paused; this release neither resumes it nor establishes a benefit result.
+
 ## [0.21.0] - 2026-09-11
 
 This product-only release fixes cache correctness and makes diagnostic and
