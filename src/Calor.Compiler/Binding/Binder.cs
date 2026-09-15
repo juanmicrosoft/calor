@@ -1731,6 +1731,8 @@ public sealed class Binder
         var symbols = _symbolsById.ToArray();
         var declarationOccurrences = _declarationIdOccurrences.ToArray();
         var expressionsBound = ExpressionsBound;
+        var misplacedRows = _misplacedRowsReported.ToArray();
+        var unsupportedNodeTypes = _unsupportedNodeTypes.ToArray();
         var enclosingWrites = _deferredCallableWrites;
         _deferredCallableWrites = [];
         _isDiscoveringLoopCallables = true;
@@ -1764,6 +1766,10 @@ public sealed class Binder
             foreach (var (key, count) in declarationOccurrences)
                 _declarationIdOccurrences.Add(key, count);
             ExpressionsBound = expressionsBound;
+            _misplacedRowsReported.Clear();
+            _misplacedRowsReported.UnionWith(misplacedRows);
+            _unsupportedNodeTypes.Clear();
+            _unsupportedNodeTypes.UnionWith(unsupportedNodeTypes);
             _deferredCallableWrites = enclosingWrites;
             _isDiscoveringLoopCallables = false;
         }
@@ -1784,33 +1790,31 @@ public sealed class Binder
     {
         var condition = BindExpression(ifStmt.Condition);
         var baseline = CaptureFlowNarrowingState();
-        var invalidated = new HashSet<VariableSymbol>();
-        var callableBranches = new List<IReadOnlyDictionary<VariableSymbol, CallableMutationSummary>>();
+        var branches = new List<FlowNarrowingState>();
+        var fallthrough = baseline;
 
         var thenBody = BindIsolatedFlowBranch(
             baseline,
-            invalidated,
-            callableBranches,
+            branches,
             () => DeclareSuccessfulConditionPatterns(ifStmt.Condition, condition),
             () => BindStatements(ifStmt.ThenBody));
 
         var elseIfClauses = new List<BoundElseIfClause>();
         foreach (var elseIf in ifStmt.ElseIfClauses)
         {
-            BoundExpression? elseIfCondition = null;
+            RestoreFlowNarrowingState(fallthrough);
+            var elseIfCondition = BindExpression(elseIf.Condition);
+            // Evaluating a false condition still executes its calls. Only the
+            // body is conditional on its result, not the condition's effects.
+            fallthrough = CaptureFlowNarrowingState();
             var elseIfBody = BindIsolatedFlowBranch(
-                baseline,
-                invalidated,
-                callableBranches,
-                () =>
-                {
-                    elseIfCondition = BindExpression(elseIf.Condition);
-                    DeclareSuccessfulConditionPatterns(elseIf.Condition, elseIfCondition);
-                },
+                fallthrough,
+                branches,
+                () => DeclareSuccessfulConditionPatterns(elseIf.Condition, elseIfCondition),
                 () => BindStatements(elseIf.Body));
             elseIfClauses.Add(new BoundElseIfClause(
                 elseIf.Span,
-                elseIfCondition!,
+                elseIfCondition,
                 elseIfBody));
         }
 
@@ -1818,24 +1822,15 @@ public sealed class Binder
         if (ifStmt.ElseBody != null)
         {
             elseBody = BindIsolatedFlowBranch(
-                baseline,
-                invalidated,
-                callableBranches,
+                fallthrough,
+                branches,
                 setup: null,
                 () => BindStatements(ifStmt.ElseBody));
         }
 
-        RestoreFlowNarrowingState(baseline);
         if (ifStmt.ElseBody is null)
-            callableBranches.Add(baseline.Callables);
-        _callableState.Clear();
-        foreach (var branch in callableBranches)
-        {
-            foreach (var (storage, effects) in branch)
-                _callableState[storage] = UnionCallableEffects(GetCallableState(storage), effects);
-        }
-        foreach (var narrowed in invalidated)
-            InvalidateMutableFlowNarrowing(narrowed);
+            branches.Add(fallthrough);
+        JoinFlowBranchStates(baseline, branches);
 
         return new BoundIfStatement(ifStmt.Span, condition, thenBody, elseIfClauses, elseBody);
     }
@@ -1846,13 +1841,13 @@ public sealed class Binder
         var visible = sources.Keys
             .Where(variable => ReferenceEquals(_scope.Lookup(variable.Name), variable))
             .ToArray();
-        return new FlowNarrowingState(sources, visible, CaptureCallableState());
+        return new FlowNarrowingState(
+            sources, visible, CaptureCallableState(), _scope.CaptureVisibleVariableBindings());
     }
 
     private IReadOnlyList<BoundStatement> BindIsolatedFlowBranch(
         FlowNarrowingState baseline,
-        HashSet<VariableSymbol> invalidated,
-        List<IReadOnlyDictionary<VariableSymbol, CallableMutationSummary>> callableBranches,
+        List<FlowNarrowingState> branches,
         Action? setup,
         Func<IReadOnlyList<BoundStatement>> bind)
     {
@@ -1867,18 +1862,30 @@ public sealed class Binder
         }
         finally
         {
-            callableBranches.Add(CaptureCallableState());
-            foreach (var narrowed in baseline.VisibleNarrowings)
-            {
-                if (!_flowNarrowingSources.ContainsKey(narrowed))
-                    invalidated.Add(narrowed);
-            }
+            branches.Add(CaptureFlowNarrowingState());
             RestoreFlowNarrowingState(baseline);
+        }
+    }
+
+    private void JoinFlowBranchStates(
+        FlowNarrowingState baseline, IReadOnlyList<FlowNarrowingState> branches)
+    {
+        RestoreFlowNarrowingState(baseline);
+        if (branches.Count == 0)
+            return;
+        _callableState.Clear();
+        foreach (var branch in branches)
+            JoinCallableState(branch.Callables);
+        foreach (var narrowed in baseline.VisibleNarrowings)
+        {
+            if (branches.Any(branch => !branch.Sources.ContainsKey(narrowed)))
+                InvalidateMutableFlowNarrowing(narrowed, requireRebindable: false);
         }
     }
 
     private void RestoreFlowNarrowingState(FlowNarrowingState state)
     {
+        Scope.RestoreVisibleVariableBindings(state.Bindings);
         RestoreCallableState(state.Callables);
         _flowNarrowingSources.Clear();
         foreach (var (narrowed, source) in state.Sources)
@@ -1888,7 +1895,8 @@ public sealed class Binder
     private sealed record FlowNarrowingState(
         IReadOnlyDictionary<VariableSymbol, VariableSymbol> Sources,
         IReadOnlyList<VariableSymbol> VisibleNarrowings,
-        IReadOnlyDictionary<VariableSymbol, CallableMutationSummary> Callables);
+        IReadOnlyDictionary<VariableSymbol, CallableMutationSummary> Callables,
+        IReadOnlyList<(Scope Scope, string Name, VariableSymbol Symbol)> Bindings);
 
     private BoundStatement BindBindStatement(BindStatementNode bind)
     {
@@ -3935,26 +3943,54 @@ public sealed class Binder
 
     private IReadOnlyList<BoundMatchCase> BindMatchCases(IReadOnlyList<MatchCaseNode> cases)
     {
+        var baseline = CaptureFlowNarrowingState();
+        var fallthrough = baseline;
+        var branches = new List<FlowNarrowingState>();
+        var canFallThrough = true;
         var boundCases = new List<BoundMatchCase>(cases.Count);
         foreach (var matchCase in cases)
         {
-            using var _ = PushScope(_scope.CreateChild());
-            var pattern = BindPattern(matchCase.Pattern);
-            var guard = matchCase.Guard != null ? BindExpression(matchCase.Guard) : null;
-            if (matchCase.Guard != null && guard != null)
-                DeclareSuccessfulConditionPatterns(matchCase.Guard, guard);
-            var body = BindStatements(matchCase.Body);
-            var result = body.LastOrDefault() is BoundReturnStatement { Expression: not null } returnStatement
-                ? returnStatement.Expression
-                : null;
-            boundCases.Add(new BoundMatchCase(
-                matchCase.Span,
-                pattern,
-                matchCase.Pattern is WildcardPatternNode,
-                guard,
-                body,
-                result));
+            RestoreFlowNarrowingState(fallthrough);
+            FlowNarrowingState afterGuard;
+            using (PushScope(_scope.CreateChild()))
+            {
+                var pattern = BindPattern(matchCase.Pattern);
+                var guard = matchCase.Guard != null ? BindExpression(matchCase.Guard) : null;
+                afterGuard = CaptureFlowNarrowingState();
+                if (matchCase.Guard != null && guard != null)
+                    DeclareSuccessfulConditionPatterns(matchCase.Guard, guard);
+                var body = BindStatements(matchCase.Body);
+                var result = body.LastOrDefault() is BoundReturnStatement { Expression: not null } returnStatement
+                    ? returnStatement.Expression
+                    : null;
+                boundCases.Add(new BoundMatchCase(
+                    matchCase.Span,
+                    pattern,
+                    matchCase.Pattern is WildcardPatternNode,
+                    guard,
+                    body,
+                    result));
+            }
+            if (!canFallThrough)
+                continue;
+
+            branches.Add(CaptureFlowNarrowingState());
+            RestoreFlowNarrowingState(afterGuard);
+            var guardedFallthrough = CaptureFlowNarrowingState();
+            // A pattern miss skips its guard; a false guard keeps its effects.
+            // Neither path executes this arm's body, nor keeps pattern bindings.
+            JoinFlowBranchStates(fallthrough, [fallthrough, guardedFallthrough]);
+            fallthrough = CaptureFlowNarrowingState();
+            canFallThrough = matchCase.Guard is not null || matchCase.Pattern switch
+            {
+                WildcardPatternNode or VarPatternNode => false,
+                VariablePatternNode variable => variable.Name.Contains('.', StringComparison.Ordinal),
+                _ => true
+            };
         }
+        if (canFallThrough)
+            branches.Add(fallthrough);
+        JoinFlowBranchStates(baseline, branches);
         return boundCases;
     }
 
@@ -6418,53 +6454,95 @@ public sealed class Binder
 
     private BoundTryStatement BindTryStatement(TryStatementNode tryStmt)
     {
-        // Bind try body in its own scope
-        IReadOnlyList<BoundStatement> tryBody;
-        {
-            using var _ = PushScope(_scope.CreateChild());
-            tryBody = BindStatements(tryStmt.TryBody);
-        }
+        var baseline = CaptureFlowNarrowingState();
+        var tryBody = BindExceptionalFlowBody(tryStmt.TryBody, out var exceptional);
+        var branches = new List<FlowNarrowingState> { CaptureFlowNarrowingState() };
+        var exceptionalExits = new List<FlowNarrowingState> { exceptional };
 
-        // Bind catch clauses
         var catchClauses = new List<BoundCatchClause>();
         foreach (var catchClause in tryStmt.CatchClauses)
         {
-            using var _ = PushScope(_scope.CreateChild());
-
-            VariableSymbol? exceptionVar = null;
-            if (catchClause.VariableName != null)
+            RestoreFlowNarrowingState(exceptional);
+            FlowNarrowingState afterFilter;
+            using (PushScope(_scope.CreateChild()))
             {
-                var typeName = catchClause.ExceptionType ?? "Exception";
-                exceptionVar = CreateLocalVariable(
-                    catchClause.VariableName,
-                    typeName,
-                    isMutable: false,
-                    isParameter: false,
-                    ParameterModifier.None,
-                    catchClause.VariableSpan ?? catchClause.Span,
-                    "catch",
-                    nullableAnnotation: BoundTypes.NullableAnnotation.NotAnnotated);
-                _scope.TryDeclare(exceptionVar);
+                VariableSymbol? exceptionVar = null;
+                if (catchClause.VariableName != null)
+                {
+                    var typeName = catchClause.ExceptionType ?? "Exception";
+                    exceptionVar = CreateLocalVariable(
+                        catchClause.VariableName,
+                        typeName,
+                        isMutable: false,
+                        isParameter: false,
+                        ParameterModifier.None,
+                        catchClause.VariableSpan ?? catchClause.Span,
+                        "catch",
+                        nullableAnnotation: BoundTypes.NullableAnnotation.NotAnnotated);
+                    _scope.TryDeclare(exceptionVar);
+                }
+
+                var filter = catchClause.Filter is null ? null : BindExpression(catchClause.Filter);
+                afterFilter = CaptureFlowNarrowingState();
+                if (catchClause.Filter is not null && filter is not null)
+                    DeclareSuccessfulConditionPatterns(catchClause.Filter, filter);
+                var catchBody = BindExceptionalFlowBody(catchClause.Body, out var catchExceptional);
+                exceptionalExits.Add(catchExceptional);
+                catchClauses.Add(new BoundCatchClause(
+                    catchClause.Span, catchClause.ExceptionType, exceptionVar, catchBody, filter));
             }
-
-            var catchBody = BindStatements(catchClause.Body);
-
-            catchClauses.Add(new BoundCatchClause(
-                catchClause.Span,
-                catchClause.ExceptionType,
-                exceptionVar,
-                catchBody));
+            branches.Add(CaptureFlowNarrowingState());
+            RestoreFlowNarrowingState(afterFilter);
+            var filterFallthrough = CaptureFlowNarrowingState();
+            JoinFlowBranchStates(exceptional, [exceptional, filterFallthrough]);
+            exceptional = CaptureFlowNarrowingState();
         }
+        exceptionalExits.Add(exceptional);
+        JoinFlowBranchStates(baseline, branches);
 
-        // Bind finally body if present
         IReadOnlyList<BoundStatement>? finallyBody = null;
         if (tryStmt.FinallyBody != null && tryStmt.FinallyBody.Count > 0)
         {
+            // Finally also runs when an exception leaves the try or a handler
+            // before its last statement, not just after their normal exits.
+            JoinFlowBranchStates(baseline, [.. branches, .. exceptionalExits]);
             using var _ = PushScope(_scope.CreateChild());
             finallyBody = BindStatements(tryStmt.FinallyBody);
         }
-
         return new BoundTryStatement(tryStmt.Span, tryBody, catchClauses, finallyBody);
+    }
+
+    private IReadOnlyList<BoundStatement> BindExceptionalFlowBody(
+        IReadOnlyList<StatementNode> statements, out FlowNarrowingState exceptional)
+    {
+        var baseline = CaptureFlowNarrowingState();
+        var enclosingWrites = _deferredCallableWrites;
+        var writes = new List<CallableMutationWrite>();
+        _deferredCallableWrites = writes;
+        IReadOnlyList<BoundStatement> body;
+        try
+        {
+            using var _ = PushScope(_scope.CreateChild());
+            body = BindStatements(statements);
+        }
+        finally
+        {
+            _deferredCallableWrites = enclosingWrites;
+            enclosingWrites?.AddRange(writes);
+        }
+        var normalExit = CaptureFlowNarrowingState();
+        JoinFlowBranchStates(baseline, [baseline, normalExit]);
+        // An exception may observe a prefix whose callable target was replaced
+        // again before normal completion. Retain all observed writes and calls.
+        ApplyCallableMutationSummary(new CallableMutationSummary
+        {
+            Mutations = GetDeferredMutations(null, body).ToArray(),
+            Alternatives = GetDeferredCallEffects(null, body).ToArray(),
+            Writes = writes
+        });
+        exceptional = CaptureFlowNarrowingState();
+        RestoreFlowNarrowingState(normalExit);
+        return body;
     }
 
     private BoundMatchStatement BindMatchStatement(MatchStatementNode matchStmt)

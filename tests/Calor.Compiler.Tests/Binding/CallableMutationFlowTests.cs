@@ -394,4 +394,489 @@ public sealed class CallableMutationFlowTests
                 diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
                 && BindingDiagnosticPolicy.IsCompilationError(diagnostic)));
     }
+
+    public static IEnumerable<object[]> BranchFallthroughCases()
+    {
+        foreach (var scenario in new[]
+        {
+            "elseif-else", "elseif-condition", "elseif-exit",
+            "match-exit", "match-arm", "match-guard", "match-next-guard", "match-no-default"
+        })
+        foreach (var safe in new[] { false, true })
+        foreach (var modifier in new[] { "ref", "out" })
+        foreach (var shape in new[] { "string", "array", "nominal" })
+        foreach (var mode in new[] { "default", "type-off", "effects-off", "transpile", "verify" })
+            yield return [scenario, safe, modifier, shape, mode];
+    }
+
+    [Theory]
+    [MemberData(nameof(BranchFallthroughCases))]
+    public void ProductionBranchFallthrough_RetainsEffectsAndIsolatesBodies(
+        string scenario, bool safe, string modifier, string shape, string mode)
+    {
+        var requiredType = shape switch
+        {
+            "string" => "str",
+            "array" => "[str]",
+            "nominal" => "Foo",
+            _ => throw new ArgumentOutOfRangeException(nameof(shape))
+        };
+        var nullableType = "?" + requiredType;
+        var sink = safe
+            ? "§IF{fresh} (!= value null)\n  §C{Take} §A value §/C"
+            : "§C{Take} §A value §/C";
+        var body = scenario switch
+        {
+            "elseif-else" => $$"""
+                §IF{select} flag
+                  §C{Noop} §/C
+                §EI §C{setter} §/C
+                  §C{Noop} §/C
+                §EL
+                  §C{later} §/C
+                {{Indent(sink, 2)}}
+                """,
+            "elseif-condition" => $$"""
+                §IF{select} flag
+                  §C{Noop} §/C
+                §EI §C{setter} §/C
+                  §C{Noop} §/C
+                §EI §C{testLater} §/C
+                  §C{Noop} §/C
+                §EL
+                {{Indent(sink, 2)}}
+                """,
+            "elseif-exit" => $$"""
+                §IF{select} flag
+                  §C{Noop} §/C
+                §EI §C{setter} §/C
+                  §C{Noop} §/C
+                §C{later} §/C
+                {{sink}}
+                """,
+            "match-exit" => $$"""
+                §ASSIGN later mutator
+                §W{select} flag
+                  §K true
+                    §ASSIGN later noopAction
+                  §K _
+                    {{(safe ? "§ASSIGN later noopAction" : "§C{Noop} §/C")}}
+                §C{later} §/C
+                §C{Take} §A value §/C
+                """,
+            "match-arm" => $$"""
+                §ASSIGN later mutator
+                §W{select} flag
+                  §K true
+                    §ASSIGN later noopAction
+                  §K _
+                    §C{later} §/C
+                {{Indent(sink, 4)}}
+                """,
+            "match-guard" => $$"""
+                §W{select} flag
+                  §K true §WHEN §C{setter} §/C
+                    §C{Noop} §/C
+                  §K _
+                    §C{later} §/C
+                {{Indent(sink, 4)}}
+                """,
+            "match-next-guard" => $$"""
+                §W{select} flag
+                  §K true §WHEN §C{setter} §/C
+                    §C{Noop} §/C
+                  §K true §WHEN §C{testLater} §/C
+                    §C{Noop} §/C
+                  §K _
+                {{Indent(sink, 4)}}
+                """,
+            "match-no-default" => $$"""
+                §ASSIGN later mutator
+                §W{select} flag
+                  §K true
+                    §ASSIGN later noopAction
+                {{(safe ? "  §K _\n    §ASSIGN later noopAction" : "")}}
+                §C{later} §/C
+                §C{Take} §A value §/C
+                """,
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario))
+        };
+        var source = $$"""
+            §M{m:BranchFallthrough}
+            {{(shape == "nominal" ? "  §CL{c1:Foo:pub}\n    §MT{marker:Marker:pub} () -> i32\n      §R 0" : "")}}
+              §F{noop:Noop:pub} () -> void
+                §E{}
+              §F{mutate:Mutate:pub} ({{nullableType}}:value:{{modifier}}) -> void
+                §ASSIGN value null
+              §F{take:Take:pub} ({{requiredType}}:value) -> void
+                §E{}
+              §F{probe:Probe:pub} ({{nullableType}}:value, bool:flag) -> void
+                §IF{guard} (!= value null)
+                  §B{noopAction:Action} §LAM{noopLambda} §C{Noop} §/C §/LAM{noopLambda}
+                  §B{mutator:Action} §LAM{mutLambda} §C{Mutate} §A{ {{modifier}} } value §/C §/LAM{mutLambda}
+                  §B{~later:Action} noopAction
+                  §B{setter:Func<bool>} §LAM{setLambda}
+                    §ASSIGN later mutator
+                    §R false
+                  §/LAM{setLambda}
+                  §B{testLater:Func<bool>} §LAM{testLambda}
+                    §C{later} §/C
+                    §R false
+                  §/LAM{testLambda}
+            {{Indent(body, 6)}}
+            """;
+        var result = CompileInMode(source, mode);
+        if (safe)
+        {
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.NotEmpty(result.GeneratedCode);
+        }
+        else
+        {
+            Assert.True(result.HasErrors, result.GeneratedCode);
+            var diagnostic = Assert.Single(result.Diagnostics.Errors);
+            Assert.Equal(DiagnosticCode.NullableArgumentToNonNullableParameter, diagnostic.Code);
+            Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+            Assert.Equal("value", source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+            var receivingShape = shape switch
+            {
+                "array" => BindingReceivingShape.Array,
+                "nominal" => BindingReceivingShape.Nominal,
+                _ => BindingReceivingShape.ScalarString
+            };
+            Assert.Equal(receivingShape, diagnostic.BindingContext?.Shape);
+            Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
+
+    public static IEnumerable<object[]> LoopDiagnosticCases()
+    {
+        foreach (var kind in new[] { "outside", "for", "while", "foreach", "do", "nested" })
+        foreach (var valid in new[] { false, true })
+        foreach (var mode in new[] { "default", "type-off", "effects-off", "transpile", "verify" })
+            yield return [kind, valid, mode];
+    }
+
+    [Theory]
+    [MemberData(nameof(LoopDiagnosticCases))]
+    public void ProductionLoopDiscovery_DoesNotConsumeMisplacedRowDiagnostic(
+        string kind, bool valid, string mode)
+    {
+        var binding = $"§B{{x:i32}} {(valid ? "" : "§E{} ")}1";
+        var body = LoopBody(kind, binding);
+        var source = $$"""
+            §M{m:LoopDiagnostics}
+              §F{probe:Probe:pub} () -> void
+            {{Indent(body, 4)}}
+            """;
+        var result = CompileInMode(source, mode);
+        if (valid)
+        {
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.NotEmpty(result.GeneratedCode);
+        }
+        else
+        {
+            Assert.True(result.HasErrors, result.GeneratedCode);
+            var diagnostic = Assert.Single(result.Diagnostics.Errors);
+            Assert.Equal(DiagnosticCode.EffectRowMisplaced, diagnostic.Code);
+            Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+            Assert.Equal("§E", source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
+
+    [Theory]
+    [InlineData("outside", false)]
+    [InlineData("outside", true)]
+    [InlineData("for", false)]
+    [InlineData("for", true)]
+    [InlineData("while", false)]
+    [InlineData("while", true)]
+    [InlineData("foreach", false)]
+    [InlineData("foreach", true)]
+    [InlineData("do", false)]
+    [InlineData("do", true)]
+    [InlineData("nested", false)]
+    [InlineData("nested", true)]
+    public void LoopDiscovery_PreservesIncompleteAnalysisDiagnosticDeduplication(
+        string kind, bool previouslyReported)
+    {
+        var body = LoopBody(kind, "§B{x:i32} §CS{2}");
+        var source = $$"""
+            §M{m:LoopIncompleteAnalysis}
+              §F{probe:Probe:pub} () -> void
+            {{(previouslyReported ? "    §B{before:i32} §CS{1}" : "")}}
+            {{Indent(body, 4)}}
+                §B{after:i32} §CS{3}
+            """;
+        var diagnostics = new DiagnosticBag();
+        var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
+        var module = new Parser(tokens, diagnostics).Parse();
+        new Binder(diagnostics).Bind(module);
+        Assert.Empty(diagnostics.Errors);
+        var diagnostic = Assert.Single(diagnostics.Where(item =>
+            item.Code == DiagnosticCode.AnalysisUnsupportedNode));
+        Assert.Equal(DiagnosticSeverity.Info, diagnostic.Severity);
+        Assert.Equal(source.IndexOf("§CS", StringComparison.Ordinal), diagnostic.Span.Start);
+        foreach (var mode in new[] { "default", "type-off", "effects-off", "transpile", "verify" })
+        {
+            var result = CompileInMode(source, mode);
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.NotEmpty(result.GeneratedCode);
+        }
+    }
+
+    private static string LoopBody(string kind, string body) => kind switch
+    {
+        "outside" => body,
+        "for" => "§L{loop:i:1:2:1}\n" + Indent(body, 2),
+        "while" => "§WH{loop} false\n" + Indent(body, 2),
+        "foreach" => "§EACH{loop:item} \"ab\"\n" + Indent(body, 2),
+        "do" => "§DO{loop}\n" + Indent(body, 2) + "\nfalse",
+        "nested" => "§L{outer:i:1:2:1}\n  §WH{inner} false\n" + Indent(body, 4),
+        _ => throw new ArgumentOutOfRangeException(nameof(kind))
+    };
+
+    public static IEnumerable<object[]> ExceptionalAndExpressionCases()
+    {
+        foreach (var scenario in new[]
+        {
+            "conditional", "coalesce", "and", "or", "try-reset", "catch-reset",
+            "catch-isolation", "try-prefix", "try-call-prefix", "finally-prefix",
+            "catch-prefix-finally", "filter-fallthrough", "unused-try", "finally-reset",
+            "filter-wrapper", "filter-unused", "filter-write", "filter-write-wrapper", "filter-write-unused"
+        })
+        foreach (var shape in new[] { "string", "array", "nominal" })
+        foreach (var modifier in new[] { "ref", "out" })
+        foreach (var mode in new[] { "default", "type-off", "effects-off", "transpile", "verify" })
+            yield return [scenario, shape, modifier, mode];
+    }
+
+    [Theory]
+    [MemberData(nameof(ExceptionalAndExpressionCases))]
+    public void ProductionExceptionalAndExpressionPaths_PreserveViableCallableTargets(
+        string scenario, string shape, string modifier, string mode)
+    {
+        foreach (var safe in new[] { false, true })
+        {
+            var requiredType = shape switch
+            {
+                "string" => "str",
+                "array" => "[str]",
+                _ => "Foo"
+            };
+            var receive = $$"""
+                §IF{fresh} (!= value null)
+                  §C{later} §/C
+                {{(safe ? "  §IF{again} (!= value null)\n    §C{Take} §A value §/C" : "  §C{Take} §A value §/C")}}
+                """;
+            var filterWrite = scenario.StartsWith("filter-write", StringComparison.Ordinal);
+            if (filterWrite)
+                receive = safe ? "§IF{again} (!= value null)\n  §C{Take} §A value §/C"
+                    : "§C{Take} §A value §/C";
+            var initialNoop = scenario is "try-prefix" or "try-call-prefix" or "finally-prefix"
+                or "catch-prefix-finally" or "filter-fallthrough" or "filter-wrapper" or "filter-unused";
+            var receiveInside = scenario is "catch-isolation" or "try-prefix" or "try-call-prefix"
+                or "finally-prefix" or "catch-prefix-finally" or "filter-fallthrough" || filterWrite;
+            var body = scenario switch
+            {
+                "conditional" => "§B{selected:bool} (? flag §C{resetter} §/C false)",
+                "coalesce" => "§B{selected:?str} (?? text §C{resetString} §/C)",
+                "and" => "§B{selected:bool} (&& flag §C{resetter} §/C)",
+                "or" => "§B{selected:bool} (|| flag §C{resetter} §/C)",
+                "try-reset" => """
+                    §TR{tr}
+                      §C{MayThrow} §A flag §/C
+                      §ASSIGN later noopAction
+                    §CA{Exception:ex}
+                      §C{Noop} §/C
+                    """,
+                "catch-reset" => """
+                    §TR{tr}
+                      §C{MayThrow} §A flag §/C
+                    §CA{Exception:ex}
+                      §ASSIGN later noopAction
+                    """,
+                "catch-isolation" => $$"""
+                    §TR{tr}
+                      §C{MayThrow} §A flag §/C
+                    §CA{ArgumentException:ex}
+                      §ASSIGN later noopAction
+                    §CA{Exception:other}
+                    {{Indent(receive, 2)}}
+                    """,
+                "try-prefix" or "try-call-prefix" => $$"""
+                    §TR{tr}
+                      {{(scenario == "try-prefix" ? "§ASSIGN later mutator" : "§B{installed:bool} §C{setter} §/C")}}
+                      §C{MayThrow} §A flag §/C
+                      §ASSIGN later noopAction
+                    §CA{Exception:ex}
+                    {{Indent(receive, 2)}}
+                    """,
+                "finally-prefix" => $$"""
+                    §TR{tr}
+                      §ASSIGN later mutator
+                      §C{MayThrow} §A flag §/C
+                      §ASSIGN later noopAction
+                    §FI
+                    {{Indent(receive, 2)}}
+                    """,
+                "catch-prefix-finally" => $$"""
+                    §TR{tr}
+                      §C{MayThrow} §A flag §/C
+                    §CA{Exception:ex}
+                      §ASSIGN later mutator
+                      §C{MayThrow} §A flag §/C
+                      §ASSIGN later noopAction
+                    §FI
+                    {{Indent(receive, 2)}}
+                    """,
+                "filter-fallthrough" => $$"""
+                    §TR{tr}
+                      §C{MayThrow} §A flag §/C
+                    §CA{Exception:ex} §WHEN (&& (!= ex null) §C{setter} §/C)
+                      §C{Noop} §/C
+                    §CA{Exception:ex} §WHEN (!= ex null)
+                    {{Indent(receive, 2)}}
+                    """,
+                "filter-write" => $$"""
+                    §IF{initial} (!= value null)
+                      §TR{tr}
+                        §C{MayThrow} §A flag §/C
+                      §CA{Exception:ex} §WHEN (&& (!= ex null) §C{writeFilter} §/C)
+                        §C{Noop} §/C
+                      §CA{Exception:ex} §WHEN (!= ex null)
+                    {{Indent(receive, 4)}}
+                    """,
+                "filter-write-wrapper" or "filter-write-unused" => $$"""
+                    §B{wrapper:Action} §LAM{wrapperLambda}
+                      §TR{tr}
+                        §C{MayThrow} §A flag §/C
+                      §CA{Exception:ex} §WHEN (&& (!= ex null) §C{writeFilter} §/C)
+                        §C{Noop} §/C
+                      §CA{Exception:ex} §WHEN (!= ex null)
+                        §C{Noop} §/C
+                    §/LAM{wrapperLambda}
+                    §IF{initial} (!= value null)
+                      {{(scenario == "filter-write-wrapper" ? "§C{wrapper} §/C" : "§C{Noop} §/C")}}
+                    {{Indent(receive, 2)}}
+                    """,
+                "filter-wrapper" or "filter-unused" => $$"""
+                    §B{wrapper:Action} §LAM{wrapperLambda}
+                      §TR{tr}
+                        §C{MayThrow} §A flag §/C
+                      §CA{Exception:ex} §WHEN §C{setter} §/C
+                        §C{Noop} §/C
+                      §CA{Exception:other}
+                        §C{Noop} §/C
+                    §/LAM{wrapperLambda}
+                    {{(scenario == "filter-wrapper" ? "§C{wrapper} §/C" : "")}}
+                    """,
+                "unused-try" => """
+                    §B{unused:Action} §LAM{unusedLambda}
+                      §TR{tr}
+                        §C{MayThrow} §A flag §/C
+                      §CA{Exception:ex}
+                        §ASSIGN later noopAction
+                    §/LAM{unusedLambda}
+                    """,
+                "finally-reset" => """
+                    §TR{tr}
+                      §C{MayThrow} §A flag §/C
+                    §CA{Exception:ex}
+                      §C{Noop} §/C
+                    §FI
+                      §ASSIGN later noopAction
+                    """,
+                _ => throw new ArgumentOutOfRangeException(nameof(scenario))
+            };
+            var source = $$"""
+                §M{m:ExceptionalCallableFlow}
+                {{(shape == "nominal" ? "  §CL{c1:Foo:pub}\n    §MT{marker:Marker:pub} () -> i32\n      §R 0" : "")}}
+                  §F{noop:Noop:pub} () -> void
+                    §E{}
+                  §F{may:MayThrow:pub} (bool:flag) -> void
+                    §E{throw}
+                    §IF{throwIf} flag
+                      §TH §CS{new Exception()}
+                  §F{mut:Mutate:pub} (?{{requiredType}}:value:{{modifier}}) -> void
+                    §ASSIGN value null
+                  §F{take:Take:pub} ({{requiredType}}:value) -> void
+                    §E{}
+                  §F{probe:Probe:pub} (?{{requiredType}}:value, bool:flag, ?str:text) -> void
+                    §E{throw}
+                    §B{noopAction:Action} §LAM{noopLambda} §C{Noop} §/C §/LAM{noopLambda}
+                    §B{mutator:Action} §LAM{mutLambda} §C{Mutate} §A{ {{modifier}} } value §/C §/LAM{mutLambda}
+                    §B{~later:Action} {{(initialNoop ? "noopAction" : "mutator")}}
+                    §B{resetter:Func<bool>} §LAM{resetLambda}
+                      §ASSIGN later noopAction
+                      §R false
+                    §/LAM{resetLambda}
+                    §B{resetString:Func<str>} §LAM{resetStringLambda}
+                      §ASSIGN later noopAction
+                      §R "done"
+                    §/LAM{resetStringLambda}
+                    §B{setter:Func<bool>} §LAM{setLambda}
+                      §ASSIGN later mutator
+                      §R false
+                    §/LAM{setLambda}
+                    §B{writeFilter:Func<bool>} §LAM{writeFilterLambda}
+                      §C{Mutate} §A{ {{modifier}} } value §/C
+                      §R false
+                    §/LAM{writeFilterLambda}
+                {{Indent(body, 4)}}
+                {{(receiveInside ? "" : Indent(receive, 4))}}
+                """;
+            var result = CompileInMode(source, mode);
+            if (safe || scenario is "finally-reset" or "filter-unused" or "filter-write-unused")
+            {
+                Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+                Assert.NotEmpty(result.GeneratedCode);
+            }
+            else
+            {
+                Assert.True(result.HasErrors, result.GeneratedCode);
+                var diagnostic = Assert.Single(result.Diagnostics.Errors);
+                Assert.Equal(DiagnosticCode.NullableArgumentToNonNullableParameter, diagnostic.Code);
+                Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+                Assert.Equal("value", source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+                Assert.Equal(shape switch
+                {
+                    "array" => BindingReceivingShape.Array,
+                    "nominal" => BindingReceivingShape.Nominal,
+                    _ => BindingReceivingShape.ScalarString
+                }, diagnostic.BindingContext?.Shape);
+                Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+                Assert.Empty(result.GeneratedCode);
+            }
+        }
+    }
+
+    [Fact]
+    public void CatchFilterTraversal_PreservesExistingConstructorCallersAndEvaluationOrder()
+    {
+        var statement = new BoundExpressionStatement(default, new BoundIntLiteral(default, 1));
+        var unfiltered = new BoundCatchClause(default, "Exception", null, [statement]);
+        Assert.Null(unfiltered.Filter);
+        Assert.Same(statement, Assert.Single(unfiltered.ChildNodes));
+
+        var filter = new BoundBoolLiteral(default, false);
+        var filtered = new BoundCatchClause(default, "Exception", null, [statement], filter);
+        Assert.Same(filter, filtered.Filter);
+        Assert.Collection(filtered.ChildNodes,
+            child => Assert.Same(filter, child),
+            child => Assert.Same(statement, child));
+    }
+
+    private static CompilationResult CompileInMode(string source, string mode) =>
+        Program.Compile(source, "callable-control-flow.calr", new CompilationOptions
+        {
+            EnableTypeChecking = mode != "type-off",
+            EnforceEffects = mode != "effects-off",
+            UnsafeTranspileOnly = mode == "transpile",
+            VerifyContracts = mode == "verify",
+            StatusWriter = TextWriter.Null
+        });
 }

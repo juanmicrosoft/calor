@@ -1407,18 +1407,22 @@ public sealed class BoundCatchClause : BoundNode
     /// The body of the catch clause.
     /// </summary>
     public IReadOnlyList<BoundStatement> Body { get; }
-    public override IEnumerable<BoundNode> ChildNodes => Body;
+    public BoundExpression? Filter { get; }
+    public override IEnumerable<BoundNode> ChildNodes =>
+        Filter is null ? Body : [Filter, .. Body];
 
     public BoundCatchClause(
         TextSpan span,
         string? exceptionTypeName,
         VariableSymbol? exceptionVariable,
-        IReadOnlyList<BoundStatement> body)
+        IReadOnlyList<BoundStatement> body,
+        BoundExpression? filter = null)
         : base(span)
     {
         ExceptionTypeName = exceptionTypeName;
         ExceptionVariable = exceptionVariable;
         Body = body;
+        Filter = filter;
     }
 }
 
