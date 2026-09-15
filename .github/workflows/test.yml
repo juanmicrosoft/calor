@@ -278,7 +278,9 @@ jobs:
     # SIGTERMs its children, so `dotnet test` under it exits 143, which is also
     # part of what #1150 has been chasing. 35 is ~75% headroom over the observed
     # maximum; the gates themselves are unchanged.
-    timeout-minutes: 35
+    # The expanded compiler inventory must finish both coverage hosts and the
+    # mutation gate; run 34981014060 reached that gate before its old 35m cap.
+    timeout-minutes: 50
 
     steps:
       - name: Checkout code
@@ -418,7 +420,10 @@ jobs:
     # The compiler shard includes the recursively checked-out corpus ratchets.
     # Scalar-nullability coverage moved two consecutive runs just beyond the
     # former 15-minute ceiling while tests were still passing.
-    timeout-minutes: ${{ fromJSON(matrix.name == 'compiler' && '20' || '15') }}
+    # Inventory grew from 7,978 to 12,018. Run 34981014060 completed the first
+    # 6,466-case host, then hit the old 20m cap during the second host.
+    # Keep both fresh hosts and all inventory/assertion gates unchanged.
+    timeout-minutes: ${{ fromJSON(matrix.name == 'compiler' && '30' || '15') }}
     strategy:
       fail-fast: false
       matrix:
