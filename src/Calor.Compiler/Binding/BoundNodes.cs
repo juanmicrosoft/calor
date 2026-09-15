@@ -1074,11 +1074,12 @@ public sealed class BoundArrayCreation : BoundExpression
 
     public BoundArrayCreation(TextSpan span, string id, string name, string elementType,
         BoundExpression? size, IReadOnlyList<BoundExpression> initializer,
-        AttributeCollection? attributes = null) : base(span)
+        AttributeCollection? attributes = null, ArrayBoundType? arrayType = null) : base(span)
     {
         Id = id; Name = name; ElementType = elementType; Size = size; Initializer = initializer;
         Attributes = attributes ?? new AttributeCollection();
-        Type = new NominalBoundType($"{elementType}[]");
+        MethodInputArrayType = arrayType;
+        Type = new NominalBoundType($"{elementType}[]", NullableAnnotation.NotAnnotated);
     }
 }
 
@@ -1140,12 +1141,14 @@ public sealed class BoundMultiDimArrayCreation : BoundExpression
 
     public BoundMultiDimArrayCreation(TextSpan span, string id, string name, string elementType,
         int rank, IReadOnlyList<BoundExpression> dimensionSizes,
-        IReadOnlyList<IReadOnlyList<BoundExpression>> initializerRows)
+        IReadOnlyList<IReadOnlyList<BoundExpression>> initializerRows, ArrayBoundType? arrayType = null)
         : base(span)
     {
         Id = id; Name = name; ElementType = elementType; Rank = rank;
         DimensionSizes = dimensionSizes; InitializerRows = initializerRows;
-        Type = new NominalBoundType($"{elementType}[{new string(',', Math.Max(0, rank - 1))}]");
+        MethodInputArrayType = arrayType;
+        Type = new NominalBoundType(
+            $"{elementType}[{new string(',', Math.Max(0, rank - 1))}]", NullableAnnotation.NotAnnotated);
     }
 }
 

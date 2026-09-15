@@ -3468,11 +3468,8 @@ public sealed class Binder
             array.ElementType,
             size,
             initializer,
-            array.Attributes)
-        {
-            MethodInputArrayType = BuildCreatedArrayInputType(
-                array.ElementType, 1, size is null ? [] : [size], initializer)
-        };
+            array.Attributes,
+            BuildCreatedArrayInputType(array.ElementType, 1, initializer));
     }
 
     private BoundExpression BindMultiDimArrayCreation(MultiDimArrayCreationNode array)
@@ -3488,20 +3485,16 @@ public sealed class Binder
             array.ElementType,
             array.Rank,
             dimensions,
-            rows)
-        {
-            MethodInputArrayType = BuildCreatedArrayInputType(
-                array.ElementType, array.Rank, dimensions, rows.SelectMany(row => row).ToArray())
-        };
+            rows,
+            BuildCreatedArrayInputType(array.ElementType, array.Rank, rows.SelectMany(row => row).ToArray()));
     }
 
     private BoundTypes.ArrayBoundType? BuildCreatedArrayInputType(
         string elementType,
         int rank,
-        IReadOnlyList<BoundExpression> dimensions,
         IReadOnlyList<BoundExpression> initializer)
     {
-        if (!TryBuildMethodInputArrayType($"{elementType}[{new string(',', rank - 1)}]", out var declared))
+        if (!TryBuildMethodInputArrayType($"ARRAY[element={elementType}]", out var declared))
             return null;
         var element = declared!.ElementType;
         if (element is BoundTypes.NominalBoundType reference
@@ -3509,9 +3502,10 @@ public sealed class Binder
             && reference.NullableAnnotation != BoundTypes.NullableAnnotation.Annotated)
         {
             var annotations = initializer.Select(value => NullabilityChecker.GetAnnotation(value.Type)).ToArray();
+            // Allocation guarantees the container, not initialization of every
+            // slot. Retain declared element annotations for sized allocations;
+            // explicit initializer values still contribute their annotations.
             var annotation = annotations.Contains(BoundTypes.NullableAnnotation.Annotated)
-                || initializer.Count == 0 && dimensions.Count > 0
-                    && !dimensions.Any(dimension => dimension is BoundIntLiteral { Value: 0 })
                 ? BoundTypes.NullableAnnotation.Annotated
                 : annotations.Any(value => value != BoundTypes.NullableAnnotation.NotAnnotated)
                     ? BoundTypes.NullableAnnotation.Oblivious

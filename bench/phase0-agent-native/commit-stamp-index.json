@@ -12,10 +12,10 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "d0dc0f8bf3ea400b1d7d16780a98d9ff3341abc7",
-      "resolvableOnMain": "d0dc0f8bf3ea400b1d7d16780a98d9ff3341abc7",
+      "measuredCommit": "ecc7962ca9da2e8c0891761e1ea321523fbaef57",
+      "resolvableOnMain": "ecc7962ca9da2e8c0891761e1ea321523fbaef57",
       "basis": "measured-on-top-of",
-      "note": "#1402 Stage B activation candidate: regenerated on top of merged Stage A evidence d0dc0f8b. Activating bounded arrays, whitelisted STRING generics, and identity-proven nominal references adds one MediatR Calor0274 bind stop, moving the effect-pass denominator 266->265 while Calor0425 remains 135/48. The measured commit is the reachable base beneath this activation diff, not a claim of an identical src tree."
+      "note": "#1402 Stage B activation candidate: regenerated with the sized-array annotation repair applied on top of ecc7962c, retained through the implementation PR merge. The three-subject effect-pass denominator remains 265 and Calor0425 remains 135/48. The earlier activation added one MediatR Calor0274 bind stop (266->265). Synthetic FizzBuzz is outside this ledger and is assessed separately in the five-subject round-trip evidence. This basis names the ancestor beneath the measured repair, not an identical src tree."
     },
     {
       "ledger": "higher-order-demand-ledger.json",
