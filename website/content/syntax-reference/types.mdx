@@ -7,6 +7,11 @@ order: 2
 
 Calor has a simple type system with primitives, optionals, and results.
 
+Code blocks on this reference page are declaration, expression, or body
+fragments, not complete files. The
+[nullability guide](/docs/guides/nullability-and-dotnet-interop/) includes
+complete checked examples.
+
 ---
 
 ## Primitive Types
@@ -25,67 +30,50 @@ Calor has a simple type system with primitives, optionals, and results.
 
 ## Usage in Declarations
 
-### Input Parameters
+### Input Parameters and Return Types
 
+Signature fragments (inside a module):
 ```calor
-§I{i32:count}       // int count
-§I{str:name}        // string name
-§I{f64:price}       // double price
-§I{bool:active}     // bool active
-```
-
-### Output Types
-
-```calor
-§O{i32}             // returns int
-§O{str}             // returns string
-§O{void}            // returns nothing
+§F{f1:Count:pub} (i32:count) -> i32
+§F{f2:Name:pub} (str:name) -> str
+§F{f3:Price:pub} (f64:price, bool:active) -> void
 ```
 
 ---
 
-## Option Type (`?T`)
+## Nullable Types (`?T`) and Runtime Options
 
-Options represent values that may be absent.
+`?str` is a nullable .NET string reference, not an `Option<str>`.
+`str` and `string` are aliases; `?str`, `?string`, `str?`, and `string?`
+are supported nullable spellings. A resolved `?User` remains an ordinary
+nullable object reference. Nullable value types such as `?i32` map to
+.NET `Nullable<T>` (`int?`).
 
-### Syntax
-
-```calor
-?T                  // Option of T (may be null)
-```
-
-### Examples
+Signature fragments:
 
 ```calor
-§F{f001:Find:pub}
-  §I{str:key}
-  §O{?str}              // might return a string, might return nothing
-  // ...
-
-§F{f002:Process:pub}
-  §I{?i32:maybeValue}   // accepts null
-  §O{void}
-  // ...
+§F{f001:Find:pub} (str:key) -> ?str
+§F{f002:Process:pub} (?i32:maybeValue) -> void
 ```
+
+Use ordinary values or `null` with nullable references. Explicit `Option<T>`
+instead represents Some/None using Calor's runtime option type. It is not
+implicitly unwrapped into a reference or by `??`.
 
 ### Creating Option Values
 
+Expression fragments for an explicit `Option<T>`:
 ```calor
 §SM value           // Some(value) - has a value
 §NN                 // None - no value
 ```
 
-### Example
-
-```calor
-§F{f001:FindUser:pub}
-  §I{i32:id}
-  §O{?User}
-  §IF{if1} (== id 0)
-    §R §NN
-  §EL
-    §R §SM user
-```
+See [Nullability and .NET Interop](/docs/guides/nullability-and-dotnet-interop/)
+for complete nullable-reference examples and the bounded support table.
+The candidate checks scalar strings, supported arrays and one-level string
+generic payloads, and identity-proven nominal reference receiving boundaries.
+It does not guarantee non-null values after arbitrary writes or validate
+constructor inputs.
 
 ---
 
@@ -102,10 +90,7 @@ T!E                 // Result: either T (success) or E (error)
 ### Examples
 
 ```calor
-§F{f001:Divide:pub}
-  §I{i32:a}
-  §I{i32:b}
-  §O{i32!str}           // returns int on success, string error on failure
+§F{f001:Divide:pub} (i32:a, i32:b) -> i32!str
   §IF{if1} (== b 0)
     §R §ERR "Division by zero"
   §EL
@@ -123,17 +108,13 @@ T!E                 // Result: either T (success) or E (error)
 
 **Parse integer:**
 ```calor
-§F{f001:ParseInt:pub}
-  §I{str:text}
-  §O{i32!str}
+§F{f001:ParseInt:pub} (str:text) -> i32!str
   // ...implementation
 ```
 
 **File read:**
 ```calor
-§F{f001:ReadFile:pub}
-  §I{str:path}
-  §O{str!str}
+§F{f001:ReadFile:pub} (str:path) -> str!str
   §E{fs:r}
   // ...implementation
 ```
@@ -155,10 +136,10 @@ Func<T, U>              // Function from T to U
 
 ### Examples
 
+Declaration fragments:
 ```calor
-§I{List<i32>:numbers}           // List<int> parameter
-§I{Dictionary<str, i32>:scores} // Dictionary<string, int>
-§O{IEnumerable<str>}            // Returns IEnumerable<string>
+§F{f1:Numbers:pub} (List<i32>:numbers) -> void
+§F{f2:Scores:pub} (Dictionary<str, i32>:scores) -> IEnumerable<str>
 §FLD{HashSet<T>:_items:pri}     // Generic field with type parameter T
 ```
 
@@ -167,8 +148,7 @@ Func<T, U>              // Function from T to U
 Generic types can be nested.
 
 ```calor
-§I{Dictionary<str, List<i32>>:data}     // Dictionary<string, List<int>>
-§O{List<Tuple<str, i32>>}               // List<(string, int)>
+§F{f1:Data:pub} (Dictionary<str, List<i32>>:data) -> List<Tuple<str, i32>>
 ```
 
 ### Type Parameters
@@ -176,9 +156,7 @@ Generic types can be nested.
 When defining generic functions or classes, type parameters (like `T`, `U`) can be used as types.
 
 ```calor
-§F{f001:First:pub}<T>
-  §I{List<T>:items}
-  §O{T}
+§F{f001:First:pub}<T> (List<T>:items) -> T
   §R items[0]
 ```
 
@@ -289,11 +267,7 @@ Calor provides built-in syntax for creating and manipulating collections with ty
 Types matter in contracts for proper comparisons:
 
 ```calor
-§F{f001:Clamp:pub}
-  §I{i32:value}
-  §I{i32:min}
-  §I{i32:max}
-  §O{i32}
+§F{f001:Clamp:pub} (i32:value, i32:min, i32:max) -> i32
   §Q (<= min max)           // Requires: min <= max
   §S (>= result min)        // Ensures: result >= min
   §S (<= result max)        // Ensures: result <= max

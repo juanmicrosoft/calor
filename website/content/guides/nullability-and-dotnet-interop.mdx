@@ -1,0 +1,280 @@
+---
+title: "Nullability and .NET Interop"
+section: "guides"
+order: 12
+description: "Nullable references, receiving-boundary diagnostics, and explicit migration choices"
+---
+
+Calor rejects possibly-null values at specified initialization, return and
+method-input boundaries. This is not whole-program null safety.
+
+**Publication scope:** this guide describes the current Stage B candidate, not
+a released 0.22 version. Stage A established scalar string checks; Stage B adds
+the bounded shapes below. See [Stage A evidence (#1386)](https://github.com/juanmicrosoft/calor/issues/1386)
+and [Stage B activation (#1402)](https://github.com/juanmicrosoft/calor/issues/1402).
+
+## Types: nullable references are not runtime Options
+
+`str` and `string` name the same .NET string type. `?str`, `?string`, `str?`,
+and `string?` mark a nullable string reference. `?System.String` is also
+supported. For a resolved reference type such as `Widget`, `?Widget` permits
+null without wrapping the object. Nullable value types, such as `?i32`, map
+to .NET nullable values (`int?`).
+
+Explicit `Option<T>` is different: it is Calor's runtime option type.
+`§SM value` and `§NN` construct Some and None. A nullable reference uses
+`null` and ordinary reference values instead. Neither a call nor the `??`
+operator implicitly unwraps an `Option<T>`. Choose a runtime Option when
+your API deliberately models Some/None, not just to silence a nullable-reference
+diagnostic. See [the type distinction (#1397)](https://github.com/juanmicrosoft/calor/issues/1397).
+
+## Supported receiving boundaries
+
+“Active” below means an Error from the production compiler, not just a binder
+finding. The checks compare supported source and destination shapes; they are
+not general conversions between arbitrary types.
+
+| Shape | Candidate status | Boundary covered |
+|:------|:-----------------|:-----------------|
+| Scalar STRING (`str`, `string`) | Active since Stage A | Initialization, native return, resolved method input |
+| Arrays | Active in Stage B | `?[str]` is a nullable container; `[?str]` has possibly-null STRING elements. Neither satisfies `[str]` at these boundaries; jagged arrays retain separate container/element information |
+| One-level string payloads | Active in Stage B | Matching definitions of `Option`, `List`, `IList`, `IEnumerable`, `IReadOnlyList`, `ICollection`, `IReadOnlyCollection`; for example `List<?str>` cannot satisfy `List<str>` |
+| Nominal reference types | Active in Stage B when identity is established | `?Widget` cannot satisfy `Widget` when both share a resolved underlying reference identity; this is not a name-based guess that every unknown type is a reference |
+| Other generic payloads, nested generics, unknown nominal identities | Outside the active guarantee | Analysis may retain type information; no promise of Calor0272–0274 coverage |
+| Mutable assignment/rebinding and constructor inputs | Excluded | Initializing a mutable local is checked; later writes and `§NEW` arguments are not covered by this receiving-boundary guarantee |
+
+Unsupported nullability shapes may still fail ordinary type checking. Absence
+of one of these three diagnostics is not evidence that a value is non-null.
+Array-element checks do not prove that every element created by an allocation
+is initialized to a non-null value.
+Generic payload checks do not enforce the generic container's own nullability:
+that outer annotation is retained as information, but its receiving-boundary
+enforcement is not activated.
+
+## Diagnostics and complete examples
+
+All examples below are complete files. The three marked **Rejected** examples
+are intentionally invalid. Their corrected controls use an explicit default.
+
+| Code | Severity | Receiving boundary | Highlighted source |
+|:-----|:---------|:-------------------|:-------------------|
+| `Calor0272` | Error | Initialization of a non-null binding | Initializer expression |
+| `Calor0273` | Error | Return from a non-null native function/method | Returned expression |
+| `Calor0274` | Error | Argument supplied to a non-null parameter | Offending argument expression |
+
+### Calor0272: initialization
+
+**Rejected:** `input` on line 4, column 22.
+
+```calor
+§M{m1:InitRejected}
+  §F{f1:Copy:pub} (?str:input) -> void
+    §E{}
+    §B{required:str} input
+```
+
+**Corrected:** choose a meaningful default for missing input.
+
+```calor
+§M{m1:InitSafe}
+  §F{f1:Copy:pub} (?str:input) -> void
+    §E{}
+    §B{required:str} (?? input "anonymous")
+```
+
+### Calor0273: return
+
+**Rejected:** `input` on line 4, column 8.
+
+```calor
+§M{m1:ReturnRejected}
+  §F{f1:Name:pub} (?str:input) -> str
+    §E{}
+    §R input
+```
+
+**Corrected:** return a non-null fallback.
+
+```calor
+§M{m1:ReturnSafe}
+  §F{f1:Name:pub} (?str:input) -> str
+    §E{}
+    §R (?? input "anonymous")
+```
+
+### Calor0274: method input
+
+**Rejected:** `input` on line 6, column 17.
+
+```calor
+§M{m1:ArgumentRejected}
+  §F{f1:Take:pub} (str:value) -> void
+    §E{}
+  §F{f2:Send:pub} (?str:input) -> void
+    §E{}
+    §C{Take} §A input §/C
+```
+
+**Corrected:** default before crossing the boundary.
+
+```calor
+§M{m1:ArgumentSafe}
+  §F{f1:Take:pub} (str:value) -> void
+    §E{}
+  §F{f2:Send:pub} (?str:input) -> void
+    §E{}
+    §C{Take} §A (?? input "anonymous") §/C
+```
+
+Statement calls and expression calls use the same argument check. Discarding
+the result does not waive it. Named arguments are matched to the named
+parameter, not to their source position:
+
+```calor
+§M{m1:NamedSafe}
+  §F{f1:Choose:pub} (str:required, ?str:optional) -> str
+    §E{}
+    §R required
+  §F{f2:Send:pub} (?str:input) -> str
+    §E{}
+    §R §C{Choose} §A[optional] input §A[required] "ready" §/C
+```
+
+For an otherwise applicable native overload, a nullable argument now yields
+`Calor0274` rather than being discarded as an overload candidate and producing
+`Calor0208` (“no matching overload”). Genuine overload failures still use
+`Calor0208`; runtime `Option<str>` is not an implicitly unwrapped string overload.
+This describes candidate behavior, not a claim that the change has shipped.
+
+## Defaults, throwing, and typed patterns
+
+A default changes behavior when the input is missing. If absence is an error,
+throw instead. Declare the allocation and throw effects:
+
+```calor
+§M{m1:ThrowSafe}
+  §F{f1:Require:pub} (?str:input) -> str
+    §E{alloc,throw}
+    §R (?? input §TH §NEW{ArgumentNullException})
+```
+
+A typed pattern binds a new non-null value in its matching arm:
+
+```calor
+§M{m1:PatternSafe}
+  §F{f1:Name:pub} (?str:input) -> str
+    §E{}
+    §R §W{w1:expr} input
+      §K §PTYPE{str:text} → text
+      §K _ → "anonymous"
+```
+
+These are explicit consumption constructs, not whole-program flow analysis.
+The candidate also transfers some local guard facts, but loops, mutation,
+aliases, callbacks, and repeated member reads make arbitrary narrowing unsafe.
+Do not assume that a prior null test proves every later use safe. See
+[working migration controls (#1398)](https://github.com/juanmicrosoft/calor/issues/1398).
+
+An early return after a null test does not currently narrow a later method
+argument. For an unchanged local, an explicit coalescing throw at that boundary
+can preserve the earlier return behavior: the throw is unreachable because the
+guard already returned on null. This is a manual migration, not an automatic
+converter rewrite.
+
+Calling a tracked callback that may write a guarded reference invalidates the
+guard fact. This conservative invalidation is not assignment/rebinding
+receiving-boundary enforcement. Merely declaring an unused lambda does not
+execute its writes.
+
+## Native code, BCL members, and metadata
+
+Native Calor return annotations describe the result at a call site. Resolved
+.NET methods, properties, and fields contribute their available metadata:
+
+| Information | Meaning at a supported receiving boundary |
+|:------------|:------------------------------------------|
+| Known non-null | May satisfy a non-null destination |
+| Declared nullable | Possibly null; consume or preserve that possibility |
+| Truly missing annotation (`Oblivious`) | Conservatively possibly null, not an assertion of non-null |
+
+For example, an environment variable may be absent. Preserve that possibility
+or choose an application-specific default:
+
+```calor
+§M{m1:EnvironmentSafe}
+  §F{f1:Name:pub} () -> str
+    §E{env}
+    §B{input} §C{System.Environment.GetEnvironmentVariable} §A "CALOR_NAME" §/C
+    §R (?? input "anonymous")
+```
+
+An inferred local retains supported nullability information from its
+initializer; omitting `:str` does not make a nullable result non-null.
+Constructor expressions can establish a non-null result without checking
+their inputs. That distinction matters when migrating object creation.
+
+Metadata depends on the referenced assemblies and nullable context. Calor
+trusts available annotations; it does not prove an external implementation
+honors them. Conversion must distinguish enabled, disabled, and restored C#
+nullable contexts, including inherited project settings. See
+[conversion context (#1401)](https://github.com/juanmicrosoft/calor/issues/1401)
+and [genuinely Oblivious metadata (#1400)](https://github.com/juanmicrosoft/calor/issues/1400).
+Missing information is not an instruction to add `?` to every declaration.
+
+Migration should follow the API's meaning: preserve a nullable result if
+absence is legitimate, provide a meaningful default, reject absence explicitly,
+or correct inaccurate upstream annotations. Changing a destination to `?str`
+only moves the obligation to its consumers. A working manual default/throw
+example does not establish behavior-preserving automatic conversion or
+automatic guard insertion.
+
+## Modes and entry points
+
+The active diagnostics are binding errors. They survive `--no-type-check`,
+`CALOR_NO_TYPE_CHECK=1`, `--no-enforce-effects`, `--permissive-effects`,
+`--no-strict-bind-inference`, and `--transpile-only`. These controls affect
+different checks; they are not nullable-reference suppression switches.
+Verification and contract-mode choices do not bypass these boundaries either.
+There is no promised legacy-module warning downgrade.
+
+The root compile command, `Program.Compile`, build paths using that pipeline,
+and `calor verify` retain these active errors. Editor binding diagnostics use
+the same active routing policy, but an editor diagnostic is not proof that
+the generated C# or the complete project builds. Project references and other
+entry-point settings still matter. See [entry-point evidence (#1396)](https://github.com/juanmicrosoft/calor/issues/1396).
+
+## Reproducing the examples
+
+Save one complete example as `example.calr`, then run:
+
+```bash
+calor --input example.calr --output example.g.cs
+```
+
+Each rejected example exits `1` with its listed Error and writes no new C#
+output. Each safe control exits `0` and emits C#. Use a fresh output path:
+a failed invocation is not evidence that an older output file was deleted.
+`NullabilityDocumentationTests` reads these MDX examples and checks the
+production `Program.Compile` result, severity, span, and generated output,
+including type-off, effect-off, transpile-only, and verification modes. This dedicated
+test is not general MDX support in `calor self-check docs` ([#1143](https://github.com/juanmicrosoft/calor/issues/1143)).
+
+This is a bounded regression set, not a corpus measurement or universal proof.
+Revision-specific command results belong with the candidate's review evidence;
+this page does not certify a release or report corpus counts.
+
+## Verification is a separate guarantee
+
+Receiving-boundary checks do not lift verifier proof demotions or remove runtime
+guards. D3 tracks nullable references, D12 tracks string indexing/counting
+semantics, and D14 tracks the reference model. [#875](https://github.com/juanmicrosoft/calor/issues/875)
+remains open; completing nullability work does not close it. Read
+[Verification Guarantees and Limits](/docs/guides/verification-guarantees/).
+
+## See also
+
+- [Types](/docs/syntax-reference/types/)
+- [Bindings](/docs/syntax-reference/binding/)
+- [Calls](/docs/syntax-reference/calls/)
+- [Compile](/docs/cli/compile/)
+- [Verify](/docs/cli/verify/)

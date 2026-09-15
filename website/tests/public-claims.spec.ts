@@ -19,6 +19,45 @@ const execFileAsync = promisify(execFile);
 const calorParseCount = data.programs.filter(program => program.calorSuccess).length;
 const cSharpParseCount = data.programs.filter(program => program.cSharpSuccess).length;
 
+test('nullability candidate guide is discoverable and its internal links and anchors resolve', async ({ page }) => {
+  const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  const guide = '/docs/guides/nullability-and-dotnet-interop/';
+  await page.route('https://**/*', route => route.abort());
+  for (const path of ['guides', 'syntax-reference/types', 'syntax-reference/binding',
+    'syntax-reference/calls', 'guides/verification-guarantees', 'cli/compile',
+    'cli/verify', 'philosophy/effects-contracts-enforcement']) {
+    await page.goto(`${base}/docs/${path}/`);
+    await expect(page.locator(`article a[href^="${base}${guide}"]`).first()).toBeVisible();
+    const guideLinks = await page.locator(`article a[href^="${base}${guide}"]`)
+      .evaluateAll(elements => elements.map(element => element.getAttribute('href')!));
+    for (const link of guideLinks) {
+      const response = await page.request.get(link);
+      expect(response.status(), link).toBe(200);
+      const anchor = link.split('#')[1];
+      if (anchor) expect(await response.text(), link).toContain(`id="${anchor}"`);
+    }
+  }
+  await page.goto(`${base}${guide}`);
+  const article = page.locator('article');
+  for (const text of ['Calor0272', 'Calor0273', 'Calor0274', 'Oblivious',
+    'constructor inputs', 'not whole-program null safety', 'D3', 'D12', 'D14',
+    'not a released 0.22 version', '?[str]', '[?str]', 'List<?str>', '?Widget',
+    'Mutable assignment/rebinding and constructor inputs']) {
+    await expect(article).toContainText(text);
+  }
+  const sidebar = page.getByRole('navigation', { name: 'Documentation', exact: true });
+  await expect(sidebar.getByRole('link', { name: 'Nullability and .NET Interop', exact: true }))
+    .toHaveAttribute('aria-current', 'page');
+  const links = await article.locator('a[href^="/"]').evaluateAll(elements =>
+    [...new Set(elements.map(element => element.getAttribute('href')!))]);
+  for (const link of links) {
+    const response = await page.request.get(link);
+    expect(response.status(), link).toBe(200);
+    const anchor = link.split('#')[1];
+    if (anchor) expect(await response.text(), link).toContain(`id="${anchor}"`);
+  }
+});
+
 test('nullability correction distinguishes binder diagnostics from CLI rejection and preserves history', async ({ page }) => {
   const root = await readFile('../CHANGELOG.md', 'utf8');
   const website = await readFile('content/changelog.mdx', 'utf8');

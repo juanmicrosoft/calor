@@ -109,6 +109,27 @@ lowering. Disabling runtime contracts is a separate, explicit mode choice.
 
 ## Modeling boundaries
 
+### Nullability checks are not solver proofs
+
+The current Stage B candidate rejects possibly-null values at specified
+initialization, native-return, and resolved method-input boundaries. It covers
+scalar strings, supported arrays and one-level string generic payloads, and
+identity-proven nominal references. Mutable assignment/rebinding and constructor
+input enforcement remain excluded. See the
+[support table and migration guide](/docs/guides/nullability-and-dotnet-interop/#supported-receiving-boundaries).
+This is candidate behavior, not a claim that 0.22 has shipped.
+
+The production checks trust available interop annotations and conservatively
+treat truly missing (`Oblivious`) annotations as possibly null. They do not prove
+that external implementations honor those annotations. A passing bounded
+regression matrix is not whole-program null safety.
+
+These checks do **not** lift the D3/D12/D14 safeguards below. D3 concerns
+nullability, D12 string indexing/counting semantics, and D14 the reference
+model. [#875](https://github.com/juanmicrosoft/calor/issues/875) remains open.
+String/array/user-type proof demotions and their retained runtime guards remain
+necessary.
+
 If a
 proof is carried by a Z3 sort that is total where the .NET value may be null,
 the result is `assumed`, not `proven`.
@@ -160,6 +181,8 @@ are not successful enforcement or proof.
 Type checking is on by default. Use `--no-type-check` on the root
 build command, `CALOR_NO_TYPE_CHECK=1` on other entry points, or
 `CalorTypeCheck=false` in MSBuild only as explicit migration opt-outs.
+These controls do not disable active binding errors `Calor0272`–`Calor0274`.
+Neither effect controls nor `--transpile-only` bypass those errors.
 
 Effect enforcement is also on by default. Interop assumptions propagate, and
 override/interface effect variance is checked. Calling a function

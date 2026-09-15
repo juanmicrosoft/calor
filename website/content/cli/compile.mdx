@@ -100,6 +100,22 @@ Compilation failed with 1 error
 For machine-readable diagnostics, use `--format json|sarif` or the
 `calor_check` MCP tool. See [Structured Output](/docs/cli/structured-output/).
 
+### Nullable receiving boundaries
+
+In the current Stage B candidate, `Calor0272` (initialization), `Calor0273`
+(native return), and `Calor0274` (method argument) are Errors on the supported
+receiving shapes. They stop compilation with exit `1` before C# output is
+emitted. Use a fresh output path when reproducing a failure; an old output
+file is not evidence of successful compilation.
+
+`--no-type-check`, `CALOR_NO_TYPE_CHECK=1`, `--no-strict-bind-inference`,
+effect controls, and `--transpile-only` do not disable these binding errors.
+Verification and runtime-contract settings do not waive them. This is not
+whole-program null safety or a statement that 0.22 has shipped. See
+[Nullability and .NET Interop](/docs/guides/nullability-and-dotnet-interop/)
+for complete rejected/safe examples, supported shapes, and the exclusions for
+mutable assignment/rebinding and constructor inputs.
+
 ---
 
 ## When One File Fails
@@ -133,7 +149,8 @@ cannot work out what it declares — an unterminated string or a stray marker,
 rather than an ordinary syntax error, which keeps enough structure to be
 scoped — then nothing is written for that run at all, which is the safe answer
 rather than the convenient one. And `--transpile-only` is exempt: it already
-opts out of the Roslyn check, so it still writes its output.
+opts out of the Roslyn check, so it can still write output when compilation has
+no earlier errors. It does not bypass active binding errors.
 
 Neither surface did any of this before 0.16, and both now apply the same rule
 from the same code, so neither reports cascade errors the other does not. They
