@@ -1,0 +1,14 @@
+{
+  "algorithm": "SHA-256",
+  "excludes": [
+    "sha256.json"
+  ],
+  "files": {
+    "README.md": "e855aa882546a45a15f05eeb5d7829c4cd25ef197c636dc0ba6aa421de4d167d",
+    "adjudication.json": "e37d9a379082d22616209cac67cb6990a3b8f27ce731c8758495e239c9a1ba83",
+    "roundtrip-comparison.json": "468697572544d4b20d44ca4ce4560c7e88fc1428afe8b99a75cccc6f146b3298",
+    "surface-matrix.json": "372040710a6702b908bcf15907abe7dc44fc813a4a04cf9f505ae902b6cc37f8",
+    "validation.json": "b6022cad0ce8f0ecaa6ae7e8cb3282d6bef04271b2c2c6056a7e39a74a279d06",
+    "review-records.md": "bee24da0661b41d2f9376955d0be189f2063e7d498fa48693b463e6030779436"
+  }
+}
