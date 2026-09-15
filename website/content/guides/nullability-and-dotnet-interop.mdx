@@ -8,8 +8,8 @@ description: "Nullable references, receiving-boundary diagnostics, and explicit 
 Calor rejects possibly-null values at specified initialization, return and
 method-input boundaries. This is not whole-program null safety.
 
-**Publication scope:** this guide describes the current Stage B candidate, not
-a released 0.22 version. Stage A established scalar string checks; Stage B adds
+**Version scope:** this guide describes Calor 0.22's bounded receiving-boundary
+checks. Stage A established scalar string checks; Stage B adds
 the bounded shapes below. See [Stage A evidence (#1386)](https://github.com/juanmicrosoft/calor/issues/1386)
 and [Stage B activation (#1402)](https://github.com/juanmicrosoft/calor/issues/1402).
 
@@ -34,7 +34,7 @@ diagnostic. See [the type distinction (#1397)](https://github.com/juanmicrosoft/
 finding. The checks compare supported source and destination shapes; they are
 not general conversions between arbitrary types.
 
-| Shape | Candidate status | Boundary covered |
+| Shape | Calor 0.22 status | Boundary covered |
 |:------|:-----------------|:-----------------|
 | Scalar STRING (`str`, `string`) | Active since Stage A | Initialization, native return, resolved method input |
 | Arrays | Active in Stage B | `?[str]` is a nullable container; `[?str]` has possibly-null STRING elements. Neither satisfies `[str]` at these boundaries; jagged arrays retain separate container/element information |
@@ -144,7 +144,7 @@ For an otherwise applicable native overload, a nullable argument now yields
 `Calor0274` rather than being discarded as an overload candidate and producing
 `Calor0208` (“no matching overload”). Genuine overload failures still use
 `Calor0208`; runtime `Option<str>` is not an implicitly unwrapped string overload.
-This describes candidate behavior, not a claim that the change has shipped.
+This diagnostic change applies to the supported boundaries in Calor 0.22.
 
 ## Defaults, throwing, and typed patterns
 
@@ -170,7 +170,7 @@ A typed pattern binds a new non-null value in its matching arm:
 ```
 
 These are explicit consumption constructs, not whole-program flow analysis.
-The candidate also transfers some local guard facts, but loops, mutation,
+Calor 0.22 also transfers some local guard facts, but loops, mutation,
 aliases, callbacks, and repeated member reads make arbitrary narrowing unsafe.
 Do not assume that a prior null test proves every later use safe. See
 [working migration controls (#1398)](https://github.com/juanmicrosoft/calor/issues/1398).
@@ -260,7 +260,7 @@ including type-off, effect-off, transpile-only, and verification modes. This ded
 test is not general MDX support in `calor self-check docs` ([#1143](https://github.com/juanmicrosoft/calor/issues/1143)).
 
 This is a bounded regression set, not a corpus measurement or universal proof.
-Revision-specific command results belong with the candidate's review evidence;
+Revision-specific command results belong with the source review evidence;
 this page does not certify a release or report corpus counts.
 
 ## Verification is a separate guarantee

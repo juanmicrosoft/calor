@@ -1,6 +1,8 @@
 {
-  "sourceCommit": "be488238",
-  "sourceDeclaredVersion": "0.20.0",
+  "sourceCommit": "c2a8816d",
+  "sourceDeclaredVersion": "0.21.0",
+  "generatedDate": "2026-09-15",
+  "publishingRelease": "0.22.0",
   "corpus": "tests/TestData/Benchmarks",
   "method": "Deterministic static-analysis calculators",
   "programCount": 217,

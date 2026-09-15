@@ -12,14 +12,15 @@ const metricPages = ['comprehension', 'correctness', 'edit-precision', 'error-de
   'generation-accuracy', 'information-density', 'refactoring-stability', 'token-economics'];
 const verificationPages = ['philosophy/static-verification', 'syntax-reference/contracts',
   'cli/compile', 'cli/verify', 'benchmarking/metrics/contract-verification'];
-const currentRelease = '0.21.0';
+const currentRelease = '0.22.0';
+const releaseDate = '2026-09-15';
 const pauseHandoff = 'https://github.com/juanmicrosoft/calor/issues/1254#issuecomment-5637070487';
 const pauseCheckpoint = 'https://github.com/juanmicrosoft/calor/pull/1438#issuecomment-5637787747';
 const execFileAsync = promisify(execFile);
 const calorParseCount = data.programs.filter(program => program.calorSuccess).length;
 const cSharpParseCount = data.programs.filter(program => program.cSharpSuccess).length;
 
-test('nullability candidate guide is discoverable and its internal links and anchors resolve', async ({ page }) => {
+test('Calor 0.22 nullability guide is discoverable and its internal links and anchors resolve', async ({ page }) => {
   const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
   const guide = '/docs/guides/nullability-and-dotnet-interop/';
   await page.route('https://**/*', route => route.abort());
@@ -41,8 +42,13 @@ test('nullability candidate guide is discoverable and its internal links and anc
   const article = page.locator('article');
   for (const text of ['Calor0272', 'Calor0273', 'Calor0274', 'Oblivious',
     'constructor inputs', 'not whole-program null safety', 'D3', 'D12', 'D14',
-    'not a released 0.22 version', '?[str]', '[?str]', 'List<?str>', '?Widget',
-    'Mutable assignment/rebinding and constructor inputs']) {
+    "Calor 0.22's bounded receiving-boundary checks", '?[str]', '[?str]', 'List<?str>', '?Widget',
+    'Mutable assignment/rebinding and constructor inputs',
+    "Generic payload checks do not enforce the generic container's own nullability",
+    'Array-element checks do not prove that every element',
+    'An early return after a null test does not currently narrow a later method argument',
+    'This is a manual migration, not an automatic converter rewrite',
+    'remains open']) {
     await expect(article).toContainText(text);
   }
   const sidebar = page.getByRole('navigation', { name: 'Documentation', exact: true });
@@ -70,6 +76,9 @@ test('nullability correction distinguishes binder diagnostics from CLI rejection
     }
     expect(source).toContain('legacy');
     expect(source).toContain('D3/D12/D14 safeguards');
+    const previousRelease = source.split('## [0.21.0]')[1]?.split('\n## [')[0] ?? '';
+    expect(previousRelease).toContain('remain analysis-only binder findings');
+    expect(previousRelease).toContain('unfinished 0.22 work');
   }
   await page.route('https://**/*', route => route.abort());
   const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
@@ -81,12 +90,14 @@ test('nullability correction distinguishes binder diagnostics from CLI rejection
   })).toBeInViewport();
   const article = page.locator('article');
   for (const text of ['BindingDiagnosticPolicy', 'Calor0272', 'Calor0273', 'Calor0274',
-    'editor diagnostics can differ', 'planned, not shipped', 'D3/D12/D14 safeguards',
+    'Historical routing through Calor 0.21', 'editor diagnostics could differ',
+    'now activate production Errors', 'not the current routing policy for those shapes',
+    'D3/D12/D14 safeguards',
     'not a shipped mode', 'changing the declaration to']) {
     await expect(article).toContainText(text);
   }
   await expect(article).not.toContainText('Unreleased (next release)');
-  await expect(page.getByRole('link', { name: 'The bounded 0.22 plan (#1082)', exact: true }))
+  await expect(page.getByRole('link', { name: "Calor 0.22's bounded checks (#1082)", exact: true }))
     .toHaveAttribute('href', 'https://github.com/juanmicrosoft/calor/issues/1082');
   for (const link of await article.locator('a[href^="/"]').evaluateAll(elements =>
     [...new Set(elements.map(element => element.getAttribute('href')!))])) {
@@ -196,14 +207,18 @@ for (const width of [1366, 390]) {
     await expect(pill).toHaveAttribute('title', `Docs describe compiler v${currentRelease}`);
     if (width >= 640) await expect(pill).toBeVisible();
     await expect(page.getByText(
-      'Cache correctness, clear diagnostic scope, and conversion failure evidence.', { exact: true },
+      'Bounded nullability checks and practical .NET migration guidance.', { exact: true },
     )).toBeVisible();
     await page.getByRole('link', { name: "See what's new", exact: true }).click();
     await expect(page).toHaveURL(/\/docs\/changelog\/$/);
-    await expect(page.getByRole('heading', { name: `[${currentRelease}] - 2026-09-11`, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: `[${currentRelease}] - ${releaseDate}`, exact: true })).toBeVisible();
     const article = page.locator('article');
-    for (const text of ['remain analysis-only binder findings', 'unfinished 0.22 work',
-      'D3/D12/D14 safeguards and runtime guards remain unchanged',
+    for (const text of ['Supported possibly-null values now stop compilation',
+      'General assignment/rebinding, member writes, and constructor inputs',
+      'Generic outer-container nullability',
+      'Array annotations do not prove every slot initialized',
+      'D3/D12/D14 safeguards, which conservatively demote proofs and retain runtime guards, remain unchanged',
+      '#875 remains open',
       'neither the pilot nor confirmation has completed',
       'does not authorize collection or apply the pending accounting amendment']) {
       await expect(article).toContainText(text);
@@ -263,6 +278,9 @@ test('current version and explicitly historical result provenance cannot silentl
   )).stdout;
   expect(SITE_VERSION).toBe(props.match(/<Version>(.*?)<\/Version>/)![1]);
   expect(provenance.sourceCommit).toBe(data.commit);
+  expect(provenance.generatedDate).toBe(data.timestamp.slice(0, 10));
+  expect(provenance.generatedDate).toBe(releaseDate);
+  expect(provenance.publishingRelease).toBe(currentRelease);
   expect(fullSourceCommit).toHaveLength(40);
   expect(sourceProps.match(/<Version>(.*?)<\/Version>/)![1])
     .toBe(provenance.sourceDeclaredVersion);
@@ -277,6 +295,13 @@ test('current version and explicitly historical result provenance cannot silentl
   expect(results).toContain(provenance.sourceDeclaredVersion);
   expect(results).toContain(data.timestamp.slice(0, 10));
   expect(results).toContain('not all behaviorally equivalent');
+  const normalizedResults = results.replace(/\s+/g, ' ');
+  expect(normalizedResults).toContain(
+    `Calor parser accepted ${calorParseCount} of ${data.programs.length} inputs`,
+  );
+  expect(normalizedResults).toContain(
+    `Roslyn syntax parser accepted ${cSharpParseCount} of ${data.programs.length} C# inputs`,
+  );
   for (const path of ['index', 'methodology']) {
     const source = (await readFile(`content/benchmarking/${path}.mdx`, 'utf8')).replace(/\s+/g, ' ');
     expect(source).toContain(provenance.sourceCommit);
@@ -294,7 +319,7 @@ test('current version and explicitly historical result provenance cannot silentl
       expect(claim).toContain(`${data.metrics.InformationDensity.ratio.toFixed(2)}x`);
     }
     expect(source.replace(/\s+/g, ' ')).toContain('not all behaviorally equivalent');
-    expect(normalized).toContain(`published with v${currentRelease}`);
+    expect(normalized).toContain(`prepared for publication with v${currentRelease}`);
     expect(normalized).toContain(`source \`${provenance.sourceCommit}\``);
     expect(normalized).toContain(`declared compiler v${provenance.sourceDeclaredVersion}`);
     expect(normalized).toContain(`${data.summary.statisticalRunCount} repetitions`);

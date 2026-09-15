@@ -102,7 +102,7 @@ For machine-readable diagnostics, use `--format json|sarif` or the
 
 ### Nullable receiving boundaries
 
-In the current Stage B candidate, `Calor0272` (initialization), `Calor0273`
+In Calor 0.22, `Calor0272` (initialization), `Calor0273`
 (native return), and `Calor0274` (method argument) are Errors on the supported
 receiving shapes. They stop compilation with exit `1` before C# output is
 emitted. Use a fresh output path when reproducing a failure; an old output
@@ -111,7 +111,7 @@ file is not evidence of successful compilation.
 `--no-type-check`, `CALOR_NO_TYPE_CHECK=1`, `--no-strict-bind-inference`,
 effect controls, and `--transpile-only` do not disable these binding errors.
 Verification and runtime-contract settings do not waive them. This is not
-whole-program null safety or a statement that 0.22 has shipped. See
+whole-program null safety. See
 [Nullability and .NET Interop](/docs/guides/nullability-and-dotnet-interop/)
 for complete rejected/safe examples, supported shapes, and the exclusions for
 mutable assignment/rebinding and constructor inputs.

@@ -43,7 +43,7 @@ binding is immutable (cannot be reassigned).
    [diagnostics](#diagnostics) below).
 2. **An explicit `:type` wins over inference.** Form (4) does not
    re-infer; the declared type supplies the receiving boundary. The
-   candidate rejects supported possibly-null initializers for non-null
+   Calor 0.22 compiler rejects supported possibly-null initializers for non-null
    destinations with `Calor0272`. Ordinary type checking also checks type
    compatibility; an annotation does not make an incompatible value valid.
 3. **Without `:type`, the bound type is `initializer.TypeName`.**
@@ -148,7 +148,7 @@ initializer (rather than be inferred from it), give an annotation:
 
 ### Calor0272 — possibly-null initialization
 
-The candidate rejects a possibly-null initializer at a supported non-null
+Calor 0.22 rejects a possibly-null initializer at a supported non-null
 receiving boundary. Inference retains supported initializer nullability:
 omitting `:str` does not make a nullable call result non-null. Initializing a
 mutable binding is checked, but later assignment/rebinding is outside this

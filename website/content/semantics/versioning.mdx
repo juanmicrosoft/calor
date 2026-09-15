@@ -53,13 +53,14 @@ of binder diagnostics, not their production CLI routing.
 ### Diagnostic routing correction (2026-09-11)
 
 `Error` severity in the binder is not the same as production CLI rejection.
-At checked main revision `080ed5a7`, `Program.Compile` uses
-`BindingDiagnosticPolicy`, which excludes `Calor0272` (binding initialization),
+**Historical routing through Calor 0.21:** at checked main revision `080ed5a7`,
+`Program.Compile` used `BindingDiagnosticPolicy`, which excluded
+`Calor0272` (binding initialization),
 `Calor0273` (return), and `Calor0274` (argument). The language server's
-`DocumentState` binds directly, so editor diagnostics can differ. Other
+`DocumentState` bound directly, so editor diagnostics could differ. Other
 compiler passes may independently reject the same program.
 
-This is not a newly introduced regression. The routing policy and its
+This historical behavior was not a newly introduced regression. The routing policy and its
 `Program.Compile` call were introduced in
 [`cc62c4ac`](https://github.com/juanmicrosoft/calor/commit/cc62c4ac7b6059de4cb7a31809c298269c6dafe7),
 an ancestor of all three release commits below. Each tagged source has the
@@ -73,11 +74,20 @@ same exclusion and calls the policy from `Program.Compile`.
 
 These are scoped source-history findings, not a claim that every possibly-null
 program compiles or that every published binary has been independently tested.
-[The bounded 0.22 plan (#1082)](https://github.com/juanmicrosoft/calor/issues/1082)
-is planned, not shipped. It targets specified initialization, return, and
-resolved method-input boundaries, not general mutation, member writes,
-constructor inputs, or whole-program non-nullness. The D3/D12/D14 safeguards
+[Calor 0.22's bounded checks (#1082)](https://github.com/juanmicrosoft/calor/issues/1082)
+now activate production Errors at specified initialization, native-return,
+and resolved method-input boundaries. They cover scalar strings, supported
+arrays, one-level whitelisted string generic payloads, and identity-proven
+nominal references. The historical exclusion above is not the current routing
+policy for those shapes. See the
+[nullability guide](/docs/guides/nullability-and-dotnet-interop/) for complete
+examples and mode behavior.
+
+General mutation, member writes, constructor inputs, and outer generic-container
+enforcement remain excluded; array annotations do not prove every slot initialized.
+These checks do not establish whole-program non-nullness. The D3/D12/D14 safeguards
 that demote conditional proofs and retain their runtime guards remain in place.
+[#875](https://github.com/juanmicrosoft/calor/issues/875) remains open.
 
 ---
 
