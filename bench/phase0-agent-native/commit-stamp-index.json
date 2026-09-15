@@ -12,10 +12,10 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "a4898048695587e6e0b1f8710db9f9af4ccef617",
-      "resolvableOnMain": "a4898048695587e6e0b1f8710db9f9af4ccef617",
+      "measuredCommit": "a00f4a525da7a88e784436fb75259b9606ca242b",
+      "resolvableOnMain": "a00f4a525da7a88e784436fb75259b9606ca242b",
       "basis": "measured-on-top-of",
-      "note": "#1386 Stage A repair candidate: regenerated on top of merged scalar activation a4898048. Preserving null-forgiving expressions and recognizing opaque same-name member overloads removes four false propagated bind stops, moving the effect-pass denominator 264->266 and Calor0425 131/47->135/48. The measured commit is the reachable base beneath this uncommitted repair diff, not a claim of an identical src tree."
+      "note": "#1402 Stage B activation candidate: regenerated with callable branch, exception/filter, and diagnostic rollback repairs applied on top of a00f4a52, retained through the implementation PR merge. The three-subject effect-pass denominator remains 265 and Calor0425 remains 135/48. The earlier activation added one MediatR Calor0274 bind stop (266->265). Synthetic FizzBuzz is outside this ledger and is assessed separately in the five-subject round-trip evidence. This basis names the ancestor beneath the measured repair, not an identical src tree."
     },
     {
       "ledger": "higher-order-demand-ledger.json",

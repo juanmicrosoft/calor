@@ -98,6 +98,10 @@ public sealed class Binder
     private readonly Dictionary<string, List<ClassDefinitionNode>> _classesBySimpleName = new(StringComparer.Ordinal);
     private readonly Dictionary<string, DelegateDefinitionNode> _delegateDefinitions = new(StringComparer.Ordinal);
     private readonly Dictionary<VariableSymbol, VariableSymbol> _flowNarrowingSources = new();
+    private readonly Dictionary<VariableSymbol, CallableMutationSummary> _callableState =
+        new(ReferenceEqualityComparer.Instance);
+    private List<CallableMutationWrite>? _deferredCallableWrites;
+    private bool _isDiscoveringLoopCallables;
     private readonly Dictionary<string, HashSet<string>> _topLevelFunctionLookupNames = new(StringComparer.Ordinal);
     private readonly Dictionary<CSharpInteropBlockNode, IReadOnlySet<string>> _interopMethodNames = new();
     private readonly Dictionary<SymbolId, Symbol> _symbolsById = new();
@@ -357,13 +361,16 @@ public sealed class Binder
             foreach (var mapping in match.Arguments)
             {
                 var parameter = match.Function.Parameters[mapping.ParameterIndex];
-                if (parameter.Modifier.HasFlag(ParameterModifier.Out)
-                    || !TryBuildMethodArgumentTarget(mapping.ParameterType, out var target, match.Function))
+                if (parameter.Modifier.HasFlag(ParameterModifier.Out))
+                    continue;
+                if (!TryBuildMethodArgumentTarget(
+                        mapping.ParameterType, out var target, match.Function))
                     continue;
                 ValidateCallArgument(arguments[mapping.ArgumentIndex], parameter.Name, target!,
                     mapping.IsExpandedParams, reported, resolution.ReplacesNativeOverloadError);
             }
         }
+
     }
 
     private void ValidateDirectFunctionArguments(
@@ -407,6 +414,7 @@ public sealed class Binder
 
     private void InvalidateMutatingCallArguments(
         IReadOnlyList<BoundExpression> arguments,
+        IReadOnlyList<string?>? argumentModifiers,
         OverloadResolutionResult resolution,
         Metadata.MetadataBinderResult? bclResolution)
     {
@@ -436,6 +444,15 @@ public sealed class Binder
                     }
                 }
             }
+
+            if (argumentModifiers is not null)
+            {
+                for (var index = 0; index < argumentModifiers.Count; index++)
+                {
+                    if (argumentModifiers[index] is "ref" or "out")
+                        mutatingArgumentIndices.Add(index);
+                }
+            }
         }
 
         foreach (var index in mutatingArgumentIndices)
@@ -443,7 +460,9 @@ public sealed class Binder
             if (index < arguments.Count
                 && arguments[index] is BoundVariableExpression variable)
             {
-                InvalidateMutableFlowNarrowing(variable.Variable);
+                var visible = _scope.Lookup(variable.Variable.Name) as VariableSymbol
+                    ?? variable.Variable;
+                InvalidateMutableFlowNarrowing(visible, requireRebindable: false);
             }
         }
     }
@@ -1188,7 +1207,8 @@ public sealed class Binder
         BoundTypes.FunctionBoundType? functionType = null,
         BoundTypes.NominalBoundType? inferredReferenceType = null,
         bool isTypeInferred = false,
-        BoundTypes.ArrayBoundType? methodInputArrayType = null)
+        BoundTypes.ArrayBoundType? methodInputArrayType = null,
+        BoundTypes.GenericInstantiationBoundType? genericNullabilityType = null)
     {
         var symbol = new VariableSymbol(
             id,
@@ -1211,7 +1231,11 @@ public sealed class Binder
             InferredReferenceType = inferredReferenceType,
             IsTypeInferred = isTypeInferred,
             MethodInputArrayType = methodInputArrayType
-                ?? (TryBuildMethodInputArrayType(typeName, out var arrayType) ? arrayType : null)
+                ?? (TryBuildMethodInputArrayType(typeName, out var arrayType) ? arrayType : null),
+            GenericNullabilityType = genericNullabilityType
+                ?? (TryBuildDeclaredNullabilityShape(typeName, out var nullabilityShape)
+                ? nullabilityShape as BoundTypes.GenericInstantiationBoundType
+                : null)
         };
         TrackSymbol(symbol);
         return symbol;
@@ -1230,7 +1254,8 @@ public sealed class Binder
         BoundTypes.FunctionBoundType? functionType = null,
         BoundTypes.NominalBoundType? inferredReferenceType = null,
         bool isTypeInferred = false,
-        BoundTypes.ArrayBoundType? methodInputArrayType = null)
+        BoundTypes.ArrayBoundType? methodInputArrayType = null,
+        BoundTypes.GenericInstantiationBoundType? genericNullabilityType = null)
     {
         var context = _declarationContext.IsNone ? _moduleSymbolId : _declarationContext;
         return CreateVariable(
@@ -1246,7 +1271,8 @@ public sealed class Binder
             functionType: functionType,
             inferredReferenceType: inferredReferenceType,
             isTypeInferred: isTypeInferred,
-            methodInputArrayType: methodInputArrayType);
+            methodInputArrayType: methodInputArrayType,
+            genericNullabilityType: genericNullabilityType);
     }
 
     private SymbolId CreateDeclarationId(
@@ -1567,7 +1593,9 @@ public sealed class Binder
             : null;
         ValidateCallArguments(args, resolution, bclResolution);
         ValidateDirectFunctionArguments(call.Target, receiverSymbol, args, resolution, bclResolution);
-        InvalidateMutatingCallArguments(args, resolution, bclResolution);
+        InvalidateMutatingCallArguments(args, call.ArgumentModifiers, resolution, bclResolution);
+        var callable = ResolveCallableStorage(call.Target, receiverSymbol);
+        var callableEffects = InvalidateDeferredCallTarget(callable);
         var (resolvedTypeName, resolvedMethodName) = GetResolvedCallIdentity(
             call.Target,
             receiverSymbol,
@@ -1579,7 +1607,7 @@ public sealed class Binder
             receiverTypeSymbol,
             resolvedTypeName);
 
-        return new BoundCallStatement(
+        var boundCall = new BoundCallStatement(
             call.Span,
             call.Target,
             args,
@@ -1602,9 +1630,12 @@ public sealed class Binder
                 .ToArray(),
             receiver)
         {
+            CallableStorageIdentity = callable,
+            ObservedCallableEffects = callableEffects,
             ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count),
             SelectedOverloadMatches = resolution.Matches
         };
+        return boundCall;
     }
 
     private BoundReturnStatement BindReturnStatement(ReturnStatementNode ret)
@@ -1665,7 +1696,10 @@ public sealed class Binder
         var from = BindExpression(forStmt.From);
         var to = BindExpression(forStmt.To);
         var step = forStmt.Step != null ? BindExpression(forStmt.Step) : null;
+        PrepareLoopCallableState(forStmt.Body);
+        var headerCallables = CaptureCallableState();
         var body = BindStatements(forStmt.Body);
+        JoinCallableState(headerCallables);
 
         return new BoundForStatement(forStmt.Span, loopVar, from, to, step, body);
     }
@@ -1674,41 +1708,113 @@ public sealed class Binder
     {
         using var _ = PushScope(_scope.CreateChild());
 
+        PrepareLoopCallableState(whileStmt.Body, whileStmt.Condition);
+        var headerCallables = CaptureCallableState();
         var condition = BindExpression(whileStmt.Condition);
         DeclareSuccessfulConditionPatterns(whileStmt.Condition, condition);
         var body = BindStatements(whileStmt.Body);
+        JoinCallableState(headerCallables);
 
         return new BoundWhileStatement(whileStmt.Span, condition, body);
+    }
+
+    private void PrepareLoopCallableState(
+        IReadOnlyList<StatementNode> statements, ExpressionNode? condition = null,
+        bool conditionAfterBody = false)
+    {
+        if (_isDiscoveringLoopCallables)
+            return;
+
+        var bindings = _scope.CaptureVisibleVariableBindings();
+        var flow = CaptureFlowNarrowingState();
+        var diagnostics = _diagnostics.CreateCheckpoint();
+        var symbols = _symbolsById.ToArray();
+        var declarationOccurrences = _declarationIdOccurrences.ToArray();
+        var expressionsBound = ExpressionsBound;
+        var misplacedRows = _misplacedRowsReported.ToArray();
+        var unsupportedNodeTypes = _unsupportedNodeTypes.ToArray();
+        var enclosingWrites = _deferredCallableWrites;
+        _deferredCallableWrites = [];
+        _isDiscoveringLoopCallables = true;
+        CallableMutationSummary summary;
+        try
+        {
+            // Discover callable writes without committing diagnostics, symbols,
+            // or ordinary narrowing from this preliminary iteration.
+            using var _ = PushScope(_scope.CreateChild());
+            var boundCondition = condition is null || conditionAfterBody ? null : BindExpression(condition);
+            if (condition is not null && boundCondition is not null)
+                DeclareSuccessfulConditionPatterns(condition, boundCondition);
+            var body = BindStatements(statements);
+            if (conditionAfterBody && condition is not null)
+                boundCondition = BindExpression(condition);
+            summary = new CallableMutationSummary
+            {
+                Alternatives = GetDeferredCallEffects(boundCondition, body).ToArray(),
+                Writes = _deferredCallableWrites.ToArray()
+            };
+        }
+        finally
+        {
+            Scope.RestoreVisibleVariableBindings(bindings);
+            RestoreFlowNarrowingState(flow);
+            _diagnostics.RestoreCheckpoint(diagnostics);
+            _symbolsById.Clear();
+            foreach (var (id, symbol) in symbols)
+                _symbolsById.Add(id, symbol);
+            _declarationIdOccurrences.Clear();
+            foreach (var (key, count) in declarationOccurrences)
+                _declarationIdOccurrences.Add(key, count);
+            ExpressionsBound = expressionsBound;
+            _misplacedRowsReported.Clear();
+            _misplacedRowsReported.UnionWith(misplacedRows);
+            _unsupportedNodeTypes.Clear();
+            _unsupportedNodeTypes.UnionWith(unsupportedNodeTypes);
+            _deferredCallableWrites = enclosingWrites;
+            _isDiscoveringLoopCallables = false;
+        }
+
+        // The weak-write fixed point includes zero executions and targets
+        // installed on a preceding iteration. Bind receiving sites only after
+        // this state is available; fresh guards in the body still narrow normally.
+        ApplyCallableMutationSummary(summary);
+    }
+
+    private void JoinCallableState(IReadOnlyDictionary<VariableSymbol, CallableMutationSummary> other)
+    {
+        foreach (var (storage, effects) in other)
+            _callableState[storage] = UnionCallableEffects(GetCallableState(storage), effects);
     }
 
     private BoundIfStatement BindIfStatement(IfStatementNode ifStmt)
     {
         var condition = BindExpression(ifStmt.Condition);
         var baseline = CaptureFlowNarrowingState();
-        var invalidated = new HashSet<VariableSymbol>();
+        var branches = new List<FlowNarrowingState>();
+        var fallthrough = baseline;
 
         var thenBody = BindIsolatedFlowBranch(
             baseline,
-            invalidated,
+            branches,
             () => DeclareSuccessfulConditionPatterns(ifStmt.Condition, condition),
             () => BindStatements(ifStmt.ThenBody));
 
         var elseIfClauses = new List<BoundElseIfClause>();
         foreach (var elseIf in ifStmt.ElseIfClauses)
         {
-            BoundExpression? elseIfCondition = null;
+            RestoreFlowNarrowingState(fallthrough);
+            var elseIfCondition = BindExpression(elseIf.Condition);
+            // Evaluating a false condition still executes its calls. Only the
+            // body is conditional on its result, not the condition's effects.
+            fallthrough = CaptureFlowNarrowingState();
             var elseIfBody = BindIsolatedFlowBranch(
-                baseline,
-                invalidated,
-                () =>
-                {
-                    elseIfCondition = BindExpression(elseIf.Condition);
-                    DeclareSuccessfulConditionPatterns(elseIf.Condition, elseIfCondition);
-                },
+                fallthrough,
+                branches,
+                () => DeclareSuccessfulConditionPatterns(elseIf.Condition, elseIfCondition),
                 () => BindStatements(elseIf.Body));
             elseIfClauses.Add(new BoundElseIfClause(
                 elseIf.Span,
-                elseIfCondition!,
+                elseIfCondition,
                 elseIfBody));
         }
 
@@ -1716,15 +1822,15 @@ public sealed class Binder
         if (ifStmt.ElseBody != null)
         {
             elseBody = BindIsolatedFlowBranch(
-                baseline,
-                invalidated,
+                fallthrough,
+                branches,
                 setup: null,
                 () => BindStatements(ifStmt.ElseBody));
         }
 
-        RestoreFlowNarrowingState(baseline);
-        foreach (var narrowed in invalidated)
-            InvalidateMutableFlowNarrowing(narrowed);
+        if (ifStmt.ElseBody is null)
+            branches.Add(fallthrough);
+        JoinFlowBranchStates(baseline, branches);
 
         return new BoundIfStatement(ifStmt.Span, condition, thenBody, elseIfClauses, elseBody);
     }
@@ -1735,12 +1841,13 @@ public sealed class Binder
         var visible = sources.Keys
             .Where(variable => ReferenceEquals(_scope.Lookup(variable.Name), variable))
             .ToArray();
-        return new FlowNarrowingState(sources, visible);
+        return new FlowNarrowingState(
+            sources, visible, CaptureCallableState(), _scope.CaptureVisibleVariableBindings());
     }
 
     private IReadOnlyList<BoundStatement> BindIsolatedFlowBranch(
         FlowNarrowingState baseline,
-        HashSet<VariableSymbol> invalidated,
+        List<FlowNarrowingState> branches,
         Action? setup,
         Func<IReadOnlyList<BoundStatement>> bind)
     {
@@ -1755,17 +1862,35 @@ public sealed class Binder
         }
         finally
         {
-            foreach (var narrowed in baseline.VisibleNarrowings)
-            {
-                if (!_flowNarrowingSources.ContainsKey(narrowed))
-                    invalidated.Add(narrowed);
-            }
+            branches.Add(CaptureFlowNarrowingState());
             RestoreFlowNarrowingState(baseline);
+        }
+    }
+
+    private void JoinFlowBranchStates(
+        FlowNarrowingState baseline, IReadOnlyList<FlowNarrowingState> branches)
+    {
+        RestoreFlowNarrowingState(baseline);
+        if (branches.Count == 0)
+            return;
+        _callableState.Clear();
+        foreach (var branch in branches)
+            JoinCallableState(branch.Callables);
+        // Restored ancestor bindings can be hidden by a local name while a
+        // previously declared callable still mutates their captured storage.
+        foreach (var narrowed in baseline.Bindings.Select(binding => binding.Symbol)
+                     .Where(baseline.Sources.ContainsKey)
+                     .Distinct<VariableSymbol>(ReferenceEqualityComparer.Instance))
+        {
+            if (branches.Any(branch => !branch.Sources.ContainsKey(narrowed)))
+                InvalidateMutableFlowNarrowing(narrowed, requireRebindable: false);
         }
     }
 
     private void RestoreFlowNarrowingState(FlowNarrowingState state)
     {
+        Scope.RestoreVisibleVariableBindings(state.Bindings);
+        RestoreCallableState(state.Callables);
         _flowNarrowingSources.Clear();
         foreach (var (narrowed, source) in state.Sources)
             _flowNarrowingSources.Add(narrowed, source);
@@ -1773,7 +1898,9 @@ public sealed class Binder
 
     private sealed record FlowNarrowingState(
         IReadOnlyDictionary<VariableSymbol, VariableSymbol> Sources,
-        IReadOnlyList<VariableSymbol> VisibleNarrowings);
+        IReadOnlyList<VariableSymbol> VisibleNarrowings,
+        IReadOnlyDictionary<VariableSymbol, CallableMutationSummary> Callables,
+        IReadOnlyList<(Scope Scope, string Name, VariableSymbol Symbol)> Bindings);
 
     private BoundStatement BindBindStatement(BindStatementNode bind)
     {
@@ -1845,6 +1972,7 @@ public sealed class Binder
 
             if (initializer != null)
             {
+                SetCallableState(rebindTarget, initializer);
                 return new BoundAssignmentStatement(
                     bind.Span,
                     new BoundVariableExpression(bind.IdentifierSpan, rebindTarget),
@@ -1896,13 +2024,16 @@ public sealed class Binder
             functionType: bindFunctionType,
             inferredReferenceType: inferredReferenceType,
             isTypeInferred: bind.TypeName is null,
-            methodInputArrayType: GetLocalMethodInputArrayType(bind.TypeName, initializer));
+            methodInputArrayType: GetLocalMethodInputArrayType(bind.TypeName, initializer),
+            genericNullabilityType: bind.TypeName is null ? initializer?.GenericNullabilityType : null);
 
         if (!_scope.TryDeclare(variable))
         {
             _diagnostics.ReportError(bind.Span, DiagnosticCode.DuplicateDefinition,
                 $"Variable '{bind.Name}' is already defined");
         }
+        if (initializer is not null)
+            SetCallableState(variable, initializer);
 
         var incompatibleRepresentation = initializer is not null && bind.TypeName is not null
             && CheckReferenceOptionRepresentation(bind.TypeName, initializer);
@@ -2171,6 +2302,11 @@ public sealed class Binder
         out BoundTypes.BoundType? target,
         FunctionSymbol? declaringFunction = null)
     {
+        if (TryBuildMethodInputArrayType(bindTypeName, out var arrayTarget, declaringFunction))
+        {
+            target = arrayTarget;
+            return true;
+        }
         if (!TryBuildDeclaredNullabilityShape(bindTypeName, out target))
             return false;
         if (target is BoundTypes.NominalBoundType nominal
@@ -2487,6 +2623,12 @@ public sealed class Binder
     private static bool TryParseGenericStringTarget(string trimmed, out BoundTypes.GenericInstantiationBoundType? target)
     {
         target = null;
+        var outerAnnotation = BoundTypes.NullableAnnotation.NotAnnotated;
+        if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(trimmed, out var referent))
+        {
+            outerAnnotation = BoundTypes.NullableAnnotation.Annotated;
+            trimmed = referent.Trim();
+        }
 
         var open = trimmed.IndexOf('<');
         if (open <= 0) return false;
@@ -2530,10 +2672,11 @@ public sealed class Binder
         }
 
         var innerBound = new BoundTypes.NominalBoundType("STRING", innerAnnotation);
-        var definition = new BoundTypes.NominalBoundType(baseName, BoundTypes.NullableAnnotation.Oblivious);
+        var definition = new BoundTypes.NominalBoundType(baseName, outerAnnotation);
         target = new BoundTypes.GenericInstantiationBoundType(
             definition,
-            System.Collections.Immutable.ImmutableArray.Create<BoundTypes.BoundType>(innerBound));
+            System.Collections.Immutable.ImmutableArray.Create<BoundTypes.BoundType>(innerBound),
+            outerAnnotation);
         return true;
     }
 
@@ -3032,16 +3175,32 @@ public sealed class Binder
     }
 
     private void DeclareSuccessfulConditionPatterns(ExpressionNode condition, BoundExpression boundCondition)
+        => DeclareSuccessfulConditionPatterns(condition, boundCondition, null);
+
+    private void DeclareSuccessfulConditionPatterns(
+        ExpressionNode condition,
+        BoundExpression boundCondition,
+        IReadOnlySet<string>? excludedNarrowings)
     {
         if (condition is BinaryOperationNode { Operator: BinaryOperator.And } conjunction
             && boundCondition is BoundBinaryExpression binary)
         {
-            DeclareSuccessfulConditionPatterns(conjunction.Left, binary.Left);
-            DeclareSuccessfulConditionPatterns(conjunction.Right, binary.Right);
+            var leftExclusions = excludedNarrowings is null
+                ? binary.InvalidatedLeftNarrowingNames
+                : excludedNarrowings
+                    .Concat(binary.InvalidatedLeftNarrowingNames)
+                    .ToHashSet(StringComparer.Ordinal);
+            DeclareSuccessfulConditionPatterns(
+                conjunction.Left,
+                binary.Left,
+                leftExclusions);
+            DeclareSuccessfulConditionPatterns(conjunction.Right, binary.Right, excludedNarrowings);
         }
         if (condition is IsPatternNode { VariableName: not null } pattern
             && boundCondition is BoundIsPatternExpression { Binding: not null } boundPattern)
         {
+            if (excludedNarrowings?.Contains(pattern.VariableName) == true)
+                return;
             DeclarePatternVariable(pattern.Span, pattern.VariableName, boundPattern.Binding.TypeName,
                 boundPattern.Binding.NullableAnnotation, boundPattern.Binding);
         }
@@ -3056,6 +3215,8 @@ public sealed class Binder
                 Operand: BoundVariableExpression testedVariable
             })
         {
+            if (excludedNarrowings?.Contains(testedReference.Name) == true)
+                return;
             DeclareNarrowedNonNullVariable(
                 testedReference,
                 testedVariable.Variable,
@@ -3072,6 +3233,8 @@ public sealed class Binder
                 Operand: BoundVariableExpression typedVariable
             })
         {
+            if (excludedNarrowings?.Contains(reference.Name) == true)
+                return;
             DeclareNarrowedNonNullVariable(
                 reference,
                 typedVariable.Variable,
@@ -3084,12 +3247,16 @@ public sealed class Binder
                 && comparison.Right is ReferenceNode right
                 && boundComparison.Right is BoundVariableExpression rightVariable)
             {
+                if (excludedNarrowings?.Contains(right.Name) == true)
+                    return;
                 DeclareNarrowedNonNullVariable(right, rightVariable.Variable);
             }
             else if (comparison.Right is ReferenceNode { Name: "null" }
                      && comparison.Left is ReferenceNode left
                      && boundComparison.Left is BoundVariableExpression leftVariable)
             {
+                if (excludedNarrowings?.Contains(left.Name) == true)
+                    return;
                 DeclareNarrowedNonNullVariable(left, leftVariable.Variable);
             }
         }
@@ -3118,7 +3285,8 @@ public sealed class Binder
     {
         if (narrowedTypeName is null
             && NullabilityChecker.GetAnnotation(new BoundVariableExpression(reference.Span, variable).Type)
-                is not BoundTypes.NullableAnnotation.Annotated)
+                is not (BoundTypes.NullableAnnotation.Annotated
+                    or BoundTypes.NullableAnnotation.Oblivious))
         {
             return;
         }
@@ -3136,12 +3304,33 @@ public sealed class Binder
             variable.FunctionType,
             variable.InferredReferenceType,
             variable.IsTypeInferred,
-            variable.MethodInputArrayType);
+            variable.MethodInputArrayType is { } array
+                ? new BoundTypes.ArrayBoundType(
+                    array.ElementType,
+                    array.Rank,
+                    BoundTypes.NullableAnnotation.NotAnnotated)
+                {
+                    RoslynSymbol = array.RoslynSymbol
+                }
+                : null,
+            variable.GenericNullabilityType is { } generic
+                ? new BoundTypes.GenericInstantiationBoundType(
+                    new BoundTypes.NominalBoundType(
+                        generic.Definition.QualifiedName,
+                        BoundTypes.NullableAnnotation.NotAnnotated,
+                        generic.Definition.Declaration,
+                        generic.Definition.RoslynSymbol),
+                    generic.TypeArguments,
+                    BoundTypes.NullableAnnotation.NotAnnotated)
+                : null);
+        narrowed.StorageIdentity = variable.StorageIdentity;
         if (_scope.TryDeclare(narrowed) || _scope.TryReplaceLocal(variable, narrowed))
             _flowNarrowingSources[narrowed] = variable;
     }
 
-    private VariableSymbol InvalidateMutableFlowNarrowing(VariableSymbol variable)
+    private VariableSymbol InvalidateMutableFlowNarrowing(
+        VariableSymbol variable,
+        bool requireRebindable = true)
     {
         var source = variable;
         var traversed = new List<VariableSymbol>();
@@ -3151,11 +3340,37 @@ public sealed class Binder
             source = previous;
         }
 
-        if (traversed.Count == 0
-            || !CanRebind(source)
-            || !_scope.TryReplaceVisible(variable, source))
+        if (traversed.Count == 0)
+        {
+            var descendants = _flowNarrowingSources.Keys
+                .Where(narrowed =>
+                {
+                    var root = narrowed;
+                    while (_flowNarrowingSources.TryGetValue(root, out var previous))
+                        root = previous;
+                    return ReferenceEquals(root, variable);
+                })
+                .ToArray();
+            foreach (var narrowed in descendants)
+                _flowNarrowingSources.Remove(narrowed);
+            return variable;
+        }
+
+        if (requireRebindable && !CanRebind(source))
         {
             return variable;
+        }
+        if (requireRebindable)
+        {
+            if (!_scope.TryReplaceVisible(variable, source))
+                return variable;
+        }
+        else
+        {
+            _scope.ReplaceVisibleSymbols(
+                variable.Name,
+                new HashSet<VariableSymbol>(traversed, ReferenceEqualityComparer.Instance),
+                source);
         }
 
         foreach (var narrowed in traversed)
@@ -3265,11 +3480,8 @@ public sealed class Binder
             array.ElementType,
             size,
             initializer,
-            array.Attributes)
-        {
-            MethodInputArrayType = BuildCreatedArrayInputType(
-                array.ElementType, 1, size is null ? [] : [size], initializer)
-        };
+            array.Attributes,
+            BuildCreatedArrayInputType(array.ElementType, 1, initializer));
     }
 
     private BoundExpression BindMultiDimArrayCreation(MultiDimArrayCreationNode array)
@@ -3285,20 +3497,16 @@ public sealed class Binder
             array.ElementType,
             array.Rank,
             dimensions,
-            rows)
-        {
-            MethodInputArrayType = BuildCreatedArrayInputType(
-                array.ElementType, array.Rank, dimensions, rows.SelectMany(row => row).ToArray())
-        };
+            rows,
+            BuildCreatedArrayInputType(array.ElementType, array.Rank, rows.SelectMany(row => row).ToArray()));
     }
 
     private BoundTypes.ArrayBoundType? BuildCreatedArrayInputType(
         string elementType,
         int rank,
-        IReadOnlyList<BoundExpression> dimensions,
         IReadOnlyList<BoundExpression> initializer)
     {
-        if (!TryBuildMethodInputArrayType($"{elementType}[{new string(',', rank - 1)}]", out var declared))
+        if (!TryBuildMethodInputArrayType($"ARRAY[element={elementType}]", out var declared))
             return null;
         var element = declared!.ElementType;
         if (element is BoundTypes.NominalBoundType reference
@@ -3306,9 +3514,10 @@ public sealed class Binder
             && reference.NullableAnnotation != BoundTypes.NullableAnnotation.Annotated)
         {
             var annotations = initializer.Select(value => NullabilityChecker.GetAnnotation(value.Type)).ToArray();
+            // Allocation guarantees the container, not initialization of every
+            // slot. Retain declared element annotations for sized allocations;
+            // explicit initializer values still contribute their annotations.
             var annotation = annotations.Contains(BoundTypes.NullableAnnotation.Annotated)
-                || initializer.Count == 0 && dimensions.Count > 0
-                    && !dimensions.Any(dimension => dimension is BoundIntLiteral { Value: 0 })
                 ? BoundTypes.NullableAnnotation.Annotated
                 : annotations.Any(value => value != BoundTypes.NullableAnnotation.NotAnnotated)
                     ? BoundTypes.NullableAnnotation.Oblivious
@@ -3490,6 +3699,7 @@ public sealed class Binder
             : coalesce.Left is ReferenceNode { Name: "null" } ? right.Type.DisplayString
             : coalesce.Right is ReferenceNode { Name: "null" } ? leftValueType
             : GetCommonType(leftValueType, rightValueType);
+        var shape = NullabilityResultTypes.Coalesce(left, right);
         return new BoundStructuralExpression(
             coalesce.Span,
             nameof(NullCoalesceNode),
@@ -3498,7 +3708,11 @@ public sealed class Binder
             metadata: null,
             deferredChildren: [right],
             typeAnnotation: BoundTypes.NullableAnnotation.Oblivious,
-            resultType: ExpressionResultTypes.Coalesce(resultName, left.Type, right.Type));
+            resultType: shape ?? ExpressionResultTypes.Coalesce(resultName, left.Type, right.Type))
+        {
+            MethodInputArrayType = shape as BoundTypes.ArrayBoundType,
+            GenericNullabilityType = shape as BoundTypes.GenericInstantiationBoundType
+        };
     }
 
     private BoundExpression BindNullConditional(NullConditionalNode conditional)
@@ -3598,6 +3812,11 @@ public sealed class Binder
 
     private BoundExpression BindLambdaExpression(LambdaExpressionNode lambda)
     {
+        var outerBindings = _scope.CaptureVisibleVariableBindings();
+        var outerFlowNarrowings = _flowNarrowingSources.ToArray();
+        var outerCallableState = CaptureCallableState();
+        var outerCallableWrites = _deferredCallableWrites;
+        _deferredCallableWrites = [];
         var parentContext = _declarationContext.IsNone ? _moduleSymbolId : _declarationContext;
         var lambdaIdentity = CreateDeclarationId(
             parentContext,
@@ -3664,6 +3883,27 @@ public sealed class Binder
             ? BoundTypes.EffectRow.Unknown
             : BoundTypes.EffectRow.AtDeclarationBoundary(
                 BindRow(lambda.Effects, binders: null));
+        var outerSymbols = new HashSet<VariableSymbol>(
+            outerBindings.Select(binding => binding.Symbol.StorageIdentity),
+            ReferenceEqualityComparer.Instance);
+        var deferredMutations = new HashSet<VariableSymbol>(
+            GetDeferredMutations(expressionBody, statementBody)
+                .Select(variable => variable.StorageIdentity)
+                .Where(outerSymbols.Contains),
+            ReferenceEqualityComparer.Instance);
+        var callableEffects = new CallableMutationSummary
+        {
+            Mutations = deferredMutations.ToArray(),
+            Alternatives = GetDeferredCallEffects(expressionBody, statementBody).ToArray(),
+            Writes = _deferredCallableWrites.ToArray()
+        };
+
+        Scope.RestoreVisibleVariableBindings(outerBindings);
+        _flowNarrowingSources.Clear();
+        foreach (var (narrowed, source) in outerFlowNarrowings)
+            _flowNarrowingSources[narrowed] = source;
+        RestoreCallableState(outerCallableState);
+        _deferredCallableWrites = outerCallableWrites;
 
         return new BoundLambdaExpression(
             lambda.Span,
@@ -3681,7 +3921,11 @@ public sealed class Binder
             // lambda's FunctionBoundType. A statement body has no single bound
             // expression, so the node falls back to the string it just computed.
             expressionBody?.Type,
-            declaredRow);
+            declaredRow,
+            deferredMutations)
+        {
+            CallableEffects = callableEffects
+        };
     }
 
     private BoundExpression BindMatchExpression(MatchExpressionNode match)
@@ -3703,26 +3947,54 @@ public sealed class Binder
 
     private IReadOnlyList<BoundMatchCase> BindMatchCases(IReadOnlyList<MatchCaseNode> cases)
     {
+        var baseline = CaptureFlowNarrowingState();
+        var fallthrough = baseline;
+        var branches = new List<FlowNarrowingState>();
+        var canFallThrough = true;
         var boundCases = new List<BoundMatchCase>(cases.Count);
         foreach (var matchCase in cases)
         {
-            using var _ = PushScope(_scope.CreateChild());
-            var pattern = BindPattern(matchCase.Pattern);
-            var guard = matchCase.Guard != null ? BindExpression(matchCase.Guard) : null;
-            if (matchCase.Guard != null && guard != null)
-                DeclareSuccessfulConditionPatterns(matchCase.Guard, guard);
-            var body = BindStatements(matchCase.Body);
-            var result = body.LastOrDefault() is BoundReturnStatement { Expression: not null } returnStatement
-                ? returnStatement.Expression
-                : null;
-            boundCases.Add(new BoundMatchCase(
-                matchCase.Span,
-                pattern,
-                matchCase.Pattern is WildcardPatternNode,
-                guard,
-                body,
-                result));
+            RestoreFlowNarrowingState(fallthrough);
+            FlowNarrowingState afterGuard;
+            using (PushScope(_scope.CreateChild()))
+            {
+                var pattern = BindPattern(matchCase.Pattern);
+                var guard = matchCase.Guard != null ? BindExpression(matchCase.Guard) : null;
+                afterGuard = CaptureFlowNarrowingState();
+                if (matchCase.Guard != null && guard != null)
+                    DeclareSuccessfulConditionPatterns(matchCase.Guard, guard);
+                var body = BindStatements(matchCase.Body);
+                var result = body.LastOrDefault() is BoundReturnStatement { Expression: not null } returnStatement
+                    ? returnStatement.Expression
+                    : null;
+                boundCases.Add(new BoundMatchCase(
+                    matchCase.Span,
+                    pattern,
+                    matchCase.Pattern is WildcardPatternNode,
+                    guard,
+                    body,
+                    result));
+            }
+            if (!canFallThrough)
+                continue;
+
+            branches.Add(CaptureFlowNarrowingState());
+            RestoreFlowNarrowingState(afterGuard);
+            var guardedFallthrough = CaptureFlowNarrowingState();
+            // A pattern miss skips its guard; a false guard keeps its effects.
+            // Neither path executes this arm's body, nor keeps pattern bindings.
+            JoinFlowBranchStates(fallthrough, [fallthrough, guardedFallthrough]);
+            fallthrough = CaptureFlowNarrowingState();
+            canFallThrough = matchCase.Guard is not null || matchCase.Pattern switch
+            {
+                WildcardPatternNode or VarPatternNode => false,
+                VariablePatternNode variable => variable.Name.Contains('.', StringComparison.Ordinal),
+                _ => true
+            };
         }
+        if (canFallThrough)
+            branches.Add(fallthrough);
+        JoinFlowBranchStates(baseline, branches);
         return boundCases;
     }
 
@@ -4189,21 +4461,325 @@ public sealed class Binder
 
     private BoundBinaryExpression BindBinaryOperation(BinaryOperationNode binOp)
     {
-        var left = BindExpression(binOp.Left);
+        BoundExpression left;
         BoundExpression right;
         if (binOp.Operator == BinaryOperator.And)
         {
             using var _ = PushScope(_scope.CreateChild());
+            var existingNarrowings = _flowNarrowingSources.Keys.ToHashSet();
+            left = BindExpression(binOp.Left);
             DeclareSuccessfulConditionPatterns(binOp.Left, left);
+            var introducedNarrowings = _flowNarrowingSources.Keys
+                .Where(variable => !existingNarrowings.Contains(variable))
+                .ToArray();
             right = BindExpression(binOp.Right);
+            var invalidatedNames = introducedNarrowings
+                .Where(variable => !_flowNarrowingSources.ContainsKey(variable))
+                .Select(variable => variable.Name)
+                .ToHashSet(StringComparer.Ordinal);
+            invalidatedNames.UnionWith(GetExplicitlyMutatedVariableNames(right));
+
+            var conjunctionResultType = GetBinaryOperationResultType(
+                binOp.Operator,
+                left.Type.DisplayString,
+                right.Type.DisplayString);
+            return new BoundBinaryExpression(binOp.Span, binOp.Operator, left, right, conjunctionResultType)
+            {
+                InvalidatedLeftNarrowingNames = invalidatedNames
+            };
         }
         else
+        {
+            left = BindExpression(binOp.Left);
             right = BindExpression(binOp.Right);
+        }
 
         // Determine result type based on operator (S7 batch-3: .Type.DisplayString shim).
         var resultType = GetBinaryOperationResultType(binOp.Operator, left.Type.DisplayString, right.Type.DisplayString);
 
         return new BoundBinaryExpression(binOp.Span, binOp.Operator, left, right, resultType);
+    }
+
+    private static IEnumerable<string> GetExplicitlyMutatedVariableNames(BoundExpression expression)
+    {
+        if (expression is BoundLambdaExpression)
+            yield break;
+
+        if (expression is BoundCallExpression
+            {
+                ArgumentModifiers: { } modifiers,
+                Arguments: var arguments
+            })
+        {
+            for (var index = 0; index < modifiers.Count && index < arguments.Count; index++)
+            {
+                if (modifiers[index] is "ref" or "out"
+                    && arguments[index] is BoundVariableExpression variable)
+                {
+                    yield return variable.Variable.Name;
+                }
+            }
+
+        }
+
+        foreach (var child in expression.Children)
+        {
+            foreach (var name in GetExplicitlyMutatedVariableNames(child))
+                yield return name;
+        }
+    }
+
+    private IEnumerable<VariableSymbol> GetDeferredMutations(
+        BoundExpression? expressionBody,
+        IReadOnlyList<BoundStatement>? statementBody)
+    {
+        if (expressionBody is not null)
+        {
+            foreach (var variable in GetExplicitlyMutatedVariables(expressionBody))
+                yield return variable;
+        }
+        if (statementBody is null)
+            yield break;
+        foreach (var statement in statementBody)
+        {
+            foreach (var variable in GetExplicitlyMutatedVariables(statement))
+                yield return variable;
+        }
+    }
+
+    private IEnumerable<VariableSymbol> GetExplicitlyMutatedVariables(BoundNode node)
+    {
+        if (node is BoundLambdaExpression)
+            yield break;
+        if (node is BoundAssignmentStatement
+            {
+                Target: BoundVariableExpression assigned
+            })
+            yield return assigned.Variable;
+        if (node is BoundCompoundAssignment
+            {
+                Target: BoundVariableExpression compounded
+            })
+            yield return compounded.Variable;
+        if (node is BoundCallExpression expression)
+        {
+            if (expression.ArgumentModifiers is { } modifiers)
+            {
+                for (var index = 0; index < modifiers.Count && index < expression.Arguments.Count; index++)
+                {
+                    if (modifiers[index] is "ref" or "out"
+                        && expression.Arguments[index] is BoundVariableExpression variable)
+                        yield return variable.Variable;
+                }
+            }
+            foreach (var captured in expression.ObservedCallableEffects.Mutations)
+                yield return captured;
+        }
+        else if (node is BoundCallStatement call)
+        {
+            if (call.ArgumentModifiers is { } modifiers)
+            {
+                for (var index = 0; index < modifiers.Count && index < call.Arguments.Count; index++)
+                {
+                    if (modifiers[index] is "ref" or "out"
+                        && call.Arguments[index] is BoundVariableExpression variable)
+                        yield return variable.Variable;
+                }
+            }
+            foreach (var captured in call.ObservedCallableEffects.Mutations)
+                yield return captured;
+        }
+        foreach (var child in node.ChildNodes)
+        {
+            foreach (var variable in GetExplicitlyMutatedVariables(child))
+                yield return variable;
+        }
+    }
+
+    private VariableSymbol? ResolveCallableStorage(string target, VariableSymbol? receiverSymbol) =>
+        (target.EndsWith(".Invoke", StringComparison.Ordinal)
+            ? receiverSymbol
+            : _scope.Lookup(target) as VariableSymbol)?.StorageIdentity;
+
+    private CallableMutationSummary InvalidateDeferredCallTarget(VariableSymbol? callable)
+    {
+        if (callable is null)
+            return CallableMutationSummary.Empty;
+
+        var observed = GetCallableState(callable);
+        return new CallableMutationSummary
+        {
+            Mutations = ApplyCallableMutationSummary(observed),
+            Dependencies = [callable],
+            Alternatives = [observed]
+        };
+    }
+
+    private IReadOnlyList<VariableSymbol> ApplyCallableMutationSummary(CallableMutationSummary observed)
+    {
+        var mutations = new HashSet<VariableSymbol>(ReferenceEqualityComparer.Instance);
+        var dependencies = new HashSet<VariableSymbol>(ReferenceEqualityComparer.Instance);
+        var visited = new HashSet<CallableMutationSummary>(ReferenceEqualityComparer.Instance);
+        var writes = new List<CallableMutationWrite>();
+        var pending = new Queue<CallableMutationSummary>();
+        pending.Enqueue(observed);
+        bool changed;
+        do
+        {
+            while (pending.TryDequeue(out var effects))
+            {
+                if (!visited.Add(effects))
+                    continue;
+                mutations.UnionWith(effects.Mutations);
+                foreach (var alternative in effects.Alternatives)
+                    pending.Enqueue(alternative);
+                foreach (var dependency in effects.Dependencies)
+                {
+                    dependencies.Add(dependency);
+                    pending.Enqueue(GetCallableState(dependency));
+                }
+                writes.AddRange(effects.Writes);
+            }
+            changed = false;
+            foreach (var (storage, observedValue, valueSources) in writes)
+            {
+                // A summary joins all paths through the deferred body. A write
+                // may not execute, so preserve the pre-call target as well.
+                var value = observedValue;
+                foreach (var source in valueSources)
+                    value = UnionCallableEffects(value, GetCallableState(source));
+                var previous = GetCallableState(storage);
+                var updated = UnionCallableEffects(previous, value);
+                if (ReferenceEquals(previous, updated))
+                    continue;
+                _callableState[storage] = updated;
+                changed = true;
+                if (dependencies.Contains(storage))
+                    pending.Enqueue(updated);
+            }
+        }
+        while (changed || pending.Count > 0);
+        foreach (var captured in mutations)
+        {
+            foreach (var binding in _scope.CaptureVisibleVariableBindings())
+            {
+                if (ReferenceEquals(binding.Symbol.StorageIdentity, captured.StorageIdentity))
+                    InvalidateMutableFlowNarrowing(binding.Symbol, requireRebindable: false);
+            }
+        }
+        return mutations.ToArray();
+    }
+
+    private CallableMutationSummary GetCallableState(VariableSymbol storage) =>
+        _callableState.GetValueOrDefault(storage.StorageIdentity, CallableMutationSummary.Empty);
+
+    private Dictionary<VariableSymbol, CallableMutationSummary> CaptureCallableState() =>
+        new(_callableState, ReferenceEqualityComparer.Instance);
+
+    private void RestoreCallableState(IReadOnlyDictionary<VariableSymbol, CallableMutationSummary> state)
+    {
+        _callableState.Clear();
+        foreach (var (storage, effects) in state)
+            _callableState.Add(storage, effects);
+    }
+
+    private void SetCallableState(VariableSymbol variable, BoundExpression value)
+    {
+        var effects = GetCallableEffects(value);
+        _callableState[variable.StorageIdentity] = effects;
+        _deferredCallableWrites?.Add(new(
+            variable.StorageIdentity, effects, GetCallableValueSources(value).ToArray()));
+    }
+
+    private static IEnumerable<VariableSymbol> GetCallableValueSources(BoundExpression expression)
+    {
+        if (expression is BoundLambdaExpression)
+            yield break;
+        if (expression is BoundVariableExpression variable)
+            yield return variable.Variable.StorageIdentity;
+        foreach (var child in expression.Children)
+        {
+            foreach (var source in GetCallableValueSources(child))
+                yield return source;
+        }
+    }
+
+    private CallableMutationSummary GetCallableEffects(BoundExpression expression)
+    {
+        if (expression is BoundLambdaExpression lambda)
+            return lambda.CallableEffects;
+        if (expression is BoundVariableExpression variable)
+            return GetCallableState(variable.Variable);
+        var effects = CallableMutationSummary.Empty;
+        foreach (var child in expression.Children)
+            effects = UnionCallableEffects(effects, GetCallableEffects(child));
+        return effects;
+    }
+
+    private static CallableMutationSummary UnionCallableEffects(
+        CallableMutationSummary left, CallableMutationSummary right)
+    {
+        if (ReferenceEquals(left, right) || ReferenceEquals(right, CallableMutationSummary.Empty))
+            return left;
+        if (ReferenceEquals(left, CallableMutationSummary.Empty))
+            return right;
+        var alternatives = new HashSet<CallableMutationSummary>(
+            GetCallableAlternatives(left), ReferenceEqualityComparer.Instance);
+        var previousCount = alternatives.Count;
+        alternatives.UnionWith(GetCallableAlternatives(right));
+        if (alternatives.Count == previousCount)
+            return left;
+        return new CallableMutationSummary { Alternatives = alternatives.ToArray() };
+    }
+
+    private static IEnumerable<CallableMutationSummary> GetCallableAlternatives(CallableMutationSummary effects)
+    {
+        if (ReferenceEquals(effects, CallableMutationSummary.Empty))
+            yield break;
+        if (effects.Mutations.Count > 0 || effects.Dependencies.Count > 0 || effects.Writes.Count > 0
+            || effects.Alternatives.Count == 0)
+        {
+            yield return effects;
+            yield break;
+        }
+        foreach (var alternative in effects.Alternatives)
+        {
+            foreach (var nested in GetCallableAlternatives(alternative))
+                yield return nested;
+        }
+    }
+
+    private static IEnumerable<CallableMutationSummary> GetDeferredCallEffects(
+        BoundExpression? expression, IReadOnlyList<BoundStatement>? statements)
+    {
+        if (expression is not null)
+        {
+            foreach (var effects in GetObservedCallEffects(expression))
+                yield return effects;
+        }
+        if (statements is not null)
+        {
+            foreach (var statement in statements)
+            {
+                foreach (var effects in GetObservedCallEffects(statement))
+                    yield return effects;
+            }
+        }
+    }
+
+    private static IEnumerable<CallableMutationSummary> GetObservedCallEffects(BoundNode node)
+    {
+        if (node is BoundLambdaExpression)
+            yield break;
+        if (node is BoundCallExpression expression)
+            yield return expression.ObservedCallableEffects;
+        else if (node is BoundCallStatement statement)
+            yield return statement.ObservedCallableEffects;
+        foreach (var child in node.ChildNodes)
+        {
+            foreach (var effects in GetObservedCallEffects(child))
+                yield return effects;
+        }
     }
 
     private static string GetBinaryOperationResultType(BinaryOperator op, string leftType, string rightType)
@@ -4278,6 +4854,7 @@ public sealed class Binder
             : null;
         var annotatedReturn = bclResolution?.GetReturnBoundTypeEx();
         var methodInputArrayReturn = annotatedReturn as BoundTypes.ArrayBoundType;
+        var genericNullabilityReturn = annotatedReturn as BoundTypes.GenericInstantiationBoundType;
         if (bclResolution?.LegacyReturnType is { } legacyReturn)
             annotatedReturn = legacyReturn;
 
@@ -4309,16 +4886,23 @@ public sealed class Binder
                     returnType, declaredAnnotation, identity?.Declaration, identity?.RoslynSymbol);
             }
         }
+        BoundTypes.BoundType? callableReturn = null;
         if (annotatedReturn is null
             && _scope.Lookup(callExpr.Target) is VariableSymbol { FunctionType: { } functionType })
         {
-            annotatedReturn = functionType.ReturnType;
+            annotatedReturn = callableReturn = functionType.ReturnType;
         }
         if (annotatedReturn is null
             && resolvedMethodName == "Invoke"
             && receiverSymbol?.FunctionType is { } receiverFunctionType)
         {
-            annotatedReturn = receiverFunctionType.ReturnType;
+            annotatedReturn = callableReturn = receiverFunctionType.ReturnType;
+        }
+        if (callableReturn is not null)
+        {
+            var callableShape = GetCallableReturnNullabilityShape(callableReturn);
+            methodInputArrayReturn ??= callableShape as BoundTypes.ArrayBoundType;
+            genericNullabilityReturn ??= callableShape as BoundTypes.GenericInstantiationBoundType;
         }
         if (annotatedReturn is null
             && resolvedMethodName == "Unwrap"
@@ -4334,9 +4918,11 @@ public sealed class Binder
 
         ValidateCallArguments(args, resolution, bclResolution);
         ValidateDirectFunctionArguments(callExpr.Target, receiverSymbol, args, resolution, bclResolution);
-        InvalidateMutatingCallArguments(args, resolution, bclResolution);
+        InvalidateMutatingCallArguments(args, callExpr.ArgumentModifiers, resolution, bclResolution);
+        var callable = ResolveCallableStorage(callExpr.Target, receiverSymbol);
+        var callableEffects = InvalidateDeferredCallTarget(callable);
 
-        return new BoundCallExpression(
+        var boundCall = new BoundCallExpression(
             callExpr.Span,
             callExpr.Target,
             args,
@@ -4361,12 +4947,33 @@ public sealed class Binder
             annotatedReturnType: annotatedReturn,
             receiver: receiver)
         {
+            CallableStorageIdentity = callable,
+            ObservedCallableEffects = callableEffects,
             ArgumentParameterIndices = GetBclArgumentParameterIndices(bclResolution, args.Count),
             SelectedOverloadMatches = resolution.Matches,
             MethodInputArrayType = methodInputArrayReturn ?? (resolution.Matches.Count == 1
                 && TryBuildMethodInputArrayType(resolution.Matches[0].ReturnType, out var nativeArray,
-                    resolution.Matches[0].Function) ? nativeArray : null)
+                    resolution.Matches[0].Function) ? nativeArray : null),
+            GenericNullabilityType = genericNullabilityReturn ?? (resolution.Matches.Count == 1
+                && TryParseGenericStringTarget(resolution.Matches[0].ReturnType, out var genericReturn)
+                    ? genericReturn : null)
         };
+        return boundCall;
+    }
+
+    private BoundTypes.BoundType? GetCallableReturnNullabilityShape(BoundTypes.BoundType returnType)
+    {
+        if (returnType is BoundTypes.ArrayBoundType or BoundTypes.GenericInstantiationBoundType)
+            return returnType;
+        if (returnType is not BoundTypes.NominalBoundType nominal)
+            return null;
+
+        var spelling = nominal.NullableAnnotation == BoundTypes.NullableAnnotation.Annotated
+            ? $"?{nominal.QualifiedName}"
+            : nominal.QualifiedName;
+        if (TryBuildMethodInputArrayType(spelling, out var array))
+            return array;
+        return TryParseGenericStringTarget(spelling, out var generic) ? generic : null;
     }
 
     /// <summary>
@@ -4916,6 +5523,12 @@ public sealed class Binder
             return null;
         if (string.Equals(argument, "NULL", StringComparison.Ordinal))
             return IsNullCompatibleParameterType(parameterType) ? 40 : null;
+
+        if (TypeIdentity.TrySplitGeneric(parameter, out var parameterDefinition, out var parameterArguments)
+            && TypeIdentity.TrySplitGeneric(argument, out var argumentDefinition, out var argumentArguments)
+            && NullabilityChecker.SameGenericDefinition(parameterDefinition, argumentDefinition)
+            && parameterArguments.SequenceEqual(argumentArguments))
+            return 0;
 
         var parameterIsArray = TrySplitArrayTypeSpelling(parameterType, out _, out _, out _);
         var argumentIsArray = TrySplitArrayTypeSpelling(argumentType, out _, out _, out _);
@@ -5845,52 +6458,95 @@ public sealed class Binder
 
     private BoundTryStatement BindTryStatement(TryStatementNode tryStmt)
     {
-        // Bind try body in its own scope
-        IReadOnlyList<BoundStatement> tryBody;
-        {
-            using var _ = PushScope(_scope.CreateChild());
-            tryBody = BindStatements(tryStmt.TryBody);
-        }
+        var baseline = CaptureFlowNarrowingState();
+        var tryBody = BindExceptionalFlowBody(tryStmt.TryBody, out var exceptional);
+        var branches = new List<FlowNarrowingState> { CaptureFlowNarrowingState() };
+        var exceptionalExits = new List<FlowNarrowingState> { exceptional };
 
-        // Bind catch clauses
         var catchClauses = new List<BoundCatchClause>();
         foreach (var catchClause in tryStmt.CatchClauses)
         {
-            using var _ = PushScope(_scope.CreateChild());
-
-            VariableSymbol? exceptionVar = null;
-            if (catchClause.VariableName != null)
+            RestoreFlowNarrowingState(exceptional);
+            FlowNarrowingState afterFilter;
+            using (PushScope(_scope.CreateChild()))
             {
-                var typeName = catchClause.ExceptionType ?? "Exception";
-                exceptionVar = CreateLocalVariable(
-                    catchClause.VariableName,
-                    typeName,
-                    isMutable: false,
-                    isParameter: false,
-                    ParameterModifier.None,
-                    catchClause.VariableSpan ?? catchClause.Span,
-                    "catch");
-                _scope.TryDeclare(exceptionVar);
+                VariableSymbol? exceptionVar = null;
+                if (catchClause.VariableName != null)
+                {
+                    var typeName = catchClause.ExceptionType ?? "Exception";
+                    exceptionVar = CreateLocalVariable(
+                        catchClause.VariableName,
+                        typeName,
+                        isMutable: false,
+                        isParameter: false,
+                        ParameterModifier.None,
+                        catchClause.VariableSpan ?? catchClause.Span,
+                        "catch",
+                        nullableAnnotation: BoundTypes.NullableAnnotation.NotAnnotated);
+                    _scope.TryDeclare(exceptionVar);
+                }
+
+                var filter = catchClause.Filter is null ? null : BindExpression(catchClause.Filter);
+                afterFilter = CaptureFlowNarrowingState();
+                if (catchClause.Filter is not null && filter is not null)
+                    DeclareSuccessfulConditionPatterns(catchClause.Filter, filter);
+                var catchBody = BindExceptionalFlowBody(catchClause.Body, out var catchExceptional);
+                exceptionalExits.Add(catchExceptional);
+                catchClauses.Add(new BoundCatchClause(
+                    catchClause.Span, catchClause.ExceptionType, exceptionVar, catchBody, filter));
             }
-
-            var catchBody = BindStatements(catchClause.Body);
-
-            catchClauses.Add(new BoundCatchClause(
-                catchClause.Span,
-                catchClause.ExceptionType,
-                exceptionVar,
-                catchBody));
+            branches.Add(CaptureFlowNarrowingState());
+            RestoreFlowNarrowingState(afterFilter);
+            var filterFallthrough = CaptureFlowNarrowingState();
+            JoinFlowBranchStates(exceptional, [exceptional, filterFallthrough]);
+            exceptional = CaptureFlowNarrowingState();
         }
+        exceptionalExits.Add(exceptional);
+        JoinFlowBranchStates(baseline, branches);
 
-        // Bind finally body if present
         IReadOnlyList<BoundStatement>? finallyBody = null;
         if (tryStmt.FinallyBody != null && tryStmt.FinallyBody.Count > 0)
         {
+            // Finally also runs when an exception leaves the try or a handler
+            // before its last statement, not just after their normal exits.
+            JoinFlowBranchStates(baseline, [.. branches, .. exceptionalExits]);
             using var _ = PushScope(_scope.CreateChild());
             finallyBody = BindStatements(tryStmt.FinallyBody);
         }
-
         return new BoundTryStatement(tryStmt.Span, tryBody, catchClauses, finallyBody);
+    }
+
+    private IReadOnlyList<BoundStatement> BindExceptionalFlowBody(
+        IReadOnlyList<StatementNode> statements, out FlowNarrowingState exceptional)
+    {
+        var baseline = CaptureFlowNarrowingState();
+        var enclosingWrites = _deferredCallableWrites;
+        var writes = new List<CallableMutationWrite>();
+        _deferredCallableWrites = writes;
+        IReadOnlyList<BoundStatement> body;
+        try
+        {
+            using var _ = PushScope(_scope.CreateChild());
+            body = BindStatements(statements);
+        }
+        finally
+        {
+            _deferredCallableWrites = enclosingWrites;
+            enclosingWrites?.AddRange(writes);
+        }
+        var normalExit = CaptureFlowNarrowingState();
+        JoinFlowBranchStates(baseline, [baseline, normalExit]);
+        // An exception may observe a prefix whose callable target was replaced
+        // again before normal completion. Retain all observed writes and calls.
+        ApplyCallableMutationSummary(new CallableMutationSummary
+        {
+            Mutations = GetDeferredMutations(null, body).ToArray(),
+            Alternatives = GetDeferredCallEffects(null, body).ToArray(),
+            Writes = writes
+        });
+        exceptional = CaptureFlowNarrowingState();
+        RestoreFlowNarrowingState(normalExit);
+        return body;
     }
 
     private BoundMatchStatement BindMatchStatement(MatchStatementNode matchStmt)
@@ -5912,6 +6568,7 @@ public sealed class Binder
             var restored = InvalidateMutableFlowNarrowing(variable.Variable);
             if (!ReferenceEquals(restored, variable.Variable))
                 target = new BoundVariableExpression(assign.Target.Span, restored);
+            SetCallableState(restored, value);
         }
         return new BoundAssignmentStatement(assign.Span, target, value);
     }
@@ -5959,7 +6616,10 @@ public sealed class Binder
             _scope.TryDeclare(indexVar);
         }
 
+        PrepareLoopCallableState(forEach.Body);
+        var headerCallables = CaptureCallableState();
         var body = BindStatements(forEach.Body);
+        JoinCallableState(headerCallables);
         return new BoundForeachStatement(forEach.Span, loopVar, collection, body);
     }
 
@@ -5967,10 +6627,35 @@ public sealed class Binder
     {
         using var _ = PushScope(_scope.CreateChild());
 
+        var resourceExpr = BindExpression(usingStmt.Resource);
         VariableSymbol? resource = null;
         if (usingStmt.VariableName != null)
         {
-            var typeName = usingStmt.VariableType ?? "IDisposable";
+            if (usingStmt.VariableType is not null
+                && TryBuildStringTarget(usingStmt.VariableType, out var target)
+                && NullabilityChecker.IsPossiblyNullAssignedTo(resourceExpr, target!))
+            {
+                var (targetShapeLabel, fixHintTargetLabel) = DescribeStringTargetShape(target!);
+                _diagnostics.Report(
+                    resourceExpr.Span,
+                    DiagnosticCode.NullableToNonNullableBinding,
+                    $"Using resource '{usingStmt.VariableName}' declares non-nullable {targetShapeLabel} but its initializer " +
+                    $"may be null (source annotation: '{DescribeAnnotation(resourceExpr)}'). " +
+                    $"Change the target to {fixHintTargetLabel} or add an explicit non-null check at the interop boundary.",
+                    SemanticsVersion.NullabilitySeverityFor(),
+                    BindingDiagnosticContext.For(BindingReceivingBoundary.Initializer, target!));
+            }
+            var inferredReferenceType = usingStmt.VariableType is null
+                ? GetInferredReferenceType(resourceExpr)
+                : null;
+            var typeName = usingStmt.VariableType
+                ?? inferredReferenceType?.DisplayString
+                ?? resourceExpr.Type.DisplayString;
+            var annotation = usingStmt.VariableType is null
+                ? inferredReferenceType?.NullableAnnotation
+                    ?? NullabilityChecker.GetAnnotation(resourceExpr.Type)
+                    ?? BoundTypes.NullableAnnotation.Oblivious
+                : TryReadDeclaredStringAnnotation(usingStmt.VariableType);
             resource = CreateLocalVariable(
                 usingStmt.VariableName,
                 typeName,
@@ -5978,11 +6663,13 @@ public sealed class Binder
                 isParameter: false,
                 ParameterModifier.None,
                 usingStmt.VariableSpan ?? usingStmt.Span,
-                "using");
+                "using",
+                nullableAnnotation: annotation,
+                inferredReferenceType: inferredReferenceType,
+                isTypeInferred: usingStmt.VariableType is null);
             _scope.TryDeclare(resource);
         }
 
-        var resourceExpr = BindExpression(usingStmt.Resource);
         var body = BindStatements(usingStmt.Body);
         return new BoundUsingStatement(usingStmt.Span, resource, resourceExpr, body);
     }
@@ -5991,8 +6678,11 @@ public sealed class Binder
     {
         using var _ = PushScope(_scope.CreateChild());
 
+        PrepareLoopCallableState(doWhile.Body, doWhile.Condition, conditionAfterBody: true);
+        var headerCallables = CaptureCallableState();
         var body = BindStatements(doWhile.Body);
         var condition = BindExpression(doWhile.Condition);
+        JoinCallableState(headerCallables);
         return new BoundDoWhileStatement(doWhile.Span, condition, body);
     }
 

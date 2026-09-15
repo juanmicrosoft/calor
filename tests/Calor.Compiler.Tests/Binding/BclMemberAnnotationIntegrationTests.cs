@@ -63,9 +63,8 @@ public partial class BclMemberAnnotationTests
             // These joint nominal/API controls disable effects; original controls retain default gates.
             var compiled = Program.Compile(source, "n5-joint-locals.calr",
                 new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
-            var activeScalar = receivingType == "str" && nullable;
-            Assert.Equal(activeScalar, compiled.HasErrors);
-            if (!activeScalar)
+            Assert.Equal(nullable, compiled.HasErrors);
+            if (!nullable)
             {
                 var validation = GeneratedCSharpCompiler.Validate(compiled.GeneratedCode);
                 Assert.True(validation.CompilationSuccess, string.Join("\n", validation.CompilationErrors));
@@ -101,7 +100,7 @@ public partial class BclMemberAnnotationTests
         AssertJointFinding(diagnostics, Code("argument"), call.Arguments[1], nullable, "'required'");
         var compiled = Program.Compile(source, "n5-joint-native.calr",
             new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
-        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
+        Assert.Equal(nullable, compiled.HasErrors);
     }
 
     [Theory]
@@ -243,9 +242,7 @@ public partial class BclMemberAnnotationTests
             Assert.Contains("'Annotated'", finding.Message);
             if (parameter is not null)
                 Assert.Contains(parameter, finding.Message);
-            Assert.Equal(
-                finding.BindingContext?.Shape == BindingReceivingShape.ScalarString,
-                BindingDiagnosticPolicy.IsCompilationError(finding));
+            Assert.True(BindingDiagnosticPolicy.IsCompilationError(finding));
         }
     }
 

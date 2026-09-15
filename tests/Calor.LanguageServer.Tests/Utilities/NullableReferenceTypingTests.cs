@@ -32,26 +32,20 @@ public class NullableReferenceTypingTests
         using var document = new DocumentState(new Uri(path), source);
         await document.ReanalyzeAsync();
         var diagnostic = Assert.Single(document.Diagnostics.Where(d => d.Code == DiagnosticCode.NullableReturnFromNonNullable));
-        var scalar = referenceType is "string" or "str";
-        Assert.Equal(scalar, BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
         var lsp = DiagnosticConverter.ToLspDiagnostic(diagnostic, source);
-        Assert.Equal(scalar ? "calor" : "calor (analysis only)", lsp.Source);
+        Assert.Equal("calor", lsp.Source);
         Assert.Equal(PositionConverter.ToLspRange(diagnostic.Span, source), lsp.Range);
-        Assert.Equal(scalar ? BindingReceivingShape.ScalarString : BindingReceivingShape.Nominal,
+        Assert.Equal(referenceType is "string" or "str"
+                ? BindingReceivingShape.ScalarString
+                : BindingReceivingShape.Nominal,
             diagnostic.BindingContext?.Shape);
         Assert.Contains("source annotation: 'Annotated'", diagnostic.Message);
         var result = Compiler.Program.Compile(source, path);
-        Assert.Equal(scalar, result.HasErrors);
-        if (scalar)
-        {
-            var compiler = Assert.Single(result.Diagnostics.Where(d => d.Code == diagnostic.Code));
-            Assert.Equal(diagnostic.Span, compiler.Span);
-            Assert.Equal(diagnostic.Severity, compiler.Severity);
-        }
-        else
-        {
-            Assert.DoesNotContain(result.Diagnostics, d => d.Code == diagnostic.Code);
-        }
+        Assert.True(result.HasErrors);
+        var compiler = Assert.Single(result.Diagnostics.Where(d => d.Code == diagnostic.Code));
+        Assert.Equal(diagnostic.Span, compiler.Span);
+        Assert.Equal(diagnostic.Severity, compiler.Severity);
         var update = await document.UpdateAsync(
             source.Replace($"-> {referenceType}", $"-> ?{referenceType}", StringComparison.Ordinal), 1);
         Assert.True(update.Accepted);
@@ -59,7 +53,7 @@ public class NullableReferenceTypingTests
     }
 
     [Fact]
-    public async Task NominalReturnDiagnostic_IsAnalysisOnlyAndClearsOnSafeEditAsync()
+    public async Task NominalReturnDiagnostic_IsActiveAndClearsOnSafeEditAsync()
     {
         const string source = """
             §M{m1:NominalIdentity}
@@ -73,14 +67,14 @@ public class NullableReferenceTypingTests
         using var document = new DocumentState(new Uri(path), source);
         await document.ReanalyzeAsync();
         var diagnostic = Assert.Single(document.Diagnostics.Where(d => d.Code == DiagnosticCode.NullableReturnFromNonNullable));
-        Assert.False(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
         var lsp = DiagnosticConverter.ToLspDiagnostic(diagnostic, source);
-        Assert.Equal("calor (analysis only)", lsp.Source);
+        Assert.Equal("calor", lsp.Source);
         Assert.Equal(PositionConverter.ToLspRange(diagnostic.Span, source), lsp.Range);
         Assert.Equal(BindingReceivingShape.Nominal, diagnostic.BindingContext?.Shape);
         var result = Compiler.Program.Compile(source, path);
-        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
-        Assert.DoesNotContain(result.Diagnostics, d => d.Code == diagnostic.Code);
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics, d => d.Code == diagnostic.Code);
         var update = await document.UpdateAsync(source.Replace("-> Foo", "-> ?Foo", StringComparison.Ordinal), 1);
         Assert.True(update.Accepted);
         Assert.DoesNotContain(update.Snapshot.Diagnostics, d => d.Code == diagnostic.Code);

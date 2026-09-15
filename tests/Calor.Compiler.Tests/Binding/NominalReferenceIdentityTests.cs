@@ -82,14 +82,130 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void ObliviousNominalReference_IsNotWidenedByIdentityRepair()
+    public void ObliviousNominalReference_IsPossiblyNullAfterStageBPolicyAdoption()
     {
         var symbol = IdentityCompilation().GetTypeByMetadataName("A.Foo");
         Assert.NotNull(symbol);
         var target = new NominalBoundType("A.Foo", NullableAnnotation.NotAnnotated, roslynSymbol: symbol);
         var source = new NominalBoundType("A.Foo", NullableAnnotation.Oblivious, roslynSymbol: symbol);
         Assert.True(source.HasSameUnderlyingReferenceType(target));
-        Assert.False(NullabilityChecker.IsPossiblyNullAssignedTo(new FixtureExpression(source), target));
+        Assert.True(NullabilityChecker.IsPossiblyNullAssignedTo(new FixtureExpression(source), target));
+    }
+
+    [Theory]
+    [InlineData("§B{copy:Exception} ex")]
+    [InlineData("§R ex")]
+    [InlineData("§R §C{Take} §A ex §/C")]
+    public void CatchVariables_AreKnownNonNullAcrossReceivingBoundaries(string statement)
+    {
+        var source = $$"""
+            §M{m1:CatchNullability}
+              §F{take:Take:pub} (Exception:value) -> Exception
+                §R value
+              §F{probe:Probe:pub} () -> Exception
+                §TR{try1}
+                  §P "try"
+                §CA{Exception:ex}
+                  {{statement}}
+            """;
+        var (_, diagnostics) = Bind(source);
+        Assert.DoesNotContain(diagnostics, d => d.Code is
+            DiagnosticCode.NullableToNonNullableBinding
+            or DiagnosticCode.NullableReturnFromNonNullable
+            or DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
+    [Theory]
+    [InlineData("§B{copy:System.IO.MemoryStream} stream")]
+    [InlineData("§R stream")]
+    [InlineData("§R §C{TakeStream} §A stream §/C")]
+    public void InferredUsingResources_PreserveNonNullInitializerIdentity(string statement)
+    {
+        var source = $$"""
+            §M{m1:UsingNullability}
+              §F{take:TakeStream:pub} (System.IO.MemoryStream:value) -> System.IO.MemoryStream
+                §R value
+              §F{probe:Probe:pub} () -> System.IO.MemoryStream
+                §USE{use1:stream} §NEW{System.IO.MemoryStream}
+                  {{statement}}
+            """;
+        var (_, diagnostics) = Bind(source);
+        Assert.DoesNotContain(diagnostics, d => d.Code is
+            DiagnosticCode.NullableToNonNullableBinding
+            or DiagnosticCode.NullableReturnFromNonNullable
+            or DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
+    [Theory]
+    [InlineData("(?? other §THIS)")]
+    [InlineData("(? flag §TH §THIS §TH other)")]
+    public void ThisExpression_IsKnownNonNullThroughReferenceJoins(string expression)
+    {
+        var source = $$"""
+            §M{m1:ThisNullability}
+              §CL{c1:Foo:pub}
+                §MT{probe:Probe:pub} (?Foo:other, bool:flag) -> Foo
+                  §R {{expression}}
+            """;
+        var (_, diagnostics) = Bind(source);
+        Assert.DoesNotContain(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableReturnFromNonNullable);
+    }
+
+    [Fact]
+    public void ThisAndBaseExpressions_AreDeclaredNonNull()
+    {
+        Assert.Equal(NullableAnnotation.NotAnnotated,
+            Assert.IsType<NominalBoundType>(new BoundThisExpression(default, "Foo").Type).NullableAnnotation);
+        Assert.Equal(NullableAnnotation.NotAnnotated,
+            Assert.IsType<NominalBoundType>(new BoundBaseExpression(default, "BaseFoo").Type).NullableAnnotation);
+    }
+
+    [Fact]
+    public void ExplicitNullableUsingResource_RemainsNullable()
+    {
+        const string source = """
+            §M{m1:NullableUsing}
+              §F{probe:Probe:pub} (?System.IO.MemoryStream:input) -> void
+                §USE{use1:stream:?System.IO.MemoryStream} input
+                  §B{copy:System.IO.MemoryStream} stream
+            """;
+        var (_, diagnostics) = Bind(source);
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding
+            && BindingDiagnosticPolicy.IsCompilationError(d));
+    }
+
+    [Fact]
+    public void ExplicitNonNullableUsingResource_RejectsNullableInitializer()
+    {
+        const string source = """
+            §M{m1:NullableUsingInitializer}
+              §F{probe:Probe:pub} (?System.IO.MemoryStream:input) -> void
+                §USE{use1:stream:System.IO.MemoryStream} input
+                  §B{copy:?System.IO.MemoryStream} stream
+            """;
+        var (_, diagnostics) = Bind(source);
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableToNonNullableBinding
+            && BindingDiagnosticPolicy.IsCompilationError(d));
+    }
+
+    [Fact]
+    public void InferredNullableUsingResource_RetainsNativeTypeForArgumentValidation()
+    {
+        const string source = """
+            §M{m1:InferredNullableUsing}
+              §F{take:Take:pub} (System.IO.MemoryStream:value) -> System.IO.MemoryStream
+                §R value
+              §F{probe:Probe:pub} (?System.IO.MemoryStream:input) -> System.IO.MemoryStream
+                §USE{use1:stream} input
+                  §R §C{Take} §A stream §/C
+            """;
+        var (_, diagnostics) = Bind(source);
+        Assert.Contains(diagnostics, d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+            && BindingDiagnosticPolicy.IsCompilationError(d));
     }
 
     public static IEnumerable<object?[]> AnnotationKinds()
@@ -303,16 +419,20 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
     [Theory]
     [InlineData("?Foo")]
     [InlineData("Foo")]
-    public void ProductionNominalRouting_RemainsAnalysisOnly(string sourceType)
+    public void ProductionNominalRouting_ActivatesOnlyForPossiblyNullSource(string sourceType)
     {
         var source = NativeSource(sourceType, "return");
         var result = Program.Compile(source, "nominal-identity.calr");
-        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
-        Assert.True(GeneratedCSharpCompiler.Validate(result.GeneratedCode).CompilationSuccess);
         var (_, raw) = Bind(source);
-        Assert.Equal(sourceType == "?Foo",
+        var shouldReject = sourceType == "?Foo";
+        Assert.Equal(shouldReject,
             raw.Any(d => d.Code == DiagnosticCode.NullableReturnFromNonNullable));
-        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.NullableReturnFromNonNullable);
+        Assert.Equal(shouldReject, result.HasErrors);
+        Assert.Equal(shouldReject, result.Diagnostics.Any(
+            d => d.Code == DiagnosticCode.NullableReturnFromNonNullable
+                && BindingDiagnosticPolicy.IsCompilationError(d)));
+        if (!shouldReject)
+            Assert.True(GeneratedCSharpCompiler.Validate(result.GeneratedCode).CompilationSuccess);
     }
 
     [Theory]
@@ -382,7 +502,7 @@ public class NominalReferenceIdentityTests(ITestOutputHelper output)
         var diagnostic = Assert.Single(diagnostics.Where(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
         Assert.Equal(BindingReceivingShape.Nominal, diagnostic.BindingContext?.Shape);
         Assert.Equal(producer.Span, diagnostic.Span);
-        Assert.False(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
     }
 
     private static string NativeSource(string sourceType, string boundary)

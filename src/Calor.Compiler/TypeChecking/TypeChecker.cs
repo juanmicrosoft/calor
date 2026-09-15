@@ -460,7 +460,7 @@ public sealed class TypeChecker
                 && !ContainsInferencePlaceholder(returnType)
                 && !IsAssignable(_currentReturnType, returnType)
                 && !(_lambdaBodyDepth == 0
-                    && IsBinderOwnedScalarNullabilityMismatch(_currentReturnType, returnType)))
+                    && IsBinderOwnedNullabilityMismatch(_currentReturnType, returnType)))
             {
                 _lambdaReturnInvalid = true;
                 if (!_suppressContextualDiagnostics)
@@ -785,7 +785,7 @@ public sealed class TypeChecker
                     initType = InferExpressionType(bind.Initializer, varType);
                 }
                 if (!IsAssignable(varType, initType)
-                    && !IsBinderOwnedScalarNullabilityMismatch(varType, initType))
+                    && !IsBinderOwnedNullabilityMismatch(varType, initType))
                 {
                     _diagnostics.ReportError(bind.Span, DiagnosticCode.TypeMismatch,
                         $"Cannot assign {initType.SurfaceName} to variable of type {varType.SurfaceName}");
@@ -1393,7 +1393,7 @@ public sealed class TypeChecker
                 return ErrorType.Instance;
             }
 
-            if (IsAssignable(leftType, rightType))
+            if (IsAssignable(leftType, rightType) || IsBinderOwnedNullabilityMismatch(leftType, rightType))
             {
                 return leftType;
             }
@@ -3508,6 +3508,17 @@ public sealed class TypeChecker
         if (trueType is TypeVariable) return falseType;
         if (falseType is TypeVariable) return trueType;
 
+        if (trueType is GenericInstanceType trueGeneric
+            && falseType is GenericInstanceType falseGeneric
+            && trueGeneric.TypeArguments.Count == 1 && falseGeneric.TypeArguments.Count == 1
+            && Binding.NullabilityChecker.SameGenericDefinition(trueGeneric.BaseName, falseGeneric.BaseName)
+            && (trueGeneric.TypeArguments[0].Equals(falseGeneric.TypeArguments[0])
+                || IsBinderOwnedNullabilityMismatch(trueGeneric, falseGeneric)))
+        {
+            return new GenericInstanceType(trueGeneric.BaseName,
+                [CommonConditionalType(span, trueGeneric.TypeArguments[0], falseGeneric.TypeArguments[0])]);
+        }
+
         if (trueType is OptionType trueOption && falseType is OptionType falseOption)
         {
             return new OptionType(CommonConditionalType(span, trueOption.InnerType, falseOption.InnerType));
@@ -4256,7 +4267,8 @@ public sealed class TypeChecker
     {
         if (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(typeName, out var referentName))
         {
-            var referent = PrimitiveType.FromName(Parsing.AttributeHelper.ToSurfaceSpelling(referentName));
+            var referentSurface = Parsing.AttributeHelper.ToSurfaceSpelling(referentName);
+            var referent = PrimitiveType.FromName(referentSurface);
             CalorType? supportedReference = referent is not null
                 && (referent.Equals(PrimitiveType.String) || referent.Equals(PrimitiveType.Object))
                     ? referent
@@ -4264,6 +4276,11 @@ public sealed class TypeChecker
                         && _env.LookupType(referentName) is ExternalType nominal
                         ? nominal
                         : null;
+            if (supportedReference is null
+                && (referentSurface.EndsWith("[]", StringComparison.Ordinal)
+                    || referentSurface.Length > 2 && referentSurface[0] == '['
+                        && referentSurface[^1] == ']' && !referentSurface.Contains(',')))
+                supportedReference = ResolveTypeName(referentSurface, span) as ArrayType;
             if (supportedReference is not null)
             {
                 return new NullableReferenceType(supportedReference,
@@ -4479,16 +4496,33 @@ public sealed class TypeChecker
 
     private static bool IsAssignableResolvedMethodArgument(CalorType target, CalorType source)
         => IsAssignable(target, source)
-            || IsBinderOwnedScalarNullabilityMismatch(target, source);
+            || IsBinderOwnedNullabilityMismatch(target, source);
 
-    private static bool IsBinderOwnedScalarNullabilityMismatch(CalorType target, CalorType source)
-        => target.Equals(PrimitiveType.String)
+    private static bool IsBinderOwnedNullabilityMismatch(CalorType target, CalorType source)
+    {
+        if (target.Equals(PrimitiveType.String)
             && source is NullableReferenceType nullable
-            && nullable.ReferentType.Equals(PrimitiveType.String);
+            && nullable.ReferentType.Equals(PrimitiveType.String))
+            return true;
+
+        var targetReferent = target is NullableReferenceType targetNullable
+            ? targetNullable.ReferentType : target;
+        var sourceReferent = source is NullableReferenceType sourceNullable
+            ? sourceNullable.ReferentType : source;
+        if (targetReferent is ArrayType targetArray && sourceReferent is ArrayType sourceArray)
+            return HaveSameArrayRuntimeType(targetArray, sourceArray);
+        return targetReferent is GenericInstanceType or OptionType
+            && sourceReferent is GenericInstanceType or OptionType
+            && Binding.Scope.HasNullableStringAnnotationDifference(target.SurfaceName, source.SurfaceName);
+    }
 
     private static bool IsAssignable(CalorType target, CalorType source)
     {
         if (target.Equals(source)) return true;
+        if (target is GenericInstanceType targetGeneric && source is GenericInstanceType sourceGeneric
+            && Binding.NullabilityChecker.SameGenericDefinition(targetGeneric.BaseName, sourceGeneric.BaseName)
+            && targetGeneric.TypeArguments.SequenceEqual(sourceGeneric.TypeArguments))
+            return true;
         if (target is ArrayType targetArray && source is ArrayType sourceArray)
             return HaveSameArrayRuntimeType(targetArray, sourceArray);
         if (source is NeverType) return true;

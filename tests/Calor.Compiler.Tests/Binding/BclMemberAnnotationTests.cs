@@ -61,20 +61,20 @@ public partial class BclMemberAnnotationTests(ITestOutputHelper output)
     {
         var source = Source(expression, parameters, receivingType, boundary);
         var result = Program.Compile(source, "bcl-members.calr");
-        var hasActiveScalarNullability = receivingType == "str" && nullable;
+        var hasActiveNullability = nullable;
         var hasUnmodeledEffect = receivingType != "str"
             && (expression.EndsWith(".Root", StringComparison.Ordinal) || boundary == "argument");
-        Assert.Equal(hasUnmodeledEffect || hasActiveScalarNullability, result.HasErrors);
+        Assert.Equal(hasUnmodeledEffect || hasActiveNullability, result.HasErrors);
         Assert.All(result.Diagnostics.Errors, d => Assert.Contains(
             d.Code, new[] { DiagnosticCode.ForbiddenEffect, Code(boundary) }));
-        Assert.Equal(hasActiveScalarNullability,
+        Assert.Equal(hasActiveNullability,
             result.Diagnostics.Any(d => d.Code == Code(boundary)));
         var (_, raw, _) = Bind(source);
         Assert.Equal(nullable, raw.Any(d => d.Code == Code(boundary)));
         // Default effect rejection above is retained, not labeled as nullability coverage.
         var withoutEffects = Program.Compile(source, "bcl-members.calr", new CompilationOptions { EnforceEffects = false });
-        Assert.Equal(hasActiveScalarNullability, withoutEffects.HasErrors);
-        if (!hasActiveScalarNullability)
+        Assert.Equal(hasActiveNullability, withoutEffects.HasErrors);
+        if (!hasActiveNullability)
         {
             var validation = GeneratedCSharpCompiler.Validate(withoutEffects.GeneratedCode);
             Assert.True(validation.CompilationSuccess, string.Join("; ", validation.CompilationErrors));
@@ -129,8 +129,32 @@ public partial class BclMemberAnnotationTests(ITestOutputHelper output)
         Assert.NotNull(boundMember.ResolvedMetadataMember);
         Assert.Equal(Microsoft.CodeAnalysis.NullableAnnotation.None, type.RoslynSymbol!.NullableAnnotation);
         Assert.Equal(NullableAnnotation.Oblivious, type.NullableAnnotation);
-        // Existing scalar policy is conservative; nominal Oblivious is not widened here.
-        Assert.Equal(receivingType == "str", diagnostics.Any(d => d.Code == Code(boundary)));
+        Assert.Contains(diagnostics, d => d.Code == Code(boundary)
+            && BindingDiagnosticPolicy.IsCompilationError(d));
+    }
+
+    [Theory]
+    [InlineData("binding", "§B{copy:System.IO.DirectoryInfo} legacy")]
+    [InlineData("return", "§R legacy")]
+    [InlineData("argument", "§R §C{Take} §A legacy §/C")]
+    public void GuardedObliviousMetadataReference_NarrowsAcrossReceivingBoundaries(
+        string boundary, string statement)
+    {
+        string Source(bool guarded) => $$"""
+            §M{m1:GuardedLegacy}
+              §F{take:Take:pub} (System.IO.DirectoryInfo:value) -> System.IO.DirectoryInfo
+                §R value
+              §F{probe:Probe:pub} (N5Fixture.Legacy:value) -> System.IO.DirectoryInfo
+                §B{legacy} value.DirectoryField
+                {{(guarded ? "§IF{guard} (!= legacy null)\n      " : "")}}{{statement}}
+            """;
+
+        var (_, guardedDiagnostics, _) = Bind(Source(guarded: true), FixtureContext.Value);
+        Assert.DoesNotContain(guardedDiagnostics, d => d.Code == Code(boundary));
+
+        var (_, unguardedDiagnostics, _) = Bind(Source(guarded: false), FixtureContext.Value);
+        Assert.Contains(unguardedDiagnostics, d => d.Code == Code(boundary)
+            && BindingDiagnosticPolicy.IsCompilationError(d));
     }
 
     [Theory]
@@ -238,10 +262,7 @@ public partial class BclMemberAnnotationTests(ITestOutputHelper output)
         {
             var diagnostic = Assert.Single(findings);
             Assert.Equal(member.Span, diagnostic.Span);
-            var isScalarString = member.Type is NominalBoundType nominal
-                && nominal.RoslynSymbol?.SpecialType == SpecialType.System_String;
-            Assert.Equal(isScalarString,
-                BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+            Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
         }
         else
             Assert.Empty(findings);

@@ -11,11 +11,67 @@ namespace Calor.LanguageServer.Tests.Utilities;
 
 public class BindingDiagnosticRoutingTests
 {
+    public static IEnumerable<object[]> StageBReceivingCases()
+    {
+        foreach (var (source, target, shape) in new[]
+        {
+            ("[?str]", "[str]", BindingReceivingShape.Array),
+            ("List<?str>", "List<str>", BindingReceivingShape.Generic),
+            ("?Widget", "Widget", BindingReceivingShape.Nominal)
+        })
+        foreach (var code in new[] { "Calor0272", "Calor0273", "Calor0274" })
+            yield return [source, target, shape, code];
+    }
+
+    [Theory]
+    [MemberData(nameof(StageBReceivingCases))]
+    public async Task StageB_AllReceivingBoundariesMatchProductionAndClearAfterEditAsync(
+        string sourceType, string targetType, BindingReceivingShape shape, string code)
+    {
+        var statement = code switch
+        {
+            "Calor0272" => $"§B{{required:{targetType}}} value",
+            "Calor0273" => "§R value",
+            _ => "§C{Take} §A value §/C"
+        };
+        var source = $$"""
+            §M{m1:StageBLsp}
+              §CL{c1:Widget:pub}
+                §MT{id:Id:pub} () -> i32
+                  §E{}
+                  §R 1
+              §F{take:Take:pub} ({{targetType}}:value) -> void
+                §E{}
+              §F{probe:Probe:pub} ({{sourceType}}:value) -> {{(code == "Calor0273" ? targetType : "void")}}
+                §E{}
+                {{statement}}
+            """;
+        var path = Path.Combine(Path.GetTempPath(), $"stage-b-lsp-{Guid.NewGuid():N}.calr");
+        using var document = new DocumentState(new Uri(path), source);
+        await document.ReanalyzeAsync();
+        var diagnostic = Assert.Single(document.Diagnostics.Where(d => d.Code == code));
+        Assert.Equal(shape, diagnostic.BindingContext?.Shape);
+        Assert.Equal("value", source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+        var lsp = DiagnosticConverter.ToLspDiagnostic(diagnostic, source);
+        Assert.Equal("calor", lsp.Source);
+        Assert.Equal(OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error, lsp.Severity);
+        Assert.Equal(PositionConverter.ToLspRange(diagnostic.Span, source), lsp.Range);
+        var result = Compiler.Program.Compile(source, path);
+        var propagated = Assert.Single(result.Diagnostics.Where(d => d.Code == code));
+        Assert.Equal(diagnostic.Span, propagated.Span);
+        Assert.Equal(diagnostic.Severity, propagated.Severity);
+        var safe = source.Replace($"({sourceType}:value)", $"({targetType}:value)", StringComparison.Ordinal);
+        var update = await document.UpdateAsync(safe, 1);
+        Assert.True(update.Accepted);
+        Assert.DoesNotContain(update.Snapshot.Diagnostics, d => d.Code == code);
+        Assert.False(Compiler.Program.Compile(safe, path).HasErrors);
+    }
+
     [Theory]
     [InlineData("?[str]", "container")]
     [InlineData("[?str]", "elements")]
     [InlineData("?[?str]", "container and STRING elements")]
-    public async Task A4_ArrayInputs_RetainAnalysisOnlyArrayContextAndExactSpanAsync(string sourceType, string component)
+    public async Task StageB_ArrayInputs_UseActiveArrayContextAndExactSpanAsync(string sourceType, string component)
     {
         var source = $$"""
             §M{m1:ArrayRouting}
@@ -37,12 +93,12 @@ public class BindingDiagnosticRoutingTests
         Assert.Equal("second", source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
         Assert.Contains(component, diagnostic.Message);
         var lsp = DiagnosticConverter.ToLspDiagnostic(diagnostic, source);
-        Assert.Equal("calor (analysis only)", lsp.Source);
+        Assert.Equal("calor", lsp.Source);
         Assert.Equal(PositionConverter.ToLspRange(diagnostic.Span, source), lsp.Range);
         Assert.Equal(OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error, lsp.Severity);
         var compiled = Compiler.Program.Compile(source, path);
-        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
-        Assert.DoesNotContain(compiled.Diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+        Assert.True(compiled.HasErrors);
+        Assert.Contains(compiled.Diagnostics, d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
     }
 
     [Theory]

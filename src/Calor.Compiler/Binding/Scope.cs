@@ -75,7 +75,8 @@ public enum BindingReceivingShape
 
 /// <summary>
 /// Binder provenance and structural receiving context, not a null-state proof.
-/// Array/generic/nominal shapes do not imply supported or resolved references.
+/// Array/generic/nominal shapes are emitted only by their bounded structural
+/// checks; unsupported and unresolved references retain separate shapes.
 /// </summary>
 public sealed record BindingDiagnosticContext(
     BindingReceivingBoundary Boundary,
@@ -156,6 +157,11 @@ public static class BindingDiagnosticPolicy
         {
             var receiving = ReceivingRules.FirstOrDefault(candidate =>
                 candidate.Code == code && candidate.Context == context);
+            receiving ??= ReceivingRules.FirstOrDefault(candidate =>
+                candidate.Code == code
+                && candidate.Context.Boundary == context.Boundary
+                && candidate.Context.Shape == context.Shape
+                && !candidate.Context.ReplacesNativeOverloadError);
             if (receiving is not null)
                 return receiving.Policy;
         }
@@ -209,15 +215,20 @@ public static class BindingDiagnosticPolicy
         return Array.AsReadOnly(boundaries.SelectMany(boundary =>
             Enum.GetValues<BindingReceivingShape>().Select(shape => new BindingReceivingRule(
                 boundary.Item1, new(boundary.Item2, shape),
-                shape == BindingReceivingShape.ScalarString
+                shape is BindingReceivingShape.ScalarString
+                    or BindingReceivingShape.Array
+                    or BindingReceivingShape.Generic
+                    or BindingReceivingShape.Nominal
                     ? new BindingDiagnosticRule(
                         boundary.Item1,
                         BindingDiagnosticDisposition.CompilationError,
-                        "Stage A activates only scalar STRING receiving boundaries.",
-                        1385)
+                        shape == BindingReceivingShape.ScalarString
+                            ? "Stage A activates scalar STRING receiving boundaries."
+                            : "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries.",
+                        shape == BindingReceivingShape.ScalarString ? 1385 : 1402)
                     : Analysis(
                         boundary.Item1,
-                        "Non-scalar or unsupported receiving context is not Stage A; Stage B requires a separate measured decision.",
+                        "No bounded supported receiving shape was established; keep unsupported and context-free findings analysis-only.",
                         1402))))
             .Append(new BindingReceivingRule(
                 DiagnosticCode.NullableArgumentToNonNullableParameter,
@@ -1124,6 +1135,22 @@ public abstract class Symbol
     }
 }
 
+// Summary edges refer to stable storage, while alternatives preserve the
+// callable values observed at individual call sites.
+internal sealed class CallableMutationSummary
+{
+    internal static readonly CallableMutationSummary Empty = new();
+    internal IReadOnlyList<VariableSymbol> Mutations { get; init; } = [];
+    internal IReadOnlyList<VariableSymbol> Dependencies { get; init; } = [];
+    internal IReadOnlyList<CallableMutationSummary> Alternatives { get; init; } = [];
+    internal IReadOnlyList<CallableMutationWrite> Writes { get; init; } = [];
+}
+
+internal sealed record CallableMutationWrite(
+    VariableSymbol Storage,
+    CallableMutationSummary Value,
+    IReadOnlyList<VariableSymbol> ValueSources);
+
 /// <summary>
 /// Represents a variable symbol.
 /// </summary>
@@ -1158,6 +1185,8 @@ public sealed class VariableSymbol : Symbol
     internal BoundTypes.NominalBoundType? InferredReferenceType { get; init; }
     internal bool IsTypeInferred { get; init; }
     internal BoundTypes.ArrayBoundType? MethodInputArrayType { get; init; }
+    internal BoundTypes.GenericInstantiationBoundType? GenericNullabilityType { get; init; }
+    internal VariableSymbol StorageIdentity { get; set; }
 
     /// <summary>
     /// v0.15 E2 slice b, design-doc §8.2 — the function type this variable
@@ -1199,6 +1228,7 @@ public sealed class VariableSymbol : Symbol
         BoundTypes.FunctionBoundType? functionType = null)
         : base(id, name, declarationSpan, conditionalAlternative: conditionalAlternative)
     {
+        StorageIdentity = this;
         TypeName = typeName ?? throw new ArgumentNullException(nameof(typeName));
         IsMutable = isMutable;
         IsParameter = isParameter;
@@ -1516,6 +1546,40 @@ public sealed class Scope
         }
 
         return false;
+    }
+
+    internal void ReplaceVisibleSymbols(
+        string name,
+        IReadOnlySet<VariableSymbol> expected,
+        VariableSymbol replacement)
+    {
+        for (var scope = this; scope != null; scope = scope.Parent)
+        {
+            if (scope._symbols.TryGetValue(name, out var current)
+                && current is VariableSymbol variable
+                && expected.Contains(variable))
+                scope._symbols[name] = replacement;
+        }
+    }
+
+    internal IReadOnlyList<(Scope Scope, string Name, VariableSymbol Symbol)>
+        CaptureVisibleVariableBindings()
+    {
+        var bindings = new List<(Scope, string, VariableSymbol)>();
+        for (var scope = this; scope != null; scope = scope.Parent)
+        {
+            bindings.AddRange(scope._symbols
+                .Where(pair => pair.Value is VariableSymbol)
+                .Select(pair => (scope, pair.Key, (VariableSymbol)pair.Value)));
+        }
+        return bindings;
+    }
+
+    internal static void RestoreVisibleVariableBindings(
+        IReadOnlyList<(Scope Scope, string Name, VariableSymbol Symbol)> bindings)
+    {
+        foreach (var binding in bindings)
+            binding.Scope._symbols[binding.Name] = binding.Symbol;
     }
 
     public bool DeclareOverload(FunctionSymbol symbol) =>
@@ -2031,9 +2095,31 @@ public sealed class Scope
     {
         var parameter = TypeIdentity.Canonicalize(parameterType);
         var argument = TypeIdentity.Canonicalize(argumentType);
-        return (parameter == "STRING" && argument == "STRING?")
-            || (parameter == "STRING?" && argument == "STRING");
+        if ((parameter == "STRING" && argument == "STRING?")
+            || (parameter == "STRING?" && argument == "STRING"))
+            return true;
+
+        while (AttributeHelper.TryUnwrapNullableAnnotation(parameterType, out var parameterReferent))
+            parameterType = parameterReferent;
+        while (AttributeHelper.TryUnwrapNullableAnnotation(argumentType, out var argumentReferent))
+            argumentType = argumentReferent;
+        parameter = TypeIdentity.Canonicalize(parameterType);
+        argument = TypeIdentity.Canonicalize(argumentType);
+
+        return TypeIdentity.TrySplitGeneric(parameter, out var parameterName, out var parameterArguments)
+            && TypeIdentity.TrySplitGeneric(argument, out var argumentName, out var argumentArguments)
+            && parameterArguments.Count == 1
+            && argumentArguments.Count == 1
+            && NullabilityChecker.SameGenericDefinition(parameterName, argumentName)
+            && IsSupportedStringContainer(parameterName)
+            && ((parameterArguments[0] == "STRING" && argumentArguments[0] == "STRING?")
+                || (parameterArguments[0] == "STRING?" && argumentArguments[0] == "STRING"));
     }
+
+    private static bool IsSupportedStringContainer(string name) =>
+        name[(name.LastIndexOf('.') + 1)..] is
+            "OPTION" or "Option" or "List" or "IList" or "IEnumerable"
+            or "IReadOnlyList" or "ICollection" or "IReadOnlyCollection";
 
     private sealed record ArgumentMapping(
         int[] ParameterMap,

@@ -18,7 +18,31 @@
         "replacesNativeOverloadError": false,
         "disposition": "CompilationError",
         "owningIssue": 1385,
-        "reason": "Stage A activates only scalar STRING receiving boundaries."
+        "reason": "Stage A activates scalar STRING receiving boundaries."
+      },
+      {
+        "boundary": "Initializer",
+        "shape": "Array",
+        "replacesNativeOverloadError": false,
+        "disposition": "CompilationError",
+        "owningIssue": 1402,
+        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+      },
+      {
+        "boundary": "Initializer",
+        "shape": "Generic",
+        "replacesNativeOverloadError": false,
+        "disposition": "CompilationError",
+        "owningIssue": 1402,
+        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+      },
+      {
+        "boundary": "Initializer",
+        "shape": "Nominal",
+        "replacesNativeOverloadError": false,
+        "disposition": "CompilationError",
+        "owningIssue": 1402,
+        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
       }
     ]
   },
@@ -249,7 +273,31 @@
         "replacesNativeOverloadError": false,
         "disposition": "CompilationError",
         "owningIssue": 1385,
-        "reason": "Stage A activates only scalar STRING receiving boundaries."
+        "reason": "Stage A activates scalar STRING receiving boundaries."
+      },
+      {
+        "boundary": "NativeReturn",
+        "shape": "Array",
+        "replacesNativeOverloadError": false,
+        "disposition": "CompilationError",
+        "owningIssue": 1402,
+        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+      },
+      {
+        "boundary": "NativeReturn",
+        "shape": "Generic",
+        "replacesNativeOverloadError": false,
+        "disposition": "CompilationError",
+        "owningIssue": 1402,
+        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+      },
+      {
+        "boundary": "NativeReturn",
+        "shape": "Nominal",
+        "replacesNativeOverloadError": false,
+        "disposition": "CompilationError",
+        "owningIssue": 1402,
+        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
       }
     ]
   },
@@ -265,6 +313,53 @@
     "disposition": "CompilationError",
     "owningIssue": 1396,
     "reason": "Unbound effect-row variables are already enforced."
+  },
+  {
+    "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindUsingStatement::DiagnosticBag.Report#01",
+    "member": "Calor.Compiler.Binding.Binder.BindUsingStatement",
+    "sink": "DiagnosticBag.Report",
+    "helperPath": "DiagnosticBag.Report",
+    "possibleCodes": [
+      "Calor0272"
+    ],
+    "severity": "Dynamic",
+    "disposition": "ReceivingContextDependent",
+    "owningIssue": 1385,
+    "reason": "Nullability activation requires explicit receiving shape and its staged prerequisites.",
+    "receivingOverrides": [
+      {
+        "boundary": "Initializer",
+        "shape": "ScalarString",
+        "replacesNativeOverloadError": false,
+        "disposition": "CompilationError",
+        "owningIssue": 1385,
+        "reason": "Stage A activates scalar STRING receiving boundaries."
+      },
+      {
+        "boundary": "Initializer",
+        "shape": "Array",
+        "replacesNativeOverloadError": false,
+        "disposition": "CompilationError",
+        "owningIssue": 1402,
+        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+      },
+      {
+        "boundary": "Initializer",
+        "shape": "Generic",
+        "replacesNativeOverloadError": false,
+        "disposition": "CompilationError",
+        "owningIssue": 1402,
+        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+      },
+      {
+        "boundary": "Initializer",
+        "shape": "Nominal",
+        "replacesNativeOverloadError": false,
+        "disposition": "CompilationError",
+        "owningIssue": 1402,
+        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+      }
+    ]
   },
   {
     "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.CheckReferenceOptionRepresentation::DiagnosticBag.ReportError#01",
@@ -428,7 +523,31 @@
         "replacesNativeOverloadError": false,
         "disposition": "CompilationError",
         "owningIssue": 1385,
-        "reason": "Stage A activates only scalar STRING receiving boundaries."
+        "reason": "Stage A activates scalar STRING receiving boundaries."
+      },
+      {
+        "boundary": "MethodArgument",
+        "shape": "Array",
+        "replacesNativeOverloadError": false,
+        "disposition": "CompilationError",
+        "owningIssue": 1402,
+        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+      },
+      {
+        "boundary": "MethodArgument",
+        "shape": "Generic",
+        "replacesNativeOverloadError": false,
+        "disposition": "CompilationError",
+        "owningIssue": 1402,
+        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
+      },
+      {
+        "boundary": "MethodArgument",
+        "shape": "Nominal",
+        "replacesNativeOverloadError": false,
+        "disposition": "CompilationError",
+        "owningIssue": 1402,
+        "reason": "Stage B activates bounded array, whitelisted STRING-generic, and identity-proven nominal receiving boundaries."
       },
       {
         "boundary": "MethodArgument",
