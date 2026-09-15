@@ -12,7 +12,7 @@ public class DocumentStateTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void N3_NamedCall_EditorRetainsActualArgumentSpanAndAnalysisOnlyRoute(bool expression)
+    public void N3_NamedCall_EditorRetainsActualArgumentSpanAndActiveRoute(bool expression)
     {
         var source = $$"""
             §M{m1:EditorMapping}
@@ -26,18 +26,19 @@ public class DocumentStateTests
         Assert.Contains("'path1'", diagnostic.Message);
         Assert.Equal(source.LastIndexOf("maybe", StringComparison.Ordinal), diagnostic.Span.Start);
         var lsp = Calor.LanguageServer.Utilities.DiagnosticConverter.ToLspDiagnostic(diagnostic, source);
-        Assert.Equal("calor (analysis only)", lsp.Source);
+        Assert.Equal("calor", lsp.Source);
         Assert.Equal(OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error, lsp.Severity);
         Assert.Equal(diagnostic.Span.Line - 1, lsp.Range.Start.Line);
         Assert.Equal(diagnostic.Span.Column - 1, lsp.Range.Start.Character);
         Assert.Equal(5, lsp.Range.End.Character - lsp.Range.Start.Character);
         var result = Compiler.Program.Compile(source, "n3-editor.calr",
             new Compiler.CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
-        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
-        Assert.DoesNotContain(result.Diagnostics, d =>
-            d.Code == Compiler.Diagnostics.DiagnosticCode.NullableArgumentToNonNullableParameter);
-        Assert.Contains("path2:", result.GeneratedCode);
-        Assert.Contains("path1:", result.GeneratedCode);
+        Assert.True(result.HasErrors);
+        var compiler = Assert.Single(result.Diagnostics.Where(d =>
+            d.Code == Compiler.Diagnostics.DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Equal(diagnostic.Span, compiler.Span);
+        Assert.Equal(diagnostic.Severity, compiler.Severity);
+        Assert.True(string.IsNullOrEmpty(result.GeneratedCode));
     }
 
     [Fact]

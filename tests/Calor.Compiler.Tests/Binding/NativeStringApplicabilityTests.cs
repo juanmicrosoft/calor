@@ -69,7 +69,7 @@ public sealed class NativeStringApplicabilityTests
 
     [Theory]
     [MemberData(nameof(FormsAndAliases))]
-    public void ExistingObjectOverload_DoesNotBecomeNewNullabilityEnforcement(bool expression, string alias)
+    public void SelectedScalarOverload_ActivatesWithoutInventingPriorRejection(bool expression, string alias)
     {
         var source = Source(expression, alias, NullableProducer, """
               §F{object:Take:pub} (object:value) -> i32
@@ -81,9 +81,10 @@ public sealed class NativeStringApplicabilityTests
         var diagnostic = Assert.Single(diagnostics.Errors);
         Assert.Equal(DiagnosticCode.NullableArgumentToNonNullableParameter, diagnostic.Code);
         Assert.False(diagnostic.BindingContext!.ReplacesNativeOverloadError);
-        Assert.True(BindingDiagnosticPolicy.IsAnalysisOnly(diagnostic));
+        Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
         var compiled = Program.Compile(source, "native-string.calr");
-        Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics));
+        Assert.True(compiled.HasErrors);
+        Assert.Empty(compiled.GeneratedCode);
     }
 
     [Theory]
@@ -166,7 +167,7 @@ public sealed class NativeStringApplicabilityTests
     }
 
     [Fact]
-    public void InvisibleArgument_DoesNotAcquireAnInventedPriorRejection()
+    public void InvisibleSiblingArgument_DoesNotChangeScalarActivationProvenance()
     {
         const string source = """
             §M{m1:NativeString}
@@ -181,7 +182,7 @@ public sealed class NativeStringApplicabilityTests
         var diagnostic = Assert.Single(diagnostics.Errors);
         Assert.Equal(DiagnosticCode.NullableArgumentToNonNullableParameter, diagnostic.Code);
         Assert.False(diagnostic.BindingContext!.ReplacesNativeOverloadError);
-        Assert.True(BindingDiagnosticPolicy.IsAnalysisOnly(diagnostic));
+        Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
     }
 
     [Fact]

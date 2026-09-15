@@ -248,6 +248,12 @@ public sealed class BoundVariableExpression : BoundExpression
         {
             return new NominalBoundType(resolvedTypeName, NullableAnnotation.Annotated);
         }
+        if (IsNullableStringType(resolvedTypeName)
+            && variable.NullableAnnotation == NullableAnnotation.NotAnnotated
+            && AttributeHelper.TryUnwrapNullableAnnotation(resolvedTypeName, out var referent))
+        {
+            return new NominalBoundType(referent, NullableAnnotation.NotAnnotated);
+        }
 
         // Preserve the existing decorator-stripped display for nominal names.
         // The checker compares declaration/Roslyn identities, not this spelling.
@@ -684,6 +690,20 @@ public sealed class BoundNoneLiteral : BoundExpression
 }
 
 /// <summary>
+/// Bound C# null literal. Its nominal type is intentionally not STRING; receiving
+/// boundaries decide whether null is applicable to their declared reference type.
+/// </summary>
+public sealed class BoundNullLiteral : BoundExpression
+{
+    public override BoundType Type { get; } =
+        new NominalBoundType("NULL", NullableAnnotation.Annotated);
+
+    public BoundNullLiteral(TextSpan span) : base(span)
+    {
+    }
+}
+
+/// <summary>
 /// Bound unary operation.
 /// </summary>
 public sealed class BoundUnaryExpression : BoundExpression
@@ -958,14 +978,15 @@ public sealed class BoundExpressionCall : BoundExpression
 {
     public BoundExpression Target { get; }
     public IReadOnlyList<BoundExpression> Arguments { get; }
-    public override BoundType Type { get; } = new NominalBoundType("OBJECT");
+    public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children => [Target, .. Arguments];
 
     public BoundExpressionCall(TextSpan span, BoundExpression target,
-        IReadOnlyList<BoundExpression> arguments) : base(span)
+        IReadOnlyList<BoundExpression> arguments, BoundType? resultType = null) : base(span)
     {
         Target = target;
         Arguments = arguments;
+        Type = resultType ?? new NominalBoundType("OBJECT");
     }
 }
 
@@ -1065,6 +1086,17 @@ public sealed class BoundArrayAccess : BoundExpression
     public BoundArrayAccess(TextSpan span, BoundExpression array, BoundExpression index) : base(span)
     {
         Array = array; Index = index;
+        if (array.MethodInputArrayType is
+            {
+                ElementType: NominalBoundType
+                {
+                    QualifiedName: "STRING" or "string" or "str" or "System.String"
+                }
+            } typedArray)
+        {
+            Type = typedArray.ElementType;
+            return;
+        }
         var arrayTypeName = array.Type.DisplayString;
         Type = new NominalBoundType(arrayTypeName.EndsWith("[]", StringComparison.Ordinal)
             ? arrayTypeName[..^2]
@@ -2048,13 +2080,16 @@ public sealed class BoundTypeOperationExpression : BoundExpression
         TextSpan span,
         TypeOp operation,
         BoundExpression operand,
-        string targetType)
+        string targetType,
+        NullableAnnotation nullableAnnotation = NullableAnnotation.Oblivious)
         : base(span)
     {
         Operation = operation;
         Operand = operand ?? throw new ArgumentNullException(nameof(operand));
         TargetType = targetType ?? throw new ArgumentNullException(nameof(targetType));
-        Type = new NominalBoundType(operation == TypeOp.Is ? "BOOL" : targetType);
+        Type = new NominalBoundType(
+            operation == TypeOp.Is ? "BOOL" : targetType,
+            operation == TypeOp.Is ? NullableAnnotation.NotAnnotated : nullableAnnotation);
         Children = [operand];
     }
 }

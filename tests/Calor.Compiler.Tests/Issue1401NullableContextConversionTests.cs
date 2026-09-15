@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Diagnostics;
 using Calor.Compiler.CodeGen;
+using Calor.Compiler.Diagnostics;
 using Calor.Compiler.Migration;
 using Calor.Compiler.Migration.Project;
 using Microsoft.CodeAnalysis;
@@ -167,6 +168,91 @@ public sealed class Issue1401NullableContextConversionTests
 
         Assert.Contains("§B{str:value}", result.CalorSource);
         Assert.DoesNotContain("§B{?str:value}", result.CalorSource);
+    }
+
+    [Fact]
+    public void UserDefinedNotNullAttribute_DoesNotNarrowDeclaredNullableReturn()
+    {
+        var result = Convert(
+            """
+            using System;
+            public sealed class NotNullAttribute : Attribute { }
+            public static class Fixture
+            {
+                public static void Probe()
+                {
+                    var value = Read();
+                }
+
+                [return: NotNull]
+                private static string? Read() => null;
+            }
+            """,
+            NullableContextOptions.Enable);
+
+        Assert.Contains("§B{?str:value}", result.CalorSource);
+    }
+
+    [Fact]
+    public void UserDefinedMaybeNullAttribute_DoesNotWidenDeclaredNonNullReturn()
+    {
+        var result = Convert(
+            """
+            using System;
+            public sealed class MaybeNullAttribute : Attribute { }
+            public static class Fixture
+            {
+                public static void Probe()
+                {
+                    var value = Read();
+                }
+
+                [return: MaybeNull]
+                private static string Read() => "value";
+            }
+            """,
+            NullableContextOptions.Enable);
+
+        Assert.Contains("§B{str:value}", result.CalorSource);
+        Assert.DoesNotContain("§B{?str:value}", result.CalorSource);
+    }
+
+    [Fact]
+    public void TerminatingIsNullOrEmptyGuard_PreservesNonNullContinuation()
+    {
+        var result = Convert(
+            """
+            using System.Threading.Tasks;
+            public static class Fixture
+            {
+                public static async Task<string> Read(string? value)
+                {
+                    await Task.Yield();
+                    if (string.IsNullOrEmpty(value))
+                    {
+                        return "fallback";
+                    }
+                    return value;
+                }
+            }
+            """,
+            NullableContextOptions.Enable);
+
+        Assert.Contains("§R value", result.CalorSource);
+        var compiled = Program.Compile(
+            result.CalorSource!,
+            "Fixture.calr",
+            new CompilationOptions
+            {
+                EnforceEffects = false,
+                DeferGeneratedOutputValidation = true,
+                StatusWriter = TextWriter.Null
+            });
+        Assert.DoesNotContain(compiled.Diagnostics,
+            diagnostic => diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable);
+        Assert.False(
+            compiled.HasErrors,
+            string.Join(Environment.NewLine, compiled.Diagnostics.Errors));
     }
 
     [Fact]

@@ -8,9 +8,19 @@
       "Calor0272"
     ],
     "severity": "Dynamic",
-    "disposition": "AnalysisOnly",
+    "disposition": "ReceivingContextDependent",
     "owningIssue": 1385,
-    "reason": "Nullability activation requires explicit receiving shape and its staged prerequisites."
+    "reason": "Nullability activation requires explicit receiving shape and its staged prerequisites.",
+    "receivingOverrides": [
+      {
+        "boundary": "Initializer",
+        "shape": "ScalarString",
+        "replacesNativeOverloadError": false,
+        "disposition": "CompilationError",
+        "owningIssue": 1385,
+        "reason": "Stage A activates only scalar STRING receiving boundaries."
+      }
+    ]
   },
   {
     "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindBindStatement::DiagnosticBag.ReportError#01",
@@ -229,9 +239,19 @@
       "Calor0273"
     ],
     "severity": "Dynamic",
-    "disposition": "AnalysisOnly",
+    "disposition": "ReceivingContextDependent",
     "owningIssue": 1385,
-    "reason": "Nullability activation requires explicit receiving shape and its staged prerequisites."
+    "reason": "Nullability activation requires explicit receiving shape and its staged prerequisites.",
+    "receivingOverrides": [
+      {
+        "boundary": "NativeReturn",
+        "shape": "ScalarString",
+        "replacesNativeOverloadError": false,
+        "disposition": "CompilationError",
+        "owningIssue": 1385,
+        "reason": "Stage A activates only scalar STRING receiving boundaries."
+      }
+    ]
   },
   {
     "siteId": "src/Calor.Compiler/Binding/Binder.cs::Binder.BindRow::DiagnosticBag.ReportError#01",
@@ -402,6 +422,14 @@
     "owningIssue": 1385,
     "reason": "Nullability activation requires explicit receiving shape and its staged prerequisites.",
     "receivingOverrides": [
+      {
+        "boundary": "MethodArgument",
+        "shape": "ScalarString",
+        "replacesNativeOverloadError": false,
+        "disposition": "CompilationError",
+        "owningIssue": 1385,
+        "reason": "Stage A activates only scalar STRING receiving boundaries."
+      },
       {
         "boundary": "MethodArgument",
         "shape": "ScalarString",

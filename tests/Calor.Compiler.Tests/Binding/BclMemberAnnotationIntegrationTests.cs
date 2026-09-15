@@ -63,9 +63,13 @@ public partial class BclMemberAnnotationTests
             // These joint nominal/API controls disable effects; original controls retain default gates.
             var compiled = Program.Compile(source, "n5-joint-locals.calr",
                 new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
-            Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
-            var validation = GeneratedCSharpCompiler.Validate(compiled.GeneratedCode);
-            Assert.True(validation.CompilationSuccess, string.Join("\n", validation.CompilationErrors));
+            var activeScalar = receivingType == "str" && nullable;
+            Assert.Equal(activeScalar, compiled.HasErrors);
+            if (!activeScalar)
+            {
+                var validation = GeneratedCSharpCompiler.Validate(compiled.GeneratedCode);
+                Assert.True(validation.CompilationSuccess, string.Join("\n", validation.CompilationErrors));
+            }
         }
     }
 
@@ -226,10 +230,12 @@ public partial class BclMemberAnnotationTests
     private static void AssertJointFinding(
         DiagnosticBag diagnostics, string code, BoundExpression source, bool nullable, string? parameter = null)
     {
-        Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
         var findings = diagnostics.Where(d => d.Code == code).ToArray();
         if (!nullable)
+        {
             Assert.Empty(findings);
+            Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+        }
         else
         {
             var finding = Assert.Single(findings);
@@ -237,7 +243,9 @@ public partial class BclMemberAnnotationTests
             Assert.Contains("'Annotated'", finding.Message);
             if (parameter is not null)
                 Assert.Contains(parameter, finding.Message);
-            Assert.False(BindingDiagnosticPolicy.IsCompilationError(finding));
+            Assert.Equal(
+                finding.BindingContext?.Shape == BindingReceivingShape.ScalarString,
+                BindingDiagnosticPolicy.IsCompilationError(finding));
         }
     }
 

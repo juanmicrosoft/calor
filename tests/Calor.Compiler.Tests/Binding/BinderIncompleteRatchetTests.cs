@@ -91,7 +91,12 @@ public class BinderIncompleteRatchetTests
         + "34703 -> 35179 binder visits; binder-combined-integration.json records the separate "
         + "additional 11 opaque boundaries/268 source expressions and four generated lambda carrier "
         + "renames. The additional opacity was separately accepted after parent per-site evidence "
-        + "review; it is not folded into the earlier M1 budget or an independent-review claim";
+        + "review; it is not folded into the earlier M1 budget or an independent-review claim. "
+        + "#1385's scalar-nullability flow repairs move 35179 -> 35163 visits with incomplete "
+        + "diagnostics still zero: MediatR/Mediator.cs -12, and the two request-exception "
+        + "processor behaviors -2 each. The same three records gain 8 exact source spans and "
+        + "remove 8 unmapped source expressions, so the lower visit count is attributed rather "
+        + "than treated as a coverage improvement";
 
     private static string SourceCoveragePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-source-coverage.json");

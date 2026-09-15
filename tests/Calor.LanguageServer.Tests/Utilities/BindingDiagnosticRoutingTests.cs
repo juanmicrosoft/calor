@@ -50,7 +50,7 @@ public class BindingDiagnosticRoutingTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public async Task NativeStringOwnership_IsNotInferredFromDiagnosticCodeOrCachedSourceAsync(
+    public async Task ScalarStringActivation_DoesNotDependOnNativeOverloadReplacementAsync(
         bool expression, bool objectOverload)
     {
         var extra = objectOverload
@@ -68,9 +68,13 @@ public class BindingDiagnosticRoutingTests
             d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
         Assert.Equal(!objectOverload, diagnostic.BindingContext!.ReplacesNativeOverloadError);
         var lsp = DiagnosticConverter.ToLspDiagnostic(diagnostic, source);
-        Assert.Equal(objectOverload ? "calor (analysis only)" : "calor", lsp.Source);
+        Assert.Equal("calor", lsp.Source);
         Assert.Equal(PositionConverter.ToLspRange(diagnostic.Span, source), lsp.Range);
-        Assert.Equal(!objectOverload, Compiler.Program.Compile(source, path).HasErrors);
+        var compiled = Compiler.Program.Compile(source, path);
+        Assert.True(compiled.HasErrors);
+        var compiler = Assert.Single(compiled.Diagnostics.Where(d => d.Code == diagnostic.Code));
+        Assert.Equal(diagnostic.Span, compiler.Span);
+        Assert.Equal(diagnostic.Severity, compiler.Severity);
 
         var safe = source.Replace("(str:value)", "(?str:value)", StringComparison.Ordinal);
         var update = await document.UpdateAsync(safe, 1);
@@ -125,7 +129,7 @@ public class BindingDiagnosticRoutingTests
     [InlineData("§B{x:str} §C{System.Environment.GetEnvironmentVariable} §A \"ROUTING_UNSET\" §/C", "void", "Calor0272")]
     [InlineData("§R §C{System.Environment.GetEnvironmentVariable} §A \"ROUTING_UNSET\" §/C", "str", "Calor0273")]
     [InlineData("§R §C{System.Int32.Parse} §A §C{System.Environment.GetEnvironmentVariable} §A \"ROUTING_UNSET\" §/C §/C", "i32", "Calor0274")]
-    public async Task AnalysisOnlyFindings_AreLabeledWithoutChangingBinderSeverityOrSpanAsync(
+    public async Task ActiveScalarFindings_AreLabeledWithoutChangingBinderSeverityOrSpanAsync(
         string body, string returnType, string code)
     {
         var source = $"§M{{m1:Routing}}\n  §F{{f1:Probe:pub}} () -> {returnType}\n    §E{{env}}\n    {body}\n";
@@ -136,15 +140,17 @@ public class BindingDiagnosticRoutingTests
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.Equal(BindingReceivingShape.ScalarString, diagnostic.BindingContext?.Shape);
         var lsp = DiagnosticConverter.ToLspDiagnostic(diagnostic, source);
-        Assert.Equal("calor (analysis only)", lsp.Source);
+        Assert.Equal("calor", lsp.Source);
         Assert.Equal(code, lsp.Code);
         Assert.Equal(OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error, lsp.Severity);
         Assert.Equal(PositionConverter.ToLspRange(diagnostic.Span, source), lsp.Range);
-        Assert.Equal("calor (analysis only)", DiagnosticConverter.ToLspDiagnosticSingleLine(diagnostic).Source);
+        Assert.Equal("calor", DiagnosticConverter.ToLspDiagnosticSingleLine(diagnostic).Source);
 
         var compiled = Compiler.Program.Compile(source, path);
-        Assert.False(compiled.HasErrors);
-        Assert.DoesNotContain(compiled.Diagnostics, d => d.Code == code);
+        Assert.True(compiled.HasErrors);
+        var compiler = Assert.Single(compiled.Diagnostics.Where(d => d.Code == code));
+        Assert.Equal(diagnostic.Span, compiler.Span);
+        Assert.Equal(diagnostic.Severity, compiler.Severity);
         var update = await document.UpdateAsync("§M{m1:Routing}\n  §F{f1:Probe:pub} () -> str\n    §R \"safe\"\n", 1);
         Assert.True(update.Accepted);
         Assert.DoesNotContain(update.Snapshot.Diagnostics, d => d.Code == code);

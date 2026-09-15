@@ -7,7 +7,7 @@ namespace Calor.RoundTrip.Harness.Tests;
 public sealed class RoundTripPipelineSafetyTests
 {
     [Fact]
-    public async Task Evidence_RealConversionRetainsNullableAnalysisResolutionErrorAndSafeControl()
+    public async Task Evidence_RealConversionRejectsActiveScalarAndRetainsSafeAndNominalControls()
     {
         const string nullableSource = """
             public static class NullableEvidence
@@ -25,6 +25,9 @@ public sealed class RoundTripPipelineSafetyTests
             await File.WriteAllTextAsync(Path.Combine(root, "Lib", "Migrated.cs"),
                 "public static class MigratedEvidence { public static string Read() => "
                 + "System.Environment.GetEnvironmentVariable(\"CALOR_E1_UNSET\") ?? \"fallback\"; }");
+            await File.WriteAllTextAsync(Path.Combine(root, "Lib", "Nominal.cs"),
+                "public sealed class NominalValue { } public static class NominalEvidence { "
+                + "public static NominalValue Read(NominalValue? value) => value; }");
             await File.WriteAllTextAsync(Path.Combine(root, "Lib", "Skip.g.cs"),
                 "public class ExcludedEvidence { }");
             var report = new RoundTripReport { ProjectName = "Evidence", StartedAt = DateTimeOffset.UtcNow };
@@ -36,14 +39,12 @@ public sealed class RoundTripPipelineSafetyTests
             };
             var results = await new RoundTripPipeline().ConvertAndReplaceAsync(root, config, report);
             var nullable = results.Single(file => file.FilePath == "Lib/Invalid.cs");
-            Assert.Equal(FileStatus.Replaced, nullable.Status);
-            Assert.Equal("Accepted", nullable.Candidate!.CompilationOutcome);
-            Assert.DoesNotContain(nullable.Candidate.Diagnostics,
-                diagnostic => diagnostic.Code is "Calor0272" or "Calor0273" or "Calor0274");
-            var finding = Assert.Single(nullable.Candidate.AnalysisDiagnostics,
+            Assert.Equal(FileStatus.CompileError, nullable.Status);
+            Assert.Equal("Rejected", nullable.Candidate!.CompilationOutcome);
+            var finding = Assert.Single(nullable.Candidate.Diagnostics,
                 diagnostic => diagnostic.Code == "Calor0273");
-            Assert.Equal("AnalysisOnly", finding.BindingDisposition);
-            Assert.Equal("shadow-bind", finding.Phase);
+            Assert.Equal("CompilationError", finding.BindingDisposition);
+            Assert.Equal("Program.Compile", finding.Phase);
             Assert.Equal("ConvertedCalor", finding.SourceKind);
             Assert.Equal("Lib/Invalid.cs", finding.Path);
             Assert.Contains("System.Environment.GetEnvironmentVariable",
@@ -58,13 +59,20 @@ public sealed class RoundTripPipelineSafetyTests
                 diagnostic.Code == "CS0246" && diagnostic.Line > 0 && diagnostic.Column > 0);
             var safe = results.Single(file => file.FilePath == "Lib/Safe.cs");
             var migrated = results.Single(file => file.FilePath == "Lib/Migrated.cs");
+            var nominal = results.Single(file => file.FilePath == "Lib/Nominal.cs");
             Assert.Equal(FileStatus.Replaced, safe.Status);
             Assert.Equal(FileStatus.Replaced, migrated.Status);
+            Assert.Equal(FileStatus.Replaced, nominal.Status);
             Assert.DoesNotContain(safe.Candidate!.AnalysisDiagnostics,
                 diagnostic => diagnostic.Code is "Calor0272" or "Calor0273" or "Calor0274");
+            var nominalFinding = Assert.Single(nominal.Candidate!.AnalysisDiagnostics,
+                diagnostic => diagnostic.Code == "Calor0273");
+            Assert.Equal("AnalysisOnly", nominalFinding.BindingDisposition);
+            Assert.DoesNotContain(nominal.Candidate.Diagnostics,
+                diagnostic => diagnostic.Code == "Calor0273");
             var assembly = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
                 $"EvidenceRuntime_{Guid.NewGuid():N}",
-                new[] { nullable, safe, migrated }.Select(file =>
+                new[] { safe, migrated, nominal }.Select(file =>
                     Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(file.EmittedCSharp!)),
                 Calor.Compiler.CodeGen.GeneratedCSharpCompiler.References,
                 new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
@@ -79,23 +87,19 @@ public sealed class RoundTripPipelineSafetyTests
             try
             {
                 Environment.SetEnvironmentVariable("CALOR_E1_UNSET", null);
-                observations["nullable-absent"] = Read("NullableEvidence");
                 observations["explicit-fallback-absent"] = Read("MigratedEvidence");
-                Assert.Null(observations["nullable-absent"]);
                 Assert.Equal("fallback", observations["explicit-fallback-absent"]);
                 Environment.SetEnvironmentVariable("CALOR_E1_UNSET", "present");
-                observations["nullable-present"] = Read("NullableEvidence");
                 observations["explicit-fallback-present"] = Read("MigratedEvidence");
-                Assert.Equal("present", observations["nullable-present"]);
                 Assert.Equal("present", observations["explicit-fallback-present"]);
             }
             finally { Environment.SetEnvironmentVariable("CALOR_E1_UNSET", prior); }
-            Assert.Equal(4, report.Evidence!.Inputs.Count);
+            Assert.Equal(5, report.Evidence!.Inputs.Count);
             Assert.Single(report.Evidence.Inputs, input => input.Excluded);
             Assert.All(results, file => Assert.Equal("Unassessed", file.Candidate!.SemanticResolution));
             var coverage = ConversionCoverage.Compute(results, report.ExcludedFileCount);
-            Assert.Equal(4, coverage.TotalConvertibleFiles);
-            Assert.Equal(0, coverage.FailedConversion);
+            Assert.Equal(5, coverage.TotalConvertibleFiles);
+            Assert.Equal(1, coverage.FailedConversion);
             Assert.Equal(1, coverage.ExcludedFiles);
             Assert.Equal(1, ConversionCoverage.Compute(missingResults, 0).FailedConversion);
             await ExportEvidenceAsync("converted-controls", report, config, results);
@@ -106,7 +110,7 @@ public sealed class RoundTripPipelineSafetyTests
                 await File.WriteAllTextAsync(Path.Combine(output, "runtime-observations.json"),
                     System.Text.Json.JsonSerializer.Serialize(new
                     {
-                        test = nameof(Evidence_RealConversionRetainsNullableAnalysisResolutionErrorAndSafeControl),
+                        test = nameof(Evidence_RealConversionRejectsActiveScalarAndRetainsSafeAndNominalControls),
                         report.Evidence.Provenance.RepositoryRevision,
                         report.Evidence.Provenance.Compiler,
                         observations,
@@ -122,14 +126,16 @@ public sealed class RoundTripPipelineSafetyTests
     }
 
     [Fact]
-    public async Task Evidence_ActualBuildRecoveryPreservesOriginalCandidateDiagnostics()
+    public async Task Evidence_ActualBuildRecoveryPreservesAcceptedCandidateEvidence()
     {
-        var root = CreateProject("public static class Seed { public static string Read() => "
-            + "System.Environment.GetEnvironmentVariable(\"CALOR_E1_UNSET\"); }");
+        var root = CreateProject(
+            "public sealed class Value { } "
+            + "public static class Seed { public static Value Read(Value? value) => value; }");
         try
         {
             await File.WriteAllTextAsync(Path.Combine(root, "Safety.csproj"),
                 "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework>"
+                + "<Nullable>enable</Nullable>"
                 + "<EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup>"
                 + "<ItemGroup><Compile Include=\"Lib/*.cs\" /></ItemGroup></Project>");
             var work = Path.Combine(root, "work");
@@ -151,7 +157,13 @@ public sealed class RoundTripPipelineSafetyTests
                 var candidateId = file.Candidate!.CandidateId;
                 var diagnostics = file.Candidate.Diagnostics.ToArray();
                 var analysisDiagnostics = file.Candidate.AnalysisDiagnostics.ToArray();
-                Assert.Contains(analysisDiagnostics, diagnostic => diagnostic.Code == "Calor0273");
+                var nominalFinding = Assert.Single(
+                    analysisDiagnostics,
+                    diagnostic => diagnostic.Code == "Calor0273");
+                Assert.Equal("AnalysisOnly", nominalFinding.BindingDisposition);
+                Assert.DoesNotContain(
+                    diagnostics,
+                    diagnostic => diagnostic.Code == "Calor0273");
                 var originalHash = file.Candidate.InputSha256;
                 // Deliberately injected recovery control, not claimed as a natural converter regression.
                 await File.WriteAllTextAsync(Path.Combine(work, file.FilePath),
@@ -164,9 +176,10 @@ public sealed class RoundTripPipelineSafetyTests
                 Assert.Equal(diagnostics, file.Candidate.Diagnostics);
                 Assert.Equal(analysisDiagnostics, file.Candidate.AnalysisDiagnostics);
                 Assert.Equal(originalHash, ReportGenerator.HashFile(Path.Combine(work, file.FilePath)));
-                Assert.Contains(Assert.Single(file.Recovery).Diagnostics,
-                    diagnostic => diagnostic.Code == "CS0103" && diagnostic.Path == "Lib/Invalid.cs"
-                        && diagnostic.Line == 1 && diagnostic.Column > 0);
+                var recovery = Assert.Single(file.Recovery);
+                Assert.Contains(recovery.Errors, error =>
+                    error.Replace('\\', '/').Contains("Lib/Invalid.cs(1,", StringComparison.Ordinal)
+                    && error.Contains("error CS0103:", StringComparison.Ordinal));
                 Assert.Equal(1, ConversionCoverage.Compute(files, 0).Reverted);
                 Assert.Equal(0, ConversionCoverage.Compute(files, 0).ConvertedNative);
                 await ExportEvidenceAsync("injected-recovery-control", report, config, files);
@@ -312,6 +325,9 @@ public sealed class RoundTripPipelineSafetyTests
             Assert.Equal(
                 ConversionFidelity.Lossy,
                 options.Fidelity);
+            Assert.Equal(
+                Microsoft.CodeAnalysis.NullableContextOptions.Disable,
+                options.NullableContextOptions);
             Assert.Equal(
                 PreprocessorConversionMode.SelectActiveBranchLossy,
                 options.PreprocessorMode);

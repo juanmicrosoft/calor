@@ -16,7 +16,7 @@ public class NullableReferenceTypingTests
     [InlineData("§THIS.Value", "string")]
     [InlineData("input", "str")]
     [InlineData("§THIS.Value", "str")]
-    public async Task LocalAndMemberReturnDiagnostic_IsAnalysisOnlyAndClearsOnSafeEditAsync(
+    public async Task LocalAndMemberReturnDiagnostic_UsesShapePolicyAndClearsOnSafeEditAsync(
         string value, string referenceType)
     {
         var source = $$"""
@@ -32,16 +32,26 @@ public class NullableReferenceTypingTests
         using var document = new DocumentState(new Uri(path), source);
         await document.ReanalyzeAsync();
         var diagnostic = Assert.Single(document.Diagnostics.Where(d => d.Code == DiagnosticCode.NullableReturnFromNonNullable));
-        Assert.False(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        var scalar = referenceType is "string" or "str";
+        Assert.Equal(scalar, BindingDiagnosticPolicy.IsCompilationError(diagnostic));
         var lsp = DiagnosticConverter.ToLspDiagnostic(diagnostic, source);
-        Assert.Equal("calor (analysis only)", lsp.Source);
+        Assert.Equal(scalar ? "calor" : "calor (analysis only)", lsp.Source);
         Assert.Equal(PositionConverter.ToLspRange(diagnostic.Span, source), lsp.Range);
-        Assert.Equal(referenceType == "Foo" ? BindingReceivingShape.Nominal : BindingReceivingShape.ScalarString,
+        Assert.Equal(scalar ? BindingReceivingShape.ScalarString : BindingReceivingShape.Nominal,
             diagnostic.BindingContext?.Shape);
         Assert.Contains("source annotation: 'Annotated'", diagnostic.Message);
         var result = Compiler.Program.Compile(source, path);
-        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
-        Assert.DoesNotContain(result.Diagnostics, d => d.Code == diagnostic.Code);
+        Assert.Equal(scalar, result.HasErrors);
+        if (scalar)
+        {
+            var compiler = Assert.Single(result.Diagnostics.Where(d => d.Code == diagnostic.Code));
+            Assert.Equal(diagnostic.Span, compiler.Span);
+            Assert.Equal(diagnostic.Severity, compiler.Severity);
+        }
+        else
+        {
+            Assert.DoesNotContain(result.Diagnostics, d => d.Code == diagnostic.Code);
+        }
         var update = await document.UpdateAsync(
             source.Replace($"-> {referenceType}", $"-> ?{referenceType}", StringComparison.Ordinal), 1);
         Assert.True(update.Accepted);

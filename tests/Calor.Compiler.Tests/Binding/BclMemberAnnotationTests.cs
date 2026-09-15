@@ -61,18 +61,24 @@ public partial class BclMemberAnnotationTests(ITestOutputHelper output)
     {
         var source = Source(expression, parameters, receivingType, boundary);
         var result = Program.Compile(source, "bcl-members.calr");
+        var hasActiveScalarNullability = receivingType == "str" && nullable;
         var hasUnmodeledEffect = receivingType != "str"
             && (expression.EndsWith(".Root", StringComparison.Ordinal) || boundary == "argument");
-        Assert.Equal(hasUnmodeledEffect, result.HasErrors);
-        Assert.All(result.Diagnostics.Errors, d => Assert.Equal("Calor0410", d.Code));
-        Assert.DoesNotContain(result.Diagnostics, d => d.Code == Code(boundary));
+        Assert.Equal(hasUnmodeledEffect || hasActiveScalarNullability, result.HasErrors);
+        Assert.All(result.Diagnostics.Errors, d => Assert.Contains(
+            d.Code, new[] { DiagnosticCode.ForbiddenEffect, Code(boundary) }));
+        Assert.Equal(hasActiveScalarNullability,
+            result.Diagnostics.Any(d => d.Code == Code(boundary)));
         var (_, raw, _) = Bind(source);
         Assert.Equal(nullable, raw.Any(d => d.Code == Code(boundary)));
         // Default effect rejection above is retained, not labeled as nullability coverage.
         var withoutEffects = Program.Compile(source, "bcl-members.calr", new CompilationOptions { EnforceEffects = false });
-        Assert.False(withoutEffects.HasErrors, string.Join("; ", withoutEffects.Diagnostics));
-        var validation = GeneratedCSharpCompiler.Validate(withoutEffects.GeneratedCode);
-        Assert.True(validation.CompilationSuccess, string.Join("; ", validation.CompilationErrors));
+        Assert.Equal(hasActiveScalarNullability, withoutEffects.HasErrors);
+        if (!hasActiveScalarNullability)
+        {
+            var validation = GeneratedCSharpCompiler.Validate(withoutEffects.GeneratedCode);
+            Assert.True(validation.CompilationSuccess, string.Join("; ", validation.CompilationErrors));
+        }
     }
 
     public static IEnumerable<object[]> ControlledCases()
@@ -232,7 +238,10 @@ public partial class BclMemberAnnotationTests(ITestOutputHelper output)
         {
             var diagnostic = Assert.Single(findings);
             Assert.Equal(member.Span, diagnostic.Span);
-            Assert.False(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+            var isScalarString = member.Type is NominalBoundType nominal
+                && nominal.RoslynSymbol?.SpecialType == SpecialType.System_String;
+            Assert.Equal(isScalarString,
+                BindingDiagnosticPolicy.IsCompilationError(diagnostic));
         }
         else
             Assert.Empty(findings);

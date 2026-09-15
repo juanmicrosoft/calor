@@ -415,7 +415,10 @@ jobs:
   remaining-tests:
     name: tests (${{ matrix.name }})
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The compiler shard includes the recursively checked-out corpus ratchets.
+    # Scalar-nullability coverage moved two consecutive runs just beyond the
+    # former 15-minute ceiling while tests were still passing.
+    timeout-minutes: ${{ fromJSON(matrix.name == 'compiler' && '20' || '15') }}
     strategy:
       fail-fast: false
       matrix:

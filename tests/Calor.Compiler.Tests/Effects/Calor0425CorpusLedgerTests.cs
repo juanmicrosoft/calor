@@ -83,12 +83,13 @@ namespace Calor.Compiler.Tests;
 /// <c>BindingDiagnosticPolicy.PropagateCompilationErrors</c>
 /// (<c>Program.cs:820</c>; allowlist <c>Binding/Scope.cs:53-78</c>) into the
 /// compilation's own bag and only then stops (<c>Program.cs:829-833</c>).
-/// Calor0200 / Calor0272 / Calor0273 / the #1097 ICE are never propagated, so a
-/// module carrying only those compiles for a real user and its Calor0425s are
-/// diagnostics a real user sees. Schema 2's "8 sites over 99 enforced modules"
-/// was therefore an artifact of the measurement's own guard, not a fact about
-/// the compiler; schema 3 measures over the modules the compiler actually
-/// reaches. Both denominators are kept in the ledger
+/// Calor0200 and the #1097 ICE are never propagated, so a module carrying only
+/// those compiles for a real user and its Calor0425s are diagnostics a real
+/// user sees. Scalar Calor0272 / Calor0273 / Calor0274 became propagated in
+/// #1385 and now stop before effect enforcement. Schema 2's "8 sites over 99
+/// enforced modules" was therefore an artifact of the measurement's own guard,
+/// not a fact about the compiler; schema 3 measures over the modules the
+/// compiler actually reaches. Both denominators are kept in the ledger
 /// (<c>ModulesEnforced</c> under the production rule,
 /// <c>ModulesEnforcedRawBagRule</c> under schema 2's), which is §3.1 K1's
 /// discriminating pin made permanent: restoring the raw-bag guard drives
@@ -175,7 +176,11 @@ public class Calor0425CorpusLedgerTests
         + "#1195 moves seven LanguageManagerTests.cs query calls and two ValidatorDescriptor.cs "
         + "selector calls behind explicit interop boundaries to preserve deferred semantics. "
         + "These nine fewer Calor0411 sites are opaque, not newly proven pure; the enforced-module "
-        + "denominator and Calor0425 counts are unchanged";
+        + "denominator and Calor0425 counts are unchanged. #1385 activates scalar STRING "
+        + "Calor0272/0273/0274 as compilation errors before effect enforcement. The propagated "
+        + "denominator therefore moves 327 -> 264 (serilog 99 -> 98; FluentValidation 194 -> 132), "
+        + "with 64 active scalar stops and one prior FluentValidation Calor0208 stop removed. "
+        + "The remaining enforced set carries 131 Calor0425 sites across 47 modules";
 
     private static readonly string[] Subjects = ["MediatR", "serilog", "FluentValidation"];
 
@@ -205,7 +210,7 @@ public class Calor0425CorpusLedgerTests
         [
             new SubjectFloor("MediatR", 29),
             new SubjectFloor("serilog", 84),
-            new SubjectFloor("FluentValidation", 137),
+            new SubjectFloor("FluentValidation", 132),
         ],
         2,
         0,
@@ -222,7 +227,9 @@ public class Calor0425CorpusLedgerTests
         + "turned out to be trivial and landed with them. The observed value is now 0, at or "
         + "under the bar, so the pending state is cleared and RegisteredAt is restated at the "
         + "value the gate now holds EXACTLY — the leg is live rather than pending, and a "
-        + "regression to even one parse failure reds it.");
+        + "regression to even one parse failure reds it. #1385 re-registers only the "
+        + "FluentValidation enforced-module floor at 132 because 62 active scalar diagnostics "
+        + "now stop those modules at binding; the aggregate 250 floor and all parse floors remain.");
 
     /// <summary>
     /// v0.16 K1, §S2's registration-time cross-check, recorded so it cannot go
@@ -353,7 +360,10 @@ public class Calor0425CorpusLedgerTests
 
                 if (output.Contains("Calor0208", StringComparison.Ordinal)
                     || output.Contains("Calor0250", StringComparison.Ordinal)
-                    || output.Contains("Calor0201", StringComparison.Ordinal))
+                    || output.Contains("Calor0201", StringComparison.Ordinal)
+                    || output.Contains("Calor0272", StringComparison.Ordinal)
+                    || output.Contains("Calor0273", StringComparison.Ordinal)
+                    || output.Contains("Calor0274", StringComparison.Ordinal))
                 {
                     bindStopped++;
                     continue;
@@ -645,9 +655,10 @@ public class Calor0425CorpusLedgerTests
 
     /// <summary>
     /// Gate 9's LIVE leg: <c>ModulesEnforced ≥ 250</c> in aggregate and
-    /// ≥ the per-subject floor (MediatR 29 and serilog 84 are EXACT today;
-    /// FluentValidation 137 sits six below its 143). A regression floor, and it
-    /// is enforced now — nothing about it waits on W3(a).
+    /// ≥ the per-subject floor. #1385 re-registers FluentValidation at 132
+    /// because active scalar binding diagnostics now stop 62 modules before
+    /// effects; the aggregate 250 floor remains unchanged. A regression floor,
+    /// and it is enforced now — nothing about it waits on W3(a).
     /// </summary>
     [Fact]
     public void Gate9_ModulesEnforcedFloor_Holds()
@@ -832,10 +843,13 @@ public class Calor0425CorpusLedgerTests
         Assert.Equal(
             committed.AggregateModulesEnforced,
             cli.PerSubject.Sum(s => s.ReachEffectPass));
-        Assert.True(cli.PerSubject.Sum(s => s.ReachEffectPass) >= 304,
+        Assert.True(
+            cli.PerSubject.Sum(s => s.ReachEffectPass)
+                >= committed.FloorRule.ModulesEnforcedMin,
             "gate 9's regression floor: the CLI leg reached "
-            + $"{cli.PerSubject.Sum(s => s.ReachEffectPass)} modules, below the 304 W3(a) "
-            + "established.");
+            + $"{cli.PerSubject.Sum(s => s.ReachEffectPass)} modules, below the "
+            + $"{committed.FloorRule.ModulesEnforcedMin} floor. #1385 legitimately moved "
+            + "active scalar failures before the effect pass; it did not remove this floor.");
         Assert.Equal(0, cli.PerSubject.Sum(s => s.ParseFailed));
     }
 
@@ -1177,9 +1191,11 @@ public class Calor0425CorpusLedgerTests
             // diagnostics `BindingDiagnosticPolicy.IsCompilationError` accepts
             // (`Program.cs:820`; allowlist `Binding/Scope.cs:53-78`), and returns
             // only if the compilation bag then has errors (`Program.cs:829-833`).
-            // So a module whose binder bag holds nothing but Calor0200 /
-            // Calor0272 / Calor0273 / the #1097 ICE DOES reach the effect pass for
-            // a real user, and its Calor0425s are diagnostics a real user sees.
+            // So a module whose binder bag holds nothing but Calor0200 or the
+            // #1097 ICE DOES reach the effect pass for a real user, and its
+            // Calor0425s are diagnostics a real user sees. Scalar Calor0272 /
+            // Calor0273 / Calor0274 became compilation errors in #1385 and stop
+            // before this pass.
             //
             // v0.16 K1 replaced schema 2's `if (bindDiagnostics.HasErrors) skip`
             // with the two lines below. That single guard was the whole of the
@@ -1501,16 +1517,25 @@ public class Calor0425CorpusLedgerTests
         // it could, so that route is closed and the outcome is HIT or MISS.
         Assert.True(RegisteredLargestCluster >= NeverFewerThan);
 
-        // WHERE THE CLUSTER STANDS NOW. R2 (overload assignability) moved it;
-        // this asserts the direction, never the target.
-        var largest = aggregate.MaxBy(entry => entry.Value);
-        Assert.Equal("Calor0208", largest.Key);
-        Assert.True(largest.Value <= RegisteredLargestCluster,
-            $"the Calor0208 cluster is {largest.Value}, above R1's registered {RegisteredLargestCluster} "
-            + "— a regression in the very cause R2 was scoped against.");
-        Assert.True(aggregate.Values.Sum() <= RegisteredTotalBindStops,
-            $"binding stops total {aggregate.Values.Sum()}, above R1's registered "
+        // WHERE THE REGISTERED CLUSTER STANDS NOW. #1385 adds a new, intentionally
+        // larger Calor0273 cluster; it must not rewrite R1's historical Calor0208
+        // experiment or make the old total-stop bound include a newly activated gate.
+        var registeredClusterNow = aggregate.GetValueOrDefault("Calor0208");
+        Assert.True(registeredClusterNow <= RegisteredLargestCluster,
+            $"the Calor0208 cluster is {registeredClusterNow}, above R1's registered "
+            + $"{RegisteredLargestCluster} — a regression in the cause R2 was scoped against.");
+        var preActivationTotal = aggregate
+            .Where(entry => entry.Key is not ("Calor0272" or "Calor0273" or "Calor0274"))
+            .Sum(entry => entry.Value);
+        Assert.True(preActivationTotal <= RegisteredTotalBindStops,
+            $"pre-#1385 binding stops total {preActivationTotal}, above R1's registered "
             + $"{RegisteredTotalBindStops}.");
+
+        // The newly active scalar cluster is independently pinned as current
+        // corpus fallout rather than being laundered into the historical R1 rule.
+        var largest = aggregate.MaxBy(entry => entry.Value);
+        Assert.Equal("Calor0273", largest.Key);
+        Assert.Equal(62, largest.Value);
 
         // R2's OUTCOME IS HISTORY AND DOES NOT MOVE. R2 took ModulesEnforced
         // 304 -> 319: +15 against the frozen target of 20, so PP-R1 leg 1 reads
@@ -1525,28 +1550,12 @@ public class Calor0425CorpusLedgerTests
             + "assertion, and the release notes together.");
 
         // WHERE THE RELEASE STANDS NOW, kept separate from that verdict.
-        //
-        // v0.17 R3's inherited-member lookup and round 4's finding 4 removed six
-        // more Calor0208 bind stops, so ModulesEnforced is 324 and the recovery
-        // from R1's 304 is 20 — numerically the frozen target. THIS IS NOT A HIT
-        // AND MUST NOT BE RECORDED AS ONE. The rule frozen in review round 3
-        // measures R2, and no rule was ever registered for "the release
-        // recovers N". A number that meets a target it was not registered
-        // against is not evidence, and writing that rule now — after seeing the
-        // data — is exactly the moving goalpost §10 R3-b forbade. The release
-        // figure is reported beside the verdict, never on top of it.
+        // #1385 intentionally moves active scalar nullability failures before
+        // effect enforcement. That lowers this denominator without changing
+        // R2's historical recovery result or reopening its closed MISS.
         var enforcedNow = committed.PerSubject.Sum(s => s.ModulesEnforced);
-        Assert.True(enforcedNow >= EnforcedAfterR2,
-            $"ModulesEnforced fell to {enforcedNow}, below the {EnforcedAfterR2} R2 left it at.");
-        // #1191 later exposes PropertyToken and StreetNumberComparer to effects.
-        // #1383 additionally resolves LogEventProperty's non-null -> nullable input.
-        // This does not change any historical R2/R3 measurement or verdict.
-        const int EnforcedAfterNativeStringCompatibility = 327;
-        Assert.True(enforcedNow == EnforcedAfterNativeStringCompatibility,
-            $"ModulesEnforced is {enforcedNow}, not the {EnforcedAfterNativeStringCompatibility} recorded for "
-            + "#1383. This is an EXACT pin: a move — in either direction — regenerates "
-            + "the ledger IN THIS PR with the change named, and updates §3.1's outcome record. It "
-            + "does not reopen PP-R1 leg 1, which is closed as a MISS on R2's own 15.");
+        const int EnforcedAfterScalarActivation = 264;
+        Assert.Equal(EnforcedAfterScalarActivation, enforcedNow);
     }
 
     /// <summary>

@@ -332,7 +332,7 @@ public class LanguageFeatureTests
             §M{m001:Test}
               §F{f001:Run:pub}
                   §I{object:x}
-                  §O{string}
+                  §O{?string}
                   §R (as x string)
             """;
         var code = CompileToCode(source);

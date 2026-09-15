@@ -93,6 +93,7 @@ public sealed record BindingDiagnosticContext(
         return new(boundary, target switch
         {
             NominalBoundType nominal when TypeIdentity.Canonicalize(nominal.QualifiedName) == "STRING"
+                || nominal.QualifiedName == "System.String"
                 => BindingReceivingShape.ScalarString,
             NominalBoundType => BindingReceivingShape.Nominal,
             ArrayBoundType => BindingReceivingShape.Array,
@@ -208,11 +209,16 @@ public static class BindingDiagnosticPolicy
         return Array.AsReadOnly(boundaries.SelectMany(boundary =>
             Enum.GetValues<BindingReceivingShape>().Select(shape => new BindingReceivingRule(
                 boundary.Item1, new(boundary.Item2, shape),
-                Analysis(boundary.Item1,
-                    shape == BindingReceivingShape.ScalarString
-                        ? "Scalar STRING is planned Stage A, not activated by the routing catalog."
-                        : "Non-scalar or unsupported receiving context is not Stage A; Stage B requires a separate measured decision.",
-                    shape == BindingReceivingShape.ScalarString ? 1385 : 1402))))
+                shape == BindingReceivingShape.ScalarString
+                    ? new BindingDiagnosticRule(
+                        boundary.Item1,
+                        BindingDiagnosticDisposition.CompilationError,
+                        "Stage A activates only scalar STRING receiving boundaries.",
+                        1385)
+                    : Analysis(
+                        boundary.Item1,
+                        "Non-scalar or unsupported receiving context is not Stage A; Stage B requires a separate measured decision.",
+                        1402))))
             .Append(new BindingReceivingRule(
                 DiagnosticCode.NullableArgumentToNonNullableParameter,
                 new(BindingReceivingBoundary.MethodArgument, BindingReceivingShape.ScalarString)
@@ -1486,6 +1492,32 @@ public sealed class Scope
         return true;
     }
 
+    internal bool TryReplaceLocal(Symbol expected, Symbol replacement)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        ArgumentNullException.ThrowIfNull(replacement);
+        if (!string.Equals(expected.Name, replacement.Name, StringComparison.Ordinal)
+            || !_symbols.TryGetValue(expected.Name, out var current)
+            || !ReferenceEquals(current, expected))
+        {
+            return false;
+        }
+
+        _symbols[expected.Name] = replacement;
+        return true;
+    }
+
+    internal bool TryReplaceVisible(Symbol expected, Symbol replacement)
+    {
+        for (var scope = this; scope != null; scope = scope.Parent)
+        {
+            if (scope.TryReplaceLocal(expected, replacement))
+                return true;
+        }
+
+        return false;
+    }
+
     public bool DeclareOverload(FunctionSymbol symbol) =>
         TryDeclareOverload(symbol.Name, symbol, out _);
 
@@ -1586,7 +1618,8 @@ public sealed class Scope
         IReadOnlyList<string?>? argumentModifiers,
         IReadOnlyList<string>? typeArguments,
         Func<string, string, int?>? implicitConversionCost,
-        bool allowNullableStringCompatibility)
+        bool allowNullableStringCompatibility,
+        Func<string, string, bool>? isBetterNullConversionTarget = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(argumentTypes);
@@ -1602,7 +1635,8 @@ public sealed class Scope
                     argumentModifiers,
                     typeArguments,
                     implicitConversionCost,
-                    allowNullableStringCompatibility)
+                    allowNullableStringCompatibility,
+                    isBetterNullConversionTarget)
                 ?? OverloadResolutionResult.NotFound();
         }
 
@@ -1640,6 +1674,32 @@ public sealed class Scope
         var best = applicable.Where(item => item.Score == bestScore).ToArray();
         if (best.Length == 1)
             return OverloadResolutionResult.Resolved(best[0].Function, best[0].ReturnType, best[0].Arguments);
+
+        if (isBetterNullConversionTarget != null
+            && argumentTypes.Any(type => string.Equals(
+                TypeIdentity.Canonicalize(type), "NULL", StringComparison.Ordinal)))
+        {
+            var undominated = best
+                .Where(candidate => !best.Any(other =>
+                    !ReferenceEquals(candidate.Function, other.Function)
+                    && IsBetterNullConversionCandidate(
+                        other,
+                        candidate,
+                        argumentTypes,
+                        isBetterNullConversionTarget)))
+                .ToArray();
+            if (undominated.Length != 0 && undominated.Length < best.Length)
+            {
+                best = undominated;
+                if (best.Length == 1)
+                {
+                    return OverloadResolutionResult.Resolved(
+                        best[0].Function,
+                        best[0].ReturnType,
+                        best[0].Arguments);
+                }
+            }
+        }
 
         var concreteNullableStringGroups = best
             .Where(item => item.UsesNullableStringCompatibility && item.Function.GenericArity == 0)
@@ -1711,6 +1771,47 @@ public sealed class Scope
         }
 
         return OverloadResolutionResult.Ambiguous(bestFunctions);
+    }
+
+    private static bool IsBetterNullConversionCandidate(
+        (FunctionSymbol Function, string ReturnType, int Score,
+            bool UsesNullableStringCompatibility,
+            IReadOnlyList<ResolvedArgumentMapping> Arguments) candidate,
+        (FunctionSymbol Function, string ReturnType, int Score,
+            bool UsesNullableStringCompatibility,
+            IReadOnlyList<ResolvedArgumentMapping> Arguments) other,
+        IReadOnlyList<string> argumentTypes,
+        Func<string, string, bool> isBetterNullConversionTarget)
+    {
+        var strictlyBetter = false;
+        for (var argumentIndex = 0; argumentIndex < argumentTypes.Count; argumentIndex++)
+        {
+            var candidateType = candidate.Arguments[argumentIndex].ParameterType;
+            var otherType = other.Arguments[argumentIndex].ParameterType;
+            if (!string.Equals(
+                    TypeIdentity.Canonicalize(argumentTypes[argumentIndex]),
+                    "NULL",
+                    StringComparison.Ordinal))
+            {
+                if (!string.Equals(
+                        TypeIdentity.Canonicalize(candidateType),
+                        TypeIdentity.Canonicalize(otherType),
+                        StringComparison.Ordinal))
+                    return false;
+                continue;
+            }
+
+            if (string.Equals(
+                    TypeIdentity.Canonicalize(candidateType),
+                    TypeIdentity.Canonicalize(otherType),
+                    StringComparison.Ordinal))
+                continue;
+            if (!isBetterNullConversionTarget(candidateType, otherType))
+                return false;
+            strictlyBetter = true;
+        }
+
+        return strictlyBetter;
     }
 
     public IReadOnlyList<FunctionSymbol> GetOverloads(string name)

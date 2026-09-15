@@ -208,6 +208,13 @@ internal static class CliTestHarness
     /// </summary>
     internal static (int ExitCode, string StdOut, string StdErr) RunCli(
         string workingDirectory, IReadOnlyDictionary<string, string>? environment, params string[] args)
+        => RunCliWithCompiler(FindCalorDll(), workingDirectory, environment, args);
+
+    internal static (int ExitCode, string StdOut, string StdErr) RunCliWithCompiler(
+        string compilerPath,
+        string workingDirectory,
+        IReadOnlyDictionary<string, string>? environment,
+        params string[] args)
     {
         var psi = new ProcessStartInfo
         {
@@ -226,7 +233,7 @@ internal static class CliTestHarness
             }
         }
 
-        psi.ArgumentList.Add(FindCalorDll());
+        psi.ArgumentList.Add(compilerPath);
         psi.ArgumentList.Add("--no-telemetry");
         foreach (var arg in args)
         {

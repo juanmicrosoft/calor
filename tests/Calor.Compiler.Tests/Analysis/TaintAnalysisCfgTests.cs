@@ -69,7 +69,7 @@ public sealed class TaintAnalysisCfgTests
     private static string N3TaintSource(string method, bool expression, bool tainted) => $$"""
         §M{m1:TaintIdentity}
           §F{f1:Run:pub} () -> void
-            §B{path:string} {{(tainted ? "§C{System.Environment.GetEnvironmentVariable} §A STR:\"N3_INPUT\" §/C" : "STR:\"constant.txt\"")}}
+            §B{path:string} {{(tainted ? "(?? §C{System.Environment.GetEnvironmentVariable} §A STR:\"N3_INPUT\" §/C STR:\"missing.txt\")" : "STR:\"constant.txt\"")}}
             {{(expression ? "§B{ignored} " : "")}}§C{System.IO.File.{{method}}} §A path {{(method == "WriteAllText" ? "§A STR:\"content\"" : "")}} §/C
         """;
 

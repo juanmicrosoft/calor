@@ -159,7 +159,7 @@ public class NullableReferenceTypingTests
     }
 
     [Fact]
-    public void ExpandedNullableAssignment_RetainsTransitionalRejectionAndAnalysisOwnership()
+    public void ExpandedNullableAssignment_UsesActivatedBinderOwnership()
     {
         const string source = """
             §M{m1:NullableTyping}
@@ -168,24 +168,29 @@ public class NullableReferenceTypingTests
                 §B{x:?str} null
                 §B{y:str} x
             """;
-        var rejected = Program.Compile(source, "nullable-typing.calr");
-        var error = Assert.Single(rejected.Diagnostics.Errors);
-        Assert.Equal(DiagnosticCode.TypeMismatch, error.Code);
-        Assert.Equal(5, error.Span.Line);
-        Assert.Null(error.BindingContext);
-        Assert.DoesNotContain(rejected.Diagnostics, d => d.Code == DiagnosticCode.UndefinedReference);
-        var accepted = Compile(source, checking: false);
-        Assert.True(GeneratedCSharpCompiler.Validate(accepted.GeneratedCode).CompilationSuccess);
+        foreach (var checking in new[] { true, false })
+        {
+            var rejected = Program.Compile(source, "nullable-typing.calr", new CompilationOptions
+            {
+                EnableTypeChecking = checking,
+                StatusWriter = TextWriter.Null
+            });
+            var error = Assert.Single(rejected.Diagnostics.Errors);
+            Assert.Equal(DiagnosticCode.NullableToNonNullableBinding, error.Code);
+            Assert.Equal(5, error.Span.Line);
+            Assert.True(BindingDiagnosticPolicy.IsCompilationError(error));
+            Assert.DoesNotContain(rejected.Diagnostics, d => d.Code == DiagnosticCode.TypeMismatch);
+            Assert.DoesNotContain(rejected.Diagnostics, d => d.Code == DiagnosticCode.UndefinedReference);
+        }
         var (_, diagnostics) = Bind(source);
-        var analysis = Assert.Single(diagnostics.Errors,
+        var bindingError = Assert.Single(diagnostics.Errors,
             d => d.Code == DiagnosticCode.NullableToNonNullableBinding);
-        Assert.Equal(DiagnosticCode.NullableToNonNullableBinding, analysis.Code);
-        Assert.Equal(5, analysis.Span.Line);
-        Assert.True(BindingDiagnosticPolicy.IsAnalysisOnly(analysis));
+        Assert.Equal(5, bindingError.Span.Line);
+        Assert.True(BindingDiagnosticPolicy.IsCompilationError(bindingError));
     }
 
     [Fact]
-    public void RawInlineNullableFlow_IsNotNewlyActivatedByNormalizingItsType()
+    public void RawInlineNullableFlow_IsActivatedForScalarString()
     {
         const string source = """
             §M{m1:NullableTyping}
@@ -194,9 +199,20 @@ public class NullableReferenceTypingTests
                 §B{y:str} input
             """;
         foreach (var checking in new[] { true, false })
-            AssertNoTypingNoise(Compile(source, checking));
+        {
+            var rejected = Program.Compile(source, "nullable-typing.calr", new CompilationOptions
+            {
+                EnableTypeChecking = checking,
+                StatusWriter = TextWriter.Null
+            });
+            var error = Assert.Single(rejected.Diagnostics.Errors);
+            Assert.Equal(DiagnosticCode.NullableToNonNullableBinding, error.Code);
+            Assert.Equal(4, error.Span.Line);
+            Assert.True(BindingDiagnosticPolicy.IsCompilationError(error));
+            Assert.DoesNotContain(rejected.Diagnostics, d => d.Code == DiagnosticCode.TypeMismatch);
+        }
         var (_, diagnostics) = Bind(source);
-        Assert.True(BindingDiagnosticPolicy.IsAnalysisOnly(Assert.Single(diagnostics.Errors)));
+        Assert.True(BindingDiagnosticPolicy.IsCompilationError(Assert.Single(diagnostics.Errors)));
     }
 
     [Fact]
@@ -247,7 +263,7 @@ public class NullableReferenceTypingTests
     }
 
     [Fact]
-    public void PreviouslyAcceptedObjectAlternative_KeepsClrOverloadSelection_NotSafety()
+    public void ObjectAlternative_DoesNotBypassScalarStringActivation()
     {
         const string source = """
             §M{m1:NullableTyping}
@@ -262,12 +278,73 @@ public class NullableReferenceTypingTests
                 §R §C{Take} §A value §/C
             """;
         var (_, diagnostics) = Bind(source);
-        Assert.True(BindingDiagnosticPolicy.IsAnalysisOnly(Assert.Single(diagnostics.Errors)));
+        var bindingError = Assert.Single(diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.NullableArgumentToNonNullableParameter, bindingError.Code);
+        Assert.True(BindingDiagnosticPolicy.IsCompilationError(bindingError));
         var result = Program.Compile(source, "native-string-overload-runtime.calr");
-        Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics));
-        var method = Emit(result.GeneratedCode).GetType("NullableTyping.NullableTypingModule")!.GetMethod("Probe")!;
-        Assert.Equal(1, method.Invoke(null, [null]));
-        Assert.Equal(1, method.Invoke(null, ["live"]));
+        var error = Assert.Single(result.Diagnostics.Errors);
+        Assert.Equal(DiagnosticCode.NullableArgumentToNonNullableParameter, error.Code);
+        Assert.True(BindingDiagnosticPolicy.IsCompilationError(error));
+        Assert.DoesNotContain(result.Diagnostics, d => d.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Theory]
+    [InlineData("§PUSH{items} value")]
+    [InlineData("§SETIDX{items} 0 value")]
+    [InlineData("§INS{items} 0 value")]
+    public void NullableString_RemainsRejectedByNonBoundaryCollectionConsumers(string operation)
+    {
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer($$"""
+            §M{m1:NullableTyping}
+              §F{f1:Probe:pub}
+                §I{?str:value}
+                §O{void}
+                §LIST{items:str}
+                  "seed"
+                §/LIST{items}
+                {{operation}}
+            """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join(Environment.NewLine, diagnostics));
+
+        new TypeChecker(diagnostics).Check(module);
+
+        Assert.Contains(diagnostics.Errors,
+            d => d.Code == DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void OptionNullableStringUnwrap_PreservesAnnotatedPayload()
+    {
+        const string source = """
+            §M{m1:NullableTyping}
+              §F{f1:Probe:pub} (Option<?str>:value) -> str
+                §E{throw}
+                §R §C{value.Unwrap} §/C
+            """;
+
+        var (bound, diagnostics) = Bind(source);
+        var returned = Assert.IsType<BoundReturnStatement>(
+            Assert.Single(bound.Functions).Body.Single());
+        var call = Assert.IsType<BoundCallExpression>(returned.Expression);
+        Assert.Equal(NullableAnnotation.Annotated,
+            Assert.IsType<NominalBoundType>(call.Type).NullableAnnotation);
+        Assert.Equal(DiagnosticCode.NullableReturnFromNonNullable,
+            Assert.Single(diagnostics.Errors).Code);
+
+        foreach (var checking in new[] { true, false })
+        {
+            var result = Program.Compile(source, "nullable-option-unwrap.calr",
+                new CompilationOptions
+                {
+                    EnableTypeChecking = checking,
+                    StatusWriter = TextWriter.Null
+                });
+            var error = Assert.Single(result.Diagnostics.Errors);
+            Assert.Equal(DiagnosticCode.NullableReturnFromNonNullable, error.Code);
+            Assert.DoesNotContain(result.Diagnostics,
+                d => d.Code == DiagnosticCode.TypeMismatch);
+        }
     }
 
     [Theory]

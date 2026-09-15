@@ -206,8 +206,11 @@ public class Calor0270CorpusVolumeTests
     /// analysis; all 364 parsed modules remain in the denominator.</para>
     // #1384: 15 explicit unsupported metadata-member Infos; no receiver is
     // classified safe and existing packed-reference errors remain unchanged.
-    private const int AggregateDiagnostics = 313;
-    private const int AggregateModulesWithDiagnostics = 37;
+    // #1385: scalar STRING activation and its flow repairs resolve one
+    // FluentValidation actionable receiver: 313/37 -> 312/36. All 364 parsed
+    // modules remain in the denominator.
+    private const int AggregateDiagnostics = 312;
+    private const int AggregateModulesWithDiagnostics = 36;
     private const int PreK1AggregateModulesBound = 364;
 
     /// <summary>
