@@ -12,10 +12,10 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "91cb9f78c57f978774a49c5c900f0fecd35ee41f",
-      "resolvableOnMain": "894c591e9baf86958a6d7476f9793a08fe6cfb50",
+      "measuredCommit": "a4898048695587e6e0b1f8710db9f9af4ccef617",
+      "resolvableOnMain": "a4898048695587e6e0b1f8710db9f9af4ccef617",
       "basis": "measured-on-top-of",
-      "note": "#1385: regenerated with scalar STRING Calor0272/0273/0274 activation applied on top of reachable main commit 894c591e. The propagated effect-pass denominator moves 327->264 because 64 scalar diagnostics now stop at binding while one prior Calor0208 stop is removed; Calor0425 moves 117->131 across the same 47 affected modules. The branch stamp is the generator's pre-squash HEAD; 894c591e is the reachable base, not a claim of an identical src tree."
+      "note": "#1386 Stage A repair candidate: regenerated on top of merged scalar activation a4898048. Preserving null-forgiving expressions and recognizing opaque same-name member overloads removes four false propagated bind stops, moving the effect-pass denominator 264->266 and Calor0425 131/47->135/48. The measured commit is the reachable base beneath this uncommitted repair diff, not a claim of an identical src tree."
     },
     {
       "ledger": "higher-order-demand-ledger.json",

@@ -96,7 +96,10 @@ public class BinderIncompleteRatchetTests
         + "diagnostics still zero: MediatR/Mediator.cs -12, and the two request-exception "
         + "processor behaviors -2 each. The same three records gain 8 exact source spans and "
         + "remove 8 unmapped source expressions, so the lower visit count is attributed rather "
-        + "than treated as a coverage improvement";
+        + "than treated as a coverage improvement. #1386 preserves C# null-forgiving expressions "
+        + "as explicit interop and keeps calls opaque when a same-name overload is preserved in a "
+        + "member interop block. This moves 35163 -> 35153 visits and 114 -> 129 opaque boundaries; "
+        + "binder-source-coverage.json records every changed source identity";
 
     private static string SourceCoveragePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-source-coverage.json");

@@ -10973,13 +10973,21 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private ExpressionNode ConvertPostfixUnaryExpression(PostfixUnaryExpressionSyntax postfix)
     {
-        var operand = ConvertExpression(postfix.Operand);
-
-        // Handle null-forgiving operator (!) - just return the operand since Calor doesn't have this concept
+        // Null-forgiving is runtime-neutral but no longer analysis-neutral once
+        // nullable receiving boundaries are active. Calor has no equivalent
+        // assertion syntax, so preserve the expression instead of silently
+        // dropping the C# compiler's explicit flow-state override.
         if (postfix.OperatorToken.IsKind(SyntaxKind.ExclamationToken))
         {
-            return operand;
+            _context.RecordLoss(
+                ConversionLossKind.InteropPreserved,
+                "null-forgiving-expression",
+                "Null-forgiving expression preserved verbatim because Calor has no equivalent flow assertion",
+                postfix.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+            return new RawCSharpExpressionNode(GetTextSpan(postfix), postfix.ToString());
         }
+
+        var operand = ConvertExpression(postfix.Operand);
 
         if (_conditionalRegionDepth > 0 &&
             postfix.Kind() is SyntaxKind.PostIncrementExpression or SyntaxKind.PostDecrementExpression)
