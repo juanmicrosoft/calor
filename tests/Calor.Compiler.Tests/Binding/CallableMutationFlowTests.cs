@@ -870,6 +870,83 @@ public sealed class CallableMutationFlowTests
             child => Assert.Same(statement, child));
     }
 
+    public static IEnumerable<object[]> HiddenCapturedGuardCases()
+    {
+        foreach (var join in new[] { "if", "match", "try", "finally" })
+        foreach (var control in new[] { "shadow", "renamed", "fresh", "no-mutation", "other-storage" })
+        foreach (var shape in new[] { "string", "array", "nominal" })
+        foreach (var modifier in new[] { "ref", "out" })
+        foreach (var mode in new[] { "default", "type-off", "effects-off", "transpile", "verify" })
+            yield return [join, control, shape, modifier, mode];
+    }
+
+    [Theory]
+    [MemberData(nameof(HiddenCapturedGuardCases))]
+    public void ProductionHiddenCapturedGuard_JoinPreservesStorageInvalidation(
+        string join, string control, string shape, string modifier, string mode)
+    {
+        var type = shape switch
+        {
+            "string" => "str",
+            "array" => "[str]",
+            _ => "Foo"
+        };
+        var call = control == "no-mutation" ? "§C{Noop} §/C" : "§C{mutator} §/C";
+        var body = join switch
+        {
+            "if" => "§IF{branch} flag\n" + Indent(call, 2),
+            "match" => "§W{inner} flag\n  §K true\n" + Indent(call, 4)
+                + "\n  §K _\n    §C{Noop} §/C",
+            "try" => "§TR{tr}\n" + Indent(call, 2)
+                + "\n§CA{Exception:ex}\n  §C{Noop} §/C",
+            "finally" => "§TR{tr}\n" + Indent(call, 2)
+                + "\n§FI\n  §C{Noop} §/C",
+            _ => throw new ArgumentOutOfRangeException(nameof(join))
+        };
+        var source = $$"""
+            §M{m:ShadowedCapture}
+            {{(shape == "nominal" ? "  §CL{c1:Foo:pub}\n    §MT{marker:Marker:pub} () -> i32\n      §R 0" : "")}}
+              §CL{c2:Holder:pub}
+                §FLD{?{{type}}:value:pub}
+                §FLD{?{{type}}:otherValue:pub}
+                §MT{noop:Noop:pub} () -> void
+                  §E{}
+                §MT{mut:Mutate:pub} (?{{type}}:target:{{modifier}}) -> void
+                  §ASSIGN target null
+                §MT{take:Take:pub} ({{type}}:target) -> void
+                  §E{}
+                §MT{probe:Probe:pub} (bool:flag) -> void
+                  §IF{guard} (!= value null)
+                    §B{mutator:Action} §LAM{mutLambda} §C{Mutate} §A{ {{modifier}} } {{(control == "other-storage" ? "otherValue" : "value")}} §/C §/LAM{mutLambda}
+                    §W{outer} flag
+                      §K §VAR{ {{(control == "renamed" ? "other" : "value")}} }
+            {{Indent(body, 12)}}
+            {{(control == "fresh" ? "        §IF{again} (!= value null)\n          §C{Take} §A value §/C" : "        §C{Take} §A value §/C")}}
+            """;
+        var result = CompileInMode(source, mode);
+        if (control is "fresh" or "no-mutation" or "other-storage")
+        {
+            Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+            Assert.NotEmpty(result.GeneratedCode);
+        }
+        else
+        {
+            Assert.True(result.HasErrors, result.GeneratedCode);
+            var diagnostic = Assert.Single(result.Diagnostics.Errors);
+            Assert.Equal(DiagnosticCode.NullableArgumentToNonNullableParameter, diagnostic.Code);
+            Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+            Assert.Equal("value", source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+            Assert.Equal(shape switch
+            {
+                "array" => BindingReceivingShape.Array,
+                "nominal" => BindingReceivingShape.Nominal,
+                _ => BindingReceivingShape.ScalarString
+            }, diagnostic.BindingContext?.Shape);
+            Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+            Assert.Empty(result.GeneratedCode);
+        }
+    }
+
     private static CompilationResult CompileInMode(string source, string mode) =>
         Program.Compile(source, "callable-control-flow.calr", new CompilationOptions
         {
