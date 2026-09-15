@@ -12,10 +12,10 @@
   "ledgers": [
     {
       "ledger": "calor0425-corpus-ledger.json",
-      "measuredCommit": "a4898048695587e6e0b1f8710db9f9af4ccef617",
-      "resolvableOnMain": "a4898048695587e6e0b1f8710db9f9af4ccef617",
+      "measuredCommit": "d0dc0f8bf3ea400b1d7d16780a98d9ff3341abc7",
+      "resolvableOnMain": "d0dc0f8bf3ea400b1d7d16780a98d9ff3341abc7",
       "basis": "measured-on-top-of",
-      "note": "#1386 Stage A repair candidate: regenerated on top of merged scalar activation a4898048. Preserving null-forgiving expressions and recognizing opaque same-name member overloads removes four false propagated bind stops, moving the effect-pass denominator 264->266 and Calor0425 131/47->135/48. The measured commit is the reachable base beneath this uncommitted repair diff, not a claim of an identical src tree."
+      "note": "#1402 Stage B activation candidate: regenerated on top of merged Stage A evidence d0dc0f8b. Activating bounded arrays, whitelisted STRING generics, and identity-proven nominal references adds one MediatR Calor0274 bind stop, moving the effect-pass denominator 266->265 while Calor0425 remains 135/48. The measured commit is the reachable base beneath this activation diff, not a claim of an identical src tree."
     },
     {
       "ledger": "higher-order-demand-ledger.json",

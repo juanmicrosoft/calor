@@ -611,7 +611,7 @@ public class NullabilityIntegrationTests
         Assert.Equal("maybe", source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
         Assert.Equal(SemanticsVersion.NullabilitySeverityFor(), diagnostic.Severity);
         Assert.Equal(BindingReceivingBoundary.MethodArgument, diagnostic.BindingContext!.Boundary);
-        Assert.False(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
     }
 
     [Theory]
@@ -716,7 +716,8 @@ public class NullabilityIntegrationTests
             }
             """;
         var converted = new Calor.Compiler.Migration.CSharpToCalorConverter().Convert(original);
-        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        Assert.Equal(form == "out", converted.Success);
+        Assert.NotNull(converted.CalorSource);
         var source = converted.CalorSource!;
         var (bound, diagnostics) = BindSource(source);
         Assert.DoesNotContain(diagnostics, d => d.Code is DiagnosticCode.NoMatchingOverload or DiagnosticCode.AmbiguousOverload);
@@ -734,12 +735,12 @@ public class NullabilityIntegrationTests
             var diagnostic = Assert.Single(findings);
             Assert.Contains($"'{selected.Parameters[0].Name}'", diagnostic.Message);
             Assert.Equal(source.LastIndexOf("maybe", StringComparison.Ordinal), diagnostic.Span.Start);
-            Assert.False(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+            Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
         }
         var result = Program.Compile(source, "n3-native.calr",
             new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
-        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
-        if (form is "ref" or "out")
+        Assert.Equal(form != "out", result.HasErrors);
+        if (form == "out")
             Assert.Contains($"{form} maybe", result.GeneratedCode);
     }
 
@@ -885,10 +886,10 @@ public class NullabilityIntegrationTests
         Assert.Contains("'directoryInfo'", finding.Message);
         Assert.Equal(argument.Span, finding.Span);
         Assert.Equal(BindingReceivingShape.Nominal, finding.BindingContext?.Shape);
-        Assert.False(BindingDiagnosticPolicy.IsCompilationError(finding));
+        Assert.True(BindingDiagnosticPolicy.IsCompilationError(finding));
         var result = Program.Compile(source, "n3-nominal-input.calr",
             new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
-        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        Assert.True(result.HasErrors);
     }
 
     [Theory]
@@ -923,7 +924,6 @@ public class NullabilityIntegrationTests
             a.Usings, a.Interfaces, [classA, classB], a.Functions, a.Attributes);
         var diagnostics = new DiagnosticBag();
         var bound = new Binder(diagnostics).Bind(module);
-        Assert.DoesNotContain(diagnostics, d => BindingDiagnosticPolicy.IsCompilationError(d));
         var caller = bound.Functions.Single(f => f.Symbol.Name.EndsWith(".Probe", StringComparison.Ordinal));
         var arguments = expression
             ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(caller.Body[0]).Expression).Arguments
@@ -940,7 +940,7 @@ public class NullabilityIntegrationTests
         Assert.Contains("'required'", finding.Message);
         Assert.Equal(arguments[1].Span, finding.Span);
         Assert.Equal(BindingReceivingShape.Nominal, finding.BindingContext?.Shape);
-        Assert.False(BindingDiagnosticPolicy.IsCompilationError(finding));
+        Assert.True(BindingDiagnosticPolicy.IsCompilationError(finding));
     }
 
     [Theory]
@@ -1001,16 +1001,16 @@ public class NullabilityIntegrationTests
             Assert.Contains(bcl ? "'directoryInfo'" : "'required'", finding.Message);
             Assert.Equal(argument.Span, finding.Span);
             Assert.Equal(BindingReceivingShape.Nominal, finding.BindingContext?.Shape);
-            Assert.False(BindingDiagnosticPolicy.IsCompilationError(finding));
+            Assert.True(BindingDiagnosticPolicy.IsCompilationError(finding));
         }
         else
         {
             Assert.Empty(findings);
         }
-        Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+        Assert.Equal(nullable, diagnostics.Any(BindingDiagnosticPolicy.IsCompilationError));
         var result = Program.Compile(source, "n3-inferred-named-input.calr",
             new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
-        Assert.False(result.HasErrors, string.Join("\n", result.Diagnostics));
+        Assert.Equal(nullable, result.HasErrors);
     }
 
     /// <summary>
@@ -3361,6 +3361,192 @@ public class NullabilityIntegrationTests
 
         Assert.DoesNotContain(diagnostics, d =>
             d.Code == DiagnosticCode.NullableToNonNullableBinding);
+    }
+
+    [Theory]
+    [InlineData("§B{copy:[str]} value", "§F{probe:Probe:pub} (?[str]:value) -> void",
+        DiagnosticCode.NullableToNonNullableBinding)]
+    [InlineData("§R value", "§F{probe:Probe:pub} (?[str]:value) -> [str]",
+        DiagnosticCode.NullableReturnFromNonNullable)]
+    [InlineData("§B{copy:[str]} value", "§F{probe:Probe:pub} ([?str]:value) -> void",
+        DiagnosticCode.NullableToNonNullableBinding)]
+    [InlineData("§R value", "§F{probe:Probe:pub} ([?str]:value) -> [str]",
+        DiagnosticCode.NullableReturnFromNonNullable)]
+    public void StageB_ArrayVariablesAreCheckedOutsideMethodArguments(
+        string statement, string signature, string expectedCode)
+    {
+        var source = $$"""
+            §M{m1:ArrayBoundary}
+              {{signature}}
+                {{statement}}
+            """;
+        var (_, diagnostics) = BindSource(source);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == expectedCode);
+    }
+
+    [Theory]
+    [InlineData("§R value", "§F{probe:Probe:pub} (IEnumerable<?str>:value) -> IEnumerable<str>",
+        DiagnosticCode.NullableReturnFromNonNullable)]
+    [InlineData("§R §C{Take} §A value §/C",
+        "§F{probe:Probe:pub} (IEnumerable<?str>:value) -> IEnumerable<str>",
+        DiagnosticCode.NullableArgumentToNonNullableParameter)]
+    public void StageB_GenericVariablePayloadNullabilitySurvivesReferences(
+        string statement, string signature, string expectedCode)
+    {
+        var helper = expectedCode == DiagnosticCode.NullableArgumentToNonNullableParameter
+            ? "§F{take:Take:pub} (IEnumerable<str>:value) -> IEnumerable<str>\n    §R value"
+            : "";
+        var source = $$"""
+            §M{m1:GenericBoundary}
+              {{helper}}
+              {{signature}}
+                {{statement}}
+            """;
+        var (bound, diagnostics) = BindSource(source);
+        if (expectedCode == DiagnosticCode.NullableArgumentToNonNullableParameter)
+        {
+            var call = Assert.IsType<BoundCallExpression>(
+                Assert.IsType<BoundReturnStatement>(
+                    Assert.Single(bound.Functions.Single(function => function.Symbol.Name == "Probe").Body))
+                .Expression);
+            Assert.Single(call.SelectedOverloadMatches);
+            Assert.Equal("IEnumerable<str>",
+                Assert.Single(call.SelectedOverloadMatches).Function.Parameters[0].TypeName);
+            var argument = Assert.IsType<BoundVariableExpression>(Assert.Single(call.Arguments));
+            var generic = argument.Variable.GenericNullabilityType;
+            Assert.Equal(NullableAnnotation.Annotated,
+                Assert.IsType<NominalBoundType>(generic!.TypeArguments[0]).NullableAnnotation);
+        }
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == expectedCode);
+    }
+
+    [Theory]
+    [InlineData("§B{copy:IEnumerable<str>} §C{Give} §/C",
+        DiagnosticCode.NullableToNonNullableBinding)]
+    [InlineData("§R §C{Give} §/C",
+        DiagnosticCode.NullableReturnFromNonNullable)]
+    [InlineData("§C{Take} §A §C{Give} §/C §/C",
+        DiagnosticCode.NullableArgumentToNonNullableParameter)]
+    public void StageB_GenericCallResultPayloadNullabilitySurvivesBoundaries(
+        string statement, string expectedCode)
+    {
+        var source = $$"""
+            §M{m1:GenericCallResult}
+              §F{give:Give:pub} () -> IEnumerable<?str>
+                §TH null
+              §F{take:Take:pub} (IEnumerable<str>:value) -> void
+                §E{}
+              §F{probe:Probe:pub} () -> IEnumerable<str>
+                {{statement}}
+                §TH null
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == expectedCode);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StageB_ExpandedGenericParamsUsesEffectiveElementTarget(bool nullablePayload)
+    {
+        var converted = new Calor.Compiler.Migration.CSharpToCalorConverter().Convert($$"""
+            using System.Collections.Generic;
+            public static class Strings
+            {
+                public static int Take(params List<string>[] values) => 1;
+                public static int Caller(List<string{{(nullablePayload ? "?" : "")}}> value)
+                    => Take(value);
+            }
+            """);
+        Assert.NotNull(converted.CalorSource);
+        Assert.Equal(!nullablePayload, converted.Success);
+
+        var (_, diagnostics) = BindSource(converted.CalorSource!);
+        var findings = diagnostics.Where(diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+            && BindingDiagnosticPolicy.IsCompilationError(diagnostic)).ToArray();
+
+        Assert.Equal(nullablePayload ? 1 : 0, findings.Length);
+    }
+
+    [Fact]
+    public void StageB_NestedGenericPayloadDifferenceDoesNotSelectOverload()
+    {
+        var source = """
+            §M{m1:NestedGeneric}
+              §F{take:Take:pub} (List<List<str>>:value) -> void
+                §E{}
+              §F{probe:Probe:pub} (List<List<?str>>:value) -> void
+                §C{Take} §A value §/C
+            """;
+
+        var (bound, diagnostics) = BindSource(source);
+        var call = Assert.IsType<BoundCallStatement>(
+            Assert.Single(bound.Functions.Single(function => function.Symbol.Name == "Probe").Body));
+
+        Assert.Empty(call.SelectedOverloadMatches);
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
+    [Theory]
+    [InlineData("?List<?str>")]
+    [InlineData("List<?str>?")]
+    public void StageB_NullableGenericContainerGuardPreservesPayloadNullability(string sourceType)
+    {
+        var source = $$"""
+            §M{m1:NullableGenericContainer}
+              §F{probe:Probe:pub} ({{sourceType}}:value) -> List<str>
+                §IF{guard} (!= value null)
+                  §R value
+                §TH null
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable);
+    }
+
+    [Theory]
+    [InlineData("?List<?str>")]
+    [InlineData("List<?str>?")]
+    public void StageB_NullableGenericCallResultPreservesPayloadNullability(string returnType)
+    {
+        var source = $$"""
+            §M{m1:NullableGenericCall}
+              §F{give:Give:pub} () -> {{returnType}}
+                §TH null
+              §F{probe:Probe:pub} () -> List<str>
+                §R §C{Give} §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable);
+    }
+
+    [Theory]
+    [InlineData("?List<str>", "?List<?str>")]
+    [InlineData("List<str>?", "List<?str>?")]
+    public void StageB_NullableGenericArgumentStillChecksPayload(
+        string targetType, string sourceType)
+    {
+        var source = $$"""
+            §M{m1:NullableGenericArgument}
+              §F{take:Take:pub} ({{targetType}}:value) -> void
+                §E{}
+              §F{probe:Probe:pub} ({{sourceType}}:value) -> void
+                §C{Take} §A value §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
     }
 
     /// <summary>

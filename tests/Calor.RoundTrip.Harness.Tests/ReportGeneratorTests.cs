@@ -99,7 +99,7 @@ public class ReportGeneratorTests
                 Calor.Compiler.Binding.BindingReceivingBoundary.NativeReturn,
                 Calor.Compiler.Binding.BindingReceivingShape.Nominal),
         };
-        Assert.Equal("AnalysisOnly", ReportGenerator.CaptureDiagnostic(
+        Assert.Equal("CompilationError", ReportGenerator.CaptureDiagnostic(
             nominal, "shadow-bind", "N.cs", source, true).BindingDisposition);
     }
 

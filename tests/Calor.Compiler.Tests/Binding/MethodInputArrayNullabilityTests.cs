@@ -43,8 +43,6 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
                 {{(expression ? "" : "§R 0")}}
             """;
         var (module, diagnostics) = Bind(source);
-        Assert.True(!diagnostics.Any(BindingDiagnosticPolicy.IsCompilationError),
-            string.Join("\n", diagnostics));
         var caller = module.Functions.Single(f => f.Symbol.Name == "Caller");
         var callExpression = expression
             ? Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(caller.Body[^1]).Expression)
@@ -77,7 +75,7 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
             Assert.Equal(BindingReceivingBoundary.MethodArgument, finding.BindingContext?.Boundary);
             Assert.Equal(BindingReceivingShape.Array, finding.BindingContext?.Shape);
             Assert.Equal(SemanticsVersion.NullabilitySeverityFor(), finding.Severity);
-            Assert.False(BindingDiagnosticPolicy.IsCompilationError(finding));
+            Assert.True(BindingDiagnosticPolicy.IsCompilationError(finding));
             if (containerMismatch)
                 Assert.Contains("container", finding.Message, StringComparison.OrdinalIgnoreCase);
             if (elementMismatch)
@@ -86,12 +84,259 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         Assert.DoesNotContain(diagnostics, d => d.Code is DiagnosticCode.NullableToNonNullableBinding
             or DiagnosticCode.NullableReturnFromNonNullable);
         var compiled = Program.Compile(source, "a4-native-array.calr");
-        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
-        var emitted = AssertEmittedArrayParameter(compiled.GeneratedCode, "Take", 1);
-        Assert.Equal((targetShape & 1) != 0 ? Microsoft.CodeAnalysis.NullableAnnotation.Annotated
-            : Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated, emitted.NullableAnnotation);
-        Assert.Equal((targetShape & 2) != 0 ? Microsoft.CodeAnalysis.NullableAnnotation.Annotated
-            : Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated, emitted.ElementType.NullableAnnotation);
+        Assert.Equal(containerMismatch || elementMismatch, compiled.HasErrors);
+        if (!compiled.HasErrors)
+        {
+            var emitted = AssertEmittedArrayParameter(compiled.GeneratedCode, "Take", 1);
+            Assert.Equal((targetShape & 1) != 0 ? Microsoft.CodeAnalysis.NullableAnnotation.Annotated
+                : Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated, emitted.NullableAnnotation);
+            Assert.Equal((targetShape & 2) != 0 ? Microsoft.CodeAnalysis.NullableAnnotation.Annotated
+                : Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated, emitted.ElementType.NullableAnnotation);
+        }
+    }
+
+    [Theory]
+    [InlineData("?[str]", false)]
+    [InlineData("?[?str]", true)]
+    public void StageB_NullGuardNarrowsOnlyArrayContainer(string sourceType, bool elementMismatch)
+    {
+        var source = $$"""
+            §M{m1:GuardedArray}
+              §F{take:Take:pub} ([str]:items) -> i32
+                §R 1
+              §F{probe:Probe:pub} ({{sourceType}}:items) -> i32
+                §IF{guard} (!= items null)
+                  §R §C{Take} §A items §/C
+                §R 0
+            """;
+        var (_, diagnostics) = Bind(source);
+        Assert.Equal(elementMismatch, diagnostics.Any(d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+            && BindingDiagnosticPolicy.IsCompilationError(d)));
+        var result = Program.Compile(source, "guarded-array.calr");
+        Assert.Equal(elementMismatch, result.HasErrors);
+    }
+
+    [Theory]
+    [InlineData("ref", false)]
+    [InlineData("out", false)]
+    [InlineData("ref", true)]
+    [InlineData("out", true)]
+    public void StageB_MutatingConjunctionDoesNotRestoreInvalidatedArrayGuard(
+        string modifier, bool nested)
+    {
+        var condition = nested
+            ? $"(&& (&& (!= value null) (!= other null)) §C{{Mutate}} §A{{{modifier}}} value §/C)"
+            : $"(&& (!= value null) §C{{Mutate}} §A{{{modifier}}} value §/C)";
+        var source = $$"""
+            §M{m1:InvalidatedArrayGuard}
+              §F{mutate:Mutate:pub} (?[str]:value:{{modifier}}) -> bool
+                §ASSIGN value null
+                §R true
+              §F{take:Take:pub} ([str]:value) -> void
+                §E{}
+              §F{probe:Probe:pub} (?[str]:value, ?[str]:other) -> void
+                §IF{guard} {{condition}}
+                  {{(nested ? "§C{Take} §A other §/C\n      " : "")}}§C{Take} §A value §/C
+            """;
+        var result = Program.Compile(source, "invalidated-array-guard.calr");
+        Assert.True(result.HasErrors);
+        var diagnostic = Assert.Single(result.Diagnostics.Where(d =>
+            d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+            && BindingDiagnosticPolicy.IsCompilationError(d)));
+        Assert.Equal("value", source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
+    }
+
+    [Theory]
+    [InlineData("ref", false)]
+    [InlineData("out", false)]
+    [InlineData("ref", true)]
+    [InlineData("out", true)]
+    public void StageB_OpaqueMutatingConjunctionInvalidatesEveryExplicitByRefArgument(
+        string modifier, bool wrapped)
+    {
+        var interop = modifier == "ref"
+            ? "§CSHARP{public bool MutateBoth(ref string[]? first, ref string[]? second) { first = null; second = null; return true; }}§/CSHARP"
+            : "§CSHARP{public bool MutateBoth(out string[]? first, out string[]? second) { first = null; second = null; return true; }}§/CSHARP";
+        var argument = modifier == "ref" ? "§A{ref}" : "§A{out}";
+        var mutation = $"§C{{MutateBoth}} {argument} first {argument} second §/C";
+        var right = wrapped ? $"(== {mutation} true)" : mutation;
+        var source = $$"""
+            §M{m1:OpaqueInvalidation}
+              §CL{c1:Holder:pub}
+                {{interop}}
+                §MT{take:Take:pub} ([str]:value) -> void
+                  §E{}
+                §MT{probe:Probe:pub} (?[str]:first, ?[str]:second) -> void
+                  §IF{guard} (&& (&& (!= first null) (!= second null)) {{right}})
+                    §C{Take} §A first §/C
+                    §C{Take} §A second §/C
+            """;
+        var bindingDiagnostics = new DiagnosticBag();
+        var tokens = new Lexer(source, bindingDiagnostics).TokenizeAllForParser();
+        var module = new Parser(tokens, bindingDiagnostics).Parse();
+        var bound = new Binder(bindingDiagnostics).Bind(module);
+        var probe = Assert.Single(bound.Functions.Where(function =>
+            function.Symbol.Name.EndsWith(".Probe", StringComparison.Ordinal)));
+        var condition = Assert.IsType<BoundBinaryExpression>(
+            Assert.IsType<BoundIfStatement>(Assert.Single(probe.Body)).Condition);
+        var call = wrapped
+            ? Assert.IsType<BoundCallExpression>(
+                Assert.IsType<BoundBinaryExpression>(condition.Right).Left)
+            : Assert.IsType<BoundCallExpression>(condition.Right);
+        Assert.Equal(new[] { modifier, modifier }, call.ArgumentModifiers);
+        Assert.Equal(new[] { "first", "second" },
+            condition.InvalidatedLeftNarrowingNames.Order(StringComparer.Ordinal).ToArray());
+        var result = Program.Compile(source, "opaque-invalidated-array-guard.calr");
+        var diagnostics = result.Diagnostics
+            .Where(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+                && BindingDiagnosticPolicy.IsCompilationError(d))
+            .ToArray();
+        Assert.Equal(2, diagnostics.Length);
+        Assert.Equal(new[] { "first", "second" }, diagnostics
+            .Select(d => source.Substring(d.Span.Start, d.Span.Length))
+            .Order(StringComparer.Ordinal)
+            .ToArray());
+    }
+
+    [Theory]
+    [InlineData("ref")]
+    [InlineData("out")]
+    public void StageB_OpaqueMutationInsideGuardedBodyInvalidatesNarrowing(string modifier)
+    {
+        var interop = modifier == "ref"
+            ? "§CSHARP{public void Mutate(ref string[]? value) { value = null; }}§/CSHARP"
+            : "§CSHARP{public void Mutate(out string[]? value) { value = null; }}§/CSHARP";
+        var argument = modifier == "ref" ? "§A{ref}" : "§A{out}";
+        var source = $$"""
+            §M{m1:GuardedOpaqueInvalidation}
+              §CL{c1:Holder:pub}
+                {{interop}}
+                §MT{take:Take:pub} ([str]:value) -> void
+                  §E{}
+                §MT{probe:Probe:pub} (?[str]:value) -> void
+                  §IF{guard} (!= value null)
+                    §C{Mutate} {{argument}} value §/C
+                    §C{Take} §A value §/C
+            """;
+        var result = Program.Compile(source, "guarded-opaque-invalidation.calr");
+        Assert.Contains(result.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+            && BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+    }
+
+    [Theory]
+    [InlineData("ref")]
+    [InlineData("out")]
+    public void StageB_NestedConjunctionMutationInvalidatesEnclosingArrayGuard(string modifier)
+    {
+        var argument = modifier == "ref" ? "§A{ref}" : "§A{out}";
+        var source = $$"""
+            §M{m1:EnclosingGuardInvalidation}
+              §F{mutate:Mutate:pub} (?[str]:value:{{modifier}}) -> bool
+                §ASSIGN value null
+                §R true
+              §F{take:Take:pub} ([str]:value) -> void
+                §E{}
+              §F{probe:Probe:pub} (?[str]:value) -> void
+                §IF{outer} (!= value null)
+                  §IF{inner} (&& (!= value null) §C{Mutate} {{argument}} value §/C)
+                    §P "mutated"
+                  §C{Take} §A value §/C
+            """;
+
+        var result = Program.Compile(source, "enclosing-array-guard-invalidation.calr");
+
+        Assert.Contains(result.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+            && BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+    }
+
+    [Theory]
+    [InlineData("ref", "?[str]", "[str]")]
+    [InlineData("out", "?[str]", "[str]")]
+    [InlineData("ref", "?str", "str")]
+    [InlineData("out", "?str", "str")]
+    public void StageB_UninvokedLambdaMutationDoesNotInvalidateOuterGuard(
+        string modifier, string nullableType, string nonNullableType)
+    {
+        var argument = modifier == "ref" ? "§A{ref}" : "§A{out}";
+        var source = $$"""
+            §M{m1:DeferredMutation}
+              §F{mutate:Mutate:pub} ({{nullableType}}:value:{{modifier}}) -> void
+                §ASSIGN value null
+              §F{take:Take:pub} ({{nonNullableType}}:value) -> void
+                §E{}
+              §F{probe:Probe:pub} ({{nullableType}}:value) -> void
+                §IF{guard} (!= value null)
+                  §B{later:Action} §LAM{lam1} §C{Mutate} {{argument}} value §/C §/LAM{lam1}
+                  §C{Take} §A value §/C
+            """;
+
+        var result = Program.Compile(source, "deferred-mutation.calr");
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+            && BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+    }
+
+    [Theory]
+    [InlineData("ref", "?[str]", "[str]")]
+    [InlineData("out", "?[str]", "[str]")]
+    [InlineData("ref", "?str", "str")]
+    [InlineData("out", "?str", "str")]
+    public void StageB_DeferredLambdaInConjunctionDoesNotInvalidateGuard(
+        string modifier, string nullableType, string nonNullableType)
+    {
+        var argument = modifier == "ref" ? "§A{ref}" : "§A{out}";
+        var source = $$"""
+            §M{m1:DeferredConjunction}
+              §F{mutate:Mutate:pub} ({{nullableType}}:value:{{modifier}}) -> bool
+                §ASSIGN value null
+                §R true
+              §F{ignore:Ignore:pub} (Action:action) -> bool
+                §R true
+              §F{take:Take:pub} ({{nonNullableType}}:value) -> void
+                §E{}
+              §F{probe:Probe:pub} ({{nullableType}}:value) -> void
+                §IF{guard} (&& (!= value null) §C{Ignore} §A §LAM{lam1} §C{Mutate} {{argument}} value §/C §/LAM{lam1} §/C)
+                  §C{Take} §A value §/C
+            """;
+
+        var result = Program.Compile(source, "deferred-conjunction.calr");
+
+        Assert.DoesNotContain(result.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+            && BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+    }
+
+    [Theory]
+    [InlineData("ref", "?[str]", "[str]")]
+    [InlineData("out", "?[str]", "[str]")]
+    [InlineData("ref", "?str", "str")]
+    [InlineData("out", "?str", "str")]
+    public void StageB_InvokedCapturedLambdaInvalidatesGuard(
+        string modifier, string nullableType, string nonNullableType)
+    {
+        var argument = modifier == "ref" ? "§A{ref}" : "§A{out}";
+        var source = $$"""
+            §M{m1:InvokedDeferredMutation}
+              §F{mutate:Mutate:pub} ({{nullableType}}:value:{{modifier}}) -> void
+                §ASSIGN value null
+              §F{take:Take:pub} ({{nonNullableType}}:value) -> void
+                §E{}
+              §F{probe:Probe:pub} ({{nullableType}}:value) -> void
+                §IF{guard} (!= value null)
+                  §B{later:Action} §LAM{lam1} §C{Mutate} {{argument}} value §/C §/LAM{lam1}
+                  §C{later} §/C
+                  §C{Take} §A value §/C
+            """;
+
+        var result = Program.Compile(source, "invoked-deferred-mutation.calr");
+
+        Assert.Contains(result.Diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter
+            && BindingDiagnosticPolicy.IsCompilationError(diagnostic));
     }
 
     [Theory]
@@ -130,9 +375,10 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
             Assert.Equal(call.Arguments[0].Span, finding.Span);
             Assert.Contains("'contents'", finding.Message);
             Assert.Equal(BindingReceivingShape.Array, finding.BindingContext?.Shape);
-            Assert.False(BindingDiagnosticPolicy.IsCompilationError(finding));
+            Assert.True(BindingDiagnosticPolicy.IsCompilationError(finding));
         }
-        Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+        Assert.Equal(nullableContainer || nullableElements,
+            diagnostics.Any(BindingDiagnosticPolicy.IsCompilationError));
     }
 
     [Theory]
@@ -159,7 +405,8 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
                 }
             }
             """, "a4-rectangular.cs");
-        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        Assert.Equal(shape == 0, converted.Success);
+        Assert.NotNull(converted.CalorSource);
         var (module, diagnostics) = Bind(converted.CalorSource!);
         var caller = module.Functions.Single(f => f.Symbol.Name.EndsWith(".Caller", StringComparison.Ordinal));
         var call = Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(caller.Body[^1]).Expression);
@@ -171,10 +418,11 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         Assert.Equal((shape & 2) != 0 ? NullableAnnotation.Annotated : NullableAnnotation.NotAnnotated,
             Assert.IsType<NominalBoundType>(array.ElementType).NullableAnnotation);
         Assert.Equal(shape != 0, diagnostics.Any(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
-        Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+        Assert.Equal(shape != 0, diagnostics.Any(BindingDiagnosticPolicy.IsCompilationError));
         var compiled = Program.Compile(converted.CalorSource!, "a4-rectangular.calr");
-        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
-        AssertEmittedArrayParameter(compiled.GeneratedCode, "Take", rank);
+        Assert.Equal(shape != 0, compiled.HasErrors);
+        if (!compiled.HasErrors)
+            AssertEmittedArrayParameter(compiled.GeneratedCode, "Take", rank);
     }
 
     [Theory]
@@ -202,7 +450,8 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
             }
             """, "a4-created.cs");
         output.WriteLine(converted.CalorSource);
-        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        Assert.Equal(!nullable, converted.Success);
+        Assert.NotNull(converted.CalorSource);
         var (module, diagnostics) = Bind(converted.CalorSource!);
         var caller = module.Functions.Single(f => f.Symbol.Name.EndsWith(".Caller", StringComparison.Ordinal));
         var call = expression
@@ -227,12 +476,14 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
             Assert.Equal(BindingReceivingShape.Array, finding.BindingContext?.Shape);
             Assert.Contains("elements", finding.Message);
         }
-        Assert.DoesNotContain(diagnostics, d => d.Code is DiagnosticCode.NullableToNonNullableBinding
-            or DiagnosticCode.NullableReturnFromNonNullable);
-        Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+        Assert.Equal(nullable,
+            diagnostics.Any(d => d.Code == DiagnosticCode.NullableToNonNullableBinding));
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.NullableReturnFromNonNullable);
+        Assert.Equal(nullable, diagnostics.Any(BindingDiagnosticPolicy.IsCompilationError));
         var compiled = Program.Compile(converted.CalorSource!, "a4-created.calr");
-        Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics));
-        AssertEmittedArrayParameter(compiled.GeneratedCode, "Take", 1);
+        Assert.Equal(nullable, compiled.HasErrors);
+        if (!compiled.HasErrors)
+            AssertEmittedArrayParameter(compiled.GeneratedCode, "Take", 1);
     }
 
     [Theory]
@@ -263,7 +514,7 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void A4_RealBclGenericArrayReturn_PreservesElementsOnlyForMethodInputs(bool nullable)
+    public void A4_RealBclGenericArrayReturn_PreservesElementsAcrossActiveBoundaries(bool nullable)
     {
         var source = $$"""
             §M{m1:GenericArrayProducer}
@@ -287,9 +538,9 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         Assert.Equal(nullable ? NullableAnnotation.Annotated : NullableAnnotation.NotAnnotated,
             Assert.IsType<NominalBoundType>(array.ElementType).NullableAnnotation);
         Assert.Equal(nullable, diagnostics.Any(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
-        Assert.DoesNotContain(diagnostics, d => d.Code is DiagnosticCode.NullableToNonNullableBinding
-            or DiagnosticCode.NullableReturnFromNonNullable);
-        Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+        Assert.Equal(nullable, diagnostics.Any(d => d.Code == DiagnosticCode.NullableToNonNullableBinding));
+        Assert.Equal(nullable, diagnostics.Any(d => d.Code == DiagnosticCode.NullableReturnFromNonNullable));
+        Assert.Equal(nullable, diagnostics.Any(BindingDiagnosticPolicy.IsCompilationError));
     }
 
     [Theory]
@@ -318,7 +569,7 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
             Assert.Contains("container", finding[0].Message);
             Assert.DoesNotContain("STRING", finding[0].Message);
         }
-        Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+        Assert.Equal(nullable, diagnostics.Any(BindingDiagnosticPolicy.IsCompilationError));
     }
 
     [Theory]
@@ -341,7 +592,8 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
                 }
             }
             """, "a4-nominal-array.cs");
-        Assert.True(converted.Success, string.Join("\n", converted.Issues));
+        Assert.Equal(!nullableContainer, converted.Success);
+        Assert.NotNull(converted.CalorSource);
         var (module, diagnostics) = Bind(converted.CalorSource!);
         var caller = module.Functions.Single(f => f.Symbol.Name.EndsWith(".Caller", StringComparison.Ordinal));
         var call = Assert.IsType<BoundCallExpression>(Assert.IsType<BoundReturnStatement>(caller.Body[^1]).Expression);
@@ -349,7 +601,7 @@ public class MethodInputArrayNullabilityTests(Xunit.Abstractions.ITestOutputHelp
         var array = Assert.IsType<ArrayBoundType>(NullabilityChecker.GetMethodInputArrayType(Assert.Single(call.Arguments)));
         Assert.True(Assert.IsType<NominalBoundType>(array.ElementType).IsKnownReferenceType);
         Assert.Equal(nullableContainer, diagnostics.Any(d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
-        Assert.DoesNotContain(diagnostics, BindingDiagnosticPolicy.IsCompilationError);
+        Assert.Equal(nullableContainer, diagnostics.Any(BindingDiagnosticPolicy.IsCompilationError));
     }
 
     [Theory]

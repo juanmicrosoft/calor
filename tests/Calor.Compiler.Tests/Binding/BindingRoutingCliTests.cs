@@ -34,6 +34,52 @@ public class BindingRoutingCliTests : IDisposable
     }
 
     [Theory]
+    [MemberData(nameof(StageBReceivingSurfaceTests.Cases), MemberType = typeof(StageBReceivingSurfaceTests))]
+    public void StageB_CliMatchesApiAndSuppressesOutputAcrossOptOuts(
+        string sourceType, string targetType, Binding.BindingReceivingShape shape,
+        Binding.BindingReceivingBoundary boundary)
+    {
+        var source = StageBReceivingSurfaceTests.Source(sourceType, targetType, boundary);
+        var file = Path.Combine(_directory, "stage-b.calr");
+        var output = Path.Combine(_directory, "stage-b.cs");
+        var api = Assert.Single(Program.Compile(source, file).Diagnostics.Errors);
+        Assert.Equal(shape, api.BindingContext?.Shape);
+        foreach (var mode in Enumerable.Range(0, 33))
+        {
+            var arguments = new List<string>
+            {
+                "-i", file, "-o", output, "--format", "json", "--no-cache", "--no-telemetry"
+            };
+            if ((mode & 1) != 0) arguments.Add("--verify");
+            if ((mode & 2) != 0) arguments.Add("--no-type-check");
+            if ((mode & 4) != 0) arguments.Add("--transpile-only");
+            if ((mode & 8) != 0) arguments.Add("--permissive-effects");
+            if ((mode & 16) != 0) arguments.AddRange(["--enforce-effects", "false"]);
+            var environment = new Dictionary<string, string>
+            {
+                ["CALOR_NO_TYPE_CHECK"] = mode == 32 ? "1" : "0"
+            };
+            File.WriteAllText(file, StageBReceivingSurfaceTests.Source(targetType, targetType, boundary));
+            var safe = CliTestHarness.RunCli(_directory, environment, arguments.ToArray());
+            Assert.Equal(0, safe.ExitCode);
+            Assert.True(File.Exists(output));
+            File.Delete(output);
+            File.WriteAllText(file, source);
+            var rejected = CliTestHarness.RunCli(_directory, environment, arguments.ToArray());
+            Assert.Equal(1, rejected.ExitCode);
+            Assert.False(File.Exists(output));
+            using var json = JsonDocument.Parse(rejected.StdOut);
+            var diagnostic = Assert.Single(json.RootElement.GetProperty("diagnostics").EnumerateArray(),
+                d => d.GetProperty("code").GetString() == api.Code);
+            Assert.Equal("error", diagnostic.GetProperty("severity").GetString());
+            var location = diagnostic.GetProperty("location");
+            Assert.Equal(api.Span.Line, location.GetProperty("line").GetInt32());
+            Assert.Equal(api.Span.Column, location.GetProperty("column").GetInt32());
+            Assert.Equal(api.Span.Length, location.GetProperty("length").GetInt32());
+        }
+    }
+
+    [Theory]
     [MemberData(nameof(NativeStringModes))]
     public void NativeStringInput_KeepsRejectionWithTheCorrectCode(bool expression, int mode)
     {

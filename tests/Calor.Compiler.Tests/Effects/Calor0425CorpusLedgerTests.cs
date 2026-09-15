@@ -184,7 +184,10 @@ public class Calor0425CorpusLedgerTests
         + "removes two false bind stops in each of serilog and FluentValidation by preserving "
         + "null-forgiving expressions and treating same-name member interop overloads as opaque. "
         + "The denominator moves 264 -> 266 and the measured set carries 135 Calor0425 sites "
-        + "across 48 modules";
+        + "across 48 modules. #1402 activates bounded arrays, whitelisted STRING generics, and "
+        + "identity-proven nominal references. One MediatR module now stops on Calor0274 before "
+        + "effect enforcement, moving the denominator 266 -> 265 while the "
+        + "measured set remains 135 Calor0425 sites across 48 modules";
 
     private static readonly string[] Subjects = ["MediatR", "serilog", "FluentValidation"];
 
@@ -1558,8 +1561,8 @@ public class Calor0425CorpusLedgerTests
         // effect enforcement. That lowers this denominator without changing
         // R2's historical recovery result or reopening its closed MISS.
         var enforcedNow = committed.PerSubject.Sum(s => s.ModulesEnforced);
-        const int EnforcedAfterStageARepairs = 266;
-        Assert.Equal(EnforcedAfterStageARepairs, enforcedNow);
+        const int EnforcedAfterStageBActivation = 265;
+        Assert.Equal(EnforcedAfterStageBActivation, enforcedNow);
     }
 
     /// <summary>

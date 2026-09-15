@@ -61,7 +61,10 @@ public class BindingDiagnosticPolicyTests
         foreach (var rule in BindingDiagnosticPolicy.ReceivingRules)
         {
             Assert.Equal(rule.Context.ReplacesNativeOverloadError
-                || rule.Context.Shape == BindingReceivingShape.ScalarString
+                || rule.Context.Shape is BindingReceivingShape.ScalarString
+                    or BindingReceivingShape.Array
+                    or BindingReceivingShape.Generic
+                    or BindingReceivingShape.Nominal
                 ? BindingDiagnosticDisposition.CompilationError
                 : BindingDiagnosticDisposition.AnalysisOnly, rule.Policy.Disposition);
             Assert.False(string.IsNullOrWhiteSpace(rule.Policy.Justification));
@@ -88,7 +91,7 @@ public class BindingDiagnosticPolicyTests
         var nominal = BindingDiagnosticContext.For(BindingReceivingBoundary.Initializer, new NominalBoundType("Foo"));
         Assert.Equal(BindingReceivingShape.Nominal, nominal.Shape);
         Assert.Equal(1402, BindingDiagnosticPolicy.GetRule(diagnostic.Code, nominal).OwningIssue);
-        Assert.Equal(BindingDiagnosticDisposition.AnalysisOnly,
+        Assert.Equal(BindingDiagnosticDisposition.CompilationError,
             BindingDiagnosticPolicy.GetRule(diagnostic.Code, nominal).Disposition);
     }
 

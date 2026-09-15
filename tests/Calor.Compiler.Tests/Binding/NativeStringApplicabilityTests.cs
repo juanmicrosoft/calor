@@ -361,7 +361,11 @@ public sealed class NativeStringApplicabilityTests
         {
             var context = new BindingDiagnosticContext(boundary, shape) { ReplacesNativeOverloadError = true };
             var rule = BindingDiagnosticPolicy.GetRule(DiagnosticCode.NullableArgumentToNonNullableParameter, context);
-            Assert.Equal(boundary == BindingReceivingBoundary.MethodArgument && shape == BindingReceivingShape.ScalarString
+            Assert.Equal(boundary == BindingReceivingBoundary.MethodArgument
+                && shape is BindingReceivingShape.ScalarString
+                    or BindingReceivingShape.Array
+                    or BindingReceivingShape.Generic
+                    or BindingReceivingShape.Nominal
                 ? BindingDiagnosticDisposition.CompilationError
                 : BindingDiagnosticDisposition.AnalysisOnly, rule.Disposition);
         }

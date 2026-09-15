@@ -226,7 +226,7 @@ public sealed class NullableReferenceType : CalorType
     internal NullableReferenceType(CalorType referentType, bool requiresTransitionalAssignmentCheck)
     {
         ReferentType = referentType ?? throw new ArgumentNullException(nameof(referentType));
-        if (referentType is not ExternalType
+        if (referentType is not (ExternalType or ArrayType)
             && !referentType.Equals(PrimitiveType.String)
             && !referentType.Equals(PrimitiveType.Object))
             throw new ArgumentException("A supported reference type is required.", nameof(referentType));

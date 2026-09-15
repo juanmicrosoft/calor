@@ -39,8 +39,8 @@ public abstract class BoundExpression : BoundNode
     /// </summary>
     public abstract BoundType Type { get; }
 
-    // Method-input preservation must not silently widen initializer/return policy.
     internal ArrayBoundType? MethodInputArrayType { get; init; }
+    internal GenericInstantiationBoundType? GenericNullabilityType { get; init; }
 
     public virtual IReadOnlyList<BoundExpression> Children => Array.Empty<BoundExpression>();
     public virtual IReadOnlyList<BoundExpression> DeferredChildren => Array.Empty<BoundExpression>();
@@ -202,7 +202,10 @@ public sealed class BoundVariableExpression : BoundExpression
         ResolvedSymbols = resolvedSymbols
             ?? [variable];
         if (ResolvedSymbols.Count == 1 && typeOverride is not UnresolvedBoundType)
+        {
             MethodInputArrayType = variable.MethodInputArrayType;
+            GenericNullabilityType = variable.GenericNullabilityType;
+        }
         if (typeOverride != null)
         {
             // The caller has already decided this reference's type and the
@@ -313,6 +316,8 @@ public sealed class BoundVariableExpression : BoundExpression
 /// </summary>
 public sealed class BoundCallStatement : BoundStatement
 {
+    internal VariableSymbol? CallableStorageIdentity { get; init; }
+    internal CallableMutationSummary ObservedCallableEffects { get; init; } = CallableMutationSummary.Empty;
     public string Target { get; }
     public IReadOnlyList<BoundExpression> Arguments { get; }
     public FunctionSymbol? ResolvedSymbol { get; }
@@ -518,6 +523,8 @@ public sealed class BoundElseIfClause : BoundNode
 /// </summary>
 public sealed class BoundBinaryExpression : BoundExpression
 {
+    internal IReadOnlySet<string> InvalidatedLeftNarrowingNames { get; init; } =
+        new HashSet<string>(StringComparer.Ordinal);
     public BinaryOperator Operator { get; }
     public BoundExpression Left { get; }
     public BoundExpression Right { get; }
@@ -728,6 +735,8 @@ public sealed class BoundUnaryExpression : BoundExpression
 /// </summary>
 public class BoundCallExpression : BoundExpression
 {
+    internal VariableSymbol? CallableStorageIdentity { get; init; }
+    internal CallableMutationSummary ObservedCallableEffects { get; init; } = CallableMutationSummary.Empty;
     public string Target { get; }
     public IReadOnlyList<BoundExpression> Arguments { get; }
     public FunctionSymbol? ResolvedSymbol { get; }
@@ -1686,7 +1695,9 @@ public sealed class BoundThisExpression : BoundExpression
 
     public BoundThisExpression(TextSpan span, string className) : base(span)
     {
-        Type = new NominalBoundType(className ?? "UNKNOWN");
+        Type = new NominalBoundType(
+            className ?? "UNKNOWN",
+            BoundTypes.NullableAnnotation.NotAnnotated);
     }
 }
 
@@ -1699,7 +1710,9 @@ public sealed class BoundBaseExpression : BoundExpression
 
     public BoundBaseExpression(TextSpan span, string typeName = "OBJECT") : base(span)
     {
-        Type = new NominalBoundType(typeName);
+        Type = new NominalBoundType(
+            typeName,
+            BoundTypes.NullableAnnotation.NotAnnotated);
     }
 }
 
@@ -1974,7 +1987,10 @@ public sealed class BoundConditionalExpression : BoundExpression
         WhenTrue = whenTrue ?? throw new ArgumentNullException(nameof(whenTrue));
         WhenFalse = whenFalse ?? throw new ArgumentNullException(nameof(whenFalse));
         if (resultType is null) throw new ArgumentNullException(nameof(resultType));
-        Type = ExpressionResultTypes.Join(resultType, [whenTrue.Type, whenFalse.Type]);
+        var shape = NullabilityResultTypes.Join([whenTrue, whenFalse]);
+        Type = shape ?? ExpressionResultTypes.Join(resultType, [whenTrue.Type, whenFalse.Type]);
+        MethodInputArrayType = shape as ArrayBoundType;
+        GenericNullabilityType = shape as GenericInstantiationBoundType;
         Children = [condition, whenTrue, whenFalse];
     }
 }
@@ -2219,6 +2235,7 @@ public sealed class BoundInterpolatedStringExpression : BoundExpression
 
 public sealed class BoundLambdaExpression : BoundExpression
 {
+    internal CallableMutationSummary CallableEffects { get; init; } = CallableMutationSummary.Empty;
     public string Id { get; }
     public IReadOnlyList<VariableSymbol> Parameters { get; }
     public EffectsNode? Effects { get; }
@@ -2228,6 +2245,7 @@ public sealed class BoundLambdaExpression : BoundExpression
     public bool IsStatic { get; }
     public BoundExpression? ExpressionBody { get; }
     public IReadOnlyList<BoundStatement>? StatementBody { get; }
+    internal IReadOnlySet<VariableSymbol> DeferredMutations { get; }
     public string ReturnTypeName { get; }
     public override BoundType Type { get; }
     public override IReadOnlyList<BoundExpression> Children { get; }
@@ -2263,7 +2281,8 @@ public sealed class BoundLambdaExpression : BoundExpression
         // by the binder from `effects`. Omitted (or `null`) means Unknown, NOT
         // pure: §3.5 infers an omitted lambda row from the body, and the body's
         // row is E3's to compute.
-        EffectRow? declaredRow = null)
+        EffectRow? declaredRow = null,
+        IReadOnlySet<VariableSymbol>? deferredMutations = null)
         : base(span)
     {
         Id = id ?? throw new ArgumentNullException(nameof(id));
@@ -2275,6 +2294,8 @@ public sealed class BoundLambdaExpression : BoundExpression
         IsStatic = isStatic;
         ExpressionBody = expressionBody;
         StatementBody = statementBody;
+        DeferredMutations = deferredMutations
+            ?? new HashSet<VariableSymbol>(ReferenceEqualityComparer.Instance);
         ReturnTypeName = returnTypeName ?? throw new ArgumentNullException(nameof(returnTypeName));
         // v0.15 E1 slice 2b — a lambda's type is a FUNCTION type, not a nominal
         // one whose name happens to spell a signature. Kind 5 is what the
@@ -2353,9 +2374,13 @@ public sealed class BoundMatchExpression : BoundExpression
         Target = target ?? throw new ArgumentNullException(nameof(target));
         Cases = cases ?? throw new ArgumentNullException(nameof(cases));
         Attributes = attributes ?? throw new ArgumentNullException(nameof(attributes));
-        Type = ExpressionResultTypes.Join(
-            resultType ?? throw new ArgumentNullException(nameof(resultType)),
+        if (resultType is null) throw new ArgumentNullException(nameof(resultType));
+        var shape = NullabilityResultTypes.Join(
+            cases.Where(matchCase => matchCase.Result != null).Select(matchCase => matchCase.Result!));
+        Type = shape ?? ExpressionResultTypes.Join(resultType,
             cases.Where(matchCase => matchCase.Result != null).Select(matchCase => matchCase.Result!.Type));
+        MethodInputArrayType = shape as ArrayBoundType;
+        GenericNullabilityType = shape as GenericInstantiationBoundType;
         Children =
         [
             target,

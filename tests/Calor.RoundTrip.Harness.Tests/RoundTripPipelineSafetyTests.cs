@@ -7,7 +7,7 @@ namespace Calor.RoundTrip.Harness.Tests;
 public sealed class RoundTripPipelineSafetyTests
 {
     [Fact]
-    public async Task Evidence_RealConversionRejectsActiveScalarAndRetainsSafeAndNominalControls()
+    public async Task Evidence_RealConversionRejectsActiveScalarAndNominalNullability()
     {
         const string nullableSource = """
             public static class NullableEvidence
@@ -62,17 +62,15 @@ public sealed class RoundTripPipelineSafetyTests
             var nominal = results.Single(file => file.FilePath == "Lib/Nominal.cs");
             Assert.Equal(FileStatus.Replaced, safe.Status);
             Assert.Equal(FileStatus.Replaced, migrated.Status);
-            Assert.Equal(FileStatus.Replaced, nominal.Status);
+            Assert.Equal(FileStatus.CompileError, nominal.Status);
             Assert.DoesNotContain(safe.Candidate!.AnalysisDiagnostics,
                 diagnostic => diagnostic.Code is "Calor0272" or "Calor0273" or "Calor0274");
-            var nominalFinding = Assert.Single(nominal.Candidate!.AnalysisDiagnostics,
+            var nominalFinding = Assert.Single(nominal.Candidate!.Diagnostics,
                 diagnostic => diagnostic.Code == "Calor0273");
-            Assert.Equal("AnalysisOnly", nominalFinding.BindingDisposition);
-            Assert.DoesNotContain(nominal.Candidate.Diagnostics,
-                diagnostic => diagnostic.Code == "Calor0273");
+            Assert.Equal("CompilationError", nominalFinding.BindingDisposition);
             var assembly = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create(
                 $"EvidenceRuntime_{Guid.NewGuid():N}",
-                new[] { safe, migrated, nominal }.Select(file =>
+                new[] { safe, migrated }.Select(file =>
                     Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(file.EmittedCSharp!)),
                 Calor.Compiler.CodeGen.GeneratedCSharpCompiler.References,
                 new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary));
@@ -99,7 +97,7 @@ public sealed class RoundTripPipelineSafetyTests
             Assert.All(results, file => Assert.Equal("Unassessed", file.Candidate!.SemanticResolution));
             var coverage = ConversionCoverage.Compute(results, report.ExcludedFileCount);
             Assert.Equal(5, coverage.TotalConvertibleFiles);
-            Assert.Equal(1, coverage.FailedConversion);
+            Assert.Equal(2, coverage.FailedConversion);
             Assert.Equal(1, coverage.ExcludedFiles);
             Assert.Equal(1, ConversionCoverage.Compute(missingResults, 0).FailedConversion);
             await ExportEvidenceAsync("converted-controls", report, config, results);
@@ -110,7 +108,7 @@ public sealed class RoundTripPipelineSafetyTests
                 await File.WriteAllTextAsync(Path.Combine(output, "runtime-observations.json"),
                     System.Text.Json.JsonSerializer.Serialize(new
                     {
-                        test = nameof(Evidence_RealConversionRejectsActiveScalarAndRetainsSafeAndNominalControls),
+                        test = nameof(Evidence_RealConversionRejectsActiveScalarAndNominalNullability),
                         report.Evidence.Provenance.RepositoryRevision,
                         report.Evidence.Provenance.Compiler,
                         observations,
@@ -130,7 +128,7 @@ public sealed class RoundTripPipelineSafetyTests
     {
         var root = CreateProject(
             "public sealed class Value { } "
-            + "public static class Seed { public static Value Read(Value? value) => value; }");
+            + "public static class Seed { public static Value Read(Value value) => value; }");
         try
         {
             await File.WriteAllTextAsync(Path.Combine(root, "Safety.csproj"),
@@ -157,10 +155,6 @@ public sealed class RoundTripPipelineSafetyTests
                 var candidateId = file.Candidate!.CandidateId;
                 var diagnostics = file.Candidate.Diagnostics.ToArray();
                 var analysisDiagnostics = file.Candidate.AnalysisDiagnostics.ToArray();
-                var nominalFinding = Assert.Single(
-                    analysisDiagnostics,
-                    diagnostic => diagnostic.Code == "Calor0273");
-                Assert.Equal("AnalysisOnly", nominalFinding.BindingDisposition);
                 Assert.DoesNotContain(
                     diagnostics,
                     diagnostic => diagnostic.Code == "Calor0273");

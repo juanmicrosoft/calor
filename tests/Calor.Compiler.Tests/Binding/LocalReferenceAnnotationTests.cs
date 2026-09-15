@@ -92,7 +92,7 @@ public class LocalReferenceAnnotationTests
         foreach (var finding in findings)
         {
             Assert.Equal(consumed.Span, finding.Span);
-            Assert.False(BindingDiagnosticPolicy.IsCompilationError(finding));
+            Assert.True(BindingDiagnosticPolicy.IsCompilationError(finding));
         }
     }
 
@@ -327,7 +327,7 @@ public class LocalReferenceAnnotationTests
     [InlineData(0, false)]
     [InlineData(1, false)]
     [InlineData(2, false)]
-    public void BclToNativeInputs_RetainApplicabilityAndAnalysisOnlyStaging(int depth, bool nullable)
+    public void BclToNativeInputs_RetainApplicabilityAndStageBActivation(int depth, bool nullable)
     {
         var value = $"§C{{System.IO.Directory.{(nullable ? "GetParent" : "CreateDirectory")}}} §A STR:\"/\" §/C";
         var statements = new List<string>();
@@ -363,10 +363,10 @@ public class LocalReferenceAnnotationTests
         // Pre-existing production behavior, not Stage B enforcement: adding a
         // local already resolved this call at the base, without any annotation.
         var result = Program.Compile(source, "native-bcl-local.calr");
-        Assert.Equal(rejected, result.HasErrors);
-        Assert.Equal(!rejected, !string.IsNullOrEmpty(result.GeneratedCode));
-        Assert.DoesNotContain(result.Diagnostics,
-            d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+        Assert.Equal(nullable, result.HasErrors);
+        Assert.Equal(!nullable, !string.IsNullOrEmpty(result.GeneratedCode));
+        Assert.Equal(nullable && !rejected, result.Diagnostics.Any(
+            d => d.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
     }
 
     public static IEnumerable<object[]> StringMemberAliases()

@@ -43,7 +43,7 @@ internal static class NullabilityChecker
         out ArrayMismatch mismatch)
     {
         mismatch = ArrayMismatch.None;
-        if (boundary != BindingReceivingBoundary.MethodArgument || target is not ArrayBoundType receiving)
+        if (target is not ArrayBoundType receiving)
             return IsPossiblyNullAssignedTo(source, target);
 
         var supplied = GetMethodInputArrayType(source);
@@ -116,7 +116,7 @@ internal static class NullabilityChecker
             // own annotation is orthogonal (we only diagnose the element
             // mismatch); a possibly-null-elements source assigned to a
             // non-null-elements array target trips the same predicate.
-            ArrayBoundType array => CheckArrayStringElementTarget(source, array),
+            ArrayBoundType array => CheckArrayTarget(source, array),
             // S7 — whitelisted generic-instantiation STRING nullability
             // (Option<T>, List<T>, IList<T>, IEnumerable<T>,
             // IReadOnlyList<T>, ICollection<T>, IReadOnlyCollection<T>).
@@ -140,12 +140,12 @@ internal static class NullabilityChecker
         var sourceType = source.Type;
         // Display spellings and annotation-sensitive equality are not the
         // referent's identity. Both sides must resolve to the same reference.
-        // Nominal Oblivious remains excluded pending the separate policy gate.
         if (isUserRef)
         {
             if (sourceType is not NominalBoundType sourceNominal) return false;
             if (!sourceNominal.HasSameUnderlyingReferenceType(nominalTarget)) return false;
-            return sourceNominal.NullableAnnotation == NullableAnnotation.Annotated;
+            return sourceNominal.NullableAnnotation is
+                NullableAnnotation.Annotated or NullableAnnotation.Oblivious;
         }
 
         // A null literal and a conditional composed only of null/string arms
@@ -213,22 +213,14 @@ internal static class NullabilityChecker
     /// sources yield false — S6 does not widen the check to unrelated
     /// shapes.
     /// </summary>
-    private static bool CheckArrayStringElementTarget(BoundExpression source, ArrayBoundType arrayTarget)
+    private static bool CheckArrayTarget(BoundExpression source, ArrayBoundType arrayTarget)
     {
-        // Only string-element arrays participate in S6.
-        if (arrayTarget.ElementType is not NominalBoundType targetElement) return false;
-        if (!IsScalarString(targetElement)) return false;
-
-        // Target element declared nullable — accepting null elements is by design.
-        if (targetElement.NullableAnnotation == NullableAnnotation.Annotated) return false;
-
-        // Source must also be an array of string element to compare.
-        if (source.Type is not ArrayBoundType sourceArray) return false;
-        if (sourceArray.ElementType is not NominalBoundType sourceElement) return false;
-        if (!IsScalarString(sourceElement)) return false;
-
-        // Source element must be provably non-null (NotAnnotated) to pass.
-        return sourceElement.NullableAnnotation != NullableAnnotation.NotAnnotated;
+        var sourceArray = GetMethodInputArrayType(source);
+        if (sourceArray is null || sourceArray.Rank != arrayTarget.Rank)
+            return false;
+        var mismatch = ArrayMismatch.None;
+        CompareArrayAnnotations(sourceArray, arrayTarget, ref mismatch);
+        return mismatch != ArrayMismatch.None;
     }
 
     /// <summary>
@@ -250,13 +242,12 @@ internal static class NullabilityChecker
         // Target payload declared nullable — accepting null payloads is by design.
         if (targetInner.NullableAnnotation == NullableAnnotation.Annotated) return false;
 
-        // Source must be the SAME whitelisted generic definition (compared
-        // by short name — the Binder builds the target with the surface
-        // spelling, e.g. "List", so we match on the trailing dotted
-        // segment to bridge Roslyn's "System.Collections.Generic.List").
-        if (source.Type is not GenericInstantiationBoundType sourceGeneric) return false;
+        // Bridge only the known BCL aliases: unrelated namespaces sharing
+        // a short name do not establish the same generic definition.
+        var sourceGeneric = source.GenericNullabilityType ?? source.Type as GenericInstantiationBoundType;
+        if (sourceGeneric is null) return false;
         if (sourceGeneric.TypeArguments.Length != 1) return false;
-        if (!ShortNameEquals(sourceGeneric.Definition.QualifiedName, genericTarget.Definition.QualifiedName)) return false;
+        if (!SameGenericDefinition(sourceGeneric.Definition.QualifiedName, genericTarget.Definition.QualifiedName)) return false;
         if (sourceGeneric.TypeArguments[0] is not NominalBoundType sourceInner) return false;
         if (!IsScalarString(sourceInner)) return false;
 
@@ -264,14 +255,18 @@ internal static class NullabilityChecker
         return sourceInner.NullableAnnotation != NullableAnnotation.NotAnnotated;
     }
 
-    private static bool ShortNameEquals(string a, string b)
+    internal static bool SameGenericDefinition(string a, string b)
     {
-        static string Short(string s)
+        static string Canonical(string name)
         {
-            var lastDot = s.LastIndexOf('.');
-            return lastDot < 0 ? s : s[(lastDot + 1)..];
+            const string prefix = "System.Collections.Generic.";
+            if (name.StartsWith(prefix, StringComparison.Ordinal)
+                && name[prefix.Length..] is "List" or "IList" or "IEnumerable"
+                    or "IReadOnlyList" or "ICollection" or "IReadOnlyCollection")
+                return name[prefix.Length..];
+            return name;
         }
-        return string.Equals(Short(a), Short(b), System.StringComparison.Ordinal);
+        return string.Equals(Canonical(a), Canonical(b), StringComparison.Ordinal);
     }
 
     /// <summary>

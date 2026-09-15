@@ -19,6 +19,53 @@ namespace Calor.Compiler.Tests;
 public sealed class SafeConsumptionRuntimeTests
 {
     [Fact]
+    public void NominalEarlyReturnMigrationPreservesNullOrderingAtRuntime()
+    {
+        // Reduced from MediatR/Internal/ObjectDetails.Compare: early-return
+        // guards are not a supported non-null transfer to the later call.
+        const string source = """
+            §M{m1:NominalMigration}
+              §CL{c1:Widget:pub}
+                §MT{id:Id:pub} () -> i32
+                  §E{}
+                  §R 0
+              §F{take:Take:pub} (Widget:x, Widget:y) -> i32
+                §E{}
+                §R 0
+              §F{compare:Compare:pub} (?Widget:x, ?Widget:y) -> i32
+                §E{throw}
+                §IF{ix} (== x null)
+                  §R 1
+                §IF{iy} (== y null)
+                  §R -1
+                §R §C{Take} §A x §A y §/C
+            """;
+        var rejected = Program.Compile(source, "nominal-early-return.calr");
+        Assert.True(rejected.HasErrors);
+        Assert.Equal(2, rejected.Diagnostics.Count(diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Empty(rejected.GeneratedCode);
+
+        var migrated = source.Replace(
+            "§R §C{Take} §A x §A y §/C",
+            """
+            §B{safeX} (?? x §TH "unreachable")
+                §B{safeY} (?? y §TH "unreachable")
+                §R §C{Take} §A safeX §A safeY §/C
+            """, StringComparison.Ordinal);
+        var result = Program.Compile(migrated, "nominal-early-return-migrated.calr");
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        var assembly = Emit(result.GeneratedCode);
+        var widget = Activator.CreateInstance(assembly.GetType("NominalMigration.Widget")!);
+        var compare = assembly.GetType("NominalMigration.NominalMigrationModule")!.GetMethod("Compare")!;
+        Assert.Equal(1, compare.Invoke(null, [null, null]));
+        Assert.Equal(1, compare.Invoke(null, [null, widget]));
+        Assert.Equal(-1, compare.Invoke(null, [widget, null]));
+        Assert.Equal(0, compare.Invoke(null, [widget, widget]));
+        WithCli(migrated, (exit, _, error) => Assert.True(exit == 0, error));
+    }
+
+    [Fact]
     public void StructuralExpression_PreservesThePublicSevenParameterConstructor()
     {
         var constructor = typeof(BoundStructuralExpression).GetConstructor(
