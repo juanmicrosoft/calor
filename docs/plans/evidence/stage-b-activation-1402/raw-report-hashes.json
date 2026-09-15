@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "download": "gh run download <run> --repo juanmicrosoft/calor --name roundtrip-reports --dir <destination>",
+  "files": [
+    {
+      "leg": "baseline",
+      "run": 34930956008,
+      "artifact": "roundtrip-reports",
+      "file": "FluentValidation-roundtrip.json",
+      "sha256": "37f5442ca30d4ed4cc3a0345c824c3417ba18a57d0e7f365ced2089b048e73e6"
+    },
+    {
+      "leg": "baseline",
+      "run": 34930956008,
+      "artifact": "roundtrip-reports",
+      "file": "MediatR-roundtrip.json",
+      "sha256": "8b0ba57b0eb5f32bc0e8cc850c3570aebdcad8da87c0b5755b9eb796d3f72cc8"
+    },
+    {
+      "leg": "baseline",
+      "run": 34930956008,
+      "artifact": "roundtrip-reports",
+      "file": "Serilog-roundtrip.json",
+      "sha256": "39d87739bce9446d1a2495e007266f211a3acb0b92e6663c00f0e66233f26a58"
+    },
+    {
+      "leg": "baseline",
+      "run": 34930956008,
+      "artifact": "roundtrip-reports",
+      "file": "Synthetic-roundtrip.json",
+      "sha256": "60406948d4d5cd6cb66f77b8f94eaf3bb8d529513ccfe91af7ecc1ecb1e676fc"
+    },
+    {
+      "leg": "baseline",
+      "run": 34930956008,
+      "artifact": "roundtrip-reports",
+      "file": "Synthetic2-roundtrip.json",
+      "sha256": "edb7819114a02652908c1fef2c0646bbb31e93c0666f59258fdad9394adc4260"
+    },
+    {
+      "leg": "candidate",
+      "run": 34988156401,
+      "artifact": "roundtrip-reports",
+      "file": "FluentValidation-roundtrip.json",
+      "sha256": "ebf6460edf2b272bfc0d102e3bffdbb833fc91597d9303b7a3dc7f488b6b0896"
+    },
+    {
+      "leg": "candidate",
+      "run": 34988156401,
+      "artifact": "roundtrip-reports",
+      "file": "MediatR-roundtrip.json",
+      "sha256": "103c11de5b641f580f597b30b5876ce0386b18136cbd4d76b97f4872fd1291ff"
+    },
+    {
+      "leg": "candidate",
+      "run": 34988156401,
+      "artifact": "roundtrip-reports",
+      "file": "Serilog-roundtrip.json",
+      "sha256": "437b36589349baef681edd3b3dd88464372d9e249263fb5dc4f66a4a4f7b67df"
+    },
+    {
+      "leg": "candidate",
+      "run": 34988156401,
+      "artifact": "roundtrip-reports",
+      "file": "Synthetic-roundtrip.json",
+      "sha256": "b2c4fb005aedfd6081738e36b0c8b70499412584b37e801224f0db22916d210c"
+    },
+    {
+      "leg": "candidate",
+      "run": 34988156401,
+      "artifact": "roundtrip-reports",
+      "file": "Synthetic2-roundtrip.json",
+      "sha256": "897db99646052d2690d9e34ca16a27c9fba32d7b07edfdc91c306cd318203049"
+    }
+  ]
+}

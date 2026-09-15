@@ -1,0 +1,14 @@
+{
+  "algorithm": "SHA-256",
+  "excludes": [
+    "sha256.json"
+  ],
+  "files": {
+    "README.md": "b61300a7a7f690e010a27cd275e64f73312dd58f94082051b83810fe9480190e",
+    "adjudication.json": "e9772a2c2a438aaaf5b5d0b1a5926e4058ed4cc0eaf24d6e983a89ea79300e35",
+    "corpus-summary.json": "e8564029684d75b4f0a1d6e537168fe402c45f201c2f33b0c39a0e4723049ff3",
+    "equal-input-comparison.json": "d38fdfe8aa2c38942579a89b0e8ca5df4f0163e0d2f5b86974f344e8a8996195",
+    "raw-report-hashes.json": "e09c66f21c4075ec68d673dbc352f01155c9bd8662f609c050abd92801bfdfc6",
+    "validation.json": "5ebd7d659ee1b35517ad52d37bfcfda53f30a70cef4597f034219119ae0f6f26"
+  }
+}
