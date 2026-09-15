@@ -148,9 +148,61 @@ internal static class NullabilityChecker
             return sourceNominal.NullableAnnotation == NullableAnnotation.Annotated;
         }
 
-        // Scalar STRING path (S3/S4/S5) — unchanged.
+        // A null literal and a conditional composed only of null/string arms
+        // remain scalar-string-compatible even when their joined source type is
+        // NULL or OBJECT rather than nominal STRING.
+        if (IsNullContainingScalarStringSource(source)) return true;
+
+        // Scalar STRING path (S3/S4/S5).
+        if (!IsScalarStringSource(sourceType)) return false;
         var sourceAnnotation = GetAnnotation(sourceType);
         return sourceAnnotation is NullableAnnotation.Annotated or NullableAnnotation.Oblivious;
+    }
+
+    internal static bool IsNullContainingScalarStringSource(BoundExpression source)
+    {
+        if (source is BoundNullLiteral)
+            return true;
+
+        if (source is not BoundConditionalExpression conditional)
+            return false;
+
+        var alternatives = new[] { conditional.WhenTrue, conditional.WhenFalse }
+            .Where(alternative => !ExpressionResultTypes.IsNever(alternative.Type))
+            .ToArray();
+        if (alternatives.Length == 0)
+            return false;
+
+        return alternatives.All(IsNullOrScalarStringSource)
+            && alternatives.Any(IsPossiblyNullScalarStringSource);
+    }
+
+    private static bool IsNullOrScalarStringSource(BoundExpression source) =>
+        source is BoundNullLiteral
+        || IsScalarStringSource(source.Type)
+        || source is BoundConditionalExpression && IsNullContainingScalarStringSource(source);
+
+    private static bool IsPossiblyNullScalarStringSource(BoundExpression source)
+    {
+        if (source is BoundNullLiteral)
+            return true;
+        if (source is BoundConditionalExpression)
+            return IsNullContainingScalarStringSource(source);
+        return IsScalarStringSource(source.Type)
+            && GetAnnotation(source.Type) is NullableAnnotation.Annotated or NullableAnnotation.Oblivious;
+    }
+
+    private static bool IsScalarStringSource(BoundType sourceType)
+    {
+        if (sourceType is not NominalBoundType nominal)
+            return false;
+        if (nominal.RoslynSymbol?.SpecialType == Microsoft.CodeAnalysis.SpecialType.System_String)
+            return true;
+
+        var name = nominal.QualifiedName;
+        while (Parsing.AttributeHelper.TryUnwrapNullableAnnotation(name, out var referent))
+            name = referent;
+        return name is "STRING" or "string" or "str" or "System.String";
     }
 
     /// <summary>

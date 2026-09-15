@@ -528,7 +528,7 @@ public class IncrementalCliEndToEndTests : IDisposable
     }
 
     [Fact]
-    public void Cache_DoesNotReplayNoTypeCheckSuccessForDefaultOptOutDefaultSequence()
+    public void Cache_NoTypeCheckCannotBypassActiveScalarBinding()
     {
         var source = WriteTransitionalNullableAssignmentViolation();
 
@@ -537,7 +537,7 @@ public class IncrementalCliEndToEndTests : IDisposable
             new Dictionary<string, string> { ["CALOR_NO_TYPE_CHECK"] = "0" },
             "--input", source, "--cache");
         Assert.NotEqual(0, firstDefault.ExitCode);
-        Assert.Contains("Calor0202", firstDefault.StdOut + firstDefault.StdErr);
+        Assert.Contains("Calor0272", firstDefault.StdOut + firstDefault.StdErr);
         var stateAfterFailure = BuildStateCache.Load(_tempDir);
         if (stateAfterFailure != null)
             Assert.Empty(stateAfterFailure.Files);
@@ -546,22 +546,23 @@ public class IncrementalCliEndToEndTests : IDisposable
             _tempDir,
             new Dictionary<string, string> { ["CALOR_NO_TYPE_CHECK"] = "0" },
             "--input", source, "--cache", "--no-type-check");
-        Assert.True(optedOut.ExitCode == 0, optedOut.StdOut + optedOut.StdErr);
-        Assert.DoesNotContain("Calor0202", optedOut.StdOut + optedOut.StdErr);
-        Assert.Contains("Compilation successful", optedOut.StdOut);
-        Assert.True(File.Exists(Path.Combine(_tempDir, ".calor-build-state.json")));
+        Assert.NotEqual(0, optedOut.ExitCode);
+        Assert.Contains("Calor0272", optedOut.StdOut + optedOut.StdErr);
+        var stateAfterOptOut = BuildStateCache.Load(_tempDir);
+        if (stateAfterOptOut != null)
+            Assert.Empty(stateAfterOptOut.Files);
 
         var defaultCompile = CliTestHarness.RunCli(
             _tempDir,
             new Dictionary<string, string> { ["CALOR_NO_TYPE_CHECK"] = "0" },
             "--input", source, "--cache");
         Assert.NotEqual(0, defaultCompile.ExitCode);
-        Assert.Contains("Calor0202", defaultCompile.StdOut + defaultCompile.StdErr);
+        Assert.Contains("Calor0272", defaultCompile.StdOut + defaultCompile.StdErr);
         Assert.DoesNotContain("Up-to-date (cached)", defaultCompile.StdOut);
     }
 
     [Fact]
-    public void Cache_DoesNotReplayEnvironmentOptOutSuccessForDefaultCompile()
+    public void Cache_EnvironmentOptOutCannotBypassActiveScalarBinding()
     {
         var source = WriteTransitionalNullableAssignmentViolation();
 
@@ -569,15 +570,18 @@ public class IncrementalCliEndToEndTests : IDisposable
             _tempDir,
             new Dictionary<string, string> { ["CALOR_NO_TYPE_CHECK"] = "1" },
             "--input", source, "--cache");
-        Assert.True(envOptOut.ExitCode == 0, envOptOut.StdOut + envOptOut.StdErr);
-        Assert.DoesNotContain("Calor0202", envOptOut.StdOut + envOptOut.StdErr);
+        Assert.NotEqual(0, envOptOut.ExitCode);
+        Assert.Contains("Calor0272", envOptOut.StdOut + envOptOut.StdErr);
+        var stateAfterOptOut = BuildStateCache.Load(_tempDir);
+        if (stateAfterOptOut != null)
+            Assert.Empty(stateAfterOptOut.Files);
 
         var defaultCompile = CliTestHarness.RunCli(
             _tempDir,
             new Dictionary<string, string> { ["CALOR_NO_TYPE_CHECK"] = "0" },
             "--input", source, "--cache");
         Assert.NotEqual(0, defaultCompile.ExitCode);
-        Assert.Contains("Calor0202", defaultCompile.StdOut + defaultCompile.StdErr);
+        Assert.Contains("Calor0272", defaultCompile.StdOut + defaultCompile.StdErr);
         Assert.DoesNotContain("Up-to-date (cached)", defaultCompile.StdOut);
     }
 

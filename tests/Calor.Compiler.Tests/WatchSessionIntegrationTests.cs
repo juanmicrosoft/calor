@@ -302,7 +302,7 @@ public sealed class WatchSessionIntegrationTests : IDisposable
     }
 
     [Fact]
-    public async Task EnvironmentTypeCheckTransition_InvalidatesWarmCache()
+    public async Task EnvironmentTypeCheckTransition_DoesNotBypassActiveScalarBinding()
     {
         var previous = Environment.GetEnvironmentVariable("CALOR_NO_TYPE_CHECK");
         try
@@ -319,11 +319,9 @@ public sealed class WatchSessionIntegrationTests : IDisposable
             });
 
             Assert.Equal(2, results.Count);
-            Assert.Equal(1, results[0].Compiled);
+            Assert.Equal(0, results[0].Compiled);
             Assert.Equal(0, results[0].Skipped);
-            Assert.False(results[0].AnyErrors);
-            // Failed files are not reported as successfully compiled, but they
-            // must be reprocessed rather than cache-skipped under the old policy.
+            Assert.True(results[0].AnyErrors);
             Assert.Equal(0, results[1].Compiled);
             Assert.Equal(0, results[1].Skipped);
             Assert.True(results[1].AnyErrors);

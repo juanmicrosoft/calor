@@ -100,17 +100,55 @@ public class BindingRoutingCliTests : IDisposable
 
     [Theory]
     [MemberData(nameof(BindingDiagnosticPolicyTests.NullableBoundaries), MemberType = typeof(BindingDiagnosticPolicyTests))]
-    public void RootCli_PlannedNullabilityRemainsAnalysisOnly(
+    public void RootCli_ActiveScalarNullabilityMatchesApi(
         string code, Binding.BindingReceivingBoundary boundary, string body, string returnType)
     {
         _ = boundary;
         var file = Path.Combine(_directory, "input.calr");
-        File.WriteAllText(file, $"§M{{m1:Routing}}\n  §F{{f1:Probe:pub}} () -> {returnType}\n    §E{{env}}\n    {body}\n");
+        var source = code == DiagnosticCode.NullableArgumentToNonNullableParameter
+            ? "§M{m1:Routing}\n  §F{take:Take:pub} (str:value) -> i32\n    §R 1\n"
+                + "  §F{probe:Probe:pub} (?str:value) -> i32\n    §R §C{Take} §A value §/C\n"
+            : $"§M{{m1:Routing}}\n  §F{{f1:Probe:pub}} () -> {returnType}\n    §E{{env}}\n    {body}\n";
+        File.WriteAllText(file, source);
         var result = CliTestHarness.RunCli(_directory, "-i", file, "--format", "json", "--no-cache", "--no-telemetry");
-        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(1, result.ExitCode);
         using var json = JsonDocument.Parse(result.StdOut);
-        Assert.DoesNotContain(json.RootElement.GetProperty("diagnostics").EnumerateArray(),
+        var diagnostic = Assert.Single(json.RootElement.GetProperty("diagnostics").EnumerateArray(),
             d => d.GetProperty("code").GetString() == code);
+        Assert.Equal("error", diagnostic.GetProperty("severity").GetString());
+    }
+
+    [Fact]
+    public void CopiedCliOutsideCheckout_UsesEmbeddedManifestWithNoTypeCheck()
+    {
+        var installedDirectory = Path.Combine(_directory, "installed");
+        CopyDirectory(
+            Path.GetDirectoryName(CliTestHarness.FindCalorDll())!,
+            installedDirectory);
+        Assert.Empty(Directory.EnumerateFiles(
+            installedDirectory,
+            "metadata-references-manifest.json",
+            SearchOption.AllDirectories));
+
+        var projectDirectory = Path.Combine(_directory, "project");
+        Directory.CreateDirectory(projectDirectory);
+        var sourcePath = Path.Combine(projectDirectory, "input.calr");
+        File.WriteAllText(sourcePath, """
+            §M{m1:Installed}
+              §F{f1:Probe:pub} () -> void
+                §E{env}
+                §B{value:str} §C{System.Environment.GetEnvironmentVariable} §A "CALOR_INSTALLED_ABSENT" §/C
+            """);
+
+        var result = CliTestHarness.RunCliWithCompiler(
+            Path.Combine(installedDirectory, "calor.dll"),
+            projectDirectory,
+            environment: null,
+            "-i", sourcePath, "--no-type-check", "--no-cache", "--format", "json");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains(DiagnosticCode.NullableToNonNullableBinding, result.StdOut);
+        Assert.DoesNotContain("metadata-references-manifest.json", result.StdErr);
     }
 
     [Theory]
@@ -134,5 +172,14 @@ public class BindingRoutingCliTests : IDisposable
             arguments.ToArray());
         Assert.Equal(1, result.ExitCode);
         Assert.Contains(DiagnosticCode.DuplicateFunctionSignature, result.StdOut + result.StdErr);
+    }
+
+    private static void CopyDirectory(string source, string destination)
+    {
+        Directory.CreateDirectory(destination);
+        foreach (var file in Directory.GetFiles(source))
+            File.Copy(file, Path.Combine(destination, Path.GetFileName(file)));
+        foreach (var directory in Directory.GetDirectories(source))
+            CopyDirectory(directory, Path.Combine(destination, Path.GetFileName(directory)));
     }
 }

@@ -32,6 +32,541 @@ public class NullabilityIntegrationTests
         return (bound, diagnostics);
     }
 
+    [Fact]
+    public void LiteralNull_TriggersAllScalarReceivingDiagnostics()
+    {
+        const string source = """
+            §M{m1:LiteralNull}
+              §F{f1:Take:pub} (string:value) -> void
+                §E{}
+              §F{f2:Probe:pub} () -> string
+                §B{required:string} null
+                §C{Take} §A null §/C
+                §R null
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        AssertScalarNullabilityDiagnostics(
+            diagnostics,
+            DiagnosticCode.NullableToNonNullableBinding,
+            DiagnosticCode.NullableArgumentToNonNullableParameter,
+            DiagnosticCode.NullableReturnFromNonNullable);
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.UndefinedReference);
+    }
+
+    [Fact]
+    public void ConditionalNullStringJoins_TriggerAllScalarReceivingDiagnostics()
+    {
+        const string source = """
+            §M{m1:ConditionalNull}
+              §F{f1:Take:pub} (string:value) -> void
+                §E{}
+              §F{f2:Probe:pub} (bool:flag) -> string
+                §B{required:string} (? flag null STR:"safe")
+                §C{Take} §A (? flag STR:"safe" null) §/C
+                §R (? flag null STR:"safe")
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        AssertScalarNullabilityDiagnostics(
+            diagnostics,
+            DiagnosticCode.NullableToNonNullableBinding,
+            DiagnosticCode.NullableArgumentToNonNullableParameter,
+            DiagnosticCode.NullableReturnFromNonNullable);
+    }
+
+    [Fact]
+    public void ConditionalNullWithUnrelatedArm_DoesNotTriggerScalarNullability()
+    {
+        const string source = """
+            §M{m1:UnrelatedConditionalNull}
+              §F{f1:Probe:pub} (bool:flag) -> void
+                §B{required:string} (? flag null INT:1)
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code is DiagnosticCode.NullableToNonNullableBinding
+                or DiagnosticCode.NullableArgumentToNonNullableParameter
+                or DiagnosticCode.NullableReturnFromNonNullable);
+    }
+
+    [Theory]
+    [InlineData("Foo")]
+    [InlineData("[str]")]
+    [InlineData("Option<str>")]
+    public void LiteralNull_RemainsApplicableToNonScalarReferenceParameters(
+        string parameterType)
+    {
+        var source = $$"""
+            §M{m1:NullReferenceApplicability}
+              §CL{c1:Foo:pub}
+                §MT{f1:Take:pub:static} ({{parameterType}}:value) -> void
+                  §E{}
+                §MT{f2:Probe:pub:static} () -> void
+                  §C{Foo.Take} §A null §/C
+            """;
+
+        var (bound, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code is DiagnosticCode.NoMatchingOverload
+                or DiagnosticCode.NullableArgumentToNonNullableParameter);
+        var probe = bound.Functions.Single(function =>
+            function.Symbol.Name.EndsWith(".Probe", StringComparison.Ordinal));
+        var call = Assert.IsType<BoundCallStatement>(Assert.Single(probe.Body));
+        Assert.NotNull(call.ResolvedSymbol);
+        Assert.Equal(parameterType, call.ResolvedSymbol.Parameters.Single().TypeName);
+    }
+
+    [Fact]
+    public void LiteralNull_DoesNotPreferScalarStringOverUnrelatedReferenceOverload()
+    {
+        const string source = """
+            §M{m1:NullOverloadIdentity}
+              §CL{c1:Foo:pub}
+                §MT{f1:Take:pub:static} (str:value) -> i32
+                  §R 1
+                §MT{f2:Take:pub:static} (Foo:value) -> i32
+                  §R 2
+                §MT{f3:Probe:pub:static} () -> i32
+                  §R §C{Foo.Take} §A null §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.AmbiguousOverload);
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
+    [Fact]
+    public void LiteralNull_PrefersScalarStringOverObject_ThenReportsCalor0274()
+    {
+        const string source = """
+            §M{m1:NullOverloadSpecificity}
+              §F{f1:Take:pub} (str:value) -> i32
+                §R 1
+              §F{f2:Take:pub} (object:value) -> i32
+                §R 2
+              §F{f3:Probe:pub} () -> i32
+                §R §C{Take} §A null §/C
+            """;
+
+        var (bound, diagnostics) = BindSource(source);
+
+        var diagnostic = Assert.Single(diagnostics.Where(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Equal(BindingReceivingShape.ScalarString, diagnostic.BindingContext!.Shape);
+        Assert.DoesNotContain(diagnostics, candidate =>
+            candidate.Code == DiagnosticCode.AmbiguousOverload);
+        var probe = bound.Functions.Single(function => function.Symbol.Name == "Probe");
+        var call = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundReturnStatement>(Assert.Single(probe.Body)).Expression);
+        Assert.Equal("str", call.ResolvedSymbol!.Parameters.Single().TypeName);
+    }
+
+    [Fact]
+    public void LiteralNull_PrefersDerivedReferenceParameter()
+    {
+        const string source = """
+            §M{m1:NullDerivedSpecificity}
+              §CL{c1:Parent:pub}
+              §CL{c2:Child:pub}
+                §EXT{Parent}
+                §MT{f1:Take:pub:static} (Parent:value) -> i32
+                  §R 1
+                §MT{f2:Take:pub:static} (Child:value) -> i32
+                  §R 2
+                §MT{f3:Probe:pub:static} () -> i32
+                  §R §C{Child.Take} §A null §/C
+            """;
+
+        var (bound, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, candidate =>
+            candidate.Code is DiagnosticCode.AmbiguousOverload
+                or DiagnosticCode.NoMatchingOverload);
+        var probe = bound.Functions.Single(function =>
+            function.Symbol.Name.EndsWith(".Probe", StringComparison.Ordinal));
+        var call = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundReturnStatement>(Assert.Single(probe.Body)).Expression);
+        Assert.Equal("Child", call.ResolvedSymbol!.Parameters.Single().TypeName);
+    }
+
+    [Theory]
+    [InlineData("ref")]
+    [InlineData("out")]
+    public void RefOrOutCall_InvalidatesFlowNarrowingBeforeNextScalarBoundary(
+        string modifier)
+    {
+        var source = $$"""
+            §M{m1:RefFlow}
+              §F{f1:Mutate:pub} (?str:value:{{modifier}}) -> void
+                §E{}
+              §F{f2:Take:pub} (str:value) -> void
+                §E{}
+              §F{f3:Probe:pub} (?str:value) -> void
+                §IF{i1} (is value str)
+                  §C{Mutate} §A{{{modifier}}} value §/C
+                  §C{Take} §A value §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        var diagnostic = Assert.Single(diagnostics.Where(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Equal(BindingReceivingShape.ScalarString, diagnostic.BindingContext!.Shape);
+        Assert.DoesNotContain(diagnostics, candidate =>
+            candidate.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
+    [Fact]
+    public void MetadataRefCall_InvalidatesFlowNarrowingBeforeNextScalarBoundary()
+    {
+        const string source = """
+            §M{m1:MetadataRefFlow}
+              §F{f1:Take:pub} (str:value) -> void
+                §E{}
+              §F{f2:Probe:pub} (?str:value, str:replacement) -> void
+                §IF{i1} (is value str)
+                  §C{System.Threading.Interlocked.Exchange} §A{ref} value §A replacement §/C
+                  §C{Take} §A value §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        var diagnostic = Assert.Single(diagnostics.Where(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter));
+        Assert.Equal(BindingReceivingShape.ScalarString, diagnostic.BindingContext!.Shape);
+    }
+
+    [Fact]
+    public void IfBranchMutation_DoesNotLeakIntoSibling_ButInvalidatesPostIfState()
+    {
+        const string source = """
+            §M{m1:BranchFlow}
+              §F{f1:Take:pub} (str:value) -> void
+                §E{}
+              §F{f2:Probe:pub} (?str:value, ?str:replacement, bool:flag) -> void
+                §B{~candidate} value
+                §IF{guard} (isempty candidate)
+                  §R
+                §IF{branch} flag
+                  §ASSIGN candidate replacement
+                §EL
+                  §C{Take} §A candidate §/C
+                §C{Take} §A candidate §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        var findings = diagnostics.Where(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter).ToArray();
+        var diagnostic = Assert.Single(findings);
+        Assert.Equal(12, diagnostic.Span.Line);
+        Assert.Equal(BindingReceivingShape.ScalarString, diagnostic.BindingContext!.Shape);
+    }
+
+    [Fact]
+    public void DirectFunctionTypeInvocation_ActivatesOnlyNonnullScalarStringParameters()
+    {
+        const string source = """
+            §M{m1:DirectDelegate}
+              §CL{c1:Foo:pub}
+                §MT{f1:Probe:pub:static} (Func<str,void>:takeString, Func<[str],void>:takeArray, Func<Option<str>,void>:takeOption, Func<Foo,void>:takeFoo, ?str:value) -> void
+                  §C{takeString} §A value §/C
+                  §C{takeString} §A null §/C
+                  §C{takeArray} §A null §/C
+                  §C{takeOption} §A null §/C
+                  §C{takeFoo} §A null §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        var findings = diagnostics.Where(candidate =>
+            candidate.Code == DiagnosticCode.NullableArgumentToNonNullableParameter).ToArray();
+        Assert.Equal(2, findings.Length);
+        Assert.All(findings, diagnostic =>
+        {
+            Assert.Equal(BindingReceivingShape.ScalarString, diagnostic.BindingContext!.Shape);
+            Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        });
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code == DiagnosticCode.NoMatchingOverload);
+    }
+
+    [Theory]
+    [InlineData("§ASSIGN candidate replacement")]
+    [InlineData("§B{~candidate} replacement")]
+    public void TerminatingIsNullOrEmptyNarrowing_IsInvalidatedByMutableMutation(
+        string mutation)
+    {
+        var source = $$"""
+            §M{m1:FlowRebind}
+              §F{f1:Take:pub} (string:value) -> void
+                §E{}
+              §F{f2:Probe:pub} (?string:value, ?string:replacement) -> string
+                §B{~candidate} value
+                §IF{i1} (isempty candidate)
+                  §R STR:"fallback"
+                {{mutation}}
+                §B{required:string} candidate
+                §C{Take} §A candidate §/C
+                §R candidate
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        AssertScalarNullabilityDiagnostics(
+            diagnostics,
+            DiagnosticCode.NullableToNonNullableBinding,
+            DiagnosticCode.NullableArgumentToNonNullableParameter,
+            DiagnosticCode.NullableReturnFromNonNullable);
+    }
+
+    [Theory]
+    [InlineData("§ASSIGN candidate replacement")]
+    [InlineData("§B{~candidate} replacement")]
+    public void NestedChildMutation_InvalidatesParentNarrowingAfterJoin(string mutation)
+    {
+        var source = $$"""
+            §M{m1:NestedJoinMutation}
+              §F{f1:Take:pub} (string:value) -> void
+                §E{}
+              §F{f2:Probe:pub} (?string:value, ?string:replacement, bool:flag) -> string
+                §B{~candidate} value
+                §IF{i1} (is candidate string)
+                  §IF{i2} flag
+                    {{mutation}}
+                  §B{required:string} candidate
+                  §C{Take} §A candidate §/C
+                  §R candidate
+                §R STR:"fallback"
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        AssertScalarNullabilityDiagnostics(
+            diagnostics,
+            DiagnosticCode.NullableToNonNullableBinding,
+            DiagnosticCode.NullableArgumentToNonNullableParameter,
+            DiagnosticCode.NullableReturnFromNonNullable);
+    }
+
+    [Theory]
+    [InlineData("§ASSIGN candidate replacement")]
+    [InlineData("§B{~candidate} replacement")]
+    public void TypedCheckNarrowing_IsInvalidatedByMutableMutation(string mutation)
+    {
+        var source = $$"""
+            §M{m1:FlowAssignment}
+              §F{f1:Take:pub} (string:value) -> void
+                §E{}
+              §F{f2:Probe:pub} (?string:value, ?string:replacement) -> string
+                §B{~candidate} value
+                §IF{i1} (is candidate string)
+                  {{mutation}}
+                  §B{required:string} candidate
+                  §C{Take} §A candidate §/C
+                  §R candidate
+                §R STR:"fallback"
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        AssertScalarNullabilityDiagnostics(
+            diagnostics,
+            DiagnosticCode.NullableToNonNullableBinding,
+            DiagnosticCode.NullableArgumentToNonNullableParameter,
+            DiagnosticCode.NullableReturnFromNonNullable);
+    }
+
+    [Theory]
+    [InlineData("§ASSIGN candidate replacement")]
+    [InlineData("§B{~candidate} replacement")]
+    public void NestedTypedCheckNarrowing_UnwindsToOriginalSymbolBeforeMutableMutation(
+        string mutation)
+    {
+        var source = $$"""
+            §M{m1:NestedFlowMutation}
+              §F{f1:Take:pub} (string:value) -> void
+                §E{}
+              §F{f2:Probe:pub} (?string:value, ?string:replacement) -> string
+                §B{~candidate} value
+                §IF{i1} (is candidate string)
+                  §IF{i2} (is candidate string)
+                    {{mutation}}
+                    §B{required:string} candidate
+                    §C{Take} §A candidate §/C
+                    §R candidate
+                  §R STR:"fallback"
+                §R STR:"fallback"
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        AssertScalarNullabilityDiagnostics(
+            diagnostics,
+            DiagnosticCode.NullableToNonNullableBinding,
+            DiagnosticCode.NullableArgumentToNonNullableParameter,
+            DiagnosticCode.NullableReturnFromNonNullable);
+    }
+
+    [Fact]
+    public void YieldReturnGuard_DoesNotNarrowContinuation()
+    {
+        const string source = """
+            §M{m1:YieldFlow}
+              §F{f1:Take:pub} (string:value) -> void
+                §E{}
+              §F{f2:Probe:pub} (?string:value) -> string
+                §IF{i1} (isempty value)
+                  §YIELD STR:"fallback"
+                §B{required:string} value
+                §C{Take} §A value §/C
+                §YIELD value
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        AssertScalarNullabilityDiagnostics(
+            diagnostics,
+            DiagnosticCode.NullableToNonNullableBinding,
+            DiagnosticCode.NullableArgumentToNonNullableParameter);
+    }
+
+    [Fact]
+    public void NestedDelegateReturnNullability_UsesQualifiedLexicalDeclaration()
+    {
+        const string source = """
+            §M{m1:NestedDelegates}
+              §CL{c1:NullableOwner:pub}
+                §DEL{d1:Handler:pub}
+                  §O{?string}
+                §MT{mt1:Probe:pub} (Handler:handler) -> string
+                  §R §C{handler} §/C
+              §CL{c2:NonNullOwner:pub}
+                §DEL{d2:Handler:pub}
+                  §O{string}
+                §MT{mt2:Probe:pub} (Handler:handler) -> string
+                  §R §C{handler} §/C
+              §CL{c3:UniqueOwner:pub}
+                §DEL{d3:NullableReader:pub}
+                  §O{?string}
+                §MT{mt3:Probe:pub} (UniqueOwner.NullableReader:reader) -> string
+                  §R §C{reader} §/C
+            """;
+
+        var (bound, diagnostics) = BindSource(source);
+
+        var nullableOwner = bound.Functions.Single(function =>
+            function.Symbol.Name.EndsWith("NullableOwner.Probe", StringComparison.Ordinal));
+        var nonNullOwner = bound.Functions.Single(function =>
+            function.Symbol.Name.EndsWith("NonNullOwner.Probe", StringComparison.Ordinal));
+        var uniqueOwner = bound.Functions.Single(function =>
+            function.Symbol.Name.EndsWith("UniqueOwner.Probe", StringComparison.Ordinal));
+        var nullableDelegate = Assert.IsType<FunctionBoundType>(
+            nullableOwner.Symbol.Parameters.Single().FunctionType);
+        var nonNullDelegate = Assert.IsType<FunctionBoundType>(
+            nonNullOwner.Symbol.Parameters.Single().FunctionType);
+        var uniqueDelegate = Assert.IsType<FunctionBoundType>(
+            uniqueOwner.Symbol.Parameters.Single().FunctionType);
+        Assert.Equal(
+            NullableAnnotation.Annotated,
+            NullabilityChecker.GetAnnotation(nullableDelegate.ReturnType));
+        Assert.Equal(
+            NullableAnnotation.NotAnnotated,
+            NullabilityChecker.GetAnnotation(nonNullDelegate.ReturnType));
+        Assert.Equal(
+            NullableAnnotation.Annotated,
+            NullabilityChecker.GetAnnotation(uniqueDelegate.ReturnType));
+        var findings = diagnostics.Where(d =>
+            d.Code == DiagnosticCode.NullableReturnFromNonNullable).ToArray();
+        Assert.True(
+            findings.Length == 2,
+            string.Join(Environment.NewLine, diagnostics.Select(diagnostic =>
+                $"{diagnostic.Code} line {diagnostic.Span.Line}: {diagnostic.Message}")));
+        Assert.All(findings, diagnostic =>
+        {
+            Assert.Equal(BindingReceivingShape.ScalarString, diagnostic.BindingContext!.Shape);
+            Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        });
+        Assert.DoesNotContain(findings, diagnostic => diagnostic.Span.Line == 11);
+    }
+
+    [Fact]
+    public void DelegateInvoke_UsesNullableReturnSignature()
+    {
+        const string source = """
+            §M{m1:DelegateInvoke}
+              §F{f1:Probe:pub} (Func<?str>:read) -> str
+                §R §C{read.Invoke} §/C
+            """;
+
+        var (_, diagnostics) = BindSource(source);
+
+        var diagnostic = Assert.Single(diagnostics.Where(d =>
+            d.Code == DiagnosticCode.NullableReturnFromNonNullable));
+        Assert.Equal(BindingReceivingShape.ScalarString, diagnostic.BindingContext!.Shape);
+        Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+    }
+
+    [Fact]
+    public void RefOverloadApplicability_UsesDeclaredStorageNullability()
+    {
+        const string source = """
+            §M{m1:RefStorage}
+              §F{f1:Mutate:pub} (str:value:ref) -> i32
+                §E{}
+                §R 1
+              §F{f2:Mutate:pub} (?str:value:ref) -> i32
+                §E{}
+                §R 2
+              §F{f3:Probe:pub} (?str:value) -> i32
+                §IF{i1} (is value str)
+                  §R §C{Mutate} §A{ref} value §/C
+                §R 0
+            """;
+
+        var (bound, diagnostics) = BindSource(source);
+
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code is DiagnosticCode.NoMatchingOverload
+                or DiagnosticCode.AmbiguousOverload);
+        var probe = bound.Functions.Single(function => function.Symbol.Name == "Probe");
+        var branch = Assert.IsType<BoundIfStatement>(probe.Body[0]);
+        var call = Assert.IsType<BoundCallExpression>(
+            Assert.IsType<BoundReturnStatement>(branch.ThenBody[0]).Expression);
+        Assert.Equal("?str", call.ResolvedSymbol!.Parameters.Single().TypeName);
+    }
+
+    private static void AssertScalarNullabilityDiagnostics(
+        DiagnosticBag diagnostics,
+        params string[] expectedCodes)
+    {
+        var findings = diagnostics.Where(diagnostic =>
+            expectedCodes.Contains(diagnostic.Code, StringComparer.Ordinal)).ToArray();
+        Assert.True(
+            findings.Length == expectedCodes.Length,
+            string.Join(Environment.NewLine, diagnostics.Select(diagnostic =>
+                $"{diagnostic.Code} line {diagnostic.Span.Line}: {diagnostic.Message}")));
+        Assert.Equal(
+            expectedCodes.OrderBy(code => code, StringComparer.Ordinal),
+            findings.Select(diagnostic => diagnostic.Code)
+                .OrderBy(code => code, StringComparer.Ordinal));
+        Assert.All(findings, diagnostic =>
+        {
+            Assert.Equal(BindingReceivingShape.ScalarString, diagnostic.BindingContext!.Shape);
+            Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        });
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
@@ -99,7 +634,7 @@ public class NullabilityIntegrationTests
         Assert.Equal(source.LastIndexOf("maybe", StringComparison.Ordinal), diagnostic.Span.Start);
         Assert.Equal("maybe", source.Substring(diagnostic.Span.Start, diagnostic.Span.Length));
         Assert.Equal(SemanticsVersion.NullabilitySeverityFor(), diagnostic.Severity);
-        Assert.False(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
     }
 
     [Theory]
@@ -141,7 +676,7 @@ public class NullabilityIntegrationTests
             Assert.Contains("'paths'", diagnostic.Message);
             Assert.Equal(source.LastIndexOf("maybe", StringComparison.Ordinal), diagnostic.Span.Start);
             Assert.Equal(BindingReceivingShape.ScalarString, diagnostic.BindingContext!.Shape);
-            Assert.False(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+            Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
         }
     }
 
@@ -736,8 +1271,7 @@ public class NullabilityIntegrationTests
         // (str x) is StringOp.ToString — the BCL object.ToString() shape.
         const string source = """
             §M{m1:ToStr}
-              §F{f1:Bad:pub} () -> void
-                §B{n:int} INT:42
+              §F{f1:Bad:pub} (object:n) -> void
                 §B{s:string} (str n)
             """;
 
@@ -756,6 +1290,25 @@ public class NullabilityIntegrationTests
             d.Code == DiagnosticCode.NullableToNonNullableBinding
             && d.Message.Contains("'s'")
             && d.Message.Contains("'Annotated'"));
+    }
+
+    [Fact]
+    public void Calor0272_DoesNotFire_For_NonNullString_ToString()
+    {
+        const string source = """
+            §M{m1:ToStr}
+              §F{f1:Ok:pub} (string:value) -> void
+                §B{s:string} (str value)
+            """;
+
+        var (bound, diagnostics) = BindSource(source);
+        var initializer = bound.Functions.Single().Body.OfType<BoundBindStatement>()
+            .Single().Initializer!;
+        Assert.Equal(
+            NullableAnnotation.NotAnnotated,
+            Assert.IsType<NominalBoundType>(initializer.Type).NullableAnnotation);
+        Assert.DoesNotContain(diagnostics,
+            d => d.Code == DiagnosticCode.NullableToNonNullableBinding);
     }
 
     /// <summary>

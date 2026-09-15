@@ -23,7 +23,7 @@ public class BindingDiagnosticPolicyTests
 
     [Theory]
     [MemberData(nameof(NullableBoundaries))]
-    public void NullableErrors_CarryStructuredContext_WithoutActivation(
+    public void ScalarNullableErrors_ActivateAcrossCompilerModes(
         string code, BindingReceivingBoundary boundary, string body, string returnType)
     {
         var source = $"§M{{m1:Routing}}\n  §F{{f1:Probe:pub}} () -> {returnType}\n    §E{{env}}\n    {body}\n";
@@ -31,8 +31,8 @@ public class BindingDiagnosticPolicyTests
         var diagnostic = Assert.Single(bag.Errors);
         Assert.Equal(code, diagnostic.Code);
         Assert.Equal(new BindingDiagnosticContext(boundary, BindingReceivingShape.ScalarString), diagnostic.BindingContext);
-        Assert.True(BindingDiagnosticPolicy.IsAnalysisOnly(diagnostic));
-        Assert.False(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        Assert.False(BindingDiagnosticPolicy.IsAnalysisOnly(diagnostic));
+        Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
         foreach (var typeChecking in new[] { true, false })
         foreach (var transpile in new[] { true, false })
         {
@@ -41,8 +41,10 @@ public class BindingDiagnosticPolicyTests
                 EnableTypeChecking = typeChecking,
                 UnsafeTranspileOnly = transpile
             });
-            Assert.False(result.HasErrors, string.Join("; ", result.Diagnostics));
-            Assert.DoesNotContain(result.Diagnostics, d => d.Code == code);
+            Assert.True(result.HasErrors);
+            var propagated = Assert.Single(result.Diagnostics.Where(d => d.Code == code));
+            Assert.Equal(DiagnosticSeverity.Error, propagated.Severity);
+            Assert.Equal(diagnostic.Span, propagated.Span);
         }
     }
 
@@ -59,6 +61,7 @@ public class BindingDiagnosticPolicyTests
         foreach (var rule in BindingDiagnosticPolicy.ReceivingRules)
         {
             Assert.Equal(rule.Context.ReplacesNativeOverloadError
+                || rule.Context.Shape == BindingReceivingShape.ScalarString
                 ? BindingDiagnosticDisposition.CompilationError
                 : BindingDiagnosticDisposition.AnalysisOnly, rule.Policy.Disposition);
             Assert.False(string.IsNullOrWhiteSpace(rule.Policy.Justification));
@@ -80,9 +83,13 @@ public class BindingDiagnosticPolicyTests
             "This message intentionally says array and Foo, not the receiving type.",
             new TextSpan(0, 1, 1, 1)) { BindingContext = context };
         Assert.Equal(1385, BindingDiagnosticPolicy.GetRule(diagnostic.Code, context).OwningIssue);
+        Assert.Equal(BindingDiagnosticDisposition.CompilationError,
+            BindingDiagnosticPolicy.GetRule(diagnostic.Code, context).Disposition);
         var nominal = BindingDiagnosticContext.For(BindingReceivingBoundary.Initializer, new NominalBoundType("Foo"));
         Assert.Equal(BindingReceivingShape.Nominal, nominal.Shape);
         Assert.Equal(1402, BindingDiagnosticPolicy.GetRule(diagnostic.Code, nominal).OwningIssue);
+        Assert.Equal(BindingDiagnosticDisposition.AnalysisOnly,
+            BindingDiagnosticPolicy.GetRule(diagnostic.Code, nominal).Disposition);
     }
 
     [Fact]
@@ -99,17 +106,21 @@ public class BindingDiagnosticPolicyTests
                 shared.Diagnostics.Select(d => (d.Code, d.Span, d.Severity)));
             Assert.Equal(source == duplicate, shared.HasErrors);
         }
-        // Nullable-to-nonnullable assignment retains its transitional typing rejection
-        // until #1385. The old nullable-literal false positive was repaired by #1397.
+        // Scalar nullable-to-nonnullable assignment is owned by the binder
+        // even when the optional type checker is enabled.
         const string early = "§M{m1:Routing}\n  §F{f1:Probe:pub} () -> void\n    §B{x:?str} null\n    §B{y:str} x\n";
         var rejected = Program.Compile(early, "routing.calr", new CompilationOptions { Context = context });
-        Assert.Contains(rejected.Diagnostics, d => d.Code == DiagnosticCode.TypeMismatch && d.IsError);
-        Assert.All(rejected.Diagnostics, d => Assert.Null(d.BindingContext));
+        var active = Assert.Single(rejected.Diagnostics);
+        Assert.Equal(DiagnosticCode.NullableToNonNullableBinding, active.Code);
+        Assert.Equal(BindingReceivingShape.ScalarString, active.BindingContext?.Shape);
         var optOut = Program.Compile(early, "routing.calr", new CompilationOptions
         {
             Context = context, EnableTypeChecking = false
         });
-        Assert.False(optOut.HasErrors);
+        Assert.True(optOut.HasErrors);
+        Assert.Contains(optOut.Diagnostics,
+            d => d.Code == DiagnosticCode.NullableToNonNullableBinding
+                && d.BindingContext?.Shape == BindingReceivingShape.ScalarString);
     }
 
     [Fact]

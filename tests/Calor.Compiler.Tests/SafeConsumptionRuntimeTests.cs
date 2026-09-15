@@ -162,29 +162,18 @@ public sealed class SafeConsumptionRuntimeTests
     [InlineData("bind")]
     [InlineData("return")]
     [InlineData("argument")]
-    public void NullableFallback_RemainsVisibleWithoutActivatingPolicy(string consumer)
+    public void NullableFallback_IsRejectedAtScalarReceivingBoundary(string consumer)
     {
         var source = Source(consumer, "(?? input fallback)", "?str:fallback");
         var (_, diagnostics) = Bind(source);
         Assert.Contains(diagnostics, diagnostic => IsNullableDiagnostic(diagnostic)
             || diagnostic.Code == DiagnosticCode.NoMatchingOverload);
         foreach (var diagnostic in diagnostics.Where(IsNullableDiagnostic))
-            Assert.True(BindingDiagnosticPolicy.IsAnalysisOnly(diagnostic));
-        WithCli(source, (exit, _, error) =>
-        {
-            if (consumer == "argument")
-                Assert.NotEqual(0, exit);
-            else
-                Assert.True(exit == 0, error);
-        });
-        if (consumer != "argument")
-        {
-            var result = Program.Compile(source, "consumption.calr");
-            Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
-            var method = Emit(result.GeneratedCode).GetType("Consumption.ConsumptionModule")!.GetMethod("Probe")!;
-            Assert.Null(method.Invoke(null, [null, null]));
-            Assert.Equal("backup", method.Invoke(null, [null, "backup"]));
-        }
+            Assert.True(BindingDiagnosticPolicy.IsCompilationError(diagnostic));
+        WithCli(source, (exit, _, _) => Assert.NotEqual(0, exit));
+        var result = Program.Compile(source, "consumption.calr");
+        Assert.True(result.HasErrors);
+        Assert.Empty(result.GeneratedCode);
     }
 
     [Fact]
@@ -536,7 +525,7 @@ public sealed class SafeConsumptionRuntimeTests
     }
 
     [Fact]
-    public void VarPattern_PreservesNullableOperandWithoutUnknownTypeWarnings()
+    public void VarPattern_PreservesNullableOperandAndIsRejectedOnNonNullableReturn()
     {
         const string source = """
             §M{m1:Consumption}
@@ -547,11 +536,9 @@ public sealed class SafeConsumptionRuntimeTests
         var (_, diagnostics) = Bind(source);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.NullableReturnFromNonNullable);
         var result = Program.Compile(source, "var-consumption.calr");
-        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics));
+        Assert.True(result.HasErrors);
         Assert.DoesNotContain(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCode.UndefinedReference);
-        var method = Emit(result.GeneratedCode).GetType("Consumption.ConsumptionModule")!.GetMethod("Probe")!;
-        Assert.Null(method.Invoke(null, [null]));
-        Assert.Equal("value", method.Invoke(null, ["value"]));
+        Assert.Empty(result.GeneratedCode);
     }
 
     [Fact]

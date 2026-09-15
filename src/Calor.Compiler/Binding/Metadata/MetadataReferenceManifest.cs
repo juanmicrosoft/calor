@@ -27,22 +27,31 @@ internal sealed record MetadataReferenceManifest(
     [property: JsonPropertyName("generatedAt")] string? GeneratedAt,
     [property: JsonPropertyName("assemblies")] ImmutableArray<ManifestAssemblyEntry> Assemblies)
 {
+    private const string EmbeddedResourceName =
+        "Calor.Compiler.Resources.metadata-references-manifest.json";
+
     /// <summary>
-    /// Loads the manifest from the standard path
-    /// (<c>bench/phase0-agent-native/metadata-references-manifest.json</c>).
-    /// Discovery walks parent directories from the current working directory
-    /// looking for the <c>bench</c> folder — the same pattern used by other
-    /// phase0-agent-native fixtures.
+    /// Loads the manifest embedded in the compiler assembly. The global tool
+    /// therefore uses the same reviewed manifest regardless of its installation
+    /// directory or the caller's current working directory.
     /// </summary>
     public static MetadataReferenceManifest Load()
     {
-        var path = FindManifestPath();
-        return LoadFrom(path);
+        using var stream = typeof(MetadataReferenceManifest).Assembly
+            .GetManifestResourceStream(EmbeddedResourceName)
+            ?? throw new InvalidOperationException(
+                $"Compiler resource '{EmbeddedResourceName}' is missing. Rebuild or reinstall calor.");
+        return Load(stream, $"embedded resource '{EmbeddedResourceName}'");
     }
 
     public static MetadataReferenceManifest LoadFrom(string path)
     {
         using var stream = File.OpenRead(path);
+        return Load(stream, $"'{path}'");
+    }
+
+    private static MetadataReferenceManifest Load(Stream stream, string source)
+    {
         // Round-2 M2 mitigation: strict deserialization. Case-sensitivity
         // matches the JSON schema; trailing commas rejected. A typo in a
         // property name fails loudly rather than silently defaulting.
@@ -57,40 +66,21 @@ internal sealed record MetadataReferenceManifest(
         if (manifest is null)
         {
             throw new InvalidOperationException(
-                $"Metadata reference manifest at '{path}' deserialized to null.");
+                $"Metadata reference manifest from {source} deserialized to null.");
         }
         // Additional invariant checks — default(ImmutableArray<>) has
         // IsDefault=true and enumerating throws NullReferenceException.
         if (string.IsNullOrWhiteSpace(manifest.SdkVersionRange))
         {
             throw new InvalidOperationException(
-                $"Metadata reference manifest at '{path}' is missing required property 'sdkVersionRange'.");
+                $"Metadata reference manifest from {source} is missing required property 'sdkVersionRange'.");
         }
         if (manifest.Assemblies.IsDefault || manifest.Assemblies.Length == 0)
         {
             throw new InvalidOperationException(
-                $"Metadata reference manifest at '{path}' has no 'assemblies' entries.");
+                $"Metadata reference manifest from {source} has no 'assemblies' entries.");
         }
         return manifest;
-    }
-
-    private static string FindManifestPath()
-    {
-        const string RelativePath = "bench/phase0-agent-native/metadata-references-manifest.json";
-        var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
-        while (dir is not null)
-        {
-            var candidate = Path.Combine(dir.FullName, RelativePath);
-            if (File.Exists(candidate))
-            {
-                return candidate;
-            }
-            dir = dir.Parent;
-        }
-        throw new FileNotFoundException(
-            $"Could not locate '{RelativePath}' by walking up from the current directory. " +
-            "Run from within the Calor repository, or invoke MetadataContext.CreateWithManifest " +
-            "with an explicit manifest.");
     }
 }
 

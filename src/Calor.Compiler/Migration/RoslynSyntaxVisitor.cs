@@ -7612,7 +7612,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             return mapped;
         }
 
-        var nullableAnnotation = type.NullableAnnotation;
+        var returnFlowAnnotation = GetReturnFlowAnnotation(typeSyntax.Parent);
+        var nullableAnnotation = returnFlowAnnotation ?? type.NullableAnnotation;
         if (typeSyntax.IsVar)
         {
             if (initializer != null
@@ -7639,7 +7640,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 type.ToDisplayString(NullableTypeDisplayFormat));
         }
 
-        if (type.IsReferenceType
+        if (returnFlowAnnotation == Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated
+            && Parsing.AttributeHelper.TryUnwrapNullableAnnotation(mapped, out var nonNullReferent))
+        {
+            mapped = nonNullReferent;
+        }
+
+        if (type.SpecialType == SpecialType.System_String
+            && initializer is LiteralExpressionSyntax literal
+            && literal.IsKind(SyntaxKind.NullLiteralExpression))
+        {
+            mapped = TypeMapper.AnnotateNullableReference(mapped);
+        }
+        else if (type.IsReferenceType
             && nullableAnnotation
                 == Microsoft.CodeAnalysis.NullableAnnotation.Annotated)
         {
@@ -7663,6 +7676,44 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         return mapped;
+    }
+
+    private Microsoft.CodeAnalysis.NullableAnnotation? GetReturnFlowAnnotation(SyntaxNode? declaration)
+    {
+        IMethodSymbol? method = declaration switch
+        {
+            MethodDeclarationSyntax syntax => _semanticModel!.GetDeclaredSymbol(
+                syntax, _cancellationToken),
+            OperatorDeclarationSyntax syntax => _semanticModel!.GetDeclaredSymbol(
+                syntax, _cancellationToken),
+            ConversionOperatorDeclarationSyntax syntax => _semanticModel!.GetDeclaredSymbol(
+                syntax, _cancellationToken),
+            _ => null
+        };
+        if (method is null)
+            return null;
+
+        var attributes = method.GetReturnTypeAttributes();
+        var compilation = _semanticModel!.Compilation;
+        var notNullAttribute = compilation.GetTypeByMetadataName(
+            "System.Diagnostics.CodeAnalysis.NotNullAttribute");
+        var maybeNullAttribute = compilation.GetTypeByMetadataName(
+            "System.Diagnostics.CodeAnalysis.MaybeNullAttribute");
+        if (attributes.Any(attribute =>
+                SymbolEqualityComparer.Default.Equals(
+                    attribute.AttributeClass,
+                    notNullAttribute)))
+        {
+            return Microsoft.CodeAnalysis.NullableAnnotation.NotAnnotated;
+        }
+        if (attributes.Any(attribute =>
+                SymbolEqualityComparer.Default.Equals(
+                    attribute.AttributeClass,
+                    maybeNullAttribute)))
+        {
+            return Microsoft.CodeAnalysis.NullableAnnotation.Annotated;
+        }
+        return null;
     }
 
     private void RecordUnresolvedNullableSemantics(TypeSyntax typeSyntax)
@@ -9583,30 +9634,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             _context.RecordFeatureUsage("null-coalescing-throw");
             _context.IncrementConverted();
-            if (_conditionalRegionDepth == 1 && IsCompleteStatementValue(binary) &&
-                _semanticModel?.GetTypeInfo(binary.Left).Type?.IsReferenceType == true)
-            {
-                var span = GetTextSpan(binary);
-                var value = ConvertExpression(binary.Left);
-                var valueName = _context.GenerateId("_nct");
-                var valueReference = new ReferenceNode(span, valueName);
-                _pendingStatements.Add(new BindStatementNode(
-                    span, valueName, null, false, value, new AttributeCollection()));
-                var unconditional = _pendingStatements.ToList();
-                _pendingStatements.Clear();
-                var exception = ConvertThrowExpression(throwExpr);
-                var throwBody = _pendingStatements.ToList();
-                throwBody.Add(new ThrowStatementNode(exception.Span, exception.Exception));
-                _pendingStatements.Clear();
-                _pendingStatements.AddRange(unconditional);
-                // Snapshot before checking, and use null identity rather than
-                // overloaded equality. Exception construction stays in the guard.
-                var isNull = new UnaryOperationNode(span, UnaryOperator.Not,
-                    new TypeOperationNode(span, TypeOp.Is, valueReference, "object"));
-                _pendingStatements.Add(new IfStatementNode(span, _context.GenerateId("if"), isNull,
-                    throwBody, Array.Empty<ElseIfClauseNode>(), null, new AttributeCollection()));
-                return valueReference;
-            }
             return new NullCoalesceNode(GetTextSpan(binary),
                 ConvertExpression(binary.Left), ConvertThrowExpression(throwExpr));
         }

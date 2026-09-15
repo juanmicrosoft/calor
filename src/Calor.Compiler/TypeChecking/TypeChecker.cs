@@ -458,7 +458,9 @@ public sealed class TypeChecker
                 && _currentReturnType != null
                 && !ContainsInferencePlaceholder(_currentReturnType)
                 && !ContainsInferencePlaceholder(returnType)
-                && !IsAssignable(_currentReturnType, returnType))
+                && !IsAssignable(_currentReturnType, returnType)
+                && !(_lambdaBodyDepth == 0
+                    && IsBinderOwnedScalarNullabilityMismatch(_currentReturnType, returnType)))
             {
                 _lambdaReturnInvalid = true;
                 if (!_suppressContextualDiagnostics)
@@ -782,7 +784,8 @@ public sealed class TypeChecker
                 {
                     initType = InferExpressionType(bind.Initializer, varType);
                 }
-                if (!IsAssignable(varType, initType))
+                if (!IsAssignable(varType, initType)
+                    && !IsBinderOwnedScalarNullabilityMismatch(varType, initType))
                 {
                     _diagnostics.ReportError(bind.Span, DiagnosticCode.TypeMismatch,
                         $"Cannot assign {initType.SurfaceName} to variable of type {varType.SurfaceName}");
@@ -2488,7 +2491,7 @@ public sealed class TypeChecker
                     return false;
                 }
             }
-            else if (!IsAssignable(target, preliminaryTypes[argumentIndex]))
+            else if (!IsAssignableResolvedMethodArgument(target, preliminaryTypes[argumentIndex]))
             {
                 return false;
             }
@@ -2799,7 +2802,7 @@ public sealed class TypeChecker
                 }
                 conversionCosts[argument.SourceIndex] = methodGroupCost;
             }
-            else if (!IsAssignable(parameterTypes[i], argument.Type))
+            else if (!IsAssignableResolvedMethodArgument(parameterTypes[i], argument.Type))
             {
                 return null;
             }
@@ -2821,7 +2824,7 @@ public sealed class TypeChecker
         {
             if (paramsIndex < 0 || parameterTypes[paramsIndex] is not ArrayType paramsArray
                 || expandedParamsArguments.Any(argument =>
-                    !IsAssignable(paramsArray.ElementType, argument.Type)))
+                    !IsAssignableResolvedMethodArgument(paramsArray.ElementType, argument.Type)))
             {
                 return null;
             }
@@ -4473,6 +4476,15 @@ public sealed class TypeChecker
     private static bool IsNumeric(CalorType type)
         => type.Equals(PrimitiveType.Int) || type.Equals(PrimitiveType.Float)
         || type.Equals(PrimitiveType.Char) || type.Equals(PrimitiveType.Decimal);
+
+    private static bool IsAssignableResolvedMethodArgument(CalorType target, CalorType source)
+        => IsAssignable(target, source)
+            || IsBinderOwnedScalarNullabilityMismatch(target, source);
+
+    private static bool IsBinderOwnedScalarNullabilityMismatch(CalorType target, CalorType source)
+        => target.Equals(PrimitiveType.String)
+            && source is NullableReferenceType nullable
+            && nullable.ReferentType.Equals(PrimitiveType.String);
 
     private static bool IsAssignable(CalorType target, CalorType source)
     {
