@@ -1876,7 +1876,11 @@ public sealed class Binder
         _callableState.Clear();
         foreach (var branch in branches)
             JoinCallableState(branch.Callables);
-        foreach (var narrowed in baseline.VisibleNarrowings)
+        // Restored ancestor bindings can be hidden by a local name while a
+        // previously declared callable still mutates their captured storage.
+        foreach (var narrowed in baseline.Bindings.Select(binding => binding.Symbol)
+                     .Where(baseline.Sources.ContainsKey)
+                     .Distinct<VariableSymbol>(ReferenceEqualityComparer.Instance))
         {
             if (branches.Any(branch => !branch.Sources.ContainsKey(narrowed)))
                 InvalidateMutableFlowNarrowing(narrowed, requireRebindable: false);
