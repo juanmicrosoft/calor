@@ -75,7 +75,7 @@ public class ReportGeneratorTests
     }
 
     [Fact]
-    public void CandidateDiagnostics_KeepMultilineUtf16SpanAndAnalysisOnlyRouting()
+    public void CandidateDiagnostics_KeepMultilineUtf16SpanAndShapeBasedRouting()
     {
         const string source = "x\n😀\ny";
         var diagnostic = new Calor.Compiler.Diagnostics.Diagnostic(
@@ -86,11 +86,21 @@ public class ReportGeneratorTests
                 Calor.Compiler.Binding.BindingReceivingShape.ScalarString),
         };
         var captured = ReportGenerator.CaptureDiagnostic(diagnostic, "shadow-bind", "N.cs", source, true);
-        Assert.Equal("AnalysisOnly", captured.BindingDisposition);
+        Assert.Equal("CompilationError", captured.BindingDisposition);
         Assert.Equal("ScalarString", captured.BindingShape);
         Assert.Equal(3, captured.EndLine);
         Assert.Equal(2, captured.EndColumn);
         Assert.Equal(ReportGenerator.Hash(source), captured.SourceSha256);
+
+        var nominal = new Calor.Compiler.Diagnostics.Diagnostic(
+            "Calor0273", "nullable", diagnostic.Span)
+        {
+            BindingContext = new(
+                Calor.Compiler.Binding.BindingReceivingBoundary.NativeReturn,
+                Calor.Compiler.Binding.BindingReceivingShape.Nominal),
+        };
+        Assert.Equal("AnalysisOnly", ReportGenerator.CaptureDiagnostic(
+            nominal, "shadow-bind", "N.cs", source, true).BindingDisposition);
     }
 
     [Theory]
