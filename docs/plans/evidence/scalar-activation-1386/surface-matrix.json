@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "candidate": "e3a84766dcc9f34c104445d1150552499c3d3ce3",
+  "candidateTree": "cc8caed0d4a897ca8bda3c7979b28e1fb8baa23b",
+  "localToolchain": {
+    "sdk": "10.0.400",
+    "runtime": "10.0.11",
+    "os": "macOS 26.6",
+    "architecture": "arm64",
+    "compilerSha256": "2f2553aa9afad80e873f7967802208914f4e45480c3c7db08b68c332cbef1f49"
+  },
+  "routingMatrix": {
+    "boundaries": [
+      "Initializer",
+      "NativeReturn",
+      "MethodArgument"
+    ],
+    "shapes": [
+      "None",
+      "ScalarString",
+      "Array",
+      "Generic",
+      "Nominal",
+      "Unsupported"
+    ],
+    "active": [
+      {
+        "boundary": "Initializer",
+        "shape": "ScalarString",
+        "code": "Calor0272",
+        "owner": 1385
+      },
+      {
+        "boundary": "NativeReturn",
+        "shape": "ScalarString",
+        "code": "Calor0273",
+        "owner": 1385
+      },
+      {
+        "boundary": "MethodArgument",
+        "shape": "ScalarString",
+        "code": "Calor0274",
+        "owner": 1385
+      }
+    ],
+    "analysisOnly": "All other boundary/shape combinations remain owned by issue 1402.",
+    "nativeReplacementException": "MethodArgument/ScalarString with ReplacesNativeOverloadError remains CompilationError under issue 1383."
+  },
+  "rootCli": {
+    "rows": 99,
+    "modeDefinition": "For each boundary, all 32 bit combinations of verify=1, no-type-check=2, transpile-only=4, permissive-effects=8, enforce-effects-false=16, plus default argv with CALOR_NO_TYPE_CHECK=1.",
+    "commonArgv": [
+      "-i",
+      "<fixture>",
+      "-o",
+      "<output>",
+      "--format",
+      "json",
+      "--no-cache",
+      "--no-telemetry"
+    ],
+    "replayedOnFinalCandidate": true,
+    "replayResult": "99/99 rows passed against the recorded Release compiler SHA-256.",
+    "results": [
+      {
+        "case": "initializer",
+        "code": "Calor0272",
+        "severity": "error",
+        "line": 4,
+        "column": 15,
+        "length": 74,
+        "lspRange": "3:14-3:88",
+        "rows": 33,
+        "allExitCode": 1,
+        "allExactlyOneExpectedDiagnostic": true,
+        "anyOutputCreated": false
+      },
+      {
+        "case": "native-return",
+        "code": "Calor0273",
+        "severity": "error",
+        "line": 4,
+        "column": 8,
+        "length": 74,
+        "lspRange": "3:7-3:81",
+        "rows": 33,
+        "allExitCode": 1,
+        "allExactlyOneExpectedDiagnostic": true,
+        "anyOutputCreated": false
+      },
+      {
+        "case": "method-argument",
+        "code": "Calor0274",
+        "severity": "error",
+        "line": 4,
+        "column": 34,
+        "length": 74,
+        "lspRange": "3:33-3:107",
+        "rows": 33,
+        "allExitCode": 1,
+        "allExactlyOneExpectedDiagnostic": true,
+        "anyOutputCreated": false
+      }
+    ],
+    "stderr": {
+      "emptyRows": 51,
+      "transpileWarningRows": 48,
+      "transpileWarning": "warning: --transpile-only is unsafe; generated C# is not type-checked or Roslyn-validated and will not be cached."
+    }
+  },
+  "entrypoints": {
+    "rows": 14,
+    "commands": [
+      "run",
+      "run --verify",
+      "run --permissive --enforce-effects false",
+      "test",
+      "test --verify",
+      "test --permissive --enforce-effects false",
+      "verify --format json --no-cache --no-telemetry"
+    ],
+    "environments": [
+      "CALOR_NO_TYPE_CHECK=0",
+      "CALOR_NO_TYPE_CHECK=1"
+    ],
+    "allExitCode": 1,
+    "allContain": "Calor0272",
+    "replayedOnFinalCandidate": true
+  },
+  "sdkMsbuild": {
+    "rows": 15,
+    "cases": [
+      "Calor0272",
+      "Calor0273",
+      "Calor0274"
+    ],
+    "modes": [
+      "default",
+      "CalorTypeCheck=false",
+      "CalorTranspileOnly=true",
+      "CalorPermissiveEffects=true with CalorVerify=true",
+      "CALOR_NO_TYPE_CHECK=1"
+    ],
+    "allBuildExitCode": 1,
+    "allContainExpectedCode": true,
+    "calorGeneratedInputFiles": 0,
+    "finalCandidateReplay": {
+      "command": "dotnet test tests/Calor.Tasks.Tests/ -c Release --no-restore --filter FullyQualifiedName~CompileCalorIntegrationTests|FullyQualifiedName~BuildStateCacheTests",
+      "passed": 105,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "cacheAndReuse": [
+    {
+      "surface": "root incremental cache safe-to-invalid transition",
+      "rows": 3,
+      "boundaries": [
+        "Initializer/Calor0272",
+        "NativeReturn/Calor0273",
+        "MethodArgument/Calor0274"
+      ],
+      "result": "Each safe source first compiled with --cache and created Input.g.cs. After editing the same path to the active violation, the next invocation recompiled, exited 1 with the expected code, did not report Up-to-date (cached), and removed the prior Input.g.cs."
+    },
+    {
+      "surface": "root incremental cache",
+      "result": "The active Calor0272 failure is never cached; default, --no-type-check, and environment opt-out all recompile and reject.",
+      "test": "IncrementalCliEndToEndTests.Cache_NoTypeCheckCannotBypassActiveScalarBinding and Cache_EnvironmentOptOutCannotBypassActiveScalarBinding"
+    },
+    {
+      "surface": "watch",
+      "result": "Environment type-check transition cannot bypass the active scalar finding; both rebuild observations are errors with zero compiled and zero skipped.",
+      "test": "WatchSessionIntegrationTests.EnvironmentTypeCheckTransition_DoesNotBypassActiveScalarBinding"
+    },
+    {
+      "surface": "public API",
+      "result": "All four type-check/transpile combinations reject each active boundary; shared context does not reuse a success or duplicate ownership.",
+      "test": "BindingDiagnosticPolicyTests.ScalarNullableErrors_ActivateAcrossCompilerModes and SharedApiContext_DoesNotReuseSuccessOrTurnEarlyTypingIntoBinderOwnership"
+    },
+    {
+      "surface": "LSP",
+      "result": "Code, Error severity and span equal the binder/API result; the LSP source label is 'calor', not 'calor (analysis only)'; safe edit clears the finding.",
+      "test": "BindingDiagnosticRoutingTests.ActiveScalarFindings_AreLabeledWithoutChangingBinderSeverityOrSpanAsync"
+    },
+    {
+      "surface": "copied CLI",
+      "result": "Embedded metadata manifest supports Calor0272 after copying the built CLI outside the checkout with --no-type-check.",
+      "test": "BindingRoutingCliTests.CopiedCliOutsideCheckout_UsesEmbeddedManifestWithNoTypeCheck"
+    }
+  ]
+}
