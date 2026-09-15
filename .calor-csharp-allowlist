@@ -127,4 +127,5 @@ src/Calor.Compiler/Binding/NullabilityChecker.cs
 # Compiler-internal representation transfer, not application implementation:
 # this helper reads BoundType annotations and Roslyn identities used to compile
 # Calor itself. Pre-register the exact path before implementation PR #1461.
+# pending: implementation PR #1461 adds the helper and removes this marker.
 src/Calor.Compiler/Binding/NullabilityResultTypes.cs
