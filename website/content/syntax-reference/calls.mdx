@@ -71,6 +71,21 @@ arguments use form (3) or (4).
 
 ## Disambiguation
 
+### Nullable arguments
+
+In the current Stage B candidate, supported possibly-null method arguments
+produce `Calor0274` in statement and expression calls alike. Named arguments
+are checked against the parameter they name, not their source position.
+An otherwise applicable native overload is no longer rejected solely because
+of nullable string input with `Calor0208`; it reports the argument error
+instead. Genuine overload mismatches still use `Calor0208`.
+
+This is bounded receiving-boundary enforcement, not whole-program null safety.
+It does not implicitly unwrap runtime `Option<T>` or enforce constructor
+inputs. See the [complete rejected and safe examples](/docs/guides/nullability-and-dotnet-interop/#calor0274-method-input).
+
+### Call parsing
+
 The implicit-close forms introduce two parser decisions. The
 disambiguation rules below match RFC §3.2.
 
@@ -141,12 +156,14 @@ explicit form for `Foo.bar`.
 
 ## Examples
 
+The examples in this reference are fragments inside a module or function.
+For complete nullable-input examples, see
+[Nullability and .NET Interop](/docs/guides/nullability-and-dotnet-interop/).
+
 ### Statement context
 
 ```calor
-§F{Greet:pub}
-  §I{name:string}
-  §O{void}
+§F{f1:Greet:pub} (str:name) -> void
   §E{cw}
 
   §C{Console.WriteLine} (concat "Hello, " name)   // implicit close
@@ -155,8 +172,7 @@ explicit form for `Foo.bar`.
 ### Expression context — zero-arg
 
 ```calor
-§F{Count:pub}
-  §O{i32}
+§F{f1:Count:pub} () -> i32
 
   §B{n:i32} §C{items.Count}            // zero-arg, implicit close
   §R n
@@ -165,9 +181,7 @@ explicit form for `Foo.bar`.
 ### Expression context — one inline arg
 
 ```calor
-§F{Doubled:pub}
-  §I{x:i32}
-  §O{i32}
+§F{f1:Doubled:pub} (i32:x) -> i32
 
   §B{y:i32} §C{Math.Abs} x             // one inline arg, implicit close
   §R (* y 2)
@@ -176,9 +190,7 @@ explicit form for `Foo.bar`.
 ### Expression context — two or more args (explicit form)
 
 ```calor
-§F{Clamp:pub}
-  §I{x:i32}
-  §O{i32}
+§F{f1:Clamp:pub} (i32:x) -> i32
 
   §B{lo:i32} INT:0
   §B{hi:i32} INT:100

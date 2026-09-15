@@ -8,6 +8,10 @@ The `§B` tag introduces a local binding (Calor's equivalent of a
 C# `var` declaration). The binder accepts four forms; in three of them
 the **type is inferred** from the initializer expression.
 
+Code blocks here are fragments inside a module or function. Complete checked
+nullable-reference examples are in the
+[nullability guide](/docs/guides/nullability-and-dotnet-interop/).
+
 > **Reference for RFC** `v0.6-bind-inference-formalization`. The
 > behavior on this page is what the binder does today and is pinned
 > by `tests/Calor.Semantics.Tests/BindInferenceDocsTests.cs`.
@@ -38,11 +42,10 @@ binding is immutable (cannot be reassigned).
    `§B{x}` with neither is a hard error (`Calor0250`,
    [diagnostics](#diagnostics) below).
 2. **An explicit `:type` wins over inference.** Form (4) does not
-   re-infer; the declared type is used verbatim. The binder itself
-   does not verify the initializer matches the declared type — that
-   check happens downstream in the C# compile (or the analyzer if
-   `--analyze` is on), so a mismatched pair like `§B{x:str} INT:42`
-   compiles to invalid C#.
+   re-infer; the declared type supplies the receiving boundary. The
+   candidate rejects supported possibly-null initializers for non-null
+   destinations with `Calor0272`. Ordinary type checking also checks type
+   compatibility; an annotation does not make an incompatible value valid.
 3. **Without `:type`, the bound type is `initializer.TypeName`.**
    This is "shallow" inference: the binder reads the type the
    initializer's bound node reports and uses it directly. There is no
@@ -73,7 +76,7 @@ no `:type` annotation is present is on the right.
 | `(+ a b)` etc. | result type of the binary op | `BoundBinaryExpression.TypeName` — type of the result, not the operands |
 | an identifier `x` | declared type of `x` | through `BoundVariableExpression` |
 | `§C{Foo.bar} … §/C` | declared return type of `Foo.bar` | the binder uses the call's bound return type |
-| `none` | **inference fails** (today: silent fallback) | `Calor0251` proposed for future strict mode |
+| `null` or untyped `§NN` | **inference fails** by default | `Calor0251`; provide an appropriate explicit nullable or Option type |
 
 The literal-type names on the right (`INT`, `STRING`, …) are the
 binder's internal type identifiers. They appear in tool output and
@@ -143,6 +146,18 @@ initializer (rather than be inferred from it), give an annotation:
 
 ## Diagnostics
 
+### Calor0272 — possibly-null initialization
+
+The candidate rejects a possibly-null initializer at a supported non-null
+receiving boundary. Inference retains supported initializer nullability:
+omitting `:str` does not make a nullable call result non-null. Initializing a
+mutable binding is checked, but later assignment/rebinding is outside this
+guarantee. Constructor results and constructor inputs are separate: the latter
+are not covered. See [Nullability and .NET Interop](/docs/guides/nullability-and-dotnet-interop/)
+for the support table and complete rejected/default/throw/pattern examples.
+`Calor0273` checks native returns and `Calor0274` checks method inputs.
+The strict-inference opt-out below does not disable these binding errors.
+
 ### Calor0250 — `BindRequiresTypeOrInitializer`
 
 A `§B{name}` declaration must carry **either** a `:type` annotation
@@ -150,8 +165,7 @@ A `§B{name}` declaration must carry **either** a `:type` annotation
 choose a type for the new symbol.
 
 ```calor
-§F{f001:Foo:pub}
-  §O{i32}
+§F{f001:Foo:pub} () -> i32
   §B{x}            // Calor0250: §B{x} requires :type or initializer
   §R INT:0
 ```

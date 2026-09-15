@@ -70,6 +70,18 @@ proved nothing exits `0` exactly like a run that proved everything.
 
 ## Reporting, Not Rewriting
 
+The command compiles its inputs before reporting contract results. Active
+receiving-boundary errors (`Calor0272`–`Calor0274`) therefore fail verification
+with exit `1`; enabling verification does not bypass them. The text report
+lists their messages under `Errors`, rather than displaying the root compile
+command's diagnostic code and source span. Use the root compile command to
+inspect that location. See the
+[candidate nullability guide](/docs/guides/nullability-and-dotnet-interop/)
+for supported shapes and complete examples. A successful compile is not a proof
+that all references are non-null. D3/D12/D14 string, array, and user-type proof
+demotions remain in force, and [#875](https://github.com/juanmicrosoft/calor/issues/875)
+remains open.
+
 `calor verify` reports verdicts; it never rewrites generated code. Guard
 elision happens in `calor --input file.calr --output file.g.cs --verify`, where a clean
 `proven` verdict drops its runtime guard by default; add

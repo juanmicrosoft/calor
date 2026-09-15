@@ -262,10 +262,24 @@ the reviewer.
 | Bug Category | Traditional Detection | Calor Detection |
 |:-------------|:---------------------|:----------------|
 | Undeclared side effect | Code review (maybe) | Compile error |
-| Missing null check | Runtime NPE | Contract or analysis finding when expressed and modeled |
+| Possibly-null value crossing a supported receiving boundary | Runtime null-reference exception | Candidate binding Error at initialization, native return, or method input |
 | Invalid state transition | Integration test (if lucky) | Contract violation when the contract covers it |
 | Effect leaking through abstraction | Production incident | Compile error with call chain |
 | Contract violation | Silent corruption | Immediate, traced exception |
+
+The [nullability guide](/docs/guides/nullability-and-dotnet-interop/) defines
+the current candidate's bounded support. It does not promise whole-program
+null safety: mutable assignment/rebinding and constructor-input enforcement
+remain excluded. Missing interop annotations (`Oblivious`) are conservatively
+possibly null; available annotations are trusted, not proved. Type/effect
+controls and transpile-only do not bypass active binding checks.
+
+These checks are separate from contract proof. D3 nullability, D12 string
+indexing/counting semantics, and D14 reference-model limits still require
+verifier proof demotions and retained runtime guards.
+[#875](https://github.com/juanmicrosoft/calor/issues/875) remains open. A bounded
+regression set is not a universal safety result; see
+[Verification Guarantees and Limits](/docs/guides/verification-guarantees/).
 
 ---
 
