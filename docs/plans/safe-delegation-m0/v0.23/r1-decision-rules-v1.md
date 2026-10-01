@@ -34,8 +34,10 @@ and 8, as carried forward by [decision.md](../decision.md). Arms:
 
 The claim is not re-derived, narrowed, or made easier here. Where the
 public-proxy domain cannot measure a component of the claim, these rules mark
-that component **NOT MEASURABLE IN DOMAIN** and route it to
-INSUFFICIENT INFORMATION (section 7). No component is dropped.
+that component **NOT MEASURABLE IN DOMAIN** and record it as missing
+evidence, which can never count as passed (section 7.3 states the resulting
+outcomes: UNADJUDICATED under amendment 001 as written, or at most
+INSUFFICIENT INFORMATION or NOT FEASIBLE). No component is dropped.
 
 ## 2. Definitions
 
@@ -202,13 +204,14 @@ A source cluster is confirmed eligible only if every criterion is confirmed:
 |---|---|---|
 | E1 | Merged change in the window | A pull request with `merged_at` in `[T - 365 days, T)`; linked issues (closing keywords) and reverts/backports that cite it join its cluster |
 | E2 | Production C# change | Changes at least one `.cs` file outside test paths, with a non-whitespace diff; test paths match the case-insensitive regex `(^|/)(test|tests|[^/]*\.tests?)(/|$)` |
-| E3 | Oracle material exists | Changes at least one file in a test path, so a held-out behavioral oracle can be derived |
+| E3 | Oracle ascertainable | **Confirmed true** if the change modifies at least one `.cs` file in a test path. **Confirmed false** only if the repository at its pinned pre-change revision contains no `.cs` file in any test path (no test code from which a held-out oracle could start). **Unresolved** otherwise (for example, unchanged existing tests that may cover the change). This test does not require the historical change to have modified tests; an independently authored oracle may still be needed, which is R3's and the future study's concern |
 | E4 | Human-authored | Author account type is `User` (not `Bot`); evaluated from account type, never from names |
 | E5 | Not generated or formatting-only | At least one changed non-test `.cs` file is not under `obj/`, `bin/`, or a path containing `Generated`, and has a change outside whitespace |
 | E6 | Inside the R3 domain cells | The R3 (#1374) domain-cell rule, which R3 must freeze before R2B′ inspects data |
 
-A criterion that is confirmed false is a rule-based exclusion with a recorded
-reason. A criterion that cannot be evaluated (missing data, API error,
+R3 may adopt a stricter oracle rule only as a disclosed domain restriction
+under E6, never by redefining E3. A criterion that is confirmed false is a
+rule-based exclusion with a recorded reason. A criterion that cannot be evaluated (missing data, API error,
 ambiguous linkage, undecidable domain cell) leaves the cluster **unresolved**;
 it is never counted as ineligible or as eligible.
 
@@ -217,8 +220,22 @@ it is never counted as ineligible or as eligible.
 The prior-familiarity list is fixed at the R1 merge commit as: the
 `bench/corpus/` submodules (MediatR, Serilog, FluentValidation); every GitHub
 repository whose URL appears in this repository's `bench/`, `benchmarks/`,
-`tests/`, `docs/`, or `.gitmodules` at that commit; and any repository the
-maintainer declares in the R2B′ record **before** extraction. R2B′ publishes
+`tests/`, `docs/`, or `.gitmodules` at that commit; and every repository named in the
+pre-extraction familiarity declarations below.
+
+**Declarations.** Before R2B′ runs its extraction, the R2B′ record must contain
+two dated declarations listing every public repository known to have been
+studied for Calor development, including exposure that left no committed URL
+(for example, a repository read during an agent or chat session): one by the
+maintainer and one by the proposer agent of record for R2B′. The proposer's
+declaration is limited by the agent's lack of cross-session memory; it must
+state which sources were searched (this repository's history, the session
+logs available to it, and the maintainer's answers) and that it may be
+incomplete. The declaration cutoff is the extraction start time. A repository
+first recognized as familiar after the cutoff is moved to the familiar stratum
+in a disclosed correction; its counts remain in `H_high`. For the record, the
+R1 proposer session that drafted these rules studied no public repository
+other than this one. R2B′ publishes
 the list. Listed repositories are excluded from the frame, the inventory draw,
 and any future task pool. Their item counts are reported as a separate
 stratum and **are added to `H_high`** (section 6.4), because removing them
@@ -306,25 +323,44 @@ The rules are mutually exclusive by construction: rule 2 requires a
 
 ### 7.3 Pre-registered reachability in the public-proxy domain
 
-G0, G1.1, G1.2, G5, and G6.2 are `NOT_MEASURABLE_IN_DOMAIN`. Therefore rules 3
-and 4 **cannot be satisfied** in the public-proxy domain under v1. The
-reachable results are:
+**Definitions.** A component is **missing evidence** when the frozen
+procedure ran and recorded it as `NOT_MEASURABLE_IN_DOMAIN`, `PROXY_ONLY`,
+`ROUTE_MISSING`, or `ROUTE_UNRESOLVED`. R4 has **failed to complete the
+assessment** when any frozen procedure did not run or produced an invalid run
+(section 6.5) for a reason other than the domain itself.
+
+**Under amendment 001 as written.** Amendment 001 section 5 makes R4
+`UNAVAILABLE` when "required inputs are missing", and makes R5's
+classification require R4 `MET`. G0, G1.1, G1.2, G5, and G6.2 are
+`NOT_MEASURABLE_IN_DOMAIN` by construction, so their inputs are always missing
+in this domain. Under amendment 001 as written, R4 is therefore expected to
+close `UNAVAILABLE`, rule 1 of section 7.2 applies, and the expected v1 result
+is process status **UNADJUDICATED**, with no formal classification. These
+rules do not override that criterion.
+
+**Only if a governing amendment changes R4's closure criterion.** If the
+maintainer adopts a versioned R0 amendment that lets R4 be `MET` after a
+complete assessment in which specified components are recorded as missing
+evidence (as defined above), and R4 has not failed to complete the
+assessment, then rules 2-5 apply and the reachable results are:
 
 - **NOT FEASIBLE (AI-adjudicated, public-proxy domain; frame-scoped)** through
   rule 2;
 - **INSUFFICIENT INFORMATION (AI-adjudicated, public-proxy domain)** through
-  rule 5;
-- process status **UNADJUDICATED** through rule 1.
+  rule 5.
 
-This outcome space is stated before any evidence is inspected. Because the
-supply bound covers the whole frame (section 6.4) and requires the R3
-certificate (section 7.4), NOT FEASIBLE is expected to be reachable only if
-the frame is small and fully enumerated; the most likely v1 outcome is
-INSUFFICIENT INFORMATION. That expectation is recorded here so it cannot be
-presented later as a finding. The public-proxy
-substitution cannot produce a positive classification; reaching one requires a
-later rules version that adds an evidence source able to measure G0, G1, G5,
-and G6.2 as originally defined.
+Rules 3 and 4 cannot be satisfied in this domain under v1 in either case,
+because G0, G1.1, G1.2, G5, and G6.2 are `NOT_MEASURABLE_IN_DOMAIN`. Reaching
+a positive classification requires a later rules version that adds an evidence
+source able to measure them as originally defined.
+
+**Expectation recorded before inspection.** Without such an amendment:
+UNADJUDICATED. With it: most likely INSUFFICIENT INFORMATION, because the
+supply bound covers the whole frame (section 6.4) and needs the R3 certificate
+(section 7.4); NOT FEASIBLE is reachable only if the frame is small and fully
+enumerated. These expectations are recorded so they cannot be presented later
+as findings. Whether to adopt the R4 amendment is a maintainer decision; it is
+not made here.
 
 ### 7.4 Method-independent necessary cluster count (supply route)
 
@@ -411,9 +447,13 @@ yet validity-checked; a finding's confirmation is pending; or any reviewer
 status depends on the evidence, not on whether a reviewer has noticed it.
 Assign exactly one state by the first matching step:
 
-1. `ROUTE_BLOCKED` if any recorded result violates the gate metric (a
-   confirmed false-established property, an accepted unauthorized bypass, or a
-   failed behavioral comparison), whatever the state of other items.
+1. `ROUTE_BLOCKED` if any **confirmed, validity-checked** result violates the
+   gate metric (a confirmed false-established property, an accepted
+   unauthorized bypass, or a failed behavioral comparison from a
+   validity-checked instrument), whatever the state of other items. A recorded
+   violation that is invalid, indeterminate, disputed, not validity-checked, or
+   pending confirmation does not match this step; it makes its item
+   unresolved (step 2).
 2. `ROUTE_UNRESOLVED` if any item is unresolved.
 3. `ROUTE_MISSING` if any item is absent.
 4. `ROUTE_ESTABLISHED` if every item is present, complete, validity-checked,

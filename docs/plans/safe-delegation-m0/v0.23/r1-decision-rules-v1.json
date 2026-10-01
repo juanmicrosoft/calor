@@ -279,15 +279,6 @@
       "when": "otherwise; name smallest information request, owner, deadline"
     }
   ],
-  "public_proxy_reachable": [
-    "NOT FEASIBLE",
-    "INSUFFICIENT INFORMATION",
-    "UNADJUDICATED"
-  ],
-  "public_proxy_unreachable": [
-    "FEASIBLE AS PROPOSED",
-    "REQUIRES SEPARATE APPROVAL"
-  ],
   "missing_heldout_after_acceptance": "adversarial imputation (subject: not correct + escape; comparator: correct + no escape); > 5% of accepted slots in any arm makes the epoch INVALID",
   "post_inspection_amendment": "compute under prior and new versions; if they differ, INSUFFICIENT INFORMATION",
   "immutable": [
@@ -299,7 +290,7 @@
     "registered design alternatives after inspection"
   ],
   "route_state_precedence": [
-    "ROUTE_BLOCKED",
+    "ROUTE_BLOCKED (confirmed, validity-checked violation only)",
     "ROUTE_UNRESOLVED",
     "ROUTE_MISSING",
     "ROUTE_ESTABLISHED",
@@ -318,13 +309,24 @@
     "eligibility": {
       "E1": "PR merged in window; linked issues, reverts, backports join its cluster",
       "E2": "changes >= 1 non-test .cs file with non-whitespace diff; test path regex (^|/)(test|tests|[^/]*\\.tests?)(/|$) case-insensitive",
-      "E3": "changes >= 1 file in a test path",
+      "E3": "confirmed true if the change modifies >= 1 .cs file in a test path; confirmed false only if the repo at the pinned pre-change revision has no .cs file in any test path; otherwise unresolved",
       "E4": "author account type User (not Bot)",
       "E5": ">= 1 changed non-test .cs file outside obj/, bin/, *Generated* paths with non-whitespace change",
       "E6": "R3 domain-cell rule, frozen before R2B' inspection",
       "unevaluable": "unresolved; never counted eligible or ineligible"
     },
-    "prior_familiarity": "bench/corpus submodules; repos whose URL appears in bench/, benchmarks/, tests/, docs/, .gitmodules at the R1 merge commit; maintainer declarations before extraction. Excluded from frame, draw, pool; counts reported separately and added to H_high"
+    "prior_familiarity": "bench/corpus submodules; repos whose URL appears in bench/, benchmarks/, tests/, docs/, .gitmodules at the R1 merge commit; dated pre-extraction declarations by the maintainer and by the R2B' proposer agent (including session-only exposure). Excluded from frame, draw, pool; counts reported separately and added to H_high"
   },
-  "expected_v1_outcome_note": "Most likely INSUFFICIENT INFORMATION; recorded before inspection (section 7.3)"
+  "expected_v1_outcome_note": "UNADJUDICATED under amendment 001 as written; most likely INSUFFICIENT INFORMATION if R4's closure criterion is amended (section 7.3)",
+  "reachability": {
+    "under_amendment_001_as_written": "R4 expected UNAVAILABLE (required inputs for G0, G1, G5, G6.2 always missing) -> UNADJUDICATED",
+    "only_if_R0_amendment_lets_R4_be_MET_with_recorded_missing_components": [
+      "NOT FEASIBLE",
+      "INSUFFICIENT INFORMATION"
+    ],
+    "never_under_v1": [
+      "FEASIBLE AS PROPOSED",
+      "REQUIRES SEPARATE APPROVAL"
+    ]
+  }
 }

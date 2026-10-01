@@ -147,8 +147,10 @@ authoritative dependency the reviewer is told to read or that the CLI loads as
 instructions:
 
 - `AGENTS.md` and `CLAUDE.md` (repository instructions);
-- `r0-authorization.md`, `amendment-001-public-proxy.md`,
-  `review-protocol.md`, and `gate-state.json` (R0 records);
+- `r0-authorization.md`, `amendment-001-public-proxy.md`, and
+  `review-protocol.md` (R0 records);
+- `r1/snapshots/gate-state-at-review.json`, an immutable copy of
+  `gate-state.json` as reviewed (see "Live gate state" below);
 - `docs/plans/roadmap-v0.20-reference-draft-v3.md`, `docs/plans/roadmap-v0.20.md`;
 - `docs/plans/safe-delegation-m0/{authorization,decision,mechanism-and-resources,predecessor-status,supply-status}.md`;
 - `r1/snapshots/issue-{1278,1370,1372}.txt` (dated snapshots of the
@@ -158,6 +160,19 @@ instructions:
 The R0 records are bound like every other dependency. If R0 (PR #1467) is
 merged with content that differs from the bound hashes, the binding check in
 section 7 fails, and R1 needs another review round or is not `MET`.
+
+**Live gate state.** `gate-state.json` is a live state file that later gates
+must update, so it is not hash-bound. Instead, at merge and at every later
+revalidation, the live file is compared with the bound snapshot
+`r1/snapshots/gate-state-at-review.json`. The only permitted differences are
+(a) the `value`, `effective`, and `record` fields of gate entries, and R5's
+classification, label, and action fields, changed by a merged record under
+the R0 transition rules; and (b) entries appended to `history`. Any other
+difference (authority, amendments, graph, prerequisites, limits, boundary
+flags, process states, classifications, or definitions) is a change to
+reviewed authority: R1 needs another review round or is not `MET`. The R1
+entry's `null -> MET` transition is an authorized transition of type (a) and is
+allowed only when section 7 items 1-5 hold.
 
 ### 5.2 Scope of review
 
@@ -222,9 +237,10 @@ R1 is `MET (AI-adjudicated)` only when all of the following are recorded:
    the change or R1 is not `MET`.
 4. The maintainer's merge of that PR.
 5. No unresolved maintainer overrule under section 6.
-6. R0 is `MET` in the merged [gate-state.json](gate-state.json), and the PR
-   (or a follow-up PR) sets the R1 entry there to `MET` only after items 1-5
-   hold. Until then the R1 value stays `null`.
+6. R0 is `MET` in the merged [gate-state.json](gate-state.json); the live file
+   differs from `r1/snapshots/gate-state-at-review.json` only as section 5.1
+   ("Live gate state") permits; and the R1 entry is set to `MET` (in this PR
+   or a follow-up PR) only after items 1-5 hold. Until then it stays `null`.
 
 Residual trust that remains after these checks: the maintainer (who has a
 conflict, section 4) performs the verification, and the capture operator could
