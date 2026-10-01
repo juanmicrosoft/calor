@@ -62,7 +62,7 @@ maintainer:
    third-party data was accessed and a notice is legally required, the
    maintainer may send that notice.
 
-Each such message is logged in the disposition log (Section 12). Neither
+Each such message is logged in the disposition log (Section 13). Neither
 exception authorizes any other contact.
 
 ## 4. Permitted work
@@ -83,7 +83,7 @@ Everything else is outside this authority, including everything in Section 9.
 | Cap | Value | Measurement |
 |---|---|---|
 | Cash | **USD 200.00 hard ceiling** across all 0.23 gates. The maintainer stated "approximately USD 200"; this record fixes it as a ceiling. | Marginal billed AI API/tool spend, recorded per invocation in [spend-ledger.md](spend-ledger.md). Existing subscriptions (Claude Code, the ChatGPT plan used by Codex CLI, GitHub Copilot) are excluded from the cash figure; their token use is still logged. |
-| Review rounds | **5** adversarial review rounds per artifact | Counted per [review-protocol.md](review-protocol.md) |
+| Review rounds | **5** adversarial review rounds per artifact, counting every reviewer (Codex and Copilot share the allowance) | Counted per [review-protocol.md](review-protocol.md) |
 | Inquiry deadline | **2026-10-29, 23:59 UTC** | All substantive gate work must finish by then |
 | Person-hours | **No person-hour cap was set by the maintainer.** Maintainer hours are not metered, as in 0.20. AI agent time is bounded only by the cash cap, the round cap, and the deadline. | Recorded as an open item; a person-hour cap requires an R0 amendment |
 | Compensation | **USD 0** to any person | Section 8 |
@@ -113,9 +113,9 @@ control, and retention rules must be merged by the maintainer **before** that
 access. Without such an amendment, any attempt to access non-public data is a
 boundary violation handled by Section 7.
 
-Committed records contain metadata, identifiers of public objects (repository,
-issue or PR number, commit SHA), and aggregates. They do not copy source code
-or issue/PR text beyond what is needed to cite a public object.
+Committed records contain repository-level metadata, provenance digests, and
+aggregates (7.1). They do not copy source code or issue/PR text, and they do
+not cite individual PRs, issues, or commits next to an analysis decision.
 
 ## 7. Privacy, retention, deletion, revocation, and notification
 
@@ -130,15 +130,22 @@ inquiry does not need individual identity, so:
 
 - Committed artifacts must not contain contributor usernames, display names,
   or email addresses. Emails are never extracted.
-- Per-item provenance uses public object identifiers (repository, PR or issue
-  number, commit SHA). These identifiers are public pointers and can be
-  resolved to an author by anyone; this residual linkability is accepted as
-  the cost of provenance and is not further reduced.
+- Committed artifacts must not contain per-item identifiers that associate an
+  individual public object (a specific PR, issue, or commit) with an
+  eligibility decision, an exclusion, or a contributor cluster. A PR number or
+  commit SHA resolves to its author by direct lookup, so publishing it next to
+  a decision would identify the individual.
+- Provenance is carried instead by: the repository name and the pinned
+  repository revision (one snapshot SHA per repository, identifying a
+  repository state, not a contributor decision); the extraction window; the
+  pinned extractor code and eligibility rules; and a SHA-256 digest of the
+  full per-item decision list. Anyone can reproduce the list by re-running the
+  pinned extractor over the pinned revisions and compare its digest. The list
+  itself is never committed and is deleted with local caches (7.3).
 - Where an analysis needs author or reviewer clustering, it uses per-run
   ordinal pseudonyms (`author-001`, ...) assigned in memory. The mapping from
   pseudonym to username is never written to the repository or to persistent
-  storage, and is discarded when the run ends. Reproduction re-derives it by
-  re-running the pinned extractor over the same public revisions.
+  storage, and is discarded when the run ends.
 - Published aggregates report no statistic computed over fewer than **5**
   distinct contributors; such cells are merged or suppressed and the
   suppression is stated.
@@ -147,35 +154,46 @@ inquiry does not need individual identity, so:
 
 | Category | Expected content | Retained | Deletion trigger |
 |---|---|---|---|
-| Contact data | None (no contacts). Inbound exclusion requests only. | Request date, repository, disposition; no personal details beyond the requester's public handle in the public issue/PR where they asked | Not deleted (governance record) unless the requester asks; then reduced to date and repository |
+| Contact data | None (no contacts). Inbound exclusion requests only. | Request date and repository only; no handle, name, or message text | Not applicable (nothing personal retained) |
 | Restricted metadata | None permitted | Nothing | Immediate on discovery (7.3) |
-| Local caches (clones, API responses, scratch extracts) | Public data | Only while a gate is active | Any trigger in 7.3 |
-| Committed per-item derived records | Public object identifiers, eligibility decisions | As part of the public record | Repository exclusion request, license change that forbids the use, or discovery of personal/non-public data in the record |
+| Local caches (clones, API responses, scratch extracts, per-item decision lists) | Public data | Only while the gate that created them is active | Gate closure or any trigger in 7.3 |
+| Committed provenance records | Repository names, pinned revisions, extractor and rule versions, per-item list digests | As part of the public record | Repository exclusion request, license change that forbids the use, or discovery of personal/non-public data in the record |
 | Committed derived aggregates | Counts and estimates | Permanently, as the public record | Only if computed from data later found to be non-public or withdrawn; then marked invalid and recomputed or removed |
-| Logs | Review transcripts, spend ledger, disposition log | Permanently, as governance records | Not deleted; corrected by appended entries |
+| Logs | Review transcripts, spend ledger, disposition log | Permanently, as governance records, **except** that personal, non-public, or confidential content found in a log is removed (7.4); the log keeps a sanitized entry | Discovery of such content |
 | Consent records | None (no participants). Repository licenses are recorded in their place. | License identifier and revision per source | Not applicable |
 | Pseudonym maps | In memory only | Never persisted | End of each run |
 
 ### 7.3 Triggers and deadlines
 
+All deadlines below are for **completed and verified** removal (7.6), not for
+opening a pull request.
+
 | Trigger | Action | Deadline |
 |---|---|---|
-| Inquiry deadline passes or R0 becomes `EXPIRED` | Stop substantive work; delete local caches | Stop immediately; delete within 7 days |
-| R0 becomes `REVOKED` | Same as expiry, plus Section 10 propagation | Stop immediately; delete within 7 days |
-| Milestone close (#1370 closed) | Delete local caches; committed public record stays | Within 7 days |
-| Repository owner or contributor asks for exclusion | Exclude the repository from all further analysis; remove its per-item records by PR; mark affected aggregates invalid and recompute or remove | Stop use immediately; PR within 7 days; reply (Section 3) within 7 days |
+| A gate closes with any value | Delete that gate's local caches | Within 7 days of closure |
+| Inquiry deadline passes or R0 becomes `EXPIRED` | Stop substantive work; Section 10 propagation; delete local caches | Stop immediately; deletion completed within 7 days |
+| R0 becomes `REVOKED` | Same as expiry | Same as expiry |
+| Milestone close (#1370 closed) | Delete any remaining local caches; committed public record stays | Within 7 days |
+| Repository owner or contributor asks for exclusion | Exclude the repository from all further analysis; remove its provenance rows; Section 10 invalidation of affected outputs | Stop use immediately; removal merged within 7 days; reply (Section 3) within 7 days |
 | A source's license or terms stop permitting the use | Same as exclusion | Same as exclusion |
-| Non-public, restricted, or personal data is found in any cache or record | Stop the run; delete local copies; remove from the working tree by PR | Stop immediately; delete within 24 hours; PR within 24 hours |
-| Refusal (`NOT_AUTHORIZED`) of any gate | No access occurred under that gate; delete any preparatory caches | Within 7 days |
+| Non-public, restricted, personal, or confidential data is found in any cache, record, or log | Stop the run; delete local copies; remove from the repository, including history (7.4) | Stop immediately; local deletion and working-tree removal merged within 24 hours; history handling per 7.4 |
+| A gate is refused (`NOT_AUTHORIZED`) or authority is withdrawn | Inventory every access actually made under that gate (date, source, material) in the disposition log; delete its caches | Inventory within 3 days; deletion within 7 days |
 
 ### 7.4 Retention exceptions and isolation
 
-- **Git history.** Material merged into this public repository remains in git
-  history after a removal PR. History is not rewritten by default. Retained
-  material is isolated by (a) a disposition-log entry naming the commit SHA,
-  path, and reason, and (b) a rule that no later analysis may read it as
-  input. Within 7 days the maintainer decides whether a history purge is
-  required and records that decision.
+- **Sensitive material overrides audit retention.** If personal, non-public,
+  or confidential material reached this public repository's history, the
+  maintainer rewrites the affected history (or, where a rewrite is
+  impossible, requests removal from the hosting service, including cached
+  views and forks it controls) and completes it within 14 days of discovery.
+  The disposition log records a sanitized entry: date, path, commit SHA of the
+  removal, and the category of material, never the material itself.
+- **Public-data history.** Public, non-sensitive material removed for any
+  other reason (for example an exclusion request) remains in git history. It
+  is isolated by a disposition-log entry naming the commit SHA, path, and
+  reason, and by the rule that no later analysis may read it as input. It is
+  disposed of only if the requester or a law requires; then the sensitive
+  rule above applies.
 - **Governance records.** Gate records, review transcripts, the spend ledger,
   and the disposition log are retained as the audit trail. Invalidated or
   expired evidence inside them may be retained only for audit and may not be
@@ -197,11 +215,13 @@ inquiry does not need individual identity, so:
 ### 7.6 Evidence of disposition
 
 Every deletion, revocation, isolation, or notification is evidenced by an
-appended entry in Section 12 giving: date, trigger, material, action taken,
+appended entry in Section 13 giving: date, trigger, material, action taken,
 the command or PR/commit SHA that performed it, and a verification (for local
 deletion, the command and its output showing the path no longer exists; for
-notices, a link to the public comment or a dated note that a private notice
-was sent).
+history removal, the removal commit or the hosting service's confirmation;
+for notices, a link to the public comment or a dated note that a private
+notice was sent). Entries are sanitized: they never reproduce the removed
+material.
 
 ## 8. Confidentiality, compensation, and conflicts
 
@@ -238,44 +258,96 @@ started, or performed:
 Even a later `FEASIBLE AS PROPOSED` does not activate implementation, spending,
 or recruitment.
 
-**Machine check.** [gate-state.json](gate-state.json) records these
-prohibitions as boundary flags that must all be `false`, together with every
-gate value. `tests/Calor.Compiler.Tests/Plans/SafeDelegationV023BoundaryTests.cs`
-fails if:
+**Machine check.** [gate-state.json](gate-state.json) is the **only
+authoritative record** of gate values, boundary flags, and the R5
+classification. A Markdown statement that contradicts it has no effect.
+`tests/Calor.Compiler.Tests/Plans/SafeDelegationV023BoundaryTests.cs` fails
+if:
 
-- any boundary flag is not `false`;
+- any boundary flag is missing or not `false`, or an unknown flag is not
+  `false`;
+- the gate set differs from the fixed amended graph (R0, R1, R2A′, R3, R2B′,
+  R4, R5), or any gate's prerequisite list differs from that graph (the
+  test holds its own copy, so editing the JSON cannot loosen it);
 - any gate value is outside the #1370 process-state vocabulary;
 - any gate is `MET` while a prerequisite is not `MET`;
 - the original-gate history values (R1, R2A, R3, R2B, R4 as filed) are
   removed or changed;
-- an R5 scientific classification lacks the label
-  "AI-adjudicated, public-proxy domain", or a Markdown record under
-  `v0.23/` declares such a classification without that label;
-- a Markdown record under `v0.23/` declares participant enrollment, task
-  execution, paid collection, or acceptance-service implementation as
-  authorized, started, or performed;
+- R5 holds a formal classification without the label
+  "AI-adjudicated, public-proxy domain", or R5 is `MET` without both a
+  formal classification and a separate maintainer action;
+- the cash cap exceeds USD 200 or the round cap exceeds 5;
 - a review file is misnamed or exceeds round 5.
 
-## 10. Expiry, revocation, and revalidation
+It also scans Markdown under `v0.23/` (outside correctly named review
+transcripts, which quote reviewer output verbatim) for two declaration forms,
+joining wrapped lines within a paragraph:
 
-Each gate revalidates this authority, the deadline, and the cash cap before it
-starts, before each data access, and immediately before closure (#1370
-lifecycle amendment).
+- a classification declaration (`classification:` or a table cell) naming one
+  of the four formal classifications without the required label;
+- a prohibited activity (participant enrollment or recruitment, task
+  execution, paid collection, acceptance-service implementation) followed by
+  a colon or table cell and a state word such as `authorized` or `started`,
+  or followed by `is`/`was`/`has been` and such a word, unless a negation
+  (`no`, `not`, `never`, `without`, `prohibit`) precedes it in the sentence.
 
-- **Expiry.** If 2026-10-29 23:59 UTC passes before every gate R1-R4 is
-  dispositioned, R0 becomes `EXPIRED`. In-progress gates become `INVALIDATED`;
-  later gates become `NOT_REACHED`. R5 still runs, but only to record the
-  closeout and preserve `UNADJUDICATED` with a dated reason; it may not access
-  new evidence.
-- **Revocation.** If the maintainer withdraws this authority, the current R0
-  value changes from `MET` to `REVOKED` with a timestamp in
-  [gate-state.json](gate-state.json) and Section 11. Section 7 rules execute.
-  Every dependent gate, including any already closed as `MET`, becomes
-  `INVALIDATED`; later gates become `NOT_REACHED`. A historical `MET` entry
-  stays in the audit log below but is not the current value and unlocks
-  nothing.
-- **Renewal.** Extending or restoring authority requires a new versioned R0
-  amendment; it does not silently revalidate invalidated outputs.
+**Limits of the machine check.** Prose scanning is heuristic. A sufficiently
+rephrased sentence can evade it, and it cannot judge the truth of a record.
+Its purpose is to catch accidental declarations; the authoritative state is
+the validated JSON, and the adversarial review protocol remains the control
+for meaning.
+
+## 10. Expiry, revocation, revalidation, and invalidation
+
+**Revalidation.** Before a gate starts, before each data access, and
+immediately before closure, the acting agent checks and records in the gate
+record that: R0 is `MET` and neither expired nor revoked; every prerequisite
+gate in the amended graph is currently `MET` in
+[gate-state.json](gate-state.json); the deadline has not passed; and the
+cumulative spend is under the cap. Any failed check stops the work.
+
+**End of authority.** R0 authority ends at the earlier of (a) 2026-10-29
+23:59 UTC and (b) the close of #1370.
+
+- If #1370 closes first, the inquiry is complete. R0 keeps its `MET` value as
+  a completed authorization and Section 7 milestone-close rules apply.
+- If the deadline arrives while **any** of R1-R5 is still undispositioned,
+  R0 becomes `EXPIRED`. Its affected descendants are reclassified under the
+  invalidation rule below, **including gates already closed as `MET`**. R5
+  still runs, only to record the closeout and preserve `UNADJUDICATED` with a
+  dated reason; it accesses no new evidence.
+
+**Revocation.** If the maintainer withdraws this authority, the current R0
+value changes from `MET` to `REVOKED` with a timestamp in
+[gate-state.json](gate-state.json) and Section 13. Section 7 rules execute and
+the invalidation rule below applies.
+
+**Prerequisite withdrawal below R0.** The same invalidation rule applies when
+any gate's own authority or input is withdrawn after it is `MET`. For R2A′
+this includes a source exclusion request or a license/terms change that
+removes a source from a pool already used downstream: R2A′ stays `MET` only if
+the amended pool still satisfies its record (otherwise it becomes
+`INVALIDATED`), and every output computed over the removed source (R2B′, R4,
+R5) becomes `INVALIDATED`.
+
+**Invalidation rule (#1370 lifecycle amendments).**
+
+1. Stop substantive work in every affected gate immediately.
+2. Each affected gate that started or finished becomes `INVALIDATED`; each
+   affected gate that never started becomes `NOT_REACHED`. A historical `MET`
+   stays in that gate's audit log but is not the current value and unlocks
+   nothing.
+3. Each invalidation entry records: time (UTC), cause (gate and value or
+   withdrawn input), affected output path and commit SHA, work performed, and
+   disposition of partial evidence under Section 7.
+4. Invalidated outputs may not be reused. A rerun requires a new versioned
+   authorization merged by the maintainer before the deadline.
+5. R5 discloses every expiry, revocation, withdrawal, invalidated output, and
+   deletion or retention action, and whether the final status therefore
+   remains `UNADJUDICATED`.
+
+**Renewal.** Extending or restoring authority requires a new versioned R0
+amendment. It does not revalidate invalidated outputs.
 
 ## 11. Interpretation limits
 
@@ -288,7 +360,28 @@ lifecycle amendment).
   [../decision.md](../decision.md) for the original organizational domain,
   which stays **UNADJUDICATED**.
 
-## 12. Audit log
+## 12. Requirement coverage
+
+| Source requirement | Where satisfied |
+|---|---|
+| #1371: name decision and budget authority | Sections 1, 2 |
+| #1371: permitted contacts and who may make them | Section 3 |
+| #1371: planning-hours cap, cash/compensation cap, inquiry deadline | Section 5 (no person-hour cap was set; recorded as such) |
+| #1371: privacy-safe metadata access and approved restricted storage | Section 6 (none approved; amendment required first) |
+| #1371: confidentiality, compensation, conflict, withdrawal, deletion rules | Sections 7, 8 |
+| #1371: prohibitions | Section 9 |
+| #1371 AC 3: machine-checkable boundary | Section 9, `SafeDelegationV023BoundaryTests` |
+| #1371 AC 4: gate value and evidence link on #1370 | Pending: posted by the maintainer after merge |
+| #1371 privacy amendment: retention vs deletion triggers by category | 7.2, 7.3 |
+| #1371 privacy amendment: deletion/revocation deadlines | 7.3, 7.4 |
+| #1371 privacy amendment: who notifies whom, by when | 7.5 |
+| #1371 privacy amendment: retention exceptions and isolation | 7.4 |
+| #1371 privacy amendment: evidence of deletion/revocation/notification | 7.6, Section 13 |
+| #1371 privacy amendment: `MET` to `REVOKED` and propagation | Section 10 |
+| #1370 lifecycle amendments: revalidation, `INVALIDATED`, `NOT_REACHED`, R5 disclosure | Section 10 |
+| #1371 interpretation: no universal-nonexistence claim | Section 11 |
+
+## 13. Audit log
 
 ### Gate value history
 

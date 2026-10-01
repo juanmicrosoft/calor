@@ -43,7 +43,7 @@ R5 (#1377) records this in its closeout.
 | Gate | Amended definition |
 |---|---|
 | R1 | Methods governance by cross-family AI adversarial review under [review-protocol.md](review-protocol.md), replacing the independent human reviewer |
-| R2A′ | Public-proxy authority: public .NET open-source repositories as the task source; their licenses and the hosting service's published terms replace a signed organizational agreement |
+| R2A′ | Public-proxy authority: public .NET open-source repositories as the task source; their licenses and the hosting service's published terms replace a signed organizational agreement. Authority only; no repository selection |
 | R3 | Paper three-arm boundary produced and frozen with AI adversarial review |
 | R2B′ | Task supply measured from public repository history; reviewer capacity measured as AI-review compute, rounds, and spend rather than human hours |
 | R4 | Joint sizing over the amended inputs, with AI adversarial review |
@@ -77,8 +77,11 @@ Every amended gate shares these conditions:
 - **Merge.** The gate value takes effect only when @juanmicrosoft merges the
   record and its [gate-state.json](gate-state.json) update.
 - **Labels.** No record describes AI review as independent or human review.
-- **Expiry.** `EXPIRED` if R0 expires or is revoked before the gate is
-  dispositioned (`INVALIDATED` if work had started).
+- **Expiry and withdrawal.** R0 Section 10 governs: when R0 expires or is
+  revoked, or a prerequisite's authority or input is withdrawn, every
+  affected gate that started or finished (including one already `MET`)
+  becomes `INVALIDATED` and every unstarted descendant becomes
+  `NOT_REACHED`.
 
 ### R1: AI methods governance
 
@@ -87,21 +90,27 @@ Every amended gate shares these conditions:
   completion, safety, trust, usable adoption, handoff), alpha and error
   control, positive-branch logic, missingness and invalid-epoch rules,
   amendment control, the four classifications, and the public-record format.
-  It also covers the objective source-selection and eligibility rules used by
-  R2A′, R3, and R2B′.
+  It also freezes the objective source-selection rules (the candidate frame
+  of public .NET repositories and how repositories are drawn from it) and the
+  eligibility rules that R2B′ later applies. It states how repositories
+  already used in Calor development (for example the `bench/corpus/`
+  submodules MediatR, Serilog, and FluentValidation, and any repository the
+  maintainer or proposer has studied for Calor) are excluded or reported
+  separately, and it records that prior familiarity.
 - `UNAVAILABLE`: Blocking objections remain after 5 rounds, or no
   cross-family reviewer can be run before the deadline.
 - `NOT_REACHED`: R0 is not `MET`.
 
 ### R2A′: public-proxy authority
 
-- `MET`: A versioned record clears the protocol. It defines the public .NET
-  source pool by objective criteria fixed **without inspecting task counts**
-  (for example language, license, public visibility, and activity window).
-  It records each source's license (SPDX identifier and revision) and the
-  hosting terms that permit the analysis, the public-only boundary, and
-  exclusion handling per R0 Section 7. It asserts no organizational
-  commitment, adopter interest, or participant consent.
+- `MET`: A versioned record clears the protocol. It establishes **authority
+  only**: which license classes (SPDX identifiers) and which published
+  hosting-service terms permit the planned analysis of public repositories,
+  the public-only boundary, and exclusion handling per R0 Section 7. It does
+  **not** select, enumerate, or inspect repositories; pool selection happens
+  only in R2B′ under the frozen R1 selection rules, and each selected
+  source's license is recorded there with its revision. It asserts no
+  organizational commitment, adopter interest, or participant consent.
 - `UNAVAILABLE`: No public source with permitting license and terms can be
   identified, or blocking objections remain after 5 rounds.
 - `NOT_AUTHORIZED`: The maintainer declines the public-proxy source.
@@ -121,9 +130,12 @@ Every amended gate shares these conditions:
 ### R2B′: public supply and AI review capacity
 
 - `MET`: A provenance-bearing inventory from public history clears the
-  protocol. It applies the frozen R1 and R3 rules to the R2A′ pool and gives
-  the extraction window, source revisions or hashes, eligibility decisions,
-  exclusions, clustering, duplication, and missingness. It reports historical
+  protocol. It draws repositories from the frozen R1 candidate frame within
+  the R2A′ license and terms authority, records each selected source's
+  license and pinned revision, and applies the frozen R1 and R3 eligibility
+  rules. It gives the extraction window, revisions, aggregate eligibility
+  decisions, exclusions, clustering, duplication, and missingness, with
+  per-item provenance carried by digest as R0 Section 7.1 requires. It reports historical
   supply and any forward projection separately; a forward projection is
   labeled a projection from public activity, not a workload commitment. It
   gives AI-review capacity in rounds, tokens, and USD under the cap. Its
@@ -178,14 +190,20 @@ Any classification produced under this amendment:
 The maintainer, who authors Calor, chooses the proxy and adjudicates the
 result. To limit selection that favors Calor:
 
-- The R2A′ pool criteria and the R1/R3 eligibility rules are frozen and
-  merged before any R2B′ count is inspected. Changing them afterwards needs a
-  new amendment version and a disposition of every affected count.
+- Selection and eligibility rules are frozen in R1 (and R3 for the domain)
+  and merged before any repository is drawn or counted. R2A′ establishes
+  license and terms authority only and selects nothing. Changing the rules
+  afterwards needs a new amendment version and a disposition of every
+  affected count.
+- Prior familiarity is declared: repositories already used in Calor
+  development, or studied by the maintainer or proposer for Calor, are
+  excluded or reported as a separate stratum under the R1 rule.
 - Repositories are not added or dropped after counting except under R0
   Section 7 (exclusion request, license change, non-public data).
 - Domain cells that Calor does not support are excluded symmetrically from
-  all three arms, and the exclusion count is reported, so that unsupported
-  shapes cannot be dropped only from the Calor arm (R3).
+  all three arms (R3). R2B′ reports the excluded share of the eligible frame
+  (items and repositories), so a domain narrowed to Calor-supported shapes is
+  visible. Any R5 statement is limited to the included cells.
 - Every review round instructs the reviewer to look specifically for bias in
   favor of Calor (protocol).
 

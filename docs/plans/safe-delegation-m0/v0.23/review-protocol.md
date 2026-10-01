@@ -28,7 +28,8 @@ docs/plans/safe-delegation-m0/v0.23/
 - `<gate>` is the gate ID with any prime written as `-prime`: `R0`, `R1`,
   `R2A-prime`, `R3`, `R2B-prime`, `R4`, `R5`. Other reviewable 0.23 artifacts
   use a short kebab-case name.
-- `<N>` is 1-5. A sixth round is never run.
+- `<N>` is 1-5, counted across all reviewers (see Round accounting). A sixth
+  round is never run.
 - `<reviewer>` is lowercase kebab-case: `codex` or `copilot`.
 
 The boundary test checks the file names and the round limit; the gate
@@ -95,11 +96,19 @@ The maintainer may not override an unresolved BLOCKING objection to reach
 
 ## Supplementary Copilot review
 
-Copilot comments on a gate PR are dispositioned in the PR conversation. A
-gate record that relies on them summarizes them in a
-`round-<N>-copilot.md` file. They do not replace a Codex round and do not
-count toward the Codex 5-round limit; Copilot rounds have their own 5-round
-limit per artifact.
+Copilot comments on a gate PR are dispositioned in the PR conversation and
+summarized in `round-<N>-copilot.md`, where `<N>` is the round whose artifact
+version Copilot reviewed. They never replace a Codex round.
+
+## Round accounting
+
+The R0 limit is **5 adversarial review rounds per artifact, counting every
+reviewer**. A round is one submitted artifact version (one commit SHA). Codex
+and Copilot reviewing the same version are one round. Any additional version
+submitted to any reviewer, including a Copilot review of an intermediate push,
+consumes a new round. The proposer therefore requests Copilot review only on a
+round's commit, and pushes intermediate fixes only when the next round
+begins.
 
 ## Spend
 
