@@ -27,8 +27,9 @@ amendment closes that gap. It invents no other value.
 This rule extends the closure criteria of amendment 001 Section 5 for R1,
 R2A′, R3, R2B′, and R4. It replaces none of them.
 
-At an early close-out, each gate whose value is still open (`null`) closes
-as follows:
+At an early close-out, each gate whose value is still open (`null`) and
+that has no conforming record already cleared by the protocol closes as
+follows:
 
 1. If any prerequisite in the amended graph is not `MET`, it closes
    `NOT_REACHED` (unchanged #1370 propagation rule).
@@ -37,7 +38,13 @@ as follows:
    closes `UNAVAILABLE` with the reason "no conforming record was obtained
    before the maintainer's early close-out on <date>". The record states the
    rounds used and the rounds left.
-3. A gate that already holds a value keeps it.
+
+A gate that already holds a value, or that closes under one of amendment
+001's own triggers, keeps that value; this rule does not apply to it.
+The rule also does not cover an open gate whose conforming record has cleared
+the protocol but is not yet merged. That gate keeps the ordinary rule: it is
+`MET` only if the maintainer merges it (amendment 001 Section 5). On
+2026-10-01 no open gate was in that state, so the case does not arise here.
 
 `UNAVAILABLE` under item 2 is a process result. It says nothing about
 whether a conforming record could have been obtained with the rounds and
@@ -47,17 +54,23 @@ time that were left.
 
 | Gate | Value before | Rule | Value after |
 |---|---|---|---|
-| R1 | `UNAVAILABLE` (round cap reached; amendment 001 trigger) | Item 3 | `UNAVAILABLE` |
+| R1 | open | Not this rule: amendment 001's own trigger applies (BLOCKING objections remain after 5 rounds) | `UNAVAILABLE` |
 | R2A′ | open | Item 2: the submitted record selects and counts repositories, which amendment 001 excludes from R2A′; 2 of 5 rounds used, 3 left | `UNAVAILABLE` |
 | R3, R2B′, R4 | open | Item 1 | `NOT_REACHED` |
 | R5 | open | Not covered by Section 2; R5 follows amendment 001 Section 5 and R0 Section 10 (`UNAVAILABLE` or `EXPIRED`) | `UNAVAILABLE` |
 
 ## 4. Evidence affected
 
-None. No gate used the R2A′ repository snapshot or any R1 rule as input. No
-count, sizing, or classification exists to disposition. The R2A′ snapshot
-and the R1 draft rules stay on file as non-binding material, as the R5
-record states.
+No gate used the R2A′ repository snapshot or any R1 rule as input. No
+downstream supply estimate, sizing, or classification exists.
+
+The R2A′ enumeration counts do exist: 1,387 candidates, 131 walked, 24
+eligible, and per-criterion failure and activity counts
+([r2a-prime-public-proxy.md](r2a-prime-public-proxy.md) Section 4 and
+[r2a-prime-repos.json](r2a-prime-repos.json)). They are retained as
+historical, non-binding material and are excluded from the evidence of every
+0.23 gate. The R1 draft rules are retained on the same terms. The R5 record
+states how a future milestone may reuse either.
 
 ## 5. What this amendment does not change
 

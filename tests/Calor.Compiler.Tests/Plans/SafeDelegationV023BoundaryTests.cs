@@ -307,14 +307,29 @@ public sealed class SafeDelegationV023BoundaryTests
     }
 
     [Fact]
-    public void Validator_AcceptsInvalidatedR5AfterLaterRevocation()
+    public void Validator_AllowsInvalidatedAsR5Value()
     {
+        var json = Mutate(root => Gate(root, "R5")["value"] = "INVALIDATED");
+        Assert.DoesNotContain(ValidateGateState(json), v => v.StartsWith("R5:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validator_AcceptsConformingRevocationAfterCloseout()
+    {
+        // R0 Section 10: R0 revoked after close-out; R1, R2A', and R5 had started or
+        // finished and become INVALIDATED with dated causes; R3, R2B', R4 never started
+        // and stay NOT_REACHED.
         var json = Mutate(root =>
         {
             Gate(root, "R0")["value"] = "REVOKED";
-            Gate(root, "R0")["reason"] = "authority withdrawn";
             Gate(root, "R0")["decided"] = "2026-10-15";
-            Gate(root, "R5")["value"] = "INVALIDATED";
+            Gate(root, "R0")["reason"] = "Maintainer withdrew R0 authority.";
+            foreach (var id in new[] { "R1", "R2A'", "R5" })
+            {
+                Gate(root, id)["value"] = "INVALIDATED";
+                Gate(root, id)["decided"] = "2026-10-15";
+                Gate(root, id)["reason"] = "R0 REVOKED 2026-10-15; outputs invalid; partial evidence retained for audit only.";
+            }
         });
         Assert.Empty(ValidateGateState(json));
     }

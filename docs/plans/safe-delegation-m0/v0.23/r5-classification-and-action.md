@@ -94,7 +94,7 @@ the rule that closes the gates still open at that time.
 R0 revalidation at close-out (2026-10-01): R0 is `MET` on merge of #1467;
 the inquiry deadline (2026-10-29) has not passed; no revocation, withdrawal,
 exclusion request, or license change is recorded; cash is USD 0.00 of 200.00
-and hours are 14.25 of 60 (agent) and 5.0 of 20 (maintainer) at the start of R5 review round 2, both
+and hours are 14.5 of 60 (agent) and 5.0 of 20 (maintainer) after R5 review round 2, both
 conservative estimates that include this close-out session
 ([spend-ledger.md](spend-ledger.md)). Every other gate in R5's prerequisite closure is not
 `MET`, which is why the administrative closeout applies.
@@ -132,8 +132,8 @@ authority; that rule only gates an R1 `MET`, which can no longer occur.
 | Review rounds, R1 | 5, plus a competence probe that is not an artifact round | 5 | `reviews/R1/` |
 | Review rounds, R2A′ | 2 | 5 | `reviews/R2A-prime/` |
 | Review rounds, R3, R2B′, R4 | 0 | 5 each | Not started |
-| Review rounds, R5 (this record) | See Section 13 | 5 | `reviews/R5/` |
-| Codex tokens (R0, R1, R2A′) | 1,529,716 (157,470 + 507,104 + 865,142) | Not capped | Ledger rows 1-4, 6-11, 13-14 |
+| Review rounds, R5 (this record) | 2 (Section 13) | 5 | `reviews/R5/` |
+| Codex tokens | 1,658,905 (R0 157,470 + R1 507,104 + R2A′ 865,142 + R5 129,189) | Not capped | Ledger rows 1-4, 6-11, 13-14, 16, 19 |
 | Agent session hours | See ledger "Cumulative" line | 60 | Ledger hours table (estimates) |
 | Maintainer hours | See ledger "Cumulative" line | 20 | Ledger hours table (estimates pending the maintainer's report) |
 | Inquiry deadline | Closed 2026-10-01 | 2026-10-29 | R0 Section 5 |
