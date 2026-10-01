@@ -422,6 +422,15 @@ amendment. It does not revalidate invalidated outputs.
 |---|---|---|---|
 | 2026-10-01 | `MET` (effective on merge) | @juanmicrosoft | This record and its merge commit |
 
+### Review status
+
+Four Codex rounds under [review-protocol.md](review-protocol.md):
+[1](reviews/R0/round-1-codex.md) (6 BLOCKING, 4 MAJOR),
+[2](reviews/R0/round-2-codex.md) (5 BLOCKING, 1 MAJOR),
+[3](reviews/R0/round-3-codex.md) (1 BLOCKING, 1 MAJOR),
+[4](reviews/R0/round-4-codex.md) (0 BLOCKING, 2 MAJOR). Every objection is
+dispositioned; no BLOCKING objection is unresolved.
+
 ### Retention and disposition log
 
 | Date | Trigger | Material | Action | Command / PR / SHA | Verification |
