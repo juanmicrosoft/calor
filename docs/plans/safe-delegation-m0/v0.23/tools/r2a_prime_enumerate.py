@@ -142,7 +142,7 @@ def evaluate(full_name, exposed):
     if sha:
         try:
             lic_at_sha = gh(["-X", "GET", f"repos/{full_name}/license", "-f", f"ref={sha}",
-                             "--jq", ".license.spdx_id // null"])
+                             "--jq", ".license.spdx_id // null | tojson"])
         except RuntimeError:
             lic_at_sha = None
     # Maintainer-association counts only (--jq / issueCount strip all items).
