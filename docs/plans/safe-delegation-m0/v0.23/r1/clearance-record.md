@@ -1,4 +1,4 @@
-# R1 round log and countersignature record
+# R1 round log and AI review clearance record
 
 This file is outside the hashed normative set (governance section 7).
 
@@ -15,6 +15,6 @@ This file is outside the hashed normative set (governance section 7).
 
 None recorded yet.
 
-## Countersignature
+## AI review clearance
 
 Not yet recorded.

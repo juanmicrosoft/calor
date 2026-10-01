@@ -9,7 +9,7 @@ merges the R0 branch at commit `b0c054377c9d414bb3702b8d57cb35f955cd523f`, so
 those records are present, read by the reviewer, and hash-bound (section 5.1).
 This file follows them for caps, deadlines, permitted access, and the review
 protocol, and adds the stricter provenance rules below. If the R0 records are
-not merged, or change after the countersigning round, R1 is not `MET`
+not merged, or change after the clearing round, R1 is not `MET`
 (section 7).
 
 **Rules governed:** [r1-decision-rules-v1.md](r1-decision-rules-v1.md).
@@ -35,8 +35,8 @@ review instead. Consequences, stated plainly:
 | Role | Holder | Function |
 |---|---|---|
 | Proposer | Claude (Anthropic), via Claude Code | Drafts rules; dispositions objections |
-| Adversarial methods reviewer | OpenAI Codex CLI (`codex exec`), read-only sandbox | Hostile methods review; countersigns by stating "no blocking objections" against a specific artifact SHA |
-| Third check | GitHub Copilot pull-request review | Advisory; its comments are dispositioned in the PR but it cannot countersign |
+| Adversarial methods reviewer | OpenAI Codex CLI (`codex exec`), read-only sandbox | Hostile methods review; clears by stating "no blocking objections" against a specific artifact SHA |
+| Third check | GitHub Copilot pull-request review | Advisory; its comments are dispositioned in the PR but it cannot clear |
 | Decision and merge authority | Maintainer @juanmicrosoft | Decides rejected blocking objections (section 6); merges |
 
 ## 3. Reviewer identity (configuration, not a person)
@@ -57,7 +57,7 @@ the actual values; the template values are:
 | Network | Not relied on; the reviewer is told to read local files only |
 
 A change of model or tool version between rounds is recorded and does not by
-itself invalidate earlier rounds; the countersigning round is the one whose
+itself invalidate earlier rounds; the clearing round is the one whose
 configuration is cited.
 
 ## 4. Competence, independence, and conflicts
@@ -76,7 +76,7 @@ rules section 4.2) rather than trusting reviewer judgment about it.
 | Framing by proposer | Claude writes the review prompt and the dispositions the reviewer sees | Fixed, hashed prompt template; reviewer reads the artifacts and the original v0.20 records directly instead of a Claude summary; all dispositions are published verbatim |
 | Same-vendor overlap in the third check | Copilot may run OpenAI models, so it is not independent of Codex | Copilot is advisory only |
 | Sycophancy / leniency | An AI reviewer may stop objecting under repeated rounds or authoritative-sounding rebuttals | Rejected blocking objections cannot be closed by Claude alone (section 6); the round cap is 5; the competence probe tests whether the reviewer flags planted defects |
-| Self-review | Claude cannot review its own rules as an independent party | Claude is proposer only and never countersigns |
+| Self-review | Claude cannot review its own rules as an independent party | Claude is proposer only and never clears |
 
 **Conflicts of interest.**
 
@@ -84,7 +84,7 @@ rules section 4.2) rather than trusting reviewer judgment about it.
   maintainer also authored the substitution of AI review for human review and
   controls merge. This is a material conflict. It is disclosed, and the rules
   limit it: the maintainer may not overrule a blocking objection into a
-  countersignature (section 6), and the thresholds cannot be amended
+  AI review clearance (section 6), and the thresholds cannot be amended
   (rules section 10).
 - Claude (Anthropic) and Codex (OpenAI) have no financial stake in Calor known
   to this record. Their vendors' commercial interest in AI-assisted coding is a
@@ -125,7 +125,7 @@ Round files follow [review-protocol.md](review-protocol.md):
 `reviews/R1/round-<N>-codex.md` (raw Codex output plus the disposition table,
 with the fixing commit for each accepted objection). Supporting files
 (prompts, logs, bindings, snapshots, the competence probe, and the
-countersignature record) live under `r1/`, because the R0 boundary test admits
+AI review clearance record) live under `r1/`, because the R0 boundary test admits
 only `round-<N>-<reviewer>.md` files under `reviews/`.
 
 **Protocol conformance and variances.** The round limit (5, counting every
@@ -189,7 +189,7 @@ Before round 1, Codex reviews a short planted-defect rule set
 ([r1/competence-probe.md](r1/competence-probe.md)) containing
 known defects. The result is recorded in that file. A reviewer that misses
 most planted defects is still used (no alternative exists), but the
-limitation is recorded and weakens the countersignature's evidentiary value.
+limitation is recorded and weakens the clearance's evidentiary value.
 
 ### 5.4 Budget
 
@@ -205,16 +205,16 @@ cap and the 2026-10-29 window set by R0. Exceeding either ends R1 as
   the rejection stands.
 - If Codex maintains a blocking objection after rejection, or round 5 ends
   with it unresolved, it goes to the maintainer, whose explicit decision is
-  recorded in `r1/countersignature.md`:
+  recorded in `r1/clearance-record.md`:
   - **accept**: the objection must be fixed, which requires another round
     (if rounds remain); or
   - **overrule**: recorded with reasons; R1 is then **not `MET`**, because the
-    countersignature requires zero blocking objections. The maintainer cannot
-    convert an overrule into a countersignature.
+    AI review clearance requires zero blocking objections. The maintainer cannot
+    convert an overrule into an AI review clearance.
 - Rejected `major` and `minor` objections are dispositioned by Claude with
   reasons and published; they do not block.
 
-## 7. Countersignature format
+## 7. AI review clearance format
 
 R1 is `MET (AI-adjudicated)` only when all of the following are recorded:
 
@@ -224,8 +224,8 @@ R1 is `MET (AI-adjudicated)` only when all of the following are recorded:
    set (`r1-decision-rules-v1.md`, `r1-decision-rules-v1.json`,
    `r1-safety-nmin.py`, this file, `r1/codex-prompt-template.md`), the
    complete effective prompt, and the dependencies listed in section 5.1.
-2. **Maintainer provenance verification**, recorded in `countersignature.md`
-   with date: the maintainer locates the countersigning session in the local
+2. **Maintainer provenance verification**, recorded in `r1/clearance-record.md`
+   with date: the maintainer locates the clearing session in the local
    Codex session store (`~/.codex/sessions/`) by its session id and confirms
    that its model, sandbox, reasoning effort, working directory, user prompt,
    and final message match the committed `round-<N>-prompt.txt`,
@@ -251,10 +251,10 @@ objections, or Codex unavailable), `EXPIRED` (window or cap exhausted),
 `REVOKED` / `INVALIDATED` per the #1370 lifecycle amendments, or
 `NOT_REACHED` if R0 is not `MET`.
 
-## 8. Round log and countersignature record
+## 8. Round log and AI review clearance record
 
 The round log, maintainer decisions on rejected blocking objections, and the
-countersignature are recorded in
-[r1/countersignature.md](r1/countersignature.md). That file is
+AI review clearance are recorded in
+[r1/clearance-record.md](r1/clearance-record.md). That file is
 outside the hashed normative set, so recording a result does not change the
-content that was countersigned.
+content that was cleared.

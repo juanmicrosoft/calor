@@ -61,7 +61,7 @@ Look specifically for:
 7. Divergence from, or silent dropping of, any original gate (cost,
    completion, safety, trust, usable adoption, independent handoff) or
    threshold.
-8. Governance weaknesses: conflicts, recusal gaps, countersignature that can
+8. Governance weaknesses: conflicts, recusal gaps, AI review clearance that can
    be faked or drifted, reviewer independence overstated.
 9. Bias in the other direction too: rules engineered to force NOT FEASIBLE
    or to make every outcome a foregone conclusion without saying so.

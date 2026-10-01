@@ -254,7 +254,7 @@
       "step": 1,
       "result": "UNADJUDICATED",
       "kind": "process_status",
-      "when": "R1 not MET; any upstream gate not MET or INVALIDATED; or R5 countersignature absent"
+      "when": "R1 not MET; any upstream gate not MET or INVALIDATED; or R5 AI review clearance absent"
     },
     {
       "step": 2,

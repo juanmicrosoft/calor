@@ -232,8 +232,12 @@ declaration is limited by the agent's lack of cross-session memory; it must
 state which sources were searched (this repository's history, the session
 logs available to it, and the maintainer's answers) and that it may be
 incomplete. The declaration cutoff is the extraction start time. A repository
-first recognized as familiar after the cutoff is moved to the familiar stratum
-in a disclosed correction; its counts remain in `H_high`. For the record, the
+first recognized as familiar after the cutoff is **not** moved: the frozen
+frame, the inventory draw, and their estimates stay as extracted, and the late
+familiarity is disclosed in the R2B′ record. Amendment 001 section 7 allows
+adding or dropping repositories after counting only for R0 section 7 events,
+so any change of inclusion, or replacement of a sampled repository, requires a
+versioned amendment with a disposition of every affected count. For the record, the
 R1 proposer session that drafted these rules studied no public repository
 other than this one. R2B′ publishes
 the list. Listed repositories are excluded from the frame, the inventory draw,
@@ -296,7 +300,7 @@ Apply in order; the first matching rule decides.
 
 1. **UNADJUDICATED** (process status, not a classification) if: R1 is not
    `MET`; any upstream gate (R0, R2A′, R3, R2B′, R4) is not `MET` or has been
-   `INVALIDATED`; or the R5 countersignature (section 7.5) is absent. R5
+   `INVALIDATED`; or the R5 AI review clearance (section 7.5) is absent. R5
    publishes the dated reason. R5 may state which rule the evidence *would*
    match, explicitly labeled "not a formal classification".
 2. **NOT FEASIBLE** if G3.1 is `SIZED_INFEASIBLE` in branch L or branch W.
@@ -326,8 +330,10 @@ The rules are mutually exclusive by construction: rule 2 requires a
 **Definitions.** A component is **missing evidence** when the frozen
 procedure ran and recorded it as `NOT_MEASURABLE_IN_DOMAIN`, `PROXY_ONLY`,
 `ROUTE_MISSING`, or `ROUTE_UNRESOLVED`. R4 has **failed to complete the
-assessment** when any frozen procedure did not run or produced an invalid run
-(section 6.5) for a reason other than the domain itself.
+assessment** when any frozen procedure lacks a valid binding run (section 6.5)
+for a reason other than the domain itself. An invalid attempt replaced by the
+permitted valid rerun does not by itself make the assessment incomplete; only
+the absence of a valid binding result does.
 
 **Under amendment 001 as written.** Amendment 001 section 5 makes R4
 `UNAVAILABLE` when "required inputs are missing", and makes R5's
@@ -423,7 +429,11 @@ true safety advantage than -1 pp would lower `N_MIN`; -1 pp is the registered
 most-favorable alternative, fixed before inspection, and cannot be changed
 after inspection (section 10).
 
-### 7.5 Countersignature of a classification
+### 7.5 AI review clearance of a classification
+
+Amendment 001 section 6 forbids describing a public-proxy classification as
+countersigned, independent, or human-reviewed. These rules therefore use
+"AI review clearance" for the AI-review conditions below.
 
 A classification is formal only when R5 records: the rules version and file
 hashes; the R2B/R4 output hashes; a Codex adversarial round under
@@ -537,11 +547,11 @@ per **extraction or computation run** (never per item):
   inspects data; nothing in v1 lets a range, envelope, frame, or alternative be
   chosen after inspection.
 - **Freeze event:** v1 is frozen at the merge commit of the PR that adds this
-  file, provided the final adversarial round countersigns the same file
+  file, provided the final adversarial round clears the same file
   content (`sha256` recorded in
-  [r1/countersignature.md](r1/countersignature.md)). R2B
+  [r1/clearance-record.md](r1/clearance-record.md)). R2B
   inventory inspection and R4 sizing may not start before that merge. If the
-  merged content differs from the countersigned content, v1 is not frozen and
+  merged content differs from the cleared content, v1 is not frozen and
   R1 is not `MET`.
 
 ## 10. Amendment control
