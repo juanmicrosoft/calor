@@ -32,8 +32,13 @@ contacted, recruited, enrolled, or asked for consent.
 
 ## 2. Gate value and conditions
 
-**Current R2A′ gate value: `NOT_REACHED` (pending R0 evidence).**
-**Value on activation: `MET`.**
+> **Superseded (2026-10-01).** The terminal value is `UNAVAILABLE`
+> (Section 2.2), set in [gate-state.json](gate-state.json), which is
+> authoritative. The value lines and items 1-5 below are the round-2 text,
+> kept as history. The activation promise in item 1 no longer applies.
+
+**Current R2A′ gate value (round-2 text, superseded): `NOT_REACHED` (pending R0 evidence).**
+**Value on activation (round-2 text, superseded): `MET`.**
 
 The R0 records that carry the 2026-10-01 maintainer decision
 (`r0-authorization.md`, `amendment-001-public-proxy.md`) are being written
@@ -99,14 +104,15 @@ show three points of non-conformance:
 
 Because of point 1, this record as written does not satisfy the amended
 `MET` definition, and the activation rule cannot make it `MET` on its own.
-This PR leaves the R2A′ entry in [gate-state.json](gate-state.json) at
-`null`. The terminal value and its reason are recorded in the 0.23
-close-out record, which applies the written rules.
+The stacked R2A′ PR (#1465) left the R2A′ entry in
+[gate-state.json](gate-state.json) at `null`. The close-out PR sets the
+terminal value (Section 2.2).
 
 ### 2.2 Terminal value (recorded 2026-10-01)
 
 **R2A′ value: `UNAVAILABLE`**, set in [gate-state.json](gate-state.json) by
-the 0.23 close-out PR and effective on its merge. The maintainer closed the
+the 0.23 close-out PR under [amendment 002](amendment-002-early-closeout.md)
+and effective on its merge. The maintainer closed the
 0.23 inquiry on 2026-10-01 and asked that R2A′ take the value the written
 rules give, recording `MET` only if the rules allow it.
 
@@ -120,18 +126,23 @@ would need an authority-only revision and fresh review rounds. Three of the
 five rounds remained, but the maintainer closed the inquiry before any
 revision was drafted. No such revision exists.
 
-**Why `UNAVAILABLE` and not another state.** Amendment 001 lists two
-`UNAVAILABLE` triggers for R2A′: no permitting public source can be
-identified, or blocking objections remain after 5 rounds. Neither occurred.
-The amendment names no value for a gate whose record does not meet its
-definition when the maintainer closes the inquiry with rounds left. Of the
-seven #1370 process states, `UNAVAILABLE` is the closest fit: no conforming
-record was obtained within the inquiry as bounded. The other states do not
-apply. `NOT_REACHED` requires that R0 is not `MET`, and R0 is `MET` on merge
-of #1467. `NOT_AUTHORIZED` requires that the maintainer decline the
-public-proxy source, which did not happen. `EXPIRED`, `REVOKED`, and
-`INVALIDATED` require a deadline, withdrawal, or invalidation event, and
-none occurred.
+**Why `UNAVAILABLE`.** Amendment 001 lists two `UNAVAILABLE` triggers for
+R2A′: no permitting public source can be identified, or blocking objections
+remain after 5 rounds. Neither occurred, and amendment 001 names no value for
+a gate that has no conforming record when the maintainer ends the inquiry
+with rounds left. [Amendment 002](amendment-002-early-closeout.md) records
+the maintainer's early close-out and adds that trigger: such a gate closes
+`UNAVAILABLE` because no conforming record was obtained before the close-out
+(Section 2 item 2 there). R2A′ used 2 of its 5 rounds; 3 were left.
+Amendment 002 and this value are in the same close-out PR and take effect
+together on its merge. Without amendment 002 no written rule gives R2A′ a
+terminal value before the 2026-10-29 deadline.
+
+The other process states do not apply. `NOT_REACHED` requires that R0 is not
+`MET`, and R0 is `MET` on merge of #1467. `NOT_AUTHORIZED` requires that the
+maintainer decline the public-proxy source, which did not happen. `EXPIRED`,
+`REVOKED`, and `INVALIDATED` require a deadline, withdrawal, or invalidation
+event, and none occurred.
 
 **Scope of the value.** This is a process result. It does **not** find
 that public .NET repositories lack permitting licenses or terms. The license
@@ -554,7 +565,7 @@ Change log (append-only):
 | 2026-10-01 | — | Review round 1 | Gate value set to `NOT_REACHED` pending R0; C12 protocol, removal and continuation rules frozen ([round 1](reviews/R2A-prime/round-1-codex.md)) |
 | 2026-10-01 | — | Review round 2 (0 blocking) | C12 digest/limits/retry matchers frozen; removal-rule review and Calor-support coverage reporting; per-class data basis; continuation chaining and license-error handling fixed ([round 2](reviews/R2A-prime/round-2-codex.md)). Review loop stopped at zero blocking |
 | 2026-10-01 | — | Stacked on R0 (#1467 branch, `b0c05437`) by merge | Review transcripts moved to `reviews/R2A-prime/`; spend rows moved to the R0 ledger format; amendment 001 conformance findings recorded in Section 2.1; gate-state R2A′ left `null` |
-| 2026-10-01 | — | 0.23 close-out | Terminal value `UNAVAILABLE` (Section 2.2); snapshot kept as a non-binding frame; no repository added or removed |
+| 2026-10-01 | — | 0.23 close-out | Terminal value `UNAVAILABLE` under amendment 002 (Section 2.2); Section 2 value lines marked superseded; snapshot kept as a non-binding frame; no repository added or removed |
 
 ## 8. Non-authorization boundary
 

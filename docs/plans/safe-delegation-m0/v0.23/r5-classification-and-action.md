@@ -46,8 +46,9 @@ Formal adjudication could not occur, for two reasons.
    such amendment was adopted. This finding comes from an uncleared record and
    is disclosed as an expectation, not a cleared result.
 
-R2A′ (#1373) is also `UNAVAILABLE`, and R3, R2B′, and R4 are `NOT_REACHED`
-(Section 3). Either blocking condition alone prevents a formal
+R2A′ (#1373) is also `UNAVAILABLE`, under the early close-out rule of
+[amendment 002](amendment-002-early-closeout.md), and R3, R2B′, and R4 are
+`NOT_REACHED` (Section 3). Either blocking condition alone prevents a formal
 classification.
 
 **What this result is not.** It is not a finding that the safe-delegation
@@ -65,7 +66,7 @@ Values take effect on merge of the close-out PR. R0 takes effect on merge of
 |---|---|---|---|---|
 | R0 | #1371 | `MET` (completed; no active authority remains once R5 is dispositioned) | [r0-authorization.md](r0-authorization.md) | Bounded public-data inquiry authorized 2026-10-01 |
 | R1 | #1372 | `UNAVAILABLE` | [r1/clearance-record.md](r1/clearance-record.md) | 2 BLOCKING objections unresolved after round 5 of 5 |
-| R2A′ | #1373 | `UNAVAILABLE` | [r2a-prime-public-proxy.md](r2a-prime-public-proxy.md) Section 2.2 | No record conforming to the amended definition cleared the protocol before close-out |
+| R2A′ | #1373 | `UNAVAILABLE` | [r2a-prime-public-proxy.md](r2a-prime-public-proxy.md) Section 2.2 | [Amendment 002](amendment-002-early-closeout.md) Section 2 item 2: no record conforming to the amended definition was obtained before the early close-out (2 of 5 rounds used) |
 | R3 | #1374 | `NOT_REACHED` | [r3-r2b-r4-not-reached.md](r3-r2b-r4-not-reached.md) | R1, R2A′ not `MET` |
 | R2B′ | #1375 | `NOT_REACHED` | [r3-r2b-r4-not-reached.md](r3-r2b-r4-not-reached.md) | R1, R2A′, R3 not `MET` |
 | R4 | #1376 | `NOT_REACHED` | [r3-r2b-r4-not-reached.md](r3-r2b-r4-not-reached.md) | R1, R2A′, R3, R2B′ not `MET` |
@@ -86,18 +87,26 @@ or extract evidence, size anything, or classify formally. This close-out did
 none of those things: it read only the committed 0.23 records and the
 #1370-#1377 issue text.
 
+The maintainer ended the inquiry early on 2026-10-01.
+[Amendment 002](amendment-002-early-closeout.md) records that decision and
+the rule that closes the gates still open at that time.
+
 R0 revalidation at close-out (2026-10-01): R0 is `MET` on merge of #1467;
 the inquiry deadline (2026-10-29) has not passed; no revocation, withdrawal,
-exclusion request, or license change is recorded; cash and hours are under
-their caps (Section 6). Every other gate in R5's prerequisite closure is not
+exclusion request, or license change is recorded; cash is USD 0.00 of 200.00
+and hours are 14.25 of 60 (agent) and 5.0 of 20 (maintainer) at the start of R5 review round 2, both
+conservative estimates that include this close-out session
+([spend-ledger.md](spend-ledger.md)). Every other gate in R5's prerequisite closure is not
 `MET`, which is why the administrative closeout applies.
 
 **Machine check.** `SafeDelegationV023BoundaryTests` gains three terminal
 invariants with this close-out: a gate whose ancestor is `UNAVAILABLE`,
 `NOT_AUTHORIZED`, or `NOT_REACHED` must be `NOT_REACHED` or open (R5
 excepted); every gate with a non-`MET` value carries a `reason` and a
-`decided` date; and a non-`MET` R5 must be `UNAVAILABLE` or `EXPIRED`,
-preserve `UNADJUDICATED`, and record a maintainer action. The close-out adds
+`decided` date; and a non-`MET` R5 must preserve `UNADJUDICATED` and record
+a maintainer action, with value `UNAVAILABLE` or `EXPIRED` (administrative
+closeout) or `INVALIDATED` (a later expiry, revocation, or withdrawal under
+R0 Section 10). The close-out adds
 the fields `decided`, `reason`, `maintainerActionNote`, and
 `originalDomainStatus` to gate entries in gate-state.json. R1's live-state
 rule (governance section 5.1) would treat new fields as a change to reviewed
@@ -206,8 +215,15 @@ This record reopens nothing.
 
 - **#1284-#1309** (closed NOT_PLANNED): none may seek reopening on the basis
   of 0.23, because 0.23 produced no formal classification. They stay closed.
-- **#1254** (0.21 effect-row proposal) and **#1259**: unaffected. No 0.23
-  approval, funds, tasks, or evidence transfer to them.
+- **#1254** (0.21 PP-W-rows effect-row proposal) and **#1259**: they may
+  still seek a separate, issue-specific approval decision on the route that
+  [../decision.md](../decision.md) ("Separate PP-W-rows proposal") already
+  sets out, with every prerequisite listed there preserved: buildability
+  gate, redesigned off-ramps, bounded spend ceiling, null-result acceptance,
+  task and oracle prerequisites, and independent review. Being eligible to
+  ask is not a reopening or an authorization. 0.23 adds nothing to that
+  route: no 0.23 approval, funds, tasks, or evidence transfer to them, and
+  `boundary.reuseBy1254Or1259` stays `false`.
 - **#1371-#1377**: their terminal values are recorded here and in the linked
   records. The maintainer closes the issues. A future milestone opens new
   issues rather than reopening these.

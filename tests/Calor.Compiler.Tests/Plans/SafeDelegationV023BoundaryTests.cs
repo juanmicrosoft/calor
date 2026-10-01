@@ -307,10 +307,23 @@ public sealed class SafeDelegationV023BoundaryTests
     }
 
     [Fact]
+    public void Validator_AcceptsInvalidatedR5AfterLaterRevocation()
+    {
+        var json = Mutate(root =>
+        {
+            Gate(root, "R0")["value"] = "REVOKED";
+            Gate(root, "R0")["reason"] = "authority withdrawn";
+            Gate(root, "R0")["decided"] = "2026-10-15";
+            Gate(root, "R5")["value"] = "INVALIDATED";
+        });
+        Assert.Empty(ValidateGateState(json));
+    }
+
+    [Fact]
     public void Validator_RejectsR5ValueOutsideCloseoutPaths()
     {
         var json = Mutate(root => Gate(root, "R5")["value"] = "NOT_REACHED");
-        Assert.Contains(ValidateGateState(json), v => v.Contains("not a closeout value", StringComparison.Ordinal));
+        Assert.Contains(ValidateGateState(json), v => v.Contains("not a closeout or lifecycle value", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -439,10 +452,12 @@ public sealed class SafeDelegationV023BoundaryTests
             var r5Value = values.GetValueOrDefault("R5");
             if (r5Value is not null and not "MET")
             {
-                // Amendment 001 Section 5 and R0 Section 10: a non-MET R5 closes UNAVAILABLE
-                // or EXPIRED, preserves UNADJUDICATED, and still records a maintainer action.
-                if (r5Value is not ("UNAVAILABLE" or "EXPIRED"))
-                    violations.Add($"R5: {r5Value} is not a closeout value (UNAVAILABLE or EXPIRED)");
+                // Amendment 001 Section 5 and R0 Section 10: the administrative closeout ends
+                // UNAVAILABLE or EXPIRED; a later expiry, revocation, or withdrawal makes a
+                // finished R5 INVALIDATED. Every non-MET R5 preserves UNADJUDICATED and still
+                // records a separate maintainer action.
+                if (r5Value is not ("UNAVAILABLE" or "EXPIRED" or "INVALIDATED"))
+                    violations.Add($"R5: {r5Value} is not a closeout or lifecycle value (UNAVAILABLE, EXPIRED, or INVALIDATED)");
                 if (OptionalString(r5, "scientificClassification") != "UNADJUDICATED")
                     violations.Add("R5: a non-MET R5 must preserve UNADJUDICATED");
                 if (OptionalString(r5, "maintainerAction") is null)

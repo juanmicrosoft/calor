@@ -29,7 +29,12 @@ None. No blocking objection was rejected in any round.
 [review-protocol.md](../review-protocol.md)) ended with 2 BLOCKING objections.
 Under the protocol, R1 cannot be `MET` on this artifact, and the maintainer
 cannot override that. The R1 entry in [gate-state.json](../gate-state.json)
-stays `null` in this PR.
+stayed `null` in the R1 PR (#1468).
+
+> **Superseded (2026-10-01).** The decision requested below was made: see
+> "Maintainer decision and terminal value (2026-10-01)". The R1 value is
+> `UNAVAILABLE` in [gate-state.json](../gate-state.json), which is
+> authoritative. The request is kept as history.
 
 Maintainer decision required (recorded here when made):
 
