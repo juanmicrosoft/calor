@@ -42,7 +42,8 @@ the actual values; the template values are:
 |---|---|
 | Tool | OpenAI Codex CLI, `codex exec` |
 | Tool version | Recorded per round (`codex --version`; 0.159.2 at drafting) |
-| Model | Recorded per round from the CLI session header; the CLI default model is used, unchanged across rounds where possible |
+| Model | Recorded per round from the CLI session header; the CLI default under `--ignore-user-config` (`gpt-6.1-sol` at drafting), unchanged across rounds where possible |
+| Reasoning effort | `high` (`-c model_reasoning_effort="high"`) for review rounds |
 | Sandbox | `--sandbox read-only` |
 | Other flags | `--ephemeral` (no session persistence), `--ignore-user-config` (no user plugins or notifier); Codex `memories` feature disabled, so no cross-session memory |
 | Working directory | This repository's worktree checked out at the round's artifact SHA |
