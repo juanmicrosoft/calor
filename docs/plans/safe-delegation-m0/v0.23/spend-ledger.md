@@ -1,0 +1,39 @@
+# Safe delegation M0 v0.23 — spend ledger
+
+**Caps:** USD 200.00 marginal AI API/tool spend across all 0.23 gates
+([r0-authorization.md](r0-authorization.md) Section 5). Existing
+subscriptions are excluded from the cash figure; their usage is still logged.
+**Procedure:** [review-protocol.md](review-protocol.md).
+
+Append one row per reviewer invocation. Proposer (Claude Code) usage is
+logged at session granularity, one row per session, because a session issues
+many model calls that are not individually reported. Do not edit earlier rows;
+correct them with a new row that cites the row it corrects. A token figure
+that the tool does not show is written "not shown".
+
+| # | Date (UTC) | Gate | Round | Tool / version | Model | Tokens | Marginal USD | Billing basis | Notes |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 2026-10-01 | R0 | 1 | Codex CLI 0.159.2 (`codex exec`, read-only) | gpt-6.1-sol | 35,454 | 0.00 | ChatGPT subscription (excluded) | [round-1-codex.md](reviews/R0/round-1-codex.md) |
+| 2 | 2026-10-01 | R0 | 2 | Codex CLI 0.159.2 (`codex exec`, read-only) | gpt-6.1-sol | 41,126 | 0.00 | ChatGPT subscription (excluded) | [round-2-codex.md](reviews/R0/round-2-codex.md) |
+| 3 | 2026-10-01 | R0 | 3 | Codex CLI 0.159.2 (`codex exec`, read-only) | gpt-6.1-sol | 43,433 | 0.00 | ChatGPT subscription (excluded) | [round-3-codex.md](reviews/R0/round-3-codex.md) |
+| 4 | 2026-10-01 | R0 | 4 | Codex CLI 0.159.2 (`codex exec`, read-only) | gpt-6.1-sol | 37,457 | 0.00 | ChatGPT subscription (excluded) | [round-4-codex.md](reviews/R0/round-4-codex.md) |
+| 5 | 2026-10-01 | R0 | — | Claude Code (proposer session) | claude-opus-5-5 | not shown | 0.00 | Existing Claude Code subscription (excluded); maintainer to confirm the basis | Drafting, revisions, and running rounds 1-4 |
+
+**Cumulative marginal USD:** 0.00
+
+## Hours
+
+Caps: maintainer 20 hours; AI agent sessions 60 wall-clock hours
+([r0-authorization.md](r0-authorization.md) Section 5), with the accounting
+rules stated there. Append one row per session; other gates' concurrent
+sessions append their own rows.
+
+| Date (UTC) | Gate | Session | Maintainer hours | Agent session hours | Basis |
+|---|---|---|---|---|---|
+| 2026-10-01 | R0 | Claude Code proposer session (drafting, revisions, running rounds 1-4) | — | 3.0 | Conservative estimate; session timestamps not captured |
+| 2026-10-01 | R0 | Codex review sessions, rounds 1-4 (counted in full although they ran inside the proposer session) | — | 1.0 | Conservative estimate, 0.25 h each |
+| 2026-10-01 | R0 | Maintainer approval of R0 and amendment 001 terms; merge review | 2.0 | — | Conservative estimate pending the maintainer's report |
+
+**Cumulative:** maintainer 2.0 of 20 (estimate); agent 4.0 of 60 (estimate).
+Unknown effort is never counted as zero; it is entered as a labeled
+conservative estimate and reconciled when reported.
