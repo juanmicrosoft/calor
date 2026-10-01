@@ -245,8 +245,72 @@ public sealed class SafeDelegationV023BoundaryTests
                 gate!["value"] = "MET";
             Gate(root, "R5")["scientificClassification"] = "NOT FEASIBLE";
             Gate(root, "R5")["classificationLabel"] = RequiredLabel;
+            Gate(root, "R5")["maintainerAction"] = null;
         });
         Assert.Contains(ValidateGateState(json), v => v.Contains("maintainer action", StringComparison.Ordinal));
+    }
+
+    // ---- Terminal-state invariants (0.23 close-out). ----
+
+    [Fact]
+    public void Validator_RejectsDescendantOfUnavailableGateThatIsNotNotReached()
+    {
+        var json = Mutate(root =>
+        {
+            Gate(root, "R1")["value"] = "UNAVAILABLE";
+            Gate(root, "R4")["value"] = "UNAVAILABLE";
+        });
+        Assert.Contains(ValidateGateState(json), v => v.Contains("R4: must be NOT_REACHED while ancestor R1", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validator_AcceptsOpenDescendantOfUnavailableGate()
+    {
+        var json = Mutate(root =>
+        {
+            Gate(root, "R1")["value"] = "UNAVAILABLE";
+            Gate(root, "R1")["reason"] = "round cap reached";
+            Gate(root, "R1")["decided"] = "2026-10-01";
+            foreach (var id in new[] { "R2A'", "R3", "R2B'", "R4", "R5" })
+                Gate(root, id)["value"] = null;
+            Gate(root, "R5")["scientificClassification"] = null;
+            Gate(root, "R5")["maintainerAction"] = null;
+        });
+        Assert.Empty(ValidateGateState(json));
+    }
+
+    [Theory]
+    [InlineData("reason", "reason")]
+    [InlineData("decided", "decided date")]
+    public void Validator_RejectsTerminalGateWithoutDatedReason(string field, string expected)
+    {
+        var json = Mutate(root => Gate(root, "R5").Remove(field));
+        Assert.Contains(ValidateGateState(json), v => v.Contains("R5", StringComparison.Ordinal) && v.Contains(expected, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validator_RejectsUnadjudicatedCloseoutWithoutMaintainerAction()
+    {
+        var json = Mutate(root => Gate(root, "R5")["maintainerAction"] = null);
+        Assert.Contains(ValidateGateState(json), v => v.Contains("separate maintainer action", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validator_RejectsFormalClassificationOnNonMetR5()
+    {
+        var json = Mutate(root =>
+        {
+            Gate(root, "R5")["scientificClassification"] = "INSUFFICIENT INFORMATION";
+            Gate(root, "R5")["classificationLabel"] = RequiredLabel;
+        });
+        Assert.Contains(ValidateGateState(json), v => v.Contains("preserve UNADJUDICATED", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Validator_RejectsR5ValueOutsideCloseoutPaths()
+    {
+        var json = Mutate(root => Gate(root, "R5")["value"] = "NOT_REACHED");
+        Assert.Contains(ValidateGateState(json), v => v.Contains("not a closeout value", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -341,9 +405,50 @@ public sealed class SafeDelegationV023BoundaryTests
             }
         }
 
+        // #1370 gate propagation: a descendant of a prerequisite that terminally failed to
+        // reach MET (UNAVAILABLE, NOT_AUTHORIZED, NOT_REACHED) closes NOT_REACHED or stays
+        // open. R5 is the closeout exception and is checked separately below.
+        foreach (var (id, _) in AmendedGraph)
+        {
+            if (id == "R5" || !values.TryGetValue(id, out var value) || value is null or "NOT_REACHED")
+                continue;
+            foreach (var ancestor in Ancestors(id))
+            {
+                var ancestorValue = values.GetValueOrDefault(ancestor);
+                if (ancestorValue is "UNAVAILABLE" or "NOT_AUTHORIZED" or "NOT_REACHED")
+                    violations.Add($"gate {id}: must be NOT_REACHED while ancestor {ancestor} is {ancestorValue}");
+            }
+        }
+
+        // Every dispositioned non-MET gate carries a dated reason (#1370 completion path 2).
+        foreach (var gate in gates)
+        {
+            var id = gate.GetProperty("id").GetString()!;
+            var value = values.GetValueOrDefault(id);
+            if (value is null or "MET")
+                continue;
+            if (string.IsNullOrWhiteSpace(OptionalString(gate, "reason")))
+                violations.Add($"gate {id}: {value} requires a non-empty reason");
+            if (!IsIsoDate(OptionalString(gate, "decided")))
+                violations.Add($"gate {id}: {value} requires a decided date (yyyy-MM-dd)");
+        }
+
         var r5 = gates.SingleOrDefault(g => g.GetProperty("id").GetString() == "R5");
         if (r5.ValueKind == JsonValueKind.Object)
         {
+            var r5Value = values.GetValueOrDefault("R5");
+            if (r5Value is not null and not "MET")
+            {
+                // Amendment 001 Section 5 and R0 Section 10: a non-MET R5 closes UNAVAILABLE
+                // or EXPIRED, preserves UNADJUDICATED, and still records a maintainer action.
+                if (r5Value is not ("UNAVAILABLE" or "EXPIRED"))
+                    violations.Add($"R5: {r5Value} is not a closeout value (UNAVAILABLE or EXPIRED)");
+                if (OptionalString(r5, "scientificClassification") != "UNADJUDICATED")
+                    violations.Add("R5: a non-MET R5 must preserve UNADJUDICATED");
+                if (OptionalString(r5, "maintainerAction") is null)
+                    violations.Add("R5: UNADJUDICATED closeout requires a separate maintainer action");
+            }
+
             var classification = OptionalString(r5, "scientificClassification");
             if (classification is not null && classification != "UNADJUDICATED")
             {
@@ -434,6 +539,29 @@ public sealed class SafeDelegationV023BoundaryTests
             : unit.LastIndexOfAny(['.', ';', '!', '?', '|'], match.Index - 1) + 1;
         return unit[begin..(match.Index + match.Length)];
     }
+
+    /// <summary>Transitive prerequisites of a gate in the fixed amended graph.</summary>
+    private static HashSet<string> Ancestors(string id)
+    {
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        var pending = new Stack<string>(AmendedGraph[id]);
+        while (pending.Count > 0)
+        {
+            var next = pending.Pop();
+            if (result.Add(next))
+            {
+                foreach (var pre in AmendedGraph[next])
+                    pending.Push(pre);
+            }
+        }
+
+        return result;
+    }
+
+    private static bool IsIsoDate(string? text)
+        => text is not null
+            && DateOnly.TryParseExact(text, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out _);
 
     private static string? OptionalString(JsonElement element, string property)
         => element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String

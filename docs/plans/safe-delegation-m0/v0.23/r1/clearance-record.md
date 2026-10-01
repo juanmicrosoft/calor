@@ -44,3 +44,51 @@ unless an R0 amendment changes R4's closure criterion.
 
 Maintainer provenance verification (governance section 7 item 2): not
 performed; not applicable while no clearing round exists.
+
+## Maintainer decision and terminal value (2026-10-01)
+
+**R1 value: `UNAVAILABLE`.** Decided by @juanmicrosoft on 2026-10-01 and
+relayed to the implementing agent that day. It takes effect when the
+maintainer merges the 0.23 close-out PR that sets the R1 entry in
+[gate-state.json](../gate-state.json). The first option above was chosen;
+no amendment opening a new artifact version was adopted.
+
+**Bounded reason.** The authorized cross-family AI adversarial review ran
+the 5 rounds that [review-protocol.md](../review-protocol.md) allows. Round 5
+ended with the 2 BLOCKING objections listed above unresolved. The proposer
+fixes in `a929aa74` were never reviewed. Under the protocol and amendment 001
+Section 5, R1 therefore cannot be `MET`, and it closes `UNAVAILABLE`
+("Blocking objections remain after 5 rounds"). This value says nothing about
+whether a human or AI reviewer could clear these rules, or a revised version
+of them, in a later round allowance.
+
+**Recorded finding carried to R5.** Rules section 7.3 records, before any
+inspection, that under amendment 001 as written the inputs for G0, G1.1,
+G1.2, G5, and G6.2 are `NOT_MEASURABLE_IN_DOMAIN` in the public-proxy domain,
+so R4 could only close `UNAVAILABLE` and R5 could only preserve
+`UNADJUDICATED`. This finding comes from an uncleared record. It is carried
+forward as a disclosed expectation, not as a cleared result.
+
+**Protocol deviations accepted (2026-10-01).** The maintainer accepted the
+three deviations below. Acceptance records them as known departures from
+[review-protocol.md](../review-protocol.md); it does not change the R1 value,
+and it does not turn any round into a clearing round.
+
+| # | Deviation | Rounds | Accepted |
+|---|---|---|---|
+| a | The prompt paraphrased, rather than quoted verbatim, the protocol's reviewer instruction (governance section 5.1 discloses this) | 1-3 | 2026-10-01 |
+| b | Codex sessions were persisted instead of run with `--ephemeral`, so that the maintainer could check provenance against `~/.codex/sessions/` | 2-5 | 2026-10-01 |
+| c | The R1 spend rows use the R0 ledger format in [spend-ledger.md](../spend-ledger.md) | all | 2026-10-01 |
+
+**Status of the rules on file.** [r1-decision-rules-v1.md](../r1-decision-rules-v1.md),
+its JSON mirror, and `r1-safety-nmin.py` are **not frozen** in the sense of
+amendment 001 Section 5: they never cleared review. The head of this branch
+contains the unreviewed `a929aa74` fixes, so the round-5 binding file no
+longer matches four normative files (expected; recorded here). They remain
+on file as reusable, non-binding input for any future milestone. A future
+milestone that relies on them must review them afresh under its own
+authorization.
+
+**Downstream effect.** R3, R2B′, and R4 close `NOT_REACHED`
+([r3-r2b-r4-not-reached.md](../r3-r2b-r4-not-reached.md)). R5 preserves
+`UNADJUDICATED` ([r5-classification-and-action.md](../r5-classification-and-action.md)).

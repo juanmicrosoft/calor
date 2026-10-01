@@ -103,6 +103,51 @@ This PR leaves the R2A′ entry in [gate-state.json](gate-state.json) at
 `null`. The terminal value and its reason are recorded in the 0.23
 close-out record, which applies the written rules.
 
+### 2.2 Terminal value (recorded 2026-10-01)
+
+**R2A′ value: `UNAVAILABLE`**, set in [gate-state.json](gate-state.json) by
+the 0.23 close-out PR and effective on its merge. The maintainer closed the
+0.23 inquiry on 2026-10-01 and asked that R2A′ take the value the written
+rules give, recording `MET` only if the rules allow it.
+
+**Why not `MET`.** Amendment 001 Section 5 requires "a versioned record
+[that] clears the protocol" and "establishes **authority only**" and "does
+**not** select, enumerate, or inspect repositories". This record selects and
+counts repositories (Sections 3-4). The activation rule in Section 2 item 1
+is a condition this record adds; it does not replace the amended definition,
+which governs (amendment 001 Sections 3 and 5). A record that met the definition
+would need an authority-only revision and fresh review rounds. Three of the
+five rounds remained, but the maintainer closed the inquiry before any
+revision was drafted. No such revision exists.
+
+**Why `UNAVAILABLE` and not another state.** Amendment 001 lists two
+`UNAVAILABLE` triggers for R2A′: no permitting public source can be
+identified, or blocking objections remain after 5 rounds. Neither occurred.
+The amendment names no value for a gate whose record does not meet its
+definition when the maintainer closes the inquiry with rounds left. Of the
+seven #1370 process states, `UNAVAILABLE` is the closest fit: no conforming
+record was obtained within the inquiry as bounded. The other states do not
+apply. `NOT_REACHED` requires that R0 is not `MET`, and R0 is `MET` on merge
+of #1467. `NOT_AUTHORIZED` requires that the maintainer decline the
+public-proxy source, which did not happen. `EXPIRED`, `REVOKED`, and
+`INVALIDATED` require a deadline, withdrawal, or invalidation event, and
+none occurred.
+
+**Scope of the value.** This is a process result. It does **not** find
+that public .NET repositories lack permitting licenses or terms. The license
+classes and GitHub terms analysis in Section 5 was not objected to as
+BLOCKING in either review round. Nor does the value say anything about
+adopter demand, which R2A′ could never measure (Section 6).
+
+**Disposition of the snapshot.** [r2a-prime-repos.json](r2a-prime-repos.json)
+and [tools/r2a_prime_enumerate.py](tools/r2a_prime_enumerate.py) stay on file
+as a reusable but non-binding repository frame. No gate used them as input.
+They were retrieved before R0 was `MET` (Section 2.1), so any future reuse
+must first re-authorize the access and re-review the frame under that
+milestone's own rules. They are not evidence for any 0.23 gate. Local caches:
+the enumeration wrote no raw responses to disk (Section 5.4); the close-out
+record carries the R0 Section 7.3 gate-closure deletion check.
+
 ## 3. Frozen selection rule
 
 Sections 3.1–3.3 were committed (`15fba333`) before any enumeration query
@@ -509,6 +554,7 @@ Change log (append-only):
 | 2026-10-01 | — | Review round 1 | Gate value set to `NOT_REACHED` pending R0; C12 protocol, removal and continuation rules frozen ([round 1](reviews/R2A-prime/round-1-codex.md)) |
 | 2026-10-01 | — | Review round 2 (0 blocking) | C12 digest/limits/retry matchers frozen; removal-rule review and Calor-support coverage reporting; per-class data basis; continuation chaining and license-error handling fixed ([round 2](reviews/R2A-prime/round-2-codex.md)). Review loop stopped at zero blocking |
 | 2026-10-01 | — | Stacked on R0 (#1467 branch, `b0c05437`) by merge | Review transcripts moved to `reviews/R2A-prime/`; spend rows moved to the R0 ledger format; amendment 001 conformance findings recorded in Section 2.1; gate-state R2A′ left `null` |
+| 2026-10-01 | — | 0.23 close-out | Terminal value `UNAVAILABLE` (Section 2.2); snapshot kept as a non-binding frame; no repository added or removed |
 
 ## 8. Non-authorization boundary
 
