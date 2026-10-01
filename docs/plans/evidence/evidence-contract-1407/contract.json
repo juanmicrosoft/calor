@@ -1,0 +1,343 @@
+{
+  "schemaVersion": 1,
+  "issue": 1407,
+  "epic": 1409,
+  "milestone": "0.24",
+  "contractVersion": "1.0.0",
+  "status": "PROPOSED",
+  "statusNote": "Proposed in the R0 pull request. The contract is frozen at the commit that merges it to main. Capacity ceilings are PROPOSED until the maintainer accepts them by merging; the R0 gate is NOT MET before that merge.",
+  "gateStatus": "NOT-MET",
+  "document": "docs/plans/v0.24-evidence-contract.md",
+  "inventory": "docs/plans/evidence/evidence-contract-1407/artifact-inventory.json",
+  "enforcedBy": "tests/Calor.Compiler.Tests/EvidenceContract/EvidenceContractTests.cs",
+  "nonAuthorization": [
+    "No product release, version bump, or package publication.",
+    "No paid or participant agent experiment and no paid LLM benchmark run.",
+    "No new public Calor advantage, whole-program soundness, or stronger verifier-coverage claim."
+  ],
+
+  "cutoff": {
+    "timestampUtc": "2026-10-01T17:36:19Z",
+    "commit": "72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1",
+    "resolvedFrom": "refs/remotes/origin/main after git fetch origin",
+    "rule": "Work merged at or before this commit is retrospective evidence or a control. It cannot satisfy confirmatory post-contract evidence by itself."
+  },
+
+  "baselines": [
+    {
+      "id": "B1",
+      "role": "primary-released-baseline",
+      "selectedBy": "maintainer decision recorded in this contract",
+      "tag": "v0.22.0",
+      "tagObject": "lightweight",
+      "commit": "72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1",
+      "declaredVersion": "0.22.0",
+      "githubRelease": { "publishedAtUtc": "2026-09-15T17:11:53Z", "prerelease": true, "assets": 0 },
+      "nugetPublished": false,
+      "facts": [
+        "Publish run 34999741476 (release event, head 72a0a855) failed: release-quality failed in the performance ratchet ('performance test run failed') and test (performance) failed; the publish job was skipped.",
+        "nuget.org lists calor versions through 0.21.0 only at the cutoff; no 0.22.0 package exists.",
+        "Deploy Next.js to GitHub Pages run 34999741475 and Benchmarks run 34999741525 for the same release event succeeded."
+      ]
+    },
+    {
+      "id": "B0",
+      "role": "historical-pin",
+      "selectedBy": "original #1311 text",
+      "tag": "v0.19.0",
+      "tagObject": "lightweight",
+      "commit": "74e55ce4861f9548199629ab6e18623ef1759f21",
+      "declaredVersion": "0.19.0",
+      "status": "Retained as a recorded row. Not the 0.24 sweep baseline unless a reviewed amendment adds it as a second investigated baseline."
+    },
+    {
+      "id": "N1",
+      "role": "recorded-not-selected",
+      "selectedBy": "none",
+      "package": "calor 0.21.0 and Calor.Sdk 0.21.0 on nuget.org",
+      "commit": "88b5d38df97fd7e438882c956b9f9dcdc7a6cef5",
+      "declaredVersion": "0.21.0",
+      "status": "The newest NuGet-distributed compiler at the cutoff. It was packed by workflow_dispatch run 34662528371 from 88b5d38 (fix: isolate MediatR release test collections, #1449), not from the v0.21.0 tag commit b1d23d7d74aa17a460d6a7d429836ca8396bb182, whose release-event publish run 34658493492 failed. Recorded so the sweep cannot silently claim to cover the binary users install. Investigating it requires an amendment."
+    }
+  ],
+
+  "candidateStart": {
+    "commit": "72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1",
+    "note": "Repairs branch from this commit. It equals the cutoff commit and baseline B1. The post-repair candidate is frozen separately by #1423."
+  },
+
+  "sections": [
+    "cutoff",
+    "baselines",
+    "artifact-inventory",
+    "outcome-vocabulary",
+    "benchmark-equivalence",
+    "provenance-identity",
+    "release-path",
+    "failure-amendment-stopping",
+    "authority-capacity",
+    "dependency-graph",
+    "retrospective"
+  ],
+
+  "outcomeVocabulary": {
+    "source": "src/Calor.Compiler/Verification/ProofOutcome.cs (ProofStatus, ProofOutcome.IsVacuous, ToContractStatus, ToObligationStatus, ToImplicationStatus), Verification/Z3/Z3ImplicationProver.cs (ContractVerificationStatus, ImplicationStatus), Verification/Obligations/ObligationTracker.cs (ObligationStatus), CodeGen/CSharpEmitter.cs (guard elision). Verification/Z3/KInduction/KInductionProver.cs (KInductionStatus) is mapped for completeness; at the cutoff it has no production consumer outside Verification/Z3/KInduction.",
+    "outcomes": [
+      {
+        "token": "Proven",
+        "codeStatuses": ["ProofStatus.Proven with IsVacuous=false", "ContractVerificationStatus.Proven", "ImplicationStatus.Proven", "KInductionStatus.Proven", "wire name 'proven' without vacuous=true"],
+        "mayRemoveGuard": true,
+        "mayEstablishClaim": true,
+        "conditions": [
+          "Produced on the frozen #1423 candidate by a registered producer.",
+          "The modeled form has no unresolved false unconditional proof under #1413.",
+          "An independent behavioral oracle agrees (#1311); the verifier's simplifier or translator is not the sole oracle.",
+          "TranslatorSemanticsVersion equals the candidate's ContractTranslator.SemanticsVersion; cache entries from another version are not evidence.",
+          "Non-vacuous."
+        ]
+      },
+      {
+        "token": "ProvenVacuous",
+        "codeStatuses": ["ProofStatus.Proven with IsVacuous=true", "diagnostic Calor0719 (VacuousPrecondition)"],
+        "mayRemoveGuard": false,
+        "mayEstablishClaim": false,
+        "conditions": ["Holds only because the precondition set is unsatisfiable. The emitter keeps the guard."]
+      },
+      {
+        "token": "Discharged",
+        "codeStatuses": ["ObligationStatus.Discharged (mapped from ProofStatus.Proven)"],
+        "mayRemoveGuard": true,
+        "mayEstablishClaim": true,
+        "conditions": [
+          "All Proven conditions apply.",
+          "The obligation channel carries no vacuity flag: ObligationSolver never assigns ProofEvidence.VacuousProof. A Discharged row establishes only when its #1419 registration records a passing non-vacuity check for that row.",
+          "Guard removal additionally requires ElideProvenGuards and an ObligationPolicy action that does not require a guard."
+        ]
+      },
+      {
+        "token": "Assumed",
+        "codeStatuses": ["ProofStatus.Assumed (non-empty assumption list)", "maps to ContractVerificationStatus.Unproven, ObligationStatus.Timeout, ImplicationStatus.Unknown"],
+        "mayRemoveGuard": false,
+        "mayEstablishClaim": false,
+        "conditions": ["Conditional on named assumptions. Never aggregates into Proven (guarantees plan D-G2.2)."]
+      },
+      {
+        "token": "Unsupported",
+        "codeStatuses": ["ProofStatus.Unsupported", "ContractVerificationStatus.Unsupported", "ObligationStatus.Unsupported", "ImplicationStatus.Unsupported", "KInductionStatus.Unsupported"],
+        "mayRemoveGuard": false,
+        "mayEstablishClaim": false,
+        "conditions": ["A refusal. It validates a registered refusal/demotion row only; it is never a proof."]
+      },
+      {
+        "token": "TimeoutOrUnavailable",
+        "codeStatuses": ["ProofStatus.Timeout", "ProofStatus.Unknown", "ProofStatus.Unavailable", "ContractVerificationStatus.Unproven", "ContractVerificationStatus.Skipped", "ObligationStatus.Timeout", "ObligationStatus.Pending", "ImplicationStatus.Unknown", "KInductionStatus.Unknown", "diagnostic Calor0710 (Z3Unavailable)"],
+        "mayRemoveGuard": false,
+        "mayEstablishClaim": false,
+        "conditions": ["Inconclusive or no solver. ObligationStatus.Timeout is a legacy bucket that also receives Assumed and Unavailable; consumers must read ProofOutcome to distinguish them."]
+      },
+      {
+        "token": "Failed",
+        "codeStatuses": ["ProofStatus.Refuted", "ContractVerificationStatus.Disproven", "ObligationStatus.Failed", "ImplicationStatus.Disproven", "KInductionStatus.Disproven"],
+        "mayRemoveGuard": false,
+        "mayEstablishClaim": false,
+        "conditions": ["Establishes no positive property. A refutation of a property the independent oracle shows true is a completeness defect and still needs a #1413 disposition."]
+      },
+      {
+        "token": "Boundary",
+        "codeStatuses": ["ObligationStatus.Boundary"],
+        "mayRemoveGuard": false,
+        "mayEstablishClaim": false,
+        "conditions": ["Never solver-checked. Listed so that no status the code can emit is unclassified."]
+      }
+    ],
+    "nonOutcomeRowStatuses": ["skipped", "flaky", "crashed", "invalid", "not-investigated", "unclassified", "incomparable", "historical", "stale"],
+    "rowStatusRule": "Every non-outcome row status is not established. An unknown token fails validation; it is never mapped to a known status.",
+    "falseUnconditionalProof": "A row whose outcome is Proven or Discharged (non-vacuous) while an independent oracle exhibits a concrete modeled input that violates the claimed property. It is release-blocking for the affected modeled form until fixed or visibly demoted. Retaining a runtime guard does not make it acceptable."
+  },
+
+  "classifications": {
+    "authoritative": "The single canonical record a gate or public surface reads. It has a recorded regeneration command and a durable provenance identity. It may carry open defects; open defects block establishment until closed.",
+    "derived": "Computed or rendered from inventoried artifacts listed in derivedFrom. It has a regeneration command. It inherits staleness: a derived artifact with a stale input is itself stale.",
+    "historical-only": "A retained record of a past measurement or publication. It is never regenerated in place and never establishes a 0.24 claim.",
+    "stale": "Known not to match its producer at the cutoff, or known not to establish what its name or description claims. It may not be consumed as evidence until repaired and regenerated."
+  },
+  "durableIdentityKinds": ["git-committed", "full-sha", "content-hash", "release-asset", "registry-immutable"],
+  "nonDurableIdentityKinds": ["short-sha", "branch-ref", "actions-artifact", "none"],
+
+  "adjudicationOutcomes": ["SUPPORTED", "BOUNDED", "HISTORICAL-ONLY", "BLOCKED"],
+  "terminalOutcomes": ["MILESTONE-SUCCEEDED", "MILESTONE-FAILED"],
+  "findingDispositions": ["VALIDATED", "FIX-IN-0.24", "DEMOTE-IN-0.24", "NOT-INVESTIGATED", "MILESTONE-FAILED"],
+
+  "benchmarkEquivalence": {
+    "consumers": [1276, 1422, 1424, 1408],
+    "pairDispositions": ["EQUIVALENT", "NOT-EQUIVALENT", "UNCLASSIFIED", "EXCLUDED-PRE-REGISTERED"],
+    "pairRowRequiredFields": ["pairId", "calorPath", "calorSha256", "csharpPath", "csharpSha256", "taskStatementSha256", "inputSet", "expectedOutputs", "failureBehavior", "disposition", "equivalenceEvidence", "reviewer"],
+    "equivalenceDefinition": "Both sides implement the same task statement, accept the same inputs, produce the same outputs, and fail on the same inputs in the same observable way. Evidence is an executed differential check, not inspection of names.",
+    "inclusionRule": "Only EQUIVALENT pairs enter comparative metrics. An included UNCLASSIFIED pair blocks headline generation. NOT-EQUIVALENT and EXCLUDED-PRE-REGISTERED pairs are counted and published in the denominator, never silently dropped. A pair whose either side fails to parse or compile is NOT-EQUIVALENT unless its registered failure behavior says otherwise.",
+    "comparabilityKey": ["pairManifestSha256", "metricSetSha256", "metricImplementationVersion", "aggregationMethod", "samplingUnit", "runCount", "generatorVersion", "exclusionsSha256"],
+    "comparabilityRule": "Two results are comparable only when every comparabilityKey field is equal. Otherwise no delta, ratio change, or advantage movement is printed; the result is labeled incomparable, and a method change needs a previously merged #1407 amendment.",
+    "samplingUnit": "program-pair",
+    "repeatedDeterministicRunsAreSamples": false,
+    "intervalRule": "Uncertainty is computed only by resampling over independent program pairs. Repeated runs of a deterministic calculator are a determinism check (all runs must agree), not samples. A category with fewer than 2 included pairs reports no interval. Because the corpus is a fixed, non-random set, any interval describes corpus-resampling sensitivity of this corpus only and must be labeled so.",
+    "claimRule": "Static feature scores are not coding-agent outcomes. Neither is presented as a measured language, productivity, correctness, or safety advantage."
+  },
+
+  "provenanceIdentity": {
+    "implementedBy": 1417,
+    "requiredFields": ["commit", "resolvedVia", "treeHashes", "inputContentHashes"],
+    "acceptedResolution": ["protected-main", "immutable-tag"],
+    "rejectedResolution": ["HEAD", "pull-request-merge-ref", "branch", "short-sha", "local-only-object"],
+    "commitRule": "A full 40-hex commit that is an ancestor of explicitly fetched refs/remotes/origin/main, or the target of an immutable release tag.",
+    "treeRule": "Claimed source, corpus, configuration, and generated-input identities are verified by tree or content hash (git rev-parse <commit>:<path>, SHA-256 of manifests). Reachability alone is insufficient.",
+    "squashRule": "When the final squash commit cannot exist before merge, either (a) merge with a merge commit that keeps the measured commit as an ancestor of main, or (b) record a pending phase-1 identity (PR head commit plus tree hashes) and complete it with a post-merge write-back that records the main commit and re-verifies tree equality. A phase-1 identity is not authoritative.",
+    "shallowCloneRule": "Authoritative validation fails, not skips, in a shallow or unfetched clone. Producers fetch the bounded history and tags they need.",
+    "historicalRule": "Existing measuredCommit stamps stay unchanged. A durable identity is recorded beside them, never written over them."
+  },
+
+  "releasePath": {
+    "surfaces": [
+      { "id": "release-pr", "trigger": "manual: .claude/skills/create-release/SKILL.md steps 1-5", "producer": "developer machine; benchmark JSON generated locally (dotnet run --project tests/Calor.Evaluation -c Release -- run --statistical --runs 30)", "gate": "required checks on main (see statusChecks); PR merged with gh pr merge --squash", "consumesAdjudication": false },
+      { "id": "github-release", "trigger": "manual: gh release create vX.Y.Z --notes-file (notes extracted with awk from the CHANGELOG.md section)", "producer": "maintainer", "gate": "none; creation precedes every package, website, and benchmark gate", "consumesAdjudication": false },
+      { "id": "nuget-packages", "trigger": "release: created, or workflow_dispatch with optional version override", "producer": ".github/workflows/publish-nuget.yml publish job (needs test matrix, sdk-consumer, release-quality)", "gate": "in-workflow jobs; dotnet nuget push --skip-duplicate", "consumesAdjudication": false },
+      { "id": "release-metadata", "trigger": "publish-nuget.yml publish job", "producer": "scripts/generate-release-metadata.py; actions/attest-build-provenance@v2; gh release upload --clobber", "gate": "publish job", "consumesAdjudication": false },
+      { "id": "website", "trigger": "release: created, or workflow_dispatch", "producer": ".github/workflows/nextjs-gh-pages.yml (npm ci, npm run build, deploy-pages)", "gate": "none in the workflow; github-pages environment has a branch policy only", "consumesAdjudication": false },
+      { "id": "benchmark-publication", "trigger": "release: created; push to main on benchmark paths; workflow_dispatch", "producer": ".github/workflows/benchmark.yml", "gate": "scripts/check-benchmark-methodology.js, but its exit status is masked (see retrospective #1157)", "consumesAdjudication": false },
+      { "id": "agent-refactoring-results", "trigger": "workflow_dispatch with agent_refactoring=true", "producer": ".github/workflows/benchmark.yml agent-refactoring-benchmark job", "gate": "none; commits directly to main with [skip ci]", "consumesAdjudication": false },
+      { "id": "installed-tool-verification", "trigger": "workflow_dispatch", "producer": ".github/workflows/verify-release.yml", "gate": "manual, after publication", "consumesAdjudication": false }
+    ],
+    "statusChecks": {
+      "branch": "main",
+      "protected": true,
+      "requiredContexts": ["test", "calor-first-guard", "d-s1.5-fixtures", "tests (compiler)", "tests (enforcement)"],
+      "enforcementLevel": "non_admins",
+      "notRequired": ["tests (verification)", "tests (conversion)", "roundtrip-verification", "quality-ratchets", "verify-phase1", "sdk-package-consumer (*)", "cli-tool-consumer (*)", "annex-freeze", "tamper-check", "onboarding", "browser (*)"],
+      "note": "tests (verification) carries the #1135 oracle and is release-critical in eng/test-manifest.json, but it is not a required check. Admins can bypass required checks."
+    },
+    "retention": {
+      "actionsArtifacts": "Per upload step: 14, 30, or 90 days. Never authoritative.",
+      "releaseAssets": "Durable until deleted; release notes and assets are mutable (gh release upload --clobber).",
+      "nugetPackages": "Immutable per version; can be unlisted, not replaced.",
+      "pagesDeployment": "Replaced by the next deployment; not an evidence store.",
+      "committedFiles": "Durable when reachable from protected main or an immutable tag."
+    }
+  },
+
+  "rules": {
+    "falseProof": "A concrete false unconditional proof is release-blocking for the affected modeled form until fixed or visibly demoted. A retained runtime guard does not cure it.",
+    "missingness": "Unknown, unsupported, unavailable, skipped, timed-out, flaky, stale, invalid, historical, incomparable, and uninvestigated rows are not established.",
+    "historical": "Corrected published artifacts are retained as historical records. They are not rewritten to look as if the repaired method produced them.",
+    "amendment": "Any scope or rule change after decision-bearing inspection is a versioned amendment with a justification and a reviewed PR. It cannot remove a failing row; removed rows stay reported with their last status.",
+    "discovery": "Discovery may create bounded repair issues within the accepted capacity. Every finding is fixed, visibly demoted, excluded by this pre-registered scope, or makes the milestone fail. It cannot become ordinary follow-up while 0.24 is reported as successful.",
+    "retrospective": "Evidence recorded at or before the cutoff is retrospective. It is a control, never confirmatory 0.24 evidence by itself.",
+    "stopping": [
+      "A ceiling in capacity is reached: stop the gate, record the overrun, and either merge a reviewed amendment raising the ceiling before more work or record the gate BLOCKED.",
+      "#1311 reaches its timebox: stop, publish the report; unreached rows are not-investigated; an unreached row registered as release-critical is BLOCKED.",
+      "A false unconditional proof cannot be fixed or demoted within capacity: MILESTONE-FAILED.",
+      "The frozen candidate changes after #1423: all downstream evidence is invalid; return to #1423.",
+      "Independent adjudication as defined in authorityCapacity is unavailable: MILESTONE-FAILED or a self-adjudicated non-release record."
+    ]
+  },
+
+  "authorityCapacity": {
+    "decisionAuthority": "@juanmicrosoft",
+    "amendmentAuthority": "@juanmicrosoft",
+    "implementationOwners": "Claude Code agents. One branch and one PR per issue. Agents never merge.",
+    "reviewAndMerge": "@juanmicrosoft reviews and merges every PR.",
+    "adjudicator": "@juanmicrosoft",
+    "independence": {
+      "rule": "Epic rule 10 and #1408: the adjudicator cannot have implemented the producer or repair, cannot change #1407 rules, and needs an independent approving review.",
+      "deviation": true,
+      "deviationStatement": "@juanmicrosoft is the #1408 adjudicator and approving reviewer. He did not write the repairs (agents did), but he directs, reviews, and merges them and also holds decision and amendment authority. Independence is reduced.",
+      "consequences": [
+        "Every adjudication row records independence = reduced-maintainer-adjudicated.",
+        "No row may be SUPPORTED; the maximum is BOUNDED with the published limitation 'adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated'. This follows #1408's own rule for unavailable independent review.",
+        "A MILESTONE-SUCCEEDED record must carry adjudicationIndependence = reduced. No public surface may call 0.24 evidence independently adjudicated or independently verified.",
+        "From the #1424 raw-artifact freeze until #1408 closes, amendment authority is not exercised; an amendment in that window invalidates affected evidence and returns to #1423."
+      ],
+      "maxAdjudicationUnderDeviation": "BOUNDED",
+      "amendable": "A versioned amendment may name an independent reviewer who neither implemented, directed, nor merged the producer or repair. It lifts the cap only for rows that reviewer adjudicates after the amendment; earlier rows are re-adjudicated, not relabeled."
+    },
+    "capacity": {
+      "status": "PROPOSED",
+      "acceptance": "PROPOSED — pending maintainer acceptance in PR review. Accepted only when the maintainer merges this contract. No downstream gate starts before acceptance.",
+      "ceilings": [
+        { "id": "milestone-timebox", "value": 56, "unit": "calendar days from the R0 merge", "status": "PROPOSED" },
+        { "id": "maintainer-review-total", "value": 40, "unit": "maintainer review hours across the milestone", "status": "PROPOSED" },
+        { "id": "maintainer-review-per-pr", "value": 2, "unit": "maintainer review hours per PR, all rounds", "status": "PROPOSED" },
+        { "id": "review-rounds-per-pr", "value": 3, "unit": "review rounds per PR before the PR is closed and re-scoped", "status": "PROPOSED" },
+        { "id": "agent-prs-per-gate", "value": 2, "unit": "PRs per gate issue (one primary, one follow-up)", "status": "PROPOSED" },
+        { "id": "pr-size", "value": 1500, "unit": "changed lines per PR, excluding committed evidence data and test fixtures", "status": "PROPOSED" },
+        { "id": "s2-repairs", "value": 6, "unit": "accepted FIX-IN-0.24 or DEMOTE-IN-0.24 PRs in total", "status": "PROPOSED" },
+        { "id": "s2-repair-size", "value": 600, "unit": "changed non-test lines per S2 repair PR", "status": "PROPOSED" },
+        { "id": "s1-timebox", "value": 10, "unit": "calendar days from the #1419 merge", "status": "PROPOSED" },
+        { "id": "s1-agent-hours", "value": 20, "unit": "agent execution hours for #1311", "status": "PROPOSED" },
+        { "id": "s1-generated-cases", "value": 1500, "unit": "generated probe cases beyond the existing 1,170-cell differential controls", "status": "PROPOSED" },
+        { "id": "s1-compute", "value": 600, "unit": "CI runner-minutes for #1311 (plus at most 10 local machine-hours)", "status": "PROPOSED" },
+        { "id": "determinism-compute", "value": 2000, "unit": "CI runner-minutes for #1421/#1135 repeated runs", "status": "PROPOSED" },
+        { "id": "regeneration-compute", "value": 1500, "unit": "CI runner-minutes per complete #1424 regeneration", "status": "PROPOSED" },
+        { "id": "regenerations", "value": 2, "unit": "complete #1424 regenerations (one rerun after a candidate-changing fix)", "status": "PROPOSED" },
+        { "id": "ordinary-ci", "value": 15000, "unit": "CI runner-minutes for ordinary PR checks across the milestone", "status": "PROPOSED" },
+        { "id": "paid-spend", "value": 0, "unit": "USD for LLM, agent, or other paid compute", "status": "PROPOSED" }
+      ],
+      "estimateNote": "The ordinary-ci ceiling assumes roughly 250 runner-minutes per full test.yml push. That figure is an unmeasured estimate."
+    }
+  },
+
+  "children": [
+    { "issue": 1419, "gate": "R1", "dependsOn": [1407], "consumes": ["cutoff", "baselines", "outcome-vocabulary", "authority-capacity", "failure-amendment-stopping", "retrospective"], "closureEvidence": "Merged versioned registration and complete initial row manifest (baseline B1, entry points, case IDs, source hashes, oracle, controls, row classes, release-critical marks, timebox and compute within s1 ceilings) committed before any decision-bearing sweep result." },
+    { "issue": 1311, "gate": "S1", "dependsOn": [1419], "consumes": ["baselines", "outcome-vocabulary", "authority-capacity", "failure-amendment-stopping"], "closureEvidence": "Every registered row executed or recorded not-investigated within the s1 ceilings; archived probes, independent-oracle results, controls, and a reproducible report, including zero-finding and timebox-stopped outcomes." },
+    { "issue": 1413, "gate": "S2", "dependsOn": [1311], "consumes": ["outcome-vocabulary", "failure-amendment-stopping", "authority-capacity"], "closureEvidence": "One reviewed disposition per row and witness from findingDispositions; accepted repairs within s2 ceilings attached to #1409 and blocking #1423; no unresolved false unconditional proof keeps guard-removal or claim eligibility." },
+    { "issue": 1420, "gate": "G1", "dependsOn": [1407], "consumes": ["artifact-inventory", "retrospective"], "closureEvidence": "Consumer and RID inventory; no unowned Z3 seeding workaround; no implicit network download; discriminating fresh-checkout tests for absent, wrong, and propagated assets." },
+    { "issue": 1421, "gate": "G2", "dependsOn": [1407, 1420], "consumes": ["outcome-vocabulary", "authority-capacity", "failure-amendment-stopping"], "closureEvidence": "Merged machine-readable determinism protocol (case IDs, environment pins, run count, timeouts, retry and failure rules) within the determinism-compute ceiling, before decision-bearing runs." },
+    { "issue": 1135, "gate": "G3", "dependsOn": [1420, 1421], "consumes": ["outcome-vocabulary", "artifact-inventory"], "closureEvidence": "Repaired oracle executed under the #1421 protocol with every attempt retained and agreement under the frozen failure rule." },
+    { "issue": 1241, "gate": "G4", "dependsOn": [1407, 1420], "consumes": ["artifact-inventory", "outcome-vocabulary"], "closureEvidence": "Checkout-pinned Tier 2 run with explicit positive/negative/multifile expectations, no build-output duplicates, no empty advertised selections, AST-roundtrip claims matching the work performed, and negative self-tests." },
+    { "issue": 1417, "gate": "P1", "dependsOn": [1407], "consumes": ["provenance-identity", "artifact-inventory", "retrospective"], "closureEvidence": "Fresh-clone resolution of every authoritative identity after squash merge; failing tests for branch-only replacement, false identical-tree claims, and shallow-clone skips; historical stamps unchanged." },
+    { "issue": 1276, "gate": "B1", "dependsOn": [1407], "consumes": ["benchmark-equivalence", "artifact-inventory", "retrospective"], "closureEvidence": "Content-addressed pair manifest with every benchmarkEquivalence pair field and disposition, declared sampling unit and population, and historical artifacts left historical." },
+    { "issue": 1422, "gate": "B2", "dependsOn": [1276, 1417], "consumes": ["benchmark-equivalence", "provenance-identity", "release-path", "retrospective"], "closureEvidence": "End-to-end tests: refusal fails the workflow and leaves no publication PR; unclassified or changed pairs block headlines; methodology change needs a prior amendment, not a workflow input." },
+    { "issue": 1410, "gate": "R2", "dependsOn": [1407], "consumes": ["release-path", "provenance-identity", "authority-capacity"], "closureEvidence": "Negative tests proving release, package, website, notes, and benchmark publication cannot proceed without one matching successful adjudication identity; GitHub release created only after adjudication." },
+    { "issue": 1423, "gate": "C1", "dependsOn": [1413, 1420, 1135, 1241, 1417, 1276, 1422, 1410], "consumes": ["artifact-inventory", "provenance-identity", "failure-amendment-stopping"], "closureEvidence": "Committed immutable candidate manifest including the SHA-256 of this contract packet (sha256.json) and its amendment log; tested invalidation classifier." },
+    { "issue": 1424, "gate": "C2", "dependsOn": [1423], "consumes": ["artifact-inventory", "outcome-vocabulary", "authority-capacity"], "closureEvidence": "Every authoritative inventory artifact regenerated on the candidate within the regeneration ceilings, all attempts retained in durable storage, fresh-clone reproduction of the deterministic subset." },
+    { "issue": 1408, "gate": "A1", "dependsOn": [1424, 1410], "consumes": ["outcome-vocabulary", "authority-capacity", "failure-amendment-stopping", "benchmark-equivalence", "release-path"], "closureEvidence": "One adjudication outcome per registered artifact and claim, capped at BOUNDED under the recorded independence deviation, and a machine-readable terminal record." }
+  ],
+
+  "retrospective": [
+    {
+      "item": "#845",
+      "preCutRepair": "PR #961 (merge e8bb373150f7ccdf303740d24af0180ada8e9220, 2026-08-12)",
+      "issueState": "OPEN",
+      "repaired": "ContractTranslator translates unsigned literals through UnsignedValue into unsigned bit-vectors and applies C# numeric promotions; NumericExecutableSemanticsTests adds a runtime differential promotion matrix including u64 0, 1, ulong.MaxValue.",
+      "residual": "#845 is still open and its named regression (a ULONG: contract bound near ulong.MaxValue that proves when satisfiable and refutes when violated) is not identified as a closing test. ExpressionSimplifier folds unary Negate and BitwiseNot over IntLiteralNode without checking IsUnsigned or IsLong; whether that reaches an established proof was NOT executed here, to keep R1 preregistered.",
+      "role": "Retrospective discriminating control for #1419/#1311 (pre-fix parent 17d253dff964e37538a5f503d3744b576bd2fb52).",
+      "residualOwner": 1419
+    },
+    {
+      "item": "#859",
+      "preCutRepair": "none (no PR); explicit-bootstrap rule superseded the proposed fix",
+      "issueState": "OPEN",
+      "repaired": "Builds are network-free; the ValidateZ3Assets target runs scripts/verify-z3-assets.py before ResolveReferences and fails on missing assets; test.yml proves 'Missing Z3 fails before compilation without downloading'.",
+      "residual": "Native propagation still relies on the evaluation-time runtimes glob plus the AfterTargets=Build CopyZ3NativeToOutput side copy that #859 suspected of racing. Each workflow bootstraps separately (download-z3 appears in 9 of 12 workflow files). Developer bootstrap uses upstream archives pinned by src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256, while publish-nuget.yml uses z3-binaries-4.15.7 release assets pinned by .github/z3-binaries-4.15.7.sha256. No RID consumer matrix proves zero silent Z3 skips for every consumer. #859's MSBuild-time download is rejected.",
+      "role": "Stale proposal; not a 0.24 child.",
+      "residualOwner": 1420
+    },
+    {
+      "item": "#1157",
+      "preCutRepair": "PR #1199 (merge 9e2bddecae7b0090b373f06e91afa228b8ca3af9, 2026-09-08)",
+      "issueState": "OPEN",
+      "repaired": "scripts/check-benchmark-methodology.js refuses fewer runs or a changed metric set; BenchmarkMethodologyAgreementTests (gate 16) checks CHANGELOG against website data. Defect 1 (metricCount) did not reproduce.",
+      "residual": "benchmark.yml pipes the checker through tee inside a step with the default shell (bash -e, no pipefail), so a refusal does not fail the step: run 34473057220 (push, efbd891a, 2026-09-10) succeeded. PR #1226 on benchmark-results-update is still OPEN at the cutoff. allow_weaker_methodology is an unchecked workflow input. Release events also open publication PRs. The agent-refactoring job pushes to main directly and writes passRate 0 when extraction fails. No pair manifest is consumed.",
+      "role": "Retrospective partial repair.",
+      "residualOwner": 1422
+    },
+    {
+      "item": "#1159",
+      "preCutRepair": "PR #1199 (merge 9e2bddecae7b0090b373f06e91afa228b8ca3af9, 2026-09-08)",
+      "issueState": "OPEN",
+      "repaired": "bench/phase0-agent-native/commit-stamp-index.json records a resolvable equivalent beside each stamp; LedgerCommitStampTests checks resolution, index/ledger agreement, and coverage.",
+      "residual": "Reachability is tested against HEAD (a pull_request merge ref in PR CI), not fetched protected main or a tag. A shallow clone skips instead of failing. The identical-src-tree basis is asserted in JSON, not verified by the test. eng/test-manifest.json says the test job runs at fetch-depth 0 and shards stay shallow; test.yml does the reverse. website/public/data/benchmark-provenance.json and benchmark-results.json carry short SHA c2a8816d. There is no post-merge write-back.",
+      "role": "Retrospective partial repair.",
+      "residualOwner": 1417
+    }
+  ],
+
+  "amendmentLog": []
+}
