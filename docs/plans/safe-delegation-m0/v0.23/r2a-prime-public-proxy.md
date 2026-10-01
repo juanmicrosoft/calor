@@ -122,6 +122,16 @@ The selection must not favor code Calor already handles well.
   in Section 7 with the rule and commit. All 12 original primary
   repositories stay in the reported denominator, with their exclusion
   reason if removed.
+- **Global rules can still be tailored.** A rule that names no repository
+  (for example, "exclude Unity projects") can still be written with the
+  public sample in mind. Two further controls apply. (a) Before
+  application, each removal rule is reviewed by the R1 methods reviewer
+  against the disclosed 24-repository sample, with the list of repositories
+  it would remove shown to the reviewer. (b) Any exclusion that depends on
+  what Calor supports (R3's support intersection) is a coverage cost of
+  Calor, not a neutral filter: R2B′ and R4 must report, per repository, the
+  fraction of otherwise-eligible tasks removed by Calor-support rules,
+  alongside and separate from comparative results.
 
 ### 3.2 Candidate query (GitHub search, metadata only)
 
@@ -166,17 +176,20 @@ author list, or link is requested. R2B′ eligibility under the R1/R3 rules
 is a different, later measurement and may find zero eligible tasks in a
 repository that passes C8.
 
-### 3.4 C12 build protocol (frozen in review round 1, before any build)
+### 3.4 C12 build protocol (frozen in review rounds 1–2, before any build)
 
 No build has run. This protocol was added after the Section 4 snapshot was
 public, in response to review objection R1-2; it names no repository.
 
-1. **Environment.** Linux x64, Docker image `mcr.microsoft.com/dotnet/sdk:10.0`
-   (digest recorded at run time), no extra workloads installed, network
-   access to `api.nuget.org` and to package sources declared in the
-   repository's own `NuGet.config`. If the repository's root `global.json`
-   pins an SDK major.minor other than 10.0, use
-   `mcr.microsoft.com/dotnet/sdk:<major.minor>` instead; if that image does
+1. **Environment.** Linux x64, Docker image
+   `mcr.microsoft.com/dotnet/sdk:10.0@sha256:35d40304542c8689331f8cab17c65926cdf48fe711e289321d71924b230a7d29`
+   (multi-arch index digest retrieved 2026-10-01; the linux/amd64 entry is
+   used). Container limits: 4 CPUs, 16 GB memory, 64 GB disk. No extra
+   workloads installed. Network access to `api.nuget.org` and to package
+   sources declared in the repository's own `NuGet.config`. If the
+   repository's root `global.json` pins an SDK major.minor other than 10.0,
+   use `mcr.microsoft.com/dotnet/sdk:<major.minor>` at the digest that tag
+   resolves to on 2026-10-01 (recorded in the C12 output); if that tag does
    not exist, the result is a failure.
 2. **Entry point.** The single `.sln`/`.slnx` file at the repository root; if
    there are several, the one whose base name equals the repository name
@@ -185,18 +198,27 @@ public, in response to review objection R1-2; it names no repository.
 3. **Command.** `dotnet build <entry> -c Release -p:TreatWarningsAsErrors=false
    -p:EnableWindowsTargeting=true -p:NuGetAudit=false`, 30-minute limit. No
    source edits, no workload installs, no repository build scripts.
-4. **Infrastructure failures.** A failure whose log matches network/HTTP 5xx,
-   NuGet feed timeout, out-of-memory, or disk-full patterns is retried, up to
-   3 attempts in total. Any other failure, or the same infrastructure
-   failure on all 3 attempts, is a repository failure.
+4. **Infrastructure failures.** A failed attempt is classed *infrastructure*
+   only if its log matches at least one of these case-insensitive regexes
+   **and** contains no `error CS\d{4}`, `error MSB\d{4}` other than
+   `MSB3073`/`MSB4181`, or `error NETSDK\d{4}` line:
+   `Response status code does not indicate success: 5\d\d`,
+   `NU1301`, `The SSL connection could not be established`,
+   `Name or service not known`, `Resource temporarily unavailable`,
+   `No space left on device`, `OutOfMemoryException`, `exit code 137`.
+   Infrastructure failures are retried, up to 3 attempts in total. Any
+   other failure, or an infrastructure failure on all 3 attempts, is a
+   repository failure. A compiler/MSBuild/SDK error line takes precedence
+   over any infrastructure match.
 5. **Outcome.** Pass = exit code 0. The log is kept in the restricted store;
    only pass/fail, attempt count, failure class, image digest, and duration
    are published.
 6. **Disclosed coverage bias.** This excludes projects needing Unity, MAUI,
-   Xamarin, Windows-only native tooling, or custom build scripts. That is a
-   toolchain restriction shared by all three study arms, not a Calor
-   advantage, but it narrows the domain toward plain SDK-style projects and
-   is reported as such.
+   Xamarin, Windows-only native tooling, or custom build scripts. The
+   restriction applies to all three arms, but repository survival may still
+   correlate with Calor suitability (plain SDK-style projects are closer to
+   what Calor targets). It is therefore reported as a possible selection
+   bias, with the list of C12 failures and their failure classes.
 
 Known biases left in place (stated, not corrected):
 
@@ -221,6 +243,17 @@ Process notes (post-freeze changes, both mechanical):
   The fix (`tojson`) is a separate commit; no selection parameter changed.
 - `derive_views()` adds per-repository summary records that are a pure
   projection of the `walked` evidence.
+- License-file identity (path, blob SHA) for the 24 selected repositories
+  was added after enumeration (latest retrieval `2026-10-01T18:50:43Z`,
+  recorded per record as `license_identity_retrieval_utc`); all lookups
+  returned status `ok` with no SPDX mismatch.
+- **C6 error audit.** The enumeration-time code mapped any license-lookup
+  error to "no license". An audit of all 50 C6 failures found none caused by
+  a retrieval error: 47 have a repository-level license outside the
+  allowlist (`NOASSERTION`, GPL/AGPL, MS-PL), 2 have no license at either
+  level, and 1 (`CesiumGS/cesium-unity`) reports `Apache-2.0` at repository
+  level but `NOASSERTION` at the pinned SHA, which fails C6's equality
+  test as written. The script now aborts on any non-404 lookup error.
 
 | Quantity | Value |
 |---|---:|
@@ -318,6 +351,16 @@ Every downstream gate that touches proxy data must stay inside it.
   required for reproducibility and license attribution. Some owners are
   individuals, so their login *is* personal information here. It is used for
   one purpose only: identifying the project.
+- **Basis for each data class (stated separately).** The AUP research
+  permission covers *public, non-personal* information only; it is not
+  cited for personal data. For repository identifiers that contain an
+  individual's login, the basis is narrower: AUP §8 allows use of personal
+  information for the purpose the user authorized, and an owner who
+  publishes a repository under `owner/name` authorizes that name to identify
+  the public project. R2A′ uses it for nothing else. **Contributor-level
+  data** (authors, reviewers, assignees, even pseudonymized) has no basis
+  under R2A′. It may be collected later only if R0 or the R2B′ record
+  establishes a separate basis first; otherwise R2B′ works without it.
 
 ### 5.2 License obligations
 
@@ -353,7 +396,7 @@ Every downstream gate that touches proxy data must stay inside it.
 | Repository identifiers, URLs, pinned SHAs, licenses, repo-level metadata and counts | Yes | — | — |
 | Per-repository aggregate task counts and eligibility tallies (R2B′) | Yes (aggregates only) | — | — |
 | Issue/PR numbers or links used as task IDs (R2B′) | **No** — they lead directly to authors | Yes, under R0 rules | — |
-| Contributor usernames, reviewer/assignee identities | **No** | Only if R2B′ needs them for clustering, as keyed-HMAC pseudonyms (pseudonymous, not anonymous); key kept outside the repository | — |
+| Contributor usernames, reviewer/assignee identities | **No** | Not under R2A′. Only if R0/R2B′ first establishes a basis (§5.1), and then only as keyed-HMAC pseudonyms (pseudonymous, not anonymous) with the key outside the repository | — |
 | Emails, profile data, organization membership, location | — | — | Yes (never collected) |
 | Verbatim issue/PR text | No | Only if R2B′ requires it, under R0 retention rules | — |
 | Build logs (C12) | No (pass/fail summary only) | Yes | — |
@@ -424,6 +467,7 @@ Change log (append-only):
 | 2026-10-01 | — | Enumeration | 12 primary + 12 reserve selected (Section 4) |
 | 2026-10-01 | 24 selected | License-file identity added (path, blob SHA) | No SPDX mismatch found |
 | 2026-10-01 | — | Review round 1 | Gate value set to `NOT_REACHED` pending R0; C12 protocol, removal and continuation rules frozen ([round 1](reviews/r2a/round-1-codex.md)) |
+| 2026-10-01 | — | Review round 2 (0 blocking) | C12 digest/limits/retry matchers frozen; removal-rule review and Calor-support coverage reporting; per-class data basis; continuation chaining and license-error handling fixed ([round 2](reviews/r2a/round-2-codex.md)). Review loop stopped at zero blocking |
 
 ## 8. Non-authorization boundary
 

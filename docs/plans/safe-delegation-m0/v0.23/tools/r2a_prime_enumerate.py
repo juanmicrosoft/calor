@@ -174,6 +174,7 @@ def evaluate(full_name, exposed):
         "license_spdx_at_pinned_sha": lic_at_sha,
         "license_file_path_at_pinned_sha": lic.get("path"),
         "license_file_blob_sha_at_pinned_sha": lic.get("blob_sha"),
+        "license_lookup_status": lic.get("status"),
         "created_at": repo["createdAt"],
         "pushed_at": repo["pushedAt"],
         "stars": repo["stargazerCount"],
@@ -217,12 +218,21 @@ def evaluate(full_name, exposed):
 
 
 def license_identity(full_name, sha):
-    """Detected license SPDX id, license-file path, and blob SHA at `sha`."""
+    """Detected license SPDX id, license-file path, and blob SHA at `sha`.
+
+    HTTP 404 means GitHub detected no license file: a documented C6 failure
+    (`status: not_found`). Any other error aborts the run, so a retrieval
+    failure can never be recorded as a license exclusion.
+    """
     try:
-        return gh(["-X", "GET", f"repos/{full_name}/license", "-f", f"ref={sha}",
-                   "--jq", "{spdx: (.license.spdx_id // null), path: .path, blob_sha: .sha}"])
-    except RuntimeError:
-        return {}
+        r = gh(["-X", "GET", f"repos/{full_name}/license", "-f", f"ref={sha}",
+                "--jq", "{spdx: (.license.spdx_id // null), path: .path, blob_sha: .sha}"])
+        r["status"] = "ok"
+        return r
+    except RuntimeError as e:
+        if "HTTP 404" in str(e) or "Not Found" in str(e):
+            return {"spdx": None, "path": None, "blob_sha": None, "status": "not_found"}
+        raise
 
 
 def add_license_identity(path):
@@ -236,9 +246,13 @@ def add_license_identity(path):
             w["license_file_path_at_pinned_sha"] = lic.get("path")
             w["license_file_blob_sha_at_pinned_sha"] = lic.get("blob_sha")
             w["license_identity_retrieval_utc"] = now
+            w["license_lookup_status"] = lic.get("status")
             if lic.get("spdx") != w["license_spdx_at_pinned_sha"]:
                 w["license_identity_mismatch"] = lic.get("spdx")
     d["content_inspected"] = CONTENT_STATEMENT
+    d["candidate_walk_order_sha256"] = hashlib.sha256(
+        "\n".join(d["candidate_walk_order"]).encode()).hexdigest()
+    d["next_rank"] = max(w["order_rank"] for w in d["walked"]) + 1
     derive_views(d)
     with open(path, "w") as f:
         json.dump(d, f, indent=2)
@@ -246,10 +260,20 @@ def add_license_identity(path):
 
 
 def continue_walk(a, exposed):
-    """Versioned continuation: frozen candidate order, live metadata at run time."""
+    """Versioned continuation: frozen candidate order, live metadata at run time.
+
+    Accepts the base snapshot or a previous continuation. Every output carries
+    the base snapshot's candidate order (and its SHA-256) plus the next cursor,
+    so continuations chain without re-walking ranks.
+    """
     base = json.load(open(a.continue_from))
     ordered = base["candidate_walk_order"]
-    start = max(w["order_rank"] for w in base["walked"])  # ranks are 1-based
+    order_sha = hashlib.sha256("\n".join(ordered).encode()).hexdigest()
+    if base.get("candidate_walk_order_sha256", order_sha) != order_sha:
+        raise SystemExit("candidate order does not match its recorded hash")
+    if base.get("criteria_freeze_commit") != a.freeze_commit:
+        raise SystemExit("freeze commit differs from the base snapshot")
+    start = base.get("next_rank", max(w["order_rank"] for w in base["walked"]) + 1) - 1
     walked, eligible = [], []
     for i in range(start, len(ordered)):
         if len(eligible) >= a.need:
@@ -263,6 +287,10 @@ def continue_walk(a, exposed):
     out = {
         "schema": "calor/r2a-prime-repos-continuation/v1",
         "continuation_of": a.continue_from,
+        "base_snapshot": base.get("base_snapshot", a.continue_from),
+        "candidate_walk_order": ordered,
+        "candidate_walk_order_sha256": order_sha,
+        "next_rank": (walked[-1]["order_rank"] + 1) if walked else start + 1,
         "criteria_freeze_commit": a.freeze_commit,
         "retrieval_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "comparability": "candidate set and order frozen at base snapshot; metadata, pins, and HEAD licenses are live at retrieval_utc",
@@ -336,6 +364,8 @@ def main():
         "search_partitions": [{k: v for k, v in p.items() if k != "names"} for p in partitions],
         "candidate_count": len(candidates),
         "candidate_walk_order": ordered,
+        "candidate_walk_order_sha256": hashlib.sha256("\n".join(ordered).encode()).hexdigest(),
+        "next_rank": walked[-1]["order_rank"] + 1,
         "primary": primary,
         "reserve_ordered": reserve,
         "walked": walked,
@@ -362,7 +392,9 @@ def derive_views(out):
         for name in out[src]:
             w = by[name]
             rec = {k: w.get(k) for k in keep}
-            rec["retrieval_utc"] = out["retrieval_utc"]
+            rec["enumeration_retrieval_utc"] = out["retrieval_utc"]
+            rec["license_identity_retrieval_utc"] = w.get(
+                "license_identity_retrieval_utc", out["retrieval_utc"])
             rec["criteria_evidence"] = {
                 "C1_primary_language": w["primary_language"],
                 "C3_created_at": w["created_at"], "C4_pushed_at": w["pushed_at"],

@@ -2215,7 +2215,8 @@
       "order_key": "040a69ac8f54a03110b8cb0185a8948077aaf79fc98faa7fcf5fbf530ef244e4",
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "f316d62a8dcc7db44196e41bfd4e8779253884fd",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "p-org/P",
@@ -2377,7 +2378,8 @@
       "order_key": "05249c29a22f89e8e4464112d6fd763715188a8c92c3b1dc480a38bd060e94c2",
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "3c41a8b143fac47abdfb6cc79e0d8c97462746d0",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "msallin/SQLiteCodeFirst",
@@ -2475,7 +2477,8 @@
       "order_key": "058b20707913580bb070437ae02d904d81b2207cbaaf6c528d899bd5536b6279",
       "license_file_path_at_pinned_sha": "license.txt",
       "license_file_blob_sha_at_pinned_sha": "ad84f46d67bc77d32efc1176902818bd758d0d75",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "microsoft/semantic-kernel",
@@ -2508,7 +2511,8 @@
       "order_key": "05c5fb29e8d9e0aa962081c8b0f9763f1f14d7690d3cec01d0f03f1531de3513",
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "9e841e7a26e4eb057b24511e7b92d42b257a80e5",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "ldqk/Masuit.LuceneEFCore.SearchEngine",
@@ -2803,7 +2807,8 @@
       "order_key": "06d8c53e5d4ac16f7b8d4889fa88fd990b29390cf2445782ffae0a921f0c6989",
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "3be7807cb688c436b95c6b2d9646eebd64debf44",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "dotnet/crank",
@@ -2869,7 +2874,8 @@
       "order_key": "073a98443c466bdd9854dd700c69b88f1e8a210fc68a01d84b2100e721b4f498",
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "a43de19ee6fe0db7705a7ba584ce7b073820daa4",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "HJLebbink/asm-dude",
@@ -3360,7 +3366,8 @@
       "order_key": "096c14f7af36f0f2483cc45e6887c9768a6aa4644f320ddf5c2823b5bcae2ed0",
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "049832f4103d739aaddebbe28b612c9891a19420",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "SpecterOps/SharpHound",
@@ -3527,7 +3534,8 @@
       "order_key": "0a56ad8fbab45492ff71bcc7b06ac15a7227ac85d1f8a4d60c5b68d832fe7923",
       "license_file_path_at_pinned_sha": "LICENSE.TXT",
       "license_file_blob_sha_at_pinned_sha": "984713a49622a96da110443c15477613bc12656b",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "Humanizr/Humanizer",
@@ -3658,7 +3666,8 @@
       "order_key": "0bb367cca6f0cc8bccc081561cc5d9780f18d7eb22ff2c1253168291a1fb54b7",
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "b7c9ed18598ab25b0c3325d5cfa0496bb0207f4d",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "svenhb/GRBL-Plotter",
@@ -3756,7 +3765,8 @@
       "order_key": "0c2b0d7d49bfff8b3190e105b7dcf9bfacad5cec48e0c3a1505a483eced8da29",
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "b46bc579feac40acca5046bc48a00fbcb74ecb44",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "Mikachu2333/rimage_gui",
@@ -4117,7 +4127,8 @@
       "order_key": "0e5fdbd8ccac82d6ea1a95f85b9353d9ffb00ba816d8a5ad954c289b9724a2b0",
       "license_file_path_at_pinned_sha": "LICENSE.txt",
       "license_file_blob_sha_at_pinned_sha": "e93594e3e3fe6d77fb7bd3c954949ff33b7d8b08",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "Lidarr/Lidarr",
@@ -4247,7 +4258,8 @@
       "order_key": "0ee87bbb4d0b5c77ec8e5116cc8f4e14fa976be35bbdc12d46c31f5a30421695",
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "91a53826ba7ddfea105907e602f90fc3e19e4a80",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "SuperStudio/SuperCom",
@@ -4347,7 +4359,8 @@
       "order_key": "0f22d75c771612488c9246eafcc4d33ad55fe351de4265bc38673d85d0f7b68b",
       "license_file_path_at_pinned_sha": "LICENSE.TXT",
       "license_file_blob_sha_at_pinned_sha": "21071075c24599ee98254f702bcfc504cdc275a6",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "helix-toolkit/helix-toolkit",
@@ -4380,7 +4393,8 @@
       "order_key": "0f6d6f19237afcbeb49e17ee743cecfcd0f216ae96085125da895cccfb5878d8",
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "337f86e69734b08cff1dbe98326d01d8dbcc5be0",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "UltraStar-Deluxe/Play",
@@ -4737,7 +4751,8 @@
       "order_key": "118e4dd2eab5ba74f06c49762d3d9083bb9ade7d888d4ccf79292596b54e5b68",
       "license_file_path_at_pinned_sha": "LICENSE.txt",
       "license_file_blob_sha_at_pinned_sha": "057f3d65a17f3586e7e648c9e4bb44b9adcc19b8",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "realworld-apps/aspnetcore-realworld-example-app",
@@ -4836,7 +4851,8 @@
       "order_key": "12dc980077099ab1b530189b8ae76a9c54d17945fa554f31abe21bbecdeafbb4",
       "license_file_path_at_pinned_sha": "LICENSE.md",
       "license_file_blob_sha_at_pinned_sha": "d864f50021345347d0804e77f957279918484993",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "SmallChi/JT808",
@@ -4902,7 +4918,8 @@
       "order_key": "131e1fc09b035d91852f604a6e12d58b4280129dfb3c6f14e1536cf18483d44f",
       "license_file_path_at_pinned_sha": "license.md",
       "license_file_blob_sha_at_pinned_sha": "87bf3c0b6fcbb8788558e3bbf76506579194d8e3",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "dotnet/iot",
@@ -4935,7 +4952,8 @@
       "order_key": "13ae09aa019d7d11ad89bfad1abe74772cc33aa7998c29f745137af71251c10c",
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "984713a49622a96da110443c15477613bc12656b",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "ThePornDatabase/Jellyfin.Plugin.ThePornDB",
@@ -5099,7 +5117,8 @@
       "order_key": "1409c3ee83482eb11ba0f509776b5cbe1b60e082414b862a8cb6b0460aab193a",
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "9e841e7a26e4eb057b24511e7b92d42b257a80e5",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "EDCD/EDDI",
@@ -5392,7 +5411,8 @@
       "order_key": "158feee89a7e549faa33fb2e8768fbc4147a982b3f0773b63ed8ee0d25d0368b",
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "cb177033a11de9529081995dad49bc207ec6b413",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "srwi/EverythingToolbar",
@@ -5491,7 +5511,8 @@
       "order_key": "160616c7f48aa5b7fab0d77e1ffbbf3ab1aef5cceaddd71cbce27baffe1f2d3e",
       "license_file_path_at_pinned_sha": "LICENSE.TXT",
       "license_file_blob_sha_at_pinned_sha": "7910db0a18d8121367d5128e09646be298ef2969",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "MvvmCross/MvvmCross",
@@ -5589,7 +5610,8 @@
       "order_key": "16d652df1e5538bef6b97573dc291d336a715fdf3fc692c2414993696d5a2f45",
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "d645695673349e3947e8e5ae42332d0ac3164cd7",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "FreyaHolmer/Mathfs",
@@ -5721,7 +5743,8 @@
       "order_key": "17913fc2ea250c349c9aa76e9d41a222f7ca5ea03613ee56bb203283c813de2c",
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "809ba9a330434d9feed4d9fd46b975a32ac9c6d6",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     },
     {
       "repo": "nesrak1/AssetsTools.NET",
@@ -5818,7 +5841,8 @@
       "order_key": "17f42f2a400cfc90d8ff2014e579dc443db77cba7f8ef6c172b80e220b861c81",
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "99483c64dd670725cee099bc20a2bc7d253a03c3",
-      "license_identity_retrieval_utc": "2026-10-01T18:44:11Z"
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
+      "license_lookup_status": "ok"
     }
   ],
   "content_inspected": "none read or retained: issue/PR searches return counts only; repository-search objects are projected to full_name in memory; maintainer-authored commit-search items are discarded inside gh (--jq); license file content is projected to SPDX id, path, blob SHA",
@@ -5833,7 +5857,8 @@
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "f316d62a8dcc7db44196e41bfd4e8779253884fd",
       "order_rank": 21,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2019-10-05T14:14:56Z",
@@ -5858,7 +5883,8 @@
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "3c41a8b143fac47abdfb6cc79e0d8c97462746d0",
       "order_rank": 26,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2022-12-17T13:40:24Z",
@@ -5883,7 +5909,8 @@
       "license_file_path_at_pinned_sha": "license.txt",
       "license_file_blob_sha_at_pinned_sha": "ad84f46d67bc77d32efc1176902818bd758d0d75",
       "order_rank": 29,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2010-12-30T16:29:27Z",
@@ -5908,7 +5935,8 @@
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "9e841e7a26e4eb057b24511e7b92d42b257a80e5",
       "order_rank": 30,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2023-02-27T17:39:42Z",
@@ -5933,7 +5961,8 @@
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "3be7807cb688c436b95c6b2d9646eebd64debf44",
       "order_rank": 39,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2022-08-28T14:00:26Z",
@@ -5958,7 +5987,8 @@
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "a43de19ee6fe0db7705a7ba584ce7b073820daa4",
       "order_rank": 41,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2017-12-20T08:55:34Z",
@@ -5983,7 +6013,8 @@
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "049832f4103d739aaddebbe28b612c9891a19420",
       "order_rank": 56,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2018-05-17T13:05:29Z",
@@ -6008,7 +6039,8 @@
       "license_file_path_at_pinned_sha": "LICENSE.TXT",
       "license_file_blob_sha_at_pinned_sha": "984713a49622a96da110443c15477613bc12656b",
       "order_rank": 61,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2021-02-15T06:04:41Z",
@@ -6033,7 +6065,8 @@
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "b7c9ed18598ab25b0c3325d5cfa0496bb0207f4d",
       "order_rank": 65,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2013-12-04T19:37:39Z",
@@ -6058,7 +6091,8 @@
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "b46bc579feac40acca5046bc48a00fbcb74ecb44",
       "order_rank": 68,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2014-02-03T08:17:41Z",
@@ -6083,7 +6117,8 @@
       "license_file_path_at_pinned_sha": "LICENSE.txt",
       "license_file_blob_sha_at_pinned_sha": "e93594e3e3fe6d77fb7bd3c954949ff33b7d8b08",
       "order_rank": 79,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2009-03-27T15:41:57Z",
@@ -6108,7 +6143,8 @@
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "91a53826ba7ddfea105907e602f90fc3e19e4a80",
       "order_rank": 83,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2022-11-04T13:49:03Z",
@@ -6135,7 +6171,8 @@
       "license_file_path_at_pinned_sha": "LICENSE.TXT",
       "license_file_blob_sha_at_pinned_sha": "21071075c24599ee98254f702bcfc504cdc275a6",
       "order_rank": 86,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2021-03-15T21:48:18Z",
@@ -6160,7 +6197,8 @@
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "337f86e69734b08cff1dbe98326d01d8dbcc5be0",
       "order_rank": 87,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2014-08-27T07:28:47Z",
@@ -6185,7 +6223,8 @@
       "license_file_path_at_pinned_sha": "LICENSE.txt",
       "license_file_blob_sha_at_pinned_sha": "057f3d65a17f3586e7e648c9e4bb44b9adcc19b8",
       "order_rank": 98,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2017-06-17T22:37:11Z",
@@ -6210,7 +6249,8 @@
       "license_file_path_at_pinned_sha": "LICENSE.md",
       "license_file_blob_sha_at_pinned_sha": "d864f50021345347d0804e77f957279918484993",
       "order_rank": 101,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2015-02-13T03:02:17Z",
@@ -6235,7 +6275,8 @@
       "license_file_path_at_pinned_sha": "license.md",
       "license_file_blob_sha_at_pinned_sha": "87bf3c0b6fcbb8788558e3bbf76506579194d8e3",
       "order_rank": 103,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2013-02-08T01:51:31Z",
@@ -6260,7 +6301,8 @@
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "984713a49622a96da110443c15477613bc12656b",
       "order_rank": 104,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2018-10-04T19:15:33Z",
@@ -6285,7 +6327,8 @@
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "9e841e7a26e4eb057b24511e7b92d42b257a80e5",
       "order_rank": 109,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2022-10-13T03:50:15Z",
@@ -6310,7 +6353,8 @@
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "cb177033a11de9529081995dad49bc207ec6b413",
       "order_rank": 118,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2018-01-04T03:34:45Z",
@@ -6335,7 +6379,8 @@
       "license_file_path_at_pinned_sha": "LICENSE.TXT",
       "license_file_blob_sha_at_pinned_sha": "7910db0a18d8121367d5128e09646be298ef2969",
       "order_rank": 121,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2016-10-29T06:28:31Z",
@@ -6360,7 +6405,8 @@
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "d645695673349e3947e8e5ae42332d0ac3164cd7",
       "order_rank": 124,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2018-11-28T18:44:09Z",
@@ -6385,7 +6431,8 @@
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "809ba9a330434d9feed4d9fd46b975a32ac9c6d6",
       "order_rank": 128,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2019-02-16T10:03:36Z",
@@ -6410,7 +6457,8 @@
       "license_file_path_at_pinned_sha": "LICENSE",
       "license_file_blob_sha_at_pinned_sha": "99483c64dd670725cee099bc20a2bc7d253a03c3",
       "order_rank": 131,
-      "retrieval_utc": "2026-10-01T18:28:29Z",
+      "enumeration_retrieval_utc": "2026-10-01T18:28:29Z",
+      "license_identity_retrieval_utc": "2026-10-01T18:50:43Z",
       "criteria_evidence": {
         "C1_primary_language": "C#",
         "C3_created_at": "2014-05-30T21:19:14Z",
@@ -6425,5 +6473,7 @@
         "C12_build_check": "deferred to R2B-prime preflight"
       }
     }
-  ]
+  ],
+  "candidate_walk_order_sha256": "6af9d591c7f2306982422475a65e7cf78b813fbef9deca99f074aec5a2f19f78",
+  "next_rank": 132
 }
