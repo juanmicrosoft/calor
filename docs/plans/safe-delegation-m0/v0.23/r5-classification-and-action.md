@@ -246,10 +246,14 @@ This record reopens nothing.
 
 R0 Section 10 sends the administrative closeout record through
 [review-protocol.md](review-protocol.md) when rounds and cash remain. Both
-remain. Round files are under `reviews/R5/`.
+remained, so the close-out record (this file, the records it links for R1,
+R2A′, R3, R2B′, and R4, amendment 002, gate-state.json, the ledger, and the
+boundary test) was reviewed by Codex.
 
-Review log: see the round files and Section 14 of this record.
+| Round | Reviewed commit | BLOCKING | MAJOR | MINOR | Outcome |
+|---|---|---:|---:|---:|---|
+| 1 | `ae0c70a1` | 2 | 3 | 0 | All accepted; fixes in `546871b0` ([round-1-codex.md](reviews/R5/round-1-codex.md)) |
 
-## 14. Review status
-
-Pending.
+A clean review round would not make R5 `MET`: R5 is `UNAVAILABLE` whatever
+the review outcome. If BLOCKING objections remained after round 5, this
+record would list them, and the maintainer could still decline to merge.
