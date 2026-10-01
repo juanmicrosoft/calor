@@ -350,7 +350,8 @@ public class EvidenceContractTests
     {
         var row = BenchmarkRow();
         row["benchmark"]!["comparability"]![field] = field == "runCount" ? 1 : "changed";
-        AssertViolation(Rows(row), "E008");
+        // A changed sampling unit is also not the frozen one, so E010 may accompany E008.
+        AssertViolation(Rows(row), "E008", "E010");
     }
 
     [Fact]
@@ -453,6 +454,33 @@ public class EvidenceContractTests
         AssertViolation(Rows(row), "E009");
     }
 
+    [Theory]
+    [InlineData("calorPath", "bool")]
+    [InlineData("pairId", "object")]
+    [InlineData("reviewer", "bool")]
+    [InlineData("inputSet", "number")]
+    public void PairFieldWithWrongJsonTypeFails(string field, string kind)
+    {
+        var row = BenchmarkRow();
+        row["benchmark"]!["pairs"]![0]![field] = kind switch
+        {
+            "bool" => JsonValue.Create(false),
+            "number" => JsonValue.Create(7),
+            _ => new JsonObject { ["x"] = 1 },
+        };
+        AssertViolation(Rows(row), "E009");
+    }
+
+    [Fact]
+    public void ComparabilityKeysAgreeingOnWrongSamplingUnitFail()
+    {
+        // Both keys agree with each other, but on the wrong unit; the outer field still says program-pair.
+        var row = BenchmarkRow();
+        row["benchmark"]!["comparability"]!["samplingUnit"] = "run";
+        row["benchmark"]!["comparedTo"]!["samplingUnit"] = "run";
+        AssertViolation(Rows(row), "E010");
+    }
+
     [Fact]
     public void ComparabilityKeyWithShortHashFails()
     {
@@ -510,25 +538,72 @@ public class EvidenceContractTests
     [Fact]
     public void WellFormedSuccessRecordPasses()
     {
-        var violations = EvidenceContractValidator.ValidateTerminalRecord(Contract(), SuccessRecord());
+        var violations = Terminal(SuccessRecord());
         Assert.True(violations.Count == 0, Describe(violations));
     }
 
     [Fact]
-    public void SuccessWithReleaseCriticalNonSweepBlockerFails()
+    public void SuccessWithClaimRowPasses()
     {
-        // A blocker outside the #1419 sweep (here, the release quality reports) still fails success.
         var record = SuccessRecord();
-        record["adjudications"]![1]!["outcome"] = "BLOCKED";
-        AssertViolation(EvidenceContractValidator.ValidateTerminalRecord(Contract(), record), "T001");
+        record["adjudications"]!.AsArray().Add(Adjudication("claim:verifier-coverage", "BOUNDED"));
+        var violations = Terminal(record);
+        Assert.True(violations.Count == 0, Describe(violations));
     }
 
     [Fact]
-    public void SuccessWithoutAdjudicationRowsFails()
+    public void SuccessWithNonSweepBlockerFails()
+    {
+        // A blocker outside the #1419 sweep (the release quality reports) still fails success.
+        var record = SuccessRecord();
+        Subject(record, "release-quality-reports")["outcome"] = "BLOCKED";
+        AssertViolation(Terminal(record), "T001");
+    }
+
+    [Fact]
+    public void SuccessWithBlockerMarkedNonCriticalStillFails()
+    {
+        // Criticality is fixed by the contract; a record-supplied flag cannot launder a blocker.
+        var record = SuccessRecord();
+        var row = Subject(record, "release-quality-reports");
+        row["outcome"] = "BLOCKED";
+        row["releaseCritical"] = false;
+        AssertViolation(Terminal(record), "T001");
+    }
+
+    [Theory]
+    [InlineData("release-quality-reports")]
+    [InlineData("gate:#1311")]
+    public void SuccessMissingRequiredSubjectFails(string subject)
     {
         var record = SuccessRecord();
-        record["adjudications"] = new JsonArray();
-        AssertViolation(EvidenceContractValidator.ValidateTerminalRecord(Contract(), record), "T001");
+        record["adjudications"]!.AsArray().Remove(Subject(record, subject));
+        AssertViolation(Terminal(record), "T001");
+    }
+
+    [Fact]
+    public void ImproperHistoricalOnlyDemotionFails()
+    {
+        // release-quality-reports is derived, not historical-only; missing evidence must be BLOCKED.
+        var record = SuccessRecord();
+        Subject(record, "release-quality-reports")["outcome"] = "HISTORICAL-ONLY";
+        AssertViolation(Terminal(record), "T003");
+    }
+
+    [Fact]
+    public void DuplicateSubjectFails()
+    {
+        var record = SuccessRecord();
+        record["adjudications"]!.AsArray().Add(Adjudication("test-manifest", "BOUNDED"));
+        AssertViolation(Terminal(record), "T003");
+    }
+
+    [Fact]
+    public void UnknownSubjectFails()
+    {
+        var record = SuccessRecord();
+        record["adjudications"]!.AsArray().Add(Adjudication("some-artifact", "BOUNDED"));
+        AssertViolation(Terminal(record), "T003");
     }
 
     [Fact]
@@ -536,15 +611,31 @@ public class EvidenceContractTests
     {
         var record = SuccessRecord();
         record["adjudicationIndependence"] = "independent";
-        AssertViolation(EvidenceContractValidator.ValidateTerminalRecord(Contract(), record), "T002");
+        AssertViolation(Terminal(record), "T002");
+    }
+
+    [Fact]
+    public void SuccessWithoutPublishedLimitationFails()
+    {
+        var record = SuccessRecord();
+        record.Remove("limitation");
+        AssertViolation(Terminal(record), "T002");
+    }
+
+    [Fact]
+    public void SuccessClaimingEpicIndependenceFails()
+    {
+        var record = SuccessRecord();
+        record["epicIndependentAdjudicationMet"] = true;
+        AssertViolation(Terminal(record), "T002");
     }
 
     [Fact]
     public void SuccessWithSupportedRowFails()
     {
         var record = SuccessRecord();
-        record["adjudications"]![0]!["outcome"] = "SUPPORTED";
-        AssertViolation(EvidenceContractValidator.ValidateTerminalRecord(Contract(), record), "T002");
+        Subject(record, "verifier-runtime-differential")["outcome"] = "SUPPORTED";
+        AssertViolation(Terminal(record), "T002");
     }
 
     [Fact]
@@ -552,8 +643,8 @@ public class EvidenceContractTests
     {
         var record = SuccessRecord();
         record["outcome"] = "MILESTONE-FAILED";
-        record["adjudications"]![1]!["outcome"] = "BLOCKED";
-        var violations = EvidenceContractValidator.ValidateTerminalRecord(Contract(), record);
+        Subject(record, "release-quality-reports")["outcome"] = "BLOCKED";
+        var violations = Terminal(record);
         Assert.True(violations.Count == 0, Describe(violations));
     }
 
@@ -562,7 +653,7 @@ public class EvidenceContractTests
     {
         var record = SuccessRecord();
         record["outcome"] = "MILESTONE-MOSTLY-SUCCEEDED";
-        AssertViolation(EvidenceContractValidator.ValidateTerminalRecord(Contract(), record), "T003");
+        AssertViolation(Terminal(record), "T003");
     }
 
     // ------------------------------------------------------------------
@@ -712,7 +803,7 @@ public class EvidenceContractTests
     [Fact]
     public void GateMarkedMetWhileCapacityProposedFails()
     {
-        var contract = Contract();
+        var contract = ProposedContract();
         contract["gateStatus"] = "MET";
         AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C008");
     }
@@ -846,13 +937,24 @@ public class EvidenceContractTests
     [Fact]
     public void AcceptanceWriteBackWithoutInventoryVersionFails()
     {
-        AssertViolation(EvidenceContractValidator.ValidateInventory(FrozenContract(), Inventory()), "I012");
+        AssertViolation(EvidenceContractValidator.ValidateInventory(FrozenContract(), ProposedInventory()), "I012");
+    }
+
+    [Fact]
+    public void ProposedPacketIsValid()
+    {
+        // The proposed state stays valid after the write-back, so the proposed-state controls below
+        // keep their meaning whichever lifecycle state is committed.
+        var contract = ProposedContract();
+        var violations = EvidenceContractValidator.ValidateContract(contract)
+            .Concat(EvidenceContractValidator.ValidateInventory(contract, ProposedInventory())).ToList();
+        Assert.True(violations.Count == 0, Describe(violations));
     }
 
     [Fact]
     public void ProposedContractWithAcceptedCeilingFails()
     {
-        var contract = Contract();
+        var contract = ProposedContract();
         contract["authorityCapacity"]!["capacity"]!["ceilings"]![0]!["status"] = "ACCEPTED";
         AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C012");
     }
@@ -887,7 +989,7 @@ public class EvidenceContractTests
     [Fact]
     public void ProposedContractWithAcceptanceRecordFails()
     {
-        var contract = Contract();
+        var contract = ProposedContract();
         contract["acceptance"] = FrozenContract()["acceptance"]!.DeepClone();
         AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C012");
     }
@@ -964,21 +1066,50 @@ public class EvidenceContractTests
         ["removedRows"] = new JsonArray(),
     };
 
-    private static JsonNode AmendedContract(JsonObject amendment)
+    private static JsonNode AmendedContract(JsonObject amendment, JsonNode? baseContract = null)
     {
-        var contract = Contract();
+        var contract = baseContract ?? Contract();
         contract["contractVersion"] = amendment["version"]?.DeepClone();
         contract["amendmentLog"]!.AsArray().Add(amendment);
         return contract;
     }
 
-    /// <summary>The committed contract after a well-formed acceptance write-back (lifecycle FROZEN).</summary>
+    /// <summary>
+    /// The committed contract in the PROPOSED lifecycle state, whatever state is committed. After the
+    /// acceptance write-back merges, this undoes it in memory so the proposed-state controls keep
+    /// testing the proposed state instead of silently changing meaning.
+    /// </summary>
+    private static JsonNode ProposedContract()
+    {
+        var contract = Contract();
+        contract.AsObject().Remove("acceptance");
+        var log = contract["amendmentLog"]!.AsArray();
+        foreach (var entry in log.Where(e => e!["justification"]?.GetValue<string>() == "acceptance write-back").ToList())
+            log.Remove(entry);
+        contract["contractVersion"] = log.Count == 0 ? "1.0.0" : log[^1]!["version"]!.GetValue<string>();
+        contract["status"] = "PROPOSED";
+        contract["gateStatus"] = "NOT-MET";
+        contract["authorityCapacity"]!["capacity"]!["status"] = "PROPOSED";
+        foreach (var ceiling in contract["authorityCapacity"]!["capacity"]!["ceilings"]!.AsArray())
+            ceiling!["status"] = "PROPOSED";
+        return contract;
+    }
+
+    /// <summary>The inventory matching <see cref="ProposedContract"/>.</summary>
+    private static JsonNode ProposedInventory()
+    {
+        var inventory = Inventory();
+        inventory["contractVersion"] = ProposedContract()["contractVersion"]!.DeepClone();
+        return inventory;
+    }
+
+    /// <summary>The proposed contract after a well-formed acceptance write-back (lifecycle FROZEN).</summary>
     private static JsonNode FrozenContract()
     {
         var acceptance = Amendment();
         acceptance["version"] = "1.0.1";
         acceptance["justification"] = "acceptance write-back";
-        var contract = AmendedContract(acceptance);
+        var contract = AmendedContract(acceptance, ProposedContract());
         contract["status"] = "FROZEN";
         contract["gateStatus"] = "MET";
         contract["authorityCapacity"]!["capacity"]!["status"] = "ACCEPTED";
@@ -1007,27 +1138,46 @@ public class EvidenceContractTests
 
     private static string Hash(char c) => new(c, 64);
 
-    private static JsonObject SuccessRecord() => new()
+    private static JsonObject Adjudication(string subject, string outcome) => new()
     {
-        ["outcome"] = "MILESTONE-SUCCEEDED",
-        ["adjudicationIndependence"] = "reduced",
-        ["adjudications"] = new JsonArray(
-            new JsonObject
-            {
-                ["subject"] = "verifier-runtime-differential", ["outcome"] = "BOUNDED",
-                ["releaseCritical"] = true, ["independence"] = "reduced-maintainer-adjudicated",
-            },
-            new JsonObject
-            {
-                ["subject"] = "release-quality-reports", ["outcome"] = "BOUNDED",
-                ["releaseCritical"] = true, ["independence"] = "reduced-maintainer-adjudicated",
-            },
-            new JsonObject
-            {
-                ["subject"] = "llm-and-agent-results", ["outcome"] = "HISTORICAL-ONLY",
-                ["releaseCritical"] = false, ["independence"] = "reduced-maintainer-adjudicated",
-            }),
+        ["subject"] = subject,
+        ["outcome"] = outcome,
+        ["independence"] = "reduced-maintainer-adjudicated",
     };
+
+    /// <summary>
+    /// A complete success record: every inventory artifact (historical-only ones as HISTORICAL-ONLY,
+    /// the rest BOUNDED) and every child gate except #1408, with the reduced-independence statement.
+    /// </summary>
+    private static JsonObject SuccessRecord()
+    {
+        var rows = new JsonArray();
+        foreach (var artifact in Inventory()["artifacts"]!.AsArray())
+        {
+            var historical = artifact!["classification"]!.GetValue<string>() == "historical-only";
+            rows.Add(Adjudication(artifact["id"]!.GetValue<string>(), historical ? "HISTORICAL-ONLY" : "BOUNDED"));
+        }
+        foreach (var child in Contract()["children"]!.AsArray())
+        {
+            var issue = child!["issue"]!.GetValue<int>();
+            if (issue != 1408)
+                rows.Add(Adjudication($"gate:#{issue}", "BOUNDED"));
+        }
+        return new JsonObject
+        {
+            ["outcome"] = "MILESTONE-SUCCEEDED",
+            ["adjudicationIndependence"] = "reduced",
+            ["limitation"] = Contract()["authorityCapacity"]!["independence"]!["publishedLimitation"]!.GetValue<string>(),
+            ["epicIndependentAdjudicationMet"] = false,
+            ["adjudications"] = rows,
+        };
+    }
+
+    private static JsonNode Subject(JsonNode record, string subject)
+        => record["adjudications"]!.AsArray().First(r => r!["subject"]!.GetValue<string>() == subject)!;
+
+    private static IReadOnlyList<ContractViolation> Terminal(JsonNode record)
+        => EvidenceContractValidator.ValidateTerminalRecord(Contract(), Inventory(), record);
 
     /// <summary>A decision-bearing benchmark row on the candidate, citing the authoritative corpus.</summary>
     private static JsonObject BenchmarkRow()

@@ -382,6 +382,7 @@ internal static class EvidenceContractValidator
         var pairDispositions = Array(contract["benchmarkEquivalence"]?["pairDispositions"]).Select(Str).OfType<string>().ToHashSet();
         var keyFields = Array(contract["benchmarkEquivalence"]?["comparabilityKey"]).Select(Str).OfType<string>().ToList();
         var pairFields = Array(contract["benchmarkEquivalence"]?["pairRowRequiredFields"]).Select(Str).OfType<string>().ToList();
+        var stringFields = Array(contract["benchmarkEquivalence"]?["pairRowStringFields"]).Select(Str).OfType<string>().ToHashSet(StringComparer.Ordinal);
         var samplingUnit = Str(contract["benchmarkEquivalence"]?["samplingUnit"]);
         var cutoff = ParseUtc(Str(contract["cutoff"]?["timestampUtc"]));
         // Fail closed: anything other than an explicit false is treated as a standing deviation.
@@ -414,7 +415,7 @@ internal static class EvidenceContractValidator
                     v.Add(new("E011", id, "SUPPORTED is unavailable under the recorded independence deviation; the cap is BOUNDED"));
             }
 
-            v.AddRange(ValidateBenchmark(row, id, keyFields, pairFields, pairDispositions, samplingUnit));
+            v.AddRange(ValidateBenchmark(row, id, keyFields, pairFields, stringFields, pairDispositions, samplingUnit));
 
             // A benchmark row is decision-bearing (it can feed a headline, delta, or adjudication)
             // unless it is explicitly recorded as historical. Decision-bearing rows meet the same
@@ -485,43 +486,67 @@ internal static class EvidenceContractValidator
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// T001–T003: the machine-checkable part of the terminal-success predicate. MILESTONE-SUCCEEDED
-    /// needs no BLOCKED adjudication of any release-critical artifact, gate, or claim, and, under the
-    /// recorded independence deviation, adjudicationIndependence = reduced with no SUPPORTED row.
+    /// T001–T003: the machine-checkable part of the terminal-success predicate
+    /// (<c>rules.terminalSuccess</c>). The required subjects and their criticality come from the
+    /// contract and inventory, never from the record: every inventory artifact and every child gate
+    /// other than #1408 is adjudicated exactly once, every subject is release-critical, and
+    /// HISTORICAL-ONLY is valid only for an artifact the inventory classifies historical-only.
+    /// MILESTONE-SUCCEEDED needs every subject present and none BLOCKED and, under the recorded
+    /// independence deviation, the reduced-independence statement and limitation.
     /// </summary>
-    public static IReadOnlyList<ContractViolation> ValidateTerminalRecord(JsonNode contract, JsonNode record)
+    public static IReadOnlyList<ContractViolation> ValidateTerminalRecord(JsonNode contract, JsonNode inventory, JsonNode record)
     {
         var v = new List<ContractViolation>();
         var terminal = Array(contract["terminalOutcomes"]).Select(Str).OfType<string>().ToHashSet();
         var adjudicationOutcomes = Array(contract["adjudicationOutcomes"]).Select(Str).OfType<string>().ToHashSet();
+        var classification = Array(inventory["artifacts"]).Where(a => a is not null)
+            .ToDictionary(a => Str(a!["id"]) ?? "", a => Str(a!["classification"]), StringComparer.Ordinal);
+        var required = classification.Keys
+            .Concat(Array(contract["children"]).Select(c => Int(c?["issue"])).OfType<int>()
+                .Where(i => i != 1408).Select(i => $"gate:#{i}"))
+            .ToHashSet(StringComparer.Ordinal);
+
         var outcome = Str(record["outcome"]);
         if (outcome is null || !terminal.Contains(outcome))
             v.Add(new("T003", "terminal", $"unknown terminal outcome '{outcome}'"));
 
         var rows = Array(record["adjudications"]);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var row in rows)
         {
-            var subject = Str(row?["subject"]) ?? "?";
+            var subject = Str(row?["subject"]);
+            var name = subject ?? "?";
+            if (subject is null || (!required.Contains(subject) && !IsClaimSubject(subject)))
+                v.Add(new("T003", name, "unknown adjudication subject; subjects are inventory artifacts, 'gate:#<issue>', or 'claim:<id>'"));
+            else if (!seen.Add(subject))
+                v.Add(new("T003", name, "subject adjudicated more than once"));
+
             var adjudication = Str(row?["outcome"]);
             if (adjudication is null || !adjudicationOutcomes.Contains(adjudication))
-                v.Add(new("T003", subject, $"unknown adjudication outcome '{adjudication}'"));
-            if (Bool(row?["releaseCritical"]) is null)
-                v.Add(new("T003", subject, "adjudication row must state releaseCritical as a boolean"));
+                v.Add(new("T003", name, $"unknown adjudication outcome '{adjudication}'"));
+            else if (adjudication == "HISTORICAL-ONLY"
+                && (subject is null || !classification.TryGetValue(subject, out var cls) || cls != "historical-only"))
+                v.Add(new("T003", name, "HISTORICAL-ONLY is valid only for an artifact the inventory classifies historical-only"));
         }
 
         if (outcome != "MILESTONE-SUCCEEDED")
             return v;
 
-        if (rows.Count == 0)
-            v.Add(new("T001", "terminal", "a success record with no adjudication rows establishes nothing"));
-        foreach (var row in rows.Where(r => Str(r?["outcome"]) == "BLOCKED" && Bool(r?["releaseCritical"]) != false))
-            v.Add(new("T001", Str(row?["subject"]) ?? "?", "a release-critical BLOCKED adjudication makes the milestone fail"));
+        foreach (var missing in required.Where(s => !seen.Contains(s)).OrderBy(s => s, StringComparer.Ordinal))
+            v.Add(new("T001", missing, "required subject is not adjudicated; missing evidence cannot succeed"));
+        foreach (var row in rows.Where(r => Str(r?["outcome"]) == "BLOCKED"))
+            v.Add(new("T001", Str(row?["subject"]) ?? "?", "a BLOCKED adjudication makes the milestone fail; every subject is release-critical"));
 
-        var deviation = Bool(contract["authorityCapacity"]?["independence"]?["deviation"]) != false;
-        if (deviation)
+        var independence = contract["authorityCapacity"]?["independence"];
+        if (Bool(independence?["deviation"]) != false)
         {
             if (Str(record["adjudicationIndependence"]) != "reduced")
                 v.Add(new("T002", "terminal", "under the independence deviation a success record carries adjudicationIndependence = reduced"));
+            var limitation = Str(independence?["publishedLimitation"]);
+            if (limitation is null || Str(record["limitation"]) != limitation)
+                v.Add(new("T002", "terminal", "a success record carries the published independence limitation verbatim"));
+            if (Bool(record["epicIndependentAdjudicationMet"]) != false)
+                v.Add(new("T002", "terminal", "a success record states epicIndependentAdjudicationMet = false"));
             foreach (var row in rows.Where(r => Str(r?["outcome"]) == "SUPPORTED"))
                 v.Add(new("T002", Str(row?["subject"]) ?? "?", "SUPPORTED is unavailable under the independence deviation"));
             foreach (var row in rows.Where(r => Str(r?["independence"]) != "reduced-maintainer-adjudicated"))
@@ -529,6 +554,9 @@ internal static class EvidenceContractValidator
         }
         return v;
     }
+
+    private static bool IsClaimSubject(string subject) =>
+        subject.StartsWith("claim:", StringComparison.Ordinal) && subject.Length > "claim:".Length;
 
     /// <summary>E013: the §4 establishment conditions the row itself must evidence.</summary>
     private static IEnumerable<ContractViolation> ValidateEstablishmentPrerequisites(
@@ -553,14 +581,17 @@ internal static class EvidenceContractValidator
 
     private static IEnumerable<ContractViolation> ValidateBenchmark(
         JsonNode row, string id, List<string> keyFields, List<string> pairFields,
-        HashSet<string> dispositions, string? samplingUnit)
+        HashSet<string> stringFields, HashSet<string> dispositions, string? samplingUnit)
     {
         var bench = row["benchmark"];
         if (bench is null)
             yield break;
 
-        if (Str(bench["samplingUnit"]) != samplingUnit)
+        if (samplingUnit is null || Str(bench["samplingUnit"]) != samplingUnit)
             yield return new("E010", id, $"sampling unit '{Str(bench["samplingUnit"])}' is not the frozen '{samplingUnit}'");
+        // Every representation of the sampling unit must be the frozen one, not merely self-consistent.
+        if (bench["comparability"]?["samplingUnit"] is not null && Str(bench["comparability"]?["samplingUnit"]) != samplingUnit)
+            yield return new("E010", id, $"comparability samplingUnit '{Str(bench["comparability"]?["samplingUnit"])}' is not the frozen '{samplingUnit}'");
 
         var pairs = Array(bench["pairs"]);
         if (pairs.Count == 0)
@@ -570,6 +601,13 @@ internal static class EvidenceContractValidator
             var pairId = Str(pair?["pairId"]) ?? "?";
             foreach (var field in pairFields.Where(f => IsBlank(pair?[f])))
                 yield return new("E009", id, $"pair {pairId} is missing required field '{field}'");
+            foreach (var field in pairFields.Where(f => !IsBlank(pair?[f])))
+            {
+                var node = pair![field];
+                var isString = node is JsonValue sv && sv.TryGetValue<string>(out _);
+                if (stringFields.Contains(field) ? !isString : node is JsonValue && !isString)
+                    yield return new("E009", id, $"pair {pairId} field '{field}' has the wrong JSON type");
+            }
             foreach (var field in pairFields.Where(f => IsHashField(f) && !IsBlank(pair?[f]) && !IsSha256(Str(pair?[f]))))
                 yield return new("E009", id, $"pair {pairId} field '{field}' is not a 64-hex SHA-256");
             var included = Bool(pair?["included"]);
