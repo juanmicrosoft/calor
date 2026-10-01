@@ -258,9 +258,39 @@ def main():
         "walked": walked,
         "content_inspected": "none: metadata and counts only; no issue/PR/commit titles, bodies, comments, labels, diffs, or source files were requested",
     }
+    derive_views(out)
     with open(a.out, "w") as f:
         json.dump(out, f, indent=2)
         f.write("\n")
+
+
+def derive_views(out):
+    """Per-repository summary records for the primary and reserve sets.
+
+    Pure function of `walked`; adds no new data. Can be re-applied to a
+    committed snapshot: python3 -c 'import r2a_prime_enumerate as m; ...'.
+    """
+    by = {w["repo"]: w for w in out["walked"]}
+    keep = ("repo", "url", "pinned_sha", "default_branch", "license_spdx_repo",
+            "license_spdx_at_pinned_sha", "order_rank")
+    for src, dst in (("primary", "primary_records"), ("reserve_ordered", "reserve_records")):
+        out[dst] = []
+        for name in out[src]:
+            w = by[name]
+            rec = {k: w[k] for k in keep}
+            rec["retrieval_utc"] = out["retrieval_utc"]
+            rec["criteria_evidence"] = {
+                "C1_primary_language": w["primary_language"],
+                "C3_created_at": w["created_at"], "C4_pushed_at": w["pushed_at"],
+                "C5_stars": w["stars"], "C7_commits_window": w["commits_default_branch_window"],
+                "C8_merged_prs_window": w["merged_prs_window"],
+                "C8_issues_opened_window": w["issues_opened_window"],
+                "C9_maintainer_issue_pr": w["maintainer_involved_issue_pr_count"],
+                "C9_maintainer_commits": w["maintainer_authored_commit_count"],
+                "C11_disk_usage_kb": w["disk_usage_kb"],
+                "C12_build_check": "deferred to R2B-prime preflight",
+            }
+            out[dst].append(rec)
 
 
 if __name__ == "__main__":

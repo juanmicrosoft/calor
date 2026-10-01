@@ -141,8 +141,72 @@ Known biases left in place (stated, not corrected):
 
 ## 4. Enumeration result
 
-*Filled after the criteria-freeze commit; see Section 4 of the second commit
-and [r2a-prime-repos.json](r2a-prime-repos.json).*
+Run on 2026-10-01 (retrieval `2026-10-01T18:28:29Z`) against criteria-freeze
+commit `15fba333792c8c1949ee38a3ee35f3b44a6e82ca`. Full evidence, including
+every walked repository and its failed criteria, is in
+[r2a-prime-repos.json](r2a-prime-repos.json).
+
+Process notes (post-freeze changes, both mechanical):
+
+- The first run crashed on the first walked repository while parsing the
+  `gh --jq` license output, before any eligibility decision was recorded.
+  The fix (`tojson`) is a separate commit; no selection parameter changed.
+- `derive_views()` adds per-repository summary records that are a pure
+  projection of the `walked` evidence.
+
+| Quantity | Value |
+|---|---:|
+| Candidates from the five star partitions (531 + 344 + 311 + 120 + 81) | 1,387 |
+| Search results flagged `incomplete_results` | 0 partitions |
+| Candidates walked (hash order) to fill 12 + 12 | 131 |
+| Eligible among walked | 24 |
+| Failed C8 public history / C6 license / C7 commits / C11 size / C10 exposed / C2 state | 76 / 50 / 48 / 8 / 2 / 1 (a repo can fail several) |
+| Failed C9 maintainer association | 0 |
+
+### 4.1 Primary set (12)
+
+Rationale for every entry is identical: it is among the first 12 hash-ordered
+candidates that pass C1–C11. No other reason was used.
+
+| Rank | Repository | License (SPDX) | Pinned SHA | Stars | Commits / merged PRs / issues (12 mo) |
+|---:|---|---|---|---:|---|
+| 21 | [kimmknight/raweb](https://github.com/kimmknight/raweb) | MIT | `2f0dc16a6d` | 857 | 793 / 119 / 65 |
+| 26 | [STranslate/STranslate](https://github.com/STranslate/STranslate) | MIT | `75f616a257` | 8,153 | 821 / 29 / 219 |
+| 29 | [quartznet/quartznet](https://github.com/quartznet/quartznet) | Apache-2.0 | `15d90a9c26` | 7,090 | 1,422 / 771 / 344 |
+| 30 | [microsoft/semantic-kernel](https://github.com/microsoft/semantic-kernel) | MIT | `ee23e07cb9` | 28,621 | 320 / 337 / 253 |
+| 39 | [featbit/featbit](https://github.com/featbit/featbit) | MIT | `21b2af4feb` | 1,909 | 156 / 162 / 31 |
+| 41 | [icsharpcode/CodeConverter](https://github.com/icsharpcode/CodeConverter) | MIT | `2606077264` | 913 | 252 / 39 / 19 |
+| 56 | [dotnet-outdated/dotnet-outdated](https://github.com/dotnet-outdated/dotnet-outdated) | MIT | `5002ab07f4` | 1,691 | 65 / 61 / 27 |
+| 61 | [dotnet/dotnet-monitor](https://github.com/dotnet/dotnet-monitor) | MIT | `862c58e491` | 726 | 438 / 954 / 13 |
+| 65 | [googleads/googleads-mobile-unity](https://github.com/googleads/googleads-mobile-unity) | Apache-2.0 | `8465b4c82a` | 1,550 | 256 / 228 / 60 |
+| 68 | [SubtitleEdit/subtitleedit](https://github.com/SubtitleEdit/subtitleedit) | MIT | `ace272afe0` | 14,389 | 9,119 / 3,327 / 1,848 |
+| 79 | [apache/lucenenet](https://github.com/apache/lucenenet) | Apache-2.0 | `b447bbf04d` | 2,417 | 182 / 171 / 73 |
+| 83 | [irihitech/Semi.Avalonia](https://github.com/irihitech/Semi.Avalonia) | MIT | `0036334ae5` | 1,952 | 151 / 86 / 79 |
+
+Full 40-character SHAs are in the JSON.
+
+### 4.2 Ordered reserve (12)
+
+In order: microsoft/fluentui-blazor (86), helix-toolkit/helix-toolkit (87),
+tixl3d/tixl (98), dotnet/ClangSharp (101), MarimerLLC/csla (103), dotnet/iot
+(104), microsoft/EventLogExpert (109), ScottPlot/ScottPlot (118),
+robinrodricks/FluentFTP (121), grpc/grpc-dotnet (124),
+testcontainers/testcontainers-dotnet (128), MapsterMapper/Mapster (131).
+All MIT except grpc/grpc-dotnet (Apache-2.0).
+
+### 4.3 Observations recorded without action
+
+These are noted so that no one later removes a repository by judgment:
+
+- `googleads/googleads-mobile-unity` is a Unity plugin and may fail C12
+  (build on the .NET SDK). If so, C12 replaces it in reserve order.
+- `microsoft/semantic-kernel` is a multi-language repository (C# primary by
+  GitHub's byte count). It stays; R3 decides which parts are in domain.
+- `icsharpcode/CodeConverter` is itself a code-translation tool. It stays;
+  this is not a reason to exclude under any frozen criterion.
+- Very high-activity repositories (e.g. SubtitleEdit, 3,327 merged PRs)
+  would dominate pooled task counts. R1 must decide per-repository caps or
+  clustering before R2B′ counts; R2A′ does not.
 
 ## 5. Data-access terms
 
@@ -243,7 +307,8 @@ Change log (append-only):
 
 | Date | Repository | Event | Action |
 |---|---|---|---|
-| 2026-10-01 | — | Gate defined | Criteria frozen |
+| 2026-10-01 | — | Gate defined | Criteria frozen (`15fba333`) |
+| 2026-10-01 | — | Enumeration | 12 primary + 12 reserve selected (Section 4) |
 
 ## 8. Non-authorization boundary
 
