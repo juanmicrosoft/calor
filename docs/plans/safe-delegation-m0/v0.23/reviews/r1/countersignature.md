@@ -7,6 +7,7 @@ This file is outside the hashed normative set (governance section 7).
 | Round | Artifact SHA | Model | Blocking | Major | Minor | Outcome |
 |---|---|---|---:|---:|---:|---|
 | 1 | `7d403e82` | gpt-6.1-sol | 13 | 2 | 0 | All accepted and fixed; see [round-1-codex.md](round-1-codex.md) |
+| 2 | `9e7ee815` | gpt-6.1-sol | 3 | 2 | 0 | All accepted and fixed; see [round-2-codex.md](round-2-codex.md) |
 
 ## Rejected blocking objections awaiting maintainer decision
 

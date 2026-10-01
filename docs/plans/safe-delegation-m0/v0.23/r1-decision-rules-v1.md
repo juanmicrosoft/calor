@@ -144,6 +144,14 @@ probability, and `m` the mean cost per assigned slot (with `m_A = 1`).
 | W design, most favorable | k=0.90, e=y+0.01 | k=0.95, e=y, cost per correct = 0.35 of A | equal to B | B/A = 0.35; +5 pp; safety -1 pp; C/B = 1 |
 
 `x` and `y` are nuisance base rates, constrained by `e <= a - k` per arm.
+Acceptance is registered as `a = 1` for every arm in these scenarios, so the
+all-assigned and accepted safety denominators coincide. A separate
+accepted-denominator boundary scenario uses `a = 0.95` in every arm with
+`e_subject = e_comparator + 0.0095`, which puts the accepted-denominator
+difference at exactly +1 pp. Cost distributions, dependence structures, and
+the values of `x` and `y` are registered by R4 before running; because
+simulation is descriptive under v1 (section 4.2), these choices cannot affect a
+classification.
 
 ## 5. Positive-branch logic for the M0 classification
 
@@ -199,10 +207,10 @@ R4 reports exactly one state per **(branch, component)** pair:
 | `SIZED_INFEASIBLE` | G3.1 (both branches) | Section 7.4 bound shows the component's necessary cluster count exceeds `F_high` |
 | `NOT_MEASURABLE_IN_DOMAIN` | any | Section 3 domain status |
 | `PROXY_ONLY` | G2, G3 | Measurable only by proxy, and not `SIZED_INFEASIBLE` |
-| `ROUTE_ESTABLISHED` | G4, G6.1 | Every checklist item in section 7.6 is evidenced |
-| `ROUTE_MISSING` | G4, G6.1 | At least one checklist item is absent |
-| `ROUTE_BLOCKED` | G4, G6.1 | A known unexcluded defect would violate the gate (for example an unfixed false-established property in the supported matrix) |
-| `ROUTE_UNRESOLVED` | G4, G6.1 | Evidence exists but is disputed or incomplete |
+| `ROUTE_BLOCKED` | G4, G6.1 | Section 7.6 assignment step 1 |
+| `ROUTE_UNRESOLVED` | G4, G6.1 | Section 7.6 assignment step 2 |
+| `ROUTE_MISSING` | G4, G6.1 | Section 7.6 assignment step 3 |
+| `ROUTE_ESTABLISHED` | G4, G6.1 | Section 7.6 assignment step 4 |
 
 ### 7.2 Ordered classification procedure
 
@@ -254,37 +262,50 @@ and G6.2 as originally defined.
 
 ### 7.4 Method-independent necessary cluster count (supply route)
 
-For the safety component G3.1 of either branch, with margin +1 pp,
-alpha = 0.025, target power 0.80, and the most-favorable registered
-alternative (subject minus comparator = -1 pp; section 4.3), any valid
-level-0.025 test of the composite null has power at that alternative no greater
-than the Neyman-Pearson most powerful test of one null point against it. The
-null point shifts only the subject arm's escape probability from `c` to
-`c + 0.02`, which lies on the null boundary. Each source cluster contributes one
-independent binary observation per arm (Draft v3 section 5.1; validity over
-arbitrary within-cluster dependence, section 4.2). Coherence limits `c` to
-`[0, 0.05]`, because a serious escape implies an accepted but not correctly
-accepted artifact and the most-favorable subject correct-acceptance
-probability is 0.95.
+**Setting.** Source clusters are independent and identically distributed draws
+of a complete cluster observation `X` (all arms, all slots, all outcomes, with
+arbitrary within-cluster and cross-arm dependence). The safety component G3.1
+of either branch concerns `D = mean over the cluster's slots of (subject
+escape) - mean of (comparator escape)`, with `-1 <= D <= 1`, and the null
+`E[D] >= +0.01`. The test is level 0.025 (branch alpha) and must be valid over
+every admissible joint distribution, because the cluster is the independent
+unit (Draft v3 section 5.1; section 4.2).
 
-`N_MIN` is the minimum over that `c` grid (step 0.001) of the smallest cluster
-count at which the most powerful test reaches power 0.80. The frozen
-calculator [r1-safety-nmin.py](r1-safety-nmin.py) gives **`N_MIN = 172`**,
-attained at `c = 0` (where it equals `ceil(ln(0.025/0.80) / ln(0.98))`).
+**Bound.** Let `P1` be any cluster distribution with `E[D] = -0.01` (the
+registered most-favorable alternative, section 4.3). Let `Q` be a cluster
+distribution with `D = +1` almost surely (every subject slot is a serious
+escape and no comparator slot is; this is coherent because a serious escape
+only requires an accepted, incorrect artifact). Define
+`P0 = (1 - eps) P1 + eps Q` with `eps = 0.02 / 1.01`, so
+`E_P0[D] = (1 - eps)(-0.01) + eps = +0.01`: `P0` is on the null boundary and
+the branch claim is false under it. For n clusters, the product measure
+satisfies `P0^n >= (1 - eps)^n P1^n` on every event, so for any test `phi`,
+`E_P1[phi] <= E_P0[phi] / (1 - eps)^n <= 0.025 / (1 - eps)^n`. Power 0.80 at
+`P1` therefore requires `(1 - eps)^n <= 0.025 / 0.80`, that is
+
+`N_MIN = ceil( ln(0.025 / 0.80) / ln(1 - 0.02/1.01) ) = 174`.
+
+The bound holds uniformly over every `P1` with mean difference -1 pp, every
+base rate, every within-cluster dependence, every repetition count, and every
+ascertainment method. It needs no grid, no simulation, and no nuisance range.
+The frozen calculator [r1-safety-nmin.py](r1-safety-nmin.py) evaluates this
+closed form. (A round-2 reviewer proposed this argument after showing that the
+earlier marginal Neyman-Pearson argument was invalid for paired outcomes.)
 
 **Rule:** G3.1 is `SIZED_INFEASIBLE` (in both branches) if and only if
-`F_high` is finite and `F_high < N_MIN`, that is, `H_high <= 128`.
+`F_high` is finite and `F_high < N_MIN`, that is, `H_high <= 130`
+(`floor(130 / 0.75) = 173`; `floor(131 / 0.75) = 174`).
 
-Why this route is valid in the proxy domain: the bound does not depend on how
-acceptance or escapes are ascertained, on reviewer type, cost, or any nuisance
-parameter other than `c`, which it minimizes over. It holds for any binary
-per-cluster escape endpoint with this margin, including the original one. What
-it scopes is the **supply**: it shows that a study drawing its final pool from
-the frozen frame cannot be powered, not that an adopter-domain study could not.
-Pilot reservations are taken as zero and authored clusters at their 25% cap,
-both favorable to feasibility. Larger true safety advantages than -1 pp would
-lower `N_MIN`; -1 pp is the registered most-favorable alternative, fixed before
-inspection, and cannot be changed after inspection (section 10).
+**Scope.** The bound does not depend on how acceptance or escapes are
+ascertained, on reviewer type, or on cost. It holds for the original endpoint.
+What it scopes is the **supply**: it shows that a study drawing its final pool
+from the frozen frame cannot reach 80% power for the +1 pp safety gate under
+the registered most-favorable alternative, for any valid test. It does not show
+that an adopter-domain study could not. Pilot reservations are taken as zero
+and authored clusters at their 25% cap, both favorable to feasibility. A larger
+true safety advantage than -1 pp would lower `N_MIN`; -1 pp is the registered
+most-favorable alternative, fixed before inspection, and cannot be changed
+after inspection (section 10).
 
 ### 7.5 Countersignature of a classification
 
@@ -295,12 +316,26 @@ objections" against the R5 artifact SHA; and the maintainer's merge. The
 maintainer action (STOP, DEFER, ALLOW A SEPARATE AUTHORIZATION REQUEST) is a
 separate field.
 
-### 7.6 Non-statistical route checklists
+### 7.6 Non-statistical route checklists and state assignment
 
-| Gate | Checklist (all items must be evidenced for `ROUTE_ESTABLISHED`) |
+| Gate | Checklist items |
 |---|---|
-| G4 | (a) frozen mechanism suite with negative controls covering the supported construct/property matrix; (b) isolated acceptance boundary with access separation (not the legacy `run-pair.sh` seam); (c) bypass probes for every protected requirement; (d) no unexcluded open false-established finding in the supported matrix (#1311) |
-| G6.1 | (a) export pipeline producing runnable C# for every supported construct; (b) behavioral comparison against the approved requirements with recorded results; (c) documented lost static guarantees and remaining runtime checks |
+| G4 | (a) frozen mechanism suite with negative controls covering the supported construct/property matrix; (b) isolated acceptance boundary with access separation (not the legacy `run-pair.sh` seam); (c) bypass probes for every protected requirement; (d) **recorded results** of (a)-(c) showing zero confirmed false-established properties and zero accepted unauthorized bypasses, and no open unexcluded false-established finding in the supported matrix (#1311) |
+| G6.1 | (a) export pipeline producing runnable C# for every supported construct; (b) behavioral comparison against the approved requirements with **recorded passing results** for every supported construct; (c) documented lost static guarantees and remaining runtime checks |
+
+An item is **absent** when no artifact for it exists. It is **incomplete or
+disputed** when an artifact exists but does not cover the whole supported
+matrix, or when any reviewer (Codex, Copilot, or the maintainer) has recorded
+an unresolved objection to it. Assign exactly one state by the first matching
+step:
+
+1. `ROUTE_BLOCKED` if any recorded result violates the gate metric (a
+   confirmed false-established property, an accepted unauthorized bypass, or a
+   failed behavioral comparison), whatever the state of other items.
+2. `ROUTE_UNRESOLVED` if any item is incomplete or disputed.
+3. `ROUTE_MISSING` if any item is absent.
+4. `ROUTE_ESTABLISHED` if every item is present, complete, undisputed, and
+   passing.
 
 ### 7.7 Interpretation limits
 

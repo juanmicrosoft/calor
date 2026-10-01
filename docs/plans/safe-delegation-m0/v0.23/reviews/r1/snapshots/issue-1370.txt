@@ -1,0 +1,153 @@
+title:	[0.23] Epic: enable an independently governed M0 safe-delegation decision
+state:	OPEN
+author:	juanmicrosoft (Juan C Rivera)
+labels:	epic
+comments:	4
+assignees:	
+projects:	
+milestone:	0.23
+issue-type:	
+parent:	
+sub-issues:	
+sub-issues-completed:	
+blocked-by:	
+blocking:	
+number:	1370
+--
+## Purpose
+
+M0 closed in #1283 as **UNADJUDICATED** with a separate maintainer administrative stop. Milestones 0.21 and 0.22 do not resolve that status:
+
+- 0.21/#1254 is a narrower PP-W-rows effect-row proposal with its own approval and funding boundary.
+- 0.22/#1082 is compiler nullability work and has no evidentiary role in M0.
+
+This milestone closes—or explicitly records the inability to close—the prerequisites that prevented a formal M0 classification. It is a planning and adjudication milestone only. It does not imply a v0.23 package, tag, website release, participant study, or implementation authorization.
+
+## Non-authorization boundary
+
+This epic does **not** authorize participant enrollment, task execution, paid experiment collection, an acceptance service, production workflows, or reopening #1284-#1309. It cannot satisfy #1259 or transfer approval, funds, tasks, or evidence into #1254. Any full-study deliverable still requires a separate issue-specific reopening and authorization decision.
+
+## Gate sequence
+
+1. **R0 — bounded inquiry authority:** authorize limited prerequisite contacts and evidence access, or record refusal.
+2. **R1 — methods governance:** secure independent methods review and freeze decision rules before decision-bearing supply inspection.
+3. **R2A — conditional adopter authority:** establish whether an authorized organization will conditionally support planning and privacy-safe feasibility checks.
+4. **R3 — paper domain/comparator boundary:** freeze the supported three-arm intersection and fairness standard. No workflows, starters, oracle, or service are built.
+5. **R2B — privacy-safe capacity inventory:** apply the frozen eligibility rules to task supply and reviewer capacity.
+6. **R4 — joint sizing and resource decision:** run pinned executable feasibility estimators over the frozen inputs and all registered gates.
+7. **R5 — independent classification and maintainer action:** record a countersigned scientific classification, or preserve UNADJUDICATED with a dated reason.
+
+Dependencies:
+
+```text
+R0 -> R1, R2A
+R1 + R2A -> R3
+R1 + R2A + R3 -> R2B
+R1 + R2A + R3 + R2B -> R4
+R4 -> R5 -> Epic close
+```
+
+## Required output semantics
+
+Each gate records one of `MET`, `UNAVAILABLE`, `EXPIRED`, or `NOT_AUTHORIZED`. Closing an issue does not imply that its prerequisite passed.
+
+The scientific classification is separate from the maintainer action:
+
+- Scientific classification: `FEASIBLE AS PROPOSED`, `REQUIRES SEPARATE APPROVAL`, `NOT FEASIBLE`, `INSUFFICIENT INFORMATION`, or process status `UNADJUDICATED` when formal classification is unavailable.
+- Maintainer action: `STOP`, `DEFER`, or `ALLOW A SEPARATE AUTHORIZATION REQUEST`.
+
+Even `FEASIBLE AS PROPOSED` does not activate implementation or spending.
+
+## Crosswalk to parked work
+
+This milestone is deliberately narrower than the closed NOT_PLANNED sequence #1284-#1309:
+
+- R2B produces a privacy-safe feasibility inventory, not participant rosters, trained reviewers, frozen task pools, or reservations.
+- R3 produces a paper boundary and equivalence standard, not starters, workflows, an oracle, or an acceptance service.
+- R4 produces an M0 feasibility estimator, not `sd-001`, pilot-updating logic, or final-study analysis.
+- None of these outputs satisfies or changes the state of #1284-#1309.
+
+## Epic completion
+
+Close this epic only after R5 publishes either:
+
+1. a formal independently countersigned classification plus a separate maintainer action; or
+2. a dated explanation of why formal adjudication remains impossible, preserving **UNADJUDICATED** without converting missing evidence into infeasibility, zero demand, or success.
+--- comments ---
+author:	juanmicrosoft
+association:	owner
+edited:	false
+status:	none
+--
+## Concrete issue map
+
+- [ ] #1371 — R0: bounded prerequisite inquiry authority
+- [ ] #1372 — R1: independent methods governance and frozen rules
+- [ ] #1373 — R2A: conditional adopter and data-access authority
+- [ ] #1374 — R3: paper three-arm domain and comparator boundary
+- [ ] #1375 — R2B: privacy-safe task supply and reviewer capacity
+- [ ] #1376 — R4: joint sizing and prospective study-envelope decision
+- [ ] #1377 — R5: independent classification and separate maintainer action
+
+Execution order:
+
+```text
+#1371 -> #1372, #1373
+#1372 + #1373 -> #1374
+#1372 + #1373 + #1374 -> #1375
+#1372 + #1373 + #1374 + #1375 -> #1376
+#1376 -> #1377 -> #1370 close
+```
+
+A closed child issue may carry `UNAVAILABLE`, `EXPIRED`, or `NOT_AUTHORIZED`; checkbox completion means the gate was dispositioned, not necessarily passed.
+--
+author:	juanmicrosoft
+association:	owner
+edited:	false
+status:	none
+--
+## Gate-propagation amendment
+
+Add process state `NOT_REACHED` for a child whose prerequisite did not return `MET`. This is an administrative sequencing state, not scientific evidence that the child's subject is unavailable or infeasible.
+
+- Only `MET` unlocks substantive work in a dependent gate.
+- If any prerequisite is `UNAVAILABLE`, `EXPIRED`, or `NOT_AUTHORIZED`, do not perform the blocked gate's outreach, evidence inspection, boundary work, or sizing. Close it as `NOT_REACHED`, naming every blocking issue and its terminal value.
+- R5 (#1377) is the exception to substantive unlocking: it runs after all prior gates are dispositioned, even when R4 is `NOT_REACHED`, so the public record can preserve `UNADJUDICATED` or apply a formally available classification without silently abandoning closeout.
+
+The complete process-state vocabulary is therefore `MET`, `UNAVAILABLE`, `EXPIRED`, `NOT_AUTHORIZED`, and `NOT_REACHED`. Only the four registered scientific classifications remain valid scientific outputs.
+--
+author:	juanmicrosoft
+association:	owner
+edited:	false
+status:	none
+--
+## Expiry, revocation, and revalidation amendment
+
+Every gate must revalidate all prerequisite authorities and expiries **before starting, before each restricted-data access or external contact, and immediately before closure**.
+
+If a prerequisite expires or is revoked after a dependent gate starts:
+
+1. stop substantive work immediately;
+2. make no further contact or restricted-data access;
+3. apply R0 retention, deletion, notification, and confidentiality rules;
+4. close the in-progress gate as process state `INVALIDATED`, citing the prerequisite, time, work performed, and disposition of partial evidence;
+5. mark any already-completed dependent output as invalid for downstream sizing or classification from the expiry/revocation time;
+6. close later descendants as `NOT_REACHED` unless a new bounded authorization and versioned rerun are separately approved.
+
+`INVALIDATED` is a process state, not a scientific classification. Invalidated or expired evidence may be retained only as required by R0 and may not be silently reused. R5 must disclose every expiry, revocation, invalidated output, deletion/retention action, and whether the final status therefore remains `UNADJUDICATED`.
+
+The process-state vocabulary is now `MET`, `UNAVAILABLE`, `EXPIRED`, `NOT_AUTHORIZED`, `NOT_REACHED`, and `INVALIDATED`.
+--
+author:	juanmicrosoft
+association:	owner
+edited:	false
+status:	none
+--
+## Lifecycle consistency correction
+
+When an upstream prerequisite expires or is revoked, **every affected dependent gate is reclassified from `MET` to `INVALIDATED`**, including gates that had already closed. Record the invalidation time, affected output version/hash, reason, and evidence retention/deletion disposition. A historical `MET` entry may remain in the audit log but is not the current gate value and cannot unlock downstream work.
+
+Add process state `REVOKED` for authority or consent that was granted and later withdrawn. `REVOKED` is non-MET and triggers the same immediate-stop, privacy-disposition, descendant invalidation, and no-reuse rules as expiry.
+
+Current process states: `MET`, `UNAVAILABLE`, `EXPIRED`, `REVOKED`, `NOT_AUTHORIZED`, `NOT_REACHED`, and `INVALIDATED`.
+--

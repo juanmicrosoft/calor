@@ -118,6 +118,27 @@ is disclosed, not eliminated.
 Round files: `reviews/r1/round-<N>-codex.md` (raw Codex output plus the
 disposition table).
 
+**Binding file.** Before each call from round 3 on, the proposer commits
+`reviews/r1/round-<N>-bindings.sha256` in `shasum -a 256` check format. It
+lists the normative set (section 7), the complete effective prompt, and every
+authoritative dependency the reviewer is told to read or that the CLI loads as
+instructions:
+
+- `AGENTS.md` and `CLAUDE.md` (repository instructions);
+- `docs/plans/roadmap-v0.20-reference-draft-v3.md`, `docs/plans/roadmap-v0.20.md`;
+- `docs/plans/safe-delegation-m0/{authorization,decision,mechanism-and-resources,predecessor-status,supply-status}.md`;
+- `reviews/r1/snapshots/issue-{1278,1370,1372}.txt` (dated snapshots of the
+  GitHub issue text the rules cite; the reviewer has no network access, so these
+  snapshots are the issue text it reviewed).
+
+The R0 records (`r0-authorization.md`, `amendment-001-public-proxy.md`) are
+being written in parallel and are not present at review time. The rules restate
+the R0 inputs they depend on (public-proxy domain, status label, USD 200 cap,
+2026-10-29 window, AI review substitution). At merge, the maintainer records the
+R0 commit in `countersignature.md`; if the merged R0 records differ from those
+restated inputs, that is an amendment-control event (rules section 10) and R1
+is not `MET` until resolved.
+
 ### 5.2 Scope of review
 
 The reviewer looks for rules that bias toward Calor, undefined or post-hoc
@@ -162,13 +183,29 @@ cap and the 2026-10-29 window set by R0. Exceeding either ends R1 as
 
 R1 is `MET (AI-adjudicated)` only when all of the following are recorded:
 
-1. A Codex round output containing `VERDICT: no blocking objections`, against
-   artifact commit `<SHA>`, with the `sha256` of the normative set:
-   `r1-decision-rules-v1.md`, `r1-decision-rules-v1.json`,
-   `r1-safety-nmin.py`, this file, and `reviews/r1/codex-prompt-template.md`.
-2. The maintainer's merge of a PR whose merged content for those files has the
-   same `sha256` values.
-3. No unresolved maintainer overrule under section 6.
+1. A Codex round output containing `VERDICT: no blocking objections`, from a
+   persisted (non-ephemeral) session, against artifact commit `<SHA>`, with a
+   committed binding file `round-<N>-bindings.sha256` covering the normative
+   set (`r1-decision-rules-v1.md`, `r1-decision-rules-v1.json`,
+   `r1-safety-nmin.py`, this file, `reviews/r1/codex-prompt-template.md`), the
+   complete effective prompt, and the dependencies listed in section 5.1.
+2. **Maintainer provenance verification**, recorded in `countersignature.md`
+   with date: the maintainer locates the countersigning session in the local
+   Codex session store (`~/.codex/sessions/`) by its session id and confirms
+   that its model, sandbox, reasoning effort, working directory, user prompt,
+   and final message match the committed `round-<N>-prompt.txt`,
+   `round-<N>-codex.log`, and `round-<N>-codex.md`. A missing session record or
+   any mismatch prevents `MET`.
+3. **Merge-time binding check**: on the merge commit,
+   `shasum -a 256 -c reviews/r1/round-<N>-bindings.sha256` passes for every
+   listed file. If any file changed after review, either a new round reviews
+   the change or R1 is not `MET`.
+4. The maintainer's merge of that PR.
+5. No unresolved maintainer overrule under section 6.
+
+Residual trust that remains after these checks: the maintainer (who has a
+conflict, section 4) performs the verification, and the capture operator could
+in principle have tampered with the local session store. Both are disclosed.
 
 Terminal values otherwise: `UNAVAILABLE` (5 rounds without zero blocking
 objections, or Codex unavailable), `EXPIRED` (window or cap exhausted),

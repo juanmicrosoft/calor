@@ -6,3 +6,4 @@ Overall cap: approximately USD 200 in API spend (R0). One row per AI review call
 |---|---|---|---|---|---|---|
 | 2026-10-01 | R1 | probe | codex exec 0.159.2 | gpt-6.1-sol (reasoning none) | 3,197 | competence probe on planted-defect rules |
 | 2026-10-01 | R1 | 1 | codex exec 0.159.2 | gpt-6.1-sol (reasoning high) | 80,815 | 13 blocking, 2 major; all accepted |
+| 2026-10-01 | R1 | 2 | codex exec 0.159.2 | gpt-6.1-sol (reasoning high) | 84,580 | 3 blocking, 2 major, 0 minor |
