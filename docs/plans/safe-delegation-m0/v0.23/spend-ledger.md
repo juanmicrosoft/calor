@@ -12,6 +12,7 @@ new row that cites the row it corrects.
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | 2026-10-01 | R0 | 1 | Codex CLI 0.159.2 (`codex exec`, read-only) | gpt-6.1-sol | 35,454 | 0.00 | ChatGPT subscription (excluded) | [round-1-codex.md](reviews/R0/round-1-codex.md) |
 | 2 | 2026-10-01 | R0 | 2 | Codex CLI 0.159.2 (`codex exec`, read-only) | gpt-6.1-sol | 41,126 | 0.00 | ChatGPT subscription (excluded) | [round-2-codex.md](reviews/R0/round-2-codex.md) |
+| 3 | 2026-10-01 | R0 | 3 | Codex CLI 0.159.2 (`codex exec`, read-only) | gpt-6.1-sol | 43,433 | 0.00 | ChatGPT subscription (excluded) | [round-3-codex.md](reviews/R0/round-3-codex.md) |
 
 **Cumulative marginal USD:** 0.00
 
