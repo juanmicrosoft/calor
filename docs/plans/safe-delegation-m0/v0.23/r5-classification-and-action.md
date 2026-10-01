@@ -93,11 +93,12 @@ the rule that closes the gates still open at that time.
 
 R0 revalidation at close-out (2026-10-01): R0 is `MET` on merge of #1467;
 the inquiry deadline (2026-10-29) has not passed; no revocation, withdrawal,
-exclusion request, or license change is recorded; cash is USD 0.00 of 200.00
-and hours are 14.5 of 60 (agent) and 5.0 of 20 (maintainer) after R5 review round 2, both
-conservative estimates that include this close-out session
-([spend-ledger.md](spend-ledger.md)). Every other gate in R5's prerequisite closure is not
-`MET`, which is why the administrative closeout applies.
+exclusion request, or license change is recorded; cash is USD 0.00 of
+200.00; hours are 14.5 of 60 (agent) and 5.0 of 20 (maintainer) after R5
+review round 2, both conservative estimates that include this close-out
+session ([spend-ledger.md](spend-ledger.md)). Every other gate in R5's
+prerequisite closure is not `MET`, which is why the administrative closeout
+applies.
 
 **Machine check.** `SafeDelegationV023BoundaryTests` gains three terminal
 invariants with this close-out: a gate whose ancestor is `UNAVAILABLE`,
@@ -106,9 +107,9 @@ excepted); every gate with a non-`MET` value carries a `reason` and a
 `decided` date; and a non-`MET` R5 must preserve `UNADJUDICATED` and record
 a maintainer action, with value `UNAVAILABLE` or `EXPIRED` (administrative
 closeout) or `INVALIDATED` (a later expiry, revocation, or withdrawal under
-R0 Section 10). The close-out adds
-the fields `decided`, `reason`, `maintainerActionNote`, and
-`originalDomainStatus` to gate entries in gate-state.json. R1's live-state
+R0 Section 10). The close-out adds the fields `decided`, `reason`,
+`maintainerActionNote`, and `originalDomainStatus` to gate entries in
+gate-state.json. R1's live-state
 rule (governance section 5.1) would treat new fields as a change to reviewed
 authority; that rule only gates an R1 `MET`, which can no longer occur.
 
@@ -127,15 +128,15 @@ authority; that rule only gates an R1 `MET`, which can no longer occur.
 
 | Resource | Used | Cap | Source |
 |---|---|---|---|
-| Marginal cash | USD 0.00 (all AI use ran on existing subscriptions) | USD 200.00 | [spend-ledger.md](spend-ledger.md) |
+| Marginal cash | USD 0.00 (all AI use ran on existing subscriptions; the maintainer confirms the billing basis) | USD 200.00 | [spend-ledger.md](spend-ledger.md) |
 | Review rounds, R0 | 4 | 5 | `reviews/R0/` |
 | Review rounds, R1 | 5, plus a competence probe that is not an artifact round | 5 | `reviews/R1/` |
 | Review rounds, R2A′ | 2 | 5 | `reviews/R2A-prime/` |
 | Review rounds, R3, R2B′, R4 | 0 | 5 each | Not started |
 | Review rounds, R5 (this record) | 2 (Section 13) | 5 | `reviews/R5/` |
 | Codex tokens | 1,658,905 (R0 157,470 + R1 507,104 + R2A′ 865,142 + R5 129,189) | Not capped | Ledger rows 1-4, 6-11, 13-14, 16, 19 |
-| Agent session hours | See ledger "Cumulative" line | 60 | Ledger hours table (estimates) |
-| Maintainer hours | See ledger "Cumulative" line | 20 | Ledger hours table (estimates pending the maintainer's report) |
+| Agent session hours | 14.5 (R0 4.0, R2A′ 2.5, R1 3.5, R5 close-out 4.5) | 60 | Ledger hours table (conservative estimates) |
+| Maintainer hours | 5.0 | 20 | Ledger hours table (conservative estimates pending the maintainer's report) |
 | Inquiry deadline | Closed 2026-10-01 | 2026-10-29 | R0 Section 5 |
 | Compensation to any person | USD 0 | USD 0 | R0 Section 8 |
 
@@ -253,6 +254,7 @@ boundary test) was reviewed by Codex.
 | Round | Reviewed commit | BLOCKING | MAJOR | MINOR | Outcome |
 |---|---|---:|---:|---:|---|
 | 1 | `ae0c70a1` | 2 | 3 | 0 | All accepted; fixes in `546871b0` ([round-1-codex.md](reviews/R5/round-1-codex.md)) |
+| 2 | `081e1b30` | 0 | 2 | 1 | All accepted; fixes in `90021eb7` ([round-2-codex.md](reviews/R5/round-2-codex.md)). No BLOCKING objection, so review stopped (2 of 5 rounds used) |
 
 A clean review round would not make R5 `MET`: R5 is `UNAVAILABLE` whatever
 the review outcome. If BLOCKING objections remained after round 5, this
