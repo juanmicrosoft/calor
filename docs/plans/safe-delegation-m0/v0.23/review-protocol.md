@@ -112,8 +112,9 @@ begins.
 
 ## Spend
 
-Each invocation is logged with date, gate, round, tool and version, model if
-shown, tokens if shown, marginal USD, and billing basis. Subscription-backed
+Each reviewer invocation, and each proposer session, is logged with date,
+gate, round, tool and version, model if shown, tokens if shown, marginal USD,
+and billing basis. Session hours go in the ledger's hours table. Subscription-backed
 use is logged at USD 0 marginal with its tokens. The cumulative marginal USD
 across all 0.23 gates may not exceed USD 200.00 (R0 Section 5). An invocation
 that could cross the cap is not run.
