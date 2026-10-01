@@ -63,6 +63,46 @@ statement here cannot prove that R0 holds. Therefore:
    any repository has enough eligible tasks, that Calor supports their code,
    or that any organization would adopt Calor.
 
+### 2.1 Stacking on R0 and conformance with amendment 001 (recorded 2026-10-01)
+
+This branch now merges the R0 branch (#1467) at commit
+`b0c054377c9d414bb3702b8d57cb35f955cd523f`, so `r0-authorization.md`,
+`amendment-001-public-proxy.md`, `review-protocol.md`, and
+[gate-state.json](gate-state.json) are present. The merge keeps every
+earlier commit of this branch, including the criteria-freeze commit
+`15fba333`, unchanged. Two mechanical changes were made at the merge: the
+review transcripts moved from `reviews/r2a/` to `reviews/R2A-prime/` (the
+directory name the protocol prescribes for R2A′), and the spend rows moved
+into the R0 ledger format.
+
+The activation rule in item 1 is not the only condition for `MET`. Amendment
+001 Section 5 governs R2A′, and the R0 records, read against this record,
+show three points of non-conformance:
+
+1. **Scope.** Amendment 001 defines R2A′ as "authority only" and states that
+   it "does **not** select, enumerate, or inspect repositories; pool
+   selection happens only in R2B′ under the frozen R1 selection rules".
+   Amendment 001 Section 7 also requires that selection rules be frozen in R1
+   and merged "before any repository is drawn or counted". This record
+   selects 12 primary and 12 reserve repositories (Sections 3-4) and counts
+   their activity, before R1 froze any rule.
+2. **Timing of data access.** The Section 4 snapshot was retrieved on
+   2026-10-01, before R0 was `MET` (R0 takes effect on merge of #1467). R0
+   Section 10 requires R0 to be `MET` before each data access, and the
+   #1373 sequencing amendment says not to inspect metadata without R0
+   authority. Item 2 above already classes the snapshot as provisional.
+3. **Review record format.** [review-protocol.md](review-protocol.md) step 3
+   requires the reviewer's output verbatim. The two round files condense the
+   reviewer's wording and do not record the prompt. The protocol and
+   amendment 001 were not in the reviewed tree, so the reviewer could not
+   check this record against the amended R2A′ definition.
+
+Because of point 1, this record as written does not satisfy the amended
+`MET` definition, and the activation rule cannot make it `MET` on its own.
+This PR leaves the R2A′ entry in [gate-state.json](gate-state.json) at
+`null`. The terminal value and its reason are recorded in the 0.23
+close-out record, which applies the written rules.
+
 ## 3. Frozen selection rule
 
 Sections 3.1–3.3 were committed (`15fba333`) before any enumeration query
@@ -466,8 +506,9 @@ Change log (append-only):
 | 2026-10-01 | — | Gate defined | Criteria frozen (`15fba333`) |
 | 2026-10-01 | — | Enumeration | 12 primary + 12 reserve selected (Section 4) |
 | 2026-10-01 | 24 selected | License-file identity added (path, blob SHA) | No SPDX mismatch found |
-| 2026-10-01 | — | Review round 1 | Gate value set to `NOT_REACHED` pending R0; C12 protocol, removal and continuation rules frozen ([round 1](reviews/r2a/round-1-codex.md)) |
-| 2026-10-01 | — | Review round 2 (0 blocking) | C12 digest/limits/retry matchers frozen; removal-rule review and Calor-support coverage reporting; per-class data basis; continuation chaining and license-error handling fixed ([round 2](reviews/r2a/round-2-codex.md)). Review loop stopped at zero blocking |
+| 2026-10-01 | — | Review round 1 | Gate value set to `NOT_REACHED` pending R0; C12 protocol, removal and continuation rules frozen ([round 1](reviews/R2A-prime/round-1-codex.md)) |
+| 2026-10-01 | — | Review round 2 (0 blocking) | C12 digest/limits/retry matchers frozen; removal-rule review and Calor-support coverage reporting; per-class data basis; continuation chaining and license-error handling fixed ([round 2](reviews/R2A-prime/round-2-codex.md)). Review loop stopped at zero blocking |
+| 2026-10-01 | — | Stacked on R0 (#1467 branch, `b0c05437`) by merge | Review transcripts moved to `reviews/R2A-prime/`; spend rows moved to the R0 ledger format; amendment 001 conformance findings recorded in Section 2.1; gate-state R2A′ left `null` |
 
 ## 8. Non-authorization boundary
 
