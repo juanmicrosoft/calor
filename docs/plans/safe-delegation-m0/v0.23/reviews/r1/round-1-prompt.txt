@@ -10,7 +10,6 @@ task-supply data is inspected. Do not use the network.
 Artifacts under review (normative set):
 - docs/plans/safe-delegation-m0/v0.23/r1-decision-rules-v1.md
 - docs/plans/safe-delegation-m0/v0.23/r1-decision-rules-v1.json
-- docs/plans/safe-delegation-m0/v0.23/r1-safety-nmin.py (frozen calculator; you may run it)
 - docs/plans/safe-delegation-m0/v0.23/r1-methods-governance.md
 - docs/plans/safe-delegation-m0/v0.23/reviews/r1/codex-prompt-template.md (this prompt)
 
@@ -59,3 +58,5 @@ Output format (Markdown):
   check whether each "accepted and fixed" item is actually fixed.
 - End with exactly one line: `VERDICT: no blocking objections` or
   `VERDICT: blocking objections remain`.
+
+Round 1. Artifact commit: 7d403e82e13b88081f6dcc24f01d17a78b829ae9. No prior rounds.

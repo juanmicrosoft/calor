@@ -45,9 +45,9 @@ the actual values; the template values are:
 | Model | Recorded per round from the CLI session header; the CLI default under `--ignore-user-config` (`gpt-6.1-sol` at drafting), unchanged across rounds where possible |
 | Reasoning effort | `high` (`-c model_reasoning_effort="high"`) for review rounds |
 | Sandbox | `--sandbox read-only` |
-| Other flags | `--ephemeral` (no session persistence), `--ignore-user-config` (no user plugins or notifier); Codex `memories` feature disabled, so no cross-session memory |
+| Other flags | `--ignore-user-config` (no user plugins or notifier); Codex `memories` feature disabled, so no cross-session memory. From round 2, sessions are **persisted** (no `--ephemeral`) so the session rollout under `~/.codex/sessions/` on the maintainer's machine can be checked against the committed transcript; round 1 ran with `--ephemeral` and has only the committed log |
 | Working directory | This repository's worktree checked out at the round's artifact SHA |
-| Prompt | [reviews/r1/codex-prompt-template.md](reviews/r1/codex-prompt-template.md); its `sha256` is recorded in each round file. Round-specific additions (prior dispositions) are appended verbatim and recorded |
+| Prompt | [reviews/r1/codex-prompt-template.md](reviews/r1/codex-prompt-template.md) plus a round header and, from round 2, the prior dispositions. The **complete effective prompt** is committed as `reviews/r1/round-<N>-prompt.txt` and its `sha256` recorded |
 | Network | Not relied on; the reviewer is told to read local files only |
 
 A change of model or tool version between rounds is recorded and does not by
@@ -99,6 +99,22 @@ rules section 4.2) rather than trusting reviewer judgment about it.
 5. Stop when a round has zero blocking objections, or after round 5.
 6. Each Codex call is appended to [spend-ledger.md](spend-ledger.md).
 
+**Provenance and attempts.** For every attempt, the complete effective prompt
+(`round-<N>-prompt.txt`), the full CLI log including the session header
+(model, session id, sandbox, reasoning effort) and token count
+(`round-<N>-codex.log`), and the final message are committed. An attempt that
+fails to return a verdict line (crash, timeout, quota) is retained as
+`round-<N>-attempt-<k>` and recorded in the ledger; at most one retry per round
+is allowed, and a second failure ends the round as having blocking objections
+unresolved. An attempt that returns a verdict cannot be discarded or rerun to
+obtain a different verdict. The reviewer reads the artifacts from the working
+tree at the recorded artifact SHA, and the tree must be clean (no uncommitted
+changes) when the call starts. The remaining trust is in the capture operator
+(the proposer's agent session): a fabricated log would be detectable only by
+comparing session ids and timestamps with the maintainer's local Codex
+session store (rounds 2 onward) and OpenAI usage records. This residual trust
+is disclosed, not eliminated.
+
 Round files: `reviews/r1/round-<N>-codex.md` (raw Codex output plus the
 disposition table).
 
@@ -148,8 +164,8 @@ R1 is `MET (AI-adjudicated)` only when all of the following are recorded:
 
 1. A Codex round output containing `VERDICT: no blocking objections`, against
    artifact commit `<SHA>`, with the `sha256` of the normative set:
-   `r1-decision-rules-v1.md`, `r1-decision-rules-v1.json`, this file, and
-   `reviews/r1/codex-prompt-template.md`.
+   `r1-decision-rules-v1.md`, `r1-decision-rules-v1.json`,
+   `r1-safety-nmin.py`, this file, and `reviews/r1/codex-prompt-template.md`.
 2. The maintainer's merge of a PR whose merged content for those files has the
    same `sha256` values.
 3. No unresolved maintainer overrule under section 6.

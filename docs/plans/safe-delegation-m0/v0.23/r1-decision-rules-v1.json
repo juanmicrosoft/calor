@@ -3,31 +3,15 @@
   "normative_source": "r1-decision-rules-v1.md",
   "normative_note": "Markdown governs; any discrepancy is an amendment-control event (section 10.6).",
   "status_label": "AI-adjudicated, public-proxy domain",
-  "arms": {
-    "A": "ordinary C#",
-    "B": "strong protected C#",
-    "C": "protected Calor"
-  },
+  "arms": {"A": "ordinary C#", "B": "strong protected C#", "C": "protected Calor"},
   "branches": {
-    "L": {
-      "name": "LANGUAGE EARNS CONTINUATION",
-      "alpha": 0.025,
-      "test": "intersection_union",
-      "subject": "C",
-      "comparators": ["A", "B"]
-    },
-    "W": {
-      "name": "WORKFLOW VALUE, LANGUAGE NOT JUSTIFIED",
-      "alpha": 0.025,
-      "test": "intersection_union",
-      "subject": "B",
-      "comparators": ["A"],
-      "additional": "branch L does not pass"
-    }
+    "L": {"name": "LANGUAGE EARNS CONTINUATION", "alpha": 0.025, "test": "intersection_union", "subject": "C", "comparators": ["A", "B"]},
+    "W": {"name": "WORKFLOW VALUE, LANGUAGE NOT JUSTIFIED", "alpha": 0.025, "test": "intersection_union", "subject": "B", "comparators": ["A"], "additional": "branch L does not pass"}
   },
   "family_alpha_bound": 0.05,
   "study_outcome_precedence": ["INVALID", "L", "W", "TARGET NOT MET"],
   "gates": [
+    {"id": "G0", "name": "workload horizon", "metric": "adopter-expected assigned relevant requests in 12 months", "threshold": 50, "direction": "ge", "bound": "none", "domain_status": "NOT_MEASURABLE_IN_DOMAIN", "branches": ["L", "W"]},
     {"id": "G1.1", "name": "cost, subject vs A", "metric": "ratio of total cost per correctly accepted change", "threshold": 0.50, "direction": "upper_bound_le", "bound": "one_sided_97.5", "domain_status": "NOT_MEASURABLE_IN_DOMAIN", "branches": ["L", "W"]},
     {"id": "G1.2", "name": "cost, C vs B", "metric": "ratio of total cost per correctly accepted change", "threshold": 0.50, "direction": "upper_bound_le", "bound": "one_sided_97.5", "domain_status": "NOT_MEASURABLE_IN_DOMAIN", "branches": ["L"]},
     {"id": "G2.1", "name": "completion level, subject", "metric": "task-weighted correctly accepted fraction", "threshold": 0.80, "direction": "lower_bound_ge", "bound": "one_sided_97.5", "domain_status": "PROXY_ONLY", "branches": ["L", "W"]},
@@ -35,69 +19,44 @@
     {"id": "G2.3", "name": "completion difference, C - B", "metric": "difference in correctly accepted fraction (proportion)", "threshold": -0.05, "direction": "lower_bound_ge", "bound": "one_sided_97.5", "domain_status": "PROXY_ONLY", "branches": ["L"]},
     {"id": "G3.1", "name": "safety, subject - A, all-assigned", "metric": "difference in task-weighted serious-escape rate (proportion)", "threshold": 0.01, "direction": "upper_bound_le", "bound": "one_sided_97.5", "domain_status": "PROXY_ONLY", "branches": ["L", "W"]},
     {"id": "G3.2", "name": "safety, C - B, all-assigned", "metric": "difference in task-weighted serious-escape rate (proportion)", "threshold": 0.01, "direction": "upper_bound_le", "bound": "one_sided_97.5", "domain_status": "PROXY_ONLY", "branches": ["L"]},
-    {"id": "G3.3", "name": "safety, subject - A, accepted", "metric": "difference in mean_t escape_t / mean_t accepted_t (proportion); undefined comparison fails", "threshold": 0.01, "direction": "upper_bound_le", "bound": "one_sided_97.5", "domain_status": "PROXY_ONLY", "branches": ["L", "W"]},
-    {"id": "G3.4", "name": "safety, C - B, accepted", "metric": "difference in mean_t escape_t / mean_t accepted_t (proportion); undefined comparison fails", "threshold": 0.01, "direction": "upper_bound_le", "bound": "one_sided_97.5", "domain_status": "PROXY_ONLY", "branches": ["L"]},
-    {"id": "G4", "name": "trust boundary", "metric": "count of confirmed false-established properties plus accepted unauthorized bypasses", "threshold": 0, "direction": "eq", "bound": "none_zero_tolerance", "domain_status": "MEASURABLE_IN_PRINCIPLE_ROUTE_MISSING", "branches": ["L", "W"]},
+    {"id": "G3.3", "name": "safety, subject - A, accepted", "metric": "difference in mean_t escape_t / mean_t accepted_t; undefined comparison fails", "threshold": 0.01, "direction": "upper_bound_le", "bound": "one_sided_97.5", "domain_status": "PROXY_ONLY", "branches": ["L", "W"]},
+    {"id": "G3.4", "name": "safety, C - B, accepted", "metric": "difference in mean_t escape_t / mean_t accepted_t; undefined comparison fails", "threshold": 0.01, "direction": "upper_bound_le", "bound": "one_sided_97.5", "domain_status": "PROXY_ONLY", "branches": ["L"]},
+    {"id": "G4", "name": "trust boundary", "metric": "confirmed false-established properties plus accepted unauthorized bypasses", "threshold": 0, "direction": "eq", "bound": "none_zero_tolerance", "domain_status": "MEASURABLE_IN_PRINCIPLE", "branches": ["L", "W"]},
     {"id": "G5", "name": "usable adoption", "metric": "independent adopter completes install, integration, one change, with full disclosure", "threshold": true, "direction": "eq", "bound": "none", "domain_status": "NOT_MEASURABLE_IN_DOMAIN", "branches": ["L", "W"]},
     {"id": "G6.1", "name": "handoff export equivalence", "metric": "runnable C# export passes behavioral comparison; losses documented", "threshold": true, "direction": "eq", "bound": "none", "domain_status": "MEASURABLE_IN_PRINCIPLE", "branches": ["L", "W"]},
     {"id": "G6.2", "name": "handoff independent receipt", "metric": "non-maintainer recipient accepts handoff", "threshold": true, "direction": "eq", "bound": "none", "domain_status": "NOT_MEASURABLE_IN_DOMAIN", "branches": ["L", "W"]}
   ],
-  "subject_note": "Subject is C in branch L and B in branch W. C-vs-B components apply only to branch L.",
-  "estimator_validation": {
-    "type1_branch_max": "0.025 + 2.576*sqrt(0.025*0.975/n_sim)",
-    "type1_family_max": "0.05 + 2.576*sqrt(0.05*0.95/n_sim)",
-    "n_sim_min": 10000,
-    "n_sim_max": 40000,
-    "undefined_draws": "count as gate failure; never dropped",
-    "required_structure": [
-      "paired_by_source_cluster",
-      "repository_cluster_effect",
-      "reviewer_effect",
-      "repeated_slots_within_cluster",
-      "accepted_and_all_assigned_denominators",
-      "replacements_charged_to_original_slot_max_2_infrastructure_only_symmetric"
-    ],
-    "forbidden": ["zero_width_safety_interval_on_zero_events"],
-    "reproducibility": ["code_commit", "runtime_version", "lockfile_sha256", "seeds", "input_sha256", "output_sha256"]
-  },
-  "power": {
-    "target": 0.80,
-    "powered_if": "p_hat - 2.576*SE >= 0.80",
-    "not_powered_if": "p_hat + 2.576*SE < 0.80",
-    "indeterminate": "rerun once at 40000 with next pinned seed; if still indeterminate: not powered for FEASIBLE/RSA, not established for NOT FEASIBLE"
-  },
-  "scenarios": {
-    "global_null": {"cost_ratio": 0.50, "completion_level": 0.80, "completion_diff": -0.05, "safety_diff": 0.01},
-    "mixed_nulls": "one component at its boundary, all others at L_least_favorable; repeat for every component of both branches",
-    "L_least_favorable": {"use": "FEASIBLE/RSA", "cost_ratio_CA": 0.40, "cost_ratio_CB": 0.40, "completion_level_C": 0.90, "completion_diff_CA": 0.0, "completion_diff_CB": 0.0, "safety_diff": 0.0},
-    "L_most_favorable": {"use": "NOT FEASIBLE", "cost_ratio_CA": 0.35, "cost_ratio_CB": 0.35, "completion_level_C": 0.95, "completion_diff_CA": 0.05, "completion_diff_CB": 0.05, "safety_diff": -0.01},
-    "W_least_favorable": {"use": "FEASIBLE/RSA", "cost_ratio_BA": 0.40, "cost_ratio_CB": 1.00, "completion_level_B": 0.90, "completion_diff_BA": 0.0, "completion_diff_CB": 0.0, "safety_diff_BA": 0.0},
-    "W_most_favorable": {"use": "NOT FEASIBLE", "cost_ratio_BA": 0.35, "cost_ratio_CB": 1.00, "completion_level_B": 0.95, "completion_diff_BA": 0.05, "completion_diff_CB": 0.0, "safety_diff_BA": -0.01}
-  },
-  "bounding": {
-    "registration": "before estimator is run on decision inputs",
-    "unevidenced_parameter": "logical_range",
-    "feasible_and_rsa": "least_favorable_joint",
-    "not_feasible": "most_favorable_joint",
-    "central_values": "never decide"
-  },
+  "simulation_role_v1": "descriptive only; cannot produce SIZED_FEASIBLE or SIZED_INFEASIBLE",
   "supply": {
-    "S_low": "confirmed eligible with complete provenance, minus registered pilot reservation",
-    "S_high": "S_low + pilot reservation + missing/indeterminate/unextracted clusters; pilot reservation taken as 0",
-    "rule_excluded": "excluded from both bounds",
-    "historical_and_forward": "reported separately; R4 uses historical only unless a bounded forward estimate is frozen"
+    "H_conf": "confirmed eligible historical clusters with complete provenance",
+    "H_unres": "enumerated items with missing or indeterminate eligibility",
+    "H_enum_max": "certified enumeration upper bound named in the frozen extraction spec; unbounded if none",
+    "H_high": "min(H_conf + H_unres + (H_enum_max - enumerated), H_enum_max); unbounded if H_enum_max unbounded",
+    "F_high": "floor(H_high / 0.75)",
+    "rule_excluded": "excluded from all bounds"
   },
-  "gate_states": ["SIZED_FEASIBLE", "SIZED_INFEASIBLE", "NOT_MEASURABLE_IN_DOMAIN", "PROXY_ONLY", "ROUTE_MISSING", "METHOD_UNAVAILABLE", "INDETERMINATE"],
+  "safety_nmin": {
+    "calculator": "r1-safety-nmin.py",
+    "alpha": 0.025,
+    "power": 0.80,
+    "margin": 0.01,
+    "delta_alt": -0.01,
+    "c_grid": "[0, 0.05] step 0.001",
+    "N_MIN": 172,
+    "attained_at_c": 0.0,
+    "rule": "G3.1 SIZED_INFEASIBLE in both branches iff F_high finite and F_high < N_MIN (H_high <= 128)"
+  },
+  "component_states": ["SIZED_FEASIBLE", "SIZED_INFEASIBLE", "NOT_MEASURABLE_IN_DOMAIN", "PROXY_ONLY", "ROUTE_ESTABLISHED", "ROUTE_MISSING", "ROUTE_BLOCKED", "ROUTE_UNRESOLVED"],
   "classification_order": [
     {"step": 1, "result": "UNADJUDICATED", "kind": "process_status", "when": "R1 not MET; any upstream gate not MET or INVALIDATED; or R5 countersignature absent"},
-    {"step": 2, "result": "NOT FEASIBLE", "when": "any statistically sized component SIZED_INFEASIBLE via supply route, or via envelope route for non-PROXY_ONLY components"},
-    {"step": 3, "result": "INSUFFICIENT INFORMATION", "when": "any component METHOD_UNAVAILABLE"},
-    {"step": 4, "result": "FEASIBLE AS PROPOSED", "when": "every component SIZED_FEASIBLE (G1-G3) or evidenced credible route (G4-G6); named roles exist; approved envelope covers least-favorable requirement"},
-    {"step": 5, "result": "REQUIRES SEPARATE APPROVAL", "when": "step 4 holds under a specified, fully evidenced resource/risk/scope change; no gate dropped"},
-    {"step": 6, "result": "INSUFFICIENT INFORMATION", "when": "otherwise; name smallest information request, owner, deadline"}
+    {"step": 2, "result": "NOT FEASIBLE", "when": "G3.1 SIZED_INFEASIBLE in branch L or W"},
+    {"step": 3, "result": "FEASIBLE AS PROPOSED", "when": "all (branch, component) SIZED_FEASIBLE or ROUTE_ESTABLISHED; G0, G5, G6.2 evidenced true; roles exist; envelope covers least-favorable requirement", "reachable_v1_public_proxy": false},
+    {"step": 4, "result": "REQUIRES SEPARATE APPROVAL", "when": "step 3 under a specified, fully evidenced resource/risk/scope change; no gate dropped", "reachable_v1_public_proxy": false},
+    {"step": 5, "result": "INSUFFICIENT INFORMATION", "when": "otherwise; name smallest information request, owner, deadline"}
   ],
   "public_proxy_reachable": ["NOT FEASIBLE", "INSUFFICIENT INFORMATION", "UNADJUDICATED"],
   "public_proxy_unreachable": ["FEASIBLE AS PROPOSED", "REQUIRES SEPARATE APPROVAL"],
+  "missing_heldout_after_acceptance": "adversarial imputation (subject: not correct + escape; comparator: correct + no escape); > 5% of accepted slots in any arm makes the epoch INVALID",
   "post_inspection_amendment": "compute under prior and new versions; if they differ, INSUFFICIENT INFORMATION",
-  "immutable_thresholds": ["cost ratio 0.50", "completion level 0.80", "completion difference -5 pp", "safety difference +1 pp", "alpha 0.025 per branch"]
+  "immutable": ["cost ratio 0.50", "completion level 0.80", "completion difference -5 pp", "safety difference +1 pp", "alpha 0.025 per branch", "registered design alternatives after inspection"]
 }
