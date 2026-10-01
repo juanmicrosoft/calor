@@ -51,19 +51,19 @@ them as such.
 participant, repository owner, or contributor is contacted by anyone acting
 under this authority. There is no human outreach.
 
-Two narrow non-solicitation exceptions exist, both executed only by the
-maintainer:
+There are no exceptions. In particular:
 
-1. **Inbound exclusion requests.** If a repository owner or contributor asks,
-   unprompted, for their repository or data to be excluded, the maintainer may
-   reply once to confirm the disposition (Section 7). The reply may not solicit
-   participation, review, or opinion.
-2. **Legally required notices.** If Section 7 discovers that non-public
-   third-party data was accessed and a notice is legally required, the
-   maintainer may send that notice.
-
-Each such message is logged in the disposition log (Section 13). Neither
-exception authorizes any other contact.
+- **Inbound exclusion requests.** If a repository owner or contributor asks,
+  unprompted, for their repository or data to be excluded, the request is
+  honored under Section 7.3 and the disposition is published by the
+  maintainer on #1370. No reply is sent to the requester under this
+  authority.
+- **Legal obligations.** This record grants no authority to contact anyone.
+  If a law independently requires a notice (for example after accidental
+  access to non-public third-party data), the inquiry stops; the maintainer
+  meets the obligation outside this inquiry; and the event is logged in the
+  disposition log (Section 13). Such a notice is not inquiry activity and
+  does not change `boundary.humanContact`, which records inquiry contacts.
 
 ## 4. Permitted work
 
@@ -85,7 +85,7 @@ Everything else is outside this authority, including everything in Section 9.
 | Cash | **USD 200.00 hard ceiling** across all 0.23 gates. The maintainer stated "approximately USD 200"; this record fixes it as a ceiling. | Marginal billed AI API/tool spend, recorded per invocation in [spend-ledger.md](spend-ledger.md). Existing subscriptions (Claude Code, the ChatGPT plan used by Codex CLI, GitHub Copilot) are excluded from the cash figure; their token use is still logged. |
 | Review rounds | **5** adversarial review rounds per artifact, counting every reviewer (Codex and Copilot share the allowance) | Counted per [review-protocol.md](review-protocol.md) |
 | Inquiry deadline | **2026-10-29, 23:59 UTC** | All substantive gate work must finish by then |
-| Person-hours | **No person-hour cap was set by the maintainer.** Maintainer hours are not metered, as in 0.20. AI agent time is bounded only by the cash cap, the round cap, and the deadline. | Recorded as an open item; a person-hour cap requires an R0 amendment |
+| Planning hours | **Maintainer: 20 hours. AI agent sessions: 60 wall-clock hours.** Both across all 0.23 gates. The maintainer did not state an hours figure when approving R0; these caps were proposed in this record and are adopted only by the maintainer's merge of it. | Self-reported per gate in the hours table of [spend-ledger.md](spend-ledger.md); agent hours are session wall-clock time, which also bounds subscription-backed AI use that the cash cap does not |
 | Compensation | **USD 0** to any person | Section 8 |
 
 Exceeding any cap, or extending the deadline, requires a versioned R0
@@ -139,9 +139,18 @@ inquiry does not need individual identity, so:
   repository revision (one snapshot SHA per repository, identifying a
   repository state, not a contributor decision); the extraction window; the
   pinned extractor code and eligibility rules; and a SHA-256 digest of the
-  full per-item decision list. Anyone can reproduce the list by re-running the
-  pinned extractor over the pinned revisions and compare its digest. The list
-  itself is never committed and is deleted with local caches (7.3).
+  full per-item decision list. The pinned extractor writes only aggregates
+  and the digest; the per-item list exists in memory or in local caches,
+  is never committed, and is deleted with local caches (7.3). Reproduction
+  re-runs the extractor and compares aggregates and digest.
+- **Scope of the anonymity rule.** The rule governs what this inquiry
+  publishes. It does not, and cannot, prevent a third party from re-deriving
+  per-item eligibility by running modified code over the same public
+  repositories, because every input is already public and attributable. The
+  inquiry does not claim anonymity against that reconstruction. The residual
+  is accepted because eligibility labels describe the technical shape of
+  public changes, not the people who made them, and the inquiry adds no
+  personal information to the public inputs.
 - Where an analysis needs author or reviewer clustering, it uses per-run
   ordinal pseudonyms (`author-001`, ...) assigned in memory. The mapping from
   pseudonym to username is never written to the repository or to persistent
@@ -174,7 +183,7 @@ opening a pull request.
 | Inquiry deadline passes or R0 becomes `EXPIRED` | Stop substantive work; Section 10 propagation; delete local caches | Stop immediately; deletion completed within 7 days |
 | R0 becomes `REVOKED` | Same as expiry | Same as expiry |
 | Milestone close (#1370 closed) | Delete any remaining local caches; committed public record stays | Within 7 days |
-| Repository owner or contributor asks for exclusion | Exclude the repository from all further analysis; remove its provenance rows; Section 10 invalidation of affected outputs | Stop use immediately; removal merged within 7 days; reply (Section 3) within 7 days |
+| Repository owner or contributor asks for exclusion | Exclude the repository from all further analysis; remove its provenance rows; Section 10 invalidation of affected outputs | Stop use immediately; removal merged within 7 days; disposition published on #1370 within 7 days |
 | A source's license or terms stop permitting the use | Same as exclusion | Same as exclusion |
 | Non-public, restricted, personal, or confidential data is found in any cache, record, or log | Stop the run; delete local copies; remove from the repository, including history (7.4) | Stop immediately; local deletion and working-tree removal merged within 24 hours; history handling per 7.4 |
 | A gate is refused (`NOT_AUTHORIZED`) or authority is withdrawn | Inventory every access actually made under that gate (date, source, material) in the disposition log; delete its caches | Inventory within 3 days; deletion within 7 days |
@@ -209,8 +218,8 @@ opening a pull request.
 | Any change to access scope, confidentiality, or a source's permission (exclusion, license change, non-public discovery) | The maintainer | The agent or person who detects it, by stopping and recording the event in the active PR or gate record | Immediately, in the same session |
 | The same events | The public record: #1370 and the affected gate issue | The maintainer | Within 3 calendar days |
 | R0 `EXPIRED` or `REVOKED`; any gate `INVALIDATED` | The public record: #1370 and every affected gate issue | The maintainer | Within 3 calendar days |
-| Inbound exclusion request | The requester | The maintainer (Section 3, exception 1) | Within 7 days |
-| Non-public third-party data accessed and notice legally required | The data owner | The maintainer (Section 3, exception 2) | As the law requires |
+| Inbound exclusion request | The public record: #1370 (no reply to the requester under this authority) | The maintainer | Within 7 days |
+| Non-public third-party data accessed and a notice is legally required | Handled outside this inquiry (Section 3); the inquiry stops | The maintainer | As the law requires |
 
 ### 7.6 Evidence of disposition
 
@@ -276,7 +285,8 @@ if:
 - R5 holds a formal classification without the label
   "AI-adjudicated, public-proxy domain", or R5 is `MET` without both a
   formal classification and a separate maintainer action;
-- the cash cap exceeds USD 200 or the round cap exceeds 5;
+- the cash cap exceeds USD 200, the round cap exceeds 5, or an hours cap
+  exceeds 20 (maintainer) or 60 (agent sessions);
 - a review file is misnamed or exceeds round 5.
 
 It also scans Markdown under `v0.23/` (outside correctly named review
@@ -300,22 +310,43 @@ for meaning.
 ## 10. Expiry, revocation, revalidation, and invalidation
 
 **Revalidation.** Before a gate starts, before each data access, and
-immediately before closure, the acting agent checks and records in the gate
-record that: R0 is `MET` and neither expired nor revoked; every prerequisite
-gate in the amended graph is currently `MET` in
-[gate-state.json](gate-state.json); the deadline has not passed; and the
-cumulative spend is under the cap. Any failed check stops the work.
+immediately before closure, the acting agent checks, and records in the gate
+record with the date and the commit SHA of gate-state.json it read:
 
-**End of authority.** R0 authority ends at the earlier of (a) 2026-10-29
-23:59 UTC and (b) the close of #1370.
+1. R0: current value `MET`, not expired, not revoked, and active authority
+   has not ended (below);
+2. for **each** prerequisite in the amended graph: its current value is `MET`
+   in [gate-state.json](gate-state.json); any expiry stated in its own record
+   has not passed; no withdrawal, exclusion, license change, or invalidation
+   affecting it is recorded in its record, in Section 13, or on #1370 after
+   its `MET` date; and the output version (commit SHA) it relied on is the one
+   still recorded as current;
+3. the cumulative spend and hours are under their caps.
 
-- If #1370 closes first, the inquiry is complete. R0 keeps its `MET` value as
-  a completed authorization and Section 7 milestone-close rules apply.
-- If the deadline arrives while **any** of R1-R5 is still undispositioned,
-  R0 becomes `EXPIRED`. Its affected descendants are reclassified under the
-  invalidation rule below, **including gates already closed as `MET`**. R5
-  still runs, only to record the closeout and preserve `UNADJUDICATED` with a
-  dated reason; it accesses no new evidence.
+Any failed check stops the work. If a check finds that a prerequisite's
+authority or input has lapsed while gate-state.json still shows `MET` (stale
+state), the agent records the finding in the active PR, and work resumes only
+after the maintainer has merged the invalidation update under the rule below.
+
+**Completion and end of authority.** The inquiry is **complete** when R5 is
+dispositioned (its value recorded in gate-state.json and merged). Active
+authority ends at the earlier of completion and 2026-10-29 23:59 UTC.
+
+| Case | R0 current value | Consequence |
+|---|---|---|
+| R5 dispositioned on or before the deadline | `MET` (a completed authorization; no active authority remains) | No further substantive work. The deadline passing later has no effect. Section 7 gate-close and milestone-close rules apply. |
+| Deadline passes before R5 is dispositioned, whatever the state of R1-R4 | `EXPIRED` | Invalidation rule below for every affected gate, including gates already `MET`; then the R5 administrative closeout. |
+
+**R5 administrative closeout.** This is the only work permitted when R0 is
+`EXPIRED` or `REVOKED`, or when a prerequisite of R5 is not `MET`. It is
+exempt from the revalidation stop above. It may only: record the terminal
+gate values, invalidations, and disposition actions; publish the dated reason
+for which formal adjudication did not occur; preserve `UNADJUDICATED`; and
+record a maintainer action. It may not inspect, access, or extract evidence,
+size anything, or classify formally. Its record goes through the review
+protocol if any round allowance and cash remain; otherwise it records that
+review was not available. Its terminal R5 value is `UNAVAILABLE` or `EXPIRED`
+per #1377.
 
 **Revocation.** If the maintainer withdraws this authority, the current R0
 value changes from `MET` to `REVOKED` with a timestamp in
@@ -366,7 +397,7 @@ amendment. It does not revalidate invalidated outputs.
 |---|---|
 | #1371: name decision and budget authority | Sections 1, 2 |
 | #1371: permitted contacts and who may make them | Section 3 |
-| #1371: planning-hours cap, cash/compensation cap, inquiry deadline | Section 5 (no person-hour cap was set; recorded as such) |
+| #1371: planning-hours cap, cash/compensation cap, inquiry deadline | Section 5 (hours caps proposed here and adopted by the maintainer's merge) |
 | #1371: privacy-safe metadata access and approved restricted storage | Section 6 (none approved; amendment required first) |
 | #1371: confidentiality, compensation, conflict, withdrawal, deletion rules | Sections 7, 8 |
 | #1371: prohibitions | Section 9 |
@@ -378,7 +409,7 @@ amendment. It does not revalidate invalidated outputs.
 | #1371 privacy amendment: retention exceptions and isolation | 7.4 |
 | #1371 privacy amendment: evidence of deletion/revocation/notification | 7.6, Section 13 |
 | #1371 privacy amendment: `MET` to `REVOKED` and propagation | Section 10 |
-| #1370 lifecycle amendments: revalidation, `INVALIDATED`, `NOT_REACHED`, R5 disclosure | Section 10 |
+| #1370 lifecycle amendments: revalidation, `INVALIDATED`, `NOT_REACHED`, R5 disclosure, R5 closeout exception | Section 10 |
 | #1371 interpretation: no universal-nonexistence claim | Section 11 |
 
 ## 13. Audit log

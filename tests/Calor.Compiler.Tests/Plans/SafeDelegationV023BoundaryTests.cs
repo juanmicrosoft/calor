@@ -20,6 +20,8 @@ public sealed class SafeDelegationV023BoundaryTests
 
     private const decimal CashCapUsd = 200m;
     private const int MaxRounds = 5;
+    private const decimal MaintainerHoursCap = 20m;
+    private const decimal AgentSessionHoursCap = 60m;
 
     private static readonly string[] ProcessStates =
         ["MET", "UNAVAILABLE", "EXPIRED", "REVOKED", "NOT_AUTHORIZED", "NOT_REACHED", "INVALIDATED"];
@@ -205,8 +207,10 @@ public sealed class SafeDelegationV023BoundaryTests
         {
             root["limits"]!["cashCapUsd"] = 500;
             root["limits"]!["maxReviewRoundsPerArtifact"] = 10;
+            root["limits"]!["agentSessionHoursCap"] = 600;
         });
         var violations = ValidateGateState(json);
+        Assert.Contains(violations, v => v.Contains("agentSessionHoursCap", StringComparison.Ordinal));
         Assert.Contains(violations, v => v.Contains("cashCapUsd", StringComparison.Ordinal));
         Assert.Contains(violations, v => v.Contains("maxReviewRoundsPerArtifact", StringComparison.Ordinal));
     }
@@ -293,6 +297,10 @@ public sealed class SafeDelegationV023BoundaryTests
             violations.Add($"limits.cashCapUsd must be at most {CashCapUsd} (R0 Section 5)");
         if (!limits.TryGetProperty("maxReviewRoundsPerArtifact", out var rounds) || rounds.GetInt32() > MaxRounds)
             violations.Add($"limits.maxReviewRoundsPerArtifact must be at most {MaxRounds} (R0 Section 5)");
+        if (!limits.TryGetProperty("maintainerHoursCap", out var maintainerHours) || maintainerHours.GetDecimal() > MaintainerHoursCap)
+            violations.Add($"limits.maintainerHoursCap must be at most {MaintainerHoursCap} (R0 Section 5)");
+        if (!limits.TryGetProperty("agentSessionHoursCap", out var agentHours) || agentHours.GetDecimal() > AgentSessionHoursCap)
+            violations.Add($"limits.agentSessionHoursCap must be at most {AgentSessionHoursCap} (R0 Section 5)");
 
         var values = new Dictionary<string, string?>(StringComparer.Ordinal);
         var gates = root.GetProperty("gates").EnumerateArray().ToList();

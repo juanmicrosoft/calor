@@ -63,14 +63,17 @@ The #1370 propagation and lifecycle rules apply unchanged: only `MET` unlocks
 a dependent gate; a dependent of a non-`MET` prerequisite closes
 `NOT_REACHED`; expiry or revocation of a prerequisite makes dependents
 `INVALIDATED`. R5 still runs after every earlier gate is dispositioned, even if
-R4 is `NOT_REACHED`, to record the closeout.
+R4 is `NOT_REACHED`, as the R0 Section 10 administrative closeout.
 
 ## 5. Amended closure criteria
 
 Every amended gate shares these conditions:
 
-- **Revalidation.** R0 is `MET`, not expired, and within the cash cap at
-  start, before each data access, and before closure.
+- **Revalidation.** The full procedure of R0 Section 10 runs at start,
+  before each data access, and before closure: R0 and **each** prerequisite's
+  value, expiry, withdrawal status, and relied-on output version, and the
+  spend and hours caps. The R5 administrative closeout (R0 Section 10) is
+  the only exception.
 - **Review.** The gate artifact completes the protocol with no unresolved
   blocking objection within 5 rounds. If blocking objections remain after
   round 5, the gate cannot be `MET`.

@@ -1,6 +1,6 @@
 # Safe delegation M0 v0.23 — spend ledger
 
-**Cap:** USD 200.00 marginal AI API/tool spend across all 0.23 gates
+**Caps:** USD 200.00 marginal AI API/tool spend across all 0.23 gates
 ([r0-authorization.md](r0-authorization.md) Section 5). Existing
 subscriptions are excluded from the cash figure; their usage is still logged.
 **Procedure:** [review-protocol.md](review-protocol.md).
@@ -13,3 +13,14 @@ new row that cites the row it corrects.
 | 1 | 2026-10-01 | R0 | 1 | Codex CLI 0.159.2 (`codex exec`, read-only) | gpt-6.1-sol | 35,454 | 0.00 | ChatGPT subscription (excluded) | [round-1-codex.md](reviews/R0/round-1-codex.md) |
 
 **Cumulative marginal USD:** 0.00
+
+## Hours
+
+Caps: maintainer 20 hours; AI agent sessions 60 wall-clock hours
+([r0-authorization.md](r0-authorization.md) Section 5). Self-reported per
+gate; append rows.
+
+| Date (UTC) | Gate | Maintainer hours | Agent session hours | Notes |
+|---|---|---|---|---|
+
+**Cumulative:** maintainer 0; agent 0.

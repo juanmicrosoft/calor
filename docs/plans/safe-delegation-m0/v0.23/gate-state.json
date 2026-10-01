@@ -12,7 +12,9 @@
     "planningWindowStart": "2026-10-01",
     "inquiryDeadline": "2026-10-29",
     "cashCapUsd": 200,
-    "maxReviewRoundsPerArtifact": 5
+    "maxReviewRoundsPerArtifact": 5,
+    "maintainerHoursCap": 20,
+    "agentSessionHoursCap": 60
   },
   "boundary": {
     "participantEnrollment": false,
