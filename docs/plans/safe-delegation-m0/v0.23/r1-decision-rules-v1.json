@@ -222,9 +222,10 @@
     "H_conf": "confirmed eligible historical clusters with complete provenance",
     "H_unres": "enumerated items with missing or indeterminate eligibility",
     "H_enum_max": "certified enumeration upper bound named in the frozen extraction spec; unbounded if none",
-    "H_high": "min(H_conf + H_unres + (H_enum_max - enumerated), H_enum_max); unbounded if H_enum_max unbounded",
+    "H_high": "min(H_conf + H_unres + (H_enum_max - enumerated), H_enum_max) + H_fam; unbounded if H_enum_max or H_fam unbounded",
     "F_high": "floor(H_high / 0.75)",
-    "rule_excluded": "excluded from all bounds"
+    "rule_excluded": "excluded from all bounds",
+    "H_fam": "merged PRs in window in prior-familiarity repositories; unbounded if not certified"
   },
   "safety_nmin": {
     "calculator": "r1-safety-nmin.py",
@@ -235,7 +236,8 @@
     "delta_alt": -0.01,
     "eps": "0.02/1.01",
     "N_MIN": 174,
-    "rule": "G3.1 SIZED_INFEASIBLE in both branches iff F_high finite and F_high < N_MIN (H_high <= 130)"
+    "rule": "G3.1 SIZED_INFEASIBLE in both branches iff R3 certificate (a) recorded, F_high finite, and F_high < N_MIN (H_high <= 130)",
+    "admissibility_certificate": "R3 must certify, before R2B' inspection, that the confirmatory analysis uses no structural constraint making Q inadmissible; otherwise the supply route is disabled"
   },
   "component_states": [
     "SIZED_FEASIBLE",
@@ -300,6 +302,29 @@
     "ROUTE_BLOCKED",
     "ROUTE_UNRESOLVED",
     "ROUTE_MISSING",
-    "ROUTE_ESTABLISHED"
-  ]
+    "ROUTE_ESTABLISHED",
+    "otherwise ROUTE_UNRESOLVED"
+  ],
+  "source_selection": {
+    "frame": [
+      "public GitHub repo; not fork, archived, mirror, or template",
+      "primary language C#",
+      "license SPDX in R2A' permitted set",
+      ">= 1 PR merged in [T-365d, T), T <= 2026-10-29",
+      "not on prior-familiarity list"
+    ],
+    "enumeration": "GitHub search API, date-sliced, spec committed and hashed before running; uncertified -> H_enum_max unbounded",
+    "inventory_draw": "order by SHA-256(salt + '/' + owner/name), salt = R1 freeze-PR merge commit SHA (lowercase hex); inspect first 30; descriptive only",
+    "eligibility": {
+      "E1": "PR merged in window; linked issues, reverts, backports join its cluster",
+      "E2": "changes >= 1 non-test .cs file with non-whitespace diff; test path regex (^|/)(test|tests|[^/]*\\.tests?)(/|$) case-insensitive",
+      "E3": "changes >= 1 file in a test path",
+      "E4": "author account type User (not Bot)",
+      "E5": ">= 1 changed non-test .cs file outside obj/, bin/, *Generated* paths with non-whitespace change",
+      "E6": "R3 domain-cell rule, frozen before R2B' inspection",
+      "unevaluable": "unresolved; never counted eligible or ineligible"
+    },
+    "prior_familiarity": "bench/corpus submodules; repos whose URL appears in bench/, benchmarks/, tests/, docs/, .gitmodules at the R1 merge commit; maintainer declarations before extraction. Excluded from frame, draw, pool; counts reported separately and added to H_high"
+  },
+  "expected_v1_outcome_note": "Most likely INSUFFICIENT INFORMATION; recorded before inspection (section 7.3)"
 }

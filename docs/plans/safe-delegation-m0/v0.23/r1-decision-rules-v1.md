@@ -42,7 +42,7 @@ INSUFFICIENT INFORMATION (section 7). No component is dropped.
 | Term | Definition (frozen) |
 |---|---|
 | Public-proxy domain | Task supply drawn from the history of public .NET open-source repositories, per the maintainer decision of 2026-10-01 recorded in `amendment-001-public-proxy.md` (R0). No adopter organization exists. |
-| Sampling frame | The list of repositories, history window, and eligibility rules that R3 freezes **before** R2B inspects any task data. Every supply figure and every NOT FEASIBLE statement is scoped to that frame. |
+| Sampling frame | The candidate frame of public .NET repositories, window, draw, and eligibility rules frozen in section 6.1-6.3 (domain cells added by R3) **before** R2B′ inspects any task data. Every supply figure and every NOT FEASIBLE statement is scoped to that frame. |
 | Source cluster | One underlying change request: the issue and every linked pull request/commit implementing the same change. Variants, reopened duplicates, backports, and repeated runs of the same change are one cluster. Under Draft v3 section 5.1, a cluster is the independent unit: repetitions and variants do not increase the independent-task count. |
 | Historical cluster | A source cluster replayed from the frame's recorded history. |
 | Authored cluster | An independently authored request (not a variant of a historical cluster). Draft v3 caps authored clusters at 25% of primary task weight in each pool. |
@@ -164,18 +164,79 @@ only for branch L is insufficient (Draft v3 section 6.3). Therefore:
   branches under the least-favorable registered alternatives. Under v1 it is
   unreachable in the public-proxy domain (section 7.3).
 
-## 6. Supply bounds and missingness
+## 6. Source selection, eligibility, supply bounds, and missingness
 
-### 6.1 Supply bounds (from R2B, within the frozen frame)
+### 6.1 Source selection (frozen by R1, per amendment 001)
 
-R2B reports, for the frozen frame:
+**Candidate frame.** A repository is in the frame if, at the R2B′ extraction
+time `T`, it:
+
+1. is a public GitHub repository that is not a fork, archived, a mirror, or a
+   template;
+2. has GitHub-reported primary language `C#`;
+3. carries a license whose SPDX identifier is in the set R2A′ (#1373) permits;
+4. has at least one pull request merged in the window `[T - 365 days, T)`;
+   `T` is no later than 2026-10-29;
+5. is not on the prior-familiarity list (section 6.3).
+
+**Enumeration.** R2B′ enumerates the frame with the GitHub search API, using
+date-sliced queries so that no query exceeds the API's result cap. The
+extraction specification (queries, slices, timestamps) is committed and hashed
+before it runs. If the enumeration cannot be completed or its completeness
+cannot be checked against the API's reported totals, the frame size is
+uncertified and `H_enum_max` is unbounded (section 6.4).
+
+**Inventory draw.** R2B′ orders the enumerated frame by
+`SHA-256(salt || "/" || owner/name)` with `salt` = the lowercase hex merge
+commit SHA of the PR that freezes these rules, and inspects the first 30
+repositories in that order (all of them if fewer). Stars, activity, size, and
+familiarity with the code play no role. The draw estimates eligibility rates
+descriptively. It does **not** define supply: the supply bound in section 6.4
+covers the whole frame, with uninspected items counted as unresolved.
+
+### 6.2 Eligibility rules R2B′ applies
+
+A source cluster is confirmed eligible only if every criterion is confirmed:
+
+| ID | Criterion | Mechanical test |
+|---|---|---|
+| E1 | Merged change in the window | A pull request with `merged_at` in `[T - 365 days, T)`; linked issues (closing keywords) and reverts/backports that cite it join its cluster |
+| E2 | Production C# change | Changes at least one `.cs` file outside test paths, with a non-whitespace diff; test paths match the case-insensitive regex `(^|/)(test|tests|[^/]*\.tests?)(/|$)` |
+| E3 | Oracle material exists | Changes at least one file in a test path, so a held-out behavioral oracle can be derived |
+| E4 | Human-authored | Author account type is `User` (not `Bot`); evaluated from account type, never from names |
+| E5 | Not generated or formatting-only | At least one changed non-test `.cs` file is not under `obj/`, `bin/`, or a path containing `Generated`, and has a change outside whitespace |
+| E6 | Inside the R3 domain cells | The R3 (#1374) domain-cell rule, which R3 must freeze before R2B′ inspects data |
+
+A criterion that is confirmed false is a rule-based exclusion with a recorded
+reason. A criterion that cannot be evaluated (missing data, API error,
+ambiguous linkage, undecidable domain cell) leaves the cluster **unresolved**;
+it is never counted as ineligible or as eligible.
+
+### 6.3 Prior familiarity
+
+The prior-familiarity list is fixed at the R1 merge commit as: the
+`bench/corpus/` submodules (MediatR, Serilog, FluentValidation); every GitHub
+repository whose URL appears in this repository's `bench/`, `benchmarks/`,
+`tests/`, `docs/`, or `.gitmodules` at that commit; and any repository the
+maintainer declares in the R2B′ record **before** extraction. R2B′ publishes
+the list. Listed repositories are excluded from the frame, the inventory draw,
+and any future task pool. Their item counts are reported as a separate
+stratum and **are added to `H_high`** (section 6.4), because removing them
+must not manufacture scarcity. The proposer (Claude) and the reviewer (Codex)
+have unmeasurable pretraining exposure to popular public .NET repositories;
+this cannot be excluded and is disclosed in every R5 output.
+
+### 6.4 Supply bounds (from R2B′, over the whole frozen frame)
+
+R2B′ reports, for the whole frozen frame:
 
 | Quantity | Definition |
 |---|---|
 | `H_conf` | Historical clusters confirmed eligible under the frozen R3 rules, with complete provenance |
 | `H_unres` | Enumerated items whose eligibility is missing or indeterminate (including extraction failures for enumerated items) |
 | `H_enum_max` | A certified upper bound on the number of items in the frame that could form clusters, taken from a complete enumeration (for example a platform-reported total count for the window) that the frozen extraction specification names in advance. If no certified enumeration exists for any repository in the frame, `H_enum_max` is **unbounded**. |
-| `H_high` | `min(H_conf + H_unres + (H_enum_max - enumerated items), H_enum_max)`, that is, every item that is not confirmed ineligible for a recorded, rule-based reason is counted as potentially eligible; unbounded if `H_enum_max` is unbounded |
+| `H_fam` | Merged pull requests in the window in prior-familiarity repositories (section 6.3); unbounded if not certified |
+| `H_high` | `min(H_conf + H_unres + (H_enum_max - enumerated items), H_enum_max) + H_fam`, that is, every item that is not confirmed ineligible for a recorded, rule-based reason is counted as potentially eligible; unbounded if `H_enum_max` or `H_fam` is unbounded |
 | `F_high` | `floor(H_high / 0.75)`: the largest final pool permitted when the pilot reservation is zero and authored clusters fill the maximum 25% weight. Authored supply is neither invented beyond that cap nor set to zero. |
 
 Clusters excluded for a recorded rule-based cause are excluded from all bounds.
@@ -183,7 +244,7 @@ Missing eligibility is never counted as ineligible (that would fabricate
 scarcity). Historical and forward supply are reported separately; forward
 supply cannot substitute for G0.
 
-### 6.2 Missingness, invalid runs, and invalid epochs
+### 6.5 Missingness, invalid runs, and invalid epochs
 
 | Situation | Frozen treatment |
 |---|---|
@@ -204,11 +265,11 @@ R4 reports exactly one state per **(branch, component)** pair:
 | State | Applies to | Meaning |
 |---|---|---|
 | `SIZED_FEASIBLE` | G1-G3 | Not available under v1 (section 4.2) |
-| `SIZED_INFEASIBLE` | G3.1 (both branches) | Section 7.4 bound shows the component's necessary cluster count exceeds `F_high` |
+| `SIZED_INFEASIBLE` | G3.1 (both branches) | Section 7.4: the admissibility certificate is recorded and `F_high < N_MIN` |
 | `NOT_MEASURABLE_IN_DOMAIN` | any | Section 3 domain status |
 | `PROXY_ONLY` | G2, G3 | Measurable only by proxy, and not `SIZED_INFEASIBLE` |
 | `ROUTE_BLOCKED` | G4, G6.1 | Section 7.6 assignment step 1 |
-| `ROUTE_UNRESOLVED` | G4, G6.1 | Section 7.6 assignment step 2 |
+| `ROUTE_UNRESOLVED` | G4, G6.1 | Section 7.6 assignment steps 2 and 5 |
 | `ROUTE_MISSING` | G4, G6.1 | Section 7.6 assignment step 3 |
 | `ROUTE_ESTABLISHED` | G4, G6.1 | Section 7.6 assignment step 4 |
 
@@ -217,7 +278,7 @@ R4 reports exactly one state per **(branch, component)** pair:
 Apply in order; the first matching rule decides.
 
 1. **UNADJUDICATED** (process status, not a classification) if: R1 is not
-   `MET`; any upstream gate (R0, R2A, R3, R2B, R4) is not `MET` or has been
+   `MET`; any upstream gate (R0, R2A′, R3, R2B′, R4) is not `MET` or has been
    `INVALIDATED`; or the R5 countersignature (section 7.5) is absent. R5
    publishes the dated reason. R5 may state which rule the evidence *would*
    match, explicitly labeled "not a formal classification".
@@ -255,7 +316,12 @@ reachable results are:
   rule 5;
 - process status **UNADJUDICATED** through rule 1.
 
-This outcome space is stated before any evidence is inspected. The public-proxy
+This outcome space is stated before any evidence is inspected. Because the
+supply bound covers the whole frame (section 6.4) and requires the R3
+certificate (section 7.4), NOT FEASIBLE is expected to be reachable only if
+the frame is small and fully enumerated; the most likely v1 outcome is
+INSUFFICIENT INFORMATION. That expectation is recorded here so it cannot be
+presented later as a finding. The public-proxy
 substitution cannot produce a positive classification; reaching one requires a
 later rules version that adds an evidence source able to measure G0, G1, G5,
 and G6.2 as originally defined.
@@ -292,9 +358,23 @@ The frozen calculator [r1-safety-nmin.py](r1-safety-nmin.py) evaluates this
 closed form. (A round-2 reviewer proposed this argument after showing that the
 earlier marginal Neyman-Pearson argument was invalid for paired outcomes.)
 
-**Rule:** G3.1 is `SIZED_INFEASIBLE` (in both branches) if and only if
-`F_high` is finite and `F_high < N_MIN`, that is, `H_high <= 130`
-(`floor(130 / 0.75) = 173`; `floor(131 / 0.75) = 174`).
+**Admissibility certificate.** The bound uses the null point `P0`, which
+mixes in `Q`. It applies only if `Q` is admissible under the frozen design:
+every eligible cluster type can, under the design's model, have a serious
+escape in every subject slot and none in any comparator slot. A design that
+uses known structural constraints in inference (for example a stratum whose
+escape probability is fixed at zero or at a known value, or known stratum
+proportions used to bound escape rates) can make `Q` inadmissible, and then a
+valid test may need fewer clusters. R3 must therefore record, before R2B′
+inspects data, either (a) a certificate that the confirmatory analysis uses no
+such constraint (the model for each cluster's escape outcomes is
+unrestricted, apart from the coherence `e <= a - k` that `Q` satisfies), or
+(b) the constraints it does use. Under (b), or if no certificate is recorded,
+the supply route is **disabled** and G3.1 cannot be `SIZED_INFEASIBLE`.
+
+**Rule:** G3.1 is `SIZED_INFEASIBLE` (in both branches) if and only if the
+R3 certificate (a) is recorded, `F_high` is finite, and `F_high < N_MIN`, that
+is, `H_high <= 130` (`floor(130 / 0.75) = 173`; `floor(131 / 0.75) = 174`).
 
 **Scope.** The bound does not depend on how acceptance or escapes are
 ascertained, on reviewer type, or on cost. It holds for the original endpoint.
@@ -323,19 +403,22 @@ separate field.
 | G4 | (a) frozen mechanism suite with negative controls covering the supported construct/property matrix; (b) isolated acceptance boundary with access separation (not the legacy `run-pair.sh` seam); (c) bypass probes for every protected requirement; (d) **recorded results** of (a)-(c) showing zero confirmed false-established properties and zero accepted unauthorized bypasses, and no open unexcluded false-established finding in the supported matrix (#1311) |
 | G6.1 | (a) export pipeline producing runnable C# for every supported construct; (b) behavioral comparison against the approved requirements with **recorded passing results** for every supported construct; (c) documented lost static guarantees and remaining runtime checks |
 
-An item is **absent** when no artifact for it exists. It is **incomplete or
-disputed** when an artifact exists but does not cover the whole supported
-matrix, or when any reviewer (Codex, Copilot, or the maintainer) has recorded
-an unresolved objection to it. Assign exactly one state by the first matching
-step:
+An item is **absent** when no artifact for it exists. It is **unresolved**
+when an artifact exists but any of these holds: it does not cover the whole
+supported matrix; any result is invalid, indeterminate, unmeasurable, or not
+yet validity-checked; a finding's confirmation is pending; or any reviewer
+(Codex, Copilot, or the maintainer) has recorded an unresolved objection. The
+status depends on the evidence, not on whether a reviewer has noticed it.
+Assign exactly one state by the first matching step:
 
 1. `ROUTE_BLOCKED` if any recorded result violates the gate metric (a
    confirmed false-established property, an accepted unauthorized bypass, or a
    failed behavioral comparison), whatever the state of other items.
-2. `ROUTE_UNRESOLVED` if any item is incomplete or disputed.
+2. `ROUTE_UNRESOLVED` if any item is unresolved.
 3. `ROUTE_MISSING` if any item is absent.
-4. `ROUTE_ESTABLISHED` if every item is present, complete, undisputed, and
-   passing.
+4. `ROUTE_ESTABLISHED` if every item is present, complete, validity-checked,
+   undisputed, and passing against the gate metric.
+5. Otherwise `ROUTE_UNRESOLVED`. This step makes the assignment exhaustive.
 
 ### 7.7 Interpretation limits
 
@@ -346,6 +429,8 @@ step:
   universal impossibility, or absence of value.
 - INSUFFICIENT INFORMATION is a stopped inquiry, not evidence of no demand or
   infeasibility.
+- Whatever the v1 result, the original-domain M0 status remains
+  **UNADJUDICATED** (amendment 001, section 2); R5 states this in its closeout.
 - No classification activates implementation, recruitment, spending, #1254,
   #1259, or #1284-#1309.
 
@@ -353,43 +438,48 @@ step:
 
 ### 8.1 Redacted public record
 
-All decision inputs in the public-proxy domain are public repository history.
-The redacted public record is therefore the full record, with these exclusions:
+All decision inputs in the public-proxy domain are public repository history,
+so there is no restricted evidence tier under v1. "Redacted" here means only
+what [r0-authorization.md](r0-authorization.md) section 7 already requires,
+which these rules adopt without change:
 
-- no copied source code beyond what the upstream license permits; store
-  references (repository, PR/issue number, commit SHA) and content hashes
-  instead of copies;
-- no contributor names, emails, or account handles in aggregates or tables;
-  a cluster is identified by repository and commit/PR reference only;
-- no secrets, tokens, or personal data that happen to appear in public
-  history; if encountered, record only that an item was withheld and why.
+- no contributor usernames, display names, or emails in any committed
+  artifact; emails are never extracted;
+- no per-item identifier (PR number, issue number, commit SHA) next to an
+  eligibility decision, exclusion, or cluster assignment; provenance is the
+  repository name, one pinned repository revision, the window, the pinned
+  extractor and rules version, and a SHA-256 digest of the full per-item
+  decision list, which is never committed and is deleted with local caches;
+- author clustering, if needed, uses in-memory ordinal pseudonyms only;
+- no published statistic over fewer than 5 distinct contributors;
+- no copied upstream source beyond what its license permits.
 
-There is **no restricted evidence tier** under v1. If any non-public evidence
-becomes necessary, work stops and an R0 amendment must define restricted
-storage before access.
+If any non-public evidence becomes necessary, work stops; R0 permits no
+restricted access.
 
 ### 8.2 Evidence manifest format
 
-Each R2B/R4/R5 output ships an `evidence-manifest.jsonl` (one JSON object per
-line) with these fields:
+Each R2B′/R4/R5 output ships an `evidence-manifest.jsonl` with one JSON object
+per **extraction or computation run** (never per item):
 
 | Field | Type | Meaning |
 |---|---|---|
 | `id` | string | Stable evidence ID, `ev-<gate>-<nnn>` |
-| `gate` | string | Consuming gate (`R2B`, `R4`, `R5`) and rule component (for example `G3.1`) |
+| `gate` | string | Producing gate (`R2B'`, `R4`, `R5`) and consuming rule component (for example `G3.1`) |
 | `rules_version` | string | `r1-decision-rules/v1` |
-| `source` | string | Upstream repository URL, or path in this repository |
-| `source_revision` | string | Upstream commit SHA or API snapshot timestamp |
+| `repositories` | array | Repository names with one pinned revision each, or `frame` for frame-level enumeration |
+| `window` | string | ISO 8601 interval |
 | `extraction_spec_sha256` | string | Hash of the frozen query/filter specification |
-| `tool` | string | Tool name and version used to extract or compute |
+| `tool` | string | Extractor/computation code commit and runtime version |
 | `extracted_at` | string | ISO 8601 UTC timestamp |
-| `artifact_path` | string | Path of the stored artifact in this repository |
-| `artifact_sha256` | string | Hash of the stored artifact |
-| `access_class` | string | `public` (only value permitted under v1) |
-| `license` | string | Upstream license identifier, or `n/a` for metadata only |
+| `per_item_list_sha256` | string | Digest of the uncommitted per-item decision list (R0 section 7.1) |
+| `aggregate_path` | string | Path of the committed aggregate in this repository |
+| `aggregate_sha256` | string | Hash of that aggregate |
+| `access_class` | string | `public` (only value permitted) |
+| `licenses` | array | SPDX identifier per repository |
 | `status` | string | `valid`, `invalid`, or `superseded` |
 | `status_reason` | string | Required unless `valid` |
-| `inspected_before_freeze` | boolean | Must be `false` for every decision-bearing item |
+| `inspected_before_freeze` | boolean | Must be `false` for every decision-bearing run |
 
 ## 9. Freeze record
 
@@ -400,14 +490,16 @@ line) with these fields:
   instructed not to inspect such data (governance file, section 5).
 - **Everything that decides a v1 classification is fixed here:** the
   thresholds, `N_MIN` and its calculator, the supply-bound formulas, the
-  reachability statement, and the ordered procedure. What remains for R3 is
-  the sampling frame and eligibility rules, which R3 must freeze before R2B
-  inspects data; nothing in v1 lets a range, envelope, or alternative be
+  reachability statement, and the ordered procedure. The candidate frame, draw,
+  eligibility rules, and prior-familiarity rule are frozen in sections
+  6.1-6.3. What remains for R3 is the domain-cell rule (E6), the criticality
+  rubric, and the admissibility certificate, which R3 must freeze before R2B′
+  inspects data; nothing in v1 lets a range, envelope, frame, or alternative be
   chosen after inspection.
 - **Freeze event:** v1 is frozen at the merge commit of the PR that adds this
   file, provided the final adversarial round countersigns the same file
   content (`sha256` recorded in
-  [reviews/r1/countersignature.md](reviews/r1/countersignature.md)). R2B
+  [r1/countersignature.md](r1/countersignature.md)). R2B
   inventory inspection and R4 sizing may not start before that merge. If the
   merged content differs from the countersigned content, v1 is not frozen and
   R1 is not `MET`.
@@ -442,7 +534,7 @@ line) with these fields:
 
 | Gate | Obligation from these rules |
 |---|---|
-| R3 (#1374) | Freeze the sampling frame (repositories, window), eligibility, cluster linkage, criticality rubric, the certified enumeration source for `H_enum_max`, and the proxy acceptance/oracle definitions, all without inspecting task data |
-| R2B (#1375) | Produce `H_conf`, `H_unres`, `H_enum_max`, `H_high`, `F_high`, repository-cluster counts, exclusions, and the evidence manifest under section 8 |
+| R3 (#1374) | Freeze the domain-cell rule (E6), the criticality rubric, the proxy acceptance/oracle definitions, and the section 7.4 admissibility certificate or its constraints, all without inspecting task data |
+| R2B′ (#1375) | Apply sections 6.1-6.3; produce `H_conf`, `H_unres`, `H_enum_max`, `H_fam`, `H_high`, `F_high`, the prior-familiarity list, repository-cluster counts, exclusions with reasons, and the evidence manifest under section 8 |
 | R4 (#1376) | Report one section 7.1 state per (branch, component); run the frozen calculator; any simulation follows section 4.2 and is descriptive under v1 |
 | R5 (#1377) | Apply section 7.2 in order; apply the status label; keep classification and maintainer action separate |

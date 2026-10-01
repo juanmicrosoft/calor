@@ -9,12 +9,12 @@
 | `r1-safety-nmin.py` sha256 | `f9c86990b7ceafca4dde46cd84c65260fdd0f4c6120d33f6ef4f379cce53eba1` |
 | `r1-methods-governance.md` sha256 | `5977aeb48913b34af53c8f6c0c9dda48afccf8fc7eb9d04c0ce5c4c22b4f9fbc` |
 | `codex-prompt-template.md` sha256 | `aa61e2e8945fc3128df031a2cea3892e6d80d60a2563f8f98b5db9ac78cec663` |
-| Effective prompt | [round-2-prompt.txt](round-2-prompt.txt), sha256 `1468d52d0bd548993e6f876c61d3c32e0b9e4d117bc91223122f175af02e0a77` |
+| Effective prompt | [round-2-prompt.txt](../../r1/round-2-prompt.txt), sha256 `1468d52d0bd548993e6f876c61d3c32e0b9e4d117bc91223122f175af02e0a77` |
 | Tool | Codex CLI 0.159.2, `codex exec -c model_reasoning_effort="high" -s read-only --ignore-user-config` (persisted session) |
 | Model | `gpt-6.1-sol` (from session header) |
 | Session id | `01a0f8ba-8e80-7393-a425-7a1950d0d0f6` (rollout `~/.codex/sessions/2026/10/01/rollout-2026-10-01T14-29-30-01a0f8ba-8e80-7393-a425-7a1950d0d0f6.jsonl`) |
 | Tokens | 84,580 |
-| Full log | [round-2-codex.log](round-2-codex.log) |
+| Full log | [round-2-codex.log](../../r1/round-2-codex.log) |
 | Verdict | `VERDICT: blocking objections remain` (3 blocking, 2 major, 0 minor) |
 
 ## Codex output (verbatim)
@@ -106,6 +106,8 @@ All round-1 objections were accepted; there are no rejected dispositions to adju
 VERDICT: blocking objections remain
 
 ## Dispositions (Claude, proposer)
+
+Fixing commit for every ACCEPTED objection below: `63784887030b6541af45e97e257230fbe33d298a`.
 
 | # | Severity | Disposition | Change |
 |---:|---|---|---|

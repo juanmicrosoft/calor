@@ -1,4 +1,17 @@
-You are a hostile research-methods reviewer. Another AI system (Claude) proposed
+Protocol instruction (verbatim from review-protocol.md):
+
+> You are an adversarial reviewer from a different model family than the
+> author. Find flaws, internal contradictions, ambiguities, missing
+> requirements from the cited issues, and any bias that favors Calor or
+> the author's preferred outcome. Do not praise. Emit numbered objections,
+> each with severity BLOCKING, MAJOR, or MINOR, the exact location, and
+> the change that would resolve it. If round N > 1, first state for each
+> earlier objection whether its disposition resolves it.
+
+Governing issues: #1370 (epic), #1372 (R1), #1371 (R0); snapshots under
+docs/plans/safe-delegation-m0/v0.23/r1/snapshots/.
+
+Additional R1 instructions: you are a hostile research-methods reviewer. Another AI system (Claude) proposed
 the artifacts below. Your job is to find defects, not to be agreeable. You are
 not the author and you owe the author nothing.
 
@@ -12,7 +25,14 @@ Artifacts under review (normative set):
 - docs/plans/safe-delegation-m0/v0.23/r1-decision-rules-v1.json
 - docs/plans/safe-delegation-m0/v0.23/r1-safety-nmin.py (frozen calculator; you may run it)
 - docs/plans/safe-delegation-m0/v0.23/r1-methods-governance.md
-- docs/plans/safe-delegation-m0/v0.23/reviews/r1/codex-prompt-template.md (this prompt)
+- docs/plans/safe-delegation-m0/v0.23/r1/codex-prompt-template.md (this prompt)
+
+R0 records the artifacts must obey (read them):
+- docs/plans/safe-delegation-m0/v0.23/r0-authorization.md
+- docs/plans/safe-delegation-m0/v0.23/amendment-001-public-proxy.md
+  (section 5, "R1: AI methods governance", lists what R1 must freeze)
+- docs/plans/safe-delegation-m0/v0.23/review-protocol.md
+- docs/plans/safe-delegation-m0/v0.23/gate-state.json
 
 The rules must faithfully operationalize the ORIGINAL M0 claim, not an easier
 one. Read the originals yourself:

@@ -2,9 +2,15 @@
 
 **Recorded:** 2026-10-01. **Issue:** #1372, parent epic #1370.
 **Authority:** the maintainer decisions of 2026-10-01 recorded in
-`r0-authorization.md` and `amendment-001-public-proxy.md` (R0, #1371). This
-file defers to those records for caps, deadlines, and permitted access. If
-they are absent, unmerged, or inconsistent with this file, R1 is not `MET`.
+[r0-authorization.md](r0-authorization.md),
+[amendment-001-public-proxy.md](amendment-001-public-proxy.md), and
+[review-protocol.md](review-protocol.md) (R0, #1371, PR #1467). This branch
+merges the R0 branch at commit `b0c054377c9d414bb3702b8d57cb35f955cd523f`, so
+those records are present, read by the reviewer, and hash-bound (section 5.1).
+This file follows them for caps, deadlines, permitted access, and the review
+protocol, and adds the stricter provenance rules below. If the R0 records are
+not merged, or change after the countersigning round, R1 is not `MET`
+(section 7).
 
 **Rules governed:** [r1-decision-rules-v1.md](r1-decision-rules-v1.md).
 
@@ -47,7 +53,7 @@ the actual values; the template values are:
 | Sandbox | `--sandbox read-only` |
 | Other flags | `--ignore-user-config` (no user plugins or notifier); Codex `memories` feature disabled, so no cross-session memory. From round 2, sessions are **persisted** (no `--ephemeral`) so the session rollout under `~/.codex/sessions/` on the maintainer's machine can be checked against the committed transcript; round 1 ran with `--ephemeral` and has only the committed log |
 | Working directory | This repository's worktree checked out at the round's artifact SHA |
-| Prompt | [reviews/r1/codex-prompt-template.md](reviews/r1/codex-prompt-template.md) plus a round header and, from round 2, the prior dispositions. The **complete effective prompt** is committed as `reviews/r1/round-<N>-prompt.txt` and its `sha256` recorded |
+| Prompt | [r1/codex-prompt-template.md](r1/codex-prompt-template.md) plus a round header and, from round 2, the prior dispositions. The **complete effective prompt** is committed as `r1/round-<N>-prompt.txt` and its `sha256` recorded |
 | Network | Not relied on; the reviewer is told to read local files only |
 
 A change of model or tool version between rounds is recorded and does not by
@@ -115,29 +121,43 @@ comparing session ids and timestamps with the maintainer's local Codex
 session store (rounds 2 onward) and OpenAI usage records. This residual trust
 is disclosed, not eliminated.
 
-Round files: `reviews/r1/round-<N>-codex.md` (raw Codex output plus the
-disposition table).
+Round files follow [review-protocol.md](review-protocol.md):
+`reviews/R1/round-<N>-codex.md` (raw Codex output plus the disposition table,
+with the fixing commit for each accepted objection). Supporting files
+(prompts, logs, bindings, snapshots, the competence probe, and the
+countersignature record) live under `r1/`, because the R0 boundary test admits
+only `round-<N>-<reviewer>.md` files under `reviews/`.
+
+**Protocol conformance and variances.** The round limit (5, counting every
+reviewer), the rule that the maintainer cannot override an unresolved blocking
+objection, and the Copilot accounting (a Copilot review counts in the round of
+the commit it reviewed; reviewing any other artifact version consumes a round)
+are taken from the protocol unchanged. Two variances are deliberate and
+stricter: (1) from round 2, sessions are persisted rather than `--ephemeral`,
+so that the maintainer can verify provenance (section 7); (2) the reviewer runs
+with `--ignore-user-config` and reasoning effort `high`. From round 4, the
+prompt includes the protocol's reviewer instruction verbatim. Rounds 1-3 used
+a prompt that covered the same instructions in different words; this is
+disclosed as a protocol deviation for those rounds.
 
 **Binding file.** Before each call from round 3 on, the proposer commits
-`reviews/r1/round-<N>-bindings.sha256` in `shasum -a 256` check format. It
+`r1/round-<N>-bindings.sha256` in `shasum -a 256` check format. It
 lists the normative set (section 7), the complete effective prompt, and every
 authoritative dependency the reviewer is told to read or that the CLI loads as
 instructions:
 
 - `AGENTS.md` and `CLAUDE.md` (repository instructions);
+- `r0-authorization.md`, `amendment-001-public-proxy.md`,
+  `review-protocol.md`, and `gate-state.json` (R0 records);
 - `docs/plans/roadmap-v0.20-reference-draft-v3.md`, `docs/plans/roadmap-v0.20.md`;
 - `docs/plans/safe-delegation-m0/{authorization,decision,mechanism-and-resources,predecessor-status,supply-status}.md`;
-- `reviews/r1/snapshots/issue-{1278,1370,1372}.txt` (dated snapshots of the
+- `r1/snapshots/issue-{1278,1370,1372}.txt` (dated snapshots of the
   GitHub issue text the rules cite; the reviewer has no network access, so these
   snapshots are the issue text it reviewed).
 
-The R0 records (`r0-authorization.md`, `amendment-001-public-proxy.md`) are
-being written in parallel and are not present at review time. The rules restate
-the R0 inputs they depend on (public-proxy domain, status label, USD 200 cap,
-2026-10-29 window, AI review substitution). At merge, the maintainer records the
-R0 commit in `countersignature.md`; if the merged R0 records differ from those
-restated inputs, that is an amendment-control event (rules section 10) and R1
-is not `MET` until resolved.
+The R0 records are bound like every other dependency. If R0 (PR #1467) is
+merged with content that differs from the bound hashes, the binding check in
+section 7 fails, and R1 needs another review round or is not `MET`.
 
 ### 5.2 Scope of review
 
@@ -151,7 +171,7 @@ claim. The reviewer must not query public repository task data
 ### 5.3 Competence probe
 
 Before round 1, Codex reviews a short planted-defect rule set
-([reviews/r1/competence-probe.md](reviews/r1/competence-probe.md)) containing
+([r1/competence-probe.md](r1/competence-probe.md)) containing
 known defects. The result is recorded in that file. A reviewer that misses
 most planted defects is still used (no alternative exists), but the
 limitation is recorded and weakens the countersignature's evidentiary value.
@@ -170,7 +190,7 @@ cap and the 2026-10-29 window set by R0. Exceeding either ends R1 as
   the rejection stands.
 - If Codex maintains a blocking objection after rejection, or round 5 ends
   with it unresolved, it goes to the maintainer, whose explicit decision is
-  recorded in `reviews/r1/countersignature.md`:
+  recorded in `r1/countersignature.md`:
   - **accept**: the objection must be fixed, which requires another round
     (if rounds remain); or
   - **overrule**: recorded with reasons; R1 is then **not `MET`**, because the
@@ -187,7 +207,7 @@ R1 is `MET (AI-adjudicated)` only when all of the following are recorded:
    persisted (non-ephemeral) session, against artifact commit `<SHA>`, with a
    committed binding file `round-<N>-bindings.sha256` covering the normative
    set (`r1-decision-rules-v1.md`, `r1-decision-rules-v1.json`,
-   `r1-safety-nmin.py`, this file, `reviews/r1/codex-prompt-template.md`), the
+   `r1-safety-nmin.py`, this file, `r1/codex-prompt-template.md`), the
    complete effective prompt, and the dependencies listed in section 5.1.
 2. **Maintainer provenance verification**, recorded in `countersignature.md`
    with date: the maintainer locates the countersigning session in the local
@@ -197,11 +217,14 @@ R1 is `MET (AI-adjudicated)` only when all of the following are recorded:
    `round-<N>-codex.log`, and `round-<N>-codex.md`. A missing session record or
    any mismatch prevents `MET`.
 3. **Merge-time binding check**: on the merge commit,
-   `shasum -a 256 -c reviews/r1/round-<N>-bindings.sha256` passes for every
+   `shasum -a 256 -c r1/round-<N>-bindings.sha256` passes for every
    listed file. If any file changed after review, either a new round reviews
    the change or R1 is not `MET`.
 4. The maintainer's merge of that PR.
 5. No unresolved maintainer overrule under section 6.
+6. R0 is `MET` in the merged [gate-state.json](gate-state.json), and the PR
+   (or a follow-up PR) sets the R1 entry there to `MET` only after items 1-5
+   hold. Until then the R1 value stays `null`.
 
 Residual trust that remains after these checks: the maintainer (who has a
 conflict, section 4) performs the verification, and the capture operator could
@@ -216,6 +239,6 @@ objections, or Codex unavailable), `EXPIRED` (window or cap exhausted),
 
 The round log, maintainer decisions on rejected blocking objections, and the
 countersignature are recorded in
-[reviews/r1/countersignature.md](reviews/r1/countersignature.md). That file is
+[r1/countersignature.md](r1/countersignature.md). That file is
 outside the hashed normative set, so recording a result does not change the
 content that was countersigned.

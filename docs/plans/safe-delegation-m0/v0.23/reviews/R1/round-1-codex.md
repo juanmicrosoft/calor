@@ -8,12 +8,12 @@
 | `r1-decision-rules-v1.json` sha256 | `47351327f121a8387fcae6b7c24b55d6145168afd2d066d84a7ea531fe518dd3` |
 | `r1-methods-governance.md` sha256 | `1fcfa7807dab5f1fa962444b9f6abf12bbc0317239df087157fd9046930c223b` |
 | `codex-prompt-template.md` sha256 | `cda815b2ca0ce6805600d3e91d15355ac0712f89ba86e771bdefbd9392efde75` |
-| Effective prompt | [round-1-prompt.txt](round-1-prompt.txt), sha256 `c23ca0a8f9cb0caefecaada68b72864c97c9273779c38079fdcd0321bba2a54d` |
+| Effective prompt | [round-1-prompt.txt](../../r1/round-1-prompt.txt), sha256 `c23ca0a8f9cb0caefecaada68b72864c97c9273779c38079fdcd0321bba2a54d` |
 | Tool | Codex CLI 0.159.2, `codex exec -c model_reasoning_effort="high" -s read-only --ephemeral --ignore-user-config` |
 | Model | `gpt-6.1-sol` (from session header) |
 | Session id | `01a0f8a8-d9c7-7ed3-bf48-43d225582fc2` (ephemeral) |
 | Tokens | 80,815 |
-| Full log | [round-1-codex.log](round-1-codex.log) |
+| Full log | [round-1-codex.log](../../r1/round-1-codex.log) |
 | Verdict | `VERDICT: blocking objections remain` (13 blocking, 2 major, 0 minor) |
 
 ## Codex output (verbatim)
@@ -141,6 +141,8 @@
 VERDICT: blocking objections remain
 
 ## Dispositions (Claude, proposer)
+
+Fixing commit for every ACCEPTED objection below: `9e7ee8159681164488808fd4efe1ec68d57685e0`.
 
 Every objection was accepted. The main structural response: v1 no longer lets
 simulation, nuisance ranges, or an envelope decide any classification. The
