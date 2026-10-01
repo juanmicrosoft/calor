@@ -309,7 +309,7 @@
     "eligibility": {
       "E1": "PR merged in window; linked issues, reverts, backports join its cluster",
       "E2": "changes >= 1 non-test .cs file with non-whitespace diff; test path regex (^|/)(test|tests|[^/]*\\.tests?)(/|$) case-insensitive",
-      "E3": "confirmed true if the change modifies >= 1 .cs file in a test path; confirmed false only if the repo at the pinned pre-change revision has no .cs file in any test path; otherwise unresolved",
+      "E3": "confirmed true if the change modifies >= 1 .cs file in a test path; never confirmed false under v1; otherwise unresolved (stays in H_high)",
       "E4": "author account type User (not Bot)",
       "E5": ">= 1 changed non-test .cs file outside obj/, bin/, *Generated* paths with non-whitespace change",
       "E6": "R3 domain-cell rule, frozen before R2B' inspection",

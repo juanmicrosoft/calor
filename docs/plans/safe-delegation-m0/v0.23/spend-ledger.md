@@ -22,6 +22,7 @@ that the tool does not show is written "not shown".
 | 7 | 2026-10-01 | R1 | 1 | Codex CLI 0.159.2 (`codex exec`, read-only) | gpt-6.1-sol (reasoning high) | 80,815 | 0.00 | ChatGPT subscription (excluded) | [round-1-codex.md](reviews/R1/round-1-codex.md); 13 BLOCKING, 2 MAJOR |
 | 8 | 2026-10-01 | R1 | 2 | Codex CLI 0.159.2 (`codex exec`, read-only) | gpt-6.1-sol (reasoning high) | 84,580 | 0.00 | ChatGPT subscription (excluded) | [round-2-codex.md](reviews/R1/round-2-codex.md); 3 BLOCKING, 2 MAJOR |
 | 9 | 2026-10-01 | R1 | 3 | Codex CLI 0.159.2 (`codex exec`, read-only) | gpt-6.1-sol (reasoning high) | 108,076 | 0.00 | ChatGPT subscription (excluded) | [round-3-codex.md](reviews/R1/round-3-codex.md); 3 BLOCKING |
+| 10 | 2026-10-01 | R1 | 4 | Codex CLI 0.159.2 (`codex exec`, read-only) | gpt-6.1-sol (reasoning high) | 112,044 | 0.00 | ChatGPT subscription (excluded) | [round-4-codex.md](reviews/R1/round-4-codex.md); 5 BLOCKING |
 
 **Cumulative marginal USD:** 0.00
 

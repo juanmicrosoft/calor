@@ -1,0 +1,97 @@
+Protocol instruction (verbatim from review-protocol.md):
+
+> You are an adversarial reviewer from a different model family than the
+> author. Find flaws, internal contradictions, ambiguities, missing
+> requirements from the cited issues, and any bias that favors Calor or
+> the author's preferred outcome. Do not praise. Emit numbered objections,
+> each with severity BLOCKING, MAJOR, or MINOR, the exact location, and
+> the change that would resolve it. If round N > 1, first state for each
+> earlier objection whether its disposition resolves it.
+
+Governing issues: #1370 (epic), #1372 (R1), #1371 (R0); snapshots under
+docs/plans/safe-delegation-m0/v0.23/r1/snapshots/.
+
+Additional R1 instructions: you are a hostile research-methods reviewer. Another AI system (Claude) proposed
+the artifacts below. Your job is to find defects, not to be agreeable. You are
+not the author and you owe the author nothing.
+
+Repository: the current working directory (read-only). Read files directly.
+Do NOT query, download, count, or sample any public GitHub repository's
+issues, pull requests, or commits: the rules must be frozen before any such
+task-supply data is inspected. Do not use the network.
+
+Artifacts under review (normative set):
+- docs/plans/safe-delegation-m0/v0.23/r1-decision-rules-v1.md
+- docs/plans/safe-delegation-m0/v0.23/r1-decision-rules-v1.json
+- docs/plans/safe-delegation-m0/v0.23/r1-safety-nmin.py (frozen calculator; you may run it)
+- docs/plans/safe-delegation-m0/v0.23/r1-methods-governance.md
+- docs/plans/safe-delegation-m0/v0.23/r1/codex-prompt-template.md (this prompt)
+
+R0 records the artifacts must obey (read them):
+- docs/plans/safe-delegation-m0/v0.23/r0-authorization.md
+- docs/plans/safe-delegation-m0/v0.23/amendment-001-public-proxy.md
+  (section 5, "R1: AI methods governance", lists what R1 must freeze)
+- docs/plans/safe-delegation-m0/v0.23/review-protocol.md
+- docs/plans/safe-delegation-m0/v0.23/gate-state.json
+
+The rules must faithfully operationalize the ORIGINAL M0 claim, not an easier
+one. Read the originals yourself:
+- docs/plans/roadmap-v0.20-reference-draft-v3.md (sections 1, 5, 6, 7.1, 8)
+- docs/plans/roadmap-v0.20.md
+- docs/plans/safe-delegation-m0/decision.md, authorization.md,
+  mechanism-and-resources.md, supply-status.md
+Context: only the maintainer and AI agents exist; no adopter organization and
+no independent human reviewer are available; task supply will come from public
+.NET open-source repository history ("public-proxy domain"); any result must be
+labeled "AI-adjudicated, public-proxy domain". Downstream consumers: R3 (domain
+boundary), R2B (supply inventory), R4 (executable sizing estimator), R5
+(classification into FEASIBLE AS PROPOSED, REQUIRES SEPARATE APPROVAL,
+NOT FEASIBLE, INSUFFICIENT INFORMATION, or process status UNADJUDICATED).
+
+Look specifically for:
+1. Rules that bias toward Calor (arm C) or toward a favorable/positive outcome.
+2. Undefined, ambiguous, or post-hoc-adjustable thresholds, ranges, scenarios,
+   or definitions.
+3. Missing or invalid error control (alpha, multiplicity, Monte Carlo error).
+4. Missingness laundering: treating missing, invalid, unmeasurable, or
+   indeterminate evidence as success, as failure, as zero supply, or as zero
+   demand.
+5. Ambiguous or overlapping classifications; cases no rule covers.
+6. Untestable or unverifiable criteria.
+7. Divergence from, or silent dropping of, any original gate (cost,
+   completion, safety, trust, usable adoption, independent handoff) or
+   threshold.
+8. Governance weaknesses: conflicts, recusal gaps, countersignature that can
+   be faked or drifted, reviewer independence overstated.
+9. Bias in the other direction too: rules engineered to force NOT FEASIBLE
+   or to make every outcome a foregone conclusion without saying so.
+
+Output format (Markdown):
+- A numbered list of objections. Each objection: `N. [blocking|major|minor]
+  <short title>` then the location (file and section), the defect, and the
+  minimal fix you would accept.
+- `blocking` = the rules cannot be frozen with this defect (it could change a
+  classification, launder missingness, bias the result, or leave a case
+  undefined). `major` = should be fixed but does not by itself invalidate the
+  freeze. `minor` = clarity.
+- If prior-round dispositions are appended below, evaluate every rejected
+  objection: state `MAINTAINED` or `WITHDRAWN` for each, with a reason, and
+  check whether each "accepted and fixed" item is actually fixed.
+- End with exactly one line: `VERDICT: no blocking objections` or
+  `VERDICT: blocking objections remain`.
+
+Round 5. The artifact commit is the commit that adds docs/plans/safe-delegation-m0/v0.23/r1/round-5-prompt.txt and round-5-bindings.sha256 (run `git log -1` to see it). Verify the bindings with `shasum -a 256 -c docs/plans/safe-delegation-m0/v0.23/r1/round-5-bindings.sha256`.
+The round-4 objections are in docs/plans/safe-delegation-m0/v0.23/reviews/R1/round-4-codex.md; earlier rounds are in the same directory. The round-4 dispositions follow. Verify each fix against the current files, state MAINTAINED or WITHDRAWN for each prior objection, and report new defects introduced by the changes.
+
+## Dispositions (Claude, proposer)
+
+Fixing commit for every ACCEPTED objection below:
+`2222a2a0b7e438de1ee2c96840bd1fd6b84283aa`.
+
+| # | Severity | Disposition | Change |
+|---:|---|---|---|
+| 1 | BLOCKING | ACCEPTED | `gate-state.json` is no longer hash-bound. An immutable copy, `r1/snapshots/gate-state-at-review.json`, is bound instead. Governance section 5.1 "Live gate state" permits only gate `value`/`effective`/`record` changes, R5 classification/label/action changes, and appended `history` entries, each made by a merged record under the R0 transition rules; any other difference is a change to reviewed authority. The R1 `null -> MET` transition is a permitted change only when section 7 items 1-5 hold (section 7 item 6). |
+| 2 | BLOCKING | ACCEPTED | Rules section 7.3 rewritten. Under amendment 001 as written, R4 is expected to close `UNAVAILABLE` because the inputs for G0, G1, G5, and G6.2 are always missing in this domain, so the expected v1 result is **UNADJUDICATED** with no formal classification. NOT FEASIBLE and INSUFFICIENT INFORMATION are reachable only if the maintainer adopts a versioned R0 amendment that lets R4 be `MET` after a complete assessment with recorded missing components. "Missing evidence" and "failure to complete the assessment" are defined. Section 1 now points to section 7.3 instead of asserting INSUFFICIENT INFORMATION. Adopting that R0 amendment is listed as a maintainer decision; these rules do not make it. |
+| 3 | BLOCKING | ACCEPTED | Rules section 7.6 step 1 now requires a confirmed, validity-checked violation; an invalid, indeterminate, disputed, unchecked, or pending violation makes its item unresolved. |
+| 4 | BLOCKING | ACCEPTED | E3 is now "oracle ascertainable": confirmed true if the change modifies a `.cs` file in a test path; never confirmed false under v1 (absence of test code does not show that no oracle could be authored); unresolved otherwise. (Commit `2222a2a0` first allowed "confirmed false" when a repository had no test code at all; the round-5 artifact removes that case.) Unresolved items stay in `H_high`. R3 may adopt a stricter oracle rule only as a disclosed E6 domain restriction. |
+| 5 | BLOCKING | ACCEPTED | Rules section 6.3 requires dated pre-extraction familiarity declarations by both the maintainer and the R2B′ proposer agent, covering session-only exposure, with the cutoff, the sources searched, and the completeness limitation stated. Late-recognized familiar repositories move to the familiar stratum by disclosed correction and stay in `H_high`. The R1 proposer session declares that it studied no public repository other than this one. |
