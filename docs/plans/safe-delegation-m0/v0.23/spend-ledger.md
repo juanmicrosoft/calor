@@ -23,6 +23,8 @@ that the tool does not show is written "not shown".
 | 8 | 2026-10-01 | R1 | 2 | Codex CLI 0.159.2 (`codex exec`, read-only) | gpt-6.1-sol (reasoning high) | 84,580 | 0.00 | ChatGPT subscription (excluded) | [round-2-codex.md](reviews/R1/round-2-codex.md); 3 BLOCKING, 2 MAJOR |
 | 9 | 2026-10-01 | R1 | 3 | Codex CLI 0.159.2 (`codex exec`, read-only) | gpt-6.1-sol (reasoning high) | 108,076 | 0.00 | ChatGPT subscription (excluded) | [round-3-codex.md](reviews/R1/round-3-codex.md); 3 BLOCKING |
 | 10 | 2026-10-01 | R1 | 4 | Codex CLI 0.159.2 (`codex exec`, read-only) | gpt-6.1-sol (reasoning high) | 112,044 | 0.00 | ChatGPT subscription (excluded) | [round-4-codex.md](reviews/R1/round-4-codex.md); 5 BLOCKING |
+| 11 | 2026-10-01 | R1 | 5 | Codex CLI 0.159.2 (`codex exec`, read-only) | gpt-6.1-sol (reasoning high) | 118,392 | 0.00 | ChatGPT subscription (excluded) | [round-5-codex.md](reviews/R1/round-5-codex.md); 2 BLOCKING, 1 MAJOR |
+| 12 | 2026-10-01 | R1 | — | Claude Code (proposer session) | claude-opus-5-5 | not shown | 0.00 | Existing Claude Code subscription (excluded); maintainer to confirm the basis | Drafting, revisions, running the probe and rounds 1-5 |
 
 **Cumulative marginal USD:** 0.00
 
@@ -38,7 +40,9 @@ sessions append their own rows.
 | 2026-10-01 | R0 | Claude Code proposer session (drafting, revisions, running rounds 1-4) | — | 3.0 | Conservative estimate; session timestamps not captured |
 | 2026-10-01 | R0 | Codex review sessions, rounds 1-4 (counted in full although they ran inside the proposer session) | — | 1.0 | Conservative estimate, 0.25 h each |
 | 2026-10-01 | R0 | Maintainer approval of R0 and amendment 001 terms; merge review | 2.0 | — | Conservative estimate pending the maintainer's report |
+| 2026-10-01 | R1 | Claude Code proposer session (drafting, revisions, running the probe and rounds 1-5) | — | 2.0 | Conservative estimate; branch commits span 14:08-15:25 EDT, plus earlier reading |
+| 2026-10-01 | R1 | Codex sessions: competence probe and rounds 1-5 (counted in full although they ran inside the proposer session) | — | 1.5 | Conservative estimate, 0.25 h each |
 
-**Cumulative:** maintainer 2.0 of 20 (estimate); agent 4.0 of 60 (estimate).
+**Cumulative:** maintainer 2.0 of 20 (estimate); agent 7.5 of 60 (estimate; R0 4.0 + R1 3.5; other gates' concurrent sessions add their own rows).
 Unknown effort is never counted as zero; it is entered as a labeled
 conservative estimate and reconciled when reported.
