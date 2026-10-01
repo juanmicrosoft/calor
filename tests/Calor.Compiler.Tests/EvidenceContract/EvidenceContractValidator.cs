@@ -494,16 +494,20 @@ internal static class EvidenceContractValidator
     /// MILESTONE-SUCCEEDED needs every subject present and none BLOCKED and, under the recorded
     /// independence deviation, the reduced-independence statement and limitation.
     /// </summary>
-    public static IReadOnlyList<ContractViolation> ValidateTerminalRecord(JsonNode contract, JsonNode inventory, JsonNode record)
+    public static IReadOnlyList<ContractViolation> ValidateTerminalRecord(
+        JsonNode contract, JsonNode inventory, IReadOnlyCollection<string> registeredClaims, JsonNode record)
     {
         var v = new List<ContractViolation>();
         var terminal = Array(contract["terminalOutcomes"]).Select(Str).OfType<string>().ToHashSet();
         var adjudicationOutcomes = Array(contract["adjudicationOutcomes"]).Select(Str).OfType<string>().ToHashSet();
         var classification = Array(inventory["artifacts"]).Where(a => a is not null)
             .ToDictionary(a => Str(a!["id"]) ?? "", a => Str(a!["classification"]), StringComparer.Ordinal);
+        foreach (var claim in registeredClaims.Where(c => !IsClaimSubject(c)))
+            v.Add(new("T003", claim, "a registered claim id must have the form 'claim:<id>'"));
         var required = classification.Keys
             .Concat(Array(contract["children"]).Select(c => Int(c?["issue"])).OfType<int>()
                 .Where(i => i != 1408).Select(i => $"gate:#{i}"))
+            .Concat(registeredClaims.Where(IsClaimSubject))
             .ToHashSet(StringComparer.Ordinal);
 
         var outcome = Str(record["outcome"]);
@@ -516,17 +520,19 @@ internal static class EvidenceContractValidator
         {
             var subject = Str(row?["subject"]);
             var name = subject ?? "?";
-            if (subject is null || (!required.Contains(subject) && !IsClaimSubject(subject)))
-                v.Add(new("T003", name, "unknown adjudication subject; subjects are inventory artifacts, 'gate:#<issue>', or 'claim:<id>'"));
+            if (subject is null || !required.Contains(subject))
+                v.Add(new("T003", name, "unknown or unregistered subject; subjects are inventory artifacts, 'gate:#<issue>', and registered 'claim:<id>' ids"));
             else if (!seen.Add(subject))
                 v.Add(new("T003", name, "subject adjudicated more than once"));
 
+            var cls = subject is not null && classification.TryGetValue(subject, out var c) ? c : null;
             var adjudication = Str(row?["outcome"]);
             if (adjudication is null || !adjudicationOutcomes.Contains(adjudication))
                 v.Add(new("T003", name, $"unknown adjudication outcome '{adjudication}'"));
-            else if (adjudication == "HISTORICAL-ONLY"
-                && (subject is null || !classification.TryGetValue(subject, out var cls) || cls != "historical-only"))
+            else if (adjudication == "HISTORICAL-ONLY" && cls != "historical-only")
                 v.Add(new("T003", name, "HISTORICAL-ONLY is valid only for an artifact the inventory classifies historical-only"));
+            else if (cls == "stale" && adjudication != "BLOCKED")
+                v.Add(new("T003", name, "an artifact still classified stale can only be BLOCKED; repair and reclassify it by amendment first"));
         }
 
         if (outcome != "MILESTONE-SUCCEEDED")

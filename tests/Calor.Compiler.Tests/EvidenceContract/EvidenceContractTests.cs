@@ -349,7 +349,13 @@ public class EvidenceContractTests
     public void ChangedComparabilityFieldIsIncomparable(string field)
     {
         var row = BenchmarkRow();
-        row["benchmark"]!["comparability"]![field] = field == "runCount" ? 1 : "changed";
+        // Hash fields change to a different valid hash, so only the equality rule can reject them.
+        row["benchmark"]!["comparability"]![field] = field switch
+        {
+            "runCount" => 1,
+            _ when field.EndsWith("Sha256", StringComparison.Ordinal) => Hash('d'),
+            _ => "changed",
+        };
         // A changed sampling unit is also not the frozen one, so E010 may accompany E008.
         AssertViolation(Rows(row), "E008", "E010");
     }
@@ -543,12 +549,39 @@ public class EvidenceContractTests
     }
 
     [Fact]
-    public void SuccessWithClaimRowPasses()
+    public void UnregisteredClaimFails()
     {
         var record = SuccessRecord();
-        record["adjudications"]!.AsArray().Add(Adjudication("claim:verifier-coverage", "BOUNDED"));
-        var violations = Terminal(record);
-        Assert.True(violations.Count == 0, Describe(violations));
+        record["adjudications"]!.AsArray().Add(Adjudication("claim:new-advantage", "BOUNDED"));
+        AssertViolation(Terminal(record), "T003");
+    }
+
+    [Fact]
+    public void OmittedRegisteredClaimFails()
+    {
+        // Dropping a registered claim (for example, one that would have been BLOCKED) fails success.
+        var record = SuccessRecord();
+        record["adjudications"]!.AsArray().Remove(Subject(record, RegisteredClaim));
+        AssertViolation(Terminal(record), "T001");
+    }
+
+    [Fact]
+    public void BlockedRegisteredClaimFails()
+    {
+        var record = SuccessRecord();
+        Subject(record, RegisteredClaim)["outcome"] = "BLOCKED";
+        AssertViolation(Terminal(record), "T001");
+    }
+
+    [Fact]
+    public void StaleArtifactAdjudicatedBoundedFails()
+    {
+        // Restore benchmark-results' committed stale classification in the repaired inventory: a
+        // BOUNDED adjudication of a still-stale artifact is rejected; it can only be BLOCKED.
+        var inventory = RepairedInventory();
+        inventory["artifacts"]!.AsArray().First(a => a!["id"]!.GetValue<string>() == "benchmark-results")!
+            ["classification"] = "stale";
+        AssertViolation(Terminal(SuccessRecord(), inventory), "T003");
     }
 
     [Fact]
@@ -1151,8 +1184,8 @@ public class EvidenceContractTests
     /// </summary>
     private static JsonObject SuccessRecord()
     {
-        var rows = new JsonArray();
-        foreach (var artifact in Inventory()["artifacts"]!.AsArray())
+        var rows = new JsonArray(Adjudication(RegisteredClaim, "BOUNDED"));
+        foreach (var artifact in RepairedInventory()["artifacts"]!.AsArray())
         {
             var historical = artifact!["classification"]!.GetValue<string>() == "historical-only";
             rows.Add(Adjudication(artifact["id"]!.GetValue<string>(), historical ? "HISTORICAL-ONLY" : "BOUNDED"));
@@ -1176,8 +1209,26 @@ public class EvidenceContractTests
     private static JsonNode Subject(JsonNode record, string subject)
         => record["adjudications"]!.AsArray().First(r => r!["subject"]!.GetValue<string>() == subject)!;
 
-    private static IReadOnlyList<ContractViolation> Terminal(JsonNode record)
-        => EvidenceContractValidator.ValidateTerminalRecord(Contract(), Inventory(), record);
+    private const string RegisteredClaim = "claim:verifier-coverage";
+
+    /// <summary>
+    /// The committed inventory after a synthetic repair amendment that reclassifies every stale
+    /// artifact as authoritative; success is impossible while any artifact is still stale.
+    /// </summary>
+    private static JsonNode RepairedInventory()
+    {
+        var inventory = Inventory();
+        foreach (var artifact in inventory["artifacts"]!.AsArray())
+        {
+            if (artifact!["classification"]!.GetValue<string>() == "stale")
+                artifact["classification"] = "authoritative";
+        }
+        return inventory;
+    }
+
+    private static IReadOnlyList<ContractViolation> Terminal(JsonNode record, JsonNode? inventory = null)
+        => EvidenceContractValidator.ValidateTerminalRecord(
+            Contract(), inventory ?? RepairedInventory(), [RegisteredClaim], record);
 
     /// <summary>A decision-bearing benchmark row on the candidate, citing the authoritative corpus.</summary>
     private static JsonObject BenchmarkRow()
