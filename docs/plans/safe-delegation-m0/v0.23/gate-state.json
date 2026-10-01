@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "epic": 1370,
+  "authority": "r0-authorization.md",
+  "amendments": ["amendment-001-public-proxy.md"],
+  "note": "Authoritative current gate values for the 0.23 M0 prerequisite inquiry. A null value means the gate is open and has not been dispositioned. Values take effect only when the PR that sets them is merged by the maintainer. Validated by tests/Calor.Compiler.Tests/Plans/SafeDelegationV023BoundaryTests.cs.",
+  "processStates": ["MET", "UNAVAILABLE", "EXPIRED", "REVOKED", "NOT_AUTHORIZED", "NOT_REACHED", "INVALIDATED"],
+  "scientificClassifications": ["FEASIBLE AS PROPOSED", "REQUIRES SEPARATE APPROVAL", "NOT FEASIBLE", "INSUFFICIENT INFORMATION", "UNADJUDICATED"],
+  "maintainerActions": ["STOP", "DEFER", "ALLOW A SEPARATE AUTHORIZATION REQUEST"],
+  "requiredClassificationLabel": "AI-adjudicated, public-proxy domain",
+  "limits": {
+    "planningWindowStart": "2026-10-01",
+    "inquiryDeadline": "2026-10-29",
+    "cashCapUsd": 200,
+    "maxReviewRoundsPerArtifact": 5
+  },
+  "boundary": {
+    "participantEnrollment": false,
+    "taskExecution": false,
+    "paidExperimentCollection": false,
+    "acceptanceServiceImplementation": false,
+    "reuseBy1254Or1259": false,
+    "reopening1284To1309": false,
+    "humanContact": false,
+    "restrictedDataAccess": false
+  },
+  "gates": [
+    {
+      "id": "R0",
+      "issue": 1371,
+      "definition": "r0-authorization.md",
+      "prerequisites": [],
+      "value": "MET",
+      "effective": "upon maintainer merge of the PR that introduces this entry",
+      "record": "r0-authorization.md"
+    },
+    {
+      "id": "R1",
+      "issue": 1372,
+      "definition": "amendment-001-public-proxy.md#r1-ai-methods-governance",
+      "prerequisites": ["R0"],
+      "value": null
+    },
+    {
+      "id": "R2A'",
+      "issue": 1373,
+      "definition": "amendment-001-public-proxy.md#r2a-public-proxy-authority",
+      "prerequisites": ["R0"],
+      "value": null
+    },
+    {
+      "id": "R3",
+      "issue": 1374,
+      "definition": "amendment-001-public-proxy.md#r3-paper-boundary",
+      "prerequisites": ["R1", "R2A'"],
+      "value": null
+    },
+    {
+      "id": "R2B'",
+      "issue": 1375,
+      "definition": "amendment-001-public-proxy.md#r2b-public-supply-and-ai-review-capacity",
+      "prerequisites": ["R1", "R2A'", "R3"],
+      "value": null
+    },
+    {
+      "id": "R4",
+      "issue": 1376,
+      "definition": "amendment-001-public-proxy.md#r4-joint-sizing",
+      "prerequisites": ["R1", "R2A'", "R3", "R2B'"],
+      "value": null
+    },
+    {
+      "id": "R5",
+      "issue": 1377,
+      "definition": "amendment-001-public-proxy.md#r5-classification-and-maintainer-action",
+      "prerequisites": ["R4"],
+      "value": null,
+      "scientificClassification": null,
+      "classificationLabel": null,
+      "maintainerAction": null
+    }
+  ],
+  "history": [
+    {
+      "id": "R1-original",
+      "issue": 1372,
+      "definition": "independent consenting human methods reviewer (#1372 as filed)",
+      "value": "UNAVAILABLE",
+      "recordedBy": "amendment-001-public-proxy.md",
+      "scope": "R0 permits no human contacts, so the authorized search for a human reviewer is empty. Not a claim that no eligible reviewer exists."
+    },
+    {
+      "id": "R2A-original",
+      "issue": 1373,
+      "definition": "conditional organizational adopter and data-access authority (#1373 as filed)",
+      "value": "UNAVAILABLE",
+      "recordedBy": "amendment-001-public-proxy.md",
+      "scope": "The maintainer has no organization available and R0 permits no outreach. Not a claim that no consenting organization exists."
+    },
+    {
+      "id": "R3-original",
+      "issue": 1374,
+      "definition": "paper boundary accepted by an independent human reviewer and a conditional adopter (#1374 as filed)",
+      "value": "NOT_REACHED",
+      "recordedBy": "amendment-001-public-proxy.md",
+      "scope": "Blocked by R1-original UNAVAILABLE and R2A-original UNAVAILABLE."
+    },
+    {
+      "id": "R2B-original",
+      "issue": 1375,
+      "definition": "private adopter task supply and human reviewer hours (#1375 as filed)",
+      "value": "NOT_REACHED",
+      "recordedBy": "amendment-001-public-proxy.md",
+      "scope": "Blocked by R1-original UNAVAILABLE, R2A-original UNAVAILABLE, and R3-original NOT_REACHED; no private task source exists."
+    },
+    {
+      "id": "R4-original",
+      "issue": 1376,
+      "definition": "joint sizing over the original inputs, independently reviewed (#1376 as filed)",
+      "value": "NOT_REACHED",
+      "recordedBy": "amendment-001-public-proxy.md",
+      "scope": "Blocked by R1-original, R2A-original, R3-original, and R2B-original."
+    }
+  ]
+}
