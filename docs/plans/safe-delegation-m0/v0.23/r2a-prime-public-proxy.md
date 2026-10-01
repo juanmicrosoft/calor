@@ -32,25 +32,46 @@ contacted, recruited, enrolled, or asked for consent.
 
 ## 2. Gate value and conditions
 
-**R2A′ gate value: `MET`**, effective 2026-10-01, under these conditions:
+**Current R2A′ gate value: `NOT_REACHED` (pending R0 evidence).**
+**Value on activation: `MET`.**
 
-1. **R0 dependency.** The value holds only while #1371 and its public-proxy
-   amendment are `MET`. If R0 is not `MET` at merge, or later becomes
-   `EXPIRED`/`REVOKED`, R2A′ is `NOT_REACHED` (never started) or
-   `INVALIDATED` (after start) under the #1370 lifecycle amendments.
-2. **Revalidation points.** Before R2B′ starts, before each R2B′ data pull,
+The R0 records that carry the 2026-10-01 maintainer decision
+(`r0-authorization.md`, `amendment-001-public-proxy.md`) are being written
+in a parallel R0 (#1371) change and are not in this branch. A conditional
+statement here cannot prove that R0 holds. Therefore:
+
+1. **Activation.** R2A′ becomes `MET` only when both R0 records are merged to
+   `main` with R0 value `MET`, and their scope covers: public GitHub
+   metadata access, no human contact, the 2026-10-29 window, and the
+   USD 200 cap. The activating change must cite the R0 merge commit in the
+   Section 7 log. Until then, nothing in this document unlocks R1, R3, or
+   R2B′ work.
+2. **Provisional evidence.** The Section 4 snapshot was collected on
+   2026-10-01 under the maintainer decision as relayed to the implementing
+   agent that day (public data only; no contacts). It is provisional
+   evidence. If R0 closes `NOT_AUTHORIZED`, R2A′ stays `NOT_REACHED`, the
+   snapshot is marked void in Section 7, and it may not be reused by any
+   gate. If R0 closes `MET` with a narrower scope than Section 1, the
+   snapshot is re-checked against that scope before activation.
+3. **Later loss of R0.** If R0 later becomes `EXPIRED` or `REVOKED`, R2A′
+   becomes `INVALIDATED` under the #1370 lifecycle amendments.
+4. **Revalidation points.** Before R2B′ starts, before each R2B′ data pull,
    and before #1373 closes, re-check: R0 status; each primary repo's
    license, visibility, and archive state (Section 7).
-3. **Scope of `MET`.** `MET` means only that a public-proxy data-access basis
+5. **Scope of `MET`.** `MET` means only that a public-proxy data-access basis
    and a frozen, bias-controlled repository set exist. It does not say that
    any repository has enough eligible tasks, that Calor supports their code,
    or that any organization would adopt Calor.
 
 ## 3. Frozen selection rule
 
-This section was committed before any enumeration query ran (see commit
-history: the criteria commit precedes the commit adding
-[r2a-prime-repos.json](r2a-prime-repos.json)). The executable form is
+Sections 3.1–3.3 were committed (`15fba333`) before any enumeration query
+ran; the commit adding [r2a-prime-repos.json](r2a-prime-repos.json) follows
+it. Limitation: these commits were created locally and first pushed together,
+so the ordering is attested by commit parentage, not by a server timestamp.
+Changes made after the snapshot (Section 3.4, the continuation and removal
+rules in 3.1) only restrict later discretion; none changes C1–C11, the seed,
+or the counts. The executable form is
 [tools/r2a_prime_enumerate.py](tools/r2a_prime_enumerate.py); its constants
 must equal the values below.
 
@@ -80,12 +101,27 @@ The selection must not favor code Calor already handles well.
   primary set. The next 12 eligible form an ordered reserve.
 - **Replacement only in order.** Any later exclusion (Section 7, or the
   deferred build check C12) is filled by the next reserve repository in
-  order. If the reserve runs out, the walk continues through the frozen
-  candidate list with the same criteria. No other replacement is allowed.
+  order. No other replacement is allowed.
+- **Continuation after reserve exhaustion.** If the 12 reserves run out, a
+  versioned continuation run (`--continue-from`, output
+  `r2a-prime-repos-cont-<n>.json`) walks the *frozen* candidate order of
+  the Section 4 snapshot from the next unwalked rank (132) with the same
+  criteria and the same fixed 12-month window. It never re-runs the
+  candidate search. Its metadata, pins, and licenses are live at its own
+  retrieval time; this comparability limit is recorded in its output. A
+  continuation run starts only when a recorded exclusion leaves fewer
+  repositories than required, never at a time chosen for other reasons.
 - **Growth only in order.** If R1 requires more repositories, they are taken
-  from the reserve and then the frozen walk, in order. R1/R3 may *remove* a
-  repository only by a rule written before inspecting that repository's task
-  content, and every removal is recorded.
+  from the reserve and then by continuation, in order.
+- **Removal only by global rule.** The selected names and their activity
+  counts are now public, so a repository-specific exclusion could be
+  tailored to them. R1/R3 may remove repositories only by a rule that
+  (a) is stated without naming any repository, (b) is frozen and committed
+  before it is applied, (c) is applied to all 24 primary and reserve
+  repositories at once, and (d) has no exceptions. Every removal is logged
+  in Section 7 with the rule and commit. All 12 original primary
+  repositories stay in the reported denominator, with their exclusion
+  reason if removed.
 
 ### 3.2 Candidate query (GitHub search, metadata only)
 
@@ -113,7 +149,7 @@ The union of names is the frozen candidate list.
 | C9 | Not authored by the Calor maintainer: owner not `juanmicrosoft`/`calor-lang`; zero issues/PRs involving, and zero commits authored by, either maintainer-associated account (`juanmicrosoft`, and `juanatjcx`, the account that runs the enumeration) | owner; GraphQL search `issueCount`; REST commit search `total_count` |
 | C10 | Not Calor-exposed (Section 3.1) | `git grep` at the freeze commit |
 | C11 | Repository disk usage ≤1 GB | GraphQL `diskUsage` |
-| C12 | **Deferred, mechanical:** the pinned SHA restores and builds on the .NET 10 SDK (10.0.100, rollForward latestMinor) or on the SDK its own `global.json` pins, within 30 minutes, with no source edits | Run at R2B′ preflight; failures replaced in reserve order (Section 3.1) |
+| C12 | **Deferred, mechanical:** the pinned SHA builds under the frozen protocol in Section 3.4 | Run at R2B′ preflight; failures replaced in reserve order (Section 3.1) |
 
 Window and pin: the pinned SHA is the default-branch HEAD at retrieval.
 The preceding-12-month window is [2025-10-01, 2026-10-01).
@@ -129,6 +165,38 @@ of all merged PRs, opened issues, and commits. No title, body, label, diff,
 author list, or link is requested. R2B′ eligibility under the R1/R3 rules
 is a different, later measurement and may find zero eligible tasks in a
 repository that passes C8.
+
+### 3.4 C12 build protocol (frozen in review round 1, before any build)
+
+No build has run. This protocol was added after the Section 4 snapshot was
+public, in response to review objection R1-2; it names no repository.
+
+1. **Environment.** Linux x64, Docker image `mcr.microsoft.com/dotnet/sdk:10.0`
+   (digest recorded at run time), no extra workloads installed, network
+   access to `api.nuget.org` and to package sources declared in the
+   repository's own `NuGet.config`. If the repository's root `global.json`
+   pins an SDK major.minor other than 10.0, use
+   `mcr.microsoft.com/dotnet/sdk:<major.minor>` instead; if that image does
+   not exist, the result is a failure.
+2. **Entry point.** The single `.sln`/`.slnx` file at the repository root; if
+   there are several, the one whose base name equals the repository name
+   (case-insensitive), else the lexicographically first; if none, the
+   lexicographically first `.csproj` at minimum directory depth.
+3. **Command.** `dotnet build <entry> -c Release -p:TreatWarningsAsErrors=false
+   -p:EnableWindowsTargeting=true -p:NuGetAudit=false`, 30-minute limit. No
+   source edits, no workload installs, no repository build scripts.
+4. **Infrastructure failures.** A failure whose log matches network/HTTP 5xx,
+   NuGet feed timeout, out-of-memory, or disk-full patterns is retried, up to
+   3 attempts in total. Any other failure, or the same infrastructure
+   failure on all 3 attempts, is a repository failure.
+5. **Outcome.** Pass = exit code 0. The log is kept in the restricted store;
+   only pass/fail, attempt count, failure class, image digest, and duration
+   are published.
+6. **Disclosed coverage bias.** This excludes projects needing Unity, MAUI,
+   Xamarin, Windows-only native tooling, or custom build scripts. That is a
+   toolchain restriction shared by all three study arms, not a Calor
+   advantage, but it narrows the domain toward plain SDK-style projects and
+   is reported as such.
 
 Known biases left in place (stated, not corrected):
 
@@ -228,21 +296,53 @@ Every downstream gate that touches proxy data must stay inside it.
   requests/minute (the script sleeps 2.5 s between search calls); GraphQL:
   5,000 points/hour. The script backs off on rate-limit or secondary-limit
   errors and does not parallelize requests.
+- **Collection boundary (what the API returns versus what is kept).**
+  Not every endpoint supports server-side field selection, so the record
+  states exactly what is received:
+  - GraphQL issue/PR searches select only `issueCount`; the server returns
+    no item fields.
+  - REST repository search returns full repository objects, including owner
+    profile fields (login, avatar URL, account type). The script keeps only
+    `full_name` in memory and writes nothing else.
+  - REST commit search is restricted to `author:` the two maintainer
+    accounts. Any items it returns are the maintainer's own commits; they are
+    discarded inside the `gh` process by `--jq .total_count`. In the snapshot
+    every such count was 0.
+  - REST license endpoint returns the license file; only SPDX id, path, and
+    blob SHA are kept.
+  - Nothing is cached to disk except the committed JSON. No issue, PR, or
+    commit title, body, label, diff, or third-party author was requested.
 - **Personal information.** The GitHub Privacy Statement treats usernames
   and profile data as personal information. R2A′ stores no contributor-level
   data. Repository `owner/name` identifiers are published because they are
-  required for reproducibility and license attribution; some owners are
-  individuals, and their owner login is used only as part of the project
-  identifier.
+  required for reproducibility and license attribution. Some owners are
+  individuals, so their login *is* personal information here. It is used for
+  one purpose only: identifying the project.
 
 ### 5.2 License obligations
 
-- Each primary repository's SPDX identifier is recorded at its pinned SHA.
+- Each selected repository's detected SPDX id, license-file path, and
+  license-file blob SHA are recorded at its pinned SHA (JSON
+  `license_file_*_at_pinned_sha`).
+- **Scope of that finding.** GitHub's license endpoint detects one top-level
+  license file. It does not certify that every file, vendored directory,
+  submodule, asset, or historical revision carries the same license. Before
+  any later gate copies or translates code from a repository (including
+  translation into Calor or into protected C#), it must check the license of
+  the specific files and revisions used: file headers, `NOTICE`,
+  third-party/vendored directories, and submodules. A HEAD relicense never
+  substitutes for that check; the grant at the pinned or task revision
+  governs.
+- **Issue and PR text is not covered by the code license.** It is user
+  content under the GitHub Terms of Service. Later gates link to it in the
+  restricted store; they do not copy it into public artifacts.
 - Analysis and published aggregates (counts, rates, distributions) carry
   no license obligation under MIT, Apache-2.0, or BSD-2/3-Clause.
-- If a later gate stores or publishes copied source, it must keep the
-  license and copyright notice with it (all four licenses), keep NOTICE
-  content (Apache-2.0 §4(d)), and mark modified files (Apache-2.0 §4(b)).
+- Derived artifacts that contain copied or translated code (including
+  Calor translations) are derivative works. They must keep the license text
+  and copyright notices (all four licenses), keep applicable `NOTICE`
+  content (Apache-2.0 §4(d)), and carry a modification notice (Apache-2.0
+  §4(b)).
 - No repository name, logo, or trademark is used to imply endorsement of
   Calor (Apache-2.0 §6; BSD-3-Clause clause 3).
 
@@ -251,28 +351,41 @@ Every downstream gate that touches proxy data must stay inside it.
 | Data class | Public repository | Restricted store | Never collected |
 |---|---|---|---|
 | Repository identifiers, URLs, pinned SHAs, licenses, repo-level metadata and counts | Yes | — | — |
-| Per-repository aggregate task counts and eligibility tallies (R2B′) | Yes | — | — |
-| Issue/PR numbers used as task IDs (R2B′) | Yes, as public links or hashes | — | — |
-| Contributor usernames, reviewer/assignee identities | **No** — omitted, or pseudonymized with a keyed HMAC whose key is kept out of the repository | Key only | — |
+| Per-repository aggregate task counts and eligibility tallies (R2B′) | Yes (aggregates only) | — | — |
+| Issue/PR numbers or links used as task IDs (R2B′) | **No** — they lead directly to authors | Yes, under R0 rules | — |
+| Contributor usernames, reviewer/assignee identities | **No** | Only if R2B′ needs them for clustering, as keyed-HMAC pseudonyms (pseudonymous, not anonymous); key kept outside the repository | — |
 | Emails, profile data, organization membership, location | — | — | Yes (never collected) |
-| Verbatim issue/PR text | No (link to the public source instead) | Only if R2B′ requires it, under R0 retention rules | — |
+| Verbatim issue/PR text | No | Only if R2B′ requires it, under R0 retention rules | — |
+| Build logs (C12) | No (pass/fail summary only) | Yes | — |
 
 ### 5.4 Retention and deletion
 
-Retention follows the R0 privacy boundary (#1371 `r0-authorization.md`). For
-R2A′ specifically:
+Retention follows the R0 privacy boundary (#1371 `r0-authorization.md`). R2A′
+adds these rules:
 
-- R2A′ collected only repository-level public metadata. It is retained in
-  this repository as the gate's evidence; it contains no contributor-level
-  data, so no deletion obligation applies to it.
-- Any raw API response caches created during enumeration are temporary,
-  are not committed, and are deleted at the end of the run.
-- If a repository owner asks for removal, or a repository becomes private or
-  is deleted, its entry is reduced to a hash of `owner/repo` plus the reason,
-  and the change is recorded in Section 7's log.
-- Any HMAC key created by later gates is deleted at the earlier of milestone
-  0.23 close or 2026-10-29 plus the R0 retention period, making
-  pseudonyms irreversible.
+- **Purpose limitation.** Repository identifiers, including individual
+  owner logins, are retained only to identify the proxy repositories for
+  #1370 gates and their audit trail. They are not joined with any other
+  personal data.
+- **Raw responses.** Raw API responses are not written to disk; there is no
+  cache to delete.
+- **Removal request or loss of public status.** If an owner asks for removal,
+  or a repository becomes private or is deleted: (1) the entry is replaced
+  by a placeholder `withdrawn-<n>` with the reason and date in every current
+  file this project controls (`candidate_walk_order`, `walked`, summary
+  records, tables in this document, and any R2B′ outputs); (2) restricted
+  copies of its data are deleted; (3) the event is logged in Section 7. A
+  hash of the name is **not** used as a placeholder, because a hash of a
+  publicly enumerable name is reversible.
+- **Limits of removal.** Removal does not erase the name from the version
+  history of this public repository or from third-party copies (forks,
+  mirrors, archives). Rewriting public history is a separate maintainer
+  decision. This limit is stated, not hidden.
+- **Pseudonym keys.** Any HMAC key created by later gates is deleted at
+  milestone 0.23 close or at the R0 retention deadline, whichever is first.
+  Key deletion prevents re-linking pseudonyms to usernames, but restricted
+  task links could still identify authors; those links are deleted under
+  the same deadline.
 
 ## 6. What R2A′ replaces and what it cannot replace
 
@@ -309,6 +422,8 @@ Change log (append-only):
 |---|---|---|---|
 | 2026-10-01 | — | Gate defined | Criteria frozen (`15fba333`) |
 | 2026-10-01 | — | Enumeration | 12 primary + 12 reserve selected (Section 4) |
+| 2026-10-01 | 24 selected | License-file identity added (path, blob SHA) | No SPDX mismatch found |
+| 2026-10-01 | — | Review round 1 | Gate value set to `NOT_REACHED` pending R0; C12 protocol, removal and continuation rules frozen ([round 1](reviews/r2a/round-1-codex.md)) |
 
 ## 8. Non-authorization boundary
 

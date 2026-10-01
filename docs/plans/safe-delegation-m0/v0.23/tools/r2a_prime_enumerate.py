@@ -4,10 +4,25 @@
 Applies ONLY the frozen selection criteria in ../r2a-prime-public-proxy.md
 (section "Frozen selection rule") to GitHub repository *metadata*. It never
 reads issue/PR titles, bodies, comments, labels, diffs, or source files.
-Every issue/PR/commit query below requests a count only.
+
+Collection boundary (see r2a-prime-public-proxy.md section 5.1):
+- GraphQL issue/PR searches select only `issueCount`; the server returns no
+  item fields.
+- REST repository search returns full repository objects (including owner
+  profile fields); only `full_name` is kept in memory, nothing else is
+  written.
+- REST commit search is restricted to commits authored by the maintainer
+  accounts; its items (the maintainer's own commits, if any) are discarded
+  by `--jq .total_count` inside the gh process and never reach this script.
+- REST license endpoint returns the license file; only SPDX id, path, and
+  blob SHA are kept.
 
 Usage:
   python3 r2a_prime_enumerate.py --freeze-commit <sha> --out ../r2a-prime-repos.json
+  # Continuation after reserve exhaustion (section 3.1): walks the frozen
+  # candidate order of an existing snapshot from the next unwalked rank.
+  python3 r2a_prime_enumerate.py --freeze-commit <sha> \
+      --continue-from ../r2a-prime-repos.json --need <k> --out ../r2a-prime-repos-cont-1.json
 
 Requires an authenticated `gh` CLI. Deterministic given the same GitHub
 snapshot; GitHub search results drift over time, so the committed JSON
@@ -44,6 +59,7 @@ STAR_PARTITIONS = [(500, 999), (1000, 1999), (2000, 4999), (5000, 9999),
                    (10000, 10_000_000)]
 EXPOSURE_PATHSPEC_EXCLUDE = ":(exclude)docs/plans/safe-delegation-m0/v0.23"
 # --------------------------------------------------------------------------
+CONTENT_STATEMENT = ("none read or retained: issue/PR searches return counts only; repository-search objects are projected to full_name in memory; maintainer-authored commit-search items are discarded inside gh (--jq); license file content is projected to SPDX id, path, blob SHA")
 
 
 def gh(args, retries=6):
@@ -138,13 +154,8 @@ def evaluate(full_name, exposed):
     repo = r["repository"]
     target = (repo.get("defaultBranchRef") or {}).get("target") or {}
     sha = target.get("oid")
-    lic_at_sha = None
-    if sha:
-        try:
-            lic_at_sha = gh(["-X", "GET", f"repos/{full_name}/license", "-f", f"ref={sha}",
-                             "--jq", ".license.spdx_id // null | tojson"])
-        except RuntimeError:
-            lic_at_sha = None
+    lic = license_identity(full_name, sha) if sha else {}
+    lic_at_sha = lic.get("spdx")
     # Maintainer-association counts only (--jq / issueCount strip all items).
     maintainer_issue_pr, maintainer_commits = 0, 0
     for login in MAINTAINER_LOGINS:
@@ -161,6 +172,8 @@ def evaluate(full_name, exposed):
         "primary_language": (repo.get("primaryLanguage") or {}).get("name"),
         "license_spdx_repo": (repo.get("licenseInfo") or {}).get("spdxId"),
         "license_spdx_at_pinned_sha": lic_at_sha,
+        "license_file_path_at_pinned_sha": lic.get("path"),
+        "license_file_blob_sha_at_pinned_sha": lic.get("blob_sha"),
         "created_at": repo["createdAt"],
         "pushed_at": repo["pushedAt"],
         "stars": repo["stargazerCount"],
@@ -203,13 +216,83 @@ def evaluate(full_name, exposed):
     return ev
 
 
+def license_identity(full_name, sha):
+    """Detected license SPDX id, license-file path, and blob SHA at `sha`."""
+    try:
+        return gh(["-X", "GET", f"repos/{full_name}/license", "-f", f"ref={sha}",
+                   "--jq", "{spdx: (.license.spdx_id // null), path: .path, blob_sha: .sha}"])
+    except RuntimeError:
+        return {}
+
+
+def add_license_identity(path):
+    """Supplement an existing snapshot's selected repos with license-file identity."""
+    d = json.load(open(path))
+    sel = set(d["primary"]) | set(d["reserve_ordered"])
+    now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    for w in d["walked"]:
+        if w["repo"] in sel:
+            lic = license_identity(w["repo"], w["pinned_sha"])
+            w["license_file_path_at_pinned_sha"] = lic.get("path")
+            w["license_file_blob_sha_at_pinned_sha"] = lic.get("blob_sha")
+            w["license_identity_retrieval_utc"] = now
+            if lic.get("spdx") != w["license_spdx_at_pinned_sha"]:
+                w["license_identity_mismatch"] = lic.get("spdx")
+    d["content_inspected"] = CONTENT_STATEMENT
+    derive_views(d)
+    with open(path, "w") as f:
+        json.dump(d, f, indent=2)
+        f.write("\n")
+
+
+def continue_walk(a, exposed):
+    """Versioned continuation: frozen candidate order, live metadata at run time."""
+    base = json.load(open(a.continue_from))
+    ordered = base["candidate_walk_order"]
+    start = max(w["order_rank"] for w in base["walked"])  # ranks are 1-based
+    walked, eligible = [], []
+    for i in range(start, len(ordered)):
+        if len(eligible) >= a.need:
+            break
+        ev = evaluate(ordered[i], exposed)
+        ev["order_rank"] = i + 1
+        ev["order_key"] = order_key(ordered[i])
+        walked.append(ev)
+        if ev["eligible"]:
+            eligible.append(ev["repo"])
+    out = {
+        "schema": "calor/r2a-prime-repos-continuation/v1",
+        "continuation_of": a.continue_from,
+        "criteria_freeze_commit": a.freeze_commit,
+        "retrieval_utc": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "comparability": "candidate set and order frozen at base snapshot; metadata, pins, and HEAD licenses are live at retrieval_utc",
+        "eligible_in_order": eligible,
+        "walked": walked,
+    }
+    with open(a.out, "w") as f:
+        json.dump(out, f, indent=2)
+        f.write("\n")
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--freeze-commit", required=True)
+    ap.add_argument("--freeze-commit")
     ap.add_argument("--repo-root", default=".")
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--out")
+    ap.add_argument("--continue-from")
+    ap.add_argument("--need", type=int, default=0)
+    ap.add_argument("--add-license-identity", metavar="SNAPSHOT_JSON")
     a = ap.parse_args()
 
+    if a.add_license_identity:
+        add_license_identity(a.add_license_identity)
+        return
+    if not (a.freeze_commit and a.out):
+        ap.error("--freeze-commit and --out are required")
+    exposed = calor_exposed(a.freeze_commit, a.repo_root)
+    if a.continue_from:
+        continue_walk(a, exposed)
+        return
     exposed = calor_exposed(a.freeze_commit, a.repo_root)
     partitions = []
     for lo, hi in STAR_PARTITIONS:
@@ -256,7 +339,7 @@ def main():
         "primary": primary,
         "reserve_ordered": reserve,
         "walked": walked,
-        "content_inspected": "none: metadata and counts only; no issue/PR/commit titles, bodies, comments, labels, diffs, or source files were requested",
+        "content_inspected": CONTENT_STATEMENT,
     }
     derive_views(out)
     with open(a.out, "w") as f:
@@ -272,12 +355,13 @@ def derive_views(out):
     """
     by = {w["repo"]: w for w in out["walked"]}
     keep = ("repo", "url", "pinned_sha", "default_branch", "license_spdx_repo",
-            "license_spdx_at_pinned_sha", "order_rank")
+            "license_spdx_at_pinned_sha", "license_file_path_at_pinned_sha",
+            "license_file_blob_sha_at_pinned_sha", "order_rank")
     for src, dst in (("primary", "primary_records"), ("reserve_ordered", "reserve_records")):
         out[dst] = []
         for name in out[src]:
             w = by[name]
-            rec = {k: w[k] for k in keep}
+            rec = {k: w.get(k) for k in keep}
             rec["retrieval_utc"] = out["retrieval_utc"]
             rec["criteria_evidence"] = {
                 "C1_primary_language": w["primary_language"],

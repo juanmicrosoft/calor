@@ -8,3 +8,4 @@ not logged here.
 
 | date | gate | round | tool | model | tokens | notes |
 |---|---|---|---|---|---|---|
+| 2026-10-01 | R2A′ (#1373) | 1 | Codex CLI 0.159.2 `exec -s read-only` | gpt-6.1-sol | 602,591 (input 599,290 of which 486,144 cached; output 3,301 incl. 328 reasoning) | Hostile review of R2A′ doc, repo JSON, script; 1 blocking / 6 major. USD cost not reported by CLI |
