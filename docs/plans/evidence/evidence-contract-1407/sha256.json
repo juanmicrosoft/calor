@@ -6,8 +6,8 @@
   ],
   "enforcedBy": "tests/Calor.Compiler.Tests/EvidenceContract/EvidenceContractTests.cs (PacketHashesMatchSha256Manifest)",
   "files": {
-    "docs/plans/v0.24-evidence-contract.md": "cb55346c06ee6e80cc2270c0e84ad9678f0dfbe7c875b5ab979431f98b9a3b92",
-    "docs/plans/evidence/evidence-contract-1407/contract.json": "1b049c7919859ecfa2fbfd2ece6b1a07c0104054a03e3af15d48d118878718b0",
+    "docs/plans/v0.24-evidence-contract.md": "09a68007e73a6dfcd59f1d0b5d8d1070ad20911b7d4ba762e83b35e00d954077",
+    "docs/plans/evidence/evidence-contract-1407/contract.json": "58a76a018160b85e4b2835fe0f9c30636d44080103e8208dc6153e5db4eea060",
     "docs/plans/evidence/evidence-contract-1407/artifact-inventory.json": "785bc23f9f864f16adc0a90124cb31ff6f423c88708627b40a028c40c26737c3"
   }
 }

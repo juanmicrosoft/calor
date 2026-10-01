@@ -52,12 +52,12 @@
     },
     {
       "id": "N1",
-      "role": "recorded-not-selected",
-      "selectedBy": "none",
+      "role": "second-investigated-baseline",
+      "selectedBy": "maintainer decision recorded in this contract (2026-10-01)",
       "package": "calor 0.21.0 and Calor.Sdk 0.21.0 on nuget.org",
       "commit": "88b5d38df97fd7e438882c956b9f9dcdc7a6cef5",
       "declaredVersion": "0.21.0",
-      "status": "The newest NuGet-distributed compiler at the cutoff. It was packed by workflow_dispatch run 34662528371 from 88b5d38 (fix: isolate MediatR release test collections, #1449), not from the v0.21.0 tag commit b1d23d7d74aa17a460d6a7d429836ca8396bb182, whose release-event publish run 34658493492 failed. Recorded so the sweep cannot silently claim to cover the binary users install. Investigating it requires an amendment."
+      "status": "The newest NuGet-distributed compiler at the cutoff. It was packed by workflow_dispatch run 34662528371 from 88b5d38 (fix: isolate MediatR release test collections, #1449), not from the v0.21.0 tag commit b1d23d7d74aa17a460d6a7d429836ca8396bb182, whose release-event publish run 34658493492 failed. This is the binary users actually install. #1419 registers it as a separate sweep row; B1 and N1 results are never pooled or substituted for each other."
     }
   ],
 
