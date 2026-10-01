@@ -435,6 +435,136 @@ public class EvidenceContractTests
         AssertViolation(Rows(row), "E008");
     }
 
+    [Theory]
+    [InlineData("calorSha256")]
+    [InlineData("taskStatementSha256")]
+    public void PairWithShortHashFails(string field)
+    {
+        var row = BenchmarkRow();
+        row["benchmark"]!["pairs"]![0]![field] = "11";
+        AssertViolation(Rows(row), "E009");
+    }
+
+    [Fact]
+    public void PairWithWrongTypeIdentityFails()
+    {
+        var row = BenchmarkRow();
+        row["benchmark"]!["pairs"]![0]!["csharpSha256"] = new JsonObject();
+        AssertViolation(Rows(row), "E009");
+    }
+
+    [Fact]
+    public void ComparabilityKeyWithShortHashFails()
+    {
+        var row = BenchmarkRow();
+        row["benchmark"]!.AsObject().Remove("comparedTo");
+        row["benchmark"]!["comparability"]!["pairManifestSha256"] = "aa";
+        AssertViolation(Rows(row), "E008");
+    }
+
+    // A benchmark row that is not counted as an established proof still feeds headlines and
+    // adjudication, so it meets the artifact, candidate, and freshness rules.
+
+    [Fact]
+    public void DecisionBearingBenchmarkOnStaleArtifactFails()
+    {
+        var row = BenchmarkRow();
+        row["artifact"] = "benchmark-results";
+        AssertViolation(Rows(row), "E005", "E014"); // benchmark-results also has two open defects
+    }
+
+    [Fact]
+    public void DecisionBearingBenchmarkFromAnotherCommitFails()
+    {
+        var row = BenchmarkRow();
+        row["sourceCommit"] = "2222222222222222222222222222222222222222";
+        AssertViolation(Rows(row), "E006");
+    }
+
+    [Fact]
+    public void DecisionBearingBenchmarkBeforeCutoffFails()
+    {
+        var row = BenchmarkRow();
+        row["recordedAtUtc"] = "2026-09-10T00:00:00Z";
+        AssertViolation(Rows(row), "E007");
+    }
+
+    [Fact]
+    public void HistoricalBenchmarkRowIsNotHeldToCandidateRules()
+    {
+        // The pre-cut benchmark-results.json, recorded as historical, is retained without being
+        // decision-bearing.
+        var row = BenchmarkRow();
+        row["outcome"] = "historical";
+        row["artifact"] = "benchmark-results";
+        row["sourceCommit"] = "2222222222222222222222222222222222222222";
+        row["recordedAtUtc"] = "2026-09-10T00:00:00Z";
+        var violations = Rows(row);
+        Assert.True(violations.Count == 0, Describe(violations));
+    }
+
+    // ------------------------------------------------------------------
+    // Terminal record (#1408): the machine-checkable success conditions
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void WellFormedSuccessRecordPasses()
+    {
+        var violations = EvidenceContractValidator.ValidateTerminalRecord(Contract(), SuccessRecord());
+        Assert.True(violations.Count == 0, Describe(violations));
+    }
+
+    [Fact]
+    public void SuccessWithReleaseCriticalNonSweepBlockerFails()
+    {
+        // A blocker outside the #1419 sweep (here, the release quality reports) still fails success.
+        var record = SuccessRecord();
+        record["adjudications"]![1]!["outcome"] = "BLOCKED";
+        AssertViolation(EvidenceContractValidator.ValidateTerminalRecord(Contract(), record), "T001");
+    }
+
+    [Fact]
+    public void SuccessWithoutAdjudicationRowsFails()
+    {
+        var record = SuccessRecord();
+        record["adjudications"] = new JsonArray();
+        AssertViolation(EvidenceContractValidator.ValidateTerminalRecord(Contract(), record), "T001");
+    }
+
+    [Fact]
+    public void SuccessWithoutReducedIndependenceFails()
+    {
+        var record = SuccessRecord();
+        record["adjudicationIndependence"] = "independent";
+        AssertViolation(EvidenceContractValidator.ValidateTerminalRecord(Contract(), record), "T002");
+    }
+
+    [Fact]
+    public void SuccessWithSupportedRowFails()
+    {
+        var record = SuccessRecord();
+        record["adjudications"]![0]!["outcome"] = "SUPPORTED";
+        AssertViolation(EvidenceContractValidator.ValidateTerminalRecord(Contract(), record), "T002");
+    }
+
+    [Fact]
+    public void FailureRecordWithBlockerPasses()
+    {
+        var record = SuccessRecord();
+        record["outcome"] = "MILESTONE-FAILED";
+        record["adjudications"]![1]!["outcome"] = "BLOCKED";
+        var violations = EvidenceContractValidator.ValidateTerminalRecord(Contract(), record);
+        Assert.True(violations.Count == 0, Describe(violations));
+    }
+
+    [Fact]
+    public void UnknownTerminalOutcomeFails()
+    {
+        var record = SuccessRecord();
+        record["outcome"] = "MILESTONE-MOSTLY-SUCCEEDED";
+        AssertViolation(EvidenceContractValidator.ValidateTerminalRecord(Contract(), record), "T003");
+    }
+
     // ------------------------------------------------------------------
     // Inventory negative controls
     // ------------------------------------------------------------------
@@ -704,8 +834,27 @@ public class EvidenceContractTests
     [Fact]
     public void WellFormedAcceptanceWriteBackPasses()
     {
-        var violations = EvidenceContractValidator.ValidateContract(FrozenContract());
+        // The whole write-back packet: contract and inventory move to 1.0.1 together.
+        var contract = FrozenContract();
+        var inventory = Inventory();
+        inventory["contractVersion"] = "1.0.1";
+        var violations = EvidenceContractValidator.ValidateContract(contract)
+            .Concat(EvidenceContractValidator.ValidateInventory(contract, inventory)).ToList();
         Assert.True(violations.Count == 0, Describe(violations));
+    }
+
+    [Fact]
+    public void AcceptanceWriteBackWithoutInventoryVersionFails()
+    {
+        AssertViolation(EvidenceContractValidator.ValidateInventory(FrozenContract(), Inventory()), "I012");
+    }
+
+    [Fact]
+    public void ProposedContractWithAcceptedCeilingFails()
+    {
+        var contract = Contract();
+        contract["authorityCapacity"]!["capacity"]!["ceilings"]![0]!["status"] = "ACCEPTED";
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C012");
     }
 
     [Theory]
@@ -792,10 +941,10 @@ public class EvidenceContractTests
     {
         ["pairId"] = pairId,
         ["calorPath"] = $"{pairId}/program.calr",
-        ["calorSha256"] = "11",
+        ["calorSha256"] = Hash('1'),
         ["csharpPath"] = $"{pairId}/Program.cs",
-        ["csharpSha256"] = "22",
-        ["taskStatementSha256"] = "33",
+        ["csharpSha256"] = Hash('2'),
+        ["taskStatementSha256"] = Hash('3'),
         ["inputSet"] = "inputs/v1",
         ["expectedOutputs"] = "outputs/v1",
         ["failureBehavior"] = "same exception type on malformed input",
@@ -846,20 +995,47 @@ public class EvidenceContractTests
 
     private static JsonObject ComparabilityKey() => new()
     {
-        ["pairManifestSha256"] = "aa",
-        ["metricSetSha256"] = "bb",
+        ["pairManifestSha256"] = Hash('a'),
+        ["metricSetSha256"] = Hash('b'),
         ["metricImplementationVersion"] = "1",
         ["aggregationMethod"] = "geometric-mean-over-equivalent-pairs",
         ["samplingUnit"] = "program-pair",
         ["runCount"] = 30,
         ["generatorVersion"] = "1.0",
-        ["exclusionsSha256"] = "cc",
+        ["exclusionsSha256"] = Hash('c'),
     };
 
+    private static string Hash(char c) => new(c, 64);
+
+    private static JsonObject SuccessRecord() => new()
+    {
+        ["outcome"] = "MILESTONE-SUCCEEDED",
+        ["adjudicationIndependence"] = "reduced",
+        ["adjudications"] = new JsonArray(
+            new JsonObject
+            {
+                ["subject"] = "verifier-runtime-differential", ["outcome"] = "BOUNDED",
+                ["releaseCritical"] = true, ["independence"] = "reduced-maintainer-adjudicated",
+            },
+            new JsonObject
+            {
+                ["subject"] = "release-quality-reports", ["outcome"] = "BOUNDED",
+                ["releaseCritical"] = true, ["independence"] = "reduced-maintainer-adjudicated",
+            },
+            new JsonObject
+            {
+                ["subject"] = "llm-and-agent-results", ["outcome"] = "HISTORICAL-ONLY",
+                ["releaseCritical"] = false, ["independence"] = "reduced-maintainer-adjudicated",
+            }),
+    };
+
+    /// <summary>A decision-bearing benchmark row on the candidate, citing the authoritative corpus.</summary>
     private static JsonObject BenchmarkRow()
     {
         var row = Row();
         row["counted"] = "not-established";
+        row["artifact"] = "benchmark-corpus";
+        row["openDefectsResolvedBy"] = new JsonArray(9002); // the #1276 defect on the corpus
         row["benchmark"] = new JsonObject
         {
             ["samplingUnit"] = "program-pair",

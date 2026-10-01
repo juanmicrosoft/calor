@@ -36,6 +36,7 @@ internal static class EvidenceContractValidator
         [1419, 1311, 1413, 1420, 1421, 1135, 1241, 1417, 1276, 1422, 1410, 1423, 1424, 1408];
 
     private static readonly Regex FullSha = new("^[0-9a-f]{40}$", RegexOptions.Compiled);
+    private static readonly Regex Sha256Hex = new("^[0-9a-f]{64}$", RegexOptions.Compiled);
 
     private static readonly string[] InventoryRequiredStrings =
         ["id", "kind", "classification", "reason", "producer", "sourceRevisions",
@@ -210,6 +211,8 @@ internal static class EvidenceContractValidator
         {
             if (acceptance is not null)
                 yield return new("C012", "acceptance", "a PROPOSED contract cannot carry an acceptance record");
+            if (Str(capacity?["status"]) != "PROPOSED" || ceilings.Any(c => Str(c?["status"]) != "PROPOSED"))
+                yield return new("C012", "capacity", "a PROPOSED contract keeps capacity and every ceiling PROPOSED until the acceptance write-back");
             yield break;
         }
         if (status != "FROZEN")
@@ -413,7 +416,15 @@ internal static class EvidenceContractValidator
 
             v.AddRange(ValidateBenchmark(row, id, keyFields, pairFields, pairDispositions, samplingUnit));
 
-            if (counted != "established")
+            // A benchmark row is decision-bearing (it can feed a headline, delta, or adjudication)
+            // unless it is explicitly recorded as historical. Decision-bearing rows meet the same
+            // artifact, candidate, and freshness rules as established proofs, whatever 'counted' says.
+            var established = counted == "established";
+            var decisionBearingBenchmark = row["benchmark"] is not null && outcome != "historical";
+            if (established || decisionBearingBenchmark)
+                v.AddRange(ValidateProvenance(row, id, artifacts, candidateCommit, cutoff));
+
+            if (!established)
                 continue;
 
             if (!isOutcome || Bool(outcomes[outcome!]["mayEstablishClaim"]) != true)
@@ -432,33 +443,90 @@ internal static class EvidenceContractValidator
                 v.Add(new("E003", id, "a Discharged obligation establishes only after a registered non-vacuity check {id, result: passed}"));
 
             v.AddRange(ValidateEstablishmentPrerequisites(row, id, candidateSemanticsVersion));
-
-            var artifactId = Str(row["artifact"]);
-            if (artifactId is null || !artifacts.TryGetValue(artifactId, out var artifact))
-                v.Add(new("E004", id, $"established row cites unknown artifact '{artifactId}'"));
-            else
-            {
-                if (Str(artifact["classification"]) != "authoritative")
-                    v.Add(new("E005", id, $"artifact '{artifactId}' is {Str(artifact["classification"])}, not authoritative"));
-                var openDefects = Array(artifact["openDefects"]).Count;
-                var resolvedBy = Array(row["openDefectsResolvedBy"]).Select(Int).ToList();
-                if (resolvedBy.Any(pr => pr is null) || resolvedBy.Count < openDefects)
-                    v.Add(new("E014", id,
-                        $"artifact '{artifactId}' has {openDefects} open defect(s) at the cutoff; the row names {resolvedBy.Count} resolving PR(s)"));
-            }
-
-            if (candidateCommit is null)
-                v.Add(new("E006", id, "no frozen candidate (#1423); nothing can be established yet"));
-            else if (!string.Equals(Str(row["sourceCommit"]), candidateCommit, StringComparison.Ordinal))
-                v.Add(new("E006", id, "row was not produced on the frozen candidate"));
-
-            var recorded = ParseUtc(Str(row["recordedAtUtc"]));
-            if (recorded is null || cutoff is null)
-                v.Add(new("E007", id, "established row needs a UTC recordedAtUtc"));
-            else if (recorded <= cutoff)
-                v.Add(new("E007", id, "row predates the cutoff; retrospective evidence cannot be confirmatory"));
         }
 
+        return v;
+    }
+
+    /// <summary>E004–E007, E014: the cited artifact, the frozen candidate, and freshness.</summary>
+    private static IEnumerable<ContractViolation> ValidateProvenance(
+        JsonNode row, string id, Dictionary<string, JsonNode> artifacts, string? candidateCommit, DateTimeOffset? cutoff)
+    {
+        var artifactId = Str(row["artifact"]);
+        if (artifactId is null || !artifacts.TryGetValue(artifactId, out var artifact))
+        {
+            yield return new("E004", id, $"row cites unknown artifact '{artifactId}'");
+        }
+        else
+        {
+            if (Str(artifact["classification"]) != "authoritative")
+                yield return new("E005", id, $"artifact '{artifactId}' is {Str(artifact["classification"])}, not authoritative");
+            var openDefects = Array(artifact["openDefects"]).Count;
+            var resolvedBy = Array(row["openDefectsResolvedBy"]).Select(Int).ToList();
+            if (resolvedBy.Any(pr => pr is null) || resolvedBy.Count < openDefects)
+                yield return new("E014", id,
+                    $"artifact '{artifactId}' has {openDefects} open defect(s) at the cutoff; the row names {resolvedBy.Count} resolving PR(s)");
+        }
+
+        if (candidateCommit is null)
+            yield return new("E006", id, "no frozen candidate (#1423); nothing can be established or decided yet");
+        else if (!string.Equals(Str(row["sourceCommit"]), candidateCommit, StringComparison.Ordinal))
+            yield return new("E006", id, "row was not produced on the frozen candidate");
+
+        var recorded = ParseUtc(Str(row["recordedAtUtc"]));
+        if (recorded is null || cutoff is null)
+            yield return new("E007", id, "row needs a UTC recordedAtUtc");
+        else if (recorded <= cutoff)
+            yield return new("E007", id, "row predates the cutoff; retrospective evidence cannot be confirmatory");
+    }
+
+    // ------------------------------------------------------------------
+    // Terminal record (#1408)
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// T001–T003: the machine-checkable part of the terminal-success predicate. MILESTONE-SUCCEEDED
+    /// needs no BLOCKED adjudication of any release-critical artifact, gate, or claim, and, under the
+    /// recorded independence deviation, adjudicationIndependence = reduced with no SUPPORTED row.
+    /// </summary>
+    public static IReadOnlyList<ContractViolation> ValidateTerminalRecord(JsonNode contract, JsonNode record)
+    {
+        var v = new List<ContractViolation>();
+        var terminal = Array(contract["terminalOutcomes"]).Select(Str).OfType<string>().ToHashSet();
+        var adjudicationOutcomes = Array(contract["adjudicationOutcomes"]).Select(Str).OfType<string>().ToHashSet();
+        var outcome = Str(record["outcome"]);
+        if (outcome is null || !terminal.Contains(outcome))
+            v.Add(new("T003", "terminal", $"unknown terminal outcome '{outcome}'"));
+
+        var rows = Array(record["adjudications"]);
+        foreach (var row in rows)
+        {
+            var subject = Str(row?["subject"]) ?? "?";
+            var adjudication = Str(row?["outcome"]);
+            if (adjudication is null || !adjudicationOutcomes.Contains(adjudication))
+                v.Add(new("T003", subject, $"unknown adjudication outcome '{adjudication}'"));
+            if (Bool(row?["releaseCritical"]) is null)
+                v.Add(new("T003", subject, "adjudication row must state releaseCritical as a boolean"));
+        }
+
+        if (outcome != "MILESTONE-SUCCEEDED")
+            return v;
+
+        if (rows.Count == 0)
+            v.Add(new("T001", "terminal", "a success record with no adjudication rows establishes nothing"));
+        foreach (var row in rows.Where(r => Str(r?["outcome"]) == "BLOCKED" && Bool(r?["releaseCritical"]) != false))
+            v.Add(new("T001", Str(row?["subject"]) ?? "?", "a release-critical BLOCKED adjudication makes the milestone fail"));
+
+        var deviation = Bool(contract["authorityCapacity"]?["independence"]?["deviation"]) != false;
+        if (deviation)
+        {
+            if (Str(record["adjudicationIndependence"]) != "reduced")
+                v.Add(new("T002", "terminal", "under the independence deviation a success record carries adjudicationIndependence = reduced"));
+            foreach (var row in rows.Where(r => Str(r?["outcome"]) == "SUPPORTED"))
+                v.Add(new("T002", Str(row?["subject"]) ?? "?", "SUPPORTED is unavailable under the independence deviation"));
+            foreach (var row in rows.Where(r => Str(r?["independence"]) != "reduced-maintainer-adjudicated"))
+                v.Add(new("T002", Str(row?["subject"]) ?? "?", "every adjudication row records independence = reduced-maintainer-adjudicated"));
+        }
         return v;
     }
 
@@ -502,6 +570,8 @@ internal static class EvidenceContractValidator
             var pairId = Str(pair?["pairId"]) ?? "?";
             foreach (var field in pairFields.Where(f => IsBlank(pair?[f])))
                 yield return new("E009", id, $"pair {pairId} is missing required field '{field}'");
+            foreach (var field in pairFields.Where(f => IsHashField(f) && !IsBlank(pair?[f]) && !IsSha256(Str(pair?[f]))))
+                yield return new("E009", id, $"pair {pairId} field '{field}' is not a 64-hex SHA-256");
             var included = Bool(pair?["included"]);
             if (included is null)
                 yield return new("E009", id, $"pair {pairId} must state included as a boolean");
@@ -516,6 +586,8 @@ internal static class EvidenceContractValidator
         var key = bench["comparability"];
         foreach (var field in keyFields.Where(f => IsBlank(key?[f])))
             yield return new("E008", id, $"comparability field '{field}' is missing; incomparable");
+        foreach (var field in keyFields.Where(f => IsHashField(f) && !IsBlank(key?[f]) && !IsSha256(Str(key?[f]))))
+            yield return new("E008", id, $"comparability field '{field}' is not a 64-hex SHA-256; incomparable");
 
         var comparedTo = bench["comparedTo"];
         if (comparedTo is null)
@@ -559,8 +631,18 @@ internal static class EvidenceContractValidator
     private static bool? Bool(JsonNode? node) =>
         node is JsonValue value && value.TryGetValue<bool>(out var b) ? b : null;
 
-    private static bool IsBlank(JsonNode? node) =>
-        node is null || (node is JsonValue value && value.TryGetValue<string>(out var s) && string.IsNullOrWhiteSpace(s));
+    private static bool IsBlank(JsonNode? node) => node switch
+    {
+        null => true,
+        JsonValue value => value.TryGetValue<string>(out var s) && string.IsNullOrWhiteSpace(s),
+        JsonObject obj => obj.Count == 0,
+        JsonArray array => array.Count == 0,
+        _ => true,
+    };
+
+    private static bool IsHashField(string field) => field.EndsWith("Sha256", StringComparison.Ordinal);
+
+    private static bool IsSha256(string? text) => text is not null && Sha256Hex.IsMatch(text);
 
     private static bool TryParseSemVer(string text, out Version version)
     {
