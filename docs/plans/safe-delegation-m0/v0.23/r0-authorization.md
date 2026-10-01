@@ -85,7 +85,7 @@ Everything else is outside this authority, including everything in Section 9.
 | Cash | **USD 200.00 hard ceiling** across all 0.23 gates. The maintainer stated "approximately USD 200"; this record fixes it as a ceiling. | Marginal billed AI API/tool spend, recorded per invocation in [spend-ledger.md](spend-ledger.md). Existing subscriptions (Claude Code, the ChatGPT plan used by Codex CLI, GitHub Copilot) are excluded from the cash figure; their token use is still logged. |
 | Review rounds | **5** adversarial review rounds per artifact, counting every reviewer (Codex and Copilot share the allowance) | Counted per [review-protocol.md](review-protocol.md) |
 | Inquiry deadline | **2026-10-29, 23:59 UTC** | All substantive gate work must finish by then |
-| Planning hours | **Maintainer: 20 hours. AI agent sessions: 60 wall-clock hours.** Both across all 0.23 gates. The maintainer did not state an hours figure when approving R0; these caps were proposed in this record and are adopted only by the maintainer's merge of it. | Self-reported per gate in the hours table of [spend-ledger.md](spend-ledger.md); agent hours are session wall-clock time, which also bounds subscription-backed AI use that the cash cap does not |
+| Planning hours | **Maintainer: 20 hours. AI agent sessions: 60 wall-clock hours.** Both across all 0.23 gates. The maintainer did not state an hours figure when approving R0; these caps were proposed in this record and are adopted only by the maintainer's merge of it. | Self-reported per session in the hours table of [spend-ledger.md](spend-ledger.md). Accounting starts 2026-10-01 at the maintainer's approval and includes pre-merge drafting, review, and revision. Agent hours are session wall-clock time from session start to hand-off, including time spent waiting on tools; concurrent sessions each count in full; unknown durations are logged as labeled conservative estimates. This also bounds subscription-backed AI use that the cash cap does not. |
 | Compensation | **USD 0** to any person | Section 8 |
 
 Exceeding any cap, or extending the deadline, requires a versioned R0
@@ -315,7 +315,9 @@ record with the date and the commit SHA of gate-state.json it read:
 
 1. R0: current value `MET`, not expired, not revoked, and active authority
    has not ended (below);
-2. for **each** prerequisite in the amended graph: its current value is `MET`
+2. for **each** gate in the transitive prerequisite closure of the acting
+   gate (for example R5 checks R0, R1, R2A′, R3, R2B′, and R4, not only R4):
+   its current value is `MET`
    in [gate-state.json](gate-state.json); any expiry stated in its own record
    has not passed; no withdrawal, exclusion, license change, or invalidation
    affecting it is recorded in its record, in Section 13, or on #1370 after

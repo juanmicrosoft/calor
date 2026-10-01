@@ -70,8 +70,9 @@ R4 is `NOT_REACHED`, as the R0 Section 10 administrative closeout.
 Every amended gate shares these conditions:
 
 - **Revalidation.** The full procedure of R0 Section 10 runs at start,
-  before each data access, and before closure: R0 and **each** prerequisite's
-  value, expiry, withdrawal status, and relied-on output version, and the
+  before each data access, and before closure: R0 and **every gate in the
+  transitive prerequisite closure** (value, expiry, withdrawal status, and
+  relied-on output version), and the
   spend and hours caps. The R5 administrative closeout (R0 Section 10) is
   the only exception.
 - **Review.** The gate artifact completes the protocol with no unresolved

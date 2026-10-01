@@ -18,10 +18,13 @@ new row that cites the row it corrects.
 ## Hours
 
 Caps: maintainer 20 hours; AI agent sessions 60 wall-clock hours
-([r0-authorization.md](r0-authorization.md) Section 5). Self-reported per
-gate; append rows.
+([r0-authorization.md](r0-authorization.md) Section 5), with the accounting
+rules stated there. Append one row per session; other gates' concurrent
+sessions append their own rows.
 
-| Date (UTC) | Gate | Maintainer hours | Agent session hours | Notes |
-|---|---|---|---|---|
+| Date (UTC) | Gate | Session | Maintainer hours | Agent session hours | Basis |
+|---|---|---|---|---|---|
+| 2026-10-01 | R0 | Claude Code session drafting R0, amendment 001, protocol, boundary test, and Codex rounds 1-3 | not metered | 3.0 | Conservative estimate; session timestamps not captured |
 
-**Cumulative:** maintainer 0; agent 0.
+**Cumulative:** maintainer not metered for this row (counts as 0 of 20 until
+reported); agent 3.0 of 60 (estimate).
