@@ -247,7 +247,7 @@
     "independence": {
       "rule": "Epic rule 10 and #1408: the adjudicator cannot have implemented the producer or repair, cannot change #1407 rules, and needs an independent approving review.",
       "deviation": true,
-      "deviationStatement": "@juanmicrosoft is the #1408 adjudicator and approving reviewer. He did not write the repairs (agents did), but he directs, reviews, and merges them and also holds decision and amendment authority. Independence is reduced.",
+      "deviationStatement": "@juanmicrosoft is the #1408 adjudicator and approving reviewer. The maintainer did not write the repairs (agents did), but directs, reviews, and merges them and also holds decision and amendment authority. Independence is reduced.",
       "consequences": [
         "Every adjudication row records independence = reduced-maintainer-adjudicated.",
         "No row may be SUPPORTED; the maximum is BOUNDED with the published limitation 'adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated'. This follows #1408's own rule for unavailable independent review.",
