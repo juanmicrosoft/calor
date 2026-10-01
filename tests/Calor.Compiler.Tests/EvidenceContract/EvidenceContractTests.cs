@@ -15,7 +15,9 @@ namespace Calor.Compiler.Tests.EvidenceContract;
 public class EvidenceContractTests
 {
     private const string PacketDir = "docs/plans/evidence/evidence-contract-1407";
+    private const string ContractPath = PacketDir + "/contract.json";
     private const string Candidate = "1111111111111111111111111111111111111111";
+    private const string SemanticsVersion = "z3-executable-semantics-v2";
 
     // ------------------------------------------------------------------
     // Positive controls: the committed packet
@@ -36,18 +38,26 @@ public class EvidenceContractTests
     }
 
     [Fact]
-    public void CommittedContractIsNotMarkedMetWhileCapacityIsProposed()
+    public void CommittedContractLifecycleIsConsistent()
     {
+        // Either PROPOSED (R0 PR and its merge commit: NOT-MET, capacity PROPOSED) or FROZEN after
+        // the acceptance write-back (MET, capacity ACCEPTED, acceptance record); C008 and C012
+        // reject every mixed state, and CommittedContractIsValid runs them on the committed packet.
         var contract = Contract();
-        Assert.Equal("NOT-MET", contract["gateStatus"]!.GetValue<string>());
-        Assert.Equal("PROPOSED", contract["authorityCapacity"]!["capacity"]!["status"]!.GetValue<string>());
+        var status = contract["status"]!.GetValue<string>();
+        Assert.Contains(status, new[] { "PROPOSED", "FROZEN" });
+        Assert.Equal(status == "FROZEN" ? "MET" : "NOT-MET", contract["gateStatus"]!.GetValue<string>());
+        Assert.Equal(status == "FROZEN" ? "ACCEPTED" : "PROPOSED",
+            contract["authorityCapacity"]!["capacity"]!["status"]!.GetValue<string>());
     }
 
     [Fact]
     public void CommittedVocabularyMatchesTheVerifierStatusEnums()
     {
-        // Every status the verifier can emit must be named by exactly one frozen token, so no
-        // emitted status is left unclassified.
+        // Every status the verifier can emit must be named by at least one frozen token, so no
+        // emitted status is left unclassified. The legacy enums are lossy (for example
+        // ContractVerificationStatus.Unproven receives both Assumed and TimeoutOrUnavailable), so a
+        // legacy value may appear under more than one token; consumers read ProofOutcome instead.
         var codeStatuses = Contract()["outcomeVocabulary"]!["outcomes"]!.AsArray()
             .SelectMany(o => o!["codeStatuses"]!.AsArray().Select(s => s!.GetValue<string>()))
             .ToList();
@@ -70,7 +80,8 @@ public class EvidenceContractTests
         var root = RepoRoot();
         var manifest = JsonNode.Parse(File.ReadAllText(Path.Combine(root, PacketDir, "sha256.json")))!;
         var files = manifest["files"]!.AsObject();
-        Assert.True(files.Count >= 3, "sha256.json must cover the document, contract, and inventory");
+        var coverage = EvidenceContractValidator.ValidatePacketManifest(Contract(), manifest, ContractPath);
+        Assert.True(coverage.Count == 0, Describe(coverage));
 
         var mismatches = new List<string>();
         foreach (var (path, expected) in files)
@@ -178,9 +189,73 @@ public class EvidenceContractTests
         row["outcome"] = "Discharged";
         AssertViolation(Rows(row), "E003");
 
+        // A bare boolean is not a registered check.
         row["nonVacuityChecked"] = true;
+        AssertViolation(Rows(row), "E003");
+
+        row["nonVacuityCheck"] = new JsonObject { ["id"] = "nv-1", ["result"] = "failed" };
+        AssertViolation(Rows(row), "E003");
+
+        row["nonVacuityCheck"] = new JsonObject { ["id"] = "nv-1", ["result"] = "passed" };
         var violations = Rows(row);
         Assert.True(violations.Count == 0, Describe(violations));
+    }
+
+    // ------------------------------------------------------------------
+    // §4 establishment conditions the row itself must evidence
+    // ------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("registrationId")]
+    [InlineData("producer")]
+    [InlineData("oracle")]
+    [InlineData("translatorSemanticsVersion")]
+    [InlineData("unresolvedFalseProof")]
+    public void EstablishedRowMissingPrerequisiteFails(string field)
+    {
+        var row = Row();
+        row.Remove(field);
+        AssertViolation(Rows(row), "E013");
+    }
+
+    [Fact]
+    public void DisagreeingOracleFails()
+    {
+        var row = Row();
+        row["oracle"]!["agrees"] = false;
+        AssertViolation(Rows(row), "E013");
+    }
+
+    [Fact]
+    public void OtherTranslatorSemanticsVersionFails()
+    {
+        var row = Row();
+        row["translatorSemanticsVersion"] = "z3-executable-semantics-v1";
+        AssertViolation(Rows(row), "E013");
+    }
+
+    [Fact]
+    public void UnknownCandidateSemanticsVersionFails()
+    {
+        AssertViolation(EvidenceContractValidator.ValidateEvidenceRows(
+            Contract(), Inventory(), [Row()], Candidate, candidateSemanticsVersion: null), "E013");
+    }
+
+    [Fact]
+    public void UnresolvedFalseProofFails()
+    {
+        var row = Row();
+        row["unresolvedFalseProof"] = true;
+        AssertViolation(Rows(row), "E013");
+    }
+
+    [Fact]
+    public void ArtifactWithOpenDefectNeedsResolution()
+    {
+        // verifier-runtime-differential carries the #1135 defect in the committed inventory.
+        var row = Row();
+        row.Remove("openDefectsResolvedBy");
+        AssertViolation(Rows(row), "E014");
     }
 
     // ------------------------------------------------------------------
@@ -196,7 +271,8 @@ public class EvidenceContractTests
     {
         var row = Row();
         row["artifact"] = artifact;
-        AssertViolation(Rows(row), "E005");
+        // Some of these also carry open defects; E014 may accompany E005.
+        AssertViolation(Rows(row), "E005", "E014");
     }
 
     [Fact]
@@ -211,7 +287,7 @@ public class EvidenceContractTests
     public void EstablishedRowWithoutFrozenCandidateFails()
     {
         AssertViolation(EvidenceContractValidator.ValidateEvidenceRows(
-            Contract(), Inventory(), [Row()], candidateCommit: null), "E006");
+            Contract(), Inventory(), [Row()], candidateCommit: null, SemanticsVersion), "E006");
     }
 
     [Fact]
@@ -227,7 +303,8 @@ public class EvidenceContractTests
     {
         var row = Row();
         row["sourceCommit"] = "c2a8816d";
-        AssertViolation(Rows(row), "E012");
+        // A short SHA is also not the frozen candidate, so E006 accompanies E012.
+        AssertViolation(Rows(row), "E012", "E006");
     }
 
     [Theory]
@@ -311,6 +388,53 @@ public class EvidenceContractTests
         AssertViolation(Rows(row), "E010");
     }
 
+    [Theory]
+    [InlineData("pairId")]
+    [InlineData("calorPath")]
+    [InlineData("calorSha256")]
+    [InlineData("csharpPath")]
+    [InlineData("csharpSha256")]
+    [InlineData("taskStatementSha256")]
+    [InlineData("inputSet")]
+    [InlineData("expectedOutputs")]
+    [InlineData("failureBehavior")]
+    [InlineData("disposition")]
+    [InlineData("equivalenceEvidence")]
+    [InlineData("reviewer")]
+    public void PairMissingRequiredFieldFails(string field)
+    {
+        var row = BenchmarkRow();
+        row["benchmark"]!["pairs"]![0]!.AsObject().Remove(field);
+        AssertViolation(Rows(row), "E009");
+    }
+
+    [Fact]
+    public void UnclassifiedPairWithoutInclusionFlagFails()
+    {
+        var row = BenchmarkRow();
+        var pair = row["benchmark"]!["pairs"]![0]!.AsObject();
+        pair["disposition"] = "UNCLASSIFIED";
+        pair.Remove("included");
+        AssertViolation(Rows(row), "E009");
+    }
+
+    [Fact]
+    public void EmptyPairDenominatorFails()
+    {
+        var row = BenchmarkRow();
+        row["benchmark"]!["pairs"] = new JsonArray();
+        AssertViolation(Rows(row), "E009");
+    }
+
+    [Fact]
+    public void MissingComparabilityFieldWithoutComparisonFails()
+    {
+        var row = BenchmarkRow();
+        row["benchmark"]!.AsObject().Remove("comparedTo");
+        row["benchmark"]!["comparability"]!.AsObject().Remove("metricSetSha256");
+        AssertViolation(Rows(row), "E008");
+    }
+
     // ------------------------------------------------------------------
     // Inventory negative controls
     // ------------------------------------------------------------------
@@ -374,7 +498,8 @@ public class EvidenceContractTests
         // identity is refused.
         var inventory = Inventory();
         Artifact(inventory, "benchmark-results")["classification"] = "authoritative";
-        AssertViolation(EvidenceContractValidator.ValidateInventory(Contract(), inventory), "I007");
+        // The stale entry also has no valid regeneration command, so I004 may accompany I007.
+        AssertViolation(EvidenceContractValidator.ValidateInventory(Contract(), inventory), "I007", "I004");
     }
 
     [Fact]
@@ -393,7 +518,8 @@ public class EvidenceContractTests
     {
         var inventory = Inventory();
         Artifact(inventory, "test-manifest")["classification"] = classification;
-        AssertViolation(EvidenceContractValidator.ValidateInventory(Contract(), inventory), "I002");
+        // An empty classification is also a missing required field (I001).
+        AssertViolation(EvidenceContractValidator.ValidateInventory(Contract(), inventory), "I002", "I001");
     }
 
     [Fact]
@@ -483,7 +609,8 @@ public class EvidenceContractTests
         var contract = Contract();
         var children = contract["children"]!.AsArray();
         children.Remove(Child(contract, 1422));
-        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C007");
+        // #1423 still depends on the removed child, so C006 accompanies C007.
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C007", "C006");
     }
 
     [Fact]
@@ -511,39 +638,132 @@ public class EvidenceContractTests
     }
 
     [Fact]
-    public void AmendmentWithoutJustificationOrVersionBumpFails()
+    public void WellFormedAmendmentPasses()
     {
-        var contract = Contract();
-        contract["amendmentLog"]!.AsArray().Add(new JsonObject
-        {
-            ["version"] = "1.1.0",
-            ["timestampUtc"] = "2026-10-20T00:00:00Z",
-            ["reviewedInPr"] = 9999,
-            ["afterDecisionBearingInspection"] = true,
-            ["justification"] = "",
-            ["removedRows"] = new JsonArray(new JsonObject { ["row"] = "S1-042" }),
-        });
-        var violations = EvidenceContractValidator.ValidateContract(contract);
-        // No justification, a removed row without its last status, and contractVersion still 1.0.0.
-        Assert.Equal(3, violations.Count(x => x.Code == "C010"));
+        var violations = EvidenceContractValidator.ValidateContract(AmendedContract(Amendment()));
+        Assert.True(violations.Count == 0, Describe(violations));
     }
 
     [Fact]
-    public void WellFormedAmendmentPasses()
+    public void AmendmentWithoutJustificationFails()
+    {
+        var amendment = Amendment();
+        amendment["justification"] = "";
+        AssertViolation(EvidenceContractValidator.ValidateContract(AmendedContract(amendment)), "C010");
+    }
+
+    [Fact]
+    public void AmendmentRemovingRowWithoutLastStatusFails()
+    {
+        var amendment = Amendment();
+        amendment["removedRows"] = new JsonArray(new JsonObject { ["row"] = "S1-042" });
+        AssertViolation(EvidenceContractValidator.ValidateContract(AmendedContract(amendment)), "C010");
+    }
+
+    [Fact]
+    public void AmendmentWithoutContractVersionBumpFails()
+    {
+        var contract = AmendedContract(Amendment());
+        contract["contractVersion"] = "1.0.0";
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C010");
+    }
+
+    [Theory]
+    [InlineData("1.0.0")]   // equal to the initial version: not a bump
+    [InlineData("0.9.0")]   // a decrease
+    [InlineData("1.1")]     // not MAJOR.MINOR.PATCH
+    public void AmendmentVersionNotStrictlyIncreasingFails(string version)
+    {
+        var amendment = Amendment();
+        amendment["version"] = version;
+        var contract = AmendedContract(amendment);
+        contract["contractVersion"] = version;
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C010");
+    }
+
+    [Fact]
+    public void RepeatedAmendmentVersionFails()
+    {
+        var contract = AmendedContract(Amendment());
+        contract["amendmentLog"]!.AsArray().Add(Amendment());
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C010");
+    }
+
+    [Fact]
+    public void AmendmentInspectionFlagMustBeBoolean()
+    {
+        var amendment = Amendment();
+        amendment["afterDecisionBearingInspection"] = "no";
+        AssertViolation(EvidenceContractValidator.ValidateContract(AmendedContract(amendment)), "C010");
+    }
+
+    // ------------------------------------------------------------------
+    // Lifecycle: PROPOSED until merge, FROZEN only with a complete acceptance record
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void WellFormedAcceptanceWriteBackPasses()
+    {
+        var violations = EvidenceContractValidator.ValidateContract(FrozenContract());
+        Assert.True(violations.Count == 0, Describe(violations));
+    }
+
+    [Theory]
+    [InlineData("mergeCommit")]
+    [InlineData("mergedAtUtc")]
+    [InlineData("pr")]
+    public void FrozenContractWithIncompleteAcceptanceFails(string field)
+    {
+        var contract = FrozenContract();
+        contract["acceptance"]!.AsObject().Remove(field);
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C012");
+    }
+
+    [Fact]
+    public void FrozenContractWithProposedCeilingFails()
+    {
+        var contract = FrozenContract();
+        contract["authorityCapacity"]!["capacity"]!["ceilings"]![0]!["status"] = "PROPOSED";
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C008", "C012");
+    }
+
+    [Fact]
+    public void FrozenContractNotMetFails()
+    {
+        var contract = FrozenContract();
+        contract["gateStatus"] = "NOT-MET";
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C012");
+    }
+
+    [Fact]
+    public void ProposedContractWithAcceptanceRecordFails()
     {
         var contract = Contract();
-        contract["contractVersion"] = "1.1.0";
-        contract["amendmentLog"]!.AsArray().Add(new JsonObject
-        {
-            ["version"] = "1.1.0",
-            ["timestampUtc"] = "2026-10-20T00:00:00Z",
-            ["reviewedInPr"] = 9999,
-            ["afterDecisionBearingInspection"] = false,
-            ["justification"] = "Positive control for the amendment rule.",
-            ["removedRows"] = new JsonArray(),
-        });
-        var violations = EvidenceContractValidator.ValidateContract(contract);
-        Assert.True(violations.Count == 0, Describe(violations));
+        contract["acceptance"] = FrozenContract()["acceptance"]!.DeepClone();
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C012");
+    }
+
+    [Fact]
+    public void UnknownContractStatusFails()
+    {
+        var contract = Contract();
+        contract["status"] = "ACCEPTED-ISH";
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C012");
+    }
+
+    // ------------------------------------------------------------------
+    // Packet hash manifest coverage
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void HashManifestMissingRequiredPacketFileFails()
+    {
+        var manifest = Load("sha256.json");
+        var files = manifest["files"]!.AsObject();
+        // Substitute an unrelated, correctly hashed file for the inventory: coverage must still fail.
+        files.Remove(PacketDir + "/artifact-inventory.json");
+        files["global.json"] = Sha256Lf(Path.Combine(RepoRoot(), "global.json"));
+        AssertViolation(EvidenceContractValidator.ValidatePacketManifest(Contract(), manifest, ContractPath), "H001");
     }
 
     // ------------------------------------------------------------------
@@ -560,7 +780,69 @@ public class EvidenceContractTests
         ["sourceCommit"] = Candidate,
         ["recordedAtUtc"] = "2026-11-01T00:00:00Z",
         ["adjudication"] = "BOUNDED",
+        ["registrationId"] = "R1-0001",
+        ["producer"] = "tests/Calor.Verification.Tests/VerifierRuntimeDifferential",
+        ["oracle"] = new JsonObject { ["id"] = "runtime-differential", ["agrees"] = true },
+        ["translatorSemanticsVersion"] = SemanticsVersion,
+        ["unresolvedFalseProof"] = false,
+        ["openDefectsResolvedBy"] = new JsonArray(9001), // the #1135 defect on this artifact
     };
+
+    private static JsonObject Pair(string pairId, string disposition, bool included) => new()
+    {
+        ["pairId"] = pairId,
+        ["calorPath"] = $"{pairId}/program.calr",
+        ["calorSha256"] = "11",
+        ["csharpPath"] = $"{pairId}/Program.cs",
+        ["csharpSha256"] = "22",
+        ["taskStatementSha256"] = "33",
+        ["inputSet"] = "inputs/v1",
+        ["expectedOutputs"] = "outputs/v1",
+        ["failureBehavior"] = "same exception type on malformed input",
+        ["disposition"] = disposition,
+        ["equivalenceEvidence"] = "differential run 1",
+        ["reviewer"] = "@juanmicrosoft",
+        ["included"] = included,
+    };
+
+    private static JsonObject Amendment() => new()
+    {
+        ["version"] = "1.1.0",
+        ["timestampUtc"] = "2026-10-20T00:00:00Z",
+        ["reviewedInPr"] = 9999,
+        ["afterDecisionBearingInspection"] = false,
+        ["justification"] = "Control fixture for the amendment rule.",
+        ["removedRows"] = new JsonArray(),
+    };
+
+    private static JsonNode AmendedContract(JsonObject amendment)
+    {
+        var contract = Contract();
+        contract["contractVersion"] = amendment["version"]?.DeepClone();
+        contract["amendmentLog"]!.AsArray().Add(amendment);
+        return contract;
+    }
+
+    /// <summary>The committed contract after a well-formed acceptance write-back (lifecycle FROZEN).</summary>
+    private static JsonNode FrozenContract()
+    {
+        var acceptance = Amendment();
+        acceptance["version"] = "1.0.1";
+        acceptance["justification"] = "acceptance write-back";
+        var contract = AmendedContract(acceptance);
+        contract["status"] = "FROZEN";
+        contract["gateStatus"] = "MET";
+        contract["authorityCapacity"]!["capacity"]!["status"] = "ACCEPTED";
+        foreach (var ceiling in contract["authorityCapacity"]!["capacity"]!["ceilings"]!.AsArray())
+            ceiling!["status"] = "ACCEPTED";
+        contract["acceptance"] = new JsonObject
+        {
+            ["mergeCommit"] = "3333333333333333333333333333333333333333",
+            ["mergedAtUtc"] = "2026-10-02T00:00:00Z",
+            ["pr"] = 1466,
+        };
+        return contract;
+    }
 
     private static JsonObject ComparabilityKey() => new()
     {
@@ -584,8 +866,8 @@ public class EvidenceContractTests
             ["comparability"] = ComparabilityKey(),
             ["comparedTo"] = ComparabilityKey(),
             ["pairs"] = new JsonArray(
-                new JsonObject { ["pairId"] = "CsvParser", ["disposition"] = "EQUIVALENT", ["included"] = true },
-                new JsonObject { ["pairId"] = "Other", ["disposition"] = "NOT-EQUIVALENT", ["included"] = false }),
+                Pair("CsvParser", "EQUIVALENT", included: true),
+                Pair("Other", "NOT-EQUIVALENT", included: false)),
         };
         return row;
     }
@@ -594,12 +876,22 @@ public class EvidenceContractTests
     {
         var array = new JsonArray();
         foreach (var row in rows) array.Add(row.DeepClone());
-        return EvidenceContractValidator.ValidateEvidenceRows(Contract(), Inventory(), array, Candidate);
+        return EvidenceContractValidator.ValidateEvidenceRows(Contract(), Inventory(), array, Candidate, SemanticsVersion);
     }
 
-    private static void AssertViolation(IReadOnlyList<ContractViolation> violations, string code)
-        => Assert.True(violations.Any(v => v.Code == code),
+    /// <summary>
+    /// The mutation must produce <paramref name="code"/>, and nothing outside
+    /// <paramref name="code"/> and the explicitly <paramref name="alsoAllowed"/> codes, so a control
+    /// cannot pass because some unrelated rule fired.
+    /// </summary>
+    private static void AssertViolation(IReadOnlyList<ContractViolation> violations, string code, params string[] alsoAllowed)
+    {
+        Assert.True(violations.Any(v => v.Code == code),
             $"expected a {code} violation; got:{Environment.NewLine}{Describe(violations)}");
+        var unexpected = violations.Where(v => v.Code != code && !alsoAllowed.Contains(v.Code)).ToList();
+        Assert.True(unexpected.Count == 0,
+            $"expected only {code}; also got:{Environment.NewLine}{Describe(unexpected)}");
+    }
 
     private static string Describe(IReadOnlyList<ContractViolation> violations)
         => violations.Count == 0 ? "(none)" : string.Join(Environment.NewLine, violations);

@@ -75,9 +75,9 @@ internal static class EvidenceContractValidator
         {
             var token = Str(outcome?["token"]) ?? "?";
             var establishing = EstablishingOutcomeTokens.Contains(token);
-            if (outcome?["mayEstablishClaim"] is not JsonValue est || est.GetValue<bool>() != establishing)
+            if (Bool(outcome?["mayEstablishClaim"]) != establishing)
                 v.Add(new("C004", token, $"mayEstablishClaim must be {establishing.ToString().ToLowerInvariant()}"));
-            if (outcome?["mayRemoveGuard"] is not JsonValue guard || guard.GetValue<bool>() != establishing)
+            if (Bool(outcome?["mayRemoveGuard"]) != establishing)
                 v.Add(new("C004", token, $"mayRemoveGuard must be {establishing.ToString().ToLowerInvariant()}"));
         }
 
@@ -127,17 +127,20 @@ internal static class EvidenceContractValidator
         if (Str(contract["gateStatus"]) is not ("MET" or "NOT-MET"))
             v.Add(new("C008", "gateStatus", "gateStatus must be MET or NOT-MET"));
 
+        v.AddRange(ValidateLifecycle(contract, capacity, ceilings));
+
         var independence = contract["authorityCapacity"]?["independence"];
-        if (independence?["deviation"] is JsonValue dev && dev.GetValue<bool>())
+        var deviation = Bool(independence?["deviation"]);
+        if (deviation == true)
         {
-            if (Str(independence["maxAdjudicationUnderDeviation"]) != "BOUNDED")
+            if (Str(independence?["maxAdjudicationUnderDeviation"]) != "BOUNDED")
                 v.Add(new("C009", "independence", "a recorded independence deviation must cap adjudication at BOUNDED"));
-            if (Array(independence["consequences"]).Count == 0)
+            if (Array(independence?["consequences"]).Count == 0)
                 v.Add(new("C009", "independence", "a recorded independence deviation must state its consequences"));
         }
-        else if (independence?["deviation"] is null)
+        else if (deviation is null)
         {
-            v.Add(new("C009", "independence", "independence.deviation must be recorded explicitly"));
+            v.Add(new("C009", "independence", "independence.deviation must be recorded explicitly as a boolean"));
         }
         foreach (var role in new[] { "decisionAuthority", "amendmentAuthority", "implementationOwners", "reviewAndMerge", "adjudicator" })
         {
@@ -194,24 +197,61 @@ internal static class EvidenceContractValidator
         return false;
     }
 
+    /// <summary>
+    /// C012: the packet is either PROPOSED (as committed in the R0 PR and its merge commit) or FROZEN
+    /// (after the acceptance write-back). FROZEN needs every acceptance field; nothing in between.
+    /// </summary>
+    private static IEnumerable<ContractViolation> ValidateLifecycle(
+        JsonNode contract, JsonNode? capacity, List<JsonNode?> ceilings)
+    {
+        var status = Str(contract["status"]);
+        var acceptance = contract["acceptance"];
+        if (status == "PROPOSED")
+        {
+            if (acceptance is not null)
+                yield return new("C012", "acceptance", "a PROPOSED contract cannot carry an acceptance record");
+            yield break;
+        }
+        if (status != "FROZEN")
+        {
+            yield return new("C012", "status", $"status '{status}' is not PROPOSED or FROZEN");
+            yield break;
+        }
+        if (Str(contract["gateStatus"]) != "MET")
+            yield return new("C012", "gateStatus", "a FROZEN contract records R0 as MET");
+        if (Str(capacity?["status"]) != "ACCEPTED" || ceilings.Any(c => Str(c?["status"]) != "ACCEPTED"))
+            yield return new("C012", "capacity", "a FROZEN contract needs capacity and every ceiling ACCEPTED");
+        if (!IsFullSha(Str(acceptance?["mergeCommit"])))
+            yield return new("C012", "acceptance", "acceptance.mergeCommit must be the full SHA of the R0 merge on main");
+        if (!IsUtcTimestamp(Str(acceptance?["mergedAtUtc"])))
+            yield return new("C012", "acceptance", "acceptance.mergedAtUtc must be a UTC timestamp");
+        if (Int(acceptance?["pr"]) is null)
+            yield return new("C012", "acceptance", "acceptance.pr must name the merged R0 pull request");
+    }
+
     private static IEnumerable<ContractViolation> ValidateAmendments(JsonNode contract)
     {
         var log = Array(contract["amendmentLog"]);
         var expectedVersion = "1.0.0";
+        var previous = new Version(1, 0, 0);
         foreach (var entry in log)
         {
             var version = Str(entry?["version"]);
             var subject = $"amendment {version ?? "?"}";
             if (string.IsNullOrWhiteSpace(version))
                 yield return new("C010", subject, "amendment has no version");
+            else if (!TryParseSemVer(version, out var parsed) || parsed <= previous)
+                yield return new("C010", subject, $"amendment version must be a MAJOR.MINOR.PATCH strictly greater than {previous}");
+            else
+                previous = parsed;
             if (string.IsNullOrWhiteSpace(Str(entry?["justification"])))
                 yield return new("C010", subject, "amendment has no justification");
             if (Int(entry?["reviewedInPr"]) is null)
                 yield return new("C010", subject, "amendment names no reviewed PR");
             if (!IsUtcTimestamp(Str(entry?["timestampUtc"])))
                 yield return new("C010", subject, "amendment has no UTC timestamp");
-            if (entry?["afterDecisionBearingInspection"] is not JsonValue)
-                yield return new("C010", subject, "amendment must state whether it follows decision-bearing inspection");
+            if (Bool(entry?["afterDecisionBearingInspection"]) is null)
+                yield return new("C010", subject, "amendment must state as a boolean whether it follows decision-bearing inspection");
             foreach (var removed in Array(entry?["removedRows"]))
             {
                 if (string.IsNullOrWhiteSpace(Str(removed?["lastStatus"])))
@@ -319,9 +359,12 @@ internal static class EvidenceContractValidator
     /// <summary>
     /// Validates evidence rows against the frozen contract. <paramref name="candidateCommit"/> is the
     /// #1423 frozen candidate; null means no candidate is frozen, so nothing can be established.
+    /// <paramref name="candidateSemanticsVersion"/> is that candidate's
+    /// <c>ContractTranslator.SemanticsVersion</c>; null means it is unknown, so nothing can be established.
     /// </summary>
     public static IReadOnlyList<ContractViolation> ValidateEvidenceRows(
-        JsonNode contract, JsonNode inventory, JsonArray rows, string? candidateCommit)
+        JsonNode contract, JsonNode inventory, JsonArray rows, string? candidateCommit,
+        string? candidateSemanticsVersion)
     {
         var v = new List<ContractViolation>();
 
@@ -335,9 +378,11 @@ internal static class EvidenceContractValidator
         var adjudications = Array(contract["adjudicationOutcomes"]).Select(Str).OfType<string>().ToHashSet();
         var pairDispositions = Array(contract["benchmarkEquivalence"]?["pairDispositions"]).Select(Str).OfType<string>().ToHashSet();
         var keyFields = Array(contract["benchmarkEquivalence"]?["comparabilityKey"]).Select(Str).OfType<string>().ToList();
+        var pairFields = Array(contract["benchmarkEquivalence"]?["pairRowRequiredFields"]).Select(Str).OfType<string>().ToList();
         var samplingUnit = Str(contract["benchmarkEquivalence"]?["samplingUnit"]);
         var cutoff = ParseUtc(Str(contract["cutoff"]?["timestampUtc"]));
-        var reducedIndependence = contract["authorityCapacity"]?["independence"]?["deviation"] is JsonValue d && d.GetValue<bool>();
+        // Fail closed: anything other than an explicit false is treated as a standing deviation.
+        var reducedIndependence = Bool(contract["authorityCapacity"]?["independence"]?["deviation"]) != false;
 
         foreach (var row in rows)
         {
@@ -366,28 +411,41 @@ internal static class EvidenceContractValidator
                     v.Add(new("E011", id, "SUPPORTED is unavailable under the recorded independence deviation; the cap is BOUNDED"));
             }
 
-            v.AddRange(ValidateBenchmark(row, id, keyFields, pairDispositions, samplingUnit));
+            v.AddRange(ValidateBenchmark(row, id, keyFields, pairFields, pairDispositions, samplingUnit));
 
             if (counted != "established")
                 continue;
 
-            if (!isOutcome || outcomes[outcome!]["mayEstablishClaim"] is not JsonValue est || !est.GetValue<bool>())
+            if (!isOutcome || Bool(outcomes[outcome!]["mayEstablishClaim"]) != true)
                 v.Add(new("E002", id, $"outcome '{outcome}' cannot be counted as established"));
             if (outcome is "Proven" or "Discharged")
             {
-                if (row["vacuous"] is not JsonValue vacuous)
+                var vacuous = Bool(row["vacuous"]);
+                if (vacuous is null)
                     v.Add(new("E003", id, "an established proof must state vacuous=false explicitly"));
-                else if (vacuous.GetValue<bool>())
+                else if (vacuous.Value)
                     v.Add(new("E003", id, "a vacuous proof is never established"));
             }
-            if (outcome == "Discharged" && (row["nonVacuityChecked"] is not JsonValue nvc || !nvc.GetValue<bool>()))
-                v.Add(new("E003", id, "a Discharged obligation establishes only after a registered non-vacuity check"));
+            if (outcome == "Discharged"
+                && (string.IsNullOrWhiteSpace(Str(row["nonVacuityCheck"]?["id"]))
+                    || Str(row["nonVacuityCheck"]?["result"]) != "passed"))
+                v.Add(new("E003", id, "a Discharged obligation establishes only after a registered non-vacuity check {id, result: passed}"));
+
+            v.AddRange(ValidateEstablishmentPrerequisites(row, id, candidateSemanticsVersion));
 
             var artifactId = Str(row["artifact"]);
             if (artifactId is null || !artifacts.TryGetValue(artifactId, out var artifact))
                 v.Add(new("E004", id, $"established row cites unknown artifact '{artifactId}'"));
-            else if (Str(artifact["classification"]) != "authoritative")
-                v.Add(new("E005", id, $"artifact '{artifactId}' is {Str(artifact["classification"])}, not authoritative"));
+            else
+            {
+                if (Str(artifact["classification"]) != "authoritative")
+                    v.Add(new("E005", id, $"artifact '{artifactId}' is {Str(artifact["classification"])}, not authoritative"));
+                var openDefects = Array(artifact["openDefects"]).Count;
+                var resolvedBy = Array(row["openDefectsResolvedBy"]).Select(Int).ToList();
+                if (resolvedBy.Any(pr => pr is null) || resolvedBy.Count < openDefects)
+                    v.Add(new("E014", id,
+                        $"artifact '{artifactId}' has {openDefects} open defect(s) at the cutoff; the row names {resolvedBy.Count} resolving PR(s)"));
+            }
 
             if (candidateCommit is null)
                 v.Add(new("E006", id, "no frozen candidate (#1423); nothing can be established yet"));
@@ -404,8 +462,30 @@ internal static class EvidenceContractValidator
         return v;
     }
 
+    /// <summary>E013: the §4 establishment conditions the row itself must evidence.</summary>
+    private static IEnumerable<ContractViolation> ValidateEstablishmentPrerequisites(
+        JsonNode row, string id, string? candidateSemanticsVersion)
+    {
+        if (string.IsNullOrWhiteSpace(Str(row["registrationId"])))
+            yield return new("E013", id, "established row names no registration entry");
+        if (string.IsNullOrWhiteSpace(Str(row["producer"])))
+            yield return new("E013", id, "established row names no registered producer");
+        if (string.IsNullOrWhiteSpace(Str(row["oracle"]?["id"])))
+            yield return new("E013", id, "established row names no independent oracle");
+        else if (Bool(row["oracle"]?["agrees"]) != true)
+            yield return new("E013", id, "the independent oracle does not agree (or its verdict is absent)");
+        if (candidateSemanticsVersion is null)
+            yield return new("E013", id, "the candidate's translator semantics version is unknown");
+        else if (!string.Equals(Str(row["translatorSemanticsVersion"]), candidateSemanticsVersion, StringComparison.Ordinal))
+            yield return new("E013", id,
+                $"translatorSemanticsVersion '{Str(row["translatorSemanticsVersion"])}' differs from the candidate's '{candidateSemanticsVersion}'");
+        if (Bool(row["unresolvedFalseProof"]) != false)
+            yield return new("E013", id, "the row must state unresolvedFalseProof=false; an unresolved or unstated false proof blocks establishment");
+    }
+
     private static IEnumerable<ContractViolation> ValidateBenchmark(
-        JsonNode row, string id, List<string> keyFields, HashSet<string> dispositions, string? samplingUnit)
+        JsonNode row, string id, List<string> keyFields, List<string> pairFields,
+        HashSet<string> dispositions, string? samplingUnit)
     {
         var bench = row["benchmark"];
         if (bench is null)
@@ -414,29 +494,58 @@ internal static class EvidenceContractValidator
         if (Str(bench["samplingUnit"]) != samplingUnit)
             yield return new("E010", id, $"sampling unit '{Str(bench["samplingUnit"])}' is not the frozen '{samplingUnit}'");
 
-        foreach (var pair in Array(bench["pairs"]))
+        var pairs = Array(bench["pairs"]);
+        if (pairs.Count == 0)
+            yield return new("E009", id, "benchmark row has an empty pair denominator");
+        foreach (var pair in pairs)
         {
             var pairId = Str(pair?["pairId"]) ?? "?";
+            foreach (var field in pairFields.Where(f => IsBlank(pair?[f])))
+                yield return new("E009", id, $"pair {pairId} is missing required field '{field}'");
+            var included = Bool(pair?["included"]);
+            if (included is null)
+                yield return new("E009", id, $"pair {pairId} must state included as a boolean");
             var disposition = Str(pair?["disposition"]);
             if (disposition is null || !dispositions.Contains(disposition))
                 yield return new("E009", id, $"pair {pairId} has unknown disposition '{disposition}'");
-            else if (pair?["included"] is JsonValue inc && inc.GetValue<bool>() && disposition != "EQUIVALENT")
+            else if (included == true && disposition != "EQUIVALENT")
                 yield return new("E009", id, $"pair {pairId} is {disposition} but included; only EQUIVALENT pairs enter metrics");
         }
+
+        // The key is required on every benchmark row, whether or not it is compared to an earlier one.
+        var key = bench["comparability"];
+        foreach (var field in keyFields.Where(f => IsBlank(key?[f])))
+            yield return new("E008", id, $"comparability field '{field}' is missing; incomparable");
 
         var comparedTo = bench["comparedTo"];
         if (comparedTo is null)
             yield break;
-        var key = bench["comparability"];
         foreach (var field in keyFields)
         {
             var mine = key?[field]?.ToJsonString();
             var theirs = comparedTo[field]?.ToJsonString();
-            if (mine is null || theirs is null)
-                yield return new("E008", id, $"comparability field '{field}' is missing; incomparable");
-            else if (mine != theirs)
+            if (theirs is null)
+                yield return new("E008", id, $"compared-to result lacks comparability field '{field}'; incomparable");
+            else if (mine is not null && mine != theirs)
                 yield return new("E008", id, $"comparability field '{field}' differs ({theirs} -> {mine}); incomparable");
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Packet hash manifest
+    // ------------------------------------------------------------------
+
+    /// <summary>H001: sha256.json must cover the contract document, contract.json, and the inventory by name.</summary>
+    public static IReadOnlyList<ContractViolation> ValidatePacketManifest(JsonNode contract, JsonNode manifest, string contractPath)
+    {
+        var v = new List<ContractViolation>();
+        var files = Keys(manifest["files"]);
+        foreach (var required in new[] { Str(contract["document"]), contractPath, Str(contract["inventory"]) })
+        {
+            if (required is null || !files.Contains(required))
+                v.Add(new("H001", "sha256.json", $"hash manifest does not cover required packet file '{required}'"));
+        }
+        return v;
     }
 
     // ------------------------------------------------------------------
@@ -445,6 +554,30 @@ internal static class EvidenceContractValidator
 
     private static string? Str(JsonNode? node) =>
         node is JsonValue value && value.TryGetValue<string>(out var s) ? s : null;
+
+    /// <summary>A JSON boolean, or null for anything else (absent, string, number): never a default.</summary>
+    private static bool? Bool(JsonNode? node) =>
+        node is JsonValue value && value.TryGetValue<bool>(out var b) ? b : null;
+
+    private static bool IsBlank(JsonNode? node) =>
+        node is null || (node is JsonValue value && value.TryGetValue<string>(out var s) && string.IsNullOrWhiteSpace(s));
+
+    private static bool TryParseSemVer(string text, out Version version)
+    {
+        version = new Version(0, 0, 0);
+        var parts = text.Split('.');
+        var numbers = new int[3];
+        if (parts.Length != 3)
+            return false;
+        for (var i = 0; i < 3; i++)
+        {
+            if (parts[i].Length == 0 || !parts[i].All(char.IsAsciiDigit)
+                || !int.TryParse(parts[i], NumberStyles.None, CultureInfo.InvariantCulture, out numbers[i]))
+                return false;
+        }
+        version = new Version(numbers[0], numbers[1], numbers[2]);
+        return true;
+    }
 
     private static int? Int(JsonNode? node) =>
         node is JsonValue value && value.TryGetValue<int>(out var i) ? i : null;

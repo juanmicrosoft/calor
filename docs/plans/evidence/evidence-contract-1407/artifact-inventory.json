@@ -53,9 +53,9 @@
     {
       "id": "release-test-suites",
       "kind": "verification",
-      "paths": ["tests/Calor.Compiler.Tests", "tests/Calor.Verification.Tests", "tests/Calor.Conversion.Tests", "tests/Calor.Enforcement.Tests", "tests/Calor.Semantics.Tests", "tests/Calor.RoundTrip.Harness.Tests"],
+      "paths": ["tests/Calor.Compiler.Tests", "tests/Calor.Conversion.Tests", "tests/Calor.Enforcement.Tests", "tests/Calor.Evaluation", "tests/Calor.Experimental.Tests", "tests/Calor.Ids.Tests", "tests/Calor.ILAnalysis.Tests", "tests/Calor.LanguageServer.Tests", "tests/Calor.Performance.Tests", "tests/Calor.RoundTrip.Harness.Tests", "tests/Calor.Semantics.Tests", "tests/Calor.Tasks.Tests", "tests/Calor.Verification.Tests"],
       "classification": "authoritative",
-      "reason": "Committed release-critical test sources named in eng/test-manifest.json, including the #1311 entry-point regression classes.",
+      "reason": "Committed test sources of all 13 projects marked releaseCritical in eng/test-manifest.json at the cutoff, including the #1311 entry-point regression classes.",
       "producer": "Repository source",
       "consumers": ["test.yml remaining-tests matrix", "publish-nuget.yml test matrix", "#1311", "#1424"],
       "derivedFrom": [],
@@ -239,6 +239,44 @@
       "storage": { "kind": "git", "retention": "permanent" },
       "owningIssues": [1410],
       "openDefects": ["The v0.22.0 release-event publish run 34999741476 failed in release-quality ('performance test run failed'), so no 0.22.0 package was published."]
+    },
+    {
+      "id": "release-quality-reports",
+      "kind": "verification",
+      "paths": ["Actions artifact release-quality-reports (publish-nuget.yml release-quality, 90 days): artifacts/coverage/, artifacts/mutation/, artifacts/performance/, artifacts/flake/, artifacts/migration/"],
+      "classification": "derived",
+      "reason": "Coverage, mutation, performance, and 100-run flake ratchet results plus the blocking round-trip run; they gate NuGet publication through publish needs: release-quality. The migration conversion scorecard in the same upload is excluded (see excludedFromScope).",
+      "producer": "publish-nuget.yml release-quality job: scripts/check_test_quality.py, scripts/check_coverage.py, scripts/run_mutation_gate.py, scripts/run_performance_gate.py, scripts/run_flake_gate.py --runs 100, tools/Calor.RoundTrip.Harness run --all",
+      "consumers": ["publish-nuget.yml publish job (needs: release-quality)", "#1410", "#1424"],
+      "derivedFrom": ["quality-ratchet-baselines", "release-test-suites", "test-manifest", "corpus-submodules"],
+      "sourceRevisions": "The workflow's checkout commit (github.sha) with recursive submodules and fetch-depth 0.",
+      "configuration": "Ratchet floors in eng/coverage-baselines.json, eng/mutation-baselines.json, eng/performance-baselines.json; 100 flake trials; job timeout 60 minutes.",
+      "seeds": "Z3 random_seed 42 for verifier suites; flake and performance runs are wall-clock measurements and unseeded.",
+      "environment": "ubuntu-latest shared runner; setup-dotnet 10.0.x and 8.0.x (floating); Z3 4.15.7.",
+      "regeneration": { "command": "Re-run publish-nuget.yml on the commit, or locally: the coverage collection loop then python3 scripts/check_coverage.py; python3 scripts/run_mutation_gate.py; python3 scripts/run_performance_gate.py; python3 scripts/run_flake_gate.py --runs 100" },
+      "provenance": { "identity": "actions-artifact", "detail": "Run ID plus github.sha; expires after 90 days. #1424 retains every attempt durably, including failed ones such as run 34999741476." },
+      "storage": { "kind": "actions-artifact", "retention": "90 days" },
+      "owningIssues": [1410, 1424],
+      "openDefects": ["The failing report of release run 34999741476 expires with the Actions artifact and is not retained durably."]
+    },
+    {
+      "id": "sdk-consumer-check",
+      "kind": "verification",
+      "paths": ["publish-nuget.yml sdk-consumer job conclusion per RID (linux-x64, linux-arm64, osx-arm64, win-x64, win-arm64); no uploaded artifact"],
+      "classification": "derived",
+      "reason": "Restore, build, and test of a template consumer against the packed Calor.Sdk from a local feed; gates NuGet publication through publish needs: sdk-consumer.",
+      "producer": ".github/scripts/test-sdk-package.sh (CALOR_SDK_REQUIRE_ALL_RIDS=1)",
+      "consumers": ["publish-nuget.yml publish job (needs: sdk-consumer)", "#1410", "#1424"],
+      "derivedFrom": ["release-test-suites", "z3-release-binaries"],
+      "sourceRevisions": "The workflow's checkout commit (github.sha); CALOR_SDK_VERSION from the dispatch input when given.",
+      "configuration": "Five-RID matrix, fail-fast false.",
+      "seeds": "Not applicable.",
+      "environment": "ubuntu-latest, ubuntu-24.04-arm, macos-14, windows-latest, windows-11-arm; setup-dotnet 10.0.x (floating).",
+      "regeneration": { "command": "CALOR_SDK_REQUIRE_ALL_RIDS=1 CALOR_SDK_EXPECTED_RID=<rid> bash .github/scripts/test-sdk-package.sh" },
+      "provenance": { "identity": "none", "detail": "Only the job conclusion and log exist; no result file is produced." },
+      "storage": { "kind": "actions-log", "retention": "Actions run-log retention" },
+      "owningIssues": [1410, 1424],
+      "openDefects": ["No result record is emitted, so a release cannot later show which consumer results it relied on (#1410)."]
     },
     {
       "id": "tier1-verification",
@@ -608,7 +646,7 @@
     { "path": "bench/real-scale/", "reason": "Synthetic demonstration bundles; not published as a measurement." },
     { "path": "bench/ILAnalysisBench, bench/IncrementalBuildBench, bench/mcp", "reason": "Performance and tooling benches; no release claim." },
     { "path": "benchmarks/", "reason": "Example .calr programs (arithmetic, loops, null-safety, security); no workflow consumes them." },
-    { "path": "test.yml conversion-scorecard artifact", "reason": "Converter scorecard; not a 0.24 proof or publication surface." },
+    { "path": "test.yml conversion-scorecard artifact and artifacts/migration/conversion-scorecard inside release-quality-reports", "reason": "Converter scorecard; generated without any threshold checked against it, and not a 0.24 proof or publication surface." },
     { "path": "performance.yml performance-report artifact", "reason": "Nightly wall-clock signal; the baselines it reads are inventoried as quality-ratchet-baselines." }
   ]
 }

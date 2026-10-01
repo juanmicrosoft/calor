@@ -7,6 +7,12 @@
   "status": "PROPOSED",
   "statusNote": "Proposed in the R0 pull request. The contract is frozen at the commit that merges it to main. Capacity ceilings are PROPOSED until the maintainer accepts them by merging; the R0 gate is NOT MET before that merge.",
   "gateStatus": "NOT-MET",
+  "lifecycle": {
+    "states": ["PROPOSED", "FROZEN"],
+    "proposed": "status PROPOSED, gateStatus NOT-MET, capacity and every ceiling PROPOSED, no acceptance record. This is the state committed in the R0 pull request and in the merge commit that freezes it.",
+    "acceptanceWriteBack": "The first commit after the R0 merge is an acceptance write-back PR. It records amendment version 1.0.1 (afterDecisionBearingInspection false, justification 'acceptance write-back') and an acceptance object { mergeCommit: full SHA of the R0 merge on main, mergedAtUtc, pr }, sets status FROZEN, gateStatus MET, capacity and every ceiling ACCEPTED with the merged values, and updates sha256.json. It changes no other field. The merge commit is the freeze identity; the write-back only records it.",
+    "frozen": "status FROZEN requires gateStatus MET, capacity and every ceiling ACCEPTED, and a complete acceptance record (validator C012). R0 is MET only in this state, and no downstream 0.24 gate starts before the write-back merges."
+  },
   "document": "docs/plans/v0.24-evidence-contract.md",
   "inventory": "docs/plans/evidence/evidence-contract-1407/artifact-inventory.json",
   "enforcedBy": "tests/Calor.Compiler.Tests/EvidenceContract/EvidenceContractTests.cs",
@@ -81,7 +87,7 @@
   ],
 
   "outcomeVocabulary": {
-    "source": "src/Calor.Compiler/Verification/ProofOutcome.cs (ProofStatus, ProofOutcome.IsVacuous, ToContractStatus, ToObligationStatus, ToImplicationStatus), Verification/Z3/Z3ImplicationProver.cs (ContractVerificationStatus, ImplicationStatus), Verification/Obligations/ObligationTracker.cs (ObligationStatus), CodeGen/CSharpEmitter.cs (guard elision). Verification/Z3/KInduction/KInductionProver.cs (KInductionStatus) is mapped for completeness; at the cutoff it has no production consumer outside Verification/Z3/KInduction.",
+    "source": "src/Calor.Compiler/Verification/ProofOutcome.cs (ProofStatus, ProofOutcome.IsVacuous, ToContractStatus, ToObligationStatus, ToImplicationStatus), Verification/Z3/Z3ImplicationProver.cs (ContractVerificationStatus, ImplicationStatus), Verification/Obligations/ObligationTracker.cs (ObligationStatus), CodeGen/CSharpEmitter.cs (guard elision). Verification/Z3/KInduction/KInductionProver.cs (KInductionStatus) is also mapped: when VerificationAnalysisOptions.EnableKInduction is set (off by default; on in VerificationAnalysisOptions.Thorough), Analysis/VerificationAnalysisPass.cs runs LoopAnalysisRunner during compilation and a Proven result becomes a Calor0950 LoopInvariantSynthesized info diagnostic. That path emits diagnostics only; it removes no runtime guard. The legacy enums are lossy (several ProofStatus values map to one legacy value), so every code status is named by at least one token, and consumers read ProofOutcome rather than the legacy enum to tell Assumed from TimeoutOrUnavailable.",
     "outcomes": [
       {
         "token": "Proven",
@@ -152,7 +158,19 @@
     ],
     "nonOutcomeRowStatuses": ["skipped", "flaky", "crashed", "invalid", "not-investigated", "unclassified", "incomparable", "historical", "stale"],
     "rowStatusRule": "Every non-outcome row status is not established. An unknown token fails validation; it is never mapped to a known status.",
-    "falseUnconditionalProof": "A row whose outcome is Proven or Discharged (non-vacuous) while an independent oracle exhibits a concrete modeled input that violates the claimed property. It is release-blocking for the affected modeled form until fixed or visibly demoted. Retaining a runtime guard does not make it acceptable."
+    "falseUnconditionalProof": "A row whose outcome is Proven or Discharged (non-vacuous) while an independent oracle exhibits a concrete modeled input that violates the claimed property. It is release-blocking for the affected modeled form until fixed or visibly demoted. Retaining a runtime guard does not make it acceptable.",
+    "establishedRowFields": {
+      "rule": "A row counted established must carry every field below; an absent field is a violation, never a default (validator E013/E014).",
+      "fields": [
+        "registrationId: the #1419 (or owning gate) registration entry that names the row's producer and case.",
+        "producer: the registered producer that emitted the outcome.",
+        "oracle: { id, agrees: true } — the independent behavioral oracle and its verdict.",
+        "translatorSemanticsVersion: equal to the frozen candidate's ContractTranslator.SemanticsVersion.",
+        "unresolvedFalseProof: false — no unresolved #1413 false unconditional proof for the row's modeled form.",
+        "nonVacuityCheck: { id, result: 'passed' } — required for Discharged.",
+        "openDefectsResolvedBy: one merged PR number per open defect the inventory records for the cited artifact."
+      ]
+    }
   },
 
   "classifications": {
@@ -170,6 +188,7 @@
 
   "benchmarkEquivalence": {
     "consumers": [1276, 1422, 1424, 1408],
+    "registrationRule": "Before #1276 repairs any pair, executes any differential check, or recomputes any metric, it merges a versioned benchmark registration that pins: the complete initial pair denominator (every pair at the cutoff, by path and SHA-256), each pair's task statement, input set, expected outputs, and failure behavior, the differential oracle and its command, the metric set and metric implementation version, the aggregation and interval method, and every pre-registered exclusion with its reason. Dispositions are assigned only after that merge, by executing the registered oracle. Any later change to a pinned field is a #1407 amendment; a pair dropped or re-dispositioned after registration stays reported with its previous disposition.",
     "pairDispositions": ["EQUIVALENT", "NOT-EQUIVALENT", "UNCLASSIFIED", "EXCLUDED-PRE-REGISTERED"],
     "pairRowRequiredFields": ["pairId", "calorPath", "calorSha256", "csharpPath", "csharpSha256", "taskStatementSha256", "inputSet", "expectedOutputs", "failureBehavior", "disposition", "equivalenceEvidence", "reviewer"],
     "equivalenceDefinition": "Both sides implement the same task statement, accept the same inputs, produce the same outputs, and fail on the same inputs in the same observable way. Evidence is an executed differential check, not inspection of names.",
@@ -234,8 +253,22 @@
       "#1311 reaches its timebox: stop, publish the report; unreached rows are not-investigated; an unreached row registered as release-critical is BLOCKED.",
       "A false unconditional proof cannot be fixed or demoted within capacity: MILESTONE-FAILED.",
       "The frozen candidate changes after #1423: all downstream evidence is invalid; return to #1423.",
-      "Independent adjudication as defined in authorityCapacity is unavailable: MILESTONE-FAILED or a self-adjudicated non-release record."
-    ]
+      "Adjudication as defined in authorityCapacity (the named adjudicator under the recorded independence deviation) is unavailable: MILESTONE-FAILED or a self-adjudicated non-release record."
+    ],
+    "terminalSuccess": {
+      "rule": "#1408 records MILESTONE-SUCCEEDED only when every condition below holds; otherwise it records MILESTONE-FAILED. #1408 does not add, drop, or weaken a condition; a change is a #1407 amendment made before the #1424 raw-artifact freeze.",
+      "conditions": [
+        "Every child in children other than #1408 itself is closed with its closureEvidence.",
+        "Every #1419-registered release-critical row, for B1 and for N1, has an outcome or row status; none is BLOCKED, not-investigated, or unclassified.",
+        "Zero unresolved false unconditional proofs: every one is fixed or visibly demoted under #1413.",
+        "Every #1413 finding has a findingDisposition other than NOT-INVESTIGATED or MILESTONE-FAILED.",
+        "Every authoritative and derived inventory artifact was regenerated by #1424 on the frozen #1423 candidate, with no stale input.",
+        "Every release surface in releasePath consumes one matching adjudication identity (#1410 negative tests pass).",
+        "Every adjudication row records independence = reduced-maintainer-adjudicated and no row is SUPPORTED while the deviation stands.",
+        "No capacity ceiling was exceeded without a merged amendment raising it."
+      ],
+      "underDeviation": "Under the recorded independence deviation a MILESTONE-SUCCEEDED record carries adjudicationIndependence = reduced and states that the epic's 'independently adjudicated' outcome is not met. It authorizes no claim of independent adjudication or verification."
+    }
   },
 
   "authorityCapacity": {
@@ -284,19 +317,19 @@
   },
 
   "children": [
-    { "issue": 1419, "gate": "R1", "dependsOn": [1407], "consumes": ["cutoff", "baselines", "outcome-vocabulary", "authority-capacity", "failure-amendment-stopping", "retrospective"], "closureEvidence": "Merged versioned registration and complete initial row manifest (baseline B1, entry points, case IDs, source hashes, oracle, controls, row classes, release-critical marks, timebox and compute within s1 ceilings) committed before any decision-bearing sweep result." },
-    { "issue": 1311, "gate": "S1", "dependsOn": [1419], "consumes": ["baselines", "outcome-vocabulary", "authority-capacity", "failure-amendment-stopping"], "closureEvidence": "Every registered row executed or recorded not-investigated within the s1 ceilings; archived probes, independent-oracle results, controls, and a reproducible report, including zero-finding and timebox-stopped outcomes." },
+    { "issue": 1419, "gate": "R1", "dependsOn": [1407], "consumes": ["cutoff", "baselines", "outcome-vocabulary", "authority-capacity", "failure-amendment-stopping", "retrospective"], "closureEvidence": "Merged versioned registration and a complete initial row manifest for each investigated baseline, B1 and N1 as separate rows that are never pooled (entry points, case IDs, source hashes, oracle, controls, row classes, release-critical marks, timebox and compute within s1 ceilings) committed before any decision-bearing sweep result." },
+    { "issue": 1311, "gate": "S1", "dependsOn": [1419], "consumes": ["baselines", "outcome-vocabulary", "authority-capacity", "failure-amendment-stopping"], "closureEvidence": "Every registered row for both B1 and N1 executed or recorded not-investigated within the s1 ceilings, which cover the combined B1 and N1 work; archived probes, independent-oracle results, controls, and a reproducible report, including zero-finding and timebox-stopped outcomes." },
     { "issue": 1413, "gate": "S2", "dependsOn": [1311], "consumes": ["outcome-vocabulary", "failure-amendment-stopping", "authority-capacity"], "closureEvidence": "One reviewed disposition per row and witness from findingDispositions; accepted repairs within s2 ceilings attached to #1409 and blocking #1423; no unresolved false unconditional proof keeps guard-removal or claim eligibility." },
     { "issue": 1420, "gate": "G1", "dependsOn": [1407], "consumes": ["artifact-inventory", "retrospective"], "closureEvidence": "Consumer and RID inventory; no unowned Z3 seeding workaround; no implicit network download; discriminating fresh-checkout tests for absent, wrong, and propagated assets." },
     { "issue": 1421, "gate": "G2", "dependsOn": [1407, 1420], "consumes": ["outcome-vocabulary", "authority-capacity", "failure-amendment-stopping"], "closureEvidence": "Merged machine-readable determinism protocol (case IDs, environment pins, run count, timeouts, retry and failure rules) within the determinism-compute ceiling, before decision-bearing runs." },
     { "issue": 1135, "gate": "G3", "dependsOn": [1420, 1421], "consumes": ["outcome-vocabulary", "artifact-inventory"], "closureEvidence": "Repaired oracle executed under the #1421 protocol with every attempt retained and agreement under the frozen failure rule." },
     { "issue": 1241, "gate": "G4", "dependsOn": [1407, 1420], "consumes": ["artifact-inventory", "outcome-vocabulary"], "closureEvidence": "Checkout-pinned Tier 2 run with explicit positive/negative/multifile expectations, no build-output duplicates, no empty advertised selections, AST-roundtrip claims matching the work performed, and negative self-tests." },
     { "issue": 1417, "gate": "P1", "dependsOn": [1407], "consumes": ["provenance-identity", "artifact-inventory", "retrospective"], "closureEvidence": "Fresh-clone resolution of every authoritative identity after squash merge; failing tests for branch-only replacement, false identical-tree claims, and shallow-clone skips; historical stamps unchanged." },
-    { "issue": 1276, "gate": "B1", "dependsOn": [1407], "consumes": ["benchmark-equivalence", "artifact-inventory", "retrospective"], "closureEvidence": "Content-addressed pair manifest with every benchmarkEquivalence pair field and disposition, declared sampling unit and population, and historical artifacts left historical." },
+    { "issue": 1276, "gate": "B1", "dependsOn": [1407], "consumes": ["benchmark-equivalence", "artifact-inventory", "retrospective"], "closureEvidence": "A benchmark registration per benchmarkEquivalence.registrationRule merged before any repair, differential check, or recomputation; then a content-addressed pair manifest with every benchmarkEquivalence pair field and a disposition produced by the registered oracle for every registered pair, the declared sampling unit and population, and historical artifacts left historical." },
     { "issue": 1422, "gate": "B2", "dependsOn": [1276, 1417], "consumes": ["benchmark-equivalence", "provenance-identity", "release-path", "retrospective"], "closureEvidence": "End-to-end tests: refusal fails the workflow and leaves no publication PR; unclassified or changed pairs block headlines; methodology change needs a prior amendment, not a workflow input." },
     { "issue": 1410, "gate": "R2", "dependsOn": [1407], "consumes": ["release-path", "provenance-identity", "authority-capacity"], "closureEvidence": "Negative tests proving release, package, website, notes, and benchmark publication cannot proceed without one matching successful adjudication identity; GitHub release created only after adjudication." },
     { "issue": 1423, "gate": "C1", "dependsOn": [1413, 1420, 1135, 1241, 1417, 1276, 1422, 1410], "consumes": ["artifact-inventory", "provenance-identity", "failure-amendment-stopping"], "closureEvidence": "Committed immutable candidate manifest including the SHA-256 of this contract packet (sha256.json) and its amendment log; tested invalidation classifier." },
-    { "issue": 1424, "gate": "C2", "dependsOn": [1423], "consumes": ["artifact-inventory", "outcome-vocabulary", "authority-capacity"], "closureEvidence": "Every authoritative inventory artifact regenerated on the candidate within the regeneration ceilings, all attempts retained in durable storage, fresh-clone reproduction of the deterministic subset." },
+    { "issue": 1424, "gate": "C2", "dependsOn": [1423], "consumes": ["artifact-inventory", "outcome-vocabulary", "authority-capacity"], "closureEvidence": "Every authoritative and derived inventory artifact regenerated on the candidate within the regeneration ceilings, all attempts retained in durable storage, fresh-clone reproduction of the deterministic subset." },
     { "issue": 1408, "gate": "A1", "dependsOn": [1424, 1410], "consumes": ["outcome-vocabulary", "authority-capacity", "failure-amendment-stopping", "benchmark-equivalence", "release-path"], "closureEvidence": "One adjudication outcome per registered artifact and claim, capped at BOUNDED under the recorded independence deviation, and a machine-readable terminal record." }
   ],
 
