@@ -10,5 +10,6 @@ new row that cites the row it corrects.
 
 | # | Date (UTC) | Gate | Round | Tool / version | Model | Tokens | Marginal USD | Billing basis | Notes |
 |---|---|---|---|---|---|---|---|---|---|
+| 1 | 2026-10-01 | R0 | 1 | Codex CLI 0.159.2 (`codex exec`, read-only) | gpt-6.1-sol | 35,454 | 0.00 | ChatGPT subscription (excluded) | [round-1-codex.md](reviews/R0/round-1-codex.md) |
 
 **Cumulative marginal USD:** 0.00
