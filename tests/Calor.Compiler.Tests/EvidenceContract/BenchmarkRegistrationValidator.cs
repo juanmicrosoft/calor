@@ -25,11 +25,15 @@ internal static partial class EvidenceContractValidator
     /// <param name="packet">Packet file name to its committed text (the five JSON files and sha256.json).</param>
     /// <param name="readRepoFile">Reads a repository-relative file's bytes, or null when it is absent.</param>
     /// <param name="corpusFiles">Repository-relative paths of every file now under the corpus root.</param>
+    /// <param name="pinnedSeal">SHA-256 of the registered sha256.json; null skips B008 (for single-rule controls).</param>
     public static IReadOnlyList<ContractViolation> ValidateBenchmarkRegistration(
         JsonNode contract, IReadOnlyDictionary<string, string> packet,
-        Func<string, byte[]?> readRepoFile, IReadOnlyCollection<string> corpusFiles)
+        Func<string, byte[]?> readRepoFile, IReadOnlyCollection<string> corpusFiles, string? pinnedSeal)
     {
         var v = new List<ContractViolation>();
+        // B008: a regenerated, internally consistent packet is still a different registration.
+        if (pinnedSeal is not null && TextSha256(packet["sha256.json"]) != pinnedSeal)
+            v.Add(new("B008", "sha256.json", "the packet is not the registered packet; changing it is a #1407 amendment"));
         JsonNode Load(string name) => JsonNode.Parse(packet[name])!;
         var registration = Load("registration.json");
         var pairs = Array(Load("pairs.json")["pairs"]).OfType<JsonNode>().ToList();
@@ -175,26 +179,22 @@ internal static partial class EvidenceContractValidator
         var oracleFiles = Array(oracle?["implementation"]).OfType<JsonNode>().ToList();
         if (oracleFiles.Count == 0)
             v.Add(new("B006", "oracle", "oracle implementation files are not pinned"));
-        foreach (var file in oracleFiles)
-        {
-            var bytes = readRepoFile(Str(file["path"]) ?? "");
-            if (bytes is null || TextSha256(Encoding.UTF8.GetString(bytes)) != Str(file["sha256"]))
-                v.Add(new("B006", Str(file["path"]) ?? "?", "oracle implementation differs from the registered hash; changing the oracle is an amendment"));
-        }
         if (Str(metricSet["implementationVersion"]) != Str(comparability?["metricImplementationVersion"]))
             v.Add(new("B006", "metric-set", "metric implementation version differs from the comparability key"));
-        foreach (var file in Array(metricSet["implementationFiles"]).OfType<JsonNode>())
+        // Oracle sources are pinned over LF-normalized text; metric sources over the cutoff blob bytes.
+        var pinned = oracleFiles.Select(f => (f, (Func<byte[], string>)(b => TextSha256(Encoding.UTF8.GetString(b)))))
+            .Concat(Array(metricSet["implementationFiles"]).OfType<JsonNode>().Select(f => (f, (Func<byte[], string>)Sha256)));
+        foreach (var (file, hash) in pinned)
         {
             var bytes = readRepoFile(Str(file["path"]) ?? "");
-            if (bytes is null || Sha256(bytes) != Str(file["sha256"]))
-                v.Add(new("B006", Str(file["path"]) ?? "?", "metric implementation differs from the registered hash; changing a metric is an amendment"));
+            if (bytes is null || hash(bytes) != Str(file["sha256"]))
+                v.Add(new("B006", Str(file["path"]) ?? "?", "implementation differs from its registered hash; changing the oracle or a metric is an amendment"));
         }
 
         // B007: every static metric category is classified exactly once, and at least one is comparative.
         var comparative = Array(metricSet["comparative"]).Select(m => Str(m?["category"])).ToList();
         var descriptive = Array(metricSet["descriptiveOnly"]).Select(m => Str(m?["category"])).ToList();
-        if (comparative.Count == 0 || descriptive.Any(d => string.IsNullOrWhiteSpace(Str(Array(metricSet["descriptiveOnly"])
-                .FirstOrDefault(m => Str(m?["category"]) == d)?["reason"]))))
+        if (comparative.Count == 0 || Array(metricSet["descriptiveOnly"]).Any(m => string.IsNullOrWhiteSpace(Str(m?["reason"]))))
             v.Add(new("B007", "metric-set", "no comparative metric, or a descriptive-only metric without a reason"));
         foreach (var category in StaticMetricCategories)
         {

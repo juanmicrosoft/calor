@@ -1,4 +1,6 @@
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Calor.Evaluation.Equivalence;
 using Xunit;
 
@@ -51,10 +53,37 @@ public class PairDifferentialOracleTests
     }
 
     [Fact]
-    public void ThrowingOnTheSameInputsIsTheSameFailureClass()
+    public void FailureMustMatchByExceptionType()
     {
-        var verdict = Run(CalorDivide, CSharp("public static int Divide(int a, int b) => a / b;"));
-        Assert.Equal("EQUIVALENT", verdict.Disposition);
+        Assert.Equal("EQUIVALENT", Run(CalorDivide, CSharp("public static int Divide(int a, int b) => a / b;")).Disposition);
+        var verdict = Run(CalorDivide, CSharp("public static int Divide(int a, int b) => b == 0 ? throw new System.ArgumentException() : a / b;"));
+        Assert.Equal(("NOT-EQUIVALENT", "OBSERVATION_MISMATCH"), Reason(verdict));
+    }
+
+    [Theory]
+    [InlineData("public static void Sort(int[] xs) => System.Array.Sort(xs);", "public static void Sort(int[] xs) { }", "NOT-EQUIVALENT")]
+    [InlineData("public static void Save(string s) => System.IO.File.WriteAllText(\"out.txt\", s);", "public static void Save(string s) { }", "NOT-EQUIVALENT")]
+    [InlineData("public static int P => 1; public static int F(int x) => x;", "public static int F(int x) => x;", "UNCLASSIFIED")]
+    [InlineData("public static void Sort(int[] xs) => System.Array.Sort(xs);", "public static void Sort(int[] xs) => System.Array.Sort(xs);", "EQUIVALENT")]
+    public void MutationsFileEffectsAndUnsupportedMembersAreObserved(string left, string right, string expected)
+    {
+        var pair = new OraclePairInput("control", "a", [], "", "b", [], "");
+        Assert.Equal(expected, PairDifferentialOracle.EvaluateCSharpArms(pair, CSharp(left), CSharp(right)).Disposition);
+    }
+
+    [Fact]
+    public void SecondRunReconcilesAndChecksTheKnownWitness()
+    {
+        static JsonArray Rows(params (string Id, string Disposition)[] rows) => new(rows.Select(r => (JsonNode?)JsonSerializer.SerializeToNode(
+            new OracleVerdict(r.Id, r.Disposition, "R", [], 1, null, [], ""))).ToArray());
+        var good = Rows((PairOracleCommand.KnownWitness, "NOT-EQUIVALENT"), ("A/Pair", "EQUIVALENT"));
+        Assert.Empty(PairOracleCommand.Reconcile(good, good.DeepClone().AsArray()).Problems);
+        Assert.NotEmpty(PairOracleCommand.Reconcile(good, null).Problems);
+        var (results, problems) = PairOracleCommand.Reconcile(good, Rows((PairOracleCommand.KnownWitness, "NOT-EQUIVALENT"), ("A/Pair", "NOT-EQUIVALENT")));
+        Assert.Empty(problems);
+        Assert.Equal("NONDETERMINISTIC_ACROSS_RUNS", results[1]!["Reason"]!.GetValue<string>());
+        var badWitness = Rows((PairOracleCommand.KnownWitness, "EQUIVALENT"));
+        Assert.Contains(PairOracleCommand.Reconcile(badWitness, badWitness.DeepClone().AsArray()).Problems, p => p.Contains("known witness", StringComparison.Ordinal));
     }
 
     [Fact]

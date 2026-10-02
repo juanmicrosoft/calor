@@ -33,41 +33,34 @@ public static class PairDifferentialOracle
         "global using global::System.Net.Http;\nglobal using global::System.Threading;\n" +
         "global using global::System.Threading.Tasks;\n";
 
-    private static readonly Lazy<List<MetadataReference>> References = new(() =>
-        ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
-            .OrderBy(p => p, StringComparer.Ordinal)
-            .Select(p => (MetadataReference)MetadataReference.CreateFromFile(p))
-            .ToList());
+    private static readonly Lazy<List<MetadataReference>> References = new(() => ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
+        .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries).Order(StringComparer.Ordinal).Select(p => (MetadataReference)MetadataReference.CreateFromFile(p)).ToList());
 
     /// <summary>Runs the registered check on one pair. Never throws for pair-level problems.</summary>
     public static OracleVerdict Evaluate(OraclePairInput pair)
     {
         // 1. Identity: the bytes must be the registered bytes, or the pair is not the registered pair.
-        var calorSha = Sha256Hex(pair.CalorBytes);
-        var csharpSha = Sha256Hex(pair.CSharpBytes);
-        if (calorSha != pair.ExpectedCalorSha256 || csharpSha != pair.ExpectedCSharpSha256)
-            return Verdict(pair, "UNCLASSIFIED", "IDENTITY_MISMATCH",
-                $"calor {calorSha} csharp {csharpSha} differ from the registered hashes");
+        if (Sha256Hex(pair.CalorBytes) != pair.ExpectedCalorSha256 || Sha256Hex(pair.CSharpBytes) != pair.ExpectedCSharpSha256)
+            return Verdict(pair, "UNCLASSIFIED", "IDENTITY_MISMATCH", "file bytes differ from the registered hashes");
 
         // 2. Build. The only arm-specific step: Calor -> C# with the compiler's default options.
-        var calorText = Decode(pair.CalorBytes);
-        var csharpText = Decode(pair.CSharpBytes);
-        string generated;
+        Calor.Compiler.CompilationResult result;
         try
         {
-            var result = Calor.Compiler.Program.Compile(calorText, pair.CalorPath,
-                new CalorCompilationOptions { StatusWriter = TextWriter.Null });
-            if (result.HasErrors)
-                return Verdict(pair, "NOT-EQUIVALENT", "BUILD_FAILED_CALOR",
-                    string.Join(" | ", result.Diagnostics.Errors.Take(3).Select(d => d.Message)));
-            generated = result.GeneratedCode;
+            result = Calor.Compiler.Program.Compile(Decode(pair.CalorBytes), pair.CalorPath, new CalorCompilationOptions { StatusWriter = TextWriter.Null });
         }
         catch (Exception ex)
         {
             return Verdict(pair, "NOT-EQUIVALENT", "BUILD_FAILED_CALOR", ex.GetType().Name + ": " + ex.Message);
         }
+        return result.HasErrors
+            ? Verdict(pair, "NOT-EQUIVALENT", "BUILD_FAILED_CALOR", string.Join(" | ", result.Diagnostics.Errors.Take(3).Select(d => d.Message)))
+            : EvaluateCSharpArms(pair, result.GeneratedCode, Decode(pair.CSharpBytes));
+    }
 
+    /// <summary>Steps 2 (Roslyn) to 6, given the Calor arm already lowered to C#.</summary>
+    internal static OracleVerdict EvaluateCSharpArms(OraclePairInput pair, string generated, string csharpText)
+    {
         var calorAsm = CompileCSharp(generated, "CalorArm", out var calorErrors);
         var csharpAsm = CompileCSharp(csharpText, "CSharpArm", out var csharpErrors);
         if (calorAsm is null || csharpAsm is null)
@@ -77,13 +70,10 @@ public static class PairDifferentialOracle
             return Verdict(pair, "NOT-EQUIVALENT", reason, string.Join(" | ", calorErrors.Concat(csharpErrors).Take(3)));
         }
 
-        var calorContext = new AssemblyLoadContext($"calor-{pair.PairId}", isCollectible: true);
-        var csharpContext = new AssemblyLoadContext($"csharp-{pair.PairId}", isCollectible: true);
+        var (calorContext, csharpContext) = (new AssemblyLoadContext("calor", isCollectible: true), new AssemblyLoadContext("csharp", isCollectible: true));
         try
         {
-            var calorSurface = Surface(calorContext.LoadFromStream(new MemoryStream(calorAsm)));
-            var csharpSurface = Surface(csharpContext.LoadFromStream(new MemoryStream(csharpAsm)));
-            return Compare(pair, calorSurface, csharpSurface);
+            return Compare(pair, Surface(calorContext.LoadFromStream(new MemoryStream(calorAsm))), Surface(csharpContext.LoadFromStream(new MemoryStream(csharpAsm))));
         }
         finally
         {
@@ -103,12 +93,11 @@ public static class PairDifferentialOracle
         if (onlyOne.Count > 0)
             return Verdict(pair, "NOT-EQUIVALENT", "SURFACE_MISMATCH",
                 string.Join(", ", onlyOne.Select(k => (calor.Members.ContainsKey(k) ? "calor-only " : "csharp-only ") + k)), keys);
+        if (calor.Unsupported.Count > 0 || csharp.Unsupported.Count > 0)
+            return Verdict(pair, "UNCLASSIFIED", "UNSUPPORTED_SURFACE",
+                "v1 drives static methods only: " + string.Join(", ", calor.Unsupported.Concat(csharp.Unsupported).Take(5)), keys);
         if (keys.Count == 0)
             return Verdict(pair, "UNCLASSIFIED", "SURFACE_EMPTY", "no public observable member in either arm", keys);
-        var instance = keys.Where(k => k.StartsWith("instance ", StringComparison.Ordinal)).ToList();
-        if (instance.Count > 0)
-            return Verdict(pair, "UNCLASSIFIED", "UNSUPPORTED_SURFACE",
-                "v1 drives static members only: " + string.Join(", ", instance.Take(3)), keys);
         var unsupported = keys.Where(k => !InputGenerator.Supports(calor.Members[k])).ToList();
         if (unsupported.Count > 0)
             return Verdict(pair, "UNCLASSIFIED", "UNSUPPORTED_TYPE", string.Join(", ", unsupported.Take(3)), keys);
@@ -163,30 +152,40 @@ public static class PairDifferentialOracle
     }
 
     /// <summary>
-    /// Public, non-special methods of exported types. Static members are keyed without their
-    /// declaring type (the arms may name their containers differently); instance members keep the
-    /// type's simple name. Constructors are not keyed: v1 never constructs an object.
+    /// Public static methods of exported types, keyed without their declaring type (the arms may name
+    /// their containers differently). Every other public member (instance methods, fields, properties,
+    /// events, constructors with parameters) is listed as unsupported, so the pair is UNCLASSIFIED.
     /// </summary>
     internal static ArmSurface Surface(Assembly assembly)
     {
         var members = new Dictionary<string, MethodInfo>(StringComparer.Ordinal);
-        var ambiguous = new List<string>();
+        var (ambiguous, unsupported) = (new List<string>(), new List<string>());
         foreach (var type in assembly.GetExportedTypes().OrderBy(t => t.FullName, StringComparer.Ordinal))
         {
             const BindingFlags flags = BindingFlags.Public | BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Instance;
-            foreach (var method in type.GetMethods(flags).Where(m => !m.IsSpecialName && !IsObjectOverride(m)))
+            foreach (var member in type.GetMembers(flags).OrderBy(m => m.ToString(), StringComparer.Ordinal))
             {
-                var key = !method.IsStatic ? "instance " + type.Name + "." + Signature(method)
-                    : IsEntryPoint(method) ? EntryKeyPrefix + TypeKey(method.ReturnType) : Signature(method);
-                if (!members.TryAdd(key, method))
-                    ambiguous.Add(key);
+                if (member is MethodInfo { IsStatic: true, IsSpecialName: false } method)
+                {
+                    var key = IsEntryPoint(method) ? EntryKeyPrefix + TypeKey(method.ReturnType) : Signature(method);
+                    if (!members.TryAdd(key, method))
+                        ambiguous.Add(key);
+                }
+                else if (!IsIgnorable(member))
+                    unsupported.Add($"{member.MemberType} {type.Name}.{member.Name}");
             }
         }
-        return new ArmSurface(members, ambiguous);
+        return new ArmSurface(members, ambiguous, unsupported);
     }
 
-    private static bool IsObjectOverride(MethodInfo m) =>
-        m.Name is "ToString" or "Equals" or "GetHashCode" && m.GetBaseDefinition().DeclaringType == typeof(object);
+    /// <summary>Accessors are covered by their property; a parameterless constructor or an object override alone is not behavior.</summary>
+    private static bool IsIgnorable(MemberInfo member) => member switch
+    {
+        MethodInfo { IsSpecialName: true } => true,
+        ConstructorInfo c => c.GetParameters().Length == 0,
+        MethodInfo m => m.Name is "ToString" or "Equals" or "GetHashCode" && m.GetBaseDefinition().DeclaringType == typeof(object),
+        _ => false,
+    };
 
     /// <summary>C# entry points <c>Main()</c> and <c>Main(string[])</c> are one member, run once with no arguments.</summary>
     internal const string EntryKeyPrefix = "main(entry)->";
@@ -202,40 +201,50 @@ public static class PairDifferentialOracle
             ? t.ToString()
             : "arm-defined:" + t.Name;
 
+    /// <summary>
+    /// One invocation: fresh argument copies, captured stdout, empty stdin, a fresh empty working
+    /// directory, invariant culture. Observes the return or exception type, stdout, the arguments
+    /// after the call, and the files created in the working directory.
+    /// </summary>
     private static Observation Invoke(MethodInfo method, object?[] args)
     {
         var stdout = new StringWriter(CultureInfo.InvariantCulture);
-        var originalOut = Console.Out;
-        var originalIn = Console.In;
-        Observation? result = null;
+        var (originalOut, originalIn, originalDir) = (Console.Out, Console.In, Environment.CurrentDirectory);
+        var sandbox = Directory.CreateTempSubdirectory("b1-1276-");
+        var actual = args.Length == 0 && method.GetParameters().Length == 1 ? new object?[] { Array.Empty<string>() } : InputGenerator.Clone(args);
+        string? kind = null;
+        string value = "", exception = "";
         var thread = new Thread(() =>
         {
             try
             {
-                var actual = args.Length == 0 && method.GetParameters().Length == 1 ? new object?[] { Array.Empty<string>() } : InputGenerator.Clone(args);
-                var value = method.Invoke(null, actual);
-                result = new Observation("return", method.ReturnType == typeof(void) ? "void" : InputGenerator.Render(value), stdout.ToString(), "");
-            }
-            catch (TargetInvocationException tie)
-            {
-                result = new Observation("throw", "", stdout.ToString(), (tie.InnerException ?? tie).GetType().FullName ?? "?");
+                var returned = method.Invoke(null, actual);
+                (kind, value) = ("return", method.ReturnType == typeof(void) ? "void" : InputGenerator.Render(returned));
             }
             catch (Exception ex)
             {
-                result = new Observation("throw", "", stdout.ToString(), ex.GetType().FullName ?? "?");
+                (kind, exception) = ("throw", ((ex as TargetInvocationException)?.InnerException ?? ex).GetType().FullName ?? "?");
             }
         }, 16 * 1024 * 1024) { IsBackground = true, CurrentCulture = CultureInfo.InvariantCulture, CurrentUICulture = CultureInfo.InvariantCulture };
         Console.SetOut(stdout);
         Console.SetIn(new StringReader(""));
+        Environment.CurrentDirectory = sandbox.FullName;
         try
         {
             thread.Start();
-            return thread.Join(InvocationTimeoutMs) && result is not null ? result : new Observation("timeout", "", "", "");
+            if (!thread.Join(InvocationTimeoutMs) || kind is null)
+                return new Observation("timeout", "", "", "", "", "");
+            var files = string.Join(";", Directory.EnumerateFiles(sandbox.FullName, "*", SearchOption.AllDirectories)
+                .Order(StringComparer.Ordinal).Select(f => Path.GetRelativePath(sandbox.FullName, f) + "=" + Sha256Hex(File.ReadAllBytes(f))));
+            var argsAfter = InputGenerator.Render(actual.Length == args.Length ? actual : args);
+            return new Observation(kind, value, stdout.ToString(), exception, argsAfter, files);
         }
         finally
         {
             Console.SetOut(originalOut);
             Console.SetIn(originalIn);
+            Environment.CurrentDirectory = originalDir;
+            try { sandbox.Delete(recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
     }
 
@@ -256,16 +265,13 @@ public sealed record OracleVerdict(
     string PairId, string Disposition, string Reason, IReadOnlyList<string> Surface, int InputCount,
     string? ObservationsSha256, IReadOnlyList<string> Witnesses, string Detail);
 
-internal sealed record ArmSurface(Dictionary<string, MethodInfo> Members, List<string> Ambiguous);
+internal sealed record ArmSurface(Dictionary<string, MethodInfo> Members, List<string> Ambiguous, List<string> Unsupported);
 
-/// <summary>
-/// One observation. Failure is compared by class (return vs throw); the exception type is recorded
-/// but, under oracle v1, not compared (registration.json oracle.failureBehavior).
-/// </summary>
-internal sealed record Observation(string Kind, string Value, string Stdout, string ExceptionType)
+/// <summary>One observation; two are the same only when every field is equal, exception type included.</summary>
+internal sealed record Observation(string Kind, string Value, string Stdout, string ExceptionType, string ArgsAfter, string Files)
 {
-    public bool SameAs(Observation other) => Kind == other.Kind && Value == other.Value && Stdout == other.Stdout;
+    public bool SameAs(Observation other) => Equals(other);
 
     public override string ToString() =>
-        $"{Kind}{(Kind == "throw" ? "(" + ExceptionType + ")" : "")} {Value} stdout={InputGenerator.Render(Stdout)}";
+        $"{Kind}{(Kind == "throw" ? "(" + ExceptionType + ")" : "")} {Value} args={ArgsAfter} stdout={InputGenerator.Render(Stdout)} files=[{Files}]";
 }

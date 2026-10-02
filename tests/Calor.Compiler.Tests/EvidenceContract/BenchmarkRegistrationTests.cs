@@ -15,6 +15,9 @@ public class BenchmarkRegistrationTests
 {
     private const string Corpus = "tests/TestData/Benchmarks";
 
+    /// <summary>SHA-256 of the registered sha256.json. Changing it is a #1407 amendment, never a refresh.</summary>
+    private const string PinnedSeal = "92d25c99a193ad809e75105c5f0febcfbdd26bf590bbc744de9504209e06bf74";
+
     private static readonly Dictionary<string, (string File, Action<JsonNode> Change, string Code, string[] Also)> Mutations = new()
     {
         ["dropped pair"] = ("pairs.json", d => d["pairs"]!.AsArray().RemoveAt(0), "B002", []),
@@ -53,7 +56,7 @@ public class BenchmarkRegistrationTests
     [Fact]
     public void CommittedRegistrationIsValid()
     {
-        var violations = Validate(Packet());
+        var violations = Validate(Packet(), PinnedSeal);
         Assert.True(violations.Count == 0, Describe(violations));
     }
 
@@ -101,6 +104,17 @@ public class BenchmarkRegistrationTests
     }
 
     [Fact]
+    public void ResealedPacketIsStillADifferentRegistration()
+    {
+        // A regenerated packet with a weaker interval is internally consistent; only the pinned seal rejects it.
+        var packet = Packet();
+        var registration = JsonNode.Parse(packet["registration.json"])!;
+        registration["statistics"]!["interval"]!["resamples"] = 2;
+        packet["registration.json"] = registration.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        AssertViolation(Validate(Reseal(packet, rekey: true), PinnedSeal), "B008");
+    }
+
+    [Fact]
     public void TamperedPacketFileBreaksTheSeal()
     {
         var packet = Packet();
@@ -130,7 +144,7 @@ public class BenchmarkRegistrationTests
     // ------------------------------------------------------------------
 
     private static IReadOnlyList<ContractViolation> Validate(
-        Dictionary<string, string> packet, string? extraCorpusFile = null, string? changedFile = null)
+        Dictionary<string, string> packet, string? pinnedSeal = null, string? extraCorpusFile = null, string? changedFile = null)
     {
         var root = RepoRoot();
         var corpus = Directory.EnumerateFiles(Path.Combine(root, Corpus), "*", SearchOption.AllDirectories)
@@ -144,7 +158,7 @@ public class BenchmarkRegistrationTests
             return !File.Exists(full) ? null : path == changedFile ? [.. File.ReadAllBytes(full), (byte)'\n'] : File.ReadAllBytes(full);
         }
         var contract = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "docs/plans/evidence/evidence-contract-1407/contract.json")))!;
-        return EvidenceContractValidator.ValidateBenchmarkRegistration(contract, packet, Read, corpus);
+        return EvidenceContractValidator.ValidateBenchmarkRegistration(contract, packet, Read, corpus, pinnedSeal);
     }
 
     private static Dictionary<string, string> Packet()
@@ -175,21 +189,9 @@ public class BenchmarkRegistrationTests
     private static string S(JsonNode node, string field) => node[field]?.GetValue<string>() ?? "";
 
     private static void AssertViolation(IReadOnlyList<ContractViolation> violations, string code, params string[] alsoAllowed)
-    {
-        Assert.True(violations.Any(v => v.Code == code), $"expected a {code} violation; got:{Environment.NewLine}{Describe(violations)}");
-        var unexpected = violations.Where(v => v.Code != code && !alsoAllowed.Contains(v.Code)).ToList();
-        Assert.True(unexpected.Count == 0, $"expected only {code}; also got:{Environment.NewLine}{Describe(unexpected)}");
-    }
+        => EvidenceContractTests.AssertViolation(violations, code, alsoAllowed);
 
-    private static string Describe(IReadOnlyList<ContractViolation> violations)
-        => violations.Count == 0 ? "(none)" : string.Join(Environment.NewLine, violations.Take(20));
+    private static string Describe(IReadOnlyList<ContractViolation> violations) => EvidenceContractTests.Describe(violations);
 
-    private static string RepoRoot()
-    {
-        var dir = AppContext.BaseDirectory;
-        while (dir != null && !Directory.Exists(Path.Combine(dir, ".git")) && !File.Exists(Path.Combine(dir, ".git")))
-            dir = Path.GetDirectoryName(dir);
-        Assert.NotNull(dir);
-        return dir!;
-    }
+    private static string RepoRoot() => EvidenceContractTests.RepoRoot();
 }

@@ -1,5 +1,7 @@
 using System.CommandLine;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -9,11 +11,15 @@ namespace Calor.Evaluation.Equivalence;
 /// <summary>
 /// <c>pair-oracle</c>: assigns #1276 dispositions. Each UNCLASSIFIED registered pair runs in its own
 /// child process, so a crash or hang in one arm cannot affect another pair; EXCLUDED-PRE-REGISTERED
-/// pairs are recorded without running. Output has no timestamps, so two runs compare byte for byte.
+/// pairs are recorded without running. Before anything runs, both modes check that HEAD is the
+/// registration commit, the packet matches its seals, and the oracle sources match their pins. The
+/// second run (<c>--compare-with</c> the first) reconciles the runs and the known-witness control
+/// and exits nonzero unless the result is valid.
 /// </summary>
 public static class PairOracleCommand
 {
     public const int PairProcessTimeoutMs = 300_000;
+    public const string KnownWitness = "DomainProblems/CsvParser";
 
     public static Command Create()
     {
@@ -22,14 +28,18 @@ public static class PairOracleCommand
         var commit = new Option<string>("--registration-commit", "Full SHA of the main commit that merged the registration") { IsRequired = true };
         var output = new Option<string>("--output", () => "pair-oracle-results.json", "Results file");
         var pair = new Option<string?>("--pair", "Evaluate one pair in-process and print its verdict (child mode)");
-        foreach (var option in new Option[] { registration, commit, output, pair })
+        var compareWith = new Option<string?>("--compare-with", "First run's results; makes this the reconciling second run");
+        foreach (var option in new Option[] { registration, commit, output, pair, compareWith })
             command.AddOption(option);
-        command.SetHandler(async (reg, sha, outPath, pairId) =>
+        command.SetHandler(async (reg, sha, outPath, pairId, first) =>
         {
-            Environment.ExitCode = pairId is null
-                ? await RunAllAsync(reg, sha, outPath)
+            var problem = Preflight(reg, sha);
+            if (problem is not null)
+                Console.Error.WriteLine("pair-oracle refused: " + problem);
+            Environment.ExitCode = problem is not null ? 2
+                : pairId is null ? await RunAllAsync(reg, sha, outPath, first)
                 : RunOne(reg, pairId);
-        }, registration, commit, output, pair);
+        }, registration, commit, output, pair, compareWith);
         return command;
     }
 
@@ -47,14 +57,56 @@ public static class PairOracleCommand
         return 0;
     }
 
-    private static async Task<int> RunAllAsync(string registrationDir, string registrationCommit, string outputPath)
+    /// <summary>Null when the executing tree is the sealed, pinned registration at its merge commit.</summary>
+    internal static string? Preflight(string registrationDir, string registrationCommit)
     {
         if (!Regex.IsMatch(registrationCommit, "^[0-9a-f]{40}$"))
+            return "--registration-commit must be a full 40-hex SHA";
+        var root = RepoRoot(registrationDir);
+        var head = Process.Start(new ProcessStartInfo("git", ["-C", root, "rev-parse", "HEAD"]) { RedirectStandardOutput = true })!;
+        if (head.StandardOutput.ReadToEnd().Trim() != registrationCommit)
+            return "HEAD is not the registration commit";
+        var seals = JsonNode.Parse(File.ReadAllText(Path.Combine(registrationDir, "sha256.json")))!["files"]!.AsObject();
+        var registration = JsonNode.Parse(File.ReadAllText(Path.Combine(registrationDir, "registration.json")))!;
+        var pins = seals.Select(f => (f.Key, f.Value!.GetValue<string>()))
+            .Concat(registration["oracle"]!["implementation"]!.AsArray().Select(f => (f!["path"]!.GetValue<string>(), f["sha256"]!.GetValue<string>())));
+        foreach (var (path, sha) in pins)
         {
-            Console.Error.WriteLine("--registration-commit must be the full 40-hex SHA of the merged registration");
-            return 2;
+            var full = Path.Combine(root, path);
+            if (!File.Exists(full) || PairDifferentialOracle.Sha256Hex(Encoding.UTF8.GetBytes(File.ReadAllText(full).Replace("\r\n", "\n"))) != sha)
+                return $"{path} does not match its registered hash";
         }
+        return null;
+    }
 
+    /// <summary>
+    /// Second-run reconciliation: a pair whose verdict differs between the runs is UNCLASSIFIED
+    /// (NONDETERMINISTIC_ACROSS_RUNS); a missing second run or a known witness that is not
+    /// NOT-EQUIVALENT makes the whole result invalid.
+    /// </summary>
+    internal static (JsonArray Results, List<string> Problems) Reconcile(JsonArray current, JsonArray? first)
+    {
+        var problems = new List<string>();
+        var prior = first?.ToDictionary(r => r!["PairId"]!.GetValue<string>(), r => r!.ToJsonString());
+        if (prior is null)
+            problems.Add("single run: dispositions need a second run with --compare-with");
+        else if (prior.Count != current.Count)
+            problems.Add("the two runs cover different pairs");
+        var results = new JsonArray();
+        foreach (var row in current)
+        {
+            var id = row!["PairId"]!.GetValue<string>();
+            results.Add(prior is not null && (!prior.TryGetValue(id, out var before) || before != row.ToJsonString())
+                ? Node(new OracleVerdict(id, "UNCLASSIFIED", "NONDETERMINISTIC_ACROSS_RUNS", [], 0, null, [], "verdicts differ between the two runs"))
+                : row.DeepClone());
+        }
+        if (results.FirstOrDefault(r => r!["PairId"]!.GetValue<string>() == KnownWitness)?["Disposition"]?.GetValue<string>() != "NOT-EQUIVALENT")
+            problems.Add($"known witness {KnownWitness} is not NOT-EQUIVALENT; the oracle run is invalid");
+        return (results, problems);
+    }
+
+    private static async Task<int> RunAllAsync(string registrationDir, string registrationCommit, string outputPath, string? firstRunPath)
+    {
         var results = new JsonArray();
         foreach (var row in Pairs(registrationDir))
         {
@@ -70,6 +122,8 @@ public static class PairOracleCommand
             results.Add(verdict);
         }
 
+        var first = firstRunPath is null ? null : JsonNode.Parse(await File.ReadAllTextAsync(firstRunPath))!["runResults"]!.AsArray();
+        var (reconciled, problems) = Reconcile(results, first);
         var document = new JsonObject
         {
             ["oracleId"] = PairDifferentialOracle.OracleId,
@@ -77,10 +131,14 @@ public static class PairOracleCommand
             ["inputGeneratorVersion"] = PairDifferentialOracle.InputGeneratorVersion,
             ["registrationCommit"] = registrationCommit,
             ["pairsSha256"] = PairDifferentialOracle.Sha256Hex(File.ReadAllBytes(Path.Combine(registrationDir, "pairs.json"))),
-            ["results"] = results,
+            ["environment"] = $"{RuntimeInformation.FrameworkDescription}; {RuntimeInformation.OSDescription}; {RuntimeInformation.ProcessArchitecture}; Roslyn {typeof(Microsoft.CodeAnalysis.Compilation).Assembly.GetName().Version}",
+            ["valid"] = problems.Count == 0,
+            ["problems"] = new JsonArray(problems.Select(p => (JsonNode?)p).ToArray()),
+            ["runResults"] = results,
+            ["results"] = reconciled,
         };
         await File.WriteAllTextAsync(outputPath, document.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n");
-        return 0;
+        return first is null || problems.Count == 0 ? 0 : 3;
     }
 
     private static async Task<JsonNode> RunChildAsync(string registrationDir, string registrationCommit, string pairId)
@@ -95,12 +153,7 @@ public static class PairOracleCommand
         using var process = Process.Start(start)!;
         var stdout = process.StandardOutput.ReadToEndAsync();
         _ = process.StandardError.ReadToEndAsync();
-        using var cts = new CancellationTokenSource(PairProcessTimeoutMs);
-        try
-        {
-            await process.WaitForExitAsync(cts.Token);
-        }
-        catch (OperationCanceledException)
+        if (!process.WaitForExit(PairProcessTimeoutMs))
         {
             process.Kill(entireProcessTree: true);
             return Node(new OracleVerdict(pairId, "UNCLASSIFIED", "TIMEOUT", [], 0, null, [], $"pair process exceeded {PairProcessTimeoutMs} ms"));

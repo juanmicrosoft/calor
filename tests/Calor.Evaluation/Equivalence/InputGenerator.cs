@@ -60,7 +60,7 @@ public static class InputGenerator
         var product = pools.Aggregate(1L, (acc, p) => Math.Min(acc * p.Length, long.MaxValue / 64));
         if (product <= PairDifferentialOracle.CartesianCap)
         {
-            foreach (var tuple in Cartesian(pools, 0))
+            foreach (var tuple in Cartesian(pools))
                 yield return tuple;
         }
         else
@@ -81,22 +81,9 @@ public static class InputGenerator
         return System.Buffers.Binary.BinaryPrimitives.ReadUInt64BigEndian(digest);
     }
 
-    private static IEnumerable<object?[]> Cartesian(object?[][] pools, int index)
-    {
-        if (index == pools.Length)
-        {
-            yield return new object?[pools.Length];
-            yield break;
-        }
-        foreach (var head in pools[index])
-        {
-            foreach (var tail in Cartesian(pools, index + 1))
-            {
-                tail[index] = head;
-                yield return tail;
-            }
-        }
-    }
+    /// <summary>First parameter outermost, last parameter innermost.</summary>
+    private static IEnumerable<object?[]> Cartesian(object?[][] pools) =>
+        pools.Aggregate((IEnumerable<object?[]>)[[]], (acc, pool) => acc.SelectMany(prefix => pool.Select(v => (object?[])[.. prefix, v])));
 
     private static object?[] BoundaryPool(Type t)
     {
