@@ -106,18 +106,36 @@ def tree_digest(root: Path) -> str:
     return sha256("".join(lines).encode("utf-8"))
 
 
-def forbidden_wording(text: str) -> list[str]:
-    hits = []
+def forbidden_wording(text: str) -> tuple[list[str], int]:
+    """Unnegated forbidden phrases, and the number of negated ones."""
+    hits, negated = [], 0
     for match in FORBIDDEN_RE.finditer(text):
-        if not NEGATION_RE.search(text[max(0, match.start() - 12): match.start()]):
+        if NEGATION_RE.search(text[max(0, match.start() - 12): match.start()]):
+            negated += 1
+        else:
             hits.append(match.group(0))
-    return hits
+    return hits, negated
+
+
+def json_strings(value: object) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [s for k, v in value.items() for s in json_strings(k) + json_strings(v)]
+    if isinstance(value, list):
+        return [s for v in value for s in json_strings(v)]
+    return []
 
 
 def renderings(label: str, text: str) -> list[str]:
     """The text as written, with entities decoded, and with markup removed two ways."""
     decoded = html.unescape(text)
     variants = [text, decoded]
+    if label.endswith(".json"):
+        try:
+            variants.append("\n".join(json_strings(json.loads(text))))
+        except ValueError:
+            pass
     if label.endswith((".html", ".htm", ".xml", ".nuspec", ".rss")) or "<" in decoded:
         variants.append(re.sub(r"<[^>]+>", " ", decoded))
         variants.append(re.sub(r"<[^>]+>", "", decoded))
@@ -126,7 +144,16 @@ def renderings(label: str, text: str) -> list[str]:
 
 
 def scan_text(gate: Gate, label: str, text: str) -> None:
-    hits = {hit for variant in renderings(label, text) for hit in forbidden_wording(variant)}
+    # A negation counts only where it is literal in the source. If removing markup produces a
+    # negated phrase the source does not literally contain (for example a hidden "not "), the
+    # negation came from markup and the rendered page still makes the claim.
+    _, literal_negations = forbidden_wording(html.unescape(text))
+    hits: set[str] = set()
+    for variant in renderings(label, text):
+        found, negated = forbidden_wording(variant)
+        hits.update(found)
+        if negated > literal_negations:
+            hits.add("negation supplied by markup")
     for hit in sorted(hits):
         gate.fail("G012", f"{label}: forbidden wording '{hit}'; 0.24 evidence is not independently adjudicated")
 
@@ -315,9 +342,18 @@ def check_candidate(gate: Gate, commit: str, record: dict, args: argparse.Namesp
         blob = gate.blob(commit, str(named[0].get("path")))
         if blob is None or sha256(blob) != named[0]["sha256"]:
             gate.fail("G010", f"{role} manifest {named[0].get('path')} is missing or changed")
-        elif cand.encode() not in blob:
-            gate.fail("G010", f"{role} manifest {named[0].get('path')} does not name the candidate {cand}")
+        elif manifest_candidate(blob) != cand:
+            gate.fail("G010", f"{role} manifest {named[0].get('path')} does not bind the candidate {cand}")
     return cand
+
+
+def manifest_candidate(blob: bytes) -> str | None:
+    """The candidate a manifest binds: top-level "candidate" as a SHA or as {"commit": SHA}."""
+    try:
+        value = json.loads(blob).get("candidate")
+    except (ValueError, AttributeError):
+        return None
+    return value.get("commit") if isinstance(value, dict) else value
 
 
 def surface(record: dict, name: str) -> dict:
@@ -364,6 +400,10 @@ def check_surfaces(gate: Gate, identity: str, record: dict, args: argparse.Names
         if text_digest(text) != notes_hash:
             gate.fail("G011", "release notes differ from the adjudicated notes")
         scan_text(gate, args.release_notes, text)
+    canonical = f"v{(record.get('candidate') or {}).get('version')}"
+    for flag, value in (("--release-tag", args.release_tag), ("--release-title", args.release_title)):
+        if value is not None and value != canonical:
+            gate.fail("G013", f"GitHub release {flag[10:]} {value!r} is not the canonical {canonical!r}")
     if args.release_body:
         lines = Path(args.release_body).read_text(encoding="utf-8").replace("\r\n", "\n").rstrip().split("\n")
         trailer = TRAILER_RE.match(lines[-1].strip()) if lines else None
@@ -460,6 +500,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--require-tag", action="store_true", help="tag v<version> must exist at the candidate")
     parser.add_argument("--release-notes", help="rendered notes file to compare and scan")
     parser.add_argument("--release-body", help="body of the existing GitHub release")
+    parser.add_argument("--release-tag", help="tag name of the GitHub release; must be v<version>")
+    parser.add_argument("--release-title", help="title of the GitHub release; must be v<version>")
     parser.add_argument("--nuget-dir", help="directory holding exactly the .nupkg files to push")
     parser.add_argument("--registry-dir", help="packages already on nuget.org for this version (with --nuget-dir)")
     parser.add_argument("--metadata-dir", help="directory holding exactly the release metadata .json files")

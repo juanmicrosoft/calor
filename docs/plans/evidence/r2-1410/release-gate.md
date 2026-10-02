@@ -41,10 +41,10 @@ calor-adjudication:v1:<adjudication commit, 40 hex>:<terminal record SHA-256, 64
 | `epicIndependentAdjudicationMet` | `false` |
 | `contract` | `{version, files}`; `files` equals `sha256.json` `files` at the adjudication commit, and the packet tree is identical at the candidate and the adjudication commit |
 | `candidate` | `{commit, version}`; full SHA, an ancestor of the adjudication commit; `Directory.Build.props` at the candidate declares `version` |
-| `evidenceManifests` | `[{role, path, sha256}]` with exactly one `candidate-manifest` (#1423) and one `raw-artifact-freeze` (#1424); each blob at the adjudication commit has that SHA-256 and contains the full candidate SHA |
+| `evidenceManifests` | `[{role, path, sha256}]` with exactly one `candidate-manifest` (#1423) and one `raw-artifact-freeze` (#1424); each blob at the adjudication commit has that SHA-256 and is JSON whose top-level `candidate` is the candidate SHA or `{"commit": <candidate SHA>}` |
 | `claimRegistry` | `{path, sha256}` of the #1424 claim registry `{"claims": ["claim:<id>", ...]}` committed at the adjudication commit |
 | `adjudications` | exactly one row per subject: every inventory artifact, `gate:#<issue>` for every child but #1408, and every registered claim; no other subject; outcome in the frozen set, never `BLOCKED`, never `SUPPORTED` under the deviation, `HISTORICAL-ONLY` only for a historical-only artifact; `independence = reduced-maintainer-adjudicated`; no inventory artifact still classified `stale` |
-| `publication.release-notes.sha256` | hash of the rendered notes (CRLF to LF, trailing whitespace trimmed, one final newline) |
+| `publication.release-notes.sha256` | hash of the rendered notes (CRLF to LF, trailing whitespace trimmed, one final newline); the GitHub release's tag and title must both be `v<version>` |
 | `publication.nuget-packages.files` | `{<file name>: sha256}`; the pushed directory holds exactly these files; a version already on nuget.org must match entry for entry except `.signature.p7s` |
 | `publication.release-metadata.files` | `{<file name>: sha256}` of the SBOM and provenance JSON |
 | `publication.website.treeSha256` | SHA-256 over sorted `<sha256>  <relative path>` lines of the built tree |
@@ -93,11 +93,15 @@ verified" (§9). The gate scans release notes, the release body, website text fi
 benchmark text files, and package `.nuspec` descriptions for `independently adjudicated|verified`
 and `independent adjudication|verification`. Each text is scanned as written, with HTML entities
 decoded, with markup replaced by a space and removed outright, and with Markdown emphasis removed.
-A phrase is allowed only directly after `not`, `no`, or `without`, as in the required limitation.
+JSON files are also scanned as their decoded string values. A phrase is allowed only directly after
+`not`, `no`, or `without`, as in the required limitation, and only when that negation is literal in
+the source: a negation that appears only after markup is removed (for example a hidden `not `) fails.
 
 **Time of check and time of use.** Each publishing job re-runs the gate against the bytes it
 publishes, in the same job, before the publishing step: the `.nupkg` files, metadata, and notes
-before attestation and push, the remote tag around release creation, the downloaded Pages artifact
+before attestation and push, the packages nuget.org actually serves (polled after the push and
+compared before the release is created), the remote tag around release creation (only a confirmed
+404 counts as absent; any other API failure stops the job), the downloaded Pages artifact
 before `deploy-pages`, and the work tree immediately before the benchmark commit. The identity names immutable git objects, so a later push
 to `main` cannot change what an identity means.
 

@@ -37,7 +37,9 @@ internal sealed class GateRepo : IDisposable
         bool sideCandidate = false,
         string? notes = null,
         string website = "<p>Calor 0.24.0</p>",
-        string description = "Calor compiler")
+        string description = "Calor compiler",
+        string? freezeManifest = null,
+        string benchmark = "{\"overallAdvantage\":1.0}\n")
     {
         var baseDir = Path.Combine(Path.GetTempPath(), "calor-r2-" + Guid.NewGuid().ToString("N")[..12]);
         var repo = new GateRepo { Root = Path.Combine(baseDir, "repo"), Scratch = Path.Combine(baseDir, "scratch") };
@@ -80,9 +82,10 @@ internal sealed class GateRepo : IDisposable
             File.AppendAllText(Path.Combine(repo.Root, "docs/plans/v0.24-evidence-contract.md"), "\nchanged after the candidate\n");
             repo.WritePacketHashes();
         }
-        var manifest = "{\"candidate\":\"" + repo.Candidate + "\"}\n";
+        var manifest = "{\"candidate\":\"" + recordedCandidate + "\"}\n";
         repo.Write(ManifestPath, manifest);
-        repo.Write(FreezePath, manifest);
+        var freeze = freezeManifest?.Replace("{CANDIDATE}", recordedCandidate) ?? manifest;
+        repo.Write(FreezePath, freeze);
         var registry = new JsonObject { ["claims"] = new JsonArray(Claims.Select(c => (JsonNode)c).ToArray()) }.ToJsonString();
         repo.Write(RegistryPath, registry);
 
@@ -92,7 +95,6 @@ internal sealed class GateRepo : IDisposable
         WritePackage(Path.Combine(repo.NugetDir, $"Calor.Sdk.{ReleaseVersion}.nupkg"), "Calor.Sdk", description);
         File.WriteAllText(Path.Combine(repo.MetadataDir, "sbom.json"), "{\"sbom\":true}\n");
         File.WriteAllText(Path.Combine(repo.WebsiteDir, "index.html"), website);
-        const string benchmark = "{\"overallAdvantage\":1.0}\n";
 
         var subjects = inventoryNode["artifacts"]!.AsArray()
             .Select(a => (a!["id"]!.GetValue<string>(), a["classification"]!.GetValue<string>()))
@@ -118,7 +120,7 @@ internal sealed class GateRepo : IDisposable
             ["candidate"] = new JsonObject { ["commit"] = recordedCandidate, ["version"] = ReleaseVersion },
             ["evidenceManifests"] = new JsonArray(
                 new JsonObject { ["role"] = "candidate-manifest", ["path"] = ManifestPath, ["sha256"] = Sha(Encoding.UTF8.GetBytes(manifest)) },
-                new JsonObject { ["role"] = "raw-artifact-freeze", ["path"] = FreezePath, ["sha256"] = Sha(Encoding.UTF8.GetBytes(manifest)) }),
+                new JsonObject { ["role"] = "raw-artifact-freeze", ["path"] = FreezePath, ["sha256"] = Sha(Encoding.UTF8.GetBytes(freeze)) }),
             ["claimRegistry"] = new JsonObject { ["path"] = RegistryPath, ["sha256"] = Sha(Encoding.UTF8.GetBytes(registry)) },
             ["adjudications"] = rows,
             ["publication"] = new JsonObject
@@ -150,7 +152,8 @@ internal sealed class GateRepo : IDisposable
     {
         "--expect-head", "--version", ReleaseVersion, "--release-notes", NotesPath, "--release-body", BodyPath,
         "--nuget-dir", NugetDir, "--registry-dir", RegistryDir, "--metadata-dir", MetadataDir,
-        "--website-dir", WebsiteDir, "--benchmark-worktree",
+        "--website-dir", WebsiteDir, "--benchmark-worktree", "--release-tag", "v" + ReleaseVersion,
+        "--release-title", "v" + ReleaseVersion,
     };
 
     public (int Code, string Output) Run(string[] args, bool includeIdentity = true, bool includeRepo = true)

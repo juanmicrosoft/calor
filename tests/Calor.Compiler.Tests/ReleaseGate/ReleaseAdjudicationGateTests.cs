@@ -528,6 +528,49 @@ public class ReleaseAdjudicationGateTests
     }
 
     // ------------------------------------------------------------------
+    // Round 2 review controls: manifest binding, JSON and hidden-markup wording, release tag/title
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void EvidenceManifestBindingAnotherCandidateFails()
+    {
+        // The expected SHA is present, but only in an unrelated field.
+        using var repo = GateRepo.Build(freezeManifest:
+            "{\"candidate\":\"" + new string('e', 40) + "\",\"previousCandidate\":\"{CANDIDATE}\"}\n");
+        AssertCodes(repo, new[] { "G010" });
+    }
+
+    [Fact]
+    public void EvidenceManifestBindingTheCandidateAsAnObjectPasses()
+    {
+        using var repo = GateRepo.Build(freezeManifest: "{\"candidate\":{\"commit\":\"{CANDIDATE}\"}}\n");
+        AssertCodes(repo, Array.Empty<string>());
+    }
+
+    [Fact]
+    public void JsonEscapedIndependentClaimInABenchmarkFileFails()
+    {
+        using var repo = GateRepo.Build(benchmark: "{\"description\":\"\\u0049ndependently verified evidence\"}\n");
+        AssertCodes(repo, new[] { "G012" }, "--benchmark-worktree");
+    }
+
+    [Fact]
+    public void NegationSuppliedOnlyByHiddenMarkupFails()
+    {
+        using var repo = GateRepo.Build(website: "<p><span hidden>not </span>indepen<b>dently</b> verified evidence</p>");
+        AssertCodes(repo, new[] { "G012" }, "--website-dir", repo.WebsiteDir);
+    }
+
+    [Theory]
+    [InlineData("--release-tag", "0.24.0")]
+    [InlineData("--release-title", "Independently verified Calor 0.24")]
+    public void NonCanonicalReleaseTagOrTitleFails(string flag, string value)
+    {
+        using var repo = GateRepo.Build();
+        AssertCodes(repo, new[] { "G013" }, flag, value);
+    }
+
+    // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 
