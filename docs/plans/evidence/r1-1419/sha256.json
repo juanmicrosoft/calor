@@ -2,8 +2,8 @@
   "algorithm": "SHA-256 over LF-normalized UTF-8 bytes",
   "files": {
     "docs/plans/v0.24-r1-soundness-registration.md": "410ea131a8ca6a5f877006aea728605033f7078e287e9d237ba9c5d3ddb99b53",
-    "docs/plans/evidence/r1-1419/registration.json": "efe4d3d0ad9b001900825b480f680b36122ad20a585431090874333409edf2b7",
-    "docs/plans/evidence/r1-1419/templates.json": "71e7fc1f3adc92902e919d6ba7661eabe65c65ccdb0396fab47f1fb90e4dd792",
+    "docs/plans/evidence/r1-1419/registration.json": "38acd9115bd30ef5733e242d35e366f4f71ca663808542153140d6adaf079b27",
+    "docs/plans/evidence/r1-1419/templates.json": "1a62215465fdf56da1b742a2903d65ffb6f65d00988e5957f20c0c5146ff92e1",
     "docs/plans/evidence/r1-1419/cases-index.json": "083512b623cb3b7ee558f6eb913d5433fcbcbe979a8c6cf3f51e3a5fbfc25d40",
     "docs/plans/evidence/r1-1419/manifest-B1.json": "59dffdd9f2c9e615642d7c66ba40973a0bb5d969b92334f896a9eb07ad0efcad",
     "docs/plans/evidence/r1-1419/manifest-N1.json": "717b8a062493df44e89286c2e444ee6aba68ed004334bd5c64c6fa6682f0e42c",

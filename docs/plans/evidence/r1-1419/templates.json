@@ -4408,7 +4408,8 @@
           }
         ],
         "hyp": "x > {c1} && x < {c1}",
-        "prop": "x {S} {c2}"
+        "prop": "x {S} {c2}",
+        "vacuousByConstruction": true
       }
     },
     {

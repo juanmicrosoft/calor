@@ -2645,7 +2645,7 @@
       "A case the baseline compiler rejects with an error diagnostic before verification is recorded as compile-rejected (no token), with its error codes. It validates a refusal only on an unsupported-refused row and only if every error code is in that row's frontEndRefusalCodes (frozen at B1; an empty list means the form must reach the verifier and be Unsupported). Any other rejection is harness-invalid for that baseline, including on N1 if its different front end rejects with other codes.",
       "Guard observation: in the elision-enabled emission the claim's guard must be absent iff the token is Proven (postcondition, non-vacuous) or Discharged with an ObligationPolicy action needing no guard; in the forced emission it must be present."
     ],
-    "claimSite": "Exactly one claim per case, fixed by the template's claimSite. Other contracts in the same case are archived but not adjudicated.",
+    "claimSite": "Exactly one claim per case, fixed by the template's claimSite (and obligationKind for obligations: the case must produce exactly one obligation of that kind, otherwise it is harness-invalid). Other contracts and obligations in the same case are archived but not adjudicated.",
     "translatorSemanticsVersion": "Recorded per run from the loaded assembly's ContractTranslator.SemanticsVersion (z3-executable-semantics-v2 at B1 and N1)."
   },
   "oracle": {
@@ -2744,7 +2744,7 @@
       "false-proof-unconfirmed-vacuity": "Discharged, O1 violated, but the non-vacuity check did not pass. Still a finding for #1413.",
       "required-demotion-absent": "Proven/Discharged on an assumed or unsupported-refused row without an O1 violation in the domain.",
       "guard-elided-without-proof": "The claim's guard is absent in the elision-enabled emission while the token is not Proven/Discharged, or is absent in the forced emission.",
-      "vacuity-mislabel": "Proven reported non-vacuous while O1 is exhaustive and vacuous-in-domain, or ProvenVacuous while O1 found a reached input.",
+      "vacuity-mislabel": "Proven reported non-vacuous while O1 is exhaustive and vacuous-in-domain or the template is vacuousByConstruction, or ProvenVacuous while O1 found a reached input.",
       "spurious-refutation": "Failed whose replayed counterexample (or, for exhaustive domains, any input) does not violate the property under O1. A completeness defect; needs a disposition.",
       "stale-cache-proof": "A warm (cached) compile yields a different claim token from the cold compile of the same text (for CACHE-SEMANTICS-VERSION variant B: any token other than the cold one).",
       "semantic-divergence": "O1 and O2 disagree on an input (see oracle.divergence).",
