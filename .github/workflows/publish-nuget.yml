@@ -10,9 +10,6 @@ on:
         required: false
         type: string
 
-env:
-  Z3_VERSION: "4.15.7"
-
 jobs:
   # Truthful release gates (#790, W1 Slice 4): publishing is impossible unless
   # the full test suite and the M-A1 packaged-SDK consumer check pass on the
@@ -84,14 +81,8 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # This is the RELEASE GATE. Without seeding, src/Calor.Compiler/{z3,runtimes}/ are
-      # empty at MSBuild evaluation time (they are gitignored), the csproj's
-      # `<None Include="runtimes\**\*">` glob matches nothing, the natives never reach the
-      # test hosts, and all Z3-backed tests SKIP — so the gate that authorizes shipping
-      # to NuGet would go green having verified none of the verification surface. The
-      # `publish` job below already stages the natives before restore for this same reason.
-      - name: Seed Z3 native libraries (before MSBuild evaluation)
-        run: bash src/Calor.Compiler/scripts/download-z3.sh
+      - name: Bootstrap verified Z3 assets
+        uses: ./.github/actions/bootstrap-z3
 
       - name: Restore dependencies
         run: dotnet restore --locked-mode
@@ -208,13 +199,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Bootstrap verified Z3 assets
-        if: runner.os != 'Windows'
-        run: bash src/Calor.Compiler/scripts/download-z3.sh
-
-      - name: Bootstrap verified Z3 assets (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: pwsh -NoProfile -File src/Calor.Compiler/scripts/download-z3.ps1
+        uses: ./.github/actions/bootstrap-z3
 
       - name: Run M-A1 consumer check
         env:
@@ -246,8 +231,8 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Seed Z3 native libraries
-        run: bash src/Calor.Compiler/scripts/download-z3.sh
+      - name: Bootstrap verified Z3 assets
+        uses: ./.github/actions/bootstrap-z3
 
       - name: Restore and build
         run: |
@@ -351,51 +336,13 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # Download pre-built Z3 binaries from our z3-binaries release
-      - name: Download Z3 binaries
-        run: |
-          RELEASE_URL="https://github.com/${{ github.repository }}/releases/download/z3-binaries-${{ env.Z3_VERSION }}"
-
-          mkdir -p src/Calor.Compiler/z3
-          mkdir -p src/Calor.Compiler/runtimes/linux-x64/native
-          mkdir -p src/Calor.Compiler/runtimes/linux-arm64/native
-          mkdir -p src/Calor.Compiler/runtimes/osx-arm64/native
-          mkdir -p src/Calor.Compiler/runtimes/win-x64/native
-          mkdir -p src/Calor.Compiler/runtimes/win-arm64/native
-
-          # W1 Slice 2 (#789): fail-closed, checksum-verified downloads. The old
-          # bare `curl -L` (no -f, no verification) would have silently packed a
-          # 404 HTML page into the shipped nupkg as libz3.
-          set -euo pipefail
-          MANIFEST=".github/z3-binaries-${{ env.Z3_VERSION }}.sha256"
-          if [ ! -s "$MANIFEST" ]; then
-            echo "::error::Z3 checksum manifest $MANIFEST is missing or empty — refusing to pack unverified natives"
-            exit 1
-          fi
-
-          STAGING="$(mktemp -d)"
-          # The checksum manifest also tracks the standalone win-x86 Z3 build,
-          # but .NET 10 has no x86 SDK, so that asset is verified but not staged
-          # into Calor packages.
-          ASSETS="Microsoft.Z3.dll libz3-linux-x64.so libz3-linux-arm64.so libz3-osx-arm64.dylib libz3-win-x64.dll libz3-win-x86.dll libz3-win-arm64.dll"
-          for asset in $ASSETS; do
-            curl -fL -sS --retry 10 --retry-all-errors --retry-max-time 300 -o "$STAGING/$asset" "${RELEASE_URL}/${asset}"
-          done
-
-          while read -r hash asset size; do
-            test "$(wc -c < "$STAGING/$asset" | tr -d ' ')" = "$size"
-          done < <(grep -v '^#' "$MANIFEST" | awk 'NF')
-          (cd "$STAGING" && grep -v '^#' "$GITHUB_WORKSPACE/$MANIFEST" | awk 'NF {print $1 "  " $2}' | sha256sum --check --strict -)
-
-          mv "$STAGING/Microsoft.Z3.dll"      src/Calor.Compiler/z3/Microsoft.Z3.dll
-          mv "$STAGING/libz3-linux-x64.so"    src/Calor.Compiler/runtimes/linux-x64/native/libz3.so
-          mv "$STAGING/libz3-linux-arm64.so"  src/Calor.Compiler/runtimes/linux-arm64/native/libz3.so
-          mv "$STAGING/libz3-osx-arm64.dylib" src/Calor.Compiler/runtimes/osx-arm64/native/libz3.dylib
-          mv "$STAGING/libz3-win-x64.dll"     src/Calor.Compiler/runtimes/win-x64/native/libz3.dll
-          mv "$STAGING/libz3-win-arm64.dll"   src/Calor.Compiler/runtimes/win-arm64/native/libz3.dll
-
-          echo "Downloaded and checksum-verified Z3 binaries:"
-          find src/Calor.Compiler/z3 src/Calor.Compiler/runtimes -type f -ls
+      # #1420: the packed Z3 bytes come from the same owned bootstrap as every
+      # test and consumer job above (checksum-pinned upstream archives, outputs
+      # verified against .github/z3-binaries-4.15.7.sha256), not from a second
+      # download path. The z3-binaries release is a mirror pinned by that same
+      # manifest; nothing packs from it.
+      - name: Bootstrap verified Z3 assets
+        uses: ./.github/actions/bootstrap-z3
 
       - name: Restore dependencies
         run: dotnet restore src/Calor.Compiler/Calor.Compiler.csproj --locked-mode
@@ -421,6 +368,12 @@ jobs:
           set -euo pipefail
           SDK_NUPKG=$(ls ./nupkg/Calor.Sdk.*.nupkg)
           bash .github/scripts/inspect-sdk-nupkg.sh "$SDK_NUPKG" --all-rids
+
+      - name: Verify packed Z3 assets against the pins
+        run: |
+          set -euo pipefail
+          python3 scripts/check-packaged-z3.py ./nupkg/calor.*.nupkg --prefix tools/net10.0/any --all-rids
+          python3 scripts/check-packaged-z3.py ./nupkg/Calor.Sdk.*.nupkg --prefix tasks/net10.0 --all-rids
 
       - name: Generate SBOM and provenance
         run: |

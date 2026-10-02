@@ -1,0 +1,26 @@
+name: Bootstrap verified Z3 assets
+description: >-
+  The single owned Z3 bootstrap for every workflow job (0.24 G1, #1420). Fetches
+  the checksum-pinned upstream Z3 4.15.7 archives, extracts the managed wrapper and
+  every supported RID's native library, and verifies each output against
+  .github/z3-binaries-4.15.7.sha256. Builds never download; run this once, after
+  checkout and before the first dotnet command. eng/z3-consumers.json registers
+  the consumer matrix, and scripts/test_z3_hermetic.py rejects any other Z3
+  seeding in a workflow.
+
+runs:
+  using: composite
+  steps:
+    - name: Fetch and verify Z3 (bash)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: bash src/Calor.Compiler/scripts/download-z3.sh
+
+    - name: Fetch and verify Z3 (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: pwsh -NoProfile -File src/Calor.Compiler/scripts/download-z3.ps1
+
+    - name: Record verified Z3 provenance
+      shell: bash
+      run: cat src/Calor.Compiler/z3/.provenance.json

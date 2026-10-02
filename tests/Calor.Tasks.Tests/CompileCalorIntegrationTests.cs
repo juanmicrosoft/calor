@@ -1416,8 +1416,8 @@ public class CompileCalorIntegrationTests : IDisposable
     // drop the refutation.
     // #826 review M4: the in-process VerifyGate tests find libz3 through the
     // test host's deps.json probing, which the real MSBuild task path does NOT
-    // get — the gate there depends on CopyZ3NativeToTasksOutput placing the
-    // native lib at the Tasks output ROOT. Pin that deployment directly: if
+    // get — the gate there depends on the host native reaching the Tasks output
+    // ROOT (Calor.Compiler's AddZ3AssetsToOutput items, #1420). Pin that deployment directly: if
     // the copy target regresses, this fails while the other gate tests stay
     // green.
     [Fact]
@@ -1443,7 +1443,7 @@ public class CompileCalorIntegrationTests : IDisposable
                 || File.Exists(Path.Combine(binDir, "libz3.dll"));
             Assert.True(hasNative,
                 $"No libz3 native library at the Calor.Tasks output root ({binDir}) — "
-                + "the MSBuild verify gate would silently report Z3 unavailable (CopyZ3NativeToTasksOutput regressed?)");
+                + "the MSBuild verify gate would silently report Z3 unavailable (AddZ3AssetsToOutput regressed?)");
         }
         Assert.True(checkedConfigs > 0, "No built Calor.Tasks output found to check");
     }

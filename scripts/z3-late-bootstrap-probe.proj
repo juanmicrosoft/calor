@@ -1,0 +1,42 @@
+<Project>
+  <!-- 0.24 G1 (#1420) negative control for #859's propagation race.
+
+       One MSBuild invocation (1) evaluates Calor.Compiler while the Z3 assets
+       are absent, (2) lets the explicit bootstrap land, then (3) builds a
+       referencing test project in the same build, which reuses the evaluation
+       from step 1. With an evaluation-time `runtimes\**\*` glob, the build
+       passes ValidateZ3Assets yet the test host receives Microsoft.Z3.dll and
+       no libz3, so every Z3 test skips. With execution-time items it receives
+       the full verified set. The caller then runs the consumer's
+       Z3ConsumerGuardTests, which fail rather than skip.
+
+       Usage (assets moved into $(Z3Stash) beforehand):
+         dotnet msbuild scripts/z3-late-bootstrap-probe.proj -t:Probe \
+           -p:Configuration=Release -p:Z3Stash=<dir> -->
+  <PropertyGroup>
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'))</RepoRoot>
+    <ProducerProject>$(RepoRoot)/src/Calor.Compiler/Calor.Compiler.csproj</ProducerProject>
+    <ConsumerProject Condition="'$(ConsumerProject)' == ''">$(RepoRoot)/tests/Calor.Semantics.Tests/Calor.Semantics.Tests.csproj</ConsumerProject>
+  </PropertyGroup>
+
+  <Target Name="Probe">
+    <Error Condition="'$(Z3Stash)' == '' or !Exists('$(Z3Stash)/z3') or !Exists('$(Z3Stash)/runtimes')"
+           Text="Z3Stash must name a directory holding the moved-away z3/ and runtimes/ folders." />
+    <Error Condition="Exists('$(RepoRoot)/src/Calor.Compiler/runtimes') or Exists('$(RepoRoot)/src/Calor.Compiler/z3')"
+           Text="Move src/Calor.Compiler/z3 and runtimes into Z3Stash first; the probe needs them absent at evaluation." />
+
+    <!-- 1. Evaluate the producer while its assets are absent. -->
+    <MSBuild Projects="$(ProducerProject)" Targets="GetTargetPath" />
+
+    <!-- 2. The explicit bootstrap lands after evaluation. -->
+    <ItemGroup>
+      <_StashedZ3 Include="$(Z3Stash)/z3/**/*" />
+      <_StashedRuntimes Include="$(Z3Stash)/runtimes/**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_StashedZ3)" DestinationFolder="$(RepoRoot)/src/Calor.Compiler/z3/%(RecursiveDir)" />
+    <Copy SourceFiles="@(_StashedRuntimes)" DestinationFolder="$(RepoRoot)/src/Calor.Compiler/runtimes/%(RecursiveDir)" />
+
+    <!-- 3. Build the consumer in the same build. -->
+    <MSBuild Projects="$(ConsumerProject)" Targets="Build" />
+  </Target>
+</Project>

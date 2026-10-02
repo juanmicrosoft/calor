@@ -95,6 +95,11 @@ if grep -q "runtimes/osx-x64/" "$ENTRIES"; then
 fi
 echo "OK: no osx-x64 native (#916 drop holds)"
 
+# #1420: the packaged Z3 bytes must be the pinned ones, for this runner's RID
+# and for every other libz3 the package carries.
+python3 "$REPO_ROOT/scripts/check-packaged-z3.py" "$NUPKG" \
+  --prefix tools/net10.0/any --rid "$RID"
+
 echo "== 3. clean-consumer install from the feed =="
 export NUGET_PACKAGES="$WORK/packages"   # cold cache: the install must come from the feed
 dotnet tool install calor \

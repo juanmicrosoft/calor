@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "issue": 1420,
+  "note": "Registered Z3 consumer and RID matrix (0.24 G1). scripts/test_z3_hermetic.py checks this file against the csproj item list, the asset verifier, every workflow, and every registered test project; tests/Shared/Z3ConsumerGuardTests.cs reads it at run time in every registered test host.",
+  "z3Version": "4.15.7",
+  "pins": {
+    "archives": "src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256",
+    "assets": ".github/z3-binaries-4.15.7.sha256"
+  },
+  "bootstrap": {
+    "action": ".github/actions/bootstrap-z3/action.yml",
+    "scripts": [
+      "src/Calor.Compiler/scripts/download-z3.sh",
+      "src/Calor.Compiler/scripts/download-z3.ps1"
+    ],
+    "verifier": "scripts/verify-z3-assets.py",
+    "source": "Checksum-pinned upstream Z3Prover/z3 4.15.7 archives; every extracted output is then verified against the asset pins. This is the only acquisition path for builds, tests, and packing. Builds never download: ValidateZ3Assets fails when an asset is missing or wrong."
+  },
+  "managed": {
+    "asset": "Microsoft.Z3.dll",
+    "path": "src/Calor.Compiler/z3/Microsoft.Z3.dll",
+    "archive": "z3-4.15.7-x64-glibc-2.39.zip"
+  },
+  "supportedRids": [
+    {
+      "rid": "linux-x64",
+      "asset": "libz3-linux-x64.so",
+      "native": "libz3.so",
+      "path": "src/Calor.Compiler/runtimes/linux-x64/native/libz3.so",
+      "archive": "z3-4.15.7-x64-glibc-2.39.zip"
+    },
+    {
+      "rid": "linux-arm64",
+      "asset": "libz3-linux-arm64.so",
+      "native": "libz3.so",
+      "path": "src/Calor.Compiler/runtimes/linux-arm64/native/libz3.so",
+      "archive": "z3-4.15.7-arm64-glibc-2.38.zip"
+    },
+    {
+      "rid": "osx-arm64",
+      "asset": "libz3-osx-arm64.dylib",
+      "native": "libz3.dylib",
+      "path": "src/Calor.Compiler/runtimes/osx-arm64/native/libz3.dylib",
+      "archive": "z3-4.15.7-arm64-osx-15.7.3.zip"
+    },
+    {
+      "rid": "win-x64",
+      "asset": "libz3-win-x64.dll",
+      "native": "libz3.dll",
+      "path": "src/Calor.Compiler/runtimes/win-x64/native/libz3.dll",
+      "archive": "z3-4.15.7-x64-win.zip"
+    },
+    {
+      "rid": "win-arm64",
+      "asset": "libz3-win-arm64.dll",
+      "native": "libz3.dll",
+      "path": "src/Calor.Compiler/runtimes/win-arm64/native/libz3.dll",
+      "archive": "z3-4.15.7-arm64-win.zip"
+    }
+  ],
+  "unsupportedRids": [
+    {
+      "rid": "osx-x64",
+      "reason": "Upstream's x64-osx archive contains an arm64 binary; Intel macOS is unsupported for verification. A test host on this RID fails Z3ConsumerGuardTests instead of skipping."
+    },
+    {
+      "rid": "win-x86",
+      "reason": ".NET 10 has no x86 SDK. The asset stays pinned in the asset manifest but is never copied to build output or packed."
+    }
+  ],
+  "testHosts": {
+    "guard": "tests/Shared/Z3ConsumerGuardTests.cs",
+    "guardClass": "Z3ConsumerGuardTests",
+    "projects": "Every project in eng/test-manifest.json. Each one references Calor.Compiler directly or transitively and links the guard.",
+    "expectedRidVariable": "CALOR_Z3_EXPECTED_RID"
+  },
+  "matrix": [
+    {
+      "consumer": "test-hosts",
+      "rid": "linux-x64",
+      "workflow": ".github/workflows/test.yml",
+      "job": "remaining-tests",
+      "coverage": "Full suites of 11 manifest projects, with check_trx.py inventory enforcement. Calor.Ids.Tests runs in the id-validation job and Calor.Performance.Tests in performance.yml; publish-nuget.yml's test job runs all 13 before a release."
+    },
+    {
+      "consumer": "test-hosts",
+      "rid": "linux-x64",
+      "workflow": ".github/workflows/publish-nuget.yml",
+      "job": "test",
+      "coverage": "Full suites of all 13 manifest projects on the release commit."
+    },
+    {
+      "consumer": "test-hosts",
+      "rid": "linux-arm64",
+      "workflow": ".github/workflows/test.yml",
+      "job": "z3-consumer-matrix",
+      "coverage": "Full Calor.Verification.Tests suite (inventory-enforced, zero skips) and the Calor.Tasks.Tests guard plus task-root native check."
+    },
+    {
+      "consumer": "test-hosts",
+      "rid": "osx-arm64",
+      "workflow": ".github/workflows/test.yml",
+      "job": "z3-consumer-matrix",
+      "coverage": "Full Calor.Verification.Tests suite (inventory-enforced, zero skips) and the Calor.Tasks.Tests guard plus task-root native check."
+    },
+    {
+      "consumer": "test-hosts",
+      "rid": "win-x64",
+      "workflow": ".github/workflows/test.yml",
+      "job": "z3-consumer-matrix",
+      "coverage": "Full Calor.Verification.Tests suite (inventory-enforced, zero skips) and the Calor.Tasks.Tests guard plus task-root native check."
+    },
+    {
+      "consumer": "test-hosts",
+      "rid": "win-arm64",
+      "workflow": ".github/workflows/test.yml",
+      "job": "z3-consumer-matrix",
+      "coverage": "Full Calor.Verification.Tests suite (inventory-enforced, zero skips) and the Calor.Tasks.Tests guard plus task-root native check."
+    },
+    {
+      "consumer": "sdk-package",
+      "rid": "*",
+      "workflow": ".github/workflows/test.yml",
+      "job": "sdk-package-consumer",
+      "coverage": "Pack Calor.Sdk, restore it from a local feed, build and test a consumer with the in-task Z3 verify canary; the packaged native for the runner RID must match its asset pin."
+    },
+    {
+      "consumer": "sdk-package",
+      "rid": "*",
+      "workflow": ".github/workflows/publish-nuget.yml",
+      "job": "sdk-consumer",
+      "coverage": "Same probe on the release commit."
+    },
+    {
+      "consumer": "cli-tool-package",
+      "rid": "*",
+      "workflow": ".github/workflows/test.yml",
+      "job": "cli-tool-consumer",
+      "coverage": "Pack the calor tool, install it into a clean tool path, and require a Z3 verdict; the packaged native for the runner RID must match its asset pin."
+    }
+  ],
+  "negativeControls": [
+    {
+      "workflow": ".github/workflows/test.yml",
+      "job": "test",
+      "step": "Missing Z3 fails before compilation without downloading"
+    },
+    {
+      "workflow": ".github/workflows/test.yml",
+      "job": "test",
+      "step": "Wrong Z3 asset fails before compilation"
+    },
+    {
+      "workflow": ".github/workflows/test.yml",
+      "job": "test",
+      "step": "Late Z3 bootstrap still reaches a referencing test host"
+    }
+  ],
+  "producersAndMonitors": [
+    {
+      "workflow": ".github/workflows/build-z3.yml",
+      "role": "workflow_dispatch producer of the z3-binaries-4.15.7 release mirror. No build, test, or pack consumes that release; its bytes are pinned by the same asset manifest the bootstrap verifies."
+    },
+    {
+      "workflow": ".github/workflows/z3-pin-check.yml",
+      "role": "Daily drift monitor for the upstream archives and the release mirror. Downloads into scratch space only."
+    }
+  ]
+}
