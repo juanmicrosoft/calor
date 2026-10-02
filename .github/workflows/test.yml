@@ -296,18 +296,14 @@ jobs:
           # stays shallow.
           fetch-depth: 0
 
-      # #1417 (v0.24 contract §6): LedgerCommitStampTests resolves every provenance
-      # identity from fetched protected main or a release tag — never HEAD, which
-      # in PR CI is refs/pull/N/merge. Fetch both explicitly instead of relying on
-      # checkout defaults, and stop here if the clone is shallow or main is absent;
-      # the test itself also fails (it no longer skips) in that state.
-      - name: Fetch protected main and release tags for provenance (#1417)
+      # #1417 (v0.24 §6): provenance identities resolve from fetched protected main,
+      # never HEAD (refs/pull/N/merge here). Fetch it, and every tag a fresh clone has.
+      - name: Fetch protected main and tags for provenance (#1417)
         shell: bash
         run: |
           set -euo pipefail
           git fetch --no-recurse-submodules --force origin \
-            '+refs/heads/main:refs/remotes/origin/main' \
-            '+refs/tags/v*:refs/tags/v*'
+            '+refs/heads/main:refs/remotes/origin/main' '+refs/tags/*:refs/tags/*'
           test "$(git rev-parse --is-shallow-repository)" = false
           git rev-parse --verify 'refs/remotes/origin/main^{commit}'
 
@@ -477,18 +473,14 @@ jobs:
           # Under a depth-1 checkout it now FAILS (it used to skip).
           fetch-depth: 0
 
-      # #1417 (v0.24 contract §6): LedgerCommitStampTests resolves every provenance
-      # identity from fetched protected main or a release tag — never HEAD, which
-      # in PR CI is refs/pull/N/merge. Fetch both explicitly instead of relying on
-      # checkout defaults, and stop here if the clone is shallow or main is absent;
-      # the test itself also fails (it no longer skips) in that state.
-      - name: Fetch protected main and release tags for provenance (#1417)
+      # #1417 (v0.24 §6): provenance identities resolve from fetched protected main,
+      # never HEAD (refs/pull/N/merge here). Fetch it, and every tag a fresh clone has.
+      - name: Fetch protected main and tags for provenance (#1417)
         shell: bash
         run: |
           set -euo pipefail
           git fetch --no-recurse-submodules --force origin \
-            '+refs/heads/main:refs/remotes/origin/main' \
-            '+refs/tags/v*:refs/tags/v*'
+            '+refs/heads/main:refs/remotes/origin/main' '+refs/tags/*:refs/tags/*'
           test "$(git rev-parse --is-shallow-repository)" = false
           git rev-parse --verify 'refs/remotes/origin/main^{commit}'
 

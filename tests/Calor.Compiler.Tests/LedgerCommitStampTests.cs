@@ -7,20 +7,36 @@ using Xunit;
 namespace Calor.Compiler.Tests;
 
 /// <summary>
-/// #1159, then #1417 — every ledger under <c>bench/phase0-agent-native/</c> stamps the commit its
-/// numbers were measured against, and the website's benchmark data stamps the commit it was
-/// generated from. A stamp written on a branch names a commit the squash merge discards; short
-/// stamps can collide. <c>commit-stamp-index.json</c> keeps every stamp as written (it is the
-/// experimental record) and records a durable identity beside it.
+/// #1159 — every ledger under <c>bench/phase0-agent-native/</c> stamps the commit its numbers were
+/// measured against, and every roadmap since 0.15 cites those stamps as the provenance of its
+/// published figures. None of them resolved.
 ///
-/// <para><b>#1417 closes three gaps the #1199 version of this test left.</b> It checked
-/// reachability from <c>HEAD</c> — in pull-request CI that is <c>refs/pull/N/merge</c>, so a
-/// branch-only commit passed and then vanished with the squash. It skipped in a shallow clone, so
-/// the gate could go quiet everywhere. And it never verified the <c>identical-src-tree</c> basis it
-/// asserted. Now every identity must resolve from fetched <c>refs/remotes/origin/main</c> or a
-/// release tag, every claimed tree and manifest hash is re-read from git, and a shallow or
-/// unfetched clone fails (<see cref="DurableProvenance"/>). The rules are exercised on throwaway
-/// repositories — squash merge, merge ref, shallow clone — by <c>DurableProvenanceTests</c>.</para>
+/// <para>The mechanism is the repository's own merge policy: it squash-merges, so a stamp written
+/// on a branch names a commit the squash discards. Three of five named commits are contained by
+/// <b>zero</b> remote branches — they survive only as unreferenced objects in individual clones and
+/// would not survive a <c>git gc</c>. The numbers were never in doubt; what was gone is a third
+/// party's ability to check them, which is the entire purpose of the stamp.</para>
+///
+/// <para><b>The stamps are not repointed, and that is deliberate.</b> A <c>measuredCommit</c> is the
+/// experimental record, not a pointer: overwriting it would falsify what was measured. One of them
+/// is additionally <c>ARM_B_COMMIT</c>, a frozen constant of a completed epoch that
+/// <c>ppw-compile.py</c>, <c>ppw-analyze.py</c> and <c>PpWRowsRegistrationTests</c> all pin. Two of
+/// the ledgers are byte-compared against their own generators, so even adding a field by hand would
+/// leave them permanently "stale". The resolvable equivalent therefore lives beside them, in
+/// <c>commit-stamp-index.json</c>.</para>
+///
+/// <para>This is the test roadmap-v0.18 §3.2 S3 asked for — <i>"a test that fails when a stamp does
+/// not resolve on main — cheap, and it would have caught this the first time"</i>. Three properties,
+/// because the first alone would pass vacuously on an empty index: every indexed commit resolves and
+/// is reachable; every entry's <c>measuredCommit</c> still matches the ledger it describes, so the
+/// index cannot drift away from the files it speaks for; and every ledger carrying a
+/// <c>measuredCommit</c> is covered, so #1159 cannot recur by simply not adding an entry.</para>
+///
+/// <para><b>#1417</b>: the #1199 version checked reachability from <c>HEAD</c> (in PR CI, the
+/// merge ref), skipped in a shallow clone, and never verified the bases it asserted. Identities now
+/// resolve only from fetched <c>refs/remotes/origin/main</c>, claimed trees and manifests are
+/// re-read, shallow or unfetched clones fail (<see cref="DurableProvenance"/>), and the website's
+/// benchmark stamps are covered. <c>DurableProvenanceTests</c> exercises the rules on real git.</para>
 /// </summary>
 public class LedgerCommitStampTests
 {
@@ -29,15 +45,14 @@ public class LedgerCommitStampTests
     private static readonly string[] PublicationStampNames = { "commit", "sourceCommit" };
 
     [Fact]
-    public void EveryAuthoritativeIdentityResolvesFromProtectedMainOrReleaseTag()
+    public void EveryAuthoritativeIdentityResolvesFromProtectedMain()
     {
         var root = RepoRoot();
         var entries = AllEntries(root);
         var result = DurableProvenance.Verify(new GitRepo(root), entries);
 
         Assert.True(result.Findings.Count == 0,
-            $"{result.Findings.Count} provenance findings (§6; fetch full history and origin/main if "
-            + "this is a fresh or shallow clone):" + Environment.NewLine
+            $"{result.Findings.Count} provenance findings (§6; fetch full history and origin/main if " + "this is a fresh or shallow clone):" + Environment.NewLine
             + string.Join(Environment.NewLine, result.Findings));
         Assert.True(entries.Count >= 11, $"expected at least 11 indexed stamps; found {entries.Count}");
         Assert.Equal(entries.Count, result.Authoritative.Count + result.Pending.Count);
