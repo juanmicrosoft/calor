@@ -1,12 +1,20 @@
 name: Benchmarks
 
+# #1410 (0.24 R2): benchmark publication (the results PR and the agent-refactoring
+# commit) is gated on one successful #1408 adjudication identity. A dispatch must
+# carry the identity and fails before any benchmark runs if it does not verify; the
+# publishing steps re-verify that every changed file is an adjudicated benchmark file.
+# Push runs measure only and never publish. There is no `release: created` trigger:
+# publish-nuget dispatches this workflow from main after the release exists, and a
+# dispatch checks out the adjudicated candidate, not the dispatch ref.
+# Design: docs/plans/evidence/r2-1410/release-gate.md.
 on:
-  # Release and push events run deterministic benchmarks only.
-  release:
-    types: [created]
-  # Allow manual trigger
   workflow_dispatch:
     inputs:
+      adjudication_identity:
+        description: 'calor-adjudication:v1:<adjudication commit>:<terminal record sha256> (#1410)'
+        required: true
+        type: string
       statistical_runs:
         description: 'Number of statistical runs (default 30)'
         required: false
@@ -35,6 +43,9 @@ on:
       - 'tests/E2E/agent-tasks/**'
       - '.github/workflows/benchmark.yml'
 
+env:
+  ADJUDICATION_IDENTITY: ${{ inputs.adjudication_identity }}
+
 jobs:
   benchmark:
     runs-on: ubuntu-latest
@@ -45,6 +56,33 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # Full history for the adjudication gate (it fails, not skips, when shallow).
+          fetch-depth: 0
+
+      - name: Verify the adjudication identity (#1410)
+        id: gate
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::benchmark publication is dispatched only from main (got $GITHUB_REF)"; exit 1
+          fi
+          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY"
+
+      - name: Check out the candidate and verify the GitHub release (#1410)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE: ${{ steps.gate.outputs.candidate }}
+          TAG: ${{ steps.gate.outputs.tag }}
+          VER: ${{ steps.gate.outputs.version }}
+        run: |
+          set -euo pipefail
+          git checkout -q --detach "$CANDIDATE"
+          gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/release-body.md"
+          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+            --expect-head --require-tag --version "$VER" --release-body "$RUNNER_TEMP/release-body.md"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -198,38 +236,42 @@ jobs:
             website/public/data/effect-discipline-results.json
           retention-days: 90
 
-      - name: Create PR with benchmark results
-        if: github.ref == 'refs/heads/main' || github.event_name == 'release' || github.event_name == 'workflow_dispatch'
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: update benchmark results"
-          title: "chore: Update benchmark results"
-          body: |
-            This PR updates the benchmark results.
-
-            ## Methodology — read this before the numbers (#1157)
-
-            ```
-            ${{ steps.methodology.outputs.report }}
-            ```
-
-            `overallAdvantage` is a geometric mean over the metric set, computed from
-            `statisticalRunCount` runs. A change in either makes the before and after
-            figures **incomparable** — a lower number is not necessarily a regression.
-            The line above states both, so the swap is visible here rather than buried
-            in JSON.
-
-            ## Changes
-            - Updated benchmark-results.json
-            - Generated HTML dashboard
-            - Updated docs/benchmarking/results.md
-
-            ## Metrics
-            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          branch: benchmark-results-update
-          base: main
-          delete-branch: true
+      # #1410: the publication branch is built here from the candidate and pushed as is.
+      # (create-pull-request would re-apply the changes onto main after the check, so the
+      # pushed bytes could differ from the verified ones.) The work tree is verified
+      # immediately before the commit: every changed file must be an adjudicated benchmark
+      # file with the adjudicated hash, and the commit records exactly that tree.
+      - name: Verify and publish the benchmark results PR (#1410)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.gate.outputs.tag }}
+          VER: ${{ steps.gate.outputs.version }}
+          REPORT: ${{ steps.methodology.outputs.report }}
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+            --expect-head --require-tag --version "$VER" --benchmark-worktree
+          BRANCH="benchmark-results-$TAG"
+          git switch -q -c "$BRANCH"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add -A
+          git diff --cached --quiet && { echo "Adjudicated benchmark files are already in the candidate; nothing to publish."; exit 0; }
+          git commit -q -m "chore: publish adjudicated benchmark results for $TAG"
+          git push origin "HEAD:refs/heads/$BRANCH"
+          {
+            echo "Adjudicated benchmark results for $TAG (adjudication identity \`$ADJUDICATION_IDENTITY\`)."
+            echo
+            echo "## Methodology (#1157)"
+            echo
+            echo '```'
+            echo "$REPORT"
+            echo '```'
+            echo
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > "$RUNNER_TEMP/pr-body.md"
+          gh pr create --base main --head "$BRANCH" --title "chore: adjudicated benchmark results for $TAG" --body-file "$RUNNER_TEMP/pr-body.md"
 
   regression-check:
     runs-on: ubuntu-latest
@@ -270,6 +312,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -358,9 +402,15 @@ jobs:
           path: website/public/data/agent-refactoring-results.json
           retention-days: 90
 
+      # #1410: this direct commit to main is publication. The gate requires HEAD to be the
+      # adjudicated candidate, which a main checkout never is, so this step fails closed;
+      # agent results are historical-only in the #1407 inventory and have no 0.24 path.
       - name: Commit agent benchmark results
         if: github.ref == 'refs/heads/main'
         run: |
+          set -euo pipefail
+          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+            --expect-head --benchmark-worktree
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git pull --rebase origin main || true

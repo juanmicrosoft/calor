@@ -1,13 +1,20 @@
 # Deploy Next.js static site to GitHub Pages
 name: Deploy Next.js to GitHub Pages
 
+# #1410 (0.24 R2): a Pages deployment is publication. It runs only by dispatch from main
+# with one successful #1408 adjudication identity, after publish-nuget has created the
+# GitHub release that carries the same identity. It builds the adjudicated candidate
+# (not the dispatch ref), checks the built tree against the adjudicated hash, and the
+# deploy job checks the uploaded artifact again before deploying it. There is no
+# `release: created` trigger and no ungated dispatch.
+# Design: docs/plans/evidence/r2-1410/release-gate.md.
 on:
-  # Runs when a release is created
-  release:
-    types: [created]
-
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+    inputs:
+      adjudication_identity:
+        description: 'calor-adjudication:v1:<adjudication commit>:<terminal record sha256> (#1410)'
+        required: true
+        type: string
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
@@ -21,13 +28,45 @@ concurrency:
   group: "pages"
   cancel-in-progress: false
 
+env:
+  ADJUDICATION_IDENTITY: ${{ inputs.adjudication_identity }}
+
 jobs:
   # Build job
   build:
     runs-on: ubuntu-latest
+    outputs:
+      candidate: ${{ steps.gate.outputs.candidate }}
+      version: ${{ steps.gate.outputs.version }}
     steps:
-      - name: Checkout
+      - name: Refuse a dispatch from any ref but main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::deploy only from main (got $GITHUB_REF); the candidate comes from the adjudication identity"
+          exit 1
+
+      - name: Checkout full history
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify the adjudication identity (#1410)
+        id: gate
+        run: python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY"
+
+      - name: Check out the candidate and verify the GitHub release (#1410)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE: ${{ steps.gate.outputs.candidate }}
+          TAG: ${{ steps.gate.outputs.tag }}
+          VER: ${{ steps.gate.outputs.version }}
+        run: |
+          set -euo pipefail
+          git checkout -q --detach "$CANDIDATE"
+          gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/release-body.md"
+          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+            --expect-head --require-tag --version "$VER" --release-body "$RUNNER_TEMP/release-body.md"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -47,6 +86,13 @@ jobs:
         working-directory: website
         run: npm run build
 
+      - name: Verify the built site against the adjudication (#1410)
+        env:
+          VER: ${{ steps.gate.outputs.version }}
+        run: |
+          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+            --expect-head --version "$VER" --website-dir website/out
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -60,6 +106,31 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
+      - name: Checkout the candidate with full history
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.candidate }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download the uploaded Pages artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: github-pages
+          path: ${{ runner.temp }}/pages
+
+      # The artifact deploy-pages publishes is the one checked here, not the build job's
+      # work tree, so a change between build and deploy cannot pass unchecked.
+      - name: Verify the artifact about to be deployed (#1410)
+        env:
+          VER: ${{ needs.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/site"
+          tar -xf "$RUNNER_TEMP/pages/artifact.tar" -C "$RUNNER_TEMP/site"
+          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+            --expect-head --require-tag --version "$VER" --website-dir "$RUNNER_TEMP/site"
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

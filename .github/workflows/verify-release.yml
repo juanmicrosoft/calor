@@ -21,9 +21,44 @@ on:
         description: 'Package version to verify (e.g. 0.14.0)'
         required: true
         type: string
+      adjudication_identity:
+        description: 'calor-adjudication:v1:<adjudication commit>:<terminal record sha256> (#1410)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
 
 jobs:
+  # #1410 (0.24 R2): the installed-tool check is a release-path surface, so it also
+  # consumes the one adjudication identity. It verifies only the adjudicated version,
+  # and only after the GitHub release carrying that identity exists.
+  adjudication-gate:
+    runs-on: ubuntu-latest
+    outputs:
+      candidate: ${{ steps.gate.outputs.candidate }}
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify the adjudication identity and the GitHub release (#1410)
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ADJUDICATION_IDENTITY: ${{ inputs.adjudication_identity }}
+          VER: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != refs/heads/main ]; then echo "::error::dispatch from main only (got $GITHUB_REF)"; exit 1; fi
+          gh release view "v$VER" --json body --jq .body > "$RUNNER_TEMP/release-body.md"
+          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+            --version "$VER" --require-tag --release-body "$RUNNER_TEMP/release-body.md"
+
   install-and-verify:
+    needs: adjudication-gate
     strategy:
       fail-fast: false
       matrix:
@@ -43,6 +78,8 @@ jobs:
         with:
           # Only need samples/Verification/proven-contracts.calr for the check.
           # Sparse-checkout keeps the runner light and avoids submodule cost.
+          # The sample comes from the adjudicated candidate, not the dispatch ref (#1410).
+          ref: ${{ needs.adjudication-gate.outputs.candidate }}
           sparse-checkout: |
             samples/Verification
 
