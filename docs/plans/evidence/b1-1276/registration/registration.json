@@ -48,7 +48,7 @@
   "oracle": {
     "id": "b1-1276-pair-oracle",
     "version": "1",
-    "command": "dotnet run --project tests/Calor.Evaluation -c Release -- pair-oracle --registration docs/plans/evidence/b1-1276/registration --registration-commit <full SHA of the main commit that merged this registration> --output run1.json; then the same command with --compare-with run1.json --output results.json",
+    "command": "dotnet run --project tests/Calor.Evaluation -c Release -- pair-oracle --registration docs/plans/evidence/b1-1276/registration --registration-commit <full SHA of the main commit that merged this registration> --output <file outside the repository, run 1>; then the same command with --compare-with <run 1 file> --output <file outside the repository, run 2>",
     "runs": 2,
     "runAgreement": "The first run exits 4: it is not a result. The second run (--compare-with the first) reconciles them. It is invalid unless the first run has the same oracleId, oracleVersion, inputGeneratorVersion, registrationCommit, pairsSha256, and environment and exactly the same pair ids. A pair whose verdict differs between the runs is UNCLASSIFIED (NONDETERMINISTIC_ACROSS_RUNS). The second file keeps its raw verdicts (runResults) and the reconciled ones (results) and exits 0 only when valid, otherwise 3. Both files are retained; there is no rerun-until-agreement.",
     "implementation": [
@@ -62,7 +62,7 @@
       },
       {
         "path": "tests/Calor.Evaluation/Equivalence/PairOracleCommand.cs",
-        "sha256": "16745b2810d268e1dcc21ec8b861955cace982378d9d154cc9a4b84d513d35fb"
+        "sha256": "a8bf420fcd9171156dee6ed7497f6f6f0541c583aa6dce195bc06b60d5c95344"
       }
     ],
     "isolation": "Each pair runs in its own child process (300,000 ms limit). A crash is UNCLASSIFIED (ORACLE_CRASH); exceeding the limit is UNCLASSIFIED (TIMEOUT).",
@@ -131,7 +131,7 @@
       "Equivalence is checked on a finite input set and is not a proof.",
       "Effects other than return values, exceptions, stdout, argument state, and files created under the working directory (absolute paths, network, environment, static state between tuples) are not observed."
     ],
-    "preflight": "Before any pair runs, in both the parent and the per-pair child mode, the command refuses (exit 2) unless HEAD equals --registration-commit, no tracked file differs from that commit (so the compiler, oracle, metrics, and packet are the committed ones), every file in sha256.json matches its seal, and every oracle implementation file matches its pinned hash. The output records the .NET runtime, OS, architecture, and Roslyn version."
+    "preflight": "Before any pair runs, in both the parent and the per-pair child mode, the command refuses (exit 2) unless HEAD equals --registration-commit, the checkout is clean (no edited tracked file and no untracked, non-ignored file anywhere, so no unregistered source can enter the build), every file in sha256.json matches its seal, and every oracle implementation file matches its pinned hash. Outputs are written outside the repository. The output records the .NET runtime, OS, architecture, and Roslyn version."
   },
   "metrics": {
     "file": "metric-set.json",

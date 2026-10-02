@@ -26,7 +26,7 @@ public static class PairOracleCommand
         var command = new Command("pair-oracle", "Run the #1276 registered pair differential oracle");
         var registration = new Option<string>("--registration", "Registration directory (contains pairs.json)") { IsRequired = true };
         var commit = new Option<string>("--registration-commit", "Full SHA of the main commit that merged the registration") { IsRequired = true };
-        var output = new Option<string>("--output", () => "pair-oracle-results.json", "Results file");
+        var output = new Option<string>("--output", "Results file, outside the repository") { IsRequired = true };
         var pair = new Option<string?>("--pair", "Evaluate one pair in-process and print its verdict (child mode)");
         var compareWith = new Option<string?>("--compare-with", "First run's results; makes this the reconciling second run");
         foreach (var option in new Option[] { registration, commit, output, pair, compareWith })
@@ -64,8 +64,8 @@ public static class PairOracleCommand
         var root = RepoRoot(registrationDir);
         if (Git(root, "rev-parse", "HEAD").Trim() != registrationCommit)
             return "HEAD is not the registration commit";
-        if (Git(root, "status", "--porcelain", "--untracked-files=no").Length > 0)
-            return "tracked files differ from the registration commit (compiler, oracle, or packet edited)";
+        if (Git(root, "status", "--porcelain", "--untracked-files=all").Length > 0)
+            return "the checkout is not clean: an edited or untracked file could change the compiler, oracle, or packet (write outputs outside the repository)";
         var seals = JsonNode.Parse(File.ReadAllText(Path.Combine(registrationDir, "sha256.json")))!["files"]!.AsObject();
         var registration = JsonNode.Parse(File.ReadAllText(Path.Combine(registrationDir, "registration.json")))!;
         var pins = seals.Select(f => (f.Key, f.Value!.GetValue<string>()))
@@ -166,7 +166,7 @@ public static class PairOracleCommand
             : Node(new OracleVerdict(pairId, "UNCLASSIFIED", "ORACLE_CRASH", [], 0, null, [], $"pair process exit code {process.ExitCode}"));
     }
 
-    private static string Git(string root, params string[] args)
+    internal static string Git(string root, params string[] args)
     {
         using var process = Process.Start(new ProcessStartInfo("git", ["-C", root, .. args]) { RedirectStandardOutput = true })!;
         var text = process.StandardOutput.ReadToEnd();

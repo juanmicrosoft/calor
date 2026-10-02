@@ -103,6 +103,18 @@ public class PairDifferentialOracleTests
         var registration = Path.Combine(PairOracleCommand.RepoRoot(AppContext.BaseDirectory), "docs/plans/evidence/b1-1276/registration");
         Assert.Contains("full 40-hex", PairOracleCommand.Preflight(registration, "72a0a855"), StringComparison.Ordinal);
         Assert.Contains("HEAD is not", PairOracleCommand.Preflight(registration, new string('0', 40)), StringComparison.Ordinal);
+        // An untracked compilation unit at the right commit is still refused.
+        var root = PairOracleCommand.RepoRoot(registration);
+        var probe = Path.Combine(root, $"b1-1276-preflight-probe-{Guid.NewGuid():N}.cs");
+        File.WriteAllText(probe, "class Probe { }");
+        try
+        {
+            Assert.Contains("not clean", PairOracleCommand.Preflight(registration, PairOracleCommand.Git(root, "rev-parse", "HEAD").Trim()), StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(probe);
+        }
     }
 
     [Fact]
