@@ -1,0 +1,13 @@
+{
+  "algorithm": "SHA-256",
+  "normalization": "UTF-8 bytes with CRLF normalized to LF",
+  "excludes": [
+    "docs/plans/evidence/evidence-contract-1407/sha256.json"
+  ],
+  "enforcedBy": "tests/Calor.Compiler.Tests/EvidenceContract/EvidenceContractTests.cs (PacketHashesMatchSha256Manifest)",
+  "files": {
+    "docs/plans/v0.24-evidence-contract.md": "a9ed0fe7e2e6d9ae8406ce90f6a967048e7ba27ebf02e6e3f7cd4f81169d8cfe",
+    "docs/plans/evidence/evidence-contract-1407/contract.json": "31670c8ba5f44a3114cbb5119986b2867c602721d5a3d541e1a363b5e83c755f",
+    "docs/plans/evidence/evidence-contract-1407/artifact-inventory.json": "f906333204dbc0b35572468c1fdfdc3e877cdadc0e8f586600bd9d300f9900dc"
+  }
+}
