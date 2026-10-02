@@ -62,6 +62,8 @@ public class ReleaseWorkflowGateTests
 
     [Theory]
     [InlineData("python3 scripts/verify_release_adjudication.py --identity \"$ID\" || true")]
+    [InlineData("python3 scripts/verify_release_adjudication.py --identity \"$ID\" || :")]
+    [InlineData("python3 scripts/verify_release_adjudication.py --identity \"$ID\" || exit 0")]
     [InlineData("python3 scripts/verify_release_adjudication.py --identity \"$ID\" \\\n            --expect-head || echo skipped")]
     public void GateCheckerRejectsASuppressedGate(string gate)
     {
@@ -118,7 +120,7 @@ public class ReleaseWorkflowGateTests
                 if (code.StartsWith('#')) continue;
                 if (code.Contains(Verifier) || inGate)
                 {
-                    if (Regex.IsMatch(code, @"\|\|\s*(?:true|:|echo)\b|;\s*true\b"))
+                    if (Regex.IsMatch(code, @"\|\|\s*(?:true\b|:(?=\s|;|$)|echo\b|exit\s+0\b)|;\s*true\b"))
                         violations.Add($"{name}:{job}: the gate's failure is suppressed: '{code}'");
                     else if (code.Contains(Verifier))
                         gateSeen = true;
