@@ -70,14 +70,28 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          # #1159: LedgerCommitStampTests decides whether a ledger's MeasuredCommit
-          # is reachable, which needs history. Under a depth-1 checkout it SKIPS —
-          # and that extra skip put the shard at 5 skips against the manifest's 4,
-          # so `Enforce test inventory` failed the release with
-          # "executed 8043, expected 8044" and publish-nuget shipped nothing.
-          # test.yml already checks out full history for the same reason; the
-          # release path is if anything where provenance most wants verifying.
+          # #1159/#1417: LedgerCommitStampTests needs full history and fetched
+          # protected main to decide whether each provenance identity is durable.
+          # Under a depth-1 checkout it used to SKIP — that extra skip once failed
+          # `Enforce test inventory` ("executed 8043, expected 8044") and shipped
+          # nothing. It now FAILS instead. The release path is where provenance
+          # most wants verifying.
           fetch-depth: 0
+
+      # #1417 (v0.24 contract §6): LedgerCommitStampTests resolves every provenance
+      # identity from fetched protected main or a release tag — never HEAD, which
+      # in PR CI is refs/pull/N/merge. Fetch both explicitly instead of relying on
+      # checkout defaults, and stop here if the clone is shallow or main is absent;
+      # the test itself also fails (it no longer skips) in that state.
+      - name: Fetch protected main and release tags for provenance (#1417)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-recurse-submodules --force origin \
+            '+refs/heads/main:refs/remotes/origin/main' \
+            '+refs/tags/v*:refs/tags/v*'
+          test "$(git rev-parse --is-shallow-repository)" = false
+          git rev-parse --verify 'refs/remotes/origin/main^{commit}'
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -233,8 +247,24 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          # Keep ledger provenance tests active, as in main CI and release tests.
+          # Keep ledger provenance tests active, as in main CI and release tests
+          # (#1159/#1417: they fail in a shallow clone).
           fetch-depth: 0
+
+      # #1417 (v0.24 contract §6): LedgerCommitStampTests resolves every provenance
+      # identity from fetched protected main or a release tag — never HEAD, which
+      # in PR CI is refs/pull/N/merge. Fetch both explicitly instead of relying on
+      # checkout defaults, and stop here if the clone is shallow or main is absent;
+      # the test itself also fails (it no longer skips) in that state.
+      - name: Fetch protected main and release tags for provenance (#1417)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-recurse-submodules --force origin \
+            '+refs/heads/main:refs/remotes/origin/main' \
+            '+refs/tags/v*:refs/tags/v*'
+          test "$(git rev-parse --is-shallow-repository)" = false
+          git rev-parse --verify 'refs/remotes/origin/main^{commit}'
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
