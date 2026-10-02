@@ -31,9 +31,9 @@
       "path": "tests/Calor.Evaluation/Calor.Evaluation.csproj",
       "workflow": ".github/workflows/test.yml",
       "releaseCritical": true,
-      "expectedTotal": 229,
+      "expectedTotal": 230,
       "expectedSkipped": 0,
-      "note": "#1276 (0.24 B1 registration): 208 -> 229, +21 PairDifferentialOracleTests cases: synthetic positive and negative controls for the registered pair oracle (agreement, one-input output difference, return vs throw, exception type, stdout, argument mutation, created files, unsupported properties and non-static classes, results that fail only when enumerated, second-run provenance, pair-set, and known-witness reconciliation, preflight commit refusal, CsvParser-shaped surface mismatch, build failures, changed bytes, nondeterminism, timeout, empty surface and unsupported types, input-generator determinism). None runs a registered benchmark pair. No new skipped cases."
+      "note": "#1276 (0.24 B1 registration): 208 -> 229, +21 PairDifferentialOracleTests cases: synthetic positive and negative controls for the registered pair oracle (agreement, one-input output difference, return vs throw, exception type, stdout, argument mutation, created files, unsupported properties and non-static classes, results that fail only when enumerated, second-run provenance, pair-set, and known-witness reconciliation, preflight commit refusal, CsvParser-shaped surface mismatch, build failures, changed bytes, nondeterminism, timeout, empty surface and unsupported types, input-generator determinism). None runs a registered benchmark pair. No new skipped cases. Verification pass: 229 -> 230, +1 ChildCommandLineParsesWithoutParentOnlyOptions regression for the per-pair child command line."
     },
     {
       "path": "tests/Calor.Experimental.Tests/Calor.Experimental.Tests.csproj",

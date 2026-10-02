@@ -62,7 +62,7 @@
       },
       {
         "path": "tests/Calor.Evaluation/Equivalence/PairOracleCommand.cs",
-        "sha256": "a8bf420fcd9171156dee6ed7497f6f6f0541c583aa6dce195bc06b60d5c95344"
+        "sha256": "a3fe191b66edc417007ac0df0d94dd9d02b0faa6b1259e3568a30742573b9629"
       }
     ],
     "isolation": "Each pair runs in its own child process (300,000 ms limit). A crash is UNCLASSIFIED (ORACLE_CRASH); exceeding the limit is UNCLASSIFIED (TIMEOUT).",
