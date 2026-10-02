@@ -211,6 +211,39 @@ class Z3HermeticTests(unittest.TestCase):
             self.assertIn(f"public void {fact}()", guard)
         self.assertIn("eng\", \"z3-consumers.json", guard)
 
+    def test_every_z3_consuming_project_is_registered(self) -> None:
+        excluded = tuple(self.registry["projects"]["excludedTrees"])
+        projects = {
+            path.relative_to(REPO_ROOT).as_posix(): path
+            for path in REPO_ROOT.rglob("*.csproj")
+            if not path.relative_to(REPO_ROOT).as_posix().startswith(excluded)
+            and "/obj/" not in path.as_posix() and "/bin/" not in path.as_posix()
+        }
+        references: dict[str, set[str]] = {}
+        for relative, path in projects.items():
+            refs = re.findall(r'<ProjectReference\s+Include="([^"]+)"', path.read_text(encoding="utf-8"))
+            references[relative] = {
+                (path.parent / ref.replace("\\", "/")).resolve().relative_to(REPO_ROOT).as_posix()
+                for ref in refs
+            }
+        compiler = "src/Calor.Compiler/Calor.Compiler.csproj"
+        consumers = {compiler}
+        changed = True
+        while changed:
+            changed = False
+            for project, refs in references.items():
+                if project not in consumers and refs & consumers:
+                    consumers.add(project)
+                    changed = True
+        manifest = json.loads((REPO_ROOT / "eng/test-manifest.json").read_text(encoding="utf-8"))
+        registered = {entry["path"] for entry in self.registry["projects"]["entries"]}
+        registered |= {project["path"] for project in manifest["projects"]}
+        self.assertEqual(consumers, registered)
+
+        performance = next(p for p in manifest["projects"] if "Calor.Performance.Tests" in p["path"])
+        baseline = json.loads((REPO_ROOT / "eng/performance-baselines.json").read_text(encoding="utf-8"))
+        self.assertEqual(performance["expectedTotal"], baseline["expectedTestCount"])
+
     def test_workflows_seed_z3_only_through_the_owned_action(self) -> None:
         action = (REPO_ROOT / self.registry["bootstrap"]["action"]).read_text(encoding="utf-8")
         for script in self.registry["bootstrap"]["scripts"]:

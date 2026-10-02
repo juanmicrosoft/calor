@@ -34,6 +34,13 @@ under 1,500 changed lines excluding evidence data, $0), §10 (G1 row), §11 (#85
 | Calor.Sdk package | `sdk-package-consumer`, `sdk-consumer` | same | same | same | same |
 | calor tool package | `cli-tool-consumer` | same (new) | same | same | same (new) |
 
+- Projects: `projects.entries` lists every non-test project whose `ProjectReference`
+  closure reaches Calor.Compiler (12, with a role and coverage or exclusion reason for
+  each). `test_every_z3_consuming_project_is_registered` recomputes the closure and
+  requires it to equal the manifest's 13 test projects plus these 12.
+- Post-publication: `verify-release.yml` (manual, installs the published tool; builds
+  nothing) is registered in `postPublicationProbes`.
+
 Off linux-x64, test hosts other than Calor.Verification.Tests and Calor.Tasks.Tests are
 not run. Every test host loads Z3 through the same `AddZ3AssetsToOutput` items, and the
 two that run cover a direct and a transitive (`Calor.Tasks`) reference; this is recorded

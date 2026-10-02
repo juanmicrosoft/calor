@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Calor.Compiler.Verification.Z3;
 using Xunit;
 
@@ -51,8 +52,9 @@ public sealed class Z3ConsumerGuardTests
 
         var version = Z3ContextFactory.GetZ3Version();
         Assert.NotNull(version);
-        // Microsoft.Z3.Version.FullVersion reads "Z3 4.15.7.0".
-        Assert.StartsWith($"Z3 {registry.Version}.", version + ".", StringComparison.Ordinal);
+        // Microsoft.Z3.Version.FullVersion reads "Z3 4.15.7.0" from most upstream
+        // natives and "4.15.7.0 <git hash>" from the arm64-win one.
+        Assert.Matches($@"(^|\s){Regex.Escape(registry.Version)}(\.|\s|$)", version);
     }
 
     [Fact]

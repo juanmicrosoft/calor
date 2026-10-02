@@ -102,11 +102,29 @@ python3 "$REPO_ROOT/scripts/check-packaged-z3.py" "$NUPKG" \
 
 echo "== 3. clean-consumer install from the feed =="
 export NUGET_PACKAGES="$WORK/packages"   # cold cache: the install must come from the feed
+# #1420: the local feed is the ONLY source. With --add-source, a same-version
+# package on another configured feed could win and the Z3 bytes checked above
+# would not be the bytes installed.
+cat >"$WORK/nuget.config" <<NUGETCONFIG
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="local" value="$FEED" />
+  </packageSources>
+</configuration>
+NUGETCONFIG
 dotnet tool install calor \
   --version "$VERSION" \
-  --add-source "$FEED" \
-  --tool-path "$TOOLDIR" \
-  --ignore-failed-sources
+  --configfile "$WORK/nuget.config" \
+  --tool-path "$TOOLDIR"
+
+INSTALLED_NATIVE="$TOOLDIR/.store/calor/$VERSION/calor/$VERSION/$NATIVE_ENTRY"
+if ! unzip -p "$NUPKG" "$NATIVE_ENTRY" | cmp -s - "$INSTALLED_NATIVE"; then
+  echo "ERROR: installed $INSTALLED_NATIVE differs from the pin-checked package entry" >&2
+  exit 1
+fi
+echo "OK: installed native is the pin-checked $NATIVE_ENTRY"
 
 if [ -f "$TOOLDIR/calor.exe" ]; then
   TOOL="$TOOLDIR/calor.exe"

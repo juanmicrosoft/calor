@@ -1299,6 +1299,13 @@ jobs:
         shell: bash
 
     steps:
+      # Windows runners default to core.autocrlf=true. Calor.Verification.Tests
+      # pins SHA-256 hashes of committed text fixtures and embeds multi-line
+      # Calor sources in C# verbatim strings, so a CRLF checkout fails those
+      # tests for reasons unrelated to Z3. Check out the bytes as committed.
+      - name: Check out committed line endings
+        run: git config --global core.autocrlf false
+
       - name: Checkout code
         uses: actions/checkout@v4
 
