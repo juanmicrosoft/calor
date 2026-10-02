@@ -28,6 +28,10 @@ that the tool does not show is written "not shown".
 | 13 | 2026-10-01 | R2A′ | 1 | Codex CLI 0.159.2 (`codex exec -s read-only`) | gpt-6.1-sol | 602,591 (input 599,290, of which 486,144 cached; output 3,301, including 328 reasoning) | 0.00 | ChatGPT subscription (excluded); the CLI reported no USD cost; maintainer to confirm the basis | [round-1-codex.md](reviews/R2A-prime/round-1-codex.md); 1 BLOCKING, 6 MAJOR. Migrated from the #1465 ledger format at the merge with R0 |
 | 14 | 2026-10-01 | R2A′ | 2 | Codex CLI 0.159.2 (`codex exec -s read-only`) | gpt-6.1-sol | 262,551 (input 259,274, of which 202,880 cached; output 3,277, including 654 reasoning) | 0.00 | ChatGPT subscription (excluded); the CLI reported no USD cost; maintainer to confirm the basis | [round-2-codex.md](reviews/R2A-prime/round-2-codex.md); 0 BLOCKING, 5 MAJOR, 1 MINOR. Migrated from the #1465 ledger format at the merge with R0 |
 | 15 | 2026-10-01 | R2A′ | — | Claude Code (proposer session) | claude-opus-5-5 | not shown | 0.00 | Existing Claude Code subscription (excluded); maintainer to confirm the basis | Drafting, enumeration run, revisions, and running rounds 1-2. Row added at the merge with R0; the #1465 ledger had no proposer row |
+| 16 | 2026-10-01 | R5 | 1 | Codex CLI 0.159.2 (`codex exec -s read-only --ephemeral`) | gpt-6.1-sol (reasoning none) | 71,988 | 0.00 | ChatGPT subscription (excluded) | [round-1-codex.md](reviews/R5/round-1-codex.md); close-out record; 2 BLOCKING, 3 MAJOR |
+| 17 | 2026-10-01 | R5 | — | Claude Code (close-out agent session) | claude-opus-5-5 | not shown | 0.00 | Existing Claude Code subscription (excluded); maintainer to confirm the basis | Restacking #1465 and #1468, drafting the close-out records and amendment 002, running R5 review rounds |
+| 18 | 2026-10-01 | R5 | — | Claude Code (orchestrating session that relayed the close-out decisions and launched the close-out agent) | claude-opus-5-5 | not shown | 0.00 | Existing Claude Code subscription (excluded); maintainer to confirm the basis | Concurrent session, counted separately |
+| 19 | 2026-10-01 | R5 | 2 | Codex CLI 0.159.2 (`codex exec -s read-only --ephemeral`) | gpt-6.1-sol (reasoning none) | 57,201 | 0.00 | ChatGPT subscription (excluded) | [round-2-codex.md](reviews/R5/round-2-codex.md); 0 BLOCKING, 2 MAJOR, 1 MINOR; review stopped |
 
 Rows 6-12 are reserved for R1 (#1372, PR #1468), which was drafted in a
 parallel branch and numbered its rows first. R2A′ rows start at 13 so that
@@ -53,7 +57,12 @@ sessions append their own rows.
 | 2026-10-01 | R1 | Codex sessions: competence probe and rounds 1-5 (counted in full although they ran inside the proposer session) | — | 1.5 | Conservative estimate, 0.25 h each |
 | 2026-10-01 | R2A′ | Claude Code proposer session (drafting, enumeration, revisions, running rounds 1-2) | — | 2.0 | Conservative estimate; branch commits span 14:05-14:52 EDT, plus earlier reading. Added at the merge with R0 |
 | 2026-10-01 | R2A′ | Codex review sessions, rounds 1-2 (counted in full) | — | 0.5 | Conservative estimate, 0.25 h each |
+| 2026-10-01 | R5 | Claude Code close-out agent session (restacking #1465 and #1468, close-out records, amendment 002, running R5 review rounds) | — | 3.0 | Conservative estimate; session start not captured, first close-out commit 19:3x UTC |
+| 2026-10-01 | R5 | Codex review session, R5 round 1 | — | 0.25 | Conservative estimate |
+| 2026-10-01 | R5 | Codex review session, R5 round 2 | — | 0.25 | Conservative estimate |
+| 2026-10-01 | R5 | Claude Code orchestrating session (relayed the close-out decisions; concurrent, counted in full) | — | 1.0 | Conservative estimate |
+| 2026-10-01 | R1, R2A′, R5 | Maintainer: R1 and R2A′ direction, close-out decisions, merge review of #1465, #1467, #1468, and the close-out PR | 3.0 | — | Conservative estimate pending the maintainer's report |
 
-**Cumulative:** maintainer 2.0 of 20 (estimate); agent 10.0 of 60 (estimate; R0 4.0 + R2A′ 2.5 + R1 3.5).
+**Cumulative:** maintainer 5.0 of 20 (estimate); agent 14.5 of 60 (estimate; R0 4.0 + R2A′ 2.5 + R1 3.5 + R5 close-out 4.5).
 Unknown effort is never counted as zero; it is entered as a labeled
 conservative estimate and reconciled when reported.
