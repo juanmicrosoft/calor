@@ -110,7 +110,9 @@ deliberately broken verifiers:
   the completed one, so removing only the first is still caught by the second.
 
 The real verifier passes all 23. `fresh-clone.log` repeats the shallow and unfetched cases on the
-real repository: the test fails with `P006` and `P004`. Nothing is skipped.
+real repository at the final head: the shallow clone fails with `P006` on all 11 identities, and the
+unfetched clone fails with `P004` on all 11, plus `P010` for the Calor0425 landing record. Nothing is
+skipped.
 
 **Historical stamps remain immutable and are linked to separately verified durable identities.**
 No `measuredCommit` and no published stamp changed. `EveryIndexEntryStillMatchesItsArtifactsOwnStamp`
