@@ -121,6 +121,27 @@ internal static class EvidenceContractValidator
             if (status is not ("PROPOSED" or "ACCEPTED"))
                 v.Add(new("C011", id, $"ceiling status '{status}' is not PROPOSED or ACCEPTED"));
         }
+        var amendmentVersions = Array(contract["amendmentLog"]).Select(a => Str(a?["version"])).OfType<string>().ToHashSet(StringComparer.Ordinal);
+        foreach (var exception in Array(capacity?["exceptions"]))
+        {
+            // A per-PR raise (stopping rule 1): a known ceiling, one PR, a value above the ceiling,
+            // a justification, and the amendment that recorded it.
+            var ceilingId = Str(exception?["ceiling"]);
+            var subject = $"exception {ceilingId ?? "?"} #{Int(exception?["pr"])?.ToString(CultureInfo.InvariantCulture) ?? "?"}";
+            var ceiling = ceilings.FirstOrDefault(c => Str(c?["id"]) == ceilingId);
+            double? limit = ceiling?["value"] is JsonValue lv && lv.TryGetValue<double>(out var l) ? l : null;
+            double? raised = exception?["value"] is JsonValue rv && rv.TryGetValue<double>(out var r) ? r : null;
+            if (ceiling is null)
+                v.Add(new("C011", subject, $"exception names unknown ceiling '{ceilingId}'"));
+            if (Int(exception?["pr"]) is not > 0)
+                v.Add(new("C011", subject, "exception must name the one PR it applies to"));
+            if (raised is null || limit is null || raised <= limit)
+                v.Add(new("C011", subject, "exception value must be numeric and above the ceiling it raises"));
+            if (string.IsNullOrWhiteSpace(Str(exception?["justification"])))
+                v.Add(new("C011", subject, "exception needs a justification"));
+            if (Str(exception?["amendment"]) is not { } recordedIn || !amendmentVersions.Contains(recordedIn))
+                v.Add(new("C011", subject, "exception must name the amendment that recorded it"));
+        }
         var anyProposed = Str(capacity?["status"]) == "PROPOSED"
             || ceilings.Any(c => Str(c?["status"]) == "PROPOSED");
         if (Str(contract["gateStatus"]) == "MET" && (anyProposed || Str(contract["status"]) == "PROPOSED"))
@@ -155,9 +176,10 @@ internal static class EvidenceContractValidator
     }
 
     /// <summary>
-    /// C013 (amendment 1.1.0): the documentation-only deploy rule, when present, keeps its allowlist
-    /// inside website documentation prose and keeps the website data directory denied, so a later
-    /// edit cannot quietly widen it to data, components, or configuration.
+    /// C013 (amendment 1.1.0): the documentation-only deploy rule, when present, may only be as strict
+    /// as or stricter than the rule amendment 1.1.0 registered: its allowlist a subset of the
+    /// registered one, its denylist a superset, the website and workflow still diffed, the
+    /// pre-contract base and attestation unchanged. Widening it is a validator change, which review sees.
     /// </summary>
     private static IEnumerable<ContractViolation> ValidateDocsDeployRule(JsonNode contract)
     {
@@ -167,24 +189,42 @@ internal static class EvidenceContractValidator
         var allowed = Array(rule["allowedPaths"]).Select(Str).ToList();
         if (allowed.Count == 0)
             yield return new("C013", "documentationOnlyDeploy", "the documentation-only deploy rule needs a non-empty allowlist");
-        foreach (var pattern in allowed)
-        {
-            if (pattern is null || !pattern.StartsWith(DocsContentRoot, StringComparison.Ordinal)
-                || !(pattern.EndsWith(".mdx", StringComparison.Ordinal) || pattern.EndsWith(".md", StringComparison.Ordinal))
-                || pattern.Contains("..", StringComparison.Ordinal))
-                yield return new("C013", "documentationOnlyDeploy",
-                    $"allowed pattern '{pattern}' is not a documentation page under {DocsContentRoot}");
-        }
+        foreach (var pattern in allowed.Where(p => p is null || !RegisteredDocsAllowedPaths.Contains(p)))
+            yield return new("C013", "documentationOnlyDeploy", $"allowed pattern '{pattern}' is not in the allowlist registered by amendment 1.1.0");
         var denied = Array(rule["deniedPaths"]).Select(Str).OfType<string>().ToHashSet(StringComparer.Ordinal);
-        if (!denied.Contains("website/public/data/**"))
-            yield return new("C013", "documentationOnlyDeploy", "website/public/data/** must stay denied");
-        if (!IsFullSha(Str(rule["base"]?["preContractDeploy"]?["commit"])) || Long(rule["base"]?["preContractDeploy"]?["runId"]) is null)
-            yield return new("C013", "documentationOnlyDeploy", "the pre-contract deploy base needs a full commit SHA and a run id");
-        if (string.IsNullOrWhiteSpace(Str(rule["auditRecord"]?["attestationStatement"])))
-            yield return new("C013", "documentationOnlyDeploy", "the audit record needs a fixed attestation statement");
+        foreach (var pattern in RegisteredDocsDeniedPaths.Where(p => !denied.Contains(p)))
+            yield return new("C013", "documentationOnlyDeploy", $"registered denial '{pattern}' was removed");
+        var inputs = Array(rule["buildInputs"]).Select(Str).OfType<string>().ToHashSet(StringComparer.Ordinal);
+        if (!inputs.Contains("website/"))
+            yield return new("C013", "documentationOnlyDeploy", "buildInputs must include website/");
+        if (!Array(rule["machinery"]?["paths"]).Select(Str).Contains(".github/workflows/nextjs-gh-pages.yml"))
+            yield return new("C013", "documentationOnlyDeploy", "the deploying workflow must stay machinery");
+        if (Str(rule["base"]?["preContractDeploy"]?["commit"]) != RegisteredPreContractDeployCommit
+            || Long(rule["base"]?["preContractDeploy"]?["runId"]) != RegisteredPreContractDeployRun)
+            yield return new("C013", "documentationOnlyDeploy", "the pre-contract deploy base is run 34999741475 at 72a0a855");
+        if (Str(rule["auditRecord"]?["attestationStatement"]) != RegisteredDocsAttestation)
+            yield return new("C013", "documentationOnlyDeploy", "the attestation statement is the one registered by amendment 1.1.0");
     }
 
-    private const string DocsContentRoot = "website/content/";
+    private static readonly HashSet<string> RegisteredDocsAllowedPaths = new(StringComparer.Ordinal)
+    {
+        "website/content/cli/**/*.mdx", "website/content/getting-started/**/*.mdx",
+        "website/content/syntax-reference/**/*.mdx", "website/content/semantics/**/*.mdx",
+        "website/content/guides/**/*.mdx", "website/content/contributing/**/*.mdx",
+    };
+
+    private static readonly string[] RegisteredDocsDeniedPaths =
+    [
+        "website/public/data/**", "website/content/benchmarking/**", "website/content/philosophy/**",
+        "website/content/changelog.mdx", "website/content/index.mdx",
+        "website/content/guides/verification-guarantees.mdx", "website/content/contributing/adding-benchmarks.mdx",
+        "website/content/cli/benchmark.mdx", "website/content/cli/evaluation.mdx",
+    ];
+
+    private const string RegisteredPreContractDeployCommit = "72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1";
+    private const long RegisteredPreContractDeployRun = 34999741475;
+    private const string RegisteredDocsAttestation =
+        "This deploy changes no claim or number about 0.24 evidence, verification results, or a Calor advantage.";
 
     private static IEnumerable<ContractViolation> ValidateGraph(List<JsonNode?> children, HashSet<int> childIssues)
     {
@@ -400,6 +440,8 @@ internal static class EvidenceContractValidator
     {
         var amendments = Array(contract["amendmentLog"]).Select(a => Str(a?["version"])).OfType<string>().ToHashSet(StringComparer.Ordinal);
         var seen = new HashSet<string>(StringComparer.Ordinal);
+        if (inventory["pendingUpdates"] is { } present && present is not JsonArray)
+            yield return new("I013", "pendingUpdates", "pendingUpdates must be an array");
         foreach (var update in Array(inventory["pendingUpdates"]))
         {
             var id = Str(update?["id"]) ?? "?";
@@ -423,6 +465,8 @@ internal static class EvidenceContractValidator
             var cutoffDefects = artifact is not null && byId.TryGetValue(artifact, out var record)
                 ? Array(record["openDefects"]).Select(Str).OfType<string>().ToHashSet(StringComparer.Ordinal)
                 : [];
+            if (update?["defectResolutions"] is not JsonArray)
+                yield return new("I013", id, "defectResolutions must be an array (empty when no defect resolves)");
             foreach (var resolution in Array(update?["defectResolutions"]))
             {
                 if (string.IsNullOrWhiteSpace(Str(resolution?["defect"])) || Int(resolution?["resolvedByPr"]) is not > 0
@@ -751,18 +795,30 @@ internal static class EvidenceContractValidator
             v.Add(new("D001", "documentationOnlyDeploy", "the contract defines no documentation-only deploy path; every deploy needs an adjudication identity"));
             return v;
         }
-        var subject = Long(record["runId"]) is { } run ? $"run {run}" : "run ?";
+        var subject = $"deploy of {Str(record["deployedCommit"]) ?? "?"}";
 
-        // D001: identity of the record and the run.
+        // D001: identity of the record and the run. An authorized record (committed before the
+        // dispatch) has no run yet; a deployed record (the completion) names it.
         if (Str(record["schema"]) != Str(rule["auditRecord"]?["schema"]))
             v.Add(new("D001", subject, $"schema must be '{Str(rule["auditRecord"]?["schema"])}'"));
-        if (Long(record["runId"]) is not > 0)
-            v.Add(new("D001", subject, "runId must be the deploying run id"));
+        var status = Str(record["status"]);
+        if (status is not ("authorized" or "deployed"))
+            v.Add(new("D001", subject, $"status '{status}' is not 'authorized' or 'deployed'"));
+        else if (status == "deployed" && Long(record["runId"]) is not > 0)
+            v.Add(new("D001", subject, "a deployed record names the deploying run id"));
+        else if (status == "authorized" && record["runId"] is not null)
+            v.Add(new("D001", subject, "an authorization is committed before the run and names no run id"));
         if (Str(record["workflow"]) != ".github/workflows/nextjs-gh-pages.yml")
             v.Add(new("D001", subject, "workflow must be .github/workflows/nextjs-gh-pages.yml"));
-        var amendedIn = TryParseSemVer(Str(rule["amendment"]) ?? "", out var introduced) ? introduced : null;
-        if (!TryParseSemVer(Str(record["contractVersion"]) ?? "", out var recordVersion) || amendedIn is null || recordVersion < amendedIn)
-            v.Add(new("D001", subject, $"contractVersion must name the contract in force, {Str(rule["amendment"])} or later"));
+        // The record's contract version must be one the log actually records, at or after the
+        // amendment that introduced the path, and that amendment must itself be in the log.
+        var logged = Array(contract["amendmentLog"]).Select(a => Str(a?["version"])).OfType<string>().ToHashSet(StringComparer.Ordinal);
+        var introducedBy = Str(rule["amendment"]);
+        var recordVersionText = Str(record["contractVersion"]);
+        if (introducedBy is null || !logged.Contains(introducedBy) || !TryParseSemVer(introducedBy, out var introduced)
+            || recordVersionText is null || !logged.Contains(recordVersionText)
+            || !TryParseSemVer(recordVersionText, out var recordVersion) || recordVersion < introduced)
+            v.Add(new("D001", subject, $"contractVersion must be a logged amendment version at or after the one that introduced this path ({introducedBy})"));
         if (!IsUtcTimestamp(Str(record["recordedAtUtc"])))
             v.Add(new("D001", subject, "recordedAtUtc must be a UTC timestamp"));
 
@@ -784,6 +840,8 @@ internal static class EvidenceContractValidator
         }
         if (Long(record["baseRunId"]) is { } baseRun && baseRun == Long(record["runId"]))
             v.Add(new("D002", subject, "a deploy cannot be its own base"));
+        if (baseKind == "audited-docs-deploy" && Str(record["baseCommit"]) == Str(record["deployedCommit"]))
+            v.Add(new("D002", subject, "a deploy cannot be its own base"));
 
         // D003: every changed path is documentation-only, re-classified here.
         var allowed = Array(rule["allowedPaths"]).Select(Str).OfType<string>().Select(GlobRegex).ToList();
@@ -802,13 +860,30 @@ internal static class EvidenceContractValidator
                     v.Add(new("D003", subject, $"changed path '{path}' is not documentation-only"));
             }
         }
+        // Machinery (the deploying workflow and what it invokes) is never documentation: each change
+        // since the base names the merged PR that brought it to main, and no website/ path is machinery.
+        if (record["machineryChanges"] is not JsonArray machinery)
+            v.Add(new("D003", subject, "machineryChanges must list every changed machinery path (empty when none changed)"));
+        else
+        {
+            foreach (var change in machinery)
+            {
+                var path = Str(change?["path"]);
+                if (string.IsNullOrWhiteSpace(path) || path.StartsWith("website/", StringComparison.Ordinal)
+                    || path.Split('/').Any(segment => segment is ".." or "." or "") || Int(change?["pr"]) is not > 0)
+                    v.Add(new("D003", subject, $"machinery change '{path}' needs a path outside website/ and the merged PR that changed it"));
+            }
+        }
 
         // D004: the recorded checks passed and the maintainer attested the semantic condition.
         if (Str(record["allowlistCheck"]?["result"]) != "passed"
             || record["allowlistCheck"]?["disallowedPaths"] is not JsonArray { Count: 0 })
             v.Add(new("D004", subject, "allowlistCheck must have passed with an empty disallowedPaths list"));
-        if (Str(record["wordingCheck"]?["result"]) != "passed")
-            v.Add(new("D004", subject, "wordingCheck must have passed"));
+        foreach (var check in new[] { "fileModeCheck", "mdxCheck", "wordingCheck" })
+        {
+            if (Str(record[check]?["result"]) != "passed")
+                v.Add(new("D004", subject, $"{check} must have passed"));
+        }
         if (string.IsNullOrWhiteSpace(Str(record["attestation"]?["by"]))
             || Str(record["attestation"]?["statement"]) != Str(rule["auditRecord"]?["attestationStatement"]))
             v.Add(new("D004", subject, "attestation needs the dispatching maintainer and the contract's attestation statement verbatim"));

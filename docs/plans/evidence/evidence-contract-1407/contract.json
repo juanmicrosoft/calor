@@ -240,9 +240,14 @@
       "amendment": "1.1.0",
       "rule": "Before #1408 records MILESTONE-SUCCEEDED, .github/workflows/nextjs-gh-pages.yml may deploy the website without an adjudication identity only for a documentation-only change, and only when the #1410 verifier proves every condition below. Every other website deployment stays blocked until #1408 records MILESTONE-SUCCEEDED and then consumes one matching adjudication identity through the #1410 gate. The classifier fails closed: a path it cannot classify, a base it cannot establish, a check it cannot complete, or any API or git failure refuses the deploy.",
       "window": "Open while no #1408 terminal record with outcome MILESTONE-SUCCEEDED exists on protected main. A documentation-only deploy is never evidence and never an adjudication. It does not repair or reclassify the website-deployment or website-benchmark-pages artifacts, which stay stale, and it does not count as a release surface consuming an adjudication identity for terminal condition 7.",
-      "noOtherPublication": "The deploying run creates no package, GitHub release, tag, or release asset; changes no benchmark data and no release notes; and changes no claim or number about 0.24 evidence, verification results, or a Calor advantage. No deployed text may describe 0.24 evidence as independently adjudicated or independently verified; the #1410 wording rule (a phrase allowed only directly after a literal 'not', 'no', or 'without') applies to every text file of the built site.",
+      "noOtherPublication": "The deploying run creates no package, GitHub release, tag, or release asset; changes no benchmark data and no release notes; and changes no claim or number about 0.24 evidence, verification results, or a Calor advantage.",
+      "wordingRule": "No changed path may contain, anywhere in the file (prose, code, or markup, after the #1410 normalization), the word 'independent' or 'independently' followed by any form of 'adjudicat' or 'verif' within the next two words, whether negated or not. The built site as a whole must also pass the #1410 wording scan. The negation allowance of the #1410 scan does not apply to changed paths.",
       "buildInputs": ["website/"],
-      "buildInputsRule": "The diff is taken over every build input. At the cutoff the website build (npm ci, npm run build in website/) reads only files under website/, including website/public/data/** through src/components imports. If the build reads any path outside buildInputs, the classifier refuses until an amendment adds that path here.",
+      "buildInputsRule": "The documentation diff is taken over every content build input. At the cutoff the website build (npm ci, npm run build in website/) reads only files under website/, including website/public/data/** through src/components imports. If the build reads any path outside buildInputs and machinery, the classifier refuses until an amendment adds that path.",
+      "machinery": {
+        "paths": [".github/workflows/nextjs-gh-pages.yml", "every script, composite action, and configuration file that workflow invokes, enumerated by #1410's verifier"],
+        "rule": "Machinery is never documentation. A machinery change since the base is allowed only when it reached protected main through a merged pull request reviewed by the maintainer; the audit record lists each changed machinery path with that PR (machineryChanges), and the verifier refuses an unlisted change, a listed PR that is not merged into main, and any path the build reads that is neither under buildInputs nor enumerated machinery. The machinery's integrity therefore rests on reviewed merges to protected main, as for every other #1410 gate; no website/ path (including package files, components, and data) is machinery."
+      },
       "allowedPaths": [
         "website/content/cli/**/*.mdx",
         "website/content/getting-started/**/*.mdx",
@@ -263,24 +268,30 @@
         "website/content/cli/evaluation.mdx"
       ],
       "pathRule": "A changed path (added, modified, deleted, or either side of a rename, from git diff --no-renames --name-only <base> <deployed> -- <buildInputs>) is documentation-only when it matches an allowedPaths pattern, matches no deniedPaths pattern, is not a path of any inventory artifact, and contains no '..' segment. Patterns are case-sensitive globs: '**/' matches zero or more directories and '*' matches within one path segment. Everything else under buildInputs (website/src/**, website/public/**, package files, configuration, tests) is not documentation-only.",
+      "fileRule": "Every added or modified changed path is a regular, non-executable file at the deployed commit (git mode 100644); a symlink, submodule, or executable file refuses.",
+      "mdxRule": "MDX is compiled, so a changed page may only carry documentation. In its added or modified lines, outside fenced code blocks and inline code spans, a changed .mdx file contains no import or export statement, no JavaScript expression in braces, and no JSX element other than the components registered in website/src/components/mdx at the base commit and plain HTML elements other than script, iframe, object, embed, style, and link.",
       "base": {
-        "rule": "The diff base is the source commit of the most recent website deployment, which must be one of: the last deployment before this contract (preContractDeploy), a documentation-only deployment whose audit record is committed on protected main, or a deployment that consumed an adjudication identity through the #1410 gate (none can precede a documentation-only deploy inside the window under this amendment; the kind is listed so the base rule is total). If GitHub reports a successful github-pages deployment newer than the base that has neither a committed audit record nor an adjudication identity, the classifier refuses.",
+        "rule": "The diff base is the source commit of the most recent website deployment, which must be one of: the last deployment before this contract (preContractDeploy), a documentation-only deployment whose audit record is committed on protected main with status deployed, or a deployment that consumed an adjudication identity through the #1410 gate (none can precede a documentation-only deploy inside the window under this amendment; the kind is listed so the base rule is total). If GitHub reports a successful github-pages deployment newer than the base that has neither a committed deployed audit record nor an adjudication identity, the classifier refuses.",
         "preContractDeploy": { "runId": 34999741475, "commit": "72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1", "event": "release (v0.22.0)" }
       },
       "auditRecord": {
         "schema": "calor.docs-only-deploy-audit/1",
-        "location": "docs/plans/evidence/r2-1410/docs-deploys/<runId>.json, committed to protected main by a reviewed PR after the run; the run also uploads it as an Actions artifact, which is not durable. Until a deploy's record is committed, it cannot serve as a base, so the next documentation-only deploy refuses.",
+        "location": "docs/plans/evidence/r2-1410/docs-deploys/<deployedCommit>.json on protected main, in two reviewed phases. Authorization: before dispatch, a reviewed PR commits the record with status 'authorized' and every field except runId; the deploying run refuses unless that record is on protected main and its deployedCommit, base, changedPaths, and machineryChanges equal the run's own recomputation. Completion: after the run, a reviewed PR sets status 'deployed' and runId and changes nothing else. An authorized record without completion cannot serve as a base, so the next documentation-only deploy refuses until the completion merges. The run's Actions-artifact copy is not durable and is not the record.",
         "fields": [
           "schema: calor.docs-only-deploy-audit/1",
-          "contractVersion: the contract version in force at the deploy, 1.1.0 or later",
+          "status: authorized | deployed",
+          "contractVersion: a contractVersion recorded in the amendment log, 1.1.0 or later, in force at the deploy",
           "workflow: .github/workflows/nextjs-gh-pages.yml",
-          "runId: the deploying run id (positive integer)",
-          "deployedCommit: full SHA on protected main that was built and deployed",
+          "runId: the deploying run id (positive integer); present only when status is deployed",
+          "deployedCommit: full SHA on protected main that is built and deployed",
           "baseKind: pre-contract-deploy | audited-docs-deploy | adjudicated-deploy",
           "baseCommit: full SHA (the preContractDeploy commit for pre-contract-deploy)",
           "baseRunId: the base deployment's run id",
           "changedPaths: every path from the pathRule diff, each documentation-only",
+          "machineryChanges: [{ path, pr }] for every machinery path changed since the base (empty when none)",
           "allowlistCheck: { result: 'passed', disallowedPaths: [] }",
+          "fileModeCheck: { result: 'passed' }",
+          "mdxCheck: { result: 'passed' }",
           "wordingCheck: { result: 'passed' }",
           "publishes: { package: false, githubRelease: false, tag: false, benchmarkData: false, releaseNotes: false }",
           "terminalSuccessRecordPresent: false",
@@ -288,16 +299,18 @@
           "recordedAtUtc: UTC timestamp"
         ],
         "attestationStatement": "This deploy changes no claim or number about 0.24 evidence, verification results, or a Calor advantage.",
-        "enforcedBy": "EvidenceContractValidator.ValidateDocsDeployAudit (D001-D006) checks the record's shape and re-classifies every changedPaths entry against this contract and the inventory; it does not re-run git. The #1410 verifier recomputes the diff and the checks from git and the GitHub API."
+        "enforcedBy": "EvidenceContractValidator.ValidateDocsDeployAudit (D001-D006) checks the record's shape and re-classifies every changedPaths entry against this contract and the inventory; it does not re-run git. The #1410 verifier recomputes the diff and every check from git and the GitHub API."
       },
       "verifierChecks": [
         "The run is a workflow_dispatch from refs/heads/main; the deployed commit is a full SHA that is an ancestor of fetched refs/remotes/origin/main (provenanceIdentity commitRule), and the clone is not shallow.",
         "No #1408 terminal record with outcome MILESTONE-SUCCEEDED exists on protected main.",
-        "The base satisfies base.rule; a successful github-pages deployment newer than the base without a committed audit record or adjudication identity refuses.",
-        "Every path in git diff --no-renames --name-only <base> <deployed> -- website/ satisfies pathRule; any other path refuses. The build reads nothing outside buildInputs.",
-        "The built site passes the #1410 wording scan.",
+        "An authorized audit record for the deployed commit is on protected main and matches the run's recomputation.",
+        "The base satisfies base.rule; a successful github-pages deployment newer than the base without a committed deployed audit record or adjudication identity refuses.",
+        "Every path in git diff --no-renames --name-only <base> <deployed> -- website/ satisfies pathRule, fileRule, and mdxRule; any other path refuses.",
+        "Every machinery path changed since the base is listed in machineryChanges with a merged, maintainer-reviewed PR; the build reads nothing outside buildInputs and the enumerated machinery.",
+        "Every changed path passes wordingRule, and the built site passes the #1410 wording scan.",
         "The run has no step that pushes a package, creates or edits a release or tag, uploads a release asset, opens a publication PR, or commits to main.",
-        "The audit record is produced with every auditRecord field and passes ValidateDocsDeployAudit; the deployed Pages artifact is the one built from deployedCommit.",
+        "The deployed Pages artifact is the one built from deployedCommit, and the completion record passes ValidateDocsDeployAudit.",
         "Negative tests for each check above are part of #1410's closure evidence."
       ]
     },
@@ -394,6 +407,9 @@
         { "id": "ordinary-ci", "value": 15000, "unit": "CI runner-minutes for ordinary PR checks across the milestone", "status": "ACCEPTED" },
         { "id": "paid-spend", "value": 0, "unit": "USD for LLM, agent, or other paid compute", "status": "ACCEPTED" }
       ],
+      "exceptions": [
+        { "ceiling": "pr-size", "pr": 1473, "issue": 1276, "value": 1520, "amendment": "1.1.0", "justification": "B1 registration PR #1473 overran the pr-size ceiling by 20 lines (1,520 changed lines excluding docs/plans/evidence/) when it fixed a BLOCKING defect found by a verification-only review after review round 3: round 3 made --output required on pair-oracle, but the per-pair child invocation omits it, so every child run would fail argument parsing and every pair would become ORACLE_CRASH, including the known witness DomainProblems/CsvParser. The fix makes --output required only for the parent run (enforced in the handler), extracts the child command line into PairOracleCommand.ChildArguments, adds one mutation-checked regression test (ChildCommandLineParsesWithoutParentOnlyOptions), and re-pins the oracle hash in the unmerged registration packet. No pair was run. Recorded under stopping rule 1; the ceiling is raised for PR #1473 only, and no other ceiling or PR changes." }
+      ],
       "evidenceDataRule": "For the pr-size ceiling, committed evidence data includes a gate's machine-readable closure inventory when the gate's closureEvidence in children names that inventory (for G1 #1420, the consumer and RID inventory eng/z3-consumers.json). The exclusion covers data files only: scripts, tests, workflows, and code that read the inventory still count (amendment 1.1.0).",
       "estimateNote": "The ordinary-ci ceiling assumes roughly 250 runner-minutes per full test.yml push. That figure is an unmeasured estimate."
     }
@@ -470,14 +486,15 @@
     { "version": "1.0.1", "justification": "acceptance write-back", "reviewedInPr": 1470, "timestampUtc": "2026-10-02T13:10:12Z", "afterDecisionBearingInspection": false },
     {
       "version": "1.1.0",
-      "justification": "Maintainer decisions approved 2026-10-02 by @juanmicrosoft on findings from open gate PRs R2 #1474/#1475, G1 #1471, P1 #1472, and B1 #1473: (1) a documentation-only website deploy path before #1408 succeeds (releasePath.documentationOnlyDeploy); (2) the B1 task-statement reading (benchmarkEquivalence.taskStatementRule), resolving B1 review round 2 BLOCKING #1; (3) pending inventory updates from G1 #1471 and P1 #1472, applied by a write-back after each PR merges (inventory pendingUpdates); (4) a gate's machine-readable closure inventory counts as evidence data for the pr-size ceiling (capacity.evidenceDataRule); (5) G1's Windows-only verifier divergences routed to #1421/#1135 as release-blocking determinism rows (rules.platformDeterminism, determinismRows).",
+      "justification": "Maintainer decisions approved 2026-10-02 by @juanmicrosoft on findings from open gate PRs R2 #1474/#1475, G1 #1471, P1 #1472, and B1 #1473: (1) a documentation-only website deploy path before #1408 succeeds (releasePath.documentationOnlyDeploy); (2) the B1 task-statement reading (benchmarkEquivalence.taskStatementRule), resolving B1 review round 2 BLOCKING #1; (3) pending inventory updates from G1 #1471 and P1 #1472, applied by a write-back after each PR merges (inventory pendingUpdates); (4) a gate's machine-readable closure inventory counts as evidence data for the pr-size ceiling (capacity.evidenceDataRule); (5) G1's Windows-only verifier divergences routed to #1421/#1135 as release-blocking determinism rows (rules.platformDeterminism, determinismRows); (6) the pr-size ceiling raised to 1,520 changed lines for B1 PR #1473 only, recording its 20-line overrun under stopping rule 1 (capacity.exceptions).",
       "reviewedInPr": 0,
       "timestampUtc": "2026-10-02T23:11:32Z",
       "afterDecisionBearingInspection": false,
-      "inspectionStatement": "No decision follows decision-bearing inspection. At this amendment no #1419 registration or #1311 sweep result exists, the #1276 registration is unmerged and its oracle has not run (every registered pair is UNCLASSIFIED, pending-oracle), and no #1421 or #1135 protocol run exists. The three Windows observations in decision 5 come from G1's consumer-matrix CI run 37020428891, not from a determinism protocol; decision 5 only adds release-blocking rows and removes no requirement.",
+      "inspectionStatement": "No decision follows decision-bearing inspection. At this amendment no #1419 registration or #1311 sweep result exists, the #1276 registration is unmerged and its oracle has not run (every registered pair is UNCLASSIFIED, pending-oracle), and no #1421 or #1135 protocol run exists. The three Windows observations in decision 5 come from G1's consumer-matrix CI run 37020428891, not from a determinism protocol; decision 5 only adds release-blocking rows and removes no requirement. Decision 6 follows a code review of B1's oracle command line, not an oracle run: no pair has been run.",
       "weakens": [
         "Decision 1 narrows releasePath.publicationSeparation: before this amendment no Pages deployment could happen before #1408 records MILESTONE-SUCCEEDED; after it, a documentation-only deploy that meets documentationOnlyDeploy can.",
         "Decision 4 widens the pr-size exclusion to a gate's machine-readable closure inventory named in its closureEvidence.",
+        "Decision 6 raises the pr-size ceiling from 1,500 to 1,520 changed lines for PR #1473 only.",
         "Decision 2 fixes the reading of 'implement the same task statement': EQUIVALENT does not mean correct with respect to the statement, and registered expected outputs may be the oracle's cross-arm agreement rule. The definition text is unchanged."
       ],
       "removedRows": []

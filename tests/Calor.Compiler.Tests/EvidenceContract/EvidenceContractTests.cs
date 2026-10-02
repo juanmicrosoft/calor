@@ -1163,6 +1163,8 @@ public class EvidenceContractTests
     [InlineData("allowlist-failed")]
     [InlineData("allowlist-disallowed")]
     [InlineData("wording-failed")]
+    [InlineData("file-mode-failed")]
+    [InlineData("mdx-missing")]
     [InlineData("attestation-reworded")]
     [InlineData("attestation-unsigned")]
     public void DocsDeployWithAFailedOrMissingCheckFails(string mutation)
@@ -1173,6 +1175,8 @@ public class EvidenceContractTests
             case "allowlist-failed": record["allowlistCheck"]!["result"] = "skipped"; break;
             case "allowlist-disallowed": record["allowlistCheck"]!["disallowedPaths"] = new JsonArray("website/package.json"); break;
             case "wording-failed": record["wordingCheck"]!["result"] = "failed"; break;
+            case "file-mode-failed": record["fileModeCheck"]!["result"] = "failed"; break;
+            case "mdx-missing": record.Remove("mdxCheck"); break;
             case "attestation-reworded": record["attestation"]!["statement"] = "No benchmark numbers changed."; break;
             case "attestation-unsigned": record["attestation"]!.AsObject().Remove("by"); break;
         }
@@ -1184,6 +1188,10 @@ public class EvidenceContractTests
     [InlineData("contract-before-amendment")]
     [InlineData("workflow")]
     [InlineData("run-id")]
+    [InlineData("deployed-without-run")]
+    [InlineData("authorized-with-run")]
+    [InlineData("unknown-status")]
+    [InlineData("unlogged-future-version")]
     public void DocsDeployAuditWithWrongIdentityFails(string mutation)
     {
         var record = DocsDeployAudit();
@@ -1193,6 +1201,10 @@ public class EvidenceContractTests
             case "contract-before-amendment": record["contractVersion"] = "1.0.1"; break;
             case "workflow": record["workflow"] = ".github/workflows/benchmark.yml"; break;
             case "run-id": record["runId"] = "37000000002"; break;
+            case "deployed-without-run": record.Remove("runId"); break;
+            case "authorized-with-run": record["status"] = "authorized"; break;
+            case "unknown-status": record["status"] = "pending"; break;
+            case "unlogged-future-version": record["contractVersion"] = "9.9.9"; break;
         }
         AssertViolation(EvidenceContractValidator.ValidateDocsDeployAudit(Contract(), Inventory(), record), "D001");
     }
@@ -1208,22 +1220,113 @@ public class EvidenceContractTests
     [Theory]
     [InlineData("website/public/data/**")]
     [InlineData("website/src/**/*.mdx")]
-    [InlineData("website/content/**/*.json")]
+    [InlineData("website/content/**/*.mdx")]
+    [InlineData("website/content/benchmarking/**/*.mdx")]
     [InlineData("website/content/../public/data/*.mdx")]
-    public void DocsDeployAllowlistWidenedBeyondDocumentationFails(string pattern)
+    public void DocsDeployAllowlistWidenedBeyondTheRegisteredOneFails(string pattern)
     {
         var contract = Contract();
         contract["releasePath"]!["documentationOnlyDeploy"]!["allowedPaths"]!.AsArray().Add(pattern);
         AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C013");
     }
 
-    [Fact]
-    public void DocsDeployDenylistWithoutWebsiteDataFails()
+    [Theory]
+    [InlineData("website/public/data/**")]
+    [InlineData("website/content/philosophy/**")]
+    [InlineData("website/content/guides/verification-guarantees.mdx")]
+    public void DocsDeployDenylistLosingARegisteredDenialFails(string pattern)
     {
         var contract = Contract();
         var denied = contract["releasePath"]!["documentationOnlyDeploy"]!["deniedPaths"]!.AsArray();
-        denied.Remove(denied.First(p => p!.GetValue<string>() == "website/public/data/**"));
+        denied.Remove(denied.First(p => p!.GetValue<string>() == pattern));
         AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C013");
+    }
+
+    [Theory]
+    [InlineData("attestation")]
+    [InlineData("pre-contract-base")]
+    [InlineData("workflow-not-machinery")]
+    [InlineData("website-not-diffed")]
+    public void DocsDeployRuleLosingARegisteredConstraintFails(string mutation)
+    {
+        var contract = Contract();
+        var rule = contract["releasePath"]!["documentationOnlyDeploy"]!;
+        switch (mutation)
+        {
+            case "attestation": rule["auditRecord"]!["attestationStatement"] = "Docs only."; break;
+            case "pre-contract-base": rule["base"]!["preContractDeploy"]!["commit"] = "b1d23d7d74aa17a460d6a7d429836ca8396bb182"; break;
+            case "workflow-not-machinery": rule["machinery"]!["paths"] = new JsonArray("scripts/verify_release_adjudication.py"); break;
+            case "website-not-diffed": rule["buildInputs"] = new JsonArray("website/content/"); break;
+        }
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C013");
+    }
+
+    [Fact]
+    public void AuthorizedDocsDeployRecordPasses()
+    {
+        // Phase 1: committed before the dispatch, so it has no run id yet.
+        var record = DocsDeployAudit();
+        record["status"] = "authorized";
+        record.Remove("runId");
+        var violations = EvidenceContractValidator.ValidateDocsDeployAudit(Contract(), Inventory(), record);
+        Assert.True(violations.Count == 0, Describe(violations));
+    }
+
+    [Fact]
+    public void InventoriedPathIsRefusedEvenWhenTheAllowlistMatches()
+    {
+        // Isolates the inventory-path exclusion: the path is allowed and not denied, so only its
+        // membership in the inventory can refuse it.
+        var inventory = Inventory();
+        Artifact(inventory, "changelog")["paths"]!.AsArray().Add("website/content/cli/compile.mdx");
+        AssertViolation(EvidenceContractValidator.ValidateDocsDeployAudit(Contract(), inventory, DocsDeployAudit()), "D003");
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("website-path")]
+    [InlineData("no-pr")]
+    public void MalformedMachineryChangeFails(string mutation)
+    {
+        var record = DocsDeployAudit();
+        switch (mutation)
+        {
+            case "missing": record.Remove("machineryChanges"); break;
+            case "website-path": record["machineryChanges"]![0]!["path"] = "website/package.json"; break;
+            case "no-pr": record["machineryChanges"]![0]!.AsObject().Remove("pr"); break;
+        }
+        AssertViolation(EvidenceContractValidator.ValidateDocsDeployAudit(Contract(), Inventory(), record), "D003");
+    }
+
+    // ------------------------------------------------------------------
+    // Amendment 1.1.0: per-PR ceiling exception (C011)
+    // ------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("unknown-ceiling")]
+    [InlineData("not-a-raise")]
+    [InlineData("no-pr")]
+    [InlineData("no-justification")]
+    [InlineData("unlogged-amendment")]
+    public void MalformedCeilingExceptionFails(string mutation)
+    {
+        var contract = Contract();
+        var exception = new JsonObject
+        {
+            ["ceiling"] = "pr-size", ["pr"] = 9004, ["value"] = 1600.0,
+            ["amendment"] = contract["contractVersion"]!.DeepClone(), ["justification"] = "fixture",
+        };
+        contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray().Add(exception);
+        Assert.True(EvidenceContractValidator.ValidateContract(contract).Count == 0, "the well-formed fixture must pass");
+        switch (mutation)
+        {
+            case "unknown-ceiling": exception["ceiling"] = "pr-lines"; break;
+            case "not-a-raise": exception["value"] = 1500.0; break;
+            case "no-pr": exception.Remove("pr"); break;
+            case "no-justification": exception["justification"] = " "; break;
+            case "unlogged-amendment": exception["amendment"] = "1.0.9"; break;
+        }
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C011");
     }
 
     [Theory]
@@ -1264,6 +1367,8 @@ public class EvidenceContractTests
     [InlineData("paraphrased-defect")]
     [InlineData("resolution-without-pr")]
     [InlineData("duplicate-id")]
+    [InlineData("resolutions-not-array")]
+    [InlineData("updates-not-array")]
     public void MalformedPendingUpdateFails(string mutation)
     {
         var update = PendingUpdate();
@@ -1281,6 +1386,8 @@ public class EvidenceContractTests
             case "paraphrased-defect": update["defectResolutions"]![0]!["defect"] = "HEAD reachability."; break;
             case "resolution-without-pr": update["defectResolutions"]![0]!.AsObject().Remove("resolvedByPr"); break;
             case "duplicate-id": updates.Add(PendingUpdate()); break;
+            case "resolutions-not-array": update["defectResolutions"] = "resolved by #9003"; break;
+            case "updates-not-array": inventory["pendingUpdates"] = new JsonObject { ["fixture"] = "x" }; break;
         }
         AssertViolation(EvidenceContractValidator.ValidateInventory(Contract(), inventory), "I013");
     }
@@ -1376,6 +1483,13 @@ public class EvidenceContractTests
         contract.AsObject().Remove("acceptance");
         contract["amendmentLog"]!.AsArray().Clear();
         contract["contractVersion"] = "1.0.0";
+        // Rules added by amendments do not exist in the proposed state.
+        contract["releasePath"]!.AsObject().Remove("documentationOnlyDeploy");
+        contract["benchmarkEquivalence"]!.AsObject().Remove("taskStatementRule");
+        contract["authorityCapacity"]!["capacity"]!.AsObject().Remove("exceptions");
+        contract["authorityCapacity"]!["capacity"]!.AsObject().Remove("evidenceDataRule");
+        contract["rules"]!.AsObject().Remove("platformDeterminism");
+        contract.AsObject().Remove("determinismRows");
         contract["status"] = "PROPOSED";
         contract["gateStatus"] = "NOT-MET";
         contract["authorityCapacity"]!["capacity"]!["status"] = "PROPOSED";
@@ -1414,13 +1528,14 @@ public class EvidenceContractTests
         return contract;
     }
 
-    /// <summary>A well-formed audit record of a documentation-only deploy on the pre-contract base.</summary>
+    /// <summary>A well-formed completed (deployed) audit record of a documentation-only deploy on the pre-contract base.</summary>
     private static JsonObject DocsDeployAudit()
     {
         var rule = Contract()["releasePath"]!["documentationOnlyDeploy"]!;
         return new JsonObject
         {
             ["schema"] = "calor.docs-only-deploy-audit/1",
+            ["status"] = "deployed",
             ["contractVersion"] = Contract()["contractVersion"]!.DeepClone(),
             ["workflow"] = ".github/workflows/nextjs-gh-pages.yml",
             ["runId"] = 37000000002L,
@@ -1429,7 +1544,14 @@ public class EvidenceContractTests
             ["baseCommit"] = rule["base"]!["preContractDeploy"]!["commit"]!.DeepClone(),
             ["baseRunId"] = rule["base"]!["preContractDeploy"]!["runId"]!.DeepClone(),
             ["changedPaths"] = new JsonArray("website/content/cli/compile.mdx", "website/content/guides/telemetry.mdx"),
+            ["machineryChanges"] = new JsonArray(new JsonObject
+            {
+                ["path"] = ".github/workflows/nextjs-gh-pages.yml",
+                ["pr"] = 1475,
+            }),
             ["allowlistCheck"] = new JsonObject { ["result"] = "passed", ["disallowedPaths"] = new JsonArray() },
+            ["fileModeCheck"] = new JsonObject { ["result"] = "passed" },
+            ["mdxCheck"] = new JsonObject { ["result"] = "passed" },
             ["wordingCheck"] = new JsonObject { ["result"] = "passed" },
             ["publishes"] = new JsonObject
             {
