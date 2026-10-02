@@ -132,13 +132,19 @@ public class SoundnessRegistrationTests
     [Fact]
     public void EveryCaseIsValidCalorBeforeVerification()
     {
-        // Every case must lex and parse cleanly, so a template typo can never pass as a refusal.
-        // Rows classified unsupported-refused may then be rejected by later front-end phases (that is
-        // a refusal, observed by #1311); every other case must compile with verification OFF. Only
-        // error presence is asserted.
-        var refused = Registration()["denominator"]!["rows"]!.AsArray()
+        // Front-end facts about the frozen cases, checked while this tree still has B1's front end (the
+        // cases target B1 and N1, so a later front-end change ends the check rather than the freeze).
+        // Every case lexes and parses cleanly, so a template typo cannot pass as a refusal. With
+        // verification and refinements OFF (only errors are read): a refused row is rejected exactly
+        // when it registers frontEndRefusalCodes, and only with those codes; every other case outside
+        // the parse-only rows compiles.
+        var b1 = Manifests()["B1"];
+        if (b1["frontEndBlobs"]!.AsObject().Concat(b1["entryPoints"]!.AsObject().Select(e => KeyValuePair.Create(e.Value!["path"]!.GetValue<string>(), e.Value["blob"])))
+            .Any(f => GitBlobId(Path.Combine(RepoRoot(), f.Key)) != f.Value!.GetValue<string>()))
+            return;
+        var refusalCodes = Registration()["denominator"]!["rows"]!.AsArray()
             .Where(r => r!["classification"]!.GetValue<string>() == "unsupported-refused")
-            .Select(r => r!["id"]!.GetValue<string>()).ToHashSet(StringComparer.Ordinal);
+            .ToDictionary(r => r!["id"]!.GetValue<string>(), r => r!["frontEndRefusalCodes"]!.AsArray().Select(c => c!.GetValue<string>()).ToHashSet());
         var failures = new List<string>();
         foreach (var c in SweepCaseGenerator.Generate(Registration(), Templates()))
         {
@@ -151,7 +157,7 @@ public class SoundnessRegistrationTests
                     failures.Add($"{c.Id} parse: {string.Join("; ", parseDiagnostics.Errors.Select(d => d.Message))}");
                     continue;
                 }
-                if (refused.Contains(c.RowId) || ParseOnlyRowPrefixes.Any(p => c.RowId.StartsWith(p, StringComparison.Ordinal)))
+                if (ParseOnlyRowPrefixes.Any(p => c.RowId.StartsWith(p, StringComparison.Ordinal)))
                     continue;
                 var result = Program.Compile(source, "r1-case.calr", new CompilationOptions
                 {
@@ -159,8 +165,10 @@ public class SoundnessRegistrationTests
                     VerifyRefinements = false,
                     EnableVerificationAnalyses = false,
                 });
-                if (result.HasErrors)
-                    failures.Add($"{c.Id} compile: {string.Join("; ", result.Diagnostics.Errors.Select(d => $"{d.Code} {d.Message}"))}");
+                var codes = result.Diagnostics.Errors.Select(d => d.Code).ToHashSet();
+                var allowed = refusalCodes.GetValueOrDefault(c.RowId) ?? [];
+                if (codes.Count > 0 != allowed.Count > 0 || !codes.IsSubsetOf(allowed))
+                    failures.Add($"{c.Id} compile: [{string.Join(",", codes)}] expected [{string.Join(",", allowed)}] {string.Join("; ", result.Diagnostics.Errors.Select(d => d.Message))}");
             }
         }
         Assert.True(failures.Count == 0, $"{failures.Count} invalid cases:\n" + string.Join("\n", failures.Take(40)));
@@ -270,7 +278,8 @@ public class SoundnessRegistrationTests
 
     private static IReadOnlyList<SoundnessRegistrationValidator.Violation> Validate(
         JsonNode registration, JsonNode templates, IReadOnlyDictionary<string, JsonNode> manifests) =>
-        SoundnessRegistrationValidator.Validate(registration, templates, Contract(), manifests);
+        SoundnessRegistrationValidator.Validate(registration, templates, Contract(), manifests,
+            SweepCaseGenerator.Generate(registration, templates));
 
     private static string ToNamespaced(string source, string ns)
     {

@@ -166,6 +166,16 @@
     "src/Calor.Compiler/CodeGen": "c3c8b6cbbb6caf50a13f04b88e15cca051157414",
     "src/Calor.Runtime": "b20bbf2ddd31d131fce545c5ca141ef78047d917"
   },
+  "frontEndBlobs": {
+    "src/Calor.Compiler/Parsing/Lexer.cs": "badbb6a4c1ce59183a5d548616cc7973139a4479",
+    "src/Calor.Compiler/Parsing/Parser.cs": "a521e369363b244b89600a747f5c65c8f5f81fa5",
+    "src/Calor.Compiler/Parsing/AttributeHelper.cs": "b934fc1a5392b72551cd1d28715187bac542ae48",
+    "src/Calor.Compiler/Binding/Binder.cs": "dd88b2480e0f8a701696eb9853a480d0a0bc9a42",
+    "src/Calor.Compiler/Binding/Scope.cs": "270b09dd2ffe67d7ab93900d575ae9573183cf82",
+    "src/Calor.Compiler/TypeChecking/TypeChecker.cs": "e393f0c2bd37482190edc19447173a0eb72a7c66",
+    "src/Calor.Compiler/TypeChecking/CalorType.cs": "f874ca5056b363fa03ad5979b7e0bd85ee404209",
+    "src/Calor.Compiler/Effects/EffectEnforcementPass.cs": "3cfd2b11e3e47258b93dc08bdbf607d8e5ea2f52"
+  },
   "whitelistDocument": {
     "path": "docs/verification-modeled-forms.md",
     "sha256": "c296720f268c497cf93e3d27943f3a0a750ed09abce3badcb5822c4e0bd5e932"
@@ -201,9 +211,7 @@
         "R1-NUM-ARITH-ADD-013",
         "R1-NUM-ARITH-ADD-014",
         "R1-NUM-ARITH-ADD-015",
-        "R1-NUM-ARITH-ADD-016",
-        "R1-NUM-ARITH-ADD-017",
-        "R1-NUM-ARITH-ADD-018"
+        "R1-NUM-ARITH-ADD-016"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/NUM-ARITH-ADD.jsonl"
     },
@@ -236,9 +244,7 @@
         "R1-NUM-ARITH-SUB-013",
         "R1-NUM-ARITH-SUB-014",
         "R1-NUM-ARITH-SUB-015",
-        "R1-NUM-ARITH-SUB-016",
-        "R1-NUM-ARITH-SUB-017",
-        "R1-NUM-ARITH-SUB-018"
+        "R1-NUM-ARITH-SUB-016"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/NUM-ARITH-SUB.jsonl"
     },
@@ -271,9 +277,7 @@
         "R1-NUM-ARITH-MUL-013",
         "R1-NUM-ARITH-MUL-014",
         "R1-NUM-ARITH-MUL-015",
-        "R1-NUM-ARITH-MUL-016",
-        "R1-NUM-ARITH-MUL-017",
-        "R1-NUM-ARITH-MUL-018"
+        "R1-NUM-ARITH-MUL-016"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/NUM-ARITH-MUL.jsonl"
     },
@@ -330,8 +334,7 @@
         "R1-NUM-DIVMOD-VAR-ENTAILED-008",
         "R1-NUM-DIVMOD-VAR-ENTAILED-009",
         "R1-NUM-DIVMOD-VAR-ENTAILED-010",
-        "R1-NUM-DIVMOD-VAR-ENTAILED-011",
-        "R1-NUM-DIVMOD-VAR-ENTAILED-012"
+        "R1-NUM-DIVMOD-VAR-ENTAILED-011"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/NUM-DIVMOD-VAR-ENTAILED.jsonl"
     },
@@ -418,8 +421,7 @@
         "R1-NUM-BITWISE-011",
         "R1-NUM-BITWISE-012",
         "R1-NUM-BITWISE-013",
-        "R1-NUM-BITWISE-014",
-        "R1-NUM-BITWISE-015"
+        "R1-NUM-BITWISE-014"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/NUM-BITWISE.jsonl"
     },
@@ -451,8 +453,7 @@
         "R1-NUM-COMPARE-014",
         "R1-NUM-COMPARE-015",
         "R1-NUM-COMPARE-016",
-        "R1-NUM-COMPARE-017",
-        "R1-NUM-COMPARE-018"
+        "R1-NUM-COMPARE-017"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/NUM-COMPARE.jsonl"
     },
@@ -478,8 +479,7 @@
         "R1-NUM-EQUALITY-008",
         "R1-NUM-EQUALITY-009",
         "R1-NUM-EQUALITY-010",
-        "R1-NUM-EQUALITY-011",
-        "R1-NUM-EQUALITY-012"
+        "R1-NUM-EQUALITY-011"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/NUM-EQUALITY.jsonl"
     },
@@ -529,8 +529,7 @@
         "R1-NUM-NARROW-ARITH-005",
         "R1-NUM-NARROW-ARITH-006",
         "R1-NUM-NARROW-ARITH-007",
-        "R1-NUM-NARROW-ARITH-008",
-        "R1-NUM-NARROW-ARITH-009"
+        "R1-NUM-NARROW-ARITH-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/NUM-NARROW-ARITH.jsonl"
     },
@@ -552,8 +551,7 @@
         "R1-NUM-NARROW-COMPARE-005",
         "R1-NUM-NARROW-COMPARE-006",
         "R1-NUM-NARROW-COMPARE-007",
-        "R1-NUM-NARROW-COMPARE-008",
-        "R1-NUM-NARROW-COMPARE-009"
+        "R1-NUM-NARROW-COMPARE-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/NUM-NARROW-COMPARE.jsonl"
     },
@@ -579,8 +577,7 @@
         "R1-NUM-LITERAL-TYPED-008",
         "R1-NUM-LITERAL-TYPED-009",
         "R1-NUM-LITERAL-TYPED-010",
-        "R1-NUM-LITERAL-TYPED-011",
-        "R1-NUM-LITERAL-TYPED-012"
+        "R1-NUM-LITERAL-TYPED-011"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/NUM-LITERAL-TYPED.jsonl"
     },
@@ -621,6 +618,22 @@
         "R1-NUM-MIXED-U64-SIGNED-006"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/NUM-MIXED-U64-SIGNED.jsonl"
+    },
+    {
+      "id": "B1:NUM-UNWHITELISTED-OPS",
+      "row": "NUM-UNWHITELISTED-OPS",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist"
+      ],
+      "caseIds": [
+        "R1-NUM-UNWHITELISTED-OPS-001",
+        "R1-NUM-UNWHITELISTED-OPS-002",
+        "R1-NUM-UNWHITELISTED-OPS-003"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/B1/rows/NUM-UNWHITELISTED-OPS.jsonl"
     },
     {
       "id": "B1:NUM-OVERFLOW-CHECKED",
@@ -702,7 +715,8 @@
         "R1-BOOL-CONNECTIVES-012",
         "R1-BOOL-CONNECTIVES-013",
         "R1-BOOL-CONNECTIVES-014",
-        "R1-BOOL-CONNECTIVES-015"
+        "R1-BOOL-CONNECTIVES-015",
+        "R1-BOOL-CONNECTIVES-016"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/BOOL-CONNECTIVES.jsonl"
     },
@@ -751,8 +765,7 @@
         "R1-BOOL-CONDITIONAL-008",
         "R1-BOOL-CONDITIONAL-009",
         "R1-BOOL-CONDITIONAL-010",
-        "R1-BOOL-CONDITIONAL-011",
-        "R1-BOOL-CONDITIONAL-012"
+        "R1-BOOL-CONDITIONAL-011"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/BOOL-CONDITIONAL.jsonl"
     },
@@ -775,8 +788,7 @@
         "R1-BOOL-IMPLICATION-005",
         "R1-BOOL-IMPLICATION-006",
         "R1-BOOL-IMPLICATION-007",
-        "R1-BOOL-IMPLICATION-008",
-        "R1-BOOL-IMPLICATION-009"
+        "R1-BOOL-IMPLICATION-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/BOOL-IMPLICATION.jsonl"
     },
@@ -799,8 +811,7 @@
         "R1-BOOL-NESTING-005",
         "R1-BOOL-NESTING-006",
         "R1-BOOL-NESTING-007",
-        "R1-BOOL-NESTING-008",
-        "R1-BOOL-NESTING-009"
+        "R1-BOOL-NESTING-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/BOOL-NESTING.jsonl"
     },
@@ -828,8 +839,7 @@
         "R1-BODY-RETURN-EXPR-011",
         "R1-BODY-RETURN-EXPR-012",
         "R1-BODY-RETURN-EXPR-013",
-        "R1-BODY-RETURN-EXPR-014",
-        "R1-BODY-RETURN-EXPR-015"
+        "R1-BODY-RETURN-EXPR-014"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/BODY-RETURN-EXPR.jsonl"
     },
@@ -882,8 +892,7 @@
         "R1-BODY-GUARD-CLAUSE-008",
         "R1-BODY-GUARD-CLAUSE-009",
         "R1-BODY-GUARD-CLAUSE-010",
-        "R1-BODY-GUARD-CLAUSE-011",
-        "R1-BODY-GUARD-CLAUSE-012"
+        "R1-BODY-GUARD-CLAUSE-011"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/BODY-GUARD-CLAUSE.jsonl"
     },
@@ -905,8 +914,7 @@
         "R1-BODY-NESTED-RETURN-005",
         "R1-BODY-NESTED-RETURN-006",
         "R1-BODY-NESTED-RETURN-007",
-        "R1-BODY-NESTED-RETURN-008",
-        "R1-BODY-NESTED-RETURN-009"
+        "R1-BODY-NESTED-RETURN-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/BODY-NESTED-RETURN.jsonl"
     },
@@ -931,8 +939,7 @@
         "R1-BODY-IMMUTABLE-BIND-008",
         "R1-BODY-IMMUTABLE-BIND-009",
         "R1-BODY-IMMUTABLE-BIND-010",
-        "R1-BODY-IMMUTABLE-BIND-011",
-        "R1-BODY-IMMUTABLE-BIND-012"
+        "R1-BODY-IMMUTABLE-BIND-011"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/BODY-IMMUTABLE-BIND.jsonl"
     },
@@ -975,8 +982,7 @@
         "R1-BODY-DIVISION-005",
         "R1-BODY-DIVISION-006",
         "R1-BODY-DIVISION-007",
-        "R1-BODY-DIVISION-008",
-        "R1-BODY-DIVISION-009"
+        "R1-BODY-DIVISION-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/BODY-DIVISION.jsonl"
     },
@@ -1038,8 +1044,7 @@
         "R1-POST-PARAM-PRESERVED-005",
         "R1-POST-PARAM-PRESERVED-006",
         "R1-POST-PARAM-PRESERVED-007",
-        "R1-POST-PARAM-PRESERVED-008",
-        "R1-POST-PARAM-PRESERVED-009"
+        "R1-POST-PARAM-PRESERVED-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/POST-PARAM-PRESERVED.jsonl"
     },
@@ -1061,8 +1066,7 @@
         "R1-POST-PARAM-MUTATED-005",
         "R1-POST-PARAM-MUTATED-006",
         "R1-POST-PARAM-MUTATED-007",
-        "R1-POST-PARAM-MUTATED-008",
-        "R1-POST-PARAM-MUTATED-009"
+        "R1-POST-PARAM-MUTATED-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/POST-PARAM-MUTATED.jsonl"
     },
@@ -1145,8 +1149,7 @@
         "R1-QNT-FORALL-BOUNDED-008",
         "R1-QNT-FORALL-BOUNDED-009",
         "R1-QNT-FORALL-BOUNDED-010",
-        "R1-QNT-FORALL-BOUNDED-011",
-        "R1-QNT-FORALL-BOUNDED-012"
+        "R1-QNT-FORALL-BOUNDED-011"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/QNT-FORALL-BOUNDED.jsonl"
     },
@@ -1169,8 +1172,7 @@
         "R1-QNT-EXISTS-BOUNDED-005",
         "R1-QNT-EXISTS-BOUNDED-006",
         "R1-QNT-EXISTS-BOUNDED-007",
-        "R1-QNT-EXISTS-BOUNDED-008",
-        "R1-QNT-EXISTS-BOUNDED-009"
+        "R1-QNT-EXISTS-BOUNDED-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/QNT-EXISTS-BOUNDED.jsonl"
     },
@@ -1253,8 +1255,7 @@
         "R1-ARR-LENGTH-005",
         "R1-ARR-LENGTH-006",
         "R1-ARR-LENGTH-007",
-        "R1-ARR-LENGTH-008",
-        "R1-ARR-LENGTH-009"
+        "R1-ARR-LENGTH-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/ARR-LENGTH.jsonl"
     },
@@ -1277,8 +1278,7 @@
         "R1-ARR-INDEX-005",
         "R1-ARR-INDEX-006",
         "R1-ARR-INDEX-007",
-        "R1-ARR-INDEX-008",
-        "R1-ARR-INDEX-009"
+        "R1-ARR-INDEX-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/ARR-INDEX.jsonl"
     },
@@ -1298,7 +1298,10 @@
         "R1-ARR-ELEMENT-TYPES-003",
         "R1-ARR-ELEMENT-TYPES-004",
         "R1-ARR-ELEMENT-TYPES-005",
-        "R1-ARR-ELEMENT-TYPES-006"
+        "R1-ARR-ELEMENT-TYPES-006",
+        "R1-ARR-ELEMENT-TYPES-007",
+        "R1-ARR-ELEMENT-TYPES-008",
+        "R1-ARR-ELEMENT-TYPES-009"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/ARR-ELEMENT-TYPES.jsonl"
     },
@@ -1342,8 +1345,7 @@
         "R1-STR-OPS-PREDICATE-008",
         "R1-STR-OPS-PREDICATE-009",
         "R1-STR-OPS-PREDICATE-010",
-        "R1-STR-OPS-PREDICATE-011",
-        "R1-STR-OPS-PREDICATE-012"
+        "R1-STR-OPS-PREDICATE-011"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/STR-OPS-PREDICATE.jsonl"
     },
@@ -1366,8 +1368,7 @@
         "R1-STR-OPS-COUNT-INDEX-005",
         "R1-STR-OPS-COUNT-INDEX-006",
         "R1-STR-OPS-COUNT-INDEX-007",
-        "R1-STR-OPS-COUNT-INDEX-008",
-        "R1-STR-OPS-COUNT-INDEX-009"
+        "R1-STR-OPS-COUNT-INDEX-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/STR-OPS-COUNT-INDEX.jsonl"
     },
@@ -1475,6 +1476,24 @@
       "resultPath": "bench/correctness/false-established/v024/B1/rows/FLD-INHERITED-NESTED.jsonl"
     },
     {
+      "id": "B1:FLD-IMPLICIT-RECEIVER",
+      "row": "FLD-IMPLICIT-RECEIVER",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "pass",
+        "translator"
+      ],
+      "caseIds": [
+        "R1-FLD-IMPLICIT-RECEIVER-001",
+        "R1-FLD-IMPLICIT-RECEIVER-002",
+        "R1-FLD-IMPLICIT-RECEIVER-003",
+        "R1-FLD-IMPLICIT-RECEIVER-004"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/B1/rows/FLD-IMPLICIT-RECEIVER.jsonl"
+    },
+    {
       "id": "B1:FLT-REFUSAL",
       "row": "FLT-REFUSAL",
       "classification": "unsupported-refused",
@@ -1492,8 +1511,7 @@
         "R1-FLT-REFUSAL-005",
         "R1-FLT-REFUSAL-006",
         "R1-FLT-REFUSAL-007",
-        "R1-FLT-REFUSAL-008",
-        "R1-FLT-REFUSAL-009"
+        "R1-FLT-REFUSAL-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/FLT-REFUSAL.jsonl"
     },
@@ -1552,8 +1570,7 @@
         "R1-VAC-UNSAT-PRECONDITIONS-005",
         "R1-VAC-UNSAT-PRECONDITIONS-006",
         "R1-VAC-UNSAT-PRECONDITIONS-007",
-        "R1-VAC-UNSAT-PRECONDITIONS-008",
-        "R1-VAC-UNSAT-PRECONDITIONS-009"
+        "R1-VAC-UNSAT-PRECONDITIONS-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/VAC-UNSAT-PRECONDITIONS.jsonl"
     },
@@ -1599,10 +1616,69 @@
         "R1-OBL-PROOF-008",
         "R1-OBL-PROOF-009",
         "R1-OBL-PROOF-010",
-        "R1-OBL-PROOF-011",
-        "R1-OBL-PROOF-012"
+        "R1-OBL-PROOF-011"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/OBL-PROOF.jsonl"
+    },
+    {
+      "id": "B1:OBL-BRANCH-FACTS",
+      "row": "OBL-BRANCH-FACTS",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "obligation",
+      "entryPoints": [
+        "facts",
+        "oblSolve"
+      ],
+      "caseIds": [
+        "R1-OBL-BRANCH-FACTS-001",
+        "R1-OBL-BRANCH-FACTS-002",
+        "R1-OBL-BRANCH-FACTS-003",
+        "R1-OBL-BRANCH-FACTS-004",
+        "R1-OBL-BRANCH-FACTS-005",
+        "R1-OBL-BRANCH-FACTS-006",
+        "R1-OBL-BRANCH-FACTS-007",
+        "R1-OBL-BRANCH-FACTS-008",
+        "R1-OBL-BRANCH-FACTS-009",
+        "R1-OBL-BRANCH-FACTS-010"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/B1/rows/OBL-BRANCH-FACTS.jsonl"
+    },
+    {
+      "id": "B1:OBL-LOOP-FACTS",
+      "row": "OBL-LOOP-FACTS",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "obligation",
+      "entryPoints": [
+        "facts",
+        "oblSolve"
+      ],
+      "caseIds": [
+        "R1-OBL-LOOP-FACTS-001",
+        "R1-OBL-LOOP-FACTS-002",
+        "R1-OBL-LOOP-FACTS-003",
+        "R1-OBL-LOOP-FACTS-004"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/B1/rows/OBL-LOOP-FACTS.jsonl"
+    },
+    {
+      "id": "B1:OBL-MUTATION-KILL",
+      "row": "OBL-MUTATION-KILL",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "obligation",
+      "entryPoints": [
+        "facts",
+        "oblSolve"
+      ],
+      "caseIds": [
+        "R1-OBL-MUTATION-KILL-001",
+        "R1-OBL-MUTATION-KILL-002",
+        "R1-OBL-MUTATION-KILL-003",
+        "R1-OBL-MUTATION-KILL-004"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/B1/rows/OBL-MUTATION-KILL.jsonl"
     },
     {
       "id": "B1:OBL-REFINEMENT-ENTRY",
@@ -1728,10 +1804,29 @@
         "R1-OBL-UNGATED-FORMS-005",
         "R1-OBL-UNGATED-FORMS-006",
         "R1-OBL-UNGATED-FORMS-007",
-        "R1-OBL-UNGATED-FORMS-008",
-        "R1-OBL-UNGATED-FORMS-009"
+        "R1-OBL-UNGATED-FORMS-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/OBL-UNGATED-FORMS.jsonl"
+    },
+    {
+      "id": "B1:OBL-UNGATED-REFERENCE",
+      "row": "OBL-UNGATED-REFERENCE",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "channel": "obligation",
+      "entryPoints": [
+        "oblSolve",
+        "translator"
+      ],
+      "caseIds": [
+        "R1-OBL-UNGATED-REFERENCE-001",
+        "R1-OBL-UNGATED-REFERENCE-002",
+        "R1-OBL-UNGATED-REFERENCE-003",
+        "R1-OBL-UNGATED-REFERENCE-004",
+        "R1-OBL-UNGATED-REFERENCE-005",
+        "R1-OBL-UNGATED-REFERENCE-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/B1/rows/OBL-UNGATED-REFERENCE.jsonl"
     },
     {
       "id": "B1:IMPL-PRECONDITION-WEAKENING",
@@ -1769,8 +1864,7 @@
         "R1-IMPL-POSTCONDITION-STRENGTHENING-002",
         "R1-IMPL-POSTCONDITION-STRENGTHENING-003",
         "R1-IMPL-POSTCONDITION-STRENGTHENING-004",
-        "R1-IMPL-POSTCONDITION-STRENGTHENING-005",
-        "R1-IMPL-POSTCONDITION-STRENGTHENING-006"
+        "R1-IMPL-POSTCONDITION-STRENGTHENING-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/IMPL-POSTCONDITION-STRENGTHENING.jsonl"
     },
@@ -1827,8 +1921,7 @@
         "R1-CACHE-BODY-CHANGE-002",
         "R1-CACHE-BODY-CHANGE-003",
         "R1-CACHE-BODY-CHANGE-004",
-        "R1-CACHE-BODY-CHANGE-005",
-        "R1-CACHE-BODY-CHANGE-006"
+        "R1-CACHE-BODY-CHANGE-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/CACHE-BODY-CHANGE.jsonl"
     },
@@ -1847,8 +1940,7 @@
         "R1-CACHE-PRECONDITION-CHANGE-002",
         "R1-CACHE-PRECONDITION-CHANGE-003",
         "R1-CACHE-PRECONDITION-CHANGE-004",
-        "R1-CACHE-PRECONDITION-CHANGE-005",
-        "R1-CACHE-PRECONDITION-CHANGE-006"
+        "R1-CACHE-PRECONDITION-CHANGE-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/CACHE-PRECONDITION-CHANGE.jsonl"
     },
@@ -1907,8 +1999,7 @@
         "R1-SIMP-CONSTANT-FOLDING-005",
         "R1-SIMP-CONSTANT-FOLDING-006",
         "R1-SIMP-CONSTANT-FOLDING-007",
-        "R1-SIMP-CONSTANT-FOLDING-008",
-        "R1-SIMP-CONSTANT-FOLDING-009"
+        "R1-SIMP-CONSTANT-FOLDING-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/SIMP-CONSTANT-FOLDING.jsonl"
     },
@@ -1932,7 +2023,9 @@
         "R1-SIMP-H1-UNARY-FOLD-006",
         "R1-SIMP-H1-UNARY-FOLD-007",
         "R1-SIMP-H1-UNARY-FOLD-008",
-        "R1-SIMP-H1-UNARY-FOLD-009"
+        "R1-SIMP-H1-UNARY-FOLD-009",
+        "R1-SIMP-H1-UNARY-FOLD-010",
+        "R1-SIMP-H1-UNARY-FOLD-011"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/SIMP-H1-UNARY-FOLD.jsonl"
     },
@@ -2060,7 +2153,9 @@
         "R1-CTRL-RETRO-845-001",
         "R1-CTRL-RETRO-845-002",
         "R1-CTRL-RETRO-845-003",
-        "R1-CTRL-RETRO-845-004"
+        "R1-CTRL-RETRO-845-004",
+        "R1-CTRL-RETRO-845-005",
+        "R1-CTRL-RETRO-845-006"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/CTRL-RETRO-845.jsonl"
     },

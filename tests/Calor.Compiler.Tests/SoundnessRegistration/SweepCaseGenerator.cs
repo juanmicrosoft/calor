@@ -140,8 +140,9 @@ internal static class SweepCaseGenerator
     {
         var holes = new Dictionary<string, (string Calor, string CSharp)>(StringComparer.Ordinal);
         var holeTypes = new Dictionary<string, string>(StringComparer.Ordinal);
+        var anchors = new List<BigInteger>();
         foreach (var (name, spec) in template["holes"]?.AsObject() ?? new JsonObject())
-            holes[name] = DrawHole(spec!, holeTypes, rng, name);
+            holes[name] = DrawHole(spec!, holeTypes, rng, name, anchors, instance);
 
         var oracle = template["oracle"]!;
         var claim = oracle["claim"]?.GetValue<string>() ?? "forall";
@@ -158,7 +159,7 @@ internal static class SweepCaseGenerator
                 Values: d["values"]?.AsArray().Select(v => Fill(v!.GetValue<string>(), holes, csharp: true)).ToArray()))
             .ToList();
         var exhaustiveProp = oracle["exhaustiveProp"]?.GetValue<bool>() ?? true;
-        var (inputs, exhaustive) = RenderInputs(domain, rng);
+        var (inputs, exhaustive) = RenderInputs(domain, rng, anchors);
         exhaustive &= exhaustiveProp;
 
         var parameters = string.Join(", ", domain.Select(d => $"{CSharpType(d.Type)} {d.Name}"));
@@ -198,11 +199,13 @@ internal static class SweepCaseGenerator
     }
 
     private static (string Calor, string CSharp) DrawHole(
-        JsonNode spec, Dictionary<string, string> holeTypes, SplitMix64 rng, string name)
+        JsonNode spec, Dictionary<string, string> holeTypes, SplitMix64 rng, string name, List<BigInteger> anchors, int instance)
     {
-        if (spec["oneOf"] is JsonArray options)
+        // cycle / cyclePairs pick option (instance mod n), so every option is rendered once the
+        // template has at least n instances (used where the registration claims coverage).
+        if ((spec["oneOf"] ?? spec["cycle"]) is JsonArray options)
         {
-            var chosen = options[rng.Below(options.Count)]!.GetValue<string>();
+            var chosen = options[spec["cycle"] != null ? instance % options.Count : rng.Below(options.Count)]!.GetValue<string>();
             if (Numeric.ContainsKey(chosen) || FixedTables.ContainsKey(chosen))
             {
                 holeTypes[name] = chosen;
@@ -210,10 +213,10 @@ internal static class SweepCaseGenerator
             }
             return (chosen, chosen);
         }
-        if (spec["pairs"] is JsonArray pairs)
+        if ((spec["pairs"] ?? spec["cyclePairs"]) is JsonArray pairs)
         {
             // A Calor spelling and the registrant's C# rendering of the same expression.
-            var pair = pairs[rng.Below(pairs.Count)]!.AsArray();
+            var pair = pairs[spec["cyclePairs"] != null ? instance % pairs.Count : rng.Below(pairs.Count)]!.AsArray();
             return (pair[0]!.GetValue<string>(), pair[1]!.GetValue<string>());
         }
         if (spec["literalOf"] is not null || spec["typedLiteralOf"] is not null)
@@ -225,11 +228,13 @@ internal static class SweepCaseGenerator
             for (var i = 0; i < SeededValuesPerParameter; i++)
                 pool.Add(rng.InRange(type.Min, type.Max));
             var value = pool[rng.Below(pool.Count)];
+            anchors.Add(value);
             return RenderLiteral(type, value, typed: spec["typedLiteralOf"] != null);
         }
         if (spec["intIn"] is JsonArray range)
         {
             var value = rng.InRange(range[0]!.GetValue<long>(), range[1]!.GetValue<long>());
+            anchors.Add(value);
             return RenderLiteral(Numeric["i32"], value, typed: false);
         }
         throw new InvalidOperationException($"Unknown hole spec for '{name}': {spec.ToJsonString()}");
@@ -255,7 +260,7 @@ internal static class SweepCaseGenerator
     }
 
     private static (string Inputs, bool Exhaustive) RenderInputs(
-        IReadOnlyList<(string Name, string Type, string[]? Values)> domain, SplitMix64 rng)
+        IReadOnlyList<(string Name, string Type, string[]? Values)> domain, SplitMix64 rng, IReadOnlyList<BigInteger> anchors)
     {
         var sb = new StringBuilder("    public static IEnumerable<object?[]> Inputs()\n    {\n");
         // Exhaustive only when every parameter is bool or a narrow integer with no override list and
@@ -285,13 +290,20 @@ internal static class SweepCaseGenerator
 
         var columns = domain.Select(d => d.Values ?? (FixedTables.TryGetValue(d.Type, out var fixedValues)
             ? fixedValues
-            : NumericColumn(Numeric[d.Type], rng))).ToList();
+            : NumericColumn(Numeric[d.Type], rng, anchors))).ToList();
         var tuples = columns.Aggregate(
             (IEnumerable<string[]>)new[] { Array.Empty<string>() },
             (acc, column) => acc.SelectMany(prefix => column.Select(v => prefix.Append(v).ToArray()))).ToList();
         if (tuples.Count > MaxSampledTuples)
         {
-            var keep = new SortedSet<int>();
+            // Tuples built only from the case's own constants (and neighbours) survive the cap;
+            // the remainder is a seeded subsample.
+            var anchorSets = domain.Select(d => d.Values == null && Numeric.TryGetValue(d.Type, out var t)
+                ? anchors.SelectMany(a => new[] { a - 1, a, a + 1 }).Where(v => v >= t.Min && v <= t.Max)
+                    .Select(v => RenderLiteral(t, v, typed: false).CSharp).ToHashSet()
+                : null).ToList();
+            var keep = new SortedSet<int>(Enumerable.Range(0, tuples.Count).Where(i =>
+                tuples[i].Select((v, c) => anchorSets[c] == null || anchorSets[c]!.Contains(v)).All(x => x)));
             while (keep.Count < MaxSampledTuples)
                 keep.Add(rng.Below(tuples.Count));
             tuples = keep.Select(i => tuples[i]).ToList();
@@ -309,11 +321,17 @@ internal static class SweepCaseGenerator
         return (sb.ToString(), false);
     }
 
-    private static string[] NumericColumn(NumericType type, SplitMix64 rng)
+    /// <summary>
+    /// Boundary table, seeded values, and every numeric constant drawn into the case together with
+    /// its neighbours (v - 1, v, v + 1): the property's own thresholds are where a counterexample
+    /// most often sits, so the sampled domain always contains them.
+    /// </summary>
+    private static string[] NumericColumn(NumericType type, SplitMix64 rng, IReadOnlyList<BigInteger> anchors)
     {
         var values = BoundaryValues(type).ToList();
         for (var i = 0; i < SeededValuesPerParameter; i++)
             values.Add(rng.InRange(type.Min, type.Max));
+        values.AddRange(anchors.SelectMany(a => new[] { a - 1, a, a + 1 }).Where(v => v >= type.Min && v <= type.Max));
         return values.Distinct().Order()
             .Select(v => RenderLiteral(type, v, typed: false).CSharp)
             .ToArray();

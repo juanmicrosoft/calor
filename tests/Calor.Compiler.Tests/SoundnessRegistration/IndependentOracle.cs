@@ -34,7 +34,11 @@ internal static class IndependentOracle
         int Violations,
         string? ViolationKind,
         string? Witness,
-        string? Error);
+        string? Error,
+        IReadOnlyList<string>? ReachedSample = null);
+
+    /// <summary>Reached inputs (domain order) that R1-O2 replays in addition to every witness.</summary>
+    internal const int ReplaySampleSize = 16;
 
     internal static IReadOnlyList<MetadataReference> BclReferences { get; } =
         ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
@@ -95,13 +99,20 @@ internal static class IndependentOracle
         var inputs = (IEnumerable<object?[]>)type.GetMethod("Inputs")!.Invoke(null, null)!;
 
         int total = 0, held = 0, reached = 0, hypThrew = 0, bodyThrew = 0, violations = 0, satisfied = 0;
+        var reachedSample = new List<string>();
         string? violationKind = null, witness = null;
         var clock = Stopwatch.StartNew();
         foreach (var input in inputs)
         {
             if (clock.Elapsed > EvaluationBudget)
-                return new Verdict("oracle-invalid", total, held, reached, hypThrew, bodyThrew, violations,
-                    violationKind, witness, "evaluation budget exceeded");
+            {
+                // A concrete witness found before the budget ran out stays conclusive; only an
+                // inconclusive partial enumeration is oracle-invalid.
+                var partial = claim == "exists" ? (satisfied > 0 ? "witness-found" : "oracle-invalid")
+                    : violations > 0 ? "violated" : "oracle-invalid";
+                return new Verdict(partial, total, held, reached, hypThrew, bodyThrew, violations,
+                    violationKind, witness, "evaluation budget exceeded (partial enumeration)", reachedSample);
+            }
             total++;
             if (!TryInvoke(hyp, [input], out var hypValue))
             {
@@ -118,6 +129,8 @@ internal static class IndependentOracle
                 continue;
             }
             reached++;
+            if (reachedSample.Count < ReplaySampleSize)
+                reachedSample.Add(Render(input));
             var ok = TryInvoke(prop, [input, result], out var propValue);
             var holds = ok && (bool)propValue!;
             if (claim == "exists")
@@ -145,7 +158,7 @@ internal static class IndependentOracle
             : violations > 0 ? "violated"
             : reached == 0 ? "vacuous-in-domain"
             : exhaustive ? "holds-exhaustive" : "holds-sampled";
-        return new Verdict(kind, total, held, reached, hypThrew, bodyThrew, violations, violationKind, witness, null);
+        return new Verdict(kind, total, held, reached, hypThrew, bodyThrew, violations, violationKind, witness, null, reachedSample);
     }
 
     private static bool TryInvoke(MethodInfo method, object?[] args, out object? value)

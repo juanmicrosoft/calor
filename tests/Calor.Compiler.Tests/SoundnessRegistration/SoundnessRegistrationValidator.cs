@@ -20,7 +20,8 @@ internal static class SoundnessRegistrationValidator
         ["aliases", "mutation", "early-returns", "caches", "numeric-widths", "arrays", "strings", "quantifiers", "guard-elision"];
 
     internal static IReadOnlyList<Violation> Validate(
-        JsonNode registration, JsonNode templates, JsonNode contract, IReadOnlyDictionary<string, JsonNode> manifests)
+        JsonNode registration, JsonNode templates, JsonNode contract, IReadOnlyDictionary<string, JsonNode> manifests,
+        IReadOnlyList<SweepCaseGenerator.Case> cases)
     {
         var v = new List<Violation>();
         void Add(string code, string message) => v.Add(new Violation(code, message));
@@ -70,15 +71,15 @@ internal static class SoundnessRegistrationValidator
             if (!rowIds.Add(id))
                 Add("R001", $"duplicate row {id}");
             var cls = Str(row, "classification");
-            var cases = row!["casesPerBaseline"]?.GetValue<int>() ?? -1;
+            var caseCount = row!["casesPerBaseline"]?.GetValue<int>() ?? -1;
             var critical = row["releaseCritical"]?.GetValue<bool>();
             if (cls == null || !Classifications.Contains(cls))
                 Add("R001", $"row {id} has unknown classification '{cls}'");
             if (critical == null)
                 Add("R001", $"row {id} has no releaseCritical mark");
-            if (cls == "not-investigated" && (cases != 0 || critical == true))
+            if (cls == "not-investigated" && (caseCount != 0 || critical == true))
                 Add("R002", $"not-investigated row {id} must have zero cases and not be release-critical");
-            if (cls != "not-investigated" && cases <= 0)
+            if (cls != "not-investigated" && caseCount <= 0)
                 Add("R003", $"investigated row {id} has no cases");
             foreach (var ep in row["entryPoints"]?.AsArray() ?? new JsonArray())
                 if (catalog == null || !catalog.ContainsKey(ep!.GetValue<string>()))
@@ -126,9 +127,10 @@ internal static class SoundnessRegistrationValidator
                     && r["samplingDimensions"]!.AsArray().Any(d => d!.GetValue<string>() == dim)))
                 Add("R009", $"sampling dimension '{dim}' reaches no row with cases");
 
-        // R010 every frozen whitelist member is mapped to rows whose Calor text carries its token.
-        var calorText = templates["templates"]!.AsArray().GroupBy(t => Str(t, "row")!)
-            .ToDictionary(g => g.Key, g => string.Join("\n", g.Select(CalorSide)), StringComparer.Ordinal);
+        // R010 every frozen whitelist member is mapped to rows whose GENERATED cases carry its token
+        // (template options alone are not coverage: a random hole may never render an option).
+        var calorText = cases.GroupBy(c => c.RowId)
+            .ToDictionary(g => g.Key, g => string.Join("\n", g.Select(c => c.CalorSource + c.CalorPrimeSource)), StringComparer.Ordinal);
         var map = registration["denominator"]?["whitelistCoverageMap"]?.AsArray() ?? new JsonArray();
         foreach (var line in registration["denominator"]?["frozenWhitelist"]?.AsArray() ?? new JsonArray())
         {
@@ -160,6 +162,9 @@ internal static class SoundnessRegistrationValidator
         if (retro == null || Str(retro, "preFixParent") != "17d253dff964e37538a5f503d3744b576bd2fb52"
             || !rowIds.Contains("CTRL-RETRO-845"))
             Add("R012", "#845 retrospective discriminating control must be registered with its pre-fix parent");
+        foreach (var t in templates["templates"]!.AsArray().Where(t => Str(t, "row")!.StartsWith("CTRL-RETRO-", StringComparison.Ordinal)))
+            if (t!["guards"] is not JsonArray guards || guards.Count == 0 || guards.Any(g => !rowIds.Contains(g!.GetValue<string>())))
+                Add("R012", $"retrospective control {Str(t, "id")} must name the registered rows it guards");
 
         // R016 manifests: one per investigated baseline, same rows, baseline-prefixed ids, own paths.
         foreach (var id in new[] { "B1", "N1" })
@@ -180,27 +185,6 @@ internal static class SoundnessRegistrationValidator
         }
         return v;
     }
-
-    /// <summary>The Calor-side text of a template: its Calor lines plus the Calor half of every hole option.</summary>
-    internal static string CalorSide(JsonNode? template)
-    {
-        var parts = new List<string> { Flatten(template!["calor"]), Flatten(template["calorPrime"]) };
-        foreach (var (_, hole) in template["holes"]?.AsObject() ?? new JsonObject())
-        {
-            if (hole!["oneOf"] is JsonArray options)
-                parts.AddRange(options.Select(o => o!.GetValue<string>()));
-            if (hole["pairs"] is JsonArray pairs)
-                parts.AddRange(pairs.Select(p => p![0]!.GetValue<string>()));
-        }
-        return string.Join("\n", parts);
-    }
-
-    private static string Flatten(JsonNode? node) => node switch
-    {
-        null => "",
-        JsonArray lines => string.Join("\n", lines.Select(l => l!.GetValue<string>())),
-        _ => node.GetValue<string>(),
-    };
 
     private static string? Str(JsonNode? node, string key) => node?[key] is JsonValue value ? value.GetValue<string>() : null;
 }

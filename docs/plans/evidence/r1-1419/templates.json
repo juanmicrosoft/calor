@@ -12,7 +12,7 @@
     {
       "id": "T-ADD-PARAM",
       "row": "NUM-ARITH-ADD",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "T": {
@@ -67,7 +67,7 @@
     {
       "id": "T-ADD-RESULT",
       "row": "NUM-ARITH-ADD",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "T": {
@@ -123,7 +123,7 @@
     {
       "id": "T-SUB-PARAM",
       "row": "NUM-ARITH-SUB",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "T": {
@@ -178,7 +178,7 @@
     {
       "id": "T-SUB-RESULT",
       "row": "NUM-ARITH-SUB",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "T": {
@@ -234,7 +234,7 @@
     {
       "id": "T-MUL-PARAM",
       "row": "NUM-ARITH-MUL",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "T": {
@@ -289,7 +289,7 @@
     {
       "id": "T-MUL-RESULT",
       "row": "NUM-ARITH-MUL",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "T": {
@@ -357,7 +357,7 @@
           ]
         },
         "OP": {
-          "oneOf": [
+          "cycle": [
             "/",
             "%"
           ]
@@ -399,7 +399,8 @@
         ],
         "hyp": "x >= {c1}",
         "prop": "x {OP} {d} {CMP} {c2}"
-      }
+      },
+      "minInstances": 2
     },
     {
       "id": "T-DIVLIT-NEG",
@@ -522,7 +523,7 @@
     {
       "id": "T-DIVVAR-ENTAILED",
       "row": "NUM-DIVMOD-VAR-ENTAILED",
-      "instances": 12,
+      "instances": 11,
       "claimSite": "postcondition",
       "holes": {
         "T": {
@@ -817,11 +818,11 @@
     {
       "id": "T-BIT",
       "row": "NUM-BITWISE",
-      "instances": 15,
+      "instances": 14,
       "claimSite": "postcondition",
       "holes": {
         "T": {
-          "oneOf": [
+          "cycle": [
             "i8",
             "i16",
             "i32",
@@ -875,12 +876,13 @@
         ],
         "hyp": "x >= {c3}",
         "prop": "(x {OP} {c1}) {CMP} {c2}"
-      }
+      },
+      "minInstances": 8
     },
     {
       "id": "T-CMP-MIXED",
       "row": "NUM-COMPARE",
-      "instances": 12,
+      "instances": 11,
       "claimSite": "postcondition",
       "holes": {
         "T1": {
@@ -1012,7 +1014,7 @@
     {
       "id": "T-EQ-SMALL",
       "row": "NUM-EQUALITY",
-      "instances": 12,
+      "instances": 11,
       "claimSite": "postcondition",
       "holes": {
         "T": {
@@ -1184,7 +1186,7 @@
     {
       "id": "T-NARROW-ARITH",
       "row": "NUM-NARROW-ARITH",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "T1": {
@@ -1251,7 +1253,7 @@
     {
       "id": "T-NARROW-CMP",
       "row": "NUM-NARROW-COMPARE",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "T1": {
@@ -1316,7 +1318,7 @@
     {
       "id": "T-LIT-TYPED",
       "row": "NUM-LITERAL-TYPED",
-      "instances": 12,
+      "instances": 11,
       "claimSite": "postcondition",
       "holes": {
         "T": {
@@ -1459,6 +1461,59 @@
         "hyp": "true",
         "prop": "(BigInteger)x {S} (BigInteger)y"
       }
+    },
+    {
+      "id": "T-UNWL-OPS",
+      "row": "NUM-UNWHITELISTED-OPS",
+      "instances": 3,
+      "claimSite": "postcondition",
+      "holes": {
+        "E": {
+          "cyclePairs": [
+            [
+              "(** x INT:2)",
+              "BigInteger.Pow(x, 2)"
+            ],
+            [
+              "(~ x)",
+              "~x"
+            ]
+          ]
+        },
+        "S": {
+          "oneOf": [
+            ">=",
+            "<=",
+            ">",
+            "<",
+            "==",
+            "!="
+          ]
+        },
+        "c1": {
+          "intIn": [
+            -3,
+            3
+          ]
+        }
+      },
+      "calor": [
+        "  §F{f1:Probe:pub} (i32:x) -> i32",
+        "    §E{}",
+        "    §S ({S} {E} {c1})",
+        "    §R INT:0"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "x",
+            "type": "i32"
+          }
+        ],
+        "hyp": "true",
+        "prop": "{E} {S} {c1}"
+      },
+      "minInstances": 2
     },
     {
       "id": "T-OVF-CHECKED-0",
@@ -1755,7 +1810,7 @@
     {
       "id": "T-BOOL-CONN",
       "row": "BOOL-CONNECTIVES",
-      "instances": 12,
+      "instances": 11,
       "claimSite": "postcondition",
       "holes": {
         "C1": {
@@ -1834,7 +1889,7 @@
     {
       "id": "T-BOOL-LIT",
       "row": "BOOL-CONNECTIVES",
-      "instances": 3,
+      "instances": 5,
       "claimSite": "postcondition",
       "holes": {
         "C": {
@@ -1846,7 +1901,7 @@
           ]
         },
         "BL": {
-          "pairs": [
+          "cyclePairs": [
             [
               "true",
               "true"
@@ -1889,7 +1944,8 @@
         ],
         "hyp": "true",
         "prop": "a {C} {BL}"
-      }
+      },
+      "minInstances": 4
     },
     {
       "id": "T-BOOL-SC-DIV",
@@ -1995,7 +2051,7 @@
     {
       "id": "T-BOOL-COND",
       "row": "BOOL-CONDITIONAL",
-      "instances": 12,
+      "instances": 11,
       "claimSite": "postcondition",
       "holes": {
         "T": {
@@ -2075,7 +2131,7 @@
     {
       "id": "T-BOOL-IMPL",
       "row": "BOOL-IMPLICATION",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "T": {
@@ -2151,7 +2207,7 @@
     {
       "id": "T-BOOL-NEST",
       "row": "BOOL-NESTING",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "C1": {
@@ -2226,7 +2282,7 @@
     {
       "id": "T-BODY-RET",
       "row": "BODY-RETURN-EXPR",
-      "instances": 15,
+      "instances": 14,
       "claimSite": "postcondition",
       "holes": {
         "T": {
@@ -2418,7 +2474,7 @@
     {
       "id": "T-BODY-GUARD",
       "row": "BODY-GUARD-CLAUSE",
-      "instances": 12,
+      "instances": 11,
       "claimSite": "postcondition",
       "holes": {
         "T": {
@@ -2513,7 +2569,7 @@
     {
       "id": "T-BODY-NESTED",
       "row": "BODY-NESTED-RETURN",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "T": {
@@ -2592,7 +2648,7 @@
     {
       "id": "T-BODY-BIND",
       "row": "BODY-IMMUTABLE-BIND",
-      "instances": 12,
+      "instances": 11,
       "claimSite": "postcondition",
       "holes": {
         "Q": {
@@ -2721,7 +2777,7 @@
     {
       "id": "T-BODY-DIV",
       "row": "BODY-DIVISION",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "T": {
@@ -2824,7 +2880,8 @@
         ],
         "hyp": "x >= 0 && x <= 100",
         "result": "int",
-        "body": "int acc = 0; for (int i = 0; i < x; i++) acc = acc + {k}; return acc;",
+        "body": "int acc = 0; for (int i = 0; i <= x; i++) acc = acc + {k}; return acc;",
+        "note": "§L bounds are inclusive (FactCollector and C# emission)",
         "prop": "result {S} {c1}"
       }
     },
@@ -2918,7 +2975,7 @@
     {
       "id": "T-POST-PRESERVED",
       "row": "POST-PARAM-PRESERVED",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "T": {
@@ -2998,7 +3055,7 @@
     {
       "id": "T-POST-MUTATED",
       "row": "POST-PARAM-MUTATED",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "Q": {
@@ -3094,7 +3151,7 @@
       },
       "calor": [
         "  §F{f1:Probe:pub} (i32[]:a, i32[]:b) -> i32",
-        "    §E{}",
+        "    §E{mut}",
         "    §Q (&& (> §LEN a INT:0) (> §LEN b INT:0))",
         "    §Q (== a{0} {c0})",
         "    §S (== a{0} {c0})",
@@ -3172,7 +3229,7 @@
     {
       "id": "T-QNT-FORALL",
       "row": "QNT-FORALL-BOUNDED",
-      "instances": 12,
+      "instances": 11,
       "claimSite": "postcondition",
       "holes": {
         "G": {
@@ -3251,7 +3308,7 @@
     {
       "id": "T-QNT-EXISTS",
       "row": "QNT-EXISTS-BOUNDED",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "S": {
@@ -3476,7 +3533,7 @@
     {
       "id": "T-ARR-LEN",
       "row": "ARR-LENGTH",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "Q": {
@@ -3537,7 +3594,7 @@
     {
       "id": "T-ARR-INDEX",
       "row": "ARR-INDEX",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "S": {
@@ -3595,11 +3652,11 @@
     {
       "id": "T-ARR-ELEM",
       "row": "ARR-ELEMENT-TYPES",
-      "instances": 6,
+      "instances": 9,
       "claimSite": "postcondition",
       "holes": {
         "AT": {
-          "oneOf": [
+          "cycle": [
             "i8[]",
             "i16[]",
             "i32[]",
@@ -3643,7 +3700,8 @@
         ],
         "hyp": "a!.Length > 0",
         "prop": "a![0] {S} {c1}"
-      }
+      },
+      "minInstances": 8
     },
     {
       "id": "T-ARR-COMPUTED",
@@ -3687,7 +3745,7 @@
     {
       "id": "T-STR-PRED",
       "row": "STR-OPS-PREDICATE",
-      "instances": 12,
+      "instances": 11,
       "claimSite": "postcondition",
       "holes": {
         "lit": {
@@ -3699,7 +3757,7 @@
           ]
         },
         "POST": {
-          "pairs": [
+          "cyclePairs": [
             [
               "(! (! (contains result STR:\"a\")))",
               "result!.Contains(\"a\")"
@@ -3740,16 +3798,17 @@
         "result": "str",
         "body": "return string.Concat(s, \"{lit}\");",
         "prop": "{POST}"
-      }
+      },
+      "minInstances": 5
     },
     {
       "id": "T-STR-COUNT",
       "row": "STR-OPS-COUNT-INDEX",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "EXPR": {
-          "pairs": [
+          "cyclePairs": [
             [
               "(len s)",
               "s!.Length"
@@ -3802,7 +3861,8 @@
         "result": "int",
         "body": "return {EXPR};",
         "prop": "result {S} {c1}"
-      }
+      },
+      "minInstances": 4
     },
     {
       "id": "T-STR-CULTURE",
@@ -3811,7 +3871,7 @@
       "claimSite": "postcondition",
       "holes": {
         "E": {
-          "pairs": [
+          "cyclePairs": [
             [
               "(starts s STR:\"\\u200dabc\")",
               "s!.StartsWith(\"\\u200dabc\")"
@@ -3821,8 +3881,8 @@
               "s!.EndsWith(\"C\", StringComparison.OrdinalIgnoreCase)"
             ],
             [
-              "(indexof s STR:\"B\" :ignore-case)",
-              "(s!.IndexOf(\"B\", StringComparison.OrdinalIgnoreCase) >= 0)"
+              "(>= (indexof s STR:\"B\" :ignore-case) INT:0)",
+              "s!.IndexOf(\"B\", StringComparison.OrdinalIgnoreCase) >= 0"
             ],
             [
               "(contains s STR:\"A\" :ignore-case)",
@@ -3853,8 +3913,9 @@
           }
         ],
         "hyp": "true",
-        "prop": "!{E}"
-      }
+        "prop": "!({E})"
+      },
+      "minInstances": 6
     },
     {
       "id": "T-STR-UNMODELED",
@@ -3863,7 +3924,7 @@
       "claimSite": "postcondition",
       "holes": {
         "E": {
-          "pairs": [
+          "cyclePairs": [
             [
               "(replace s STR:\"a\" STR:\"bb\")",
               "s!.Replace(\"a\", \"bb\")"
@@ -3900,7 +3961,8 @@
         "result": "str",
         "body": "return {E};",
         "prop": "result!.Length == s!.Length"
-      }
+      },
+      "minInstances": 4
     },
     {
       "id": "T-STR-NONASCII",
@@ -3909,7 +3971,7 @@
       "claimSite": "postcondition",
       "holes": {
         "L": {
-          "pairs": [
+          "cyclePairs": [
             [
               "\\u00e9",
               "\\u00e9"
@@ -3925,7 +3987,7 @@
           ]
         },
         "POST": {
-          "pairs": [
+          "cyclePairs": [
             [
               "(<= (len result) INT:1)",
               "result!.Length <= 1"
@@ -3958,7 +4020,8 @@
         "result": "str",
         "body": "return c ? \"{L}\" : \"\";",
         "prop": "{POST}"
-      }
+      },
+      "minInstances": 3
     },
     {
       "id": "T-FLD-ACCESS",
@@ -3971,18 +4034,6 @@
             "u8",
             "i32",
             "u16"
-          ]
-        },
-        "RV": {
-          "pairs": [
-            [
-              "this.Value",
-              "value"
-            ],
-            [
-              "Value",
-              "value"
-            ]
           ]
         },
         "Q": {
@@ -4021,10 +4072,10 @@
       "calor": [
         "  §CL{c1:Box:pub}",
         "    §FLD{{FT}:Value:pub}",
-        "    §MT{mt1:Probe:pub} (i32:k) -> i32",
+        "    §MT{mt1:Probe:pub} (Box:p, i32:k) -> i32",
         "      §E{}",
         "      §Q ({Q} k {c0})",
-        "      §S ({S} {RV} {c1})",
+        "      §S ({S} p.Value {c1})",
         "      §R k"
       ],
       "oracle": {
@@ -4044,8 +4095,9 @@
           }
         ],
         "hyp": "k {Q} {c0}",
-        "prop": "{RV} {S} {c1}",
-        "replay": "new Box { Value = value }.Probe(k)"
+        "prop": "value {S} {c1}",
+        "replay": "new Box().Probe(new Box { Value = value }, k)",
+        "note": "p is non-null in the replay; a null p would throw before the §S and is excluded (normal-return semantics)"
       }
     },
     {
@@ -4076,9 +4128,9 @@
         "    §FLD{u8:Level:pub}",
         "  §CL{c1:Box:pub}",
         "    §EXT{Base}",
-        "    §MT{mt1:Probe:pub} (i32:k) -> i32",
+        "    §MT{mt1:Probe:pub} (Box:p, i32:k) -> i32",
         "      §E{}",
-        "      §S ({S} this.Level {c1})",
+        "      §S ({S} p.Level {c1})",
         "      §R k"
       ],
       "oracle": {
@@ -4097,13 +4149,82 @@
         ],
         "hyp": "true",
         "prop": "level {S} {c1}",
-        "replay": "new Box { Level = level }.Probe(k)"
+        "replay": "new Box().Probe(new Box { Level = level }, k)"
       }
+    },
+    {
+      "id": "T-FLD-RECEIVER",
+      "row": "FLD-IMPLICIT-RECEIVER",
+      "instances": 4,
+      "claimSite": "postcondition",
+      "holes": {
+        "FT": {
+          "oneOf": [
+            "u8",
+            "i32"
+          ]
+        },
+        "RV": {
+          "cyclePairs": [
+            [
+              "this.Value",
+              "value"
+            ],
+            [
+              "Value",
+              "value"
+            ]
+          ]
+        },
+        "S": {
+          "oneOf": [
+            ">=",
+            "<=",
+            ">",
+            "<",
+            "==",
+            "!="
+          ]
+        },
+        "c1": {
+          "intIn": [
+            -1,
+            256
+          ]
+        }
+      },
+      "calor": [
+        "  §CL{c1:Box:pub}",
+        "    §FLD{{FT}:Value:pub}",
+        "    §MT{mt1:Probe:pub} (i32:k) -> i32",
+        "      §E{}",
+        "      §S ({S} {RV} {c1})",
+        "      §R k"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "value",
+            "type": "{FT}"
+          },
+          {
+            "name": "k",
+            "type": "i32",
+            "values": [
+              "0"
+            ]
+          }
+        ],
+        "hyp": "true",
+        "prop": "value {S} {c1}",
+        "replay": "new Box { Value = value }.Probe(k)"
+      },
+      "minInstances": 2
     },
     {
       "id": "T-FLT",
       "row": "FLT-REFUSAL",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "FT": {
@@ -4112,7 +4233,7 @@
           ]
         },
         "POST": {
-          "pairs": [
+          "cyclePairs": [
             [
               "(== d d)",
               "d == d"
@@ -4156,7 +4277,8 @@
         ],
         "hyp": "true",
         "prop": "{POST}"
-      }
+      },
+      "minInstances": 4
     },
     {
       "id": "T-CALL",
@@ -4205,17 +4327,16 @@
       "claimSite": "postcondition",
       "holes": {
         "GT": {
-          "oneOf": [
+          "cycle": [
             "object",
-            "List<i32>",
-            "Option<i32>"
+            "f64[]"
           ]
         }
       },
       "calor": [
         "  §F{f1:Probe:pub} ({GT}:o) -> i32",
         "    §E{}",
-        "    §S (!= o null)",
+        "    §S (== o o)",
         "    §R INT:0"
       ],
       "oracle": {
@@ -4225,18 +4346,21 @@
             "type": "object",
             "values": [
               "null",
-              "new object()"
+              "new object()",
+              "new double[0]"
             ]
           }
         ],
         "hyp": "true",
-        "prop": "o != null"
-      }
+        "prop": "o == o",
+        "note": "a tautology: a Proven here is a missing reference-model demotion (required-demotion-absent), not a false proof"
+      },
+      "minInstances": 2
     },
     {
       "id": "T-VAC-UNSAT",
       "row": "VAC-UNSAT-PRECONDITIONS",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "T": {
@@ -4353,12 +4477,13 @@
     {
       "id": "T-OBL-PROOF",
       "row": "OBL-PROOF",
-      "instances": 12,
+      "instances": 11,
       "claimSite": "obligation",
       "holes": {
         "T": {
           "oneOf": [
-            "i32"
+            "i32",
+            "i64"
           ]
         },
         "Q": {
@@ -4390,6 +4515,72 @@
           ]
         },
         "c0": {
+          "literalOf": "T"
+        },
+        "c1": {
+          "literalOf": "T"
+        },
+        "c2": {
+          "literalOf": "T"
+        }
+      },
+      "calor": [
+        "  §F{f1:Probe:priv} ({T}:x) -> i32",
+        "    §E{}",
+        "    §Q ({Q} x {c0})",
+        "    §PROOF{p1:claim} ({S} ({OP} x {c1}) {c2})",
+        "    §R INT:0"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "x",
+            "type": "{T}"
+          }
+        ],
+        "hyp": "x {Q} {c0}",
+        "prop": "(x {OP} {c1}) {S} {c2}",
+        "note": "parameters only: the obligation solver declares parameters, not local bindings"
+      },
+      "obligationKind": "ProofObligation"
+    },
+    {
+      "id": "T-OBL-BRANCH",
+      "row": "OBL-BRANCH-FACTS",
+      "instances": 4,
+      "claimSite": "obligation",
+      "holes": {
+        "Q": {
+          "oneOf": [
+            ">=",
+            "<=",
+            ">",
+            "<",
+            "==",
+            "!="
+          ]
+        },
+        "A": {
+          "oneOf": [
+            ">=",
+            "<=",
+            ">",
+            "<",
+            "==",
+            "!="
+          ]
+        },
+        "S": {
+          "oneOf": [
+            ">=",
+            "<=",
+            ">",
+            "<",
+            "==",
+            "!="
+          ]
+        },
+        "c0": {
           "literalOf": "i32"
         },
         "c1": {
@@ -4400,25 +4591,244 @@
         }
       },
       "calor": [
-        "  §F{f1:Probe:pub} ({T}:x) -> {T}",
+        "  §F{f1:Probe:priv} (i32:x, i32:y) -> i32",
         "    §E{}",
-        "    §Q ({Q} x {c0})",
-        "    §B{y:{T}} ({OP} x {c1})",
-        "    §PROOF{p1:claim} ({S} y {c2})",
-        "    §R y"
+        "    §Q ({Q} y {c0})",
+        "    §IF{if1} ({A} x {c1})",
+        "      §PROOF{p1:claim} ({S} x {c2})",
+        "    §R INT:0"
       ],
       "oracle": {
         "domain": [
           {
             "name": "x",
-            "type": "{T}"
+            "type": "i32"
+          },
+          {
+            "name": "y",
+            "type": "i32"
           }
         ],
-        "hyp": "x {Q} {c0}",
-        "result": "{T}",
-        "body": "return x {OP} {c1};",
-        "prop": "result {S} {c2}",
-        "note": "oracle result = value of y at the §PROOF point"
+        "hyp": "y {Q} {c0} && x {A} {c1}",
+        "prop": "x {S} {c2}",
+        "note": "proof inside the then-branch: the guard is a scoped fact"
+      },
+      "obligationKind": "ProofObligation"
+    },
+    {
+      "id": "T-OBL-ELSE",
+      "row": "OBL-BRANCH-FACTS",
+      "instances": 3,
+      "claimSite": "obligation",
+      "holes": {
+        "A": {
+          "oneOf": [
+            ">=",
+            "<=",
+            ">",
+            "<",
+            "==",
+            "!="
+          ]
+        },
+        "S": {
+          "oneOf": [
+            ">=",
+            "<=",
+            ">",
+            "<",
+            "==",
+            "!="
+          ]
+        },
+        "c1": {
+          "literalOf": "i32"
+        },
+        "c2": {
+          "literalOf": "i32"
+        }
+      },
+      "calor": [
+        "  §F{f1:Probe:priv} (i32:x) -> i32",
+        "    §E{}",
+        "    §IF{if1} ({A} x {c1})",
+        "      §R INT:1",
+        "    §EL",
+        "      §PROOF{p1:claim} ({S} x {c2})",
+        "    §R INT:0"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "x",
+            "type": "i32"
+          }
+        ],
+        "hyp": "!(x {A} {c1})",
+        "prop": "x {S} {c2}",
+        "note": "proof in the else-branch: only the negated guard holds"
+      },
+      "obligationKind": "ProofObligation"
+    },
+    {
+      "id": "T-OBL-AFTER-IF",
+      "row": "OBL-BRANCH-FACTS",
+      "instances": 3,
+      "claimSite": "obligation",
+      "holes": {
+        "A": {
+          "oneOf": [
+            ">=",
+            "<=",
+            ">",
+            "<",
+            "==",
+            "!="
+          ]
+        },
+        "S": {
+          "oneOf": [
+            ">=",
+            "<=",
+            ">",
+            "<",
+            "==",
+            "!="
+          ]
+        },
+        "c1": {
+          "literalOf": "i32"
+        },
+        "c2": {
+          "literalOf": "i32"
+        }
+      },
+      "calor": [
+        "  §F{f1:Probe:priv} (i32:x) -> i32",
+        "    §E{}",
+        "    §IF{if1} ({A} x {c1})",
+        "      §B{t:i32} INT:0",
+        "    §PROOF{p1:claim} ({S} x {c2})",
+        "    §R INT:0"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "x",
+            "type": "i32"
+          }
+        ],
+        "hyp": "true",
+        "prop": "x {S} {c2}",
+        "note": "proof after a non-returning if: the guard must not leak"
+      },
+      "obligationKind": "ProofObligation"
+    },
+    {
+      "id": "T-OBL-LOOP",
+      "row": "OBL-LOOP-FACTS",
+      "instances": 4,
+      "claimSite": "obligation",
+      "holes": {
+        "lo": {
+          "cyclePairs": [
+            [
+              "0",
+              "0"
+            ],
+            [
+              "1",
+              "1"
+            ],
+            [
+              "2",
+              "2"
+            ]
+          ]
+        },
+        "S": {
+          "oneOf": [
+            ">=",
+            "<=",
+            ">",
+            "<",
+            "==",
+            "!="
+          ]
+        },
+        "c1": {
+          "intIn": [
+            -3,
+            52
+          ]
+        }
+      },
+      "calor": [
+        "  §F{f1:Probe:priv} (i8:n) -> i32",
+        "    §E{}",
+        "    §Q (&& (>= n INT:0) (<= n INT:50))",
+        "    §L{l1:i:{lo}:n:1}",
+        "      §PROOF{p1:claim} ({S} i {c1})",
+        "    §R INT:0"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "n",
+            "type": "i8"
+          }
+        ],
+        "hyp": "n >= 0 && n <= 50",
+        "prelude": "    static bool All(int lo, int hi, Func<int, bool> p) { for (int i = lo; i <= hi; i++) if (!p(i)) return false; return true; }",
+        "prop": "All({lo}, n, i => i {S} {c1})",
+        "note": "inclusive loop bounds"
+      },
+      "obligationKind": "ProofObligation"
+    },
+    {
+      "id": "T-OBL-KILL",
+      "row": "OBL-MUTATION-KILL",
+      "instances": 4,
+      "claimSite": "obligation",
+      "holes": {
+        "A": {
+          "oneOf": [
+            ">=",
+            "<=",
+            ">",
+            "<",
+            "==",
+            "!="
+          ]
+        },
+        "c1": {
+          "literalOf": "i32"
+        },
+        "c2": {
+          "literalOf": "i32"
+        }
+      },
+      "calor": [
+        "  §F{f1:Probe:priv} (i32:x) -> i32",
+        "    §E{}",
+        "    §B{~v:i32} x",
+        "    §IF{if1} ({A} v {c1})",
+        "      §ASSIGN v {c2}",
+        "      §PROOF{p1:claim} ({A} v {c1})",
+        "    §R v"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "x",
+            "type": "i32"
+          }
+        ],
+        "hyp": "x {A} {c1}",
+        "result": "int",
+        "body": "int v = x; v = {c2}; return v;",
+        "prop": "result {A} {c1}",
+        "note": "the guard fact must be killed by the assignment; oracle result = v at the proof"
       },
       "obligationKind": "ProofObligation"
     },
@@ -4682,7 +5092,7 @@
       },
       "calor": [
         "  §ITYPE{it1:Sized:i32[]:n} (> # INT:0)",
-        "  §F{f1:Probe:pub}",
+        "  §F{f1:Probe:priv}",
         "    §I{Sized:a}",
         "    §I{i32:k}",
         "    §O{i32}",
@@ -4780,7 +5190,7 @@
     {
       "id": "T-OBL-UNGATED",
       "row": "OBL-UNGATED-FORMS",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "obligation",
       "holes": {
         "PT": {
@@ -4830,6 +5240,67 @@
         "prop": "{E}"
       },
       "obligationKind": "ProofObligation"
+    },
+    {
+      "id": "T-OBL-UNGATED-REF",
+      "row": "OBL-UNGATED-REFERENCE",
+      "instances": 6,
+      "claimSite": "obligation",
+      "holes": {
+        "E": {
+          "cyclePairs": [
+            [
+              "(>= p.Value INT:0)",
+              "p!.Value >= 0"
+            ],
+            [
+              "(>= (len s) INT:0)",
+              "s!.Length >= 0"
+            ],
+            [
+              "(>= §LEN a INT:0)",
+              "a!.Length >= 0"
+            ],
+            [
+              "(|| (! (isempty s)) (== s STR:\"\"))",
+              "!string.IsNullOrEmpty(s) || s == \"\""
+            ]
+          ]
+        }
+      },
+      "calor": [
+        "  §CL{c1:Box:pub}",
+        "    §FLD{u8:Value:pub}",
+        "  §F{f1:Probe:priv} (Box:p, str:s, i32[]:a) -> i32",
+        "    §E{}",
+        "    §PROOF{p1:claim} {E}",
+        "    §R INT:0"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "p",
+            "type": "Box",
+            "values": [
+              "null",
+              "new Box { Value = 3 }"
+            ]
+          },
+          {
+            "name": "s",
+            "type": "str"
+          },
+          {
+            "name": "a",
+            "type": "i32[]"
+          }
+        ],
+        "prelude": "    public sealed class Box { public byte Value; }",
+        "hyp": "true",
+        "prop": "{E}"
+      },
+      "obligationKind": "ProofObligation",
+      "minInstances": 4
     },
     {
       "id": "T-IMPL-PRE",
@@ -4893,7 +5364,7 @@
     {
       "id": "T-IMPL-POST",
       "row": "IMPL-POSTCONDITION-STRENGTHENING",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "implication",
       "holes": {
         "A": {
@@ -5000,7 +5471,7 @@
         "      §I{i32:x}",
         "      §O{i32}",
         "      §I{i32:y}",
-        "      §Q ({A} ({OP} x y) {c1})",
+        "      §Q ({A} x {c1})",
         "  §CL{c1:Impl:pub}",
         "    §IMPL{IProbe}",
         "    §MT{mt1:Run:pub}",
@@ -5021,8 +5492,9 @@
             "type": "i8"
           }
         ],
-        "hyp": "(x {OP} y) {A} {c1}",
-        "prop": "(x {OP} y) {B} {c2}"
+        "hyp": "x {A} {c1}",
+        "prop": "(x {OP} y) {B} {c2}",
+        "note": "division only in the implementer precondition: a zero divisor admitted by the interface precondition makes the implementer check throw, which is a violation"
       }
     },
     {
@@ -5085,28 +5557,12 @@
     {
       "id": "T-CACHE-BODY",
       "row": "CACHE-BODY-CHANGE",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "postcondition",
       "holes": {
-        "S": {
-          "oneOf": [
-            ">=",
-            "<=",
-            ">",
-            "<",
-            "==",
-            "!="
-          ]
-        },
-        "c1": {
+        "k": {
           "intIn": [
-            -5,
-            1005
-          ]
-        },
-        "c2": {
-          "intIn": [
-            -5,
+            1,
             5
           ]
         }
@@ -5116,15 +5572,15 @@
         "    §E{}",
         "    §Q (>= x INT:0)",
         "    §Q (< x INT:1000)",
-        "    §S ({S} result {c1})",
-        "    §R (+ x {c2})"
+        "    §S (>= result INT:0)",
+        "    §R (- x {k})"
       ],
       "calorPrime": [
         "  §F{f1:Probe:pub} (i32:x) -> i32",
         "    §E{}",
         "    §Q (>= x INT:0)",
         "    §Q (< x INT:1000)",
-        "    §S ({S} result {c1})",
+        "    §S (>= result INT:0)",
         "    §R x"
       ],
       "oracle": {
@@ -5136,45 +5592,30 @@
         ],
         "hyp": "x >= 0 && x < 1000",
         "result": "int",
-        "body": "return x + {c2};",
-        "prop": "result {S} {c1}"
-      }
+        "body": "return x - {k};",
+        "prop": "result >= 0"
+      },
+      "note": "prime is a true postcondition (expected Proven); the final body makes it false at x = 0"
     },
     {
       "id": "T-CACHE-PRE",
       "row": "CACHE-PRECONDITION-CHANGE",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "postcondition",
       "holes": {
-        "S": {
-          "oneOf": [
-            ">=",
-            "<=",
-            ">",
-            "<",
-            "==",
-            "!="
-          ]
-        },
-        "c1": {
+        "k": {
           "intIn": [
             -5,
-            5
-          ]
-        },
-        "c2": {
-          "intIn": [
-            -5,
-            5
+            -1
           ]
         }
       },
       "calor": [
         "  §F{f1:Probe:pub} (i32:x) -> i32",
         "    §E{}",
-        "    §Q (>= x {c2})",
+        "    §Q (>= x {k})",
         "    §Q (< x INT:1000)",
-        "    §S ({S} x {c1})",
+        "    §S (>= x INT:0)",
         "    §R INT:0"
       ],
       "calorPrime": [
@@ -5182,7 +5623,7 @@
         "    §E{}",
         "    §Q (>= x INT:0)",
         "    §Q (< x INT:1000)",
-        "    §S ({S} x {c1})",
+        "    §S (>= x INT:0)",
         "    §R INT:0"
       ],
       "oracle": {
@@ -5192,9 +5633,10 @@
             "type": "i32"
           }
         ],
-        "hyp": "x >= {c2} && x < 1000",
-        "prop": "x {S} {c1}"
-      }
+        "hyp": "x >= {k} && x < 1000",
+        "prop": "x >= 0"
+      },
+      "note": "prime is true (expected Proven); the weakened precondition makes the final false at x = k"
     },
     {
       "id": "T-CACHE-DEP",
@@ -5205,31 +5647,25 @@
         "FT": {
           "oneOf": [
             "i8",
+            "i16",
             "i32"
-          ]
-        },
-        "S": {
-          "oneOf": [
-            ">=",
-            ">",
-            "!="
           ]
         }
       },
       "calor": [
         "  §CL{c1:Box:pub}",
         "    §FLD{{FT}:Value:pub}",
-        "    §MT{mt1:Probe:pub} (i32:k) -> i32",
+        "    §MT{mt1:Probe:pub} (Box:p, i32:k) -> i32",
         "      §E{}",
-        "      §S ({S} Value INT:0)",
+        "      §S (>= p.Value INT:0)",
         "      §R k"
       ],
       "calorPrime": [
         "  §CL{c1:Box:pub}",
         "    §FLD{u8:Value:pub}",
-        "    §MT{mt1:Probe:pub} (i32:k) -> i32",
+        "    §MT{mt1:Probe:pub} (Box:p, i32:k) -> i32",
         "      §E{}",
-        "      §S ({S} Value INT:0)",
+        "      §S (>= p.Value INT:0)",
         "      §R k"
       ],
       "oracle": {
@@ -5247,9 +5683,10 @@
           }
         ],
         "hyp": "true",
-        "prop": "value {S} 0",
-        "replay": "new Box { Value = value }.Probe(k)"
-      }
+        "prop": "value >= 0",
+        "replay": "new Box().Probe(new Box { Value = value }, k)"
+      },
+      "note": "field width change u8 -> signed; any warm/cold outcome difference is a stale-cache finding"
     },
     {
       "id": "T-CACHE-SEMVER",
@@ -5257,48 +5694,41 @@
       "instances": 3,
       "claimSite": "postcondition",
       "holes": {
-        "S": {
-          "oneOf": [
-            ">",
-            ">=",
-            "!="
-          ]
-        },
         "c1": {
           "intIn": [
-            0,
-            2
+            -5,
+            5
           ]
         }
       },
       "calor": [
-        "  §F{f1:Probe:pub} (u32:x) -> i32",
+        "  §F{f1:Probe:pub} (i32:x) -> i32",
         "    §E{}",
-        "    §S ({S} (+ x {c1}) x)",
+        "    §S (> x {c1})",
         "    §R INT:0"
       ],
       "calorPrime": [
-        "  §F{f1:Probe:pub} (u32:x) -> i32",
+        "  §F{f1:Probe:pub} (i32:x) -> i32",
         "    §E{}",
-        "    §S ({S} (+ x {c1}) x)",
+        "    §S (> x {c1})",
         "    §R INT:0"
       ],
       "oracle": {
         "domain": [
           {
             "name": "x",
-            "type": "u32"
+            "type": "i32"
           }
         ],
         "hyp": "true",
-        "prop": "(x + {c1}) {S} x"
+        "prop": "x > {c1}"
       },
-      "cacheProcedure": "after priming, rewrite every primed entry's translator semantics version to 'r1-stale-version' before the second compile"
+      "cacheProcedure": "Prime (expected Failed). Variant A: rewrite the primed entry's outcome to proven only, recompile: Proven is required (proves the tamper reaches the cache; otherwise the case is harness-invalid). Variant B: re-prime, rewrite the outcome to proven AND the translator semantics version to 'r1-stale-version', recompile: the stale entry must be ignored (warm token equals the cold token); Proven is a stale-cache-proof finding."
     },
     {
       "id": "T-SIMP-FOLD",
       "row": "SIMP-CONSTANT-FOLDING",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "S": {
@@ -5377,17 +5807,11 @@
       }
     },
     {
-      "id": "T-SIMP-H1",
+      "id": "T-SIMP-H1-SIGNED",
       "row": "SIMP-H1-UNARY-FOLD",
-      "instances": 9,
+      "instances": 6,
       "claimSite": "postcondition",
       "holes": {
-        "T": {
-          "oneOf": [
-            "i64",
-            "u64"
-          ]
-        },
         "S": {
           "oneOf": [
             ">=",
@@ -5399,23 +5823,7 @@
           ]
         },
         "E": {
-          "pairs": [
-            [
-              "(- ULONG:1)",
-              "-(BigInteger)1UL"
-            ],
-            [
-              "(~ ULONG:0)",
-              "(BigInteger)(~0UL)"
-            ],
-            [
-              "(- UINT:1)",
-              "(BigInteger)(-1L)"
-            ],
-            [
-              "(~ UINT:0)",
-              "(BigInteger)(~0U)"
-            ],
+          "cyclePairs": [
             [
               "(- LONG:1)",
               "(BigInteger)(-1L)"
@@ -5431,12 +5839,20 @@
             [
               "(- INT:-2147483648)",
               "(BigInteger)(-MinI)"
+            ],
+            [
+              "(- UINT:1)",
+              "(BigInteger)(-1L)"
+            ],
+            [
+              "(~ UINT:0)",
+              "(BigInteger)(~0U)"
             ]
           ]
         }
       },
       "calor": [
-        "  §F{f1:Probe:pub} ({T}:x) -> i32",
+        "  §F{f1:Probe:pub} (i64:x) -> i32",
         "    §E{}",
         "    §S ({S} x {E})",
         "    §R INT:0"
@@ -5445,7 +5861,7 @@
         "domain": [
           {
             "name": "x",
-            "type": "{T}"
+            "type": "i64"
           }
         ],
         "hyp": "true",
@@ -5453,7 +5869,65 @@
         "prop": "(BigInteger)x {S} {E}"
       },
       "hypothesis": "H1",
-      "note": "Exact-integer oracle. C# has no unary minus on ulong; for that pair the reference is the mathematical value -1, under which any Proven comparison against a u64 must agree with exact arithmetic."
+      "minInstances": 6,
+      "note": "i64 operand; C# semantics per pair (-(int.MinValue) throws under checked; -1U is long -1)"
+    },
+    {
+      "id": "T-SIMP-H1-UNSIGNED",
+      "row": "SIMP-H1-UNARY-FOLD",
+      "instances": 5,
+      "claimSite": "postcondition",
+      "holes": {
+        "S": {
+          "oneOf": [
+            ">=",
+            "<=",
+            ">",
+            "<",
+            "==",
+            "!="
+          ]
+        },
+        "E": {
+          "cyclePairs": [
+            [
+              "(- ULONG:1)",
+              "-(BigInteger)1UL"
+            ],
+            [
+              "(~ ULONG:0)",
+              "(BigInteger)(~0UL)"
+            ],
+            [
+              "(~ UINT:0)",
+              "(BigInteger)(~0U)"
+            ],
+            [
+              "(- UINT:1)",
+              "(BigInteger)(-1L)"
+            ]
+          ]
+        }
+      },
+      "calor": [
+        "  §F{f1:Probe:pub} (u64:x) -> i32",
+        "    §E{}",
+        "    §S ({S} x {E})",
+        "    §R INT:0"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "x",
+            "type": "u64"
+          }
+        ],
+        "hyp": "true",
+        "prop": "(BigInteger)x {S} {E}"
+      },
+      "hypothesis": "H1",
+      "minInstances": 4,
+      "note": "u64 operand; exact integers where C# has no typing (unary minus on ulong; ulong vs long)"
     },
     {
       "id": "T-MIX-QNT-ARR",
@@ -5856,23 +6330,15 @@
       "expectedOutcome": "oracle-equal-across-pair"
     },
     {
-      "id": "C-RETRO-845-SAT",
+      "id": "C-845-ULONG-SAT",
       "row": "CTRL-RETRO-845",
-      "instances": 2,
+      "instances": 1,
       "claimSite": "postcondition",
-      "holes": {
-        "b": {
-          "oneOf": [
-            "18446744073709551615",
-            "18446744073709551614"
-          ]
-        }
-      },
       "calor": [
         "  §F{f1:Probe:pub} (u64:x) -> i32",
         "    §E{}",
-        "    §Q (>= x ULONG:{b})",
-        "    §S (>= x ULONG:{b})",
+        "    §Q (>= x ULONG:18446744073709551614)",
+        "    §S (>= x ULONG:18446744073709551614)",
         "    §R INT:0"
       ],
       "oracle": {
@@ -5882,36 +6348,33 @@
             "type": "u64"
           }
         ],
-        "hyp": "x >= {b}UL",
-        "prop": "x >= {b}UL"
+        "hyp": "x >= 18446744073709551614UL",
+        "prop": "x >= 18446744073709551614UL"
       },
       "expectedOutcome": "Proven",
+      "guards": [
+        "NUM-LITERAL-TYPED",
+        "NUM-ARITH-ADD"
+      ],
       "retrospective": {
         "issue": 845,
         "fixPr": 961,
         "fixMerge": "e8bb373150f7ccdf303740d24af0180ada8e9220",
         "preFixParent": "17d253dff964e37538a5f503d3744b576bd2fb52",
-        "preFixExpectation": "not Proven-and-correct on at least one of the pair (discriminates)"
+        "p845ExpectedOutcome": "Unsupported",
+        "basis": "Source reading of the pre-#961 translator: unsigned literals above int.MaxValue were refused and every other integer literal was translated as signed 32-bit, so LONG:/UINT: width and signedness were lost (not executed)."
       }
     },
     {
-      "id": "C-RETRO-845-VIOL",
+      "id": "C-845-ULONG-VIOL",
       "row": "CTRL-RETRO-845",
-      "instances": 2,
+      "instances": 1,
       "claimSite": "postcondition",
-      "holes": {
-        "b": {
-          "oneOf": [
-            "18446744073709551614",
-            "9223372036854775808"
-          ]
-        }
-      },
       "calor": [
         "  §F{f1:Probe:pub} (u64:x) -> i32",
         "    §E{}",
         "    §Q (>= x INT:0)",
-        "    §S (<= x ULONG:{b})",
+        "    §S (<= x ULONG:18446744073709551614)",
         "    §R INT:0"
       ],
       "oracle": {
@@ -5921,16 +6384,169 @@
             "type": "u64"
           }
         ],
-        "hyp": "x >= 0",
-        "prop": "x <= {b}UL"
+        "hyp": "true",
+        "prop": "x <= 18446744073709551614UL"
       },
       "expectedOutcome": "Failed",
+      "guards": [
+        "NUM-LITERAL-TYPED",
+        "NUM-ARITH-ADD"
+      ],
       "retrospective": {
         "issue": 845,
         "fixPr": 961,
         "fixMerge": "e8bb373150f7ccdf303740d24af0180ada8e9220",
         "preFixParent": "17d253dff964e37538a5f503d3744b576bd2fb52",
-        "preFixExpectation": "Proven (the pre-fix false proof) on at least one of the pair"
+        "p845ExpectedOutcome": "Unsupported",
+        "basis": "Source reading of the pre-#961 translator: unsigned literals above int.MaxValue were refused and every other integer literal was translated as signed 32-bit, so LONG:/UINT: width and signedness were lost (not executed)."
+      }
+    },
+    {
+      "id": "C-845-LONG-VIOL",
+      "row": "CTRL-RETRO-845",
+      "instances": 1,
+      "claimSite": "postcondition",
+      "overflow": "unchecked",
+      "calor": [
+        "  §F{f1:Probe:pub} (i32:x) -> i32",
+        "    §E{}",
+        "    §Q (== x INT:2147483647)",
+        "    §S (< (+ x LONG:1) INT:0)",
+        "    §R INT:0"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "x",
+            "type": "i32"
+          }
+        ],
+        "hyp": "x == 2147483647",
+        "prop": "x + 1L < 0"
+      },
+      "expectedOutcome": "Failed",
+      "guards": [
+        "NUM-LITERAL-TYPED",
+        "NUM-ARITH-ADD"
+      ],
+      "retrospective": {
+        "issue": 845,
+        "fixPr": 961,
+        "fixMerge": "e8bb373150f7ccdf303740d24af0180ada8e9220",
+        "preFixParent": "17d253dff964e37538a5f503d3744b576bd2fb52",
+        "p845ExpectedOutcome": "Proven",
+        "basis": "Source reading of the pre-#961 translator: unsigned literals above int.MaxValue were refused and every other integer literal was translated as signed 32-bit, so LONG:/UINT: width and signedness were lost (not executed)."
+      }
+    },
+    {
+      "id": "C-845-LONG-SAT",
+      "row": "CTRL-RETRO-845",
+      "instances": 1,
+      "claimSite": "postcondition",
+      "overflow": "unchecked",
+      "calor": [
+        "  §F{f1:Probe:pub} (i32:x) -> i32",
+        "    §E{}",
+        "    §Q (== x INT:2147483647)",
+        "    §S (> (+ x LONG:1) INT:0)",
+        "    §R INT:0"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "x",
+            "type": "i32"
+          }
+        ],
+        "hyp": "x == 2147483647",
+        "prop": "x + 1L > 0"
+      },
+      "expectedOutcome": "Proven",
+      "guards": [
+        "NUM-LITERAL-TYPED",
+        "NUM-ARITH-ADD"
+      ],
+      "retrospective": {
+        "issue": 845,
+        "fixPr": 961,
+        "fixMerge": "e8bb373150f7ccdf303740d24af0180ada8e9220",
+        "preFixParent": "17d253dff964e37538a5f503d3744b576bd2fb52",
+        "p845ExpectedOutcome": "Failed",
+        "basis": "Source reading of the pre-#961 translator: unsigned literals above int.MaxValue were refused and every other integer literal was translated as signed 32-bit, so LONG:/UINT: width and signedness were lost (not executed)."
+      }
+    },
+    {
+      "id": "C-845-UINT-VIOL",
+      "row": "CTRL-RETRO-845",
+      "instances": 1,
+      "claimSite": "postcondition",
+      "overflow": "unchecked",
+      "calor": [
+        "  §F{f1:Probe:pub} (i32:x) -> i32",
+        "    §E{}",
+        "    §Q (== x INT:2147483647)",
+        "    §S (< (+ x UINT:1) INT:0)",
+        "    §R INT:0"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "x",
+            "type": "i32"
+          }
+        ],
+        "hyp": "x == 2147483647",
+        "prop": "x + 1U < 0"
+      },
+      "expectedOutcome": "Failed",
+      "guards": [
+        "NUM-LITERAL-TYPED",
+        "NUM-ARITH-ADD"
+      ],
+      "retrospective": {
+        "issue": 845,
+        "fixPr": 961,
+        "fixMerge": "e8bb373150f7ccdf303740d24af0180ada8e9220",
+        "preFixParent": "17d253dff964e37538a5f503d3744b576bd2fb52",
+        "p845ExpectedOutcome": "Proven",
+        "basis": "Source reading of the pre-#961 translator: unsigned literals above int.MaxValue were refused and every other integer literal was translated as signed 32-bit, so LONG:/UINT: width and signedness were lost (not executed)."
+      }
+    },
+    {
+      "id": "C-845-UINT-SAT",
+      "row": "CTRL-RETRO-845",
+      "instances": 1,
+      "claimSite": "postcondition",
+      "overflow": "unchecked",
+      "calor": [
+        "  §F{f1:Probe:pub} (i32:x) -> i32",
+        "    §E{}",
+        "    §Q (== x INT:2147483647)",
+        "    §S (> (+ x UINT:1) INT:0)",
+        "    §R INT:0"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "x",
+            "type": "i32"
+          }
+        ],
+        "hyp": "x == 2147483647",
+        "prop": "x + 1U > 0"
+      },
+      "expectedOutcome": "Proven",
+      "guards": [
+        "NUM-LITERAL-TYPED",
+        "NUM-ARITH-ADD"
+      ],
+      "retrospective": {
+        "issue": 845,
+        "fixPr": 961,
+        "fixMerge": "e8bb373150f7ccdf303740d24af0180ada8e9220",
+        "preFixParent": "17d253dff964e37538a5f503d3744b576bd2fb52",
+        "p845ExpectedOutcome": "Failed",
+        "basis": "Source reading of the pre-#961 translator: unsigned literals above int.MaxValue were refused and every other integer literal was translated as signed 32-bit, so LONG:/UINT: width and signedness were lost (not executed)."
       }
     },
     {
@@ -5956,7 +6572,11 @@
         "body": "return s;",
         "prop": "!string.IsNullOrEmpty(result) || result == \"\""
       },
-      "expectedOutcome": "Assumed"
+      "expectedOutcome": "Assumed",
+      "guards": [
+        "STR-OPS-PREDICATE",
+        "STR-NULL-NONASCII"
+      ]
     },
     {
       "id": "C-RETRO-D4",
@@ -5981,7 +6601,10 @@
         "body": "return s;",
         "prop": "!result!.StartsWith(\"\\u200dabc\")"
       },
-      "expectedOutcome": "Unsupported"
+      "expectedOutcome": "Unsupported",
+      "guards": [
+        "STR-CULTURE-MODE"
+      ]
     },
     {
       "id": "C-RETRO-D8",
@@ -6008,7 +6631,12 @@
         "hyp": "true",
         "prop": "!(y == 0) || (x / y != 5)"
       },
-      "expectedOutcome": "Unsupported"
+      "expectedOutcome": "Unsupported",
+      "guards": [
+        "BOOL-SHORTCIRCUIT",
+        "MIX-DIV-IMPL",
+        "NUM-DIVMOD-VAR-UNGUARDED"
+      ]
     },
     {
       "id": "C-RETRO-D11",
@@ -6032,7 +6660,10 @@
         "hyp": "x != 0",
         "prop": "(x << 32) == 0"
       },
-      "expectedOutcome": "Failed"
+      "expectedOutcome": "Failed",
+      "guards": [
+        "NUM-SHIFT"
+      ]
     },
     {
       "id": "C-RETRO-D14",
@@ -6055,7 +6686,11 @@
         "hyp": "true",
         "prop": "a!.Length >= 0"
       },
-      "expectedOutcome": "Assumed"
+      "expectedOutcome": "Assumed",
+      "guards": [
+        "ARR-LENGTH",
+        "ARR-INDEX"
+      ]
     },
     {
       "id": "C-RETRO-D15",
@@ -6085,7 +6720,10 @@
         "prelude": "    static bool All(int lo, int hi, Func<int, bool> p) { for (int i = lo; i < hi; i++) if (!p(i)) return false; return true; }",
         "prop": "All(0, n, i => !(i != 3) || i != 3)"
       },
-      "expectedOutcome": "Proven"
+      "expectedOutcome": "Proven",
+      "guards": [
+        "QNT-FORALL-BOUNDED"
+      ]
     },
     {
       "id": "C-RETRO-807",
@@ -6112,7 +6750,11 @@
         "body": "int r = x; r = r + 2; return r;",
         "prop": "result == x + 1"
       },
-      "expectedOutcome": "Unsupported"
+      "expectedOutcome": "Unsupported",
+      "guards": [
+        "BODY-LOOP-CALL-MUTABLE",
+        "BODY-RETURN-EXPR"
+      ]
     },
     {
       "id": "C-RETRO-G1C1",
@@ -6137,7 +6779,10 @@
         "body": "return p + 1;",
         "prop": "result == p + 1 + 1"
       },
-      "expectedOutcome": "Unsupported"
+      "expectedOutcome": "Unsupported",
+      "guards": [
+        "POST-RESULT-PARAM-COLLISION"
+      ]
     }
   ],
   "oracleControls": [

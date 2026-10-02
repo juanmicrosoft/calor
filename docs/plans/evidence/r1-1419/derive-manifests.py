@@ -19,6 +19,12 @@ ROOT = HERE.parents[3]
 TREES = ["src", "src/Calor.Compiler/Verification", "src/Calor.Compiler/Parsing", "src/Calor.Compiler/Binding",
          "src/Calor.Compiler/TypeChecking", "src/Calor.Compiler/CodeGen", "src/Calor.Runtime"]
 WHITELIST_DOC = "docs/verification-modeled-forms.md"
+# Front-end files whose B1 blobs gate the R1 case-validity test (it re-checks validity only while
+# the working tree still has B1's front end; the frozen cases target B1 and N1, not later trees).
+FRONT_END = ["src/Calor.Compiler/Parsing/Lexer.cs", "src/Calor.Compiler/Parsing/Parser.cs",
+             "src/Calor.Compiler/Parsing/AttributeHelper.cs", "src/Calor.Compiler/Binding/Binder.cs",
+             "src/Calor.Compiler/Binding/Scope.cs", "src/Calor.Compiler/TypeChecking/TypeChecker.cs",
+             "src/Calor.Compiler/TypeChecking/CalorType.cs", "src/Calor.Compiler/Effects/EffectEnforcementPass.cs"]
 
 
 def git(*args):
@@ -51,6 +57,7 @@ def manifest(reg, templates, baseline):
         "entryPoints": {key: {"path": ep["path"], "symbols": ep["symbols"], "blob": git("rev-parse", f"{commit}:{ep['path']}")}
                         for key, ep in sorted(catalog.items())},
         "trees": {path: git("rev-parse", f"{commit}:{path}") for path in TREES},
+        "frontEndBlobs": {path: git("rev-parse", f"{commit}:{path}") for path in FRONT_END},
         "whitelistDocument": {"path": WHITELIST_DOC, "sha256": hashlib.sha256(doc_bytes).hexdigest()},
         "translatorSemanticsVersion": "z3-executable-semantics-v2",
         "rows": [{

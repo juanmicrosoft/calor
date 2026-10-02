@@ -12,10 +12,10 @@
     "decisionBearingInspectionBeforeFreeze": false,
     "executedInR1": [
       "The independent oracle (O1) on the 13 registered oracleControls in templates.json. These compile and run registrant-written C# only; no Calor compiler code runs.",
-      "Lex-and-parse validity of every generated case, and compile validity (VerifyContracts=false, VerifyRefinements=false) of every case outside the unsupported-refused rows, on the working tree (whose src/ tree equals B1's). Only the presence of error diagnostics is asserted; no verification, obligation, or implication outcome is read or printed. Cases in the IMPL-*, SIMP-*, and CTRL-RETRO-845 rows are parse-only, because full compilation would run the always-on inheritance checker (Z3) or the simplifier under test. unsupported-refused rows are parse-only so that their front-end acceptance or rejection is first observed by #1311.",
+      "Lex-and-parse validity of every generated case, and compilation with VerifyContracts=false and VerifyRefinements=false of every case outside the IMPL-*, SIMP-*, and CTRL-RETRO-845 rows (those are parse-only, because full compilation would run the always-on inheritance checker (Z3) or the simplifier under test), on the working tree whose src/ tree equals B1's. Only error diagnostic codes are read; no verification, obligation, or implication outcome is read or printed. This froze each refused row's frontEndRefusalCodes (front-end facts, not verifier outcomes).",
       "Oracle compilation of every generated case (registrant C# against BCL references only)."
     ],
-    "preFreezeTemplateFixes": "The validity check found defects in 7 templates, fixed before the freeze: front-end rejections in FLD-INHERITED-NESTED (inheritance syntax), OBL-REFINEMENT-ENTRY and OBL-SUBTYPE (binding an unrefined value to a refined type is a type error; templates now use refined parameters), MIX-QNT-ARRAY (a quantifier bounded by §LEN cannot be lowered; the bound is now a parameter); lex/parse errors in BODY-LOOP-CALL-MUTABLE and STR-CULTURE-MODE that would otherwise have passed as refusals. QNT-NESTED was reclassified modeled -> unsupported-refused because B1's front end rejects runtime lowering of nested quantifiers (Calor0326), a front-end fact, not a verifier outcome.",
+    "preFreezeTemplateFixes": "The validity check found defects in 7 templates, fixed before the freeze: front-end rejections in FLD-INHERITED-NESTED (inheritance syntax), OBL-REFINEMENT-ENTRY and OBL-SUBTYPE (binding an unrefined value to a refined type is a type error; templates now use refined parameters), MIX-QNT-ARRAY (a quantifier bounded by §LEN cannot be lowered; the bound is now a parameter); lex/parse errors in BODY-LOOP-CALL-MUTABLE and STR-CULTURE-MODE that would otherwise have passed as refusals. QNT-NESTED was reclassified modeled -> unsupported-refused because B1's front end rejects runtime lowering of nested quantifiers (Calor0326), a front-end fact, not a verifier outcome. Adversarial review rounds then changed templates and rules before the freeze; each change is recorded in docs/plans/evidence/r1-1419/reviews/.",
     "notExecutedInR1": [
       "No B1 or N1 verifier outcome was produced or inspected for any registered row.",
       "Hypothesis H1 was not tested.",
@@ -90,7 +90,7 @@
       "commit": "17d253dff964e37538a5f503d3744b576bd2fb52",
       "binary": {
         "kind": "built-from-commit",
-        "procedure": "As B1, at this commit. Runs only the CTRL-RETRO-845 cases."
+        "procedure": "As B1, at this commit. Runs only the CTRL-RETRO-845 cases, preceded by the CTRL-POSITIVE and CTRL-NEGATIVE solver-availability check (charged to the reserve)."
       }
     }
   ],
@@ -384,7 +384,7 @@
           "FLD-ACCESS",
           "FLD-INHERITED-NESTED"
         ],
-        "token": "this."
+        "token": "p.Value"
       },
       {
         "line": "expression-kinds",
@@ -810,7 +810,7 @@
         "samplingDimensions": [
           "numeric-widths"
         ],
-        "casesPerBaseline": 18,
+        "casesPerBaseline": 16,
         "title": "Add over 32/64-bit signed and unsigned operands; checked overflow demotes to Assumed unless entailed",
         "templates": [
           "T-ADD-PARAM",
@@ -833,7 +833,7 @@
         "samplingDimensions": [
           "numeric-widths"
         ],
-        "casesPerBaseline": 18,
+        "casesPerBaseline": 16,
         "title": "Subtract, same widths and overflow rule",
         "templates": [
           "T-SUB-PARAM",
@@ -856,7 +856,7 @@
         "samplingDimensions": [
           "numeric-widths"
         ],
-        "casesPerBaseline": 18,
+        "casesPerBaseline": 16,
         "title": "Multiply, same widths and overflow rule",
         "templates": [
           "T-MUL-PARAM",
@@ -901,7 +901,7 @@
         "samplingDimensions": [
           "numeric-widths"
         ],
-        "casesPerBaseline": 12,
+        "casesPerBaseline": 11,
         "title": "Divide/Modulo by a variable when §Q entails divisor > 0",
         "templates": [
           "T-DIVVAR-ENTAILED"
@@ -963,7 +963,7 @@
         "samplingDimensions": [
           "numeric-widths"
         ],
-        "casesPerBaseline": 15,
+        "casesPerBaseline": 14,
         "title": "Bitwise and/or/xor across all eight widths",
         "templates": [
           "T-BIT"
@@ -983,7 +983,7 @@
         "samplingDimensions": [
           "numeric-widths"
         ],
-        "casesPerBaseline": 18,
+        "casesPerBaseline": 17,
         "title": "Ordered comparison with mixed signedness/width (D10 promotions)",
         "templates": [
           "T-CMP-MIXED",
@@ -1004,7 +1004,7 @@
         "samplingDimensions": [
           "numeric-widths"
         ],
-        "casesPerBaseline": 12,
+        "casesPerBaseline": 11,
         "title": "Equality against small signed literals, including -1 versus unsigned",
         "templates": [
           "T-EQ-SMALL"
@@ -1046,11 +1046,12 @@
         "samplingDimensions": [
           "numeric-widths"
         ],
-        "casesPerBaseline": 9,
+        "casesPerBaseline": 8,
         "title": "Arithmetic with both operands sub-32-bit: refused (D1)",
         "templates": [
           "T-NARROW-ARITH"
-        ]
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "NUM-NARROW-COMPARE",
@@ -1065,7 +1066,7 @@
         "samplingDimensions": [
           "numeric-widths"
         ],
-        "casesPerBaseline": 9,
+        "casesPerBaseline": 8,
         "title": "Comparisons over narrow operands (extension matches promotion)",
         "templates": [
           "T-NARROW-CMP"
@@ -1085,7 +1086,7 @@
         "samplingDimensions": [
           "numeric-widths"
         ],
-        "casesPerBaseline": 12,
+        "casesPerBaseline": 11,
         "title": "LONG/UINT/ULONG typed literals including bounds near ulong.MaxValue (#845 territory)",
         "templates": [
           "T-LIT-TYPED"
@@ -1108,7 +1109,8 @@
         "title": "INT: literals outside int32 range: refused (D2)",
         "templates": [
           "T-LIT-OVERSIZE"
-        ]
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "NUM-MIXED-U64-SIGNED",
@@ -1127,7 +1129,29 @@
         "title": "u64 mixed with a signed operand: refused (no common C# type); exact-integer oracle",
         "templates": [
           "T-U64-MIXED"
+        ],
+        "frontEndRefusalCodes": [
+          "Calor1002"
         ]
+      },
+      {
+        "id": "NUM-UNWHITELISTED-OPS",
+        "family": "numeric",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 3,
+        "title": "Operators outside ModeledForms (Power, BitwiseNot): refused by the whitelist gate",
+        "templates": [
+          "T-UNWL-OPS"
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "NUM-OVERFLOW-CHECKED",
@@ -1187,7 +1211,7 @@
           "post"
         ],
         "samplingDimensions": [],
-        "casesPerBaseline": 15,
+        "casesPerBaseline": 16,
         "title": "And/Or/Not grouping over bool and i8 (exhaustive domain)",
         "templates": [
           "T-BOOL-CONN",
@@ -1210,7 +1234,8 @@
         "templates": [
           "T-BOOL-SC-DIV",
           "T-BOOL-COND-DIV"
-        ]
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "BOOL-CONDITIONAL",
@@ -1226,7 +1251,7 @@
         "samplingDimensions": [
           "numeric-widths"
         ],
-        "casesPerBaseline": 12,
+        "casesPerBaseline": 11,
         "title": "?: expressions across widths",
         "templates": [
           "T-BOOL-COND"
@@ -1246,7 +1271,7 @@
         "samplingDimensions": [
           "numeric-widths"
         ],
-        "casesPerBaseline": 9,
+        "casesPerBaseline": 8,
         "title": "Implication (->) across widths",
         "templates": [
           "T-BOOL-IMPL"
@@ -1264,7 +1289,7 @@
           "post"
         ],
         "samplingDimensions": [],
-        "casesPerBaseline": 9,
+        "casesPerBaseline": 8,
         "title": "Depth-4 boolean composition (exhaustive domain)",
         "templates": [
           "T-BOOL-NEST"
@@ -1284,7 +1309,7 @@
           "early-returns",
           "numeric-widths"
         ],
-        "casesPerBaseline": 15,
+        "casesPerBaseline": 14,
         "title": "Single return expression bound to result; body arithmetic may demote",
         "templates": [
           "T-BODY-RET"
@@ -1322,7 +1347,7 @@
         "samplingDimensions": [
           "early-returns"
         ],
-        "casesPerBaseline": 12,
+        "casesPerBaseline": 11,
         "title": "Guard-clause fall-through early returns",
         "templates": [
           "T-BODY-GUARD"
@@ -1341,7 +1366,7 @@
         "samplingDimensions": [
           "early-returns"
         ],
-        "casesPerBaseline": 9,
+        "casesPerBaseline": 8,
         "title": "Nested if returns with arithmetic",
         "templates": [
           "T-BODY-NESTED"
@@ -1360,7 +1385,7 @@
         "samplingDimensions": [
           "mutation"
         ],
-        "casesPerBaseline": 12,
+        "casesPerBaseline": 11,
         "title": "Width-neutral immutable §B bindings (SSA substitution)",
         "templates": [
           "T-BODY-BIND"
@@ -1383,7 +1408,8 @@
         "title": "Width-changing §B binding in a result-bound body: refused",
         "templates": [
           "T-BODY-WIDTHBIND"
-        ]
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "BODY-DIVISION",
@@ -1397,7 +1423,7 @@
           "post"
         ],
         "samplingDimensions": [],
-        "casesPerBaseline": 9,
+        "casesPerBaseline": 8,
         "title": "Body division: Assumed (exceptional-paths:division) required",
         "templates": [
           "T-BODY-DIV"
@@ -1421,7 +1447,8 @@
         "templates": [
           "T-BODY-LOOP",
           "T-BODY-MUTABLE"
-        ]
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "BODY-ARRAY-RETURN",
@@ -1440,7 +1467,8 @@
         "title": "Array-returning body with a result-length postcondition: refused",
         "templates": [
           "T-BODY-ARRRET"
-        ]
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "POST-PARAM-PRESERVED",
@@ -1455,7 +1483,7 @@
         "samplingDimensions": [
           "mutation"
         ],
-        "casesPerBaseline": 9,
+        "casesPerBaseline": 8,
         "title": "Parameter-only §S over a non-mutating body",
         "templates": [
           "T-POST-PRESERVED"
@@ -1474,11 +1502,12 @@
         "samplingDimensions": [
           "mutation"
         ],
-        "casesPerBaseline": 9,
+        "casesPerBaseline": 8,
         "title": "Parameter-only §S over a body that assigns the parameter: refused",
         "templates": [
           "T-POST-MUTATED"
-        ]
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "POST-RESULT-PARAM-COLLISION",
@@ -1496,7 +1525,8 @@
         "title": "Parameter named result: refused (G1 review C1)",
         "templates": [
           "T-POST-COLLIDE"
-        ]
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "POST-ARRAY-ALIAS",
@@ -1517,7 +1547,8 @@
         "title": "Array element write through a possibly aliased parameter: refused",
         "templates": [
           "T-POST-ARRAY-ALIAS"
-        ]
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "POST-METHOD-RECEIVER",
@@ -1538,7 +1569,8 @@
         "title": "Method contract over a receiver field mutated by the body: refused",
         "templates": [
           "T-POST-RECEIVER"
-        ]
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "QNT-FORALL-BOUNDED",
@@ -1555,7 +1587,7 @@
           "quantifiers",
           "guard-elision"
         ],
-        "casesPerBaseline": 12,
+        "casesPerBaseline": 11,
         "title": "Bounded forall with extra antecedent conjuncts (D15 lowering)",
         "templates": [
           "T-QNT-FORALL"
@@ -1575,7 +1607,7 @@
         "samplingDimensions": [
           "quantifiers"
         ],
-        "casesPerBaseline": 9,
+        "casesPerBaseline": 8,
         "title": "Bounded exists",
         "templates": [
           "T-QNT-EXISTS"
@@ -1598,6 +1630,9 @@
         "title": "Unbounded quantifier: rejected at compile (Calor0326) or refused",
         "templates": [
           "T-QNT-UNBOUNDED"
+        ],
+        "frontEndRefusalCodes": [
+          "Calor0326"
         ]
       },
       {
@@ -1638,6 +1673,9 @@
         "title": "Nested bounded forall: the front end rejects runtime lowering (Calor0326) at B1",
         "templates": [
           "T-QNT-NESTED"
+        ],
+        "frontEndRefusalCodes": [
+          "Calor0326"
         ]
       },
       {
@@ -1653,7 +1691,7 @@
         "samplingDimensions": [
           "arrays"
         ],
-        "casesPerBaseline": 9,
+        "casesPerBaseline": 8,
         "title": "Array length: Assumed (reference-model, D14) required",
         "templates": [
           "T-ARR-LEN"
@@ -1673,7 +1711,7 @@
         "samplingDimensions": [
           "arrays"
         ],
-        "casesPerBaseline": 9,
+        "casesPerBaseline": 8,
         "title": "Element access: Assumed (reference-model) required",
         "templates": [
           "T-ARR-INDEX"
@@ -1693,7 +1731,7 @@
           "arrays",
           "numeric-widths"
         ],
-        "casesPerBaseline": 6,
+        "casesPerBaseline": 9,
         "title": "u8[] and i64[] elements: Assumed required",
         "templates": [
           "T-ARR-ELEM"
@@ -1716,7 +1754,8 @@
         "title": "Computed array base: refused",
         "templates": [
           "T-ARR-COMPUTED"
-        ]
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "STR-OPS-PREDICATE",
@@ -1732,7 +1771,7 @@
         "samplingDimensions": [
           "strings"
         ],
-        "casesPerBaseline": 12,
+        "casesPerBaseline": 11,
         "title": "Predicate string operations: Assumed (string-model, D3/D12) required",
         "templates": [
           "T-STR-PRED"
@@ -1752,7 +1791,7 @@
         "samplingDimensions": [
           "strings"
         ],
-        "casesPerBaseline": 9,
+        "casesPerBaseline": 8,
         "title": "Length/IndexOf/Substring: Assumed required (D12/D13)",
         "templates": [
           "T-STR-COUNT"
@@ -1775,7 +1814,8 @@
         "title": "Non-ordinal or missing comparison mode: refused (D4)",
         "templates": [
           "T-STR-CULTURE"
-        ]
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "STR-UNMODELED-OPS",
@@ -1793,7 +1833,8 @@
         "title": "Replace/upper/lower/trim: refused (D9)",
         "templates": [
           "T-STR-UNMODELED"
-        ]
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "STR-NULL-NONASCII",
@@ -1830,7 +1871,7 @@
           "aliases"
         ],
         "casesPerBaseline": 7,
-        "title": "Receiver field access in method contracts: Assumed (reference-model) required",
+        "title": "Field access through an explicitly declared object parameter: Assumed (reference-model) required",
         "templates": [
           "T-FLD-ACCESS"
         ]
@@ -1847,10 +1888,30 @@
         ],
         "samplingDimensions": [],
         "casesPerBaseline": 6,
-        "title": "Inherited field access: Assumed required, or refused when unregistered",
+        "title": "Inherited field access through an object parameter: Assumed required",
         "templates": [
           "T-FLD-INHERITED"
         ]
+      },
+      {
+        "id": "FLD-IMPLICIT-RECEIVER",
+        "family": "user-type",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "pass",
+          "translator"
+        ],
+        "samplingDimensions": [
+          "aliases"
+        ],
+        "casesPerBaseline": 4,
+        "title": "Receiver fields (this.X or bare X) in method contracts: the adapted method has no receiver variable, so refused",
+        "templates": [
+          "T-FLD-RECEIVER"
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "FLT-REFUSAL",
@@ -1863,11 +1924,12 @@
           "translator"
         ],
         "samplingDimensions": [],
-        "casesPerBaseline": 9,
+        "casesPerBaseline": 8,
         "title": "Floating-point parameters, literals, NaN: refused",
         "templates": [
           "T-FLT"
-        ]
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "CALL-IN-CONTRACT",
@@ -1883,7 +1945,8 @@
         "title": "Calls in contracts: refused",
         "templates": [
           "T-CALL"
-        ]
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "GEN-REFUSAL",
@@ -1900,7 +1963,8 @@
         "title": "object, List<T>, Option<T> parameters: refused or uninterpreted (no unconditional proof)",
         "templates": [
           "T-GENERIC"
-        ]
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "VAC-UNSAT-PRECONDITIONS",
@@ -1915,7 +1979,7 @@
         "samplingDimensions": [
           "guard-elision"
         ],
-        "casesPerBaseline": 9,
+        "casesPerBaseline": 8,
         "title": "Unsatisfiable §Q set: ProvenVacuous required; guard kept",
         "templates": [
           "T-VAC-UNSAT"
@@ -1952,10 +2016,71 @@
         "samplingDimensions": [
           "guard-elision"
         ],
-        "casesPerBaseline": 12,
+        "casesPerBaseline": 11,
         "title": "§PROOF obligations (Discharged needs a registered non-vacuity check)",
         "templates": [
           "T-OBL-PROOF"
+        ]
+      },
+      {
+        "id": "OBL-BRANCH-FACTS",
+        "family": "obligation",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "obligation",
+        "entryPoints": [
+          "facts",
+          "oblSolve"
+        ],
+        "samplingDimensions": [
+          "early-returns",
+          "guard-elision"
+        ],
+        "casesPerBaseline": 10,
+        "title": "Scoped guard facts: then-branch, else-branch, and no leakage after a non-returning if",
+        "templates": [
+          "T-OBL-BRANCH",
+          "T-OBL-ELSE",
+          "T-OBL-AFTER-IF"
+        ]
+      },
+      {
+        "id": "OBL-LOOP-FACTS",
+        "family": "obligation",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "obligation",
+        "entryPoints": [
+          "facts",
+          "oblSolve"
+        ],
+        "samplingDimensions": [
+          "guard-elision"
+        ],
+        "casesPerBaseline": 4,
+        "title": "Inclusive §L loop-bound facts",
+        "templates": [
+          "T-OBL-LOOP"
+        ]
+      },
+      {
+        "id": "OBL-MUTATION-KILL",
+        "family": "obligation",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "obligation",
+        "entryPoints": [
+          "facts",
+          "oblSolve"
+        ],
+        "samplingDimensions": [
+          "mutation",
+          "guard-elision"
+        ],
+        "casesPerBaseline": 4,
+        "title": "Guard facts killed by assignment",
+        "templates": [
+          "T-OBL-KILL"
         ]
       },
       {
@@ -2071,10 +2196,31 @@
         "samplingDimensions": [
           "guard-elision"
         ],
-        "casesPerBaseline": 9,
+        "casesPerBaseline": 8,
         "title": "Forms outside ModeledForms reaching the ungated obligation solver (bitwise not, calls, overflow)",
         "templates": [
           "T-OBL-UNGATED"
+        ]
+      },
+      {
+        "id": "OBL-UNGATED-REFERENCE",
+        "family": "obligation",
+        "classification": "assumed",
+        "releaseCritical": true,
+        "channel": "obligation",
+        "entryPoints": [
+          "oblSolve",
+          "translator"
+        ],
+        "samplingDimensions": [
+          "strings",
+          "arrays",
+          "aliases"
+        ],
+        "casesPerBaseline": 6,
+        "title": "String, array, and field forms in the ungated obligation solver: Assumed required (null references)",
+        "templates": [
+          "T-OBL-UNGATED-REF"
         ]
       },
       {
@@ -2105,7 +2251,7 @@
           "implProver"
         ],
         "samplingDimensions": [],
-        "casesPerBaseline": 6,
+        "casesPerBaseline": 5,
         "title": "Implementer §S implies interface §S",
         "templates": [
           "T-IMPL-POST"
@@ -2162,7 +2308,7 @@
         "samplingDimensions": [
           "caches"
         ],
-        "casesPerBaseline": 6,
+        "casesPerBaseline": 5,
         "title": "Primed proof, then body change",
         "templates": [
           "T-CACHE-BODY"
@@ -2181,7 +2327,7 @@
         "samplingDimensions": [
           "caches"
         ],
-        "casesPerBaseline": 6,
+        "casesPerBaseline": 5,
         "title": "Primed proof, then precondition change",
         "templates": [
           "T-CACHE-PRE"
@@ -2202,7 +2348,7 @@
           "caches"
         ],
         "casesPerBaseline": 4,
-        "title": "Primed proof, then user-type field width change",
+        "title": "Primed outcome, then user-type field width change (warm must equal cold)",
         "templates": [
           "T-CACHE-DEP"
         ]
@@ -2221,7 +2367,7 @@
           "caches"
         ],
         "casesPerBaseline": 3,
-        "title": "Primed entries rewritten to another translator semantics version",
+        "title": "Tampered Proven entry with a stale translator semantics version must be ignored",
         "templates": [
           "T-CACHE-SEMVER"
         ]
@@ -2240,7 +2386,7 @@
         "samplingDimensions": [
           "numeric-widths"
         ],
-        "casesPerBaseline": 9,
+        "casesPerBaseline": 8,
         "title": "Literal-literal folding before verification and emission",
         "templates": [
           "T-SIMP-FOLD"
@@ -2260,10 +2406,11 @@
         "samplingDimensions": [
           "numeric-widths"
         ],
-        "casesPerBaseline": 9,
+        "casesPerBaseline": 11,
         "title": "HYPOTHESIS H1 (R0): unary Negate/BitwiseNot folding versus IsUnsigned/IsLong literals; not executed in R1",
         "templates": [
-          "T-SIMP-H1"
+          "T-SIMP-H1-SIGNED",
+          "T-SIMP-H1-UNSIGNED"
         ]
       },
       {
@@ -2321,7 +2468,8 @@
         "title": "Division in an implication consequent: refused (conditional-position divisor)",
         "templates": [
           "T-MIX-DIV-IMPL"
-        ]
+        ],
+        "frontEndRefusalCodes": []
       },
       {
         "id": "CTRL-POSITIVE",
@@ -2389,11 +2537,15 @@
         "samplingDimensions": [
           "numeric-widths"
         ],
-        "casesPerBaseline": 4,
+        "casesPerBaseline": 6,
         "title": "Retrospective discriminating control #845 / PR #961",
         "templates": [
-          "C-RETRO-845-SAT",
-          "C-RETRO-845-VIOL"
+          "C-845-ULONG-SAT",
+          "C-845-ULONG-VIOL",
+          "C-845-LONG-VIOL",
+          "C-845-LONG-SAT",
+          "C-845-UINT-VIOL",
+          "C-845-UINT-SAT"
         ]
       },
       {
@@ -2480,16 +2632,16 @@
   "channels": {
     "CH-CONTRACT": "Program.Compile(source, \"case.calr\", CompilationOptions { VerifyContracts = true, VerifyRefinements = false, EnableTypeChecking = TypeCheckingDefault, ContractMode = Debug, VerificationTimeoutMs = 5000, VerificationCacheOptions = { Enabled = false } }) run twice: ElideProvenGuards = true (the default user path) and ElideProvenGuards = false. Outcomes are read from options.VerificationResults (ContractVerificationResult.EffectiveOutcome: Status, IsVacuous, Assumptions).",
     "CH-OBLIGATION": "As CH-CONTRACT with VerifyRefinements = true; outcomes are read from options.ObligationResults (Obligation.Outcome, Status, Kind). This is the path behind calor_refine (MCP) and the public API; the CLI and MSBuild task do not solve obligations at B1/N1.",
-    "CH-IMPLICATION": "The inheritance checker that Program.Compile always runs (Z3 when available). Outcomes are the Calor0815 info diagnostic (ImplicationStatus.Proven) and the StrongerPrecondition / incompatible-contract error diagnostics (Disproven), attributed by span to the implementing method.",
+    "CH-IMPLICATION": "The inheritance checker that Program.Compile always runs (Z3 when available). Each IMPL template carries contracts in exactly one direction (interface/implementer §Q, or §S), so at most one implication is checked per case; its outcome is read from the Calor0815 info diagnostic text ('Precondition weakening proven' or the postcondition counterpart: Proven) and the LSP-violation error diagnostics (Failed), attributed to the implementing method. Any other Calor0815 on the case is archived, not adjudicated. A case with no implication diagnostic is no-claim.",
     "CH-CACHE": "CH-CONTRACT with VerificationCacheOptions { Enabled = true, ProjectDirectory = <fresh per-case temp dir> }: compile calorPrime, then calor, in the same directory; then a cold compile of calor in a new directory. CACHE-SEMANTICS-VERSION rewrites every primed entry's translator semantics version string to 'r1-stale-version' between the two compiles.",
-    "CH-CLI-CROSSCHECK": "For CTRL-* cases only: the baseline CLI (calor --input case.calr --output case.g.cs --verify --format json --no-telemetry) must report, per contract diagnostic, the same status as the in-process channel. Disagreement makes the run invalid (harness defect), not a finding.",
-    "invocation": "In-process: the baseline's calor.dll is loaded into a collectible AssemblyLoadContext with its own Microsoft.Z3.dll and native libz3, and Calor.Compiler.Program.Compile and CompilationOptions are bound by reflection by name. If the N1 or B1 assembly cannot be loaded this way, the registered fallback is the CLI for CH-CONTRACT (envelope verification payload + emitted .g.cs) and calor mcp (calor_refine action=obligations) for CH-OBLIGATION; the fallback choice is made on the CTRL-* cases before any sweep case and recorded in pins.json."
+    "CH-CLI-CROSSCHECK": "For CTRL-* cases only: the baseline CLI (calor --input case.calr --output case.g.cs --verify --verbose --format json --no-telemetry) must not contradict the in-process channel on any contract it reports (the CLI omits some Proven diagnostics, so absence is not a contradiction). A contradiction makes the run invalid (harness defect), not a finding.",
+    "invocation": "In-process only: the baseline's calor.dll is loaded into a collectible AssemblyLoadContext with its own Microsoft.Z3.dll and native libz3, and Calor.Compiler.Program.Compile and CompilationOptions are bound by reflection by name. There is no fallback channel (the CLI envelope does not carry every outcome and both emissions). If a baseline cannot be loaded in-process, that baseline's run is invalid; after the invalid-run limit its release-critical rows are BLOCKED."
   },
   "observation": {
     "perCase": [
       "Compile the case once per channel listed for its row; record raw statuses, IsVacuous, assumption lists, counterexample models, diagnostics, and both emitted C# texts.",
       "Map each claim-bearing raw status to exactly one contract §4 token: Proven, ProvenVacuous, Discharged, Assumed, Unsupported, TimeoutOrUnavailable, Failed, Boundary. Map from ProofOutcome (Status, IsVacuous, Assumptions), never from a legacy enum. An unmapped status is a harness error (contract E001), never the nearest token.",
-      "A case the baseline compiler rejects with an error diagnostic before verification is recorded as compile-rejected (no token), with its error codes. For an unsupported-refused row this validates the refusal only if no error code is a lexer or parser code (Calor0001-Calor0199): every case lexes and parses cleanly at B1 (SoundnessRegistrationTests), so a lexer/parser rejection is a template or front-end defect and the case is harness-invalid. For any other row a compile rejection is harness-invalid for that baseline.",
+      "A case the baseline compiler rejects with an error diagnostic before verification is recorded as compile-rejected (no token), with its error codes. It validates a refusal only on an unsupported-refused row and only if every error code is in that row's frontEndRefusalCodes (frozen at B1; an empty list means the form must reach the verifier and be Unsupported). Any other rejection is harness-invalid for that baseline, including on N1 if its different front end rejects with other codes.",
       "Guard observation: in the elision-enabled emission the claim's guard must be absent iff the token is Proven (postcondition, non-vacuous) or Discharged with an ObligationPolicy action needing no guard; in the forced emission it must be present."
     ],
     "claimSite": "Exactly one claim per case, fixed by the template's claimSite. Other contracts in the same case are archived but not adjudicated.",
@@ -2501,8 +2653,8 @@
     "definition": "For each case, the registrant-authored C# in templates.json (rendered per case by SweepCaseGenerator) is compiled with Roslyn against BCL assemblies only and executed over the case's registered input domain, under CultureInfo en-US and the module's overflow mode (checked unless the template says unchecked). It never references or loads a Calor assembly and never calls the verifier's translator, simplifier, emitter, solver, or cache. Implementation: tests/Calor.Compiler.Tests/SoundnessRegistration/IndependentOracle.cs.",
     "semantics": [
       "forall claims (postcondition, obligation, implication): for every input with Hyp true and a normally-returning Body, Prop must evaluate to true without throwing. Inputs where Hyp is false are excluded; inputs where Hyp or Body throws are excluded and counted (normal-return semantics, D5). A Prop that is false or throws is a violation.",
-      "exists claims (precondition satisfiability): a witness is an input where Prop is true.",
-      "Exhaustive when every domain parameter is bool or an 8/16-bit integer without an override list and the product is at most 65,536 inputs; otherwise the domain is the per-type boundary table plus 6 seeded values per parameter, capped at 4,096 tuples by seeded subsampling. A sampled domain can show violation but never establishes truth.",
+      "exists claims (precondition satisfiability): a witness is an input where Prop is true. Adjudication: Proven with a solver model that satisfies Prop under O1 -> validated-proof; Proven when O1 is no-witness-exhaustive -> false-unconditional-proof; Proven with a model that does not satisfy Prop -> spurious-model (a finding; the claim may still be true); Proven, no usable model, and no-witness-sampled -> unconfirmed-claim (blocks CLEAN); Failed (unsatisfiable) with an O1 witness -> spurious-refutation. The non-vacuity check for an exists claim is the satisfying witness itself.",
+      "Exhaustive when every domain parameter is bool or an 8/16-bit integer without an override list and the product is at most 65,536 inputs; otherwise the domain is the per-type boundary table plus 6 seeded values per parameter plus every numeric constant drawn into the case with its neighbours (v-1, v, v+1, within the parameter's type), capped at 4,096 tuples by seeded subsampling. A sampled domain can show violation but never establishes truth.",
       "Where C# defines no semantics (u64 mixed with a signed operand; unary minus on ulong in H1), the oracle uses exact mathematical integers (System.Numerics.BigInteger) and the row is a refusal or hypothesis row."
     ],
     "verdicts": [
@@ -2518,10 +2670,11 @@
     "evaluationBudget": "60 s wall clock per case; exceeding it is oracle-invalid.",
     "corroboration": {
       "id": "R1-O2",
-      "definition": "The baseline's emitted C# with forced guards (ElideProvenGuards = false) is compiled with the baseline's Calor.Runtime.dll and executed on every O1 witness (via the template's replay expression, or Probe(args) by position). O2 records whether the forced guard throws ContractViolationException / InvalidOperationException on the witness.",
+      "definition": "The baseline's emitted C# with forced guards (ElideProvenGuards = false) is compiled with the baseline's Calor.Runtime.dll and executed (via the template's replay expression, or Probe(args) by position) on every O1 witness and on the first 16 reached inputs in domain order (IndependentOracle.ReplaySampleSize; this includes D15's i == 3 input). O2 records whether the forced guard throws ContractViolationException / InvalidOperationException.",
       "role": "Corroboration and divergence detection only. O2 runs post-simplification code (ContractSimplificationPass rewrites contracts before emission), so it shares the simplifier's assumptions and can never be the sole oracle."
     },
-    "divergence": "If O1 says the property is violated on an input and the forced O2 guard does not throw on that input (or the reverse), the case additionally gets a semantic-divergence record for #1413. The O1 verdict is not changed by O2."
+    "divergence": "If O1 says the property is violated on a replayed input and the forced O2 guard does not throw, or O1 says it holds on a replayed reached input and the forced guard throws, the case additionally gets a semantic-divergence record for #1413. The O1 verdict is not changed by O2.",
+    "partialEnumeration": "A violation (or, for exists, a witness) found before the 60 s budget runs out is conclusive and kept; only an inconclusive partial enumeration is oracle-invalid."
   },
   "generation": {
     "method": "Deterministic template expansion. templates.json holds every template; each template has a row, an instance count, holes, Calor text, and oracle text. Case ids are R1-<row>-<nnn> numbered within the row in template order. Each case uses SplitMix64 seeded with masterSeed XOR the first 8 bytes (little-endian) of SHA-256(caseId).",
@@ -2529,6 +2682,7 @@
     "generator": "tests/Calor.Compiler.Tests/SoundnessRegistration/SweepCaseGenerator.cs",
     "templates": "docs/plans/evidence/r1-1419/templates.json",
     "caseIndex": "docs/plans/evidence/r1-1419/cases-index.json",
+    "coverageHoles": "Holes of kind cycle/cyclePairs take option (instance mod n), so every advertised member is rendered (minInstances guarantees n instances). Whitelist coverage is checked against the generated case texts, not template options.",
     "caseIndexRule": "cases-index.json lists every case id with its row, template, claim, exhaustive flag, and the SHA-256 of its Calor text, prime text, and oracle text. A test regenerates the cases and fails on any byte difference, so the case set cannot change without a visible edit to a hashed file.",
     "sameCasesBothBaselines": true
   },
@@ -2545,16 +2699,16 @@
     "allocation": {
       "B1": {
         "sweep": 678,
-        "controls": 30
+        "controls": 32
       },
       "N1": {
         "sweep": 678,
-        "controls": 30
+        "controls": 32
       },
       "P845": {
-        "controls": 4
+        "controls": 6
       },
-      "minimizationReserve": 80,
+      "minimizationReserve": 74,
       "total": 1500
     },
     "reserveUse": "Only for (a) minimizing a candidate finding, (b) re-running a finding's case on the other baseline, (c) the single permitted retry of an inconclusive attempt. Reserve executions are labeled and never raise a row to clean.",
@@ -2577,9 +2731,10 @@
     },
     "invalidRunPolicy": [
       "A run is invalid if: a pinned binary or native hash differs; dotnet --version changes mid-sweep; any oracleControl does not produce its registered verdict on the executing machine; CH-CLI-CROSSCHECK disagrees; or more than 10% of a baseline's cases crash in the harness (not in the compiler).",
-      "Invalid runs are archived under attempts/ with the reason and are never used for row status.",
+      "Invalid runs are archived under attempts/ with the reason and are never used for row status, except that any Proven/Discharged attempt with an O1 violation recorded in an invalid run becomes a candidate-unconfirmed finding and its case is re-executed first in the next valid run; it is not discarded.",
       "After an invalid run the harness may be fixed and the baseline restarted from its first case with the same case list. At most 3 invalid runs per baseline; a fourth makes every unexecuted release-critical row of that baseline BLOCKED.",
-      "A compiler crash or compile rejection on a case is a case result, not a harness crash."
+      "A compiler crash or compile rejection on a case is a case result, not a harness crash.",
+      "Solver availability: on every baseline (including P845) the CTRL-POSITIVE and CTRL-NEGATIVE cases must all produce their expectedOutcome before any other case. Any mismatch (for example a missing solver turning proofs into TimeoutOrUnavailable) invalidates the run; it is never read as a completeness result."
     ]
   },
   "caseResults": {
@@ -2590,20 +2745,24 @@
       "guard-elided-without-proof": "The claim's guard is absent in the elision-enabled emission while the token is not Proven/Discharged, or is absent in the forced emission.",
       "vacuity-mislabel": "Proven reported non-vacuous while O1 is exhaustive and vacuous-in-domain, or ProvenVacuous while O1 found a reached input.",
       "spurious-refutation": "Failed whose replayed counterexample (or, for exhaustive domains, any input) does not violate the property under O1. A completeness defect; needs a disposition.",
-      "stale-cache-proof": "A warm (cached) compile yields Proven/Discharged where the cold compile of the same text does not.",
+      "stale-cache-proof": "A warm (cached) compile yields a different claim token from the cold compile of the same text (for CACHE-SEMANTICS-VERSION variant B: any token other than the cold one).",
       "semantic-divergence": "O1 and O2 disagree on an input (see oracle.divergence).",
       "candidate-unconfirmed": "A finding whose minimization or standalone C# reproduction did not complete inside capacity. Stays a finding.",
       "validated-proof": "Proven/Discharged (non-vacuous, non-vacuity check passed for Discharged) on a modeled row, O1 holds-exhaustive or holds-sampled with at least one reached input. Sampled means no counterexample was found within the domain, not that the property holds.",
       "refusal-validated": "Assumed, Unsupported, or compile-rejected where the row requires that, with guards retained.",
       "no-claim": "Assumed, Unsupported, TimeoutOrUnavailable, Failed (with a genuine counterexample), or Boundary on a modeled row. Establishes nothing.",
-      "harness-invalid": "The case could not be evaluated on this baseline (oracle-invalid, compile-rejected on a modeled or assumed row, unmappable status). Counted and reported; never replaced by another case."
+      "harness-invalid": "The case could not be evaluated on this baseline (oracle-invalid, compile-rejected on a modeled or assumed row, a front-end rejection on a refused row whose error codes are not all in that row's frontEndRefusalCodes, unmappable status). Counted and reported; never replaced by another case.",
+      "unconfirmed-claim": "Proven on an exists claim with no usable model and no O1 witness in a sampled domain.",
+      "spurious-model": "Proven on an exists claim whose solver model does not satisfy the property under O1.",
+      "control-mismatch": "A verifier control (other than the solver-availability check) whose token differs from its expectedOutcome on B1 or N1. A finding for #1413; a Proven with an O1 violation is a false-unconditional-proof instead.",
+      "flaky": "Two attempts disagree (contract non-outcome status). Never established."
     },
     "nonVacuityCheck": "For every Discharged (and every Proven) claim, O1 must report at least one reached input (Hyp true, Body returned normally). Recorded as nonVacuityCheck {id: \"R1-O1-reached\", result: \"passed\" | \"failed\"}. Required by contract §4 condition 5 for Discharged.",
     "rowStatus": [
       "FALSE-PROOF if any case is false-unconditional-proof.",
       "else FINDING if any case is any other finding class.",
-      "else INCOMPLETE if any allocated case is unexecuted, or harness-invalid cases exceed 20% of the row's cases, or (modeled rows only) every executed case is no-claim because of TimeoutOrUnavailable.",
-      "else CLEAN-WITHIN-BUDGET, reported with the counts of validated-proof, refusal-validated, and no-claim cases and the share of exhaustive domains."
+      "else INCOMPLETE if any allocated case is unexecuted, harness-invalid, flaky, crashed, unconfirmed-claim, or still TimeoutOrUnavailable after its retry. There is no tolerance: one such case blocks CLEAN.",
+      "else CLEAN-WITHIN-BUDGET, reported with the counts of validated-proof, refusal-validated, and no-claim cases and the share of exhaustive domains. A modeled row with zero validated-proof cases is reported as CLEAN-WITHIN-BUDGET (no establishing outcome observed): it supports no release claim that relies on a Proven/Discharged result for that form."
     ],
     "rowStatusToContract": "CLEAN-WITHIN-BUDGET is the only status #1413 may disposition VALIDATED, and it means no counterexample was found within this matrix and budget. INCOMPLETE release-critical rows are BLOCKED at the timebox (contract §8 stopping condition 2). Row status is per baseline."
   },
@@ -2681,15 +2840,15 @@
   },
   "controls": {
     "oracleControls": "templates.json oracleControls: 13 registrant C# properties with known verdicts (positive: holds; negative: violated with a registered witness; exists and vacuity cases). Executed in R1 by SoundnessRegistrationTests and re-executed by #1311 on its machine before any case (invalid-run policy).",
-    "verifierControls": "CTRL-POSITIVE, CTRL-NEGATIVE, CTRL-MUTATION, CTRL-RETRO-845, and CTRL-RETRO-FIXED cases carry expectedOutcome. #1311 runs them first on each baseline. A control whose observed token differs from expectedOutcome is reported; if the control is a retrospective false-proof vector and the observation is Proven with an O1 violation, it is a false-unconditional-proof finding like any other.",
+    "verifierControls": "CTRL-POSITIVE, CTRL-NEGATIVE, CTRL-MUTATION, CTRL-RETRO-845, and CTRL-RETRO-FIXED cases carry an exact expectedOutcome. #1311 runs them first on each baseline. CTRL-POSITIVE/CTRL-NEGATIVE mismatches invalidate the run (solver availability). Any other mismatch on B1 or N1 is a control-mismatch finding; a Proven with an O1 violation is a false-unconditional-proof finding. A retrospective vector whose observation differs from expectedOutcome on B1 or N1 means a fixed defect may have regressed: it is a finding that #1413 must disposition, and the rows listed in the template's guards field cannot be dispositioned VALIDATED before it is.",
     "mutationControls": "CTRL-MUTATION pairs M1 (behavior-preserving rewrite) and M2 (contract-preserving rewrite). The oracle verdicts within a pair must be equal; the verifier tokens may differ, and a differing token alone is not a finding (changed behavior is not a false proof).",
     "retrospective845": {
       "issue": 845,
       "fixPr": 961,
       "fixMerge": "e8bb373150f7ccdf303740d24af0180ada8e9220",
       "preFixParent": "17d253dff964e37538a5f503d3744b576bd2fb52",
-      "cases": "CTRL-RETRO-845 (4 cases): ULONG bounds near ulong.MaxValue that are satisfiable (expected Proven) and violated (expected Failed).",
-      "discrimination": "On P845 the pair must show the pre-fix defect (a Proven on a violated case, or a non-Proven on a satisfiable case); on B1 and N1 it must not. If P845 shows no defect, the control does not discriminate and is reported as non-discriminating, not as a pass.",
+      "cases": "CTRL-RETRO-845 (6 cases, each with expectedOutcome for B1/N1 and p845ExpectedOutcome). Two are the shape named in #845 (ULONG bounds near ulong.MaxValue; pre-#961 the translator refused unsigned literals above int.MaxValue, so P845 is expected Unsupported: these two document the named shape and do not discriminate). Four discriminate the defect #961 actually fixed: in-range LONG:/UINT: literals were translated as signed 32-bit, so under overflow=unchecked x + LONG:1 and x + UINT:1 wrapped at int.MaxValue in the solver while C# widens to long.",
+      "discrimination": "The control discriminates only if, for at least one of the four width cases, P845 produces exactly its p845ExpectedOutcome (Proven on a violated case, or Failed on a satisfiable case) while B1 (and, separately, N1) produces exactly its expectedOutcome. P845 must first pass the solver-availability check. If no width case discriminates, the control is reported as non-discriminating, not as a pass.",
       "residual": "#845 stays open; its named regression is not identified as a closing test (contract §11)."
     },
     "existingDifferential": "bench/phase0-agent-native/verifier-runtime-differential.json (65 forms, 1,170 cells) is cited as an existing control on the cutoff tree. It runs in CI on the current tree, not on the B1/N1 binaries, and is not part of this sweep's denominator or budget."
