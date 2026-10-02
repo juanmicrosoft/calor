@@ -1,0 +1,63 @@
+# #1417 fresh-clone run, recorded 2026-10-02T14:17:39Z on macOS arm64, dotnet 10.0.401
+# Scratch paths shortened to <fresh>.
+
+$ git clone https://github.com/juanmicrosoft/calor.git <fresh>   # no submodules
+$ git checkout milestone-0.24/p1-1417-durable-provenance
+HEAD b547aef8beaa4ce98ac30038d8940a31562774e3
+$ git rev-parse --is-shallow-repository  ->  false
+$ git rev-parse refs/remotes/origin/main  ->  585b45d683eb19c1ab7caa413361d5ae890a0144
+$ git cat-file -e 3bb2601e0cbd93fc25fdaaf2a0ea5183b8a2dd6a  ->  absent (the #1159 orphan; its ledger's identity is the landing commit 82a7c653)
+$ src/Calor.Compiler/scripts/download-z3.sh && dotnet build tests/Calor.Compiler.Tests -c Release
+$ dotnet test tests/Calor.Compiler.Tests -c Release --no-build --filter 'FullyQualifiedName~LedgerCommitStampTests|FullyQualifiedName~DurableProvenanceTests'
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.MergeCommitWriteBackNamesTheMergeCommit
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.ClaimedTreeAndManifestHashesAreReRead
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.WriteBackFailsClosedWhenTheMergeChangedAMeasuredTree
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.FalseIdenticalTreeClaimIsRejected
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.SquashMergeWriteBackResolvesFromAFreshClone
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.PullRequestMergeRefIsNotProtectedMain
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.ShallowCloneFailsInsteadOfSkipping
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.BranchOnlyCommitIsRejectedEvenWhenItIsHead
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.CommitOnProtectedMainIsAuthoritativeInAFreshClone
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.TrueIdenticalTreeClaimVerifiesAtBothCommits
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.LandingCommitOnlyMustHaveLandedTheArtifact
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.ShortShaAndTagRulesAreEnforced
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.ShortStampExpandsOnlyWhenUniqueAndMatching
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.PendingIdentityIsNeverAuthoritativeAndMustDescribeTheCommittedArtifact
+  Passed Calor.Compiler.Tests.Provenance.DurableProvenanceTests.CloneWithoutFetchedMainFails
+  Passed Calor.Compiler.Tests.LedgerCommitStampTests.PendingIdentitiesAwaitLandingOrCompleteWithEqualTrees
+  Passed Calor.Compiler.Tests.LedgerCommitStampTests.EveryIndexEntryStillMatchesItsArtifactsOwnStamp
+  Passed Calor.Compiler.Tests.LedgerCommitStampTests.EveryPublishedBenchmarkStampIsIndexed
+  Passed Calor.Compiler.Tests.LedgerCommitStampTests.EveryLedgerThatStampsAMeasurementIsIndexed
+  Passed Calor.Compiler.Tests.LedgerCommitStampTests.EveryAuthoritativeIdentityResolvesFromProtectedMainOrReleaseTag
+Total tests: 20
+
+## Same clone made shallow: git fetch --depth=1 origin milestone-0.24/p1-1417-durable-provenance
+$ git rev-parse --is-shallow-repository  ->  true
+$ dotnet test ... --filter 'FullyQualifiedName~LedgerCommitStampTests.EveryAuthoritativeIdentity'
+P006 bench/phase0-agent-native/calor0425-corpus-ledger.json: the clone is shallow, so no identity can be decided here. Authoritative validation fails rather than skips (§6); fetch full history (fetch-depth: 0).
+P006 bench/phase0-agent-native/effect-resolver-key-ledger.json: the clone is shallow, so no identity can be decided here. Authoritative validation fails rather than skips (§6); fetch full history (fetch-depth: 0).
+P006 bench/phase0-agent-native/effect-rows-benefit-ledger.json: the clone is shallow, so no identity can be decided here. Authoritative validation fails rather than skips (§6); fetch full history (fetch-depth: 0).
+P006 bench/phase0-agent-native/effect-rows-probe-ledger.json: the clone is shallow, so no identity can be decided here. Authoritative validation fails rather than skips (§6); fetch full history (fetch-depth: 0).
+P006 bench/phase0-agent-native/higher-order-demand-ledger.json: the clone is shallow, so no identity can be decided here. Authoritative validation fails rather than skips (§6); fetch full history (fetch-depth: 0).
+P006 website/public/data/agent-benchmark-results.json#/commit: the clone is shallow, so no identity can be decided here. Authoritative validation fails rather than skips (§6); fetch full history (fetch-depth: 0).
+P006 website/public/data/agent-refactoring-results.json#/commit: the clone is shallow, so no identity can be decided here. Authoritative validation fails rather than skips (§6); fetch full history (fetch-depth: 0).
+P006 website/public/data/benchmark-provenance.json#/agentRefactoring/sourceCommit: the clone is shallow, so no identity can be decided here. Authoritative validation fails rather than skips (§6); fetch full history (fetch-depth: 0).
+P006 website/public/data/benchmark-provenance.json#/agentTasks/sourceCommit: the clone is shallow, so no identity can be decided here. Authoritative validation fails rather than skips (§6); fetch full history (fetch-depth: 0).
+P006 website/public/data/benchmark-provenance.json#/sourceCommit: the clone is shallow, so no identity can be decided here. Authoritative validation fails rather than skips (§6); fetch full history (fetch-depth: 0).
+P006 website/public/data/benchmark-results.json#/commit: the clone is shallow, so no identity can be decided here. Authoritative validation fails rather than skips (§6); fetch full history (fetch-depth: 0).
+Failed!  - Failed:     1, Passed:     0, Skipped:     0, Total:     1
+
+## Unshallowed, then refs/remotes/origin/main deleted (an unfetched clone)
+$ git fetch --unshallow origin && git update-ref -d refs/remotes/origin/main
+P004 bench/phase0-agent-native/calor0425-corpus-ledger.json: refs/remotes/origin/main is not present: this clone has not fetched protected main, so durability cannot be decided. Run `git fetch origin main`.
+P004 bench/phase0-agent-native/effect-resolver-key-ledger.json: refs/remotes/origin/main is not present: this clone has not fetched protected main, so durability cannot be decided. Run `git fetch origin main`.
+P004 bench/phase0-agent-native/effect-rows-benefit-ledger.json: refs/remotes/origin/main is not present: this clone has not fetched protected main, so durability cannot be decided. Run `git fetch origin main`.
+P004 bench/phase0-agent-native/effect-rows-probe-ledger.json: refs/remotes/origin/main is not present: this clone has not fetched protected main, so durability cannot be decided. Run `git fetch origin main`.
+P004 bench/phase0-agent-native/higher-order-demand-ledger.json: refs/remotes/origin/main is not present: this clone has not fetched protected main, so durability cannot be decided. Run `git fetch origin main`.
+P004 website/public/data/agent-benchmark-results.json#/commit: refs/remotes/origin/main is not present: this clone has not fetched protected main, so durability cannot be decided. Run `git fetch origin main`.
+P004 website/public/data/agent-refactoring-results.json#/commit: refs/remotes/origin/main is not present: this clone has not fetched protected main, so durability cannot be decided. Run `git fetch origin main`.
+P004 website/public/data/benchmark-provenance.json#/agentRefactoring/sourceCommit: refs/remotes/origin/main is not present: this clone has not fetched protected main, so durability cannot be decided. Run `git fetch origin main`.
+P004 website/public/data/benchmark-provenance.json#/agentTasks/sourceCommit: refs/remotes/origin/main is not present: this clone has not fetched protected main, so durability cannot be decided. Run `git fetch origin main`.
+P004 website/public/data/benchmark-provenance.json#/sourceCommit: refs/remotes/origin/main is not present: this clone has not fetched protected main, so durability cannot be decided. Run `git fetch origin main`.
+P004 website/public/data/benchmark-results.json#/commit: refs/remotes/origin/main is not present: this clone has not fetched protected main, so durability cannot be decided. Run `git fetch origin main`.
+Failed!  - Failed:     1, Passed:     0, Skipped:     0, Total:     1
