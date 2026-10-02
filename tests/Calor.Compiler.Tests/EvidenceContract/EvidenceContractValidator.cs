@@ -325,7 +325,7 @@ internal static class EvidenceContractValidator
                 previous = parsed;
             if (string.IsNullOrWhiteSpace(Str(entry?["justification"])))
                 yield return new("C010", subject, "amendment has no justification");
-            if (Int(entry?["reviewedInPr"]) is null)
+            if (Int(entry?["reviewedInPr"]) is not > 0)
                 yield return new("C010", subject, "amendment names no reviewed PR");
             if (!IsUtcTimestamp(Str(entry?["timestampUtc"])))
                 yield return new("C010", subject, "amendment has no UTC timestamp");

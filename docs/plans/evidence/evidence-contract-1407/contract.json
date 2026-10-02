@@ -486,7 +486,7 @@
     {
       "version": "1.1.0",
       "justification": "Maintainer decisions approved 2026-10-02 by @juanmicrosoft on findings from open gate PRs R2 #1474/#1475, G1 #1471, P1 #1472, and B1 #1473: (1) a documentation-only website deploy path before #1408 succeeds (releasePath.documentationOnlyDeploy); (2) the B1 task-statement reading (benchmarkEquivalence.taskStatementRule), resolving B1 review round 2 BLOCKING #1; (3) pending inventory updates from G1 #1471 and P1 #1472, applied by a write-back after each PR merges (inventory pendingUpdates); (4) a gate's machine-readable closure inventory counts as evidence data for the pr-size ceiling (capacity.evidenceDataRule); (5) G1's Windows-only verifier divergences routed to #1421/#1135 as release-blocking determinism rows (rules.platformDeterminism, determinismRows); (6) the pr-size ceiling raised to 1,520 changed lines for B1 PR #1473 only, recording its 20-line overrun under stopping rule 1 (capacity.exceptions).",
-      "reviewedInPr": 0,
+      "reviewedInPr": 1477,
       "timestampUtc": "2026-10-02T23:11:32Z",
       "afterDecisionBearingInspection": false,
       "inspectionStatement": "No decision follows decision-bearing inspection. At this amendment no #1419 registration or #1311 sweep result exists, the #1276 registration is unmerged and its oracle has not run (every registered pair is UNCLASSIFIED, pending-oracle), and no #1421 or #1135 protocol run exists. The three Windows observations in decision 5 come from G1's consumer-matrix CI run 37020428891, not from a determinism protocol; decision 5 only adds release-blocking rows and removes no requirement. Decision 6 follows a code review of B1's oracle command line, not an oracle run: no pair has been run.",
