@@ -1,0 +1,84 @@
+title:	Epic: Earn the Language - M0 only; implementation parked
+state:	CLOSED
+author:	juanmicrosoft (Juan C Rivera)
+labels:	epic, needs-external-human, not-authorized, v0.20
+comments:	5
+assignees:	juanmicrosoft (Juan C Rivera)
+projects:	
+milestone:	0.20
+issue-type:	
+parent:	
+sub-issues:	juanmicrosoft/calor#1279, juanmicrosoft/calor#1280, juanmicrosoft/calor#1281, juanmicrosoft/calor#1282, juanmicrosoft/calor#1283, juanmicrosoft/calor#1284, juanmicrosoft/calor#1285, juanmicrosoft/calor#1286, juanmicrosoft/calor#1287, juanmicrosoft/calor#1288, juanmicrosoft/calor#1289, juanmicrosoft/calor#1290, juanmicrosoft/calor#1291, juanmicrosoft/calor#1292, juanmicrosoft/calor#1293, juanmicrosoft/calor#1294, juanmicrosoft/calor#1295, juanmicrosoft/calor#1296, juanmicrosoft/calor#1297, juanmicrosoft/calor#1298, juanmicrosoft/calor#1299, juanmicrosoft/calor#1300, juanmicrosoft/calor#1301, juanmicrosoft/calor#1302, juanmicrosoft/calor#1303, juanmicrosoft/calor#1304, juanmicrosoft/calor#1305, juanmicrosoft/calor#1306, juanmicrosoft/calor#1307, juanmicrosoft/calor#1308, juanmicrosoft/calor#1309, juanmicrosoft/calor#1321, juanmicrosoft/calor#1322, juanmicrosoft/calor#1323, juanmicrosoft/calor#1324
+sub-issues-completed:	35/35
+blocked-by:	
+blocking:	
+number:	1278
+--
+<!-- v020-revision:m0-only; source:fc55e3cf065560f49133beb794cd63403bceabf7 -->
+# Earn the Language: M0 only
+
+**Active scope: five M0 items (#1279-#1283).** The 26 downstream issues #1284-#1309 are closed **not planned, pending M0**, not completed implementations. Use the native sub-issue list for status; there is no second checkbox mirror.
+
+The owner requested planning/backlog edits on 2026-09-09. That is **not a lift of the experiment-execution pause**. @juanmicrosoft owns maintainer triage; no independent human sign-off, committed research adopter, accepted desk budget, or dated collection schedule is evidenced in this record.
+
+## Authority and stop semantics
+
+This is the single shared authority section for the children. The original adoption claim is unchanged:
+
+| Gate | Required original result |
+|---|---|
+| Economics | Calor cost per correctly accepted change: one-sided 97.5% upper ratio bound <= 0.50 versus BOTH ordinary C# and strong protected C# |
+| Completion | One-sided 97.5% lower correctly accepted fraction >= 80%; differences versus each control >= -5 percentage points |
+| Safety | One-sided 97.5% upper serious-defect differences <= +1 percentage point, over BOTH all-assigned and accepted denominators |
+| Trust/adoption | No confirmed false-established property or accepted unauthorized bypass; successful independent adopter handoff within the registered scope |
+
+Allocate alpha = 0.025 to each positive decision branch; all components in a branch must pass (intersection-union). The union bound controls any false-positive branch claim at 5%, not simultaneous interval coverage. Workflow-only requires B's same full adoption gates versus A while C does not earn continuation; INVALID takes precedence.
+
+**No risk-margin relaxation is proposed.** A different claim requires a separate written business-risk rationale, adopter acceptance, independent methods review, and owner approval before a comparative pilot. Affordability alone is not justification.
+
+M0's four outputs remain FEASIBLE AS PROPOSED, REQUIRES SEPARATE APPROVAL, NOT FEASIBLE, and INSUFFICIENT INFORMATION under their evidence requirements. Missing information or an owner declining further inquiry is not fabricated scientific proof of infeasibility or no demand.
+
+No paid collection, recruitment commitment, prototype/service build, larger budget, or downstream reopening is automatic. A formal M0 disposition needs its named reviewer and approved rules; a half-day desk cap is only a proposal. An owner may stop administratively without pretending the methods were adjudicated.
+
+On any stop preserve the actual label, spent resources, support obligations, correctness ownership, and interpretation limits. A memo consumes no software version and produces no package/tag. Actual software needs a separately authorized release plan and ordinary gates.
+
+## What the arithmetic says now
+
+The [reproducible triage note](https://github.com/juanmicrosoft/calor/blob/fc55e3cf065560f49133beb794cd63403bceabf7/docs/plans/roadmap-v0.20.md#preliminary-arithmetic-one-page-triage-not-an-authorized-study) gives a 97.5% zero-event single-rate bound of 8.81% at n=40 and 4.51% at n=80; the illustrative 1-point crossover is 368. These figures do not justify the proposed capacity.
+
+They are not a completed paired/clustered joint-power analysis. Task supply, realistic review duration, cost variation/mechanisms, and least-favorable setup inputs are not established. The formal M0 outcome remains unadjudicated; downstream work stays parked rather than manufacturing a favorable margin or a false countersignature.
+
+## Current facts and missing people
+
+- v0.18 and v0.19.0 shipped; #1182/#1202 are closed. The [31-row v0.19 disposition](https://github.com/juanmicrosoft/calor/blob/fc55e3cf065560f49133beb794cd63403bceabf7/docs/plans/v0.19-audit-disposition.md) records actual resolutions and limits, not whole-language soundness.
+- Call W recorded DEMAND UNPROVEN/no secured adopter on 2026-08-04. Recruitment activity since then is **unknown in the reviewed records**, not an invented nine-release failed search.
+- #1280 is the concrete request to name a consenting external methods reviewer, approved bounded scope/cap, and deadline, or record that no inquiry is authorized. Assignees are accountable triage owners, not proof of independent approval.
+- #1281 must articulate mechanisms for BOTH C/B and B/A cost reductions, including adverse costs, before further investment. No 2.5-2.9x improvement is assumed.
+
+## Separate correctness work
+
+**#1311** searches the released compiler for false-established properties with a concrete code-derived matrix, independent property oracle, controls, existing tests, and proposed evidence path. It is standalone, assigned to @juanmicrosoft, with no M0/M1/adopter/power prerequisite. It is not a hidden service-build project. Zero findings are not whole-compiler soundness.
+
+## Sequence and identifiers
+
+Milestone **0.20** is this planning tranche, not a promise to consume a software version. A future experiment uses independent ID **sd-001**, not a release-number namespace. No epoch has been created or renamed.
+
+Milestone **0.21 / #1254** is a candidate PP-W-rows proposal, not automatic continued language investment. New activation/funding waits for #1283's recorded disposition and a separate explicit maintainer decision; #1259 retains its own bounded-spend/null-result approval. Its frozen science is unchanged.
+
+## Source
+
+[Active M0-only plan](https://github.com/juanmicrosoft/calor/blob/fc55e3cf065560f49133beb794cd63403bceabf7/docs/plans/roadmap-v0.20.md), [full critique disposition](https://github.com/juanmicrosoft/calor/blob/fc55e3cf065560f49133beb794cd63403bceabf7/docs/plans/epic-1278-review-disposition.md), and [verbatim archived Draft v3](https://github.com/juanmicrosoft/calor/blob/fc55e3cf065560f49133beb794cd63403bceabf7/docs/plans/roadmap-v0.20-reference-draft-v3.md).
+
+PR #1221 publishes the planning correction, not an execution authorization. The corrected parked graph puts analysis before pilot, adopter approvals after adopter governance, decisions after the M0 record, and stop rules before runner-dependent execution. Historical audit artifacts and critique records are preserved, not presented as new validation.
+
+<!-- web-doc-followups -->
+## Public website documentation follow-ups
+
+The M0 evidence decision remains **UNADJUDICATED** with an administrative stop. Four documentation-only children are active to align the public website with that record; they do not reopen #1284-#1309 or authorize a version, experiment, recruitment, prototype, or paid collection.
+
+- #1324 — publish a public M0 evidence-status page without creating a software release
+- #1321 — qualify adoption and how-it-works claims
+- #1323 — reconcile benchmark methodology and effect-row study status
+- #1322 — reframe the dated agent-task snapshot as bounded evidence
+
+Close the epic and milestone again after these four website issues merge.

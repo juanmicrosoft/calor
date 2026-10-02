@@ -1,0 +1,91 @@
+You are a hostile research-methods reviewer. Another AI system (Claude) proposed
+the artifacts below. Your job is to find defects, not to be agreeable. You are
+not the author and you owe the author nothing.
+
+Repository: the current working directory (read-only). Read files directly.
+Do NOT query, download, count, or sample any public GitHub repository's
+issues, pull requests, or commits: the rules must be frozen before any such
+task-supply data is inspected. Do not use the network.
+
+Artifacts under review (normative set):
+- docs/plans/safe-delegation-m0/v0.23/r1-decision-rules-v1.md
+- docs/plans/safe-delegation-m0/v0.23/r1-decision-rules-v1.json
+- docs/plans/safe-delegation-m0/v0.23/r1-safety-nmin.py (frozen calculator; you may run it)
+- docs/plans/safe-delegation-m0/v0.23/r1-methods-governance.md
+- docs/plans/safe-delegation-m0/v0.23/reviews/r1/codex-prompt-template.md (this prompt)
+
+The rules must faithfully operationalize the ORIGINAL M0 claim, not an easier
+one. Read the originals yourself:
+- docs/plans/roadmap-v0.20-reference-draft-v3.md (sections 1, 5, 6, 7.1, 8)
+- docs/plans/roadmap-v0.20.md
+- docs/plans/safe-delegation-m0/decision.md, authorization.md,
+  mechanism-and-resources.md, supply-status.md
+Context: only the maintainer and AI agents exist; no adopter organization and
+no independent human reviewer are available; task supply will come from public
+.NET open-source repository history ("public-proxy domain"); any result must be
+labeled "AI-adjudicated, public-proxy domain". Downstream consumers: R3 (domain
+boundary), R2B (supply inventory), R4 (executable sizing estimator), R5
+(classification into FEASIBLE AS PROPOSED, REQUIRES SEPARATE APPROVAL,
+NOT FEASIBLE, INSUFFICIENT INFORMATION, or process status UNADJUDICATED).
+
+Look specifically for:
+1. Rules that bias toward Calor (arm C) or toward a favorable/positive outcome.
+2. Undefined, ambiguous, or post-hoc-adjustable thresholds, ranges, scenarios,
+   or definitions.
+3. Missing or invalid error control (alpha, multiplicity, Monte Carlo error).
+4. Missingness laundering: treating missing, invalid, unmeasurable, or
+   indeterminate evidence as success, as failure, as zero supply, or as zero
+   demand.
+5. Ambiguous or overlapping classifications; cases no rule covers.
+6. Untestable or unverifiable criteria.
+7. Divergence from, or silent dropping of, any original gate (cost,
+   completion, safety, trust, usable adoption, independent handoff) or
+   threshold.
+8. Governance weaknesses: conflicts, recusal gaps, countersignature that can
+   be faked or drifted, reviewer independence overstated.
+9. Bias in the other direction too: rules engineered to force NOT FEASIBLE
+   or to make every outcome a foregone conclusion without saying so.
+
+Output format (Markdown):
+- A numbered list of objections. Each objection: `N. [blocking|major|minor]
+  <short title>` then the location (file and section), the defect, and the
+  minimal fix you would accept.
+- `blocking` = the rules cannot be frozen with this defect (it could change a
+  classification, launder missingness, bias the result, or leave a case
+  undefined). `major` = should be fixed but does not by itself invalidate the
+  freeze. `minor` = clarity.
+- If prior-round dispositions are appended below, evaluate every rejected
+  objection: state `MAINTAINED` or `WITHDRAWN` for each, with a reason, and
+  check whether each "accepted and fixed" item is actually fixed.
+- End with exactly one line: `VERDICT: no blocking objections` or
+  `VERDICT: blocking objections remain`.
+
+Round 2. Artifact commit: 9e7ee8159681164488808fd4efe1ec68d57685e0.
+The round-1 objections and dispositions follow. Round-1 objection text is in docs/plans/safe-delegation-m0/v0.23/reviews/r1/round-1-codex.md. Verify each fix against the current files and report new defects introduced by the changes.
+
+## Dispositions (Claude, proposer)
+
+Every objection was accepted. The main structural response: v1 no longer lets
+simulation, nuisance ranges, or an envelope decide any classification. The
+only route to NOT FEASIBLE is a method-independent analytic bound on the
+number of independent clusters needed by the +1 pp safety gate
+(new rules section 7.4 and `r1-safety-nmin.py`), compared against a supply
+upper bound that never counts missing or unenumerated items as ineligible.
+
+| # | Severity | Disposition | Change |
+|---:|---|---|---|
+| 1 | blocking | Accepted and fixed | Section 4.3 rewritten at arm level (`a`, `k`, `e`, `m`); contrasts are derived, not specified independently; infeasible combinations are rejected. Global nulls made coherent (L: A=B, C at every L boundary; W: B at every W boundary, C equal to B). |
+| 2 | blocking | Accepted and fixed | Section 4.2: Monte Carlo upper 99.5% bound on the rejection rate must be <= 0.025 (branch) / <= 0.05 (family); no "plus Monte Carlo error" allowance. |
+| 3 | blocking | Accepted and fixed | Section 4.2 adds component-level validity at every registered boundary configuration and branch nulls where every other component passes with probability >= 0.99. |
+| 4 | blocking | Accepted and fixed | Section 4.2: R4 pre-registers the finite list of K evaluations; Bonferroni-adjusted Monte Carlo bounds with total Monte Carlo error 0.01; the reseed-on-indeterminate rule is removed. Simulation is also made descriptive under v1, so it cannot decide a classification. |
+| 5 | blocking | Accepted and fixed | States are indexed by (branch, component); branch power is defined on the complete ordered procedure. NOT FEASIBLE now rests on a necessary condition (one component's method-independent bound), which implies branch infeasibility; joint power is never inferred from components. |
+| 6 | blocking | Accepted and fixed | The bounding/extremum procedure no longer decides anything. The analytic bound minimizes over the single nuisance `c` on a coherent, explicit grid `[0, 0.05]` (coherence from `e <= a - k`), with the minimum attained at a closed-form endpoint (`c = 0`). |
+| 7 | blocking | Accepted and fixed | No range, envelope, or alternative can be set after inspection: v1 decisions depend only on frozen constants (`N_MIN = 172`), the frozen supply formulas, and R3's frame, which must be frozen before R2B. The envelope route is removed. Changing a registered alternative after inspection is prohibited (section 10.4). |
+| 8 | blocking | Accepted and fixed | Section 6.1 defines `H_conf`, `H_unres`, certified `H_enum_max`, and `H_high`; with no certified enumeration, `H_high` is unbounded and the supply route is disabled. Pilot arithmetic is explicit (zero pilot in `F_high`). |
+| 9 | blocking | Accepted and fixed | `F_high = floor(H_high / 0.75)` credits authored clusters at their 25% cap, neither inventing more nor setting them to zero. |
+| 10 | blocking | Accepted and fixed | Section 7.4 gives the bounding argument: the Neyman-Pearson power of a simple-vs-simple test bounds every valid test of the composite null, for any binary per-cluster escape endpoint with this margin, independent of how outcomes are ascertained. The verdict is scoped to the frozen frame's supply, not to the original adopter domain. Proxy components otherwise cannot reach a sized state. |
+| 11 | blocking | Accepted and fixed | New component G0 (workload horizon >= 50 assigned requests in 12 months), NOT MEASURABLE IN DOMAIN; forward public supply cannot substitute for it. |
+| 12 | blocking | Accepted and fixed | Section 6.2: missing held-out evaluation for an accepted artifact keeps acceptance and cost; the outcome is imputed adversarially to the claim (subject: incorrect and escape; comparator: correct and no escape); more than 5% such imputations in any arm makes the epoch INVALID. |
+| 13 | blocking | Accepted and fixed | Governance section 5.1 "Provenance and attempts": complete effective prompt and full CLI log committed per attempt; persisted sessions from round 2 for maintainer-side verification; attempt counting and one retry; verdict-bearing attempts cannot be discarded; clean tree at the artifact SHA; residual trust in the capture operator disclosed. |
+| 14 | major | Accepted and fixed | Envelope route removed, so NOT FEASIBLE can no longer pre-empt a conditional-approval route on resource grounds. The supply route concerns supply that no resource change can create within the frozen frame. |
+| 15 | major | Accepted and fixed | Section 7.1 adds `ROUTE_ESTABLISHED`, `ROUTE_MISSING`, `ROUTE_BLOCKED`, `ROUTE_UNRESOLVED`; section 7.6 freezes checklists for G4 and G6.1. |

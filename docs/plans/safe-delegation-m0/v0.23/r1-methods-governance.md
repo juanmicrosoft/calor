@@ -1,0 +1,260 @@
+# R1 methods governance (#1372)
+
+**Recorded:** 2026-10-01. **Issue:** #1372, parent epic #1370.
+**Authority:** the maintainer decisions of 2026-10-01 recorded in
+[r0-authorization.md](r0-authorization.md),
+[amendment-001-public-proxy.md](amendment-001-public-proxy.md), and
+[review-protocol.md](review-protocol.md) (R0, #1371, PR #1467). This branch
+merges the R0 branch at commit `b0c054377c9d414bb3702b8d57cb35f955cd523f`, so
+those records are present, read by the reviewer, and hash-bound (section 5.1).
+This file follows them for caps, deadlines, permitted access, and the review
+protocol, and adds the stricter provenance rules below. If the R0 records are
+not merged, or change after the clearing round, R1 is not `MET`
+(section 7).
+
+**Rules governed:** [r1-decision-rules-v1.md](r1-decision-rules-v1.md).
+
+## 1. What replaces the independent human reviewer
+
+#1372 originally requires a consenting independent **human** methods reviewer.
+Only the maintainer and AI agents are available. On 2026-10-01 the maintainer
+decided that R1 methods governance is performed by cross-family AI adversarial
+review instead. Consequences, stated plainly:
+
+- R1 cannot reach the `MET` value as #1372 was originally written. Any `MET`
+  recorded here is **"MET (AI-adjudicated)"** under the maintainer's
+  substitution, and every downstream output carries the label
+  *AI-adjudicated, public-proxy domain*.
+- This is **not independent human review**. It does not satisfy any
+  requirement elsewhere (#1254, #1259, #1284-#1309, Draft v3 section 7.1) that
+  names an independent human reviewer, adopter lead, or non-maintainer
+  participant.
+
+## 2. Roles
+
+| Role | Holder | Function |
+|---|---|---|
+| Proposer | Claude (Anthropic), via Claude Code | Drafts rules; dispositions objections |
+| Adversarial methods reviewer | OpenAI Codex CLI (`codex exec`), read-only sandbox | Hostile methods review; clears by stating "no blocking objections" against a specific artifact SHA |
+| Third check | GitHub Copilot pull-request review | Advisory; its comments are dispositioned in the PR but it cannot clear |
+| Decision and merge authority | Maintainer @juanmicrosoft | Decides rejected blocking objections (section 6); merges |
+
+## 3. Reviewer identity (configuration, not a person)
+
+The "identity" of the reviewer is its configuration. Each round file records
+the actual values; the template values are:
+
+| Field | Value |
+|---|---|
+| Tool | OpenAI Codex CLI, `codex exec` |
+| Tool version | Recorded per round (`codex --version`; 0.159.2 at drafting) |
+| Model | Recorded per round from the CLI session header; the CLI default under `--ignore-user-config` (`gpt-6.1-sol` at drafting), unchanged across rounds where possible |
+| Reasoning effort | `high` (`-c model_reasoning_effort="high"`) for review rounds |
+| Sandbox | `--sandbox read-only` |
+| Other flags | `--ignore-user-config` (no user plugins or notifier); Codex `memories` feature disabled, so no cross-session memory. From round 2, sessions are **persisted** (no `--ephemeral`) so the session rollout under `~/.codex/sessions/` on the maintainer's machine can be checked against the committed transcript; round 1 ran with `--ephemeral` and has only the committed log |
+| Working directory | This repository's worktree checked out at the round's artifact SHA |
+| Prompt | [r1/codex-prompt-template.md](r1/codex-prompt-template.md) plus a round header and, from round 2, the prior dispositions. The **complete effective prompt** is committed as `r1/round-<N>-prompt.txt` and its `sha256` recorded |
+| Network | Not relied on; the reviewer is told to read local files only |
+
+A change of model or tool version between rounds is recorded and does not by
+itself invalidate earlier rounds; the clearing round is the one whose
+configuration is cited.
+
+## 4. Competence, independence, and conflicts
+
+**Competence.** Neither AI reviewer has verified credentials in clinical-trial
+or econometric methods. Their competence is unmeasured beyond a single
+planted-defect probe (section 5.3). The rules compensate by making R4's
+estimator falsifiable (type I, Monte Carlo, and reproducibility checks in
+rules section 4.2) rather than trusting reviewer judgment about it.
+
+**Independence.**
+
+| Risk | Assessment | Mitigation |
+|---|---|---|
+| Shared training data | Claude and Codex models are trained on overlapping public text, including the same statistics literature; they may share blind spots and stock answers | Cross-vendor review reduces, but does not remove, correlated error. Recorded as a limitation |
+| Framing by proposer | Claude writes the review prompt and the dispositions the reviewer sees | Fixed, hashed prompt template; reviewer reads the artifacts and the original v0.20 records directly instead of a Claude summary; all dispositions are published verbatim |
+| Same-vendor overlap in the third check | Copilot may run OpenAI models, so it is not independent of Codex | Copilot is advisory only |
+| Sycophancy / leniency | An AI reviewer may stop objecting under repeated rounds or authoritative-sounding rebuttals | Rejected blocking objections cannot be closed by Claude alone (section 6); the round cap is 5; the competence probe tests whether the reviewer flags planted defects |
+| Self-review | Claude cannot review its own rules as an independent party | Claude is proposer only and never clears |
+
+**Conflicts of interest.**
+
+- The maintainer created Calor and benefits from a favorable result. The
+  maintainer also authored the substitution of AI review for human review and
+  controls merge. This is a material conflict. It is disclosed, and the rules
+  limit it: the maintainer may not overrule a blocking objection into a
+  AI review clearance (section 6), and the thresholds cannot be amended
+  (rules section 10).
+- Claude (Anthropic) and Codex (OpenAI) have no financial stake in Calor known
+  to this record. Their vendors' commercial interest in AI-assisted coding is a
+  diffuse conflict and is disclosed.
+
+## 5. Adversarial review protocol
+
+### 5.1 Rounds
+
+1. Record the artifact commit SHA and the `sha256` of each reviewed file.
+2. Run Codex with the template prompt plus, from round 2, the prior round's
+   objections and their dispositions.
+3. Codex emits numbered objections, each with severity `blocking`, `major`,
+   or `minor`, and ends with either `VERDICT: no blocking objections` or
+   `VERDICT: blocking objections remain`.
+4. Claude dispositions every objection: **accepted and fixed** (with the
+   change) or **rejected** (with an explicit reason).
+5. Stop when a round has zero blocking objections, or after round 5.
+6. Each Codex call is appended to [spend-ledger.md](spend-ledger.md).
+
+**Provenance and attempts.** For every attempt, the complete effective prompt
+(`round-<N>-prompt.txt`), the full CLI log including the session header
+(model, session id, sandbox, reasoning effort) and token count
+(`round-<N>-codex.log`), and the final message are committed. An attempt that
+fails to return a verdict line (crash, timeout, quota) is retained as
+`round-<N>-attempt-<k>` and recorded in the ledger; at most one retry per round
+is allowed, and a second failure ends the round as having blocking objections
+unresolved. An attempt that returns a verdict cannot be discarded or rerun to
+obtain a different verdict. The reviewer reads the artifacts from the working
+tree at the recorded artifact SHA, and the tree must be clean (no uncommitted
+changes) when the call starts. The remaining trust is in the capture operator
+(the proposer's agent session): a fabricated log would be detectable only by
+comparing session ids and timestamps with the maintainer's local Codex
+session store (rounds 2 onward) and OpenAI usage records. This residual trust
+is disclosed, not eliminated.
+
+Round files follow [review-protocol.md](review-protocol.md):
+`reviews/R1/round-<N>-codex.md` (raw Codex output plus the disposition table,
+with the fixing commit for each accepted objection). Supporting files
+(prompts, logs, bindings, snapshots, the competence probe, and the
+AI review clearance record) live under `r1/`, because the R0 boundary test admits
+only `round-<N>-<reviewer>.md` files under `reviews/`.
+
+**Protocol conformance and variances.** The round limit (5, counting every
+reviewer), the rule that the maintainer cannot override an unresolved blocking
+objection, and the Copilot accounting (a Copilot review counts in the round of
+the commit it reviewed; reviewing any other artifact version consumes a round)
+are taken from the protocol unchanged. Two variances are deliberate and
+stricter: (1) from round 2, sessions are persisted rather than `--ephemeral`,
+so that the maintainer can verify provenance (section 7); (2) the reviewer runs
+with `--ignore-user-config` and reasoning effort `high`. From round 4, the
+prompt includes the protocol's reviewer instruction verbatim. Rounds 1-3 used
+a prompt that covered the same instructions in different words; this is
+disclosed as a protocol deviation for those rounds.
+
+**Binding file.** Before each call from round 3 on, the proposer commits
+`r1/round-<N>-bindings.sha256` in `shasum -a 256` check format. It
+lists the normative set (section 7), the complete effective prompt, and every
+authoritative dependency the reviewer is told to read or that the CLI loads as
+instructions:
+
+- `AGENTS.md` and `CLAUDE.md` (repository instructions);
+- `r0-authorization.md`, `amendment-001-public-proxy.md`, and
+  `review-protocol.md` (R0 records);
+- `r1/snapshots/gate-state-at-review.json`, an immutable copy of
+  `gate-state.json` as reviewed (see "Live gate state" below);
+- `docs/plans/roadmap-v0.20-reference-draft-v3.md`, `docs/plans/roadmap-v0.20.md`;
+- `docs/plans/safe-delegation-m0/{authorization,decision,mechanism-and-resources,predecessor-status,supply-status}.md`;
+- `r1/snapshots/issue-{1278,1370,1372}.txt` (dated snapshots of the
+  GitHub issue text the rules cite; the reviewer has no network access, so these
+  snapshots are the issue text it reviewed).
+
+The R0 records are bound like every other dependency. If R0 (PR #1467) is
+merged with content that differs from the bound hashes, the binding check in
+section 7 fails, and R1 needs another review round or is not `MET`.
+
+**Live gate state.** `gate-state.json` is a live state file that later gates
+must update, so it is not hash-bound. Instead, at merge and at every later
+revalidation, the live file is compared with the bound snapshot
+`r1/snapshots/gate-state-at-review.json`. The only permitted differences are
+(a) the `value`, `effective`, and `record` fields of gate entries, and R5's
+classification, label, and action fields, changed by a merged record under
+the R0 transition rules; and (b) entries appended to `history`. Any other
+difference (authority, amendments, graph, prerequisites, limits, boundary
+flags, process states, classifications, or definitions) is a change to
+reviewed authority: R1 needs another review round or is not `MET`. The R1
+entry's `null -> MET` transition is an authorized transition of type (a) and is
+allowed only when section 7 items 1-5 hold.
+
+### 5.2 Scope of review
+
+The reviewer looks for rules that bias toward Calor, undefined or post-hoc
+adjustable thresholds, missing error control, missingness laundering
+(treating missing or invalid as success or as zero demand), ambiguous
+classifications, untestable criteria, and divergence from the original v0.20
+claim. The reviewer must not query public repository task data
+(rules section 9).
+
+### 5.3 Competence probe
+
+Before round 1, Codex reviews a short planted-defect rule set
+([r1/competence-probe.md](r1/competence-probe.md)) containing
+known defects. The result is recorded in that file. A reviewer that misses
+most planted defects is still used (no alternative exists), but the
+limitation is recorded and weakens the clearance's evidentiary value.
+
+### 5.4 Budget
+
+At most 5 rounds per artifact, within the overall approximately USD 200 API
+cap and the 2026-10-29 window set by R0. Exceeding either ends R1 as
+`EXPIRED`.
+
+## 6. Recusal and rejected objections
+
+- Claude **cannot be final arbiter** of its own rejection of a **blocking**
+  objection. A rejected blocking objection is re-presented to Codex in the
+  next round with the rejection reason. If Codex withdraws or downgrades it,
+  the rejection stands.
+- If Codex maintains a blocking objection after rejection, or round 5 ends
+  with it unresolved, it goes to the maintainer, whose explicit decision is
+  recorded in `r1/clearance-record.md`:
+  - **accept**: the objection must be fixed, which requires another round
+    (if rounds remain); or
+  - **overrule**: recorded with reasons; R1 is then **not `MET`**, because the
+    AI review clearance requires zero blocking objections. The maintainer cannot
+    convert an overrule into an AI review clearance.
+- Rejected `major` and `minor` objections are dispositioned by Claude with
+  reasons and published; they do not block.
+
+## 7. AI review clearance format
+
+R1 is `MET (AI-adjudicated)` only when all of the following are recorded:
+
+1. A Codex round output containing `VERDICT: no blocking objections`, from a
+   persisted (non-ephemeral) session, against artifact commit `<SHA>`, with a
+   committed binding file `round-<N>-bindings.sha256` covering the normative
+   set (`r1-decision-rules-v1.md`, `r1-decision-rules-v1.json`,
+   `r1-safety-nmin.py`, this file, `r1/codex-prompt-template.md`), the
+   complete effective prompt, and the dependencies listed in section 5.1.
+2. **Maintainer provenance verification**, recorded in `r1/clearance-record.md`
+   with date: the maintainer locates the clearing session in the local
+   Codex session store (`~/.codex/sessions/`) by its session id and confirms
+   that its model, sandbox, reasoning effort, working directory, user prompt,
+   and final message match the committed `round-<N>-prompt.txt`,
+   `round-<N>-codex.log`, and `round-<N>-codex.md`. A missing session record or
+   any mismatch prevents `MET`.
+3. **Merge-time binding check**: on the merge commit,
+   `shasum -a 256 -c r1/round-<N>-bindings.sha256` passes for every
+   listed file. If any file changed after review, either a new round reviews
+   the change or R1 is not `MET`.
+4. The maintainer's merge of that PR.
+5. No unresolved maintainer overrule under section 6.
+6. R0 is `MET` in the merged [gate-state.json](gate-state.json); the live file
+   differs from `r1/snapshots/gate-state-at-review.json` only as section 5.1
+   ("Live gate state") permits; and the R1 entry is set to `MET` (in this PR
+   or a follow-up PR) only after items 1-5 hold. Until then it stays `null`.
+
+Residual trust that remains after these checks: the maintainer (who has a
+conflict, section 4) performs the verification, and the capture operator could
+in principle have tampered with the local session store. Both are disclosed.
+
+Terminal values otherwise: `UNAVAILABLE` (5 rounds without zero blocking
+objections, or Codex unavailable), `EXPIRED` (window or cap exhausted),
+`REVOKED` / `INVALIDATED` per the #1370 lifecycle amendments, or
+`NOT_REACHED` if R0 is not `MET`.
+
+## 8. Round log and AI review clearance record
+
+The round log, maintainer decisions on rejected blocking objections, and the
+AI review clearance are recorded in
+[r1/clearance-record.md](r1/clearance-record.md). That file is
+outside the hashed normative set, so recording a result does not change the
+content that was cleared.

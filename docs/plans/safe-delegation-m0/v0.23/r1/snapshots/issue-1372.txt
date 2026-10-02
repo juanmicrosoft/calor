@@ -1,0 +1,60 @@
+title:	[0.23 M0-R1] Establish independent methods governance and freeze decision rules
+state:	OPEN
+author:	juanmicrosoft (Juan C Rivera)
+labels:	
+comments:	2
+assignees:	
+projects:	
+milestone:	0.23
+issue-type:	
+parent:	
+sub-issues:	
+sub-issues-completed:	
+blocked-by:	
+blocking:	
+number:	1372
+--
+Parent: #1370. Depends on M0-R0.
+
+## Purpose
+
+A formal M0 classification requires a consenting independent human methods reviewer and rules frozen before decision-bearing evidence is inspected.
+
+## Work
+
+- Obtain reviewer consent within the R0 authority, or record that the bounded search ended without one.
+- Record competence, independence, conflicts, scope, hours, deadline, withdrawal terms, and countersignature format.
+- Freeze a versioned gate table covering cost, completion, safety, trust, usable adoption, and independent handoff.
+- Freeze alpha/error control, positive-branch logic, missingness and invalid-epoch rules, amendment control, and the four registered classifications.
+- Define the redacted public record and restricted evidence manifest.
+
+## Closure paths
+
+- `MET`: an eligible reviewer consents and countersigns the frozen rules.
+- `UNAVAILABLE`: the authorized search completes without an eligible consenting reviewer.
+- `EXPIRED`: consent or review authority expires.
+
+Closing this issue never fabricates sign-off and never authorizes implementation.
+
+## Acceptance criteria
+
+- [ ] Reviewer identity is handled according to R0 privacy rules; the public record contains sufficient role and independence evidence.
+- [ ] Conflicts and recusal rules are recorded.
+- [ ] Rules are versioned and frozen before R2B inventory inspection or R4 sizing.
+- [ ] Amendments require a new version and explicit disposition of affected evidence.
+- [ ] Gate value and countersignature/unavailability evidence are linked from #1370.
+--- comments ---
+author:	juanmicrosoft
+association:	owner
+edited:	false
+status:	none
+--
+Sequencing amendment: substantive work starts only if #1371 is `MET`. Otherwise close this gate as `NOT_REACHED`, citing #1371 and its terminal value; do not contact reviewers or freeze rules without R0 authority.
+--
+author:	juanmicrosoft
+association:	owner
+edited:	false
+status:	none
+--
+Lifecycle amendment: revalidate every prerequisite before start, each external contact/restricted-data access, and closure. If a prerequisite expires or is revoked after work starts, stop immediately, apply #1371 privacy/retention rules, close `INVALIDATED`, identify partial outputs, and prohibit downstream reuse without a separately approved versioned rerun.
+--
