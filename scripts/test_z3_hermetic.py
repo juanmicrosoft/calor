@@ -103,7 +103,9 @@ def divergence_filter(rid: str, project: str) -> str:
     return "&".join(f"FullyQualifiedName!={name}" for name in divergences(rid, project))
 
 
-def check_guard_trx(trx: Path, min_passed: int, exact: bool = False) -> list[str]:
+def check_guard_trx(
+    trx: Path, min_passed: int, exact: bool = False, guard: bool = True, required: tuple[str, ...] = ()
+) -> list[str]:
     root = ET.parse(trx).getroot()
     results = root.findall("./{*}Results/{*}UnitTestResult")
     errors: list[str] = []
@@ -120,9 +122,12 @@ def check_guard_trx(trx: Path, min_passed: int, exact: bool = False) -> list[str
     if exact and len(results) != min_passed:
         errors.append(f"{len(results)} results; expected exactly {min_passed}")
     names = [result.attrib.get("testName", "") for result in results]
-    for fact in GUARD_FACTS:
+    for fact in GUARD_FACTS if guard else ():
         if not any(f"Z3ConsumerGuardTests.{fact}" in name for name in names):
             errors.append(f"Z3ConsumerGuardTests.{fact} did not run")
+    for name in required:
+        if name not in names:
+            errors.append(f"{name} did not run")
     return errors
 
 
@@ -336,6 +341,9 @@ class Z3HermeticTests(unittest.TestCase):
             self.assertIn(f"void {test['name'].rsplit('.', 1)[1]}(", source)
         job = workflow_jobs((REPO_ROOT / ".github/workflows/test.yml").read_text(encoding="utf-8"))["z3-consumer-matrix"]
         self.assertIn("--divergence-filter", job)
+        self.assertEqual(3, job.count("--list-test-projects"), "build, guard run, and guard check cover every manifest project")
+        self.assertIn('--exact 4', job)
+        self.assertIn("--require Calor.Tasks.Tests.CompileCalorIntegrationTests.VerifyGate_NativeZ3_DeployedToTasksOutputRoot", job)
         self.assertIn(f"--check-trx artifacts/z3/verification.trx --project {entry['project']}", job)
         self.assertEqual("", divergence_filter("linux-arm64", entry["project"]))
         self.assertEqual(3, divergence_filter("win-x64", entry["project"]).count("FullyQualifiedName!="))
@@ -422,6 +430,10 @@ class Z3HermeticTests(unittest.TestCase):
         self.assertTrue(check_guard_trx(trx(good[:-1] + [(GUARD_FACTS[-1], "NotExecuted")]), 3))
         self.assertTrue(check_guard_trx(trx(good[:-1] + [(GUARD_FACTS[-1], "Failed")]), 3))
         self.assertTrue(check_guard_trx(trx(good), 5))
+        self.assertTrue(check_guard_trx(trx(good + [("Other", "Passed")]), 4, exact=True))
+        root_test = "Calor.Tasks.Tests.CompileCalorIntegrationTests.VerifyGate_NativeZ3_DeployedToTasksOutputRoot"
+        substitute = trx([("Unrelated", "Passed")])
+        self.assertTrue(check_guard_trx(substitute, 1, exact=True, guard=False, required=(root_test,)))
 
 
 def main() -> int:
@@ -431,7 +443,15 @@ def main() -> int:
     parser.add_argument("--project", help="with --check-trx: require the manifest total minus registered divergences")
     parser.add_argument("--rid")
     parser.add_argument("--divergence-filter", action="store_true", help="print the dotnet test filter for --rid/--project")
+    parser.add_argument("--list-test-projects", action="store_true", help="print every eng/test-manifest.json project")
+    parser.add_argument("--exact", type=int, help="with --check-trx: require exactly this many results, all passed")
+    parser.add_argument("--no-guard", action="store_true", help="with --check-trx: the run need not include the guard")
+    parser.add_argument("--require", action="append", default=[], help="with --check-trx: a test name that must pass")
     args, rest = parser.parse_known_args()
+    if args.list_test_projects:
+        manifest = json.loads((REPO_ROOT / "eng/test-manifest.json").read_text(encoding="utf-8"))
+        print("\n".join(project["path"] for project in manifest["projects"]))
+        return 0
     if args.divergence_filter:
         print(divergence_filter(args.rid, args.project))
         return 0
@@ -441,11 +461,16 @@ def main() -> int:
             manifest = json.loads((REPO_ROOT / "eng/test-manifest.json").read_text(encoding="utf-8"))
             total = next(p["expectedTotal"] for p in manifest["projects"] if p["path"] == args.project)
             min_passed = total - len(divergences(args.rid or "", args.project))
-        errors = check_guard_trx(args.check_trx, min_passed, exact=bool(args.project))
+        if args.exact is not None:
+            min_passed = args.exact
+        errors = check_guard_trx(
+            args.check_trx, min_passed, exact=bool(args.project) or args.exact is not None,
+            guard=not args.no_guard, required=tuple(args.require),
+        )
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
         if not errors:
-            print(f"OK: {args.check_trx} ran every Z3 consumer guard with no skip or failure.")
+            print(f"OK: {args.check_trx}: every required result passed, nothing skipped or failed.")
         return 1 if errors else 0
     result = unittest.main(argv=[sys.argv[0], *rest], exit=False).result
     return 0 if result.wasSuccessful() else 1

@@ -137,28 +137,28 @@
       "rid": "linux-arm64",
       "workflow": ".github/workflows/test.yml",
       "job": "z3-consumer-matrix",
-      "coverage": "Full Calor.Verification.Tests suite (inventory-enforced, zero skips) and the Calor.Tasks.Tests guard plus task-root native check."
+      "coverage": "All 13 registered test hosts built and their four guard facts run (exactly 4 passing results each); the full Calor.Verification.Tests suite with zero skips and an exact count (minus registered platform divergences); the Calor.Tasks.Tests task-root native check by name."
     },
     {
       "consumer": "test-hosts",
       "rid": "osx-arm64",
       "workflow": ".github/workflows/test.yml",
       "job": "z3-consumer-matrix",
-      "coverage": "Full Calor.Verification.Tests suite (inventory-enforced, zero skips) and the Calor.Tasks.Tests guard plus task-root native check."
+      "coverage": "All 13 registered test hosts built and their four guard facts run (exactly 4 passing results each); the full Calor.Verification.Tests suite with zero skips and an exact count (minus registered platform divergences); the Calor.Tasks.Tests task-root native check by name."
     },
     {
       "consumer": "test-hosts",
       "rid": "win-x64",
       "workflow": ".github/workflows/test.yml",
       "job": "z3-consumer-matrix",
-      "coverage": "Full Calor.Verification.Tests suite (inventory-enforced, zero skips) and the Calor.Tasks.Tests guard plus task-root native check."
+      "coverage": "All 13 registered test hosts built and their four guard facts run (exactly 4 passing results each); the full Calor.Verification.Tests suite with zero skips and an exact count (minus registered platform divergences); the Calor.Tasks.Tests task-root native check by name."
     },
     {
       "consumer": "test-hosts",
       "rid": "win-arm64",
       "workflow": ".github/workflows/test.yml",
       "job": "z3-consumer-matrix",
-      "coverage": "Full Calor.Verification.Tests suite (inventory-enforced, zero skips) and the Calor.Tasks.Tests guard plus task-root native check."
+      "coverage": "All 13 registered test hosts built and their four guard facts run (exactly 4 passing results each); the full Calor.Verification.Tests suite with zero skips and an exact count (minus registered platform divergences); the Calor.Tasks.Tests task-root native check by name."
     },
     {
       "consumer": "sdk-package",

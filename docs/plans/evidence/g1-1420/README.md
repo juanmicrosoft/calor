@@ -30,7 +30,7 @@ under 1,500 changed lines excluding evidence data, $0), §10 (G1 row), §11 (#85
 
 | Consumer | linux-x64 | linux-arm64 | osx-arm64 | win-x64 | win-arm64 |
 |---|---|---|---|---|---|
-| Test hosts (13 projects, guard in each) | all 13 (`remaining-tests`, `id-validation`, `performance.yml`, `publish-nuget.yml` `test`) | Verification + Tasks (`z3-consumer-matrix`) | same | same | same |
+| Test hosts (13 projects, guard in each) | all 13, full suites (`remaining-tests`, `id-validation`, `performance.yml`, `publish-nuget.yml` `test`) | all 13 guards + full Verification + Tasks root check (`z3-consumer-matrix`) | same | same | same |
 | Calor.Sdk package | `sdk-package-consumer`, `sdk-consumer` | same | same | same | same |
 | calor tool package | `cli-tool-consumer` | same (new) | same | same | same (new) |
 
@@ -41,10 +41,10 @@ under 1,500 changed lines excluding evidence data, $0), §10 (G1 row), §11 (#85
 - Post-publication: `verify-release.yml` (manual, installs the published tool; builds
   nothing) is registered in `postPublicationProbes`.
 
-Off linux-x64, test hosts other than Calor.Verification.Tests and Calor.Tasks.Tests are
-not run. Every test host loads Z3 through the same `AddZ3AssetsToOutput` items, and the
-two that run cover a direct and a transitive (`Calor.Tasks`) reference; this is recorded
-as the registered coverage, not as a claim about the other 11 projects on those RIDs.
+Off linux-x64, every one of the 13 test hosts is built and runs its four guard facts
+(exactly 4 passing results per project and RID, checked from TRX), so all 65 test-host ×
+RID cells are exercised. The full suites run only on linux-x64, except
+Calor.Verification.Tests, which runs in full on all five RIDs.
 
 **No unowned Z3 seeding workaround.** See the second residual row. The z3-binaries
 producer (`build-z3.yml`) and drift monitor (`z3-pin-check.yml`) are registered in
