@@ -102,10 +102,11 @@ public class ReleaseWorkflowGateTests
         int Index(string marker) => Array.FindIndex(lines, l => l.Contains(marker) && !l.TrimStart().StartsWith('#'));
         var verify = Index("--nuget-dir ./nupkg");
         var push = Index("dotnet nuget push");
+        var served = Index("--registry-dir \"$RUNNER_TEMP/served\"");
         var create = Index("gh release create");
         var dispatch = Index("gh workflow run nextjs-gh-pages.yml");
-        Assert.True(verify > 0 && verify < push && push < create && create < dispatch,
-            $"order verify={verify} push={push} create={create} dispatch={dispatch}");
+        Assert.True(verify > 0 && verify < push && push < served && served < create && create < dispatch,
+            $"order verify={verify} push={push} served={served} create={create} dispatch={dispatch}");
     }
 
     private static string WorkflowDir() => Path.Combine(ReleaseAdjudicationGateTests.RepoRoot(), ".github", "workflows");

@@ -65,8 +65,10 @@ jobs:
           set -euo pipefail
           git checkout -q --detach "$CANDIDATE"
           gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/release-body.md"
+          TITLE="$(gh release view "$TAG" --json name --jq .name)"
           python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
-            --expect-head --require-tag --version "$VER" --release-body "$RUNNER_TEMP/release-body.md"
+            --expect-head --require-tag --version "$VER" --release-body "$RUNNER_TEMP/release-body.md" \
+            --release-tag "$TAG" --release-title "$TITLE"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

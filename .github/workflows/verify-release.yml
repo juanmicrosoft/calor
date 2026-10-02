@@ -54,8 +54,10 @@ jobs:
           set -euo pipefail
           if [ "$GITHUB_REF" != refs/heads/main ]; then echo "::error::dispatch from main only (got $GITHUB_REF)"; exit 1; fi
           gh release view "v$VER" --json body --jq .body > "$RUNNER_TEMP/release-body.md"
+          TITLE="$(gh release view "v$VER" --json name --jq .name)"
           python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
-            --version "$VER" --require-tag --release-body "$RUNNER_TEMP/release-body.md"
+            --version "$VER" --require-tag --release-body "$RUNNER_TEMP/release-body.md" \
+            --release-tag "v$VER" --release-title "$TITLE"
 
   install-and-verify:
     needs: adjudication-gate

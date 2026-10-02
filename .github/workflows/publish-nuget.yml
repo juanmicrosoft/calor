@@ -528,6 +528,28 @@ jobs:
       - name: Push to NuGet
         run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
+      # A pre-push 404 followed by a 409 from --skip-duplicate would leave an unverified
+      # package in place. Wait until nuget.org serves both packages, then compare them with
+      # the adjudicated packages before anything else is published.
+      - name: Verify the packages nuget.org serves (#1410)
+        env:
+          VER: ${{ needs.adjudication-gate.outputs.version }}
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/served" && mkdir -p "$RUNNER_TEMP/served"
+          for id in calor calor.sdk; do
+            url="https://api.nuget.org/v3-flatcontainer/$id/$VER/$id.$VER.nupkg"
+            for attempt in $(seq 1 60); do
+              code="$(curl -sS -L -o "$RUNNER_TEMP/served/$id.$VER.nupkg" -w '%{http_code}' "$url" || echo 000)"
+              [ "$code" = 200 ] && break
+              rm -f "$RUNNER_TEMP/served/$id.$VER.nupkg"
+              sleep 30
+            done
+            test -s "$RUNNER_TEMP/served/$id.$VER.nupkg" || { echo "::error::nuget.org does not serve $id $VER after 30 minutes"; exit 1; }
+          done
+          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+            --expect-head --version "$VER" --nuget-dir ./nupkg --registry-dir "$RUNNER_TEMP/served"
+
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
         with:
@@ -549,16 +571,22 @@ jobs:
           PRERELEASE: ${{ needs.adjudication-gate.outputs.prerelease }}
         run: |
           set -euo pipefail
+          shopt -s inherit_errexit
+          # Only a confirmed absence counts as absent; any API failure stops the job.
           remote_tag() {
-            gh api "repos/$GITHUB_REPOSITORY/commits/refs/tags/$TAG" --jq .sha 2>/dev/null || true
+            local found
+            found="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$TAG" --jq "[.[] | select(.ref == \"refs/tags/$TAG\")] | length")"
+            if [ "$found" = 0 ]; then return 0; fi
+            gh api "repos/$GITHUB_REPOSITORY/commits/refs/tags/$TAG" --jq .sha
           }
           existing="$(remote_tag)"
           if [ -n "$existing" ] && [ "$existing" != "$CANDIDATE" ]; then
             echo "::error::tag $TAG already points at $existing, not the candidate $CANDIDATE"; exit 1
           fi
           if gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/existing.md" 2>/dev/null; then
+            TITLE="$(gh release view "$TAG" --json name --jq .name)"
             python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
-              --expect-head --release-body "$RUNNER_TEMP/existing.md"
+              --expect-head --release-body "$RUNNER_TEMP/existing.md" --release-tag "$TAG" --release-title "$TITLE"
           else
             { cat "$RUNNER_TEMP/notes.md"; printf '\n<!-- calor-adjudication: %s -->\n' "$ADJUDICATION_IDENTITY"; } > "$RUNNER_TEMP/body.md"
             FLAG=""
