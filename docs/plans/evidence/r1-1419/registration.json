@@ -694,6 +694,22 @@
           "QNT-BOUND-TYPES"
         ],
         "token": "((v i64))"
+      },
+      {
+        "line": "quantifier-bound-variable-types",
+        "member": "u16",
+        "rows": [
+          "QNT-BOUND-TYPES"
+        ],
+        "token": "((v u16))"
+      },
+      {
+        "line": "quantifier-bound-variable-types",
+        "member": "u32",
+        "rows": [
+          "QNT-BOUND-TYPES"
+        ],
+        "token": "((v u32))"
       }
     ],
     "whitelistCoverage": "Every whitelist member maps to at least one row with cases (enforced by SoundnessRegistrationTests). Members outside the whitelist that the code can still reach are registered as refusal rows (Power and other operators, BitwiseNot outside the obligation solver, floating point, calls, Replace and other string operations, non-ordinal modes).",
@@ -1157,7 +1173,7 @@
         "samplingDimensions": [
           "numeric-widths"
         ],
-        "casesPerBaseline": 6,
+        "casesPerBaseline": 5,
         "title": "u64 mixed with a signed operand: refused (no common C# type); exact-integer oracle",
         "templates": [
           "T-U64-MIXED"
@@ -1261,7 +1277,7 @@
           "post"
         ],
         "samplingDimensions": [],
-        "casesPerBaseline": 9,
+        "casesPerBaseline": 8,
         "title": "Division in a short-circuit right operand or ?: arm: refused (conditional-position divisor, D8)",
         "templates": [
           "T-BOOL-SC-DIV",
@@ -1436,7 +1452,7 @@
         "samplingDimensions": [
           "numeric-widths"
         ],
-        "casesPerBaseline": 6,
+        "casesPerBaseline": 5,
         "title": "Width-changing §B binding in a result-bound body: refused",
         "templates": [
           "T-BODY-WIDTHBIND"
@@ -1682,7 +1698,7 @@
           "quantifiers",
           "numeric-widths"
         ],
-        "casesPerBaseline": 5,
+        "casesPerBaseline": 6,
         "title": "Bound variables of u8/i8/i16/i64",
         "templates": [
           "T-QNT-BOUNDTYPES"
@@ -2027,10 +2043,11 @@
           "pre"
         ],
         "samplingDimensions": [],
-        "casesPerBaseline": 5,
+        "casesPerBaseline": 7,
         "title": "Precondition satisfiability claims (Proven = satisfiable)",
         "templates": [
-          "T-VAC-PRESAT"
+          "T-VAC-PRESAT",
+          "T-VAC-PREUNSAT"
         ]
       },
       {
@@ -2753,7 +2770,21 @@
         ],
         "samplingDimensions": [],
         "casesPerBaseline": 0,
-        "title": "Quantifier bound variables of bool, string, array, or user types: not investigated (runtime lowering needs integer bounds)",
+        "title": "Quantifier bound variables of bool, string, array, or user types (runtime lowering needs integer bounds), and u64 bound variables against the signed bounds the sweep uses (no C# typing: CS0034, observed front-end only): not investigated",
+        "templates": []
+      },
+      {
+        "id": "XCL-PRECONDITION-SAT-FORMS",
+        "family": "excluded",
+        "classification": "not-investigated",
+        "releaseCritical": false,
+        "channel": "none",
+        "entryPoints": [
+          "pre"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 0,
+        "title": "Precondition satisfiability over division, checked arithmetic, string, array, and quantifier forms: not investigated (precondition outcomes never remove a guard; numeric satisfiability is covered by VAC-PRECONDITION-SAT-CLAIM)",
         "templates": []
       },
       {
@@ -2771,7 +2802,7 @@
     ]
   },
   "channels": {
-    "CH-CONTRACT": "Program.Compile(source, \"case.calr\", CompilationOptions { VerifyContracts = true, VerifyRefinements = false, EnableTypeChecking = TypeCheckingDefault, ContractMode = Debug, VerificationTimeoutMs = 5000, VerificationCacheOptions = { Enabled = false } }) run twice: ElideProvenGuards = true (the default user path) and ElideProvenGuards = false. Outcomes are read from options.VerificationResults (ContractVerificationResult.EffectiveOutcome: Status, IsVacuous, Assumptions).",
+    "CH-CONTRACT": "Program.Compile(source, \"case.calr\", CompilationOptions { VerifyContracts = true, VerifyRefinements = false, EnableTypeChecking = true (explicit; CALOR_NO_TYPE_CHECK must be unset in the harness and CLI environment, recorded in pins.json, and a change invalidates the run), ContractMode = Debug, VerificationTimeoutMs = 5000, VerificationCacheOptions = { Enabled = false } }) run twice: ElideProvenGuards = true (the default user path) and ElideProvenGuards = false. Outcomes are read from options.VerificationResults (ContractVerificationResult.EffectiveOutcome: Status, IsVacuous, Assumptions).",
     "CH-OBLIGATION": "As CH-CONTRACT with VerifyRefinements = true; outcomes are read from options.ObligationResults (Obligation.Outcome, Status, Kind). This is the path behind calor_refine (MCP) and the public API; the CLI and MSBuild task do not solve obligations at B1/N1.",
     "CH-IMPLICATION": "The inheritance checker that Program.Compile always runs (Z3 when available). Each IMPL template carries contracts in exactly one direction (interface/implementer §Q, or §S), so at most one implication is checked per case; its outcome is read from the Calor0815 info diagnostic text ('Precondition weakening proven' or the postcondition counterpart: Proven) and the LSP-violation error diagnostics (Failed), attributed to the implementing method. Any other Calor0815 on the case is archived, not adjudicated. Calor0816 (ImplicationUnknown) maps to TimeoutOrUnavailable (retried once; still inconclusive -> INCOMPLETE). No implication diagnostic at all means the checker fell back to its heuristic: mapped to Unsupported (establishes nothing). A guard-emission claim (INH-*) produces no token; it is judged only on the inherited guard being present in both emissions.",
     "CH-CACHE": "CH-CONTRACT with VerificationCacheOptions { Enabled = true, ProjectDirectory = <fresh per-case temp dir> }: compile calorPrime, then calor, in the same directory; then a cold compile of calor in a new directory. CACHE-SEMANTICS-VERSION rewrites every primed entry's translator semantics version string to 'r1-stale-version' between the two compiles.",
@@ -2782,7 +2813,7 @@
     "perCase": [
       "Compile the case once per channel listed for its row; record raw statuses, IsVacuous, assumption lists, counterexample models, diagnostics, and both emitted C# texts.",
       "Map each claim-bearing raw status to exactly one contract §4 token: Proven, ProvenVacuous, Discharged, Assumed, Unsupported, TimeoutOrUnavailable, Failed, Boundary. Map from ProofOutcome (Status, IsVacuous, Assumptions), never from a legacy enum. An unmapped status is a harness error (contract E001), never the nearest token.",
-      "A case the baseline compiler rejects with an error diagnostic before verification is recorded as compile-rejected (no token), with its error codes. It validates a refusal only on an unsupported-refused row and only if every error code is in that row's frontEndRefusalCodes (frozen at B1; an empty list means the form must reach the verifier and be Unsupported; [\"*\"] — only SIMP-H1-INVALID-TYPING, which R1 did not compile so as not to exercise H1 — accepts any code outside the lexer/parser bands Calor0001-Calor0199). Any other rejection is harness-invalid for that baseline, including on N1 if its different front end rejects with other codes.",
+      "Every claim-bearing outcome the compiler produced is adjudicated even if compilation then fails (Calor1002 and Calor0326 arise after verification). A case the compiler rejects is recorded as compile-rejected with its error codes; the rejection is used only when no claim-bearing outcome exists for the claim. It validates a refusal only on an unsupported-refused row and only if every error code is in that row's frontEndRefusalCodes (frozen at B1; an empty list means the form must reach the verifier and be Unsupported; [\"*\"] — only SIMP-H1-INVALID-TYPING, which R1 did not compile so as not to exercise H1 — accepts any code outside the lexer/parser bands Calor0001-Calor0199). Any other rejection is harness-invalid for that baseline, including on N1 if its different front end rejects with other codes.",
       "Guard observation: in the elision-enabled emission the claim's guard must be absent iff the token is Proven (postcondition, non-vacuous) or Discharged with an ObligationPolicy action needing no guard; in the forced emission it must be present."
     ],
     "claimSite": "Exactly one claim per case, fixed by the template's claimSite (and obligationKind for obligations: the case must produce exactly one obligation of that kind, otherwise it is harness-invalid). Other contracts and obligations in the same case are archived but not adjudicated.",
@@ -2811,7 +2842,7 @@
     "evaluationBudget": "60 s wall clock per case; exceeding it is oracle-invalid.",
     "corroboration": {
       "id": "R1-O2",
-      "definition": "The baseline's emitted C# with forced guards (ElideProvenGuards = false) is compiled with the baseline's Calor.Runtime.dll and executed (via the template's replay expression, or Probe(args) by position) on every O1 witness and on the first 16 reached inputs in domain order (IndependentOracle.ReplaySampleSize; this includes D15's i == 3 input). O2 records whether the forced guard throws ContractViolationException / InvalidOperationException.",
+      "definition": "The baseline's emitted C# with forced guards (ElideProvenGuards = false) is compiled with the baseline's Calor.Runtime.dll and executed (via the template's replay expression, or Probe(args) by position) on every O1 witness and on the first 16 reached inputs in domain order (IndependentOracle.ReplaySampleSize; this includes D15's i == 3 input). O2 records whether the claim site's guard fired: ContractViolationException (postconditions, inherited guards), InvalidOperationException (proof obligations), ArgumentOutOfRangeException (refinement entry, return, subtype), IndexOutOfRangeException (index bounds). Any other exception is recorded as o2-other-exception and creates no divergence record. O2 is not applicable to implication and precondition claims (no emitted guard checks the adjudicated property) and is recorded as not-applicable.",
       "role": "Corroboration and divergence detection only. O2 runs post-simplification code (ContractSimplificationPass rewrites contracts before emission), so it shares the simplifier's assumptions and can never be the sole oracle."
     },
     "divergence": "If O1 says the property is violated on a replayed input and the forced O2 guard does not throw, or O1 says it holds on a replayed reached input and the forced guard throws, the case additionally gets a semantic-divergence record for #1413. The O1 verdict is not changed by O2.",
@@ -3002,6 +3033,7 @@
       "fixMerge": "e8bb373150f7ccdf303740d24af0180ada8e9220",
       "preFixParent": "17d253dff964e37538a5f503d3744b576bd2fb52",
       "cases": "CTRL-RETRO-845 (6 cases, each with expectedOutcome for B1/N1 and p845ExpectedOutcome). Two are the shape named in #845 (ULONG bounds near ulong.MaxValue; pre-#961 the translator refused unsigned literals above int.MaxValue, so P845 is expected Unsupported: these two document the named shape and do not discriminate). Four discriminate the defect #961 actually fixed: in-range LONG:/UINT: literals were translated as signed 32-bit, so under overflow=unchecked x + LONG:1 and x + UINT:1 wrapped at int.MaxValue in the solver while C# widens to long.",
+      "nonDiscriminatingConsequence": "If no width case discriminates on a baseline, the guarded rows (NUM-LITERAL-TYPED, NUM-ARITH-ADD) are INCOMPLETE on that baseline and cannot be dispositioned VALIDATED until a reviewed amendment registers a replacement discriminating control and it passes; B1 and N1 are judged separately.",
       "discrimination": "The control discriminates only if, for at least one of the four width cases, P845 produces exactly its p845ExpectedOutcome (Proven on a violated case, or Failed on a satisfiable case) while B1 (and, separately, N1) produces exactly its expectedOutcome. P845 must first pass the solver-availability check. If no width case discriminates, the control is reported as non-discriminating, not as a pass.",
       "residual": "#845 stays open; its named regression is not identified as a closing test (contract §11)."
     },

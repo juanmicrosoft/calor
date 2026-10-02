@@ -1419,7 +1419,7 @@
     {
       "id": "T-U64-MIXED",
       "row": "NUM-MIXED-U64-SIGNED",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "postcondition",
       "holes": {
         "T": {
@@ -1950,7 +1950,7 @@
     {
       "id": "T-BOOL-SC-DIV",
       "row": "BOOL-SHORTCIRCUIT",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "postcondition",
       "holes": {
         "C": {
@@ -2734,7 +2734,7 @@
     {
       "id": "T-BODY-WIDTHBIND",
       "row": "BODY-WIDTH-BIND",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "postcondition",
       "holes": {
         "S": {
@@ -3425,7 +3425,7 @@
     {
       "id": "T-QNT-BOUNDTYPES",
       "row": "QNT-BOUND-TYPES",
-      "instances": 5,
+      "instances": 6,
       "claimSite": "postcondition",
       "holes": {
         "VT": {
@@ -3433,7 +3433,9 @@
             "u8",
             "i8",
             "i16",
-            "i64"
+            "i64",
+            "u16",
+            "u32"
           ]
         },
         "S": {
@@ -3477,10 +3479,10 @@
           }
         ],
         "hyp": "n > 0 && n < 300",
-        "prelude": "    static bool All(long lo, long hi, Func<long, bool> p) { for (long i = lo; i < hi; i++) if (!p(i)) return false; return true; }\n    static bool InType(string t, long v) => t switch { \"u8\" => v >= 0 && v <= 255, \"i8\" => v >= -128 && v <= 127, \"i16\" => v >= -32768 && v <= 32767, _ => true };",
+        "prelude": "    static bool All(long lo, long hi, Func<long, bool> p) { for (long i = lo; i < hi; i++) if (!p(i)) return false; return true; }\n    static bool InType(string t, long v) => t switch { \"u8\" => v >= 0 && v <= 255, \"i8\" => v >= -128 && v <= 127, \"i16\" => v >= -32768 && v <= 32767, \"u16\" or \"u32\" or \"u64\" => v >= 0, _ => true };",
         "prop": "All(0, n, v => !InType(\"{VT}\", v) || v {S} {c1})"
       },
-      "minInstances": 4
+      "minInstances": 6
     },
     {
       "id": "T-QNT-NESTED",
@@ -4477,6 +4479,56 @@
       }
     },
     {
+      "id": "T-VAC-PREUNSAT",
+      "row": "VAC-PRECONDITION-SAT-CLAIM",
+      "instances": 2,
+      "claimSite": "precondition",
+      "holes": {
+        "T": {
+          "cycle": [
+            "i8",
+            "u8"
+          ]
+        },
+        "A": {
+          "oneOf": [
+            ">=",
+            "<=",
+            ">",
+            "<",
+            "==",
+            "!="
+          ]
+        },
+        "c1": {
+          "literalOf": "T"
+        }
+      },
+      "calor": [
+        "  §F{f1:Probe:pub} ({T}:x, {T}:y) -> i32",
+        "    §E{}",
+        "    §Q (&& ({A} x {c1}) (! ({A} x {c1})))",
+        "    §R INT:0"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "x",
+            "type": "{T}"
+          },
+          {
+            "name": "y",
+            "type": "{T}"
+          }
+        ],
+        "claim": "exists",
+        "hyp": "true",
+        "prop": "(x {A} {c1}) && !(x {A} {c1})",
+        "note": "unsatisfiable by construction over an exhaustive 8-bit domain: Proven (satisfiable) is a false proof"
+      },
+      "minInstances": 2
+    },
+    {
       "id": "T-OBL-PROOF",
       "row": "OBL-PROOF",
       "instances": 11,
@@ -5236,6 +5288,7 @@
         "  §ITYPE{it1:Sized:i32[]:n} (> # INT:0)",
         "  §F{f1:Probe:priv}",
         "    §I{Sized:a}",
+        "    §I{i32:n}",
         "    §I{i32:k}",
         "    §O{i32}",
         "    §E{}",
@@ -5245,12 +5298,13 @@
       "oracle": {
         "domain": [
           {
-            "name": "a",
-            "type": "i32[]",
+            "name": "n",
+            "type": "i32",
             "values": [
-              "new[] { 0 }",
-              "new[] { 1, 2, 3 }",
-              "new[] { 1, 2, 3, 4, 5, 6, 7, 8 }"
+              "1",
+              "2",
+              "3",
+              "8"
             ]
           },
           {
@@ -5266,8 +5320,10 @@
             ]
           }
         ],
-        "hyp": "a!.Length > 0 && k >= 0 && k {S} {c1}",
-        "prop": "k < a!.Length"
+        "hyp": "n > 0 && k >= 0 && k {S} {c1}",
+        "prop": "k < n",
+        "replay": "Probe(new int[n], n, k)",
+        "note": "the IndexBounds obligation is 0 <= k < n over the size witness n (an array of length n is the indexed-type contract)"
       },
       "obligationKind": "IndexBounds"
     },
@@ -6240,7 +6296,12 @@
         "note": "x is pinned to the value a wrong fold would produce, so a wrong fold turns a false property into an unconditional proof"
       },
       "hypothesis": "H1",
-      "minInstances": 3
+      "minInstances": 3,
+      "anchors": [
+        "-1",
+        "4294967295",
+        "4294967290"
+      ]
     },
     {
       "id": "T-SIMP-H1-INVALID",

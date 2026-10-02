@@ -143,6 +143,8 @@ internal static class SweepCaseGenerator
         var anchors = new List<BigInteger>();
         foreach (var (name, spec) in template["holes"]?.AsObject() ?? new JsonObject())
             holes[name] = DrawHole(spec!, holeTypes, rng, name, anchors, instance);
+        // Constants written in template text or pair holes are registered explicitly as anchors.
+        anchors.AddRange(template["anchors"]?.AsArray().Select(a => BigInteger.Parse(a!.GetValue<string>(), CultureInfo.InvariantCulture)) ?? []);
 
         var oracle = template["oracle"]!;
         var claim = oracle["claim"]?.GetValue<string>() ?? "forall";

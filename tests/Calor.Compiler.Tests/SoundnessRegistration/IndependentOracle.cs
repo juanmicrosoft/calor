@@ -8,11 +8,9 @@ using Microsoft.CodeAnalysis.CSharp;
 namespace Calor.Compiler.Tests.SoundnessRegistration;
 
 /// <summary>
-/// #1419 (0.24 R1) — the independent behavioral oracle (O1). It compiles a case's reference C#
-/// against BCL assemblies ONLY (no Calor assembly is referenced or loaded) and executes it over the
-/// case's registered input domain under the registered culture and overflow mode. It decides the
-/// claimed property from ordinary .NET execution, never from the verifier's translator, simplifier,
-/// emitter, or solver.
+/// #1419 (0.24 R1) — the independent behavioral oracle (O1). It compiles a case's reference C# against
+/// BCL assemblies ONLY and executes it over the case's input domain under the registered culture and
+/// overflow mode, never using the verifier's translator, simplifier, emitter, or solver.
 /// </summary>
 internal static class IndependentOracle
 {

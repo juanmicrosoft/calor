@@ -1905,16 +1905,6 @@
       "oracleSha256": "fe5da12e0ec7274df1353583e015275bf45de3fd867b33b7d26c66d963dcbd50"
     },
     {
-      "id": "R1-NUM-MIXED-U64-SIGNED-006",
-      "row": "NUM-MIXED-U64-SIGNED",
-      "template": "T-U64-MIXED",
-      "claim": "forall",
-      "exhaustive": false,
-      "calorSha256": "8567c06b17d94e24bdf2455f031d848d65a0c0324b16e5a0afc8dc4558d4e03c",
-      "primeSha256": null,
-      "oracleSha256": "fcf3b660ea779ade5e9e32b15ebb1f9d82e5a39fb86fb2ff83479996e6ccb28f"
-    },
-    {
       "id": "R1-NUM-UNWHITELISTED-OPS-001",
       "row": "NUM-UNWHITELISTED-OPS",
       "template": "T-UNWL-OPS",
@@ -2397,12 +2387,12 @@
     {
       "id": "R1-BOOL-SHORTCIRCUIT-006",
       "row": "BOOL-SHORTCIRCUIT",
-      "template": "T-BOOL-SC-DIV",
+      "template": "T-BOOL-COND-DIV",
       "claim": "forall",
       "exhaustive": false,
-      "calorSha256": "68ce73fa8428195ceae080c4b28e242410cedda871f6fcc2b6675eb2b2ef1ce1",
+      "calorSha256": "e2747b930c5fbb08488b0beb783728226b5234fecfa95b3e2d6bf73db4e4066f",
       "primeSha256": null,
-      "oracleSha256": "9e2f497534a78831495e5f5bebe3e228782fcc1e3174c1dade80a3a771c8eb35"
+      "oracleSha256": "189d65bff2d9978b262d14d39bdbf2ea1bd0844fc58e6d4294457f3bd585a54d"
     },
     {
       "id": "R1-BOOL-SHORTCIRCUIT-007",
@@ -2423,16 +2413,6 @@
       "calorSha256": "ccb3c276378c42017721e54ce5b52cfd33678397b28b8d31e067018dd109b450",
       "primeSha256": null,
       "oracleSha256": "97ec009016a9cd6052eeb192781f7ecbffacb67a91084274d7e640358154229b"
-    },
-    {
-      "id": "R1-BOOL-SHORTCIRCUIT-009",
-      "row": "BOOL-SHORTCIRCUIT",
-      "template": "T-BOOL-COND-DIV",
-      "claim": "forall",
-      "exhaustive": false,
-      "calorSha256": "bdca6f7d060db3adc6bbc7e3a4038d4c186259bf2067014733ab18cbaf2ca457",
-      "primeSha256": null,
-      "oracleSha256": "66ae2f899a49e6cb7c533d6234b3977e3384e3aed55813a49959993fe887908a"
     },
     {
       "id": "R1-BOOL-CONDITIONAL-001",
@@ -3335,16 +3315,6 @@
       "oracleSha256": "cd8668d83b41755c0dd40c8f85a9891ec369d3e41a11074c57b917ac0ee62f81"
     },
     {
-      "id": "R1-BODY-WIDTH-BIND-006",
-      "row": "BODY-WIDTH-BIND",
-      "template": "T-BODY-WIDTHBIND",
-      "claim": "forall",
-      "exhaustive": false,
-      "calorSha256": "848f513b388f17ce922af0ffb2dd3b889d12c8258023d645fdcc47c14ccebf31",
-      "primeSha256": null,
-      "oracleSha256": "ed1854ba159697a49f6106c2f774badcbe6c79579e87b1c1f740a227b3e4e95a"
-    },
-    {
       "id": "R1-BODY-DIVISION-001",
       "row": "BODY-DIVISION",
       "template": "T-BODY-DIV",
@@ -4082,7 +4052,7 @@
       "exhaustive": false,
       "calorSha256": "00460fca622dba60059b7b1643b0c19db6ed6bf9c4240c0c5e2a43ba71cd2ae1",
       "primeSha256": null,
-      "oracleSha256": "3897a0d118eff92550446234f3d4ea259e8d8a5fefcb333a4f79ad7e4d0c95b0"
+      "oracleSha256": "045913ffb6cc19d01e4e732f0108f4a98f25c036ca885531812b4d41ece92c10"
     },
     {
       "id": "R1-QNT-BOUND-TYPES-002",
@@ -4092,7 +4062,7 @@
       "exhaustive": false,
       "calorSha256": "4666b166ef27e02769185270abe9f7dda71601d2f775cb175f19405e2b326305",
       "primeSha256": null,
-      "oracleSha256": "47a3da169e468ce1b39f02ecb9cfbcfa1a773cb7405e42592cf6f3b9eb66bffd"
+      "oracleSha256": "1f57a653109aff16c9d895e98a7572e90ce2587b965094333fb9dff0384875a6"
     },
     {
       "id": "R1-QNT-BOUND-TYPES-003",
@@ -4102,7 +4072,7 @@
       "exhaustive": false,
       "calorSha256": "fec59c92eb1c6b4311800014a092ae23b760d02717a6f52606d18eb5f8ce7e0b",
       "primeSha256": null,
-      "oracleSha256": "d1795d22ef544d7393538d0641ae087ad9c795dd239ab0ee034a98a64ed4abf8"
+      "oracleSha256": "e09924dcf060312dc1baa047340387e8132918a3b6160cc5df38ed18f9d1e16b"
     },
     {
       "id": "R1-QNT-BOUND-TYPES-004",
@@ -4112,7 +4082,7 @@
       "exhaustive": false,
       "calorSha256": "f14a72944e9ff92135f4da245cf650981f888ad6eea31de566f7ed8fb2b3c2a0",
       "primeSha256": null,
-      "oracleSha256": "a66f8af4d724a9a13e8aac73475c6ece4bcf03dc86bde67b75166ea35e38970a"
+      "oracleSha256": "6054defd4713320cb6f2673e782f03f5e25574b00f9e2e6ffa669e93e9376545"
     },
     {
       "id": "R1-QNT-BOUND-TYPES-005",
@@ -4120,9 +4090,19 @@
       "template": "T-QNT-BOUNDTYPES",
       "claim": "forall",
       "exhaustive": false,
-      "calorSha256": "54f8098590763e17e282b21309d8006802c7427fde1b5421707557cd4f3b3c17",
+      "calorSha256": "6711425140a9c90f56f09f59ddd826e791d46a02fa3cf51bb09e810513e70a0a",
       "primeSha256": null,
-      "oracleSha256": "a2e3796df2fe997b9f2ae29b84ed9557e2316c7fe9882d9839be9eeccfc5bd03"
+      "oracleSha256": "4007176648da772911c14c98318db324b86edc7faa71fcbef345efe16f951060"
+    },
+    {
+      "id": "R1-QNT-BOUND-TYPES-006",
+      "row": "QNT-BOUND-TYPES",
+      "template": "T-QNT-BOUNDTYPES",
+      "claim": "forall",
+      "exhaustive": false,
+      "calorSha256": "4fb57ce8c9a6d1decd0e677015975f23d4b5ae7ca9bcd3ed3032e863ade1dd87",
+      "primeSha256": null,
+      "oracleSha256": "47479d0b9faf7eb342f97e100198e350088c49189f9ef4c8d17c7b0dc96ab626"
     },
     {
       "id": "R1-QNT-NESTED-001",
@@ -5275,6 +5255,26 @@
       "oracleSha256": "9eaba8fcd6c231bffbd71d3aea32ff4f5ef381a20e52b2a14e3252b4bf8c02a7"
     },
     {
+      "id": "R1-VAC-PRECONDITION-SAT-CLAIM-006",
+      "row": "VAC-PRECONDITION-SAT-CLAIM",
+      "template": "T-VAC-PREUNSAT",
+      "claim": "exists",
+      "exhaustive": true,
+      "calorSha256": "be6edff6c74c02ef049e5c8bff0383864e683bd2a12ee145fb72988b7cb897c1",
+      "primeSha256": null,
+      "oracleSha256": "e75d51ce52ff2f34ab17fc3a6813aaeb8c5b0184a248bc8d66b14a0b7fc8774b"
+    },
+    {
+      "id": "R1-VAC-PRECONDITION-SAT-CLAIM-007",
+      "row": "VAC-PRECONDITION-SAT-CLAIM",
+      "template": "T-VAC-PREUNSAT",
+      "claim": "exists",
+      "exhaustive": true,
+      "calorSha256": "c03c30542cf61edad436a3d4c7e8cf63ed1224c6da837806ea3de3fe91da2d9b",
+      "primeSha256": null,
+      "oracleSha256": "aa01fab4d26454266618c1cd2fa6cbc628006771f570d5aebdf77118f89d3df7"
+    },
+    {
       "id": "R1-OBL-PROOF-001",
       "row": "OBL-PROOF",
       "template": "T-OBL-PROOF",
@@ -5820,9 +5820,9 @@
       "template": "T-OBL-INDEX",
       "claim": "forall",
       "exhaustive": false,
-      "calorSha256": "f79da030d3cb5f10f384c063c288279300ccf07a81066f3a33039809085a2757",
+      "calorSha256": "c715224440629a6f09fd8621a5f2999fc26c03a6cd8e073fbd753177247bc08b",
       "primeSha256": null,
-      "oracleSha256": "026103dbf3b14220e8de54daf8e08bb3bd298f0623ebe4ca88be55078677eb1b"
+      "oracleSha256": "1d520b00c01358d183e74307b72ed1e2d43dd173988a31deb471d496db589525"
     },
     {
       "id": "R1-OBL-INDEX-BOUNDS-002",
@@ -5830,9 +5830,9 @@
       "template": "T-OBL-INDEX",
       "claim": "forall",
       "exhaustive": false,
-      "calorSha256": "ca3dc3c19bc815dfbb997e9551b8ba4ed09e5bc8cf9b06c9fd0f92963d1222b3",
+      "calorSha256": "76530bebc28b6177f7534ee6c712e4986befd264c6616617cf1f34402820e244",
       "primeSha256": null,
-      "oracleSha256": "3f04c50ce86aa34e7b9efe5542daa8887c9c27f5f50ac28182bf419e32f9b290"
+      "oracleSha256": "7d5dd81f0df62f48de0d250e97b4580faf6d406112819bc200ae7e86315b47d0"
     },
     {
       "id": "R1-OBL-INDEX-BOUNDS-003",
@@ -5840,9 +5840,9 @@
       "template": "T-OBL-INDEX",
       "claim": "forall",
       "exhaustive": false,
-      "calorSha256": "ca3dc3c19bc815dfbb997e9551b8ba4ed09e5bc8cf9b06c9fd0f92963d1222b3",
+      "calorSha256": "76530bebc28b6177f7534ee6c712e4986befd264c6616617cf1f34402820e244",
       "primeSha256": null,
-      "oracleSha256": "ea98ddb178890df3a453e688dd28bb1ac385e08bd8d8d0b6dec96e6be857645a"
+      "oracleSha256": "468ac344ff9ea3e76073aa3e1c26d78ff8aca49855706afdea85ef2ace86c3cd"
     },
     {
       "id": "R1-OBL-INDEX-BOUNDS-004",
@@ -5850,9 +5850,9 @@
       "template": "T-OBL-INDEX",
       "claim": "forall",
       "exhaustive": false,
-      "calorSha256": "f02fe321ce29dc76432e86f7b1fe3592a6d598f0a8510767e7c33498d997b7b2",
+      "calorSha256": "f7184ed345f6787181188ef3279bda50cb052f09cf2ac12556cd263d8c10d4a2",
       "primeSha256": null,
-      "oracleSha256": "e1e4d3d1100f387e5396a67939d46e3649a909bb33788fd463a05d5897492765"
+      "oracleSha256": "f71c6852ad4875cd20002d0bbfdbe4c692ab77d311311de96153e43d51a7a3de"
     },
     {
       "id": "R1-OBL-SELFREF-001",
@@ -6642,7 +6642,7 @@
       "exhaustive": false,
       "calorSha256": "b3b67802b796f02643d739af1b4e50788157171db47c922c4d4d2117a4f61c93",
       "primeSha256": null,
-      "oracleSha256": "3f4aa3a1f9578fe0862b96d4bd59b9caeb03abb86c48aa1e47f7fc9b3231a1ce"
+      "oracleSha256": "8dc9de816f95c45453b2569d8d1807e0c572c55fa29923d3017acb6bd7055078"
     },
     {
       "id": "R1-SIMP-H1-UNARY-FOLD-010",
@@ -6652,7 +6652,7 @@
       "exhaustive": false,
       "calorSha256": "9477518c20066d5ac3bd835bda39de98a00b1c601885463bbdcf1a58ece08428",
       "primeSha256": null,
-      "oracleSha256": "cfedf94565d161f7e68e098bb8c695ab36bf370c7fd72813d64e4aebe442575a"
+      "oracleSha256": "180cd989c43391d5e54717eba74b59fa5ec6e62ade8c1ed86641b65601f89bf7"
     },
     {
       "id": "R1-SIMP-H1-UNARY-FOLD-011",
@@ -6662,7 +6662,7 @@
       "exhaustive": false,
       "calorSha256": "fde60abcb9742e1da9211b8cde66e9379e43550e8151aa88523df34e018dba56",
       "primeSha256": null,
-      "oracleSha256": "5fb327eb964ccaeee4f8b93e2123e86bb86ce60afeb104a5874bc0f255729208"
+      "oracleSha256": "891dd5e48baf1fa29a509488fb8831d2a847289fe26c0430e6fb9d270241c9f9"
     },
     {
       "id": "R1-SIMP-H1-INVALID-TYPING-001",

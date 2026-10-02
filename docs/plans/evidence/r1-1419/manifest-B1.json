@@ -614,8 +614,7 @@
         "R1-NUM-MIXED-U64-SIGNED-002",
         "R1-NUM-MIXED-U64-SIGNED-003",
         "R1-NUM-MIXED-U64-SIGNED-004",
-        "R1-NUM-MIXED-U64-SIGNED-005",
-        "R1-NUM-MIXED-U64-SIGNED-006"
+        "R1-NUM-MIXED-U64-SIGNED-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/NUM-MIXED-U64-SIGNED.jsonl"
     },
@@ -738,8 +737,7 @@
         "R1-BOOL-SHORTCIRCUIT-005",
         "R1-BOOL-SHORTCIRCUIT-006",
         "R1-BOOL-SHORTCIRCUIT-007",
-        "R1-BOOL-SHORTCIRCUIT-008",
-        "R1-BOOL-SHORTCIRCUIT-009"
+        "R1-BOOL-SHORTCIRCUIT-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/BOOL-SHORTCIRCUIT.jsonl"
     },
@@ -958,8 +956,7 @@
         "R1-BODY-WIDTH-BIND-002",
         "R1-BODY-WIDTH-BIND-003",
         "R1-BODY-WIDTH-BIND-004",
-        "R1-BODY-WIDTH-BIND-005",
-        "R1-BODY-WIDTH-BIND-006"
+        "R1-BODY-WIDTH-BIND-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/BODY-WIDTH-BIND.jsonl"
     },
@@ -1209,7 +1206,8 @@
         "R1-QNT-BOUND-TYPES-002",
         "R1-QNT-BOUND-TYPES-003",
         "R1-QNT-BOUND-TYPES-004",
-        "R1-QNT-BOUND-TYPES-005"
+        "R1-QNT-BOUND-TYPES-005",
+        "R1-QNT-BOUND-TYPES-006"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/QNT-BOUND-TYPES.jsonl"
     },
@@ -1578,7 +1576,9 @@
         "R1-VAC-PRECONDITION-SAT-CLAIM-002",
         "R1-VAC-PRECONDITION-SAT-CLAIM-003",
         "R1-VAC-PRECONDITION-SAT-CLAIM-004",
-        "R1-VAC-PRECONDITION-SAT-CLAIM-005"
+        "R1-VAC-PRECONDITION-SAT-CLAIM-005",
+        "R1-VAC-PRECONDITION-SAT-CLAIM-006",
+        "R1-VAC-PRECONDITION-SAT-CLAIM-007"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/VAC-PRECONDITION-SAT-CLAIM.jsonl"
     },
@@ -2296,6 +2296,18 @@
       ],
       "caseIds": [],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/XCL-QNT-NONNUMERIC-BOUND.jsonl"
+    },
+    {
+      "id": "B1:XCL-PRECONDITION-SAT-FORMS",
+      "row": "XCL-PRECONDITION-SAT-FORMS",
+      "classification": "not-investigated",
+      "releaseCritical": false,
+      "channel": "none",
+      "entryPoints": [
+        "pre"
+      ],
+      "caseIds": [],
+      "resultPath": "bench/correctness/false-established/v024/B1/rows/XCL-PRECONDITION-SAT-FORMS.jsonl"
     },
     {
       "id": "B1:XCL-HEAP-GENERICS",
