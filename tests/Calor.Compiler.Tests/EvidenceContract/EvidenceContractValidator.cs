@@ -19,7 +19,7 @@ internal sealed record ContractViolation(string Code, string Subject, string Mes
 /// known value, and an absent field is a violation rather than a default. The rules encode the
 /// contract's frozen sections; changing what they accept is a contract amendment.</para>
 /// </summary>
-internal static class EvidenceContractValidator
+internal static partial class EvidenceContractValidator
 {
     /// <summary>The proof-outcome tokens frozen by #1407. Adding or removing one is an amendment.</summary>
     public static readonly IReadOnlyList<string> FrozenOutcomeTokens =

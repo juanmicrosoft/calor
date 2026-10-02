@@ -1,0 +1,3044 @@
+{
+  "schemaVersion": 1,
+  "cutoffCommit": "72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1",
+  "root": "tests/TestData/Benchmarks",
+  "hashing": "SHA-256 of the git blob bytes at the cutoff (no line-ending normalization).",
+  "files": [
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/AsyncChain.calr",
+      "sha256": "f04d898ad82306ae5265e7937bedb981252d4594ffeca9e6f115836520d4d307",
+      "role": "calor-arm",
+      "pairId": "AsyncConcurrency/AsyncChain"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/AsyncChain.cs",
+      "sha256": "9037f13b044b2e42917734d18327643b98864ef66a620cfcda8dc163c2d73e32",
+      "role": "csharp-arm",
+      "pairId": "AsyncConcurrency/AsyncChain"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/AsyncEffect.calr",
+      "sha256": "7ef2f8c838287e05c791ca54d9210b47c78aa4291485c0d1f9f561879a09b7c8",
+      "role": "calor-arm",
+      "pairId": "AsyncConcurrency/AsyncEffect"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/AsyncEffect.cs",
+      "sha256": "8accd17d9537a3bb70bcdf460a1d8e7abfd709f3f267213fbb8800849ba34e22",
+      "role": "csharp-arm",
+      "pairId": "AsyncConcurrency/AsyncEffect"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/AsyncErrorHandling.calr",
+      "sha256": "b6e009a0dc9b778621e370ff30dc34ef790190eabf414145c991d1ace1905bc4",
+      "role": "calor-arm",
+      "pairId": "AsyncConcurrency/AsyncErrorHandling"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/AsyncErrorHandling.cs",
+      "sha256": "03a28af014cec7a9a988dc0c837f2f18f70aa6f6bfb1dd52b730870e186c9db0",
+      "role": "csharp-arm",
+      "pairId": "AsyncConcurrency/AsyncErrorHandling"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/AsyncLoop.calr",
+      "sha256": "7ec7b4b4b59b113a05e699c1f703923b16e28960f3b894e773d9d77d5e749408",
+      "role": "calor-arm",
+      "pairId": "AsyncConcurrency/AsyncLoop"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/AsyncLoop.cs",
+      "sha256": "19e4850578a41512cade09ddb4b63241ea1f98bff8199ee50d7c39f1499b790a",
+      "role": "csharp-arm",
+      "pairId": "AsyncConcurrency/AsyncLoop"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/AsyncPure.calr",
+      "sha256": "793675e9f3b0379677ec0aca26ec78bd434e77abc76e88cba2deed10c5ccd667",
+      "role": "calor-arm",
+      "pairId": "AsyncConcurrency/AsyncPure"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/AsyncPure.cs",
+      "sha256": "adf6e7294b8e8d185094fe8e2cc248edf040f367981209ae357de29b8b4fcc90",
+      "role": "csharp-arm",
+      "pairId": "AsyncConcurrency/AsyncPure"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/AsyncReturn.calr",
+      "sha256": "abe45297c1edb1a0f70c14cacc7fd15b2385d676d5c626ae26a3231c5e0f3f14",
+      "role": "calor-arm",
+      "pairId": "AsyncConcurrency/AsyncReturn"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/AsyncReturn.cs",
+      "sha256": "2364dae84f1311e5ca2f9641760c00235a05bd7eb894c100434bab7dc82a8869",
+      "role": "csharp-arm",
+      "pairId": "AsyncConcurrency/AsyncReturn"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/CancellableTask.calr",
+      "sha256": "e752c8d7bce8b652b11d4d7db151c06ca460691c655c7e6371e398454ecdae0e",
+      "role": "calor-arm",
+      "pairId": "AsyncConcurrency/CancellableTask"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/CancellableTask.cs",
+      "sha256": "7e22537451fd77e821b9d43f2b0f4efb9fd397de013635dee9fb459ca1df3641",
+      "role": "csharp-arm",
+      "pairId": "AsyncConcurrency/CancellableTask"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/DelayedResult.calr",
+      "sha256": "b2690330ec100bc54d65fc2f625062478536382033dfc5890e1d3d98890f43cc",
+      "role": "calor-arm",
+      "pairId": "AsyncConcurrency/DelayedResult"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/DelayedResult.cs",
+      "sha256": "ca67d81e027f97aa172b2ab080b375c3c542b545ef9ea90c7f56b22736a5c542",
+      "role": "csharp-arm",
+      "pairId": "AsyncConcurrency/DelayedResult"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/ParallelTasks.calr",
+      "sha256": "6e1e1833e7b51c14b29c8d1d659e38d5cbbfebbb40fb0a3294d54a3f15a0d291",
+      "role": "calor-arm",
+      "pairId": "AsyncConcurrency/ParallelTasks"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/ParallelTasks.cs",
+      "sha256": "40f45f948390bc660578db3b7209041a838a976a92d2b5d3750ffaa2c967b13a",
+      "role": "csharp-arm",
+      "pairId": "AsyncConcurrency/ParallelTasks"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/SimpleAsync.calr",
+      "sha256": "876305c472eca966d6d64328942b88b6d875a2f7ffc6920e6098c112492ea38a",
+      "role": "calor-arm",
+      "pairId": "AsyncConcurrency/SimpleAsync"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/AsyncConcurrency/SimpleAsync.cs",
+      "sha256": "c145a7ab2db49046aeb72a60a6ec95ecc109dfe4351dedd9885cf46a1a123bef",
+      "role": "csharp-arm",
+      "pairId": "AsyncConcurrency/SimpleAsync"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/ArraySlice.calr",
+      "sha256": "43c69c2afc3e7922ee45afe9550bb3be0db46b81b5f53653aea2b8ae20156ce3",
+      "role": "calor-arm",
+      "pairId": "CollectionsLINQ/ArraySlice"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/ArraySlice.cs",
+      "sha256": "11714439897f59bc15b5f73802ec64c8219087bba9112bc5cbb598ddf7351532",
+      "role": "csharp-arm",
+      "pairId": "CollectionsLINQ/ArraySlice"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/DictOps.calr",
+      "sha256": "c06d80ccc1f3d4b32d0432a1127669074a7e03a8b073d638d25cb87f85045f2f",
+      "role": "calor-arm",
+      "pairId": "CollectionsLINQ/DictOps"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/DictOps.cs",
+      "sha256": "0a6d0545da9793d3600d1e91bf40ba307e5afd94990f6e786ba9154d136ab837",
+      "role": "csharp-arm",
+      "pairId": "CollectionsLINQ/DictOps"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/Filter.calr",
+      "sha256": "9bb6737e1eb83d60712f99f00247da4832f5a5e6ab89ca6b7b0caa3a6c1bed67",
+      "role": "calor-arm",
+      "pairId": "CollectionsLINQ/Filter"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/Filter.cs",
+      "sha256": "9133e939313c644252faedd8e617b483772436d12b445e8c79e24c4f2ac0b04a",
+      "role": "csharp-arm",
+      "pairId": "CollectionsLINQ/Filter"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/GroupBy.calr",
+      "sha256": "a4065b2066e1393c34ad4ee02ee059efd62c78afd305953c0c18bcb9fa36a515",
+      "role": "calor-arm",
+      "pairId": "CollectionsLINQ/GroupBy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/GroupBy.cs",
+      "sha256": "4f7e72947acb59be2ee2009488ac1620612080133a958ac72e0a10878a39e376",
+      "role": "csharp-arm",
+      "pairId": "CollectionsLINQ/GroupBy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/LinqPipeline.calr",
+      "sha256": "50c240df35662a2585f06f3007a4dd32adfd55e23af08715c8565f6f970a2208",
+      "role": "calor-arm",
+      "pairId": "CollectionsLINQ/LinqPipeline"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/LinqPipeline.cs",
+      "sha256": "a96d098f47dbc146e60f55075de0ca1b14804fd3c1ff52a2c9087e0986c2437b",
+      "role": "csharp-arm",
+      "pairId": "CollectionsLINQ/LinqPipeline"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/ListOps.calr",
+      "sha256": "ef56e2e50b80922ad2ce0088cd4f38c8c38c60ec0ee8c0c8dc19e2d3a0695619",
+      "role": "calor-arm",
+      "pairId": "CollectionsLINQ/ListOps"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/ListOps.cs",
+      "sha256": "6bed8742dc4aade100483e984c6de709ff1aa421644bbc1aa85cc17f391fe5e2",
+      "role": "csharp-arm",
+      "pairId": "CollectionsLINQ/ListOps"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/Map.calr",
+      "sha256": "37853ca0657223f6e16cee1d6e7fd8ba9f656ae138f34a0d4aae49d2e98056d6",
+      "role": "calor-arm",
+      "pairId": "CollectionsLINQ/Map"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/Map.cs",
+      "sha256": "292f9b5300440ad6e26ec63f1a25dece165be665fd88f756160235ba9575fdb2",
+      "role": "csharp-arm",
+      "pairId": "CollectionsLINQ/Map"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/Reduce.calr",
+      "sha256": "c9a0e74141614671c67db22fb1fc2bfcfdc8016f32c78999da40a25c9a8905ff",
+      "role": "calor-arm",
+      "pairId": "CollectionsLINQ/Reduce"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/Reduce.cs",
+      "sha256": "3e70331a73601f5d6478805bb9492bb944174a92cf6d3be849736a05b747a801",
+      "role": "csharp-arm",
+      "pairId": "CollectionsLINQ/Reduce"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/SetOps.calr",
+      "sha256": "913245b5968df3ce6c9a20262dd43fc4920a589f0c731301f1c0c19c8df492b0",
+      "role": "calor-arm",
+      "pairId": "CollectionsLINQ/SetOps"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/SetOps.cs",
+      "sha256": "9f4aa9c9c65d607fc57c402e023c12acf5a1194be4265bb418a5044344c1b84e",
+      "role": "csharp-arm",
+      "pairId": "CollectionsLINQ/SetOps"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/Sort.calr",
+      "sha256": "e222f939e0602dbbad158721c57309724352bd5a8bc4dd35385c196a3dd8f01e",
+      "role": "calor-arm",
+      "pairId": "CollectionsLINQ/Sort"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/Sort.cs",
+      "sha256": "0822055f20fca0d98b3aa8b1f40e1ca1ecfa48523bb2149de0ca123d4569e3e7",
+      "role": "csharp-arm",
+      "pairId": "CollectionsLINQ/Sort"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/Zip.calr",
+      "sha256": "fd48610e9dc76118fc987e7edafd4e8312b31135309199cc2d21806378dafd67",
+      "role": "calor-arm",
+      "pairId": "CollectionsLINQ/Zip"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CollectionsLINQ/Zip.cs",
+      "sha256": "ee589361bfb5fc7cf5c4c72d7b5e1ffc25f1caf45456ec16d97c85dc47c54793",
+      "role": "csharp-arm",
+      "pairId": "CollectionsLINQ/Zip"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CompactSyntax/AutoProps.calr",
+      "sha256": "7857e383a9dfa80fe91f9f46757fd6f88c67a0d316b3af9e2a024ca910119f81",
+      "role": "calor-arm",
+      "pairId": "CompactSyntax/AutoProps"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CompactSyntax/AutoProps.cs",
+      "sha256": "5ccaa630e4abb0fc53da18112826f4a504166e864306370ee9ec75fa13544178",
+      "role": "csharp-arm",
+      "pairId": "CompactSyntax/AutoProps"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CompactSyntax/CompactClass.calr",
+      "sha256": "2e58d45fef11213f0e7c5c6d8b59bd7b244bfa76371edb89eb2415332195a9e0",
+      "role": "calor-arm",
+      "pairId": "CompactSyntax/CompactClass"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CompactSyntax/CompactClass.cs",
+      "sha256": "5cedd55faabd6d4c90c2e2347d329c26598e2c32716638704340807b4fc271b2",
+      "role": "csharp-arm",
+      "pairId": "CompactSyntax/CompactClass"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CompactSyntax/InlineSigs.calr",
+      "sha256": "498833da6011cdcbd95d41a106c781632c085395d4b2387cef27729d3bf5d116",
+      "role": "calor-arm",
+      "pairId": "CompactSyntax/InlineSigs"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CompactSyntax/InlineSigs.cs",
+      "sha256": "7a285df1906282323a556923a12228528357a201733b63116b6faf5b02de01e2",
+      "role": "csharp-arm",
+      "pairId": "CompactSyntax/InlineSigs"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CompactSyntax/MixedSyntax.calr",
+      "sha256": "d3184e3324c97226f9ababe4b977f1be0492264a4755ae987ff16858328ee87b",
+      "role": "calor-arm",
+      "pairId": "CompactSyntax/MixedSyntax"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CompactSyntax/MixedSyntax.cs",
+      "sha256": "55b54137d39e7f3a2467120b9686411f9220ac3d418b73fa87e41fa3bf7d3df6",
+      "role": "csharp-arm",
+      "pairId": "CompactSyntax/MixedSyntax"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CompactSyntax/OptionalIds.calr",
+      "sha256": "0faf8b357cf4f09747e8d4ebff958a042bb739896ad0c2c94ddf5f6302f1485b",
+      "role": "calor-arm",
+      "pairId": "CompactSyntax/OptionalIds"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/CompactSyntax/OptionalIds.cs",
+      "sha256": "3899e82b49780a8d710088859572b26529a3eba9ff6af1c921cecf8409a9b658",
+      "role": "csharp-arm",
+      "pairId": "CompactSyntax/OptionalIds"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/BreadthFirstSearch.calr",
+      "sha256": "ec0c39eddbc4911bc6fee79dec4aeeec84d88c41f5ba53907ac259cf8de62b33",
+      "role": "calor-arm",
+      "pairId": "ComplexAlgorithms/BreadthFirstSearch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/BreadthFirstSearch.cs",
+      "sha256": "b820fe1e1a0ece1f6b4965110a01a62c22a5ed6b036d0d2a31a01b24e4050cfa",
+      "role": "csharp-arm",
+      "pairId": "ComplexAlgorithms/BreadthFirstSearch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/BubbleSort.calr",
+      "sha256": "68155c655cb39f260d7fd7d2de7232703a05ec28aaaf1b00cf76d603191162ef",
+      "role": "calor-arm",
+      "pairId": "ComplexAlgorithms/BubbleSort"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/BubbleSort.cs",
+      "sha256": "27c92e5802098bd0a14615bd2dfd18e45aa51dbc92cd4c6d67f6cdc5a07473dc",
+      "role": "csharp-arm",
+      "pairId": "ComplexAlgorithms/BubbleSort"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/DepthFirstSearch.calr",
+      "sha256": "63173e3af46b98d2ed0f23eb7b79e17ca808e71a78b62d5a3c9699c5f0acbd3a",
+      "role": "calor-arm",
+      "pairId": "ComplexAlgorithms/DepthFirstSearch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/DepthFirstSearch.cs",
+      "sha256": "68298152250286b684553f477bb417a036e039c4893fd2438e89ccc74bd679ad",
+      "role": "csharp-arm",
+      "pairId": "ComplexAlgorithms/DepthFirstSearch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/Dijkstra.calr",
+      "sha256": "fce4d6cafaa3e3a8c8f37174bab265a364641713e6ab62e734f55b3aca1910ee",
+      "role": "calor-arm",
+      "pairId": "ComplexAlgorithms/Dijkstra"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/Dijkstra.cs",
+      "sha256": "2f643e2f110b8dbd04bf3237f59f43313fde40e414a02901b7fd5266184c8e2b",
+      "role": "csharp-arm",
+      "pairId": "ComplexAlgorithms/Dijkstra"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/EditDistance.calr",
+      "sha256": "dca89d8f18fb4329d12ac5545b60a3a39bf14f3ccd594a368b18bf5f160185b7",
+      "role": "calor-arm",
+      "pairId": "ComplexAlgorithms/EditDistance"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/EditDistance.cs",
+      "sha256": "4741090f6239c68042a923bce7b5edd482d6e5faada38b9e5fb676f8def1d2e5",
+      "role": "csharp-arm",
+      "pairId": "ComplexAlgorithms/EditDistance"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/InsertionSort.calr",
+      "sha256": "6e155d4ab6e90f01d9575ff1e5b928b669d30e904d83710300f0a5a78d878f36",
+      "role": "calor-arm",
+      "pairId": "ComplexAlgorithms/InsertionSort"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/InsertionSort.cs",
+      "sha256": "176e818ffb3c62937e27baacf98d54487bb662e09f145dc458eb9441c96db6a3",
+      "role": "csharp-arm",
+      "pairId": "ComplexAlgorithms/InsertionSort"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/InterpolationSearch.calr",
+      "sha256": "e08f786011152b43db9cae06ce98bcaff2f3415aa17fa87abead51cc473d36c3",
+      "role": "calor-arm",
+      "pairId": "ComplexAlgorithms/InterpolationSearch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/InterpolationSearch.cs",
+      "sha256": "86ad1132210bb8cdccc4cb45b09c92b3219d5836ca53763239e42078c9fa2689",
+      "role": "csharp-arm",
+      "pairId": "ComplexAlgorithms/InterpolationSearch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/Knapsack.calr",
+      "sha256": "3aeaee1c6c5b969c8dab2a934625ad9d11b85fb69a5b30532a720f161b205350",
+      "role": "calor-arm",
+      "pairId": "ComplexAlgorithms/Knapsack"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/Knapsack.cs",
+      "sha256": "0eb65ffee8c156fb2ed2dcd443ad8cd7124801d772aa204da407ba9e6884dac1",
+      "role": "csharp-arm",
+      "pairId": "ComplexAlgorithms/Knapsack"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/LCS.calr",
+      "sha256": "7cd8e4c765317b45b11197bf97733912b9830b9faa10524594a23e22036c3803",
+      "role": "calor-arm",
+      "pairId": "ComplexAlgorithms/LCS"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/LCS.cs",
+      "sha256": "4e29c4a9908ed497185086d38a2e2d004601343edb27301390e96082d226be0d",
+      "role": "csharp-arm",
+      "pairId": "ComplexAlgorithms/LCS"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/LinearSearch.calr",
+      "sha256": "34da5b2ba94f3224afaa98b516f296b507cbb84ca4710227d87825a2ad19a2db",
+      "role": "calor-arm",
+      "pairId": "ComplexAlgorithms/LinearSearch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/LinearSearch.cs",
+      "sha256": "5c8bab5f5ef9833cc924cce7a7dd65cecd71a4aecdb192cc7cc4f5f5ec17b5e4",
+      "role": "csharp-arm",
+      "pairId": "ComplexAlgorithms/LinearSearch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/MatrixMultiply.calr",
+      "sha256": "b670b55213b0395ff6fcab50ce0ee2c98167fe928df3bb82bfe6e02139e52c71",
+      "role": "calor-arm",
+      "pairId": "ComplexAlgorithms/MatrixMultiply"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/MatrixMultiply.cs",
+      "sha256": "530db1e154d1e96b225a9dee53d6681a94b98964b942dc8dcd02f973ec76e05a",
+      "role": "csharp-arm",
+      "pairId": "ComplexAlgorithms/MatrixMultiply"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/MergeSort.calr",
+      "sha256": "a0924676b63dfae75f28994096846f41e452f55ffe0e00b5921ed6ba53b2b6e0",
+      "role": "calor-arm",
+      "pairId": "ComplexAlgorithms/MergeSort"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/MergeSort.cs",
+      "sha256": "b860d156477920355a8c27afd92732f7f1b63cfbd9779675de29f676d9798c99",
+      "role": "csharp-arm",
+      "pairId": "ComplexAlgorithms/MergeSort"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/QuickSort.calr",
+      "sha256": "441ee2ae2e60a452f9daeb5904ba185a446e135e5e379362547584021aa0ec23",
+      "role": "calor-arm",
+      "pairId": "ComplexAlgorithms/QuickSort"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/QuickSort.cs",
+      "sha256": "16092f40324c72ea4e98c4532619598631b0c328acaaf3fbfb14631705c909b7",
+      "role": "csharp-arm",
+      "pairId": "ComplexAlgorithms/QuickSort"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/SelectionSort.calr",
+      "sha256": "a062cc06a44f01e554bf84e411ce7b10064269f19f63f6786b3c1b04e2ca85ee",
+      "role": "calor-arm",
+      "pairId": "ComplexAlgorithms/SelectionSort"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/SelectionSort.cs",
+      "sha256": "156a39a7404c123211570fa87c18eee59709825f466b3090ef2086e007433e0d",
+      "role": "csharp-arm",
+      "pairId": "ComplexAlgorithms/SelectionSort"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/TowerOfHanoi.calr",
+      "sha256": "2830d03b4d9c95f57b8b08ee82b65cd0147854fb7c2d5c53c1b1309a6b7f8cd0",
+      "role": "calor-arm",
+      "pairId": "ComplexAlgorithms/TowerOfHanoi"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ComplexAlgorithms/TowerOfHanoi.cs",
+      "sha256": "d8fcbda27f4d7ff4fb9f9ebdc9b59309fea977f08a6fd3bc66007abb5bed0c7f",
+      "role": "csharp-arm",
+      "pairId": "ComplexAlgorithms/TowerOfHanoi"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/Comprehension/questions.json",
+      "sha256": "00a18f645b1ccdb640f62fbe2eeb1a9ef0c0ece862de69a3f25bd80a092d9ff4",
+      "role": "non-pair",
+      "reason": "LLM comprehension question bank; not a program."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/AbsoluteContracts.calr",
+      "sha256": "9efd3c0832f83cc1270bf3516b3c7da4dbc26aa86ad2e114b4b3e7aaed484fbf",
+      "role": "calor-arm",
+      "pairId": "ContractVerification/AbsoluteContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/AbsoluteContracts.cs",
+      "sha256": "7af7e7c01a10626a3c03d08544c327b62541f52384fecaf07dd44fc645311c71",
+      "role": "csharp-arm",
+      "pairId": "ContractVerification/AbsoluteContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/ArrayContracts.calr",
+      "sha256": "d5c99b611a5491ad5cb5f648870ca6792d2ac6c446d83357291c1e4bf570696f",
+      "role": "calor-arm",
+      "pairId": "ContractVerification/ArrayContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/ArrayContracts.cs",
+      "sha256": "1e92844fb3d4a7d75a8f43919c6f7ea228678caea16bd34b747492511cdd6ee3",
+      "role": "csharp-arm",
+      "pairId": "ContractVerification/ArrayContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/BitContracts.calr",
+      "sha256": "d508e77a4fa5660cd3b28c11d3581a66a4d2e0fc37185e32bc7a74be37785899",
+      "role": "calor-arm",
+      "pairId": "ContractVerification/BitContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/BitContracts.cs",
+      "sha256": "a52a0633c3e190e0d375c3e1acc1bcccf40cd9d3bd10842b959829c4c2a6212e",
+      "role": "csharp-arm",
+      "pairId": "ContractVerification/BitContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/BuggyContracts.calr",
+      "sha256": "a93414b73c8cd0a0bc781e9eb56504e3f66dccaa14dca7f65c2302fb4b978a56",
+      "role": "calor-arm",
+      "pairId": "ContractVerification/BuggyContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/BuggyContracts.cs",
+      "sha256": "42c327009d1f3f28db25d23503c0772d8f5263f12b7110bdec822d1e1473cbba",
+      "role": "csharp-arm",
+      "pairId": "ContractVerification/BuggyContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/DivisionContracts.calr",
+      "sha256": "a197cdfde4dafd31ca2dc73456d636eeee90cc4c807da32de3887e447d4ff77d",
+      "role": "calor-arm",
+      "pairId": "ContractVerification/DivisionContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/DivisionContracts.cs",
+      "sha256": "9ec1194ea6f58c66ca298bd4592f5d2af2f6d2a5376a2ad1ba594dbd0dcf842f",
+      "role": "csharp-arm",
+      "pairId": "ContractVerification/DivisionContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/ListInvariant.calr",
+      "sha256": "1b931113ee69701ca4cf3c20f920b8c1d79ee5c9b47783c238bf62a955ac1282",
+      "role": "calor-arm",
+      "pairId": "ContractVerification/ListInvariant"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/ListInvariant.cs",
+      "sha256": "0e0748e85301f01727c5f294a2cd8c9b5bd72c7bc07582be3c945d2c7660c482",
+      "role": "csharp-arm",
+      "pairId": "ContractVerification/ListInvariant"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/MixedContracts.calr",
+      "sha256": "30aacec10d2fe90bd378dde1a7f6d2e22dfc0a381e315c6c17ab57f7e8329bbf",
+      "role": "calor-arm",
+      "pairId": "ContractVerification/MixedContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/MixedContracts.cs",
+      "sha256": "9c559cff8bc0567294bc5ea8d4ab077c4dc740a73849f9d14882dbafba6692a3",
+      "role": "csharp-arm",
+      "pairId": "ContractVerification/MixedContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/ModuloContracts.calr",
+      "sha256": "3594e9c67000340c1feb90d1afcd1eb9f4bb360c54ecd44df5ac4302a0c87939",
+      "role": "calor-arm",
+      "pairId": "ContractVerification/ModuloContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/ModuloContracts.cs",
+      "sha256": "f507809dd6d7074b87bad723cbdb1e90295df68d7a3119b8cb14bd907cbe5369",
+      "role": "csharp-arm",
+      "pairId": "ContractVerification/ModuloContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/OverflowSafe.calr",
+      "sha256": "0a60195b2566e53432246a0d8245e5109e6e8cab54e6bdf5fae3641748232091",
+      "role": "calor-arm",
+      "pairId": "ContractVerification/OverflowSafe"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/OverflowSafe.cs",
+      "sha256": "3938611002d350b2f39eaa3f05414f53e307f80292586c075e948a69502651d1",
+      "role": "csharp-arm",
+      "pairId": "ContractVerification/OverflowSafe"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/OverflowUnsafe.calr",
+      "sha256": "052d08c7de73a1fbfafc4cdd28d88d20227ff46f422c9ba00c8cb31a58b5f257",
+      "role": "calor-arm",
+      "pairId": "ContractVerification/OverflowUnsafe"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/OverflowUnsafe.cs",
+      "sha256": "ef3f8e6380dbef0826213e0591c848e0671c641f030e3c5c893a5d7619cbe1fd",
+      "role": "csharp-arm",
+      "pairId": "ContractVerification/OverflowUnsafe"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/ProvableContracts.calr",
+      "sha256": "7ba67e2b984ba02e988b1e4004e69ac7dcc59fe19f4539de7de043a6a645baea",
+      "role": "calor-arm",
+      "pairId": "ContractVerification/ProvableContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/ProvableContracts.cs",
+      "sha256": "115fc88bae795ec1fa71dde00110bf7c5b2c26bee5167ced25aeba21c2631459",
+      "role": "csharp-arm",
+      "pairId": "ContractVerification/ProvableContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/RangeContracts.calr",
+      "sha256": "bb7b08f7f9115f192d7352f62f06b117f50586b5b208f3a7267def51b6e75494",
+      "role": "calor-arm",
+      "pairId": "ContractVerification/RangeContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/RangeContracts.cs",
+      "sha256": "f3312457a7a67562458c68488862ab4b6ef062b2ab449b291a4afbb3a664ea9c",
+      "role": "csharp-arm",
+      "pairId": "ContractVerification/RangeContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/SearchContracts.calr",
+      "sha256": "5805b21a3e722132ec5f614b9e99b7b8978af00f84acb8e8cc26085c304c9c20",
+      "role": "calor-arm",
+      "pairId": "ContractVerification/SearchContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/SearchContracts.cs",
+      "sha256": "b4e4cc5b237389e4cd30cdc42f29bcaa950fd12fefbeea48438632098b40a927",
+      "role": "csharp-arm",
+      "pairId": "ContractVerification/SearchContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/SortingContracts.calr",
+      "sha256": "abc73cbd0cac9aab7664236f008f68e1d3107312e3f6fab68ff1d465475067bc",
+      "role": "calor-arm",
+      "pairId": "ContractVerification/SortingContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/SortingContracts.cs",
+      "sha256": "79adc03eeb9f08da236ef23e761179d38cb5c21ca6f0da49a5ccb8860e30bfa1",
+      "role": "csharp-arm",
+      "pairId": "ContractVerification/SortingContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/StringContracts.calr",
+      "sha256": "eefb0037d47dc3337f3d490d9ddf8ceab43bfb919c76b8aef9a9d9237246a394",
+      "role": "calor-arm",
+      "pairId": "ContractVerification/StringContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ContractVerification/StringContracts.cs",
+      "sha256": "ab14d1402f9f589946bc98182562061394142c46ebcbfa24d10f27a97ca58bf3",
+      "role": "csharp-arm",
+      "pairId": "ContractVerification/StringContracts"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/BinaryTree.calr",
+      "sha256": "7f6a2b4709e3bf4097cfafebe408f5f48b845d41a4fe7d4718506b1028a0ed2f",
+      "role": "calor-arm",
+      "pairId": "DataStructures/BinaryTree"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/BinaryTree.cs",
+      "sha256": "87b338ce6c4e1560cec124aba963cf6796c9730f6ef0ab76b8d32ddaf1b0ab22",
+      "role": "csharp-arm",
+      "pairId": "DataStructures/BinaryTree"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/BitSet.calr",
+      "sha256": "0ec8ed80a33a32750d58075987e33ca4ddbabb46e682b53668111aca246fdf8e",
+      "role": "calor-arm",
+      "pairId": "DataStructures/BitSet"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/BitSet.cs",
+      "sha256": "13f76042e456980348cb875c570d14a039e66bac920b0d407e906f5ccce363ba",
+      "role": "csharp-arm",
+      "pairId": "DataStructures/BitSet"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/CircularBuffer.calr",
+      "sha256": "6b4eea020713c945bd6293aba78965a6388dd1e2253112fc0af9020693e36e85",
+      "role": "calor-arm",
+      "pairId": "DataStructures/CircularBuffer"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/CircularBuffer.cs",
+      "sha256": "e6fd946619d8ac7d312d94cffc3967d57ed3b49643562324b0e85884d6e62008",
+      "role": "csharp-arm",
+      "pairId": "DataStructures/CircularBuffer"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/Deque.calr",
+      "sha256": "56f0e27ea94da752cbcb217c11cda8c9938bc0c3a382f1b0ad854f7809ffbcf0",
+      "role": "calor-arm",
+      "pairId": "DataStructures/Deque"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/Deque.cs",
+      "sha256": "5c697fc6eb503e4f008d607f183b82c02ebefcfb1552ab5a26327bedb9b5a45e",
+      "role": "csharp-arm",
+      "pairId": "DataStructures/Deque"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/DisjointSet.calr",
+      "sha256": "7ea0ddd37066d9b8e71ac4ba2c38db0c2e823aff56c702e41acbbfb1b23374e2",
+      "role": "calor-arm",
+      "pairId": "DataStructures/DisjointSet"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/DisjointSet.cs",
+      "sha256": "f5ea79174528aa734b2ce91954db230c724da873b02bd7ae2f47541fa3393135",
+      "role": "csharp-arm",
+      "pairId": "DataStructures/DisjointSet"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/Graph.calr",
+      "sha256": "fb138f0440315741108a1d74fb084f32a16922cd66b7bc14fcc4d114abb19187",
+      "role": "calor-arm",
+      "pairId": "DataStructures/Graph"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/Graph.cs",
+      "sha256": "d7eb83f83215d03ed6bc3bf274c9e07049fe5d0b8b25078218152044452508de",
+      "role": "csharp-arm",
+      "pairId": "DataStructures/Graph"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/HashMap.calr",
+      "sha256": "7de67f37d10ebf5a9d62790cee71363e0d85f7fd99146f03ba457cbc02e8d889",
+      "role": "calor-arm",
+      "pairId": "DataStructures/HashMap"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/HashMap.cs",
+      "sha256": "63a15d44944b592ff801d04aca381d0347015d7e5ab7fc63f8277793e2807267",
+      "role": "csharp-arm",
+      "pairId": "DataStructures/HashMap"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/LinkedList.calr",
+      "sha256": "6c5b040f9ba0bbd93af95d2718ea43565a5693ba680df84b9bbb4d3f900f7f91",
+      "role": "calor-arm",
+      "pairId": "DataStructures/LinkedList"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/LinkedList.cs",
+      "sha256": "12c074ffc79f4982641a63d9b807a5967596582fbb198ca5663cbebbbb3c9644",
+      "role": "csharp-arm",
+      "pairId": "DataStructures/LinkedList"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/MaxHeap.calr",
+      "sha256": "b0840511d85041e416f461a9dbf8d29f311bbd546c310abe6a42480045eb7328",
+      "role": "calor-arm",
+      "pairId": "DataStructures/MaxHeap"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/MaxHeap.cs",
+      "sha256": "5637403f2bd054e629ab1ca866ba2c2c8a895028545791ae08ea4dc21ad492d9",
+      "role": "csharp-arm",
+      "pairId": "DataStructures/MaxHeap"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/MinStack.calr",
+      "sha256": "e530559992243547dfef5015fec5a204c8e5680d48b05e8379a174cfd3276860",
+      "role": "calor-arm",
+      "pairId": "DataStructures/MinStack"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/MinStack.cs",
+      "sha256": "5d049c97d1411d23d76275ce8c007a1aab54c473f440ed5cd212262437c1cfc2",
+      "role": "csharp-arm",
+      "pairId": "DataStructures/MinStack"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/PriorityQueue.calr",
+      "sha256": "09e693ca51607fb47600a395fce891931749d01ca03e905271b7a8a4cc79dcf2",
+      "role": "calor-arm",
+      "pairId": "DataStructures/PriorityQueue"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/PriorityQueue.cs",
+      "sha256": "a833dd470d51f934d5fc9929ceb5e4df1e1ef88731c8c05519ae53a1ca39b4c4",
+      "role": "csharp-arm",
+      "pairId": "DataStructures/PriorityQueue"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/Queue.calr",
+      "sha256": "2a43ce7a395c419f2fcc3665bbd90e0d2316f046e899c0abe0e54e00f750e474",
+      "role": "calor-arm",
+      "pairId": "DataStructures/Queue"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/Queue.cs",
+      "sha256": "3f365c7c8cd94b0c97974e96b3d66f593033968fb304f3ca9c592a841bd965ab",
+      "role": "csharp-arm",
+      "pairId": "DataStructures/Queue"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/SortedList.calr",
+      "sha256": "22184bd36b4239f30ab58c104a7bc66c0eeed5dca90e087feac3aa25dcaa3d77",
+      "role": "calor-arm",
+      "pairId": "DataStructures/SortedList"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/SortedList.cs",
+      "sha256": "c67cc3af66370743bfdf9d67946c49acc4fe543d78f55c0fe06f0a5866d7a453",
+      "role": "csharp-arm",
+      "pairId": "DataStructures/SortedList"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/Stack.calr",
+      "sha256": "2911657a033e80b98d7838e91f5678e56f9fa6454d322aeaae2305d4e6a3b08a",
+      "role": "calor-arm",
+      "pairId": "DataStructures/Stack"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/Stack.cs",
+      "sha256": "e391b132e808e26625b6f74841a680a64e52a025295e9796085c9540778901f2",
+      "role": "csharp-arm",
+      "pairId": "DataStructures/Stack"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/Trie.calr",
+      "sha256": "e01b5d152aeac8c0348f63c4a804e52df4f49cca3cd0b4a1053b8acd70180efa",
+      "role": "calor-arm",
+      "pairId": "DataStructures/Trie"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DataStructures/Trie.cs",
+      "sha256": "b19e2cef44ca5f6c84e30bc9f94cd336fc2de54e64e14d5dbb226e5df28c778d",
+      "role": "csharp-arm",
+      "pairId": "DataStructures/Trie"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Adapter.calr",
+      "sha256": "9f2a6bc2d3f85342a02708682499b6d19ca70d74db3813188ddc0d169be4b0af",
+      "role": "calor-arm",
+      "pairId": "DesignPatterns/Adapter"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Adapter.cs",
+      "sha256": "b5f56c9e1259b55432841de1caeeca1f894258027c9815b37d5d6945aa4d2009",
+      "role": "csharp-arm",
+      "pairId": "DesignPatterns/Adapter"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Builder.calr",
+      "sha256": "1e967865e92307024634c896d41f1b19a891db0681f19373d232f6518a32fee4",
+      "role": "calor-arm",
+      "pairId": "DesignPatterns/Builder"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Builder.cs",
+      "sha256": "20438859f8d52b0f6143cb77470f5257f1f92a52454f92388033641f20d4a9c9",
+      "role": "csharp-arm",
+      "pairId": "DesignPatterns/Builder"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/ChainOfResponsibility.calr",
+      "sha256": "94dbec3965196c5888bb613387a1a317180fb04dfdf97fe233b12d92585b3cb7",
+      "role": "calor-arm",
+      "pairId": "DesignPatterns/ChainOfResponsibility"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/ChainOfResponsibility.cs",
+      "sha256": "646f1ea798f6a9faa64833fc438ed55ffaae285caf8ae22ad1c044e43f692534",
+      "role": "csharp-arm",
+      "pairId": "DesignPatterns/ChainOfResponsibility"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Command.calr",
+      "sha256": "0905688fb7ba3501a01f130ba0bdd82447feb770ade91a9725bc6cb1ef265827",
+      "role": "calor-arm",
+      "pairId": "DesignPatterns/Command"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Command.cs",
+      "sha256": "d091c0190cd21063df022c92d2ff5e79a802de2b23997c546c34fee5af2f7d26",
+      "role": "csharp-arm",
+      "pairId": "DesignPatterns/Command"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Composite.calr",
+      "sha256": "8dc70078fce533ef44786129ed6daef272deb918981b6e33e7c7f7eb584d1c5b",
+      "role": "calor-arm",
+      "pairId": "DesignPatterns/Composite"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Composite.cs",
+      "sha256": "923e0fbfe7564945520c1195b45e5bdd7cfc12d9f5d739927e32948b57fdc6e7",
+      "role": "csharp-arm",
+      "pairId": "DesignPatterns/Composite"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Decorator.calr",
+      "sha256": "d2426f50e9cda7a993c232422af564694d2d86e5470c60d73162e5152831d290",
+      "role": "calor-arm",
+      "pairId": "DesignPatterns/Decorator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Decorator.cs",
+      "sha256": "d5eeab493305535096fa8183bdb5a131907a28f5009b25f2f4ca6749648a6bc7",
+      "role": "csharp-arm",
+      "pairId": "DesignPatterns/Decorator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Factory.calr",
+      "sha256": "0b74573c47ae7b032b983a96d95e7a7b57b5b17975a7925349f701eb65b14fa6",
+      "role": "calor-arm",
+      "pairId": "DesignPatterns/Factory"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Factory.cs",
+      "sha256": "18f4d188d439dfd30d9d264c8d13c07ad82f1b234ac52b2900944b5d15cafbf3",
+      "role": "csharp-arm",
+      "pairId": "DesignPatterns/Factory"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Flyweight.calr",
+      "sha256": "890eed7c5b0e58679560e5141eb760bfb474e9651019bef1dfe028004305c330",
+      "role": "calor-arm",
+      "pairId": "DesignPatterns/Flyweight"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Flyweight.cs",
+      "sha256": "5f0dc928de352b3cf2428387905ba846a32f637a269238f84c83322bc70aa277",
+      "role": "csharp-arm",
+      "pairId": "DesignPatterns/Flyweight"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Iterator.calr",
+      "sha256": "6acc56f7dea2ab951710cd79eb20af3c22d41676c1beb9a477b4a3574fa04e82",
+      "role": "calor-arm",
+      "pairId": "DesignPatterns/Iterator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Iterator.cs",
+      "sha256": "ebf777f1e888ff9914d64e75381abb3af2c187c4853e9a718ad2c3396965197c",
+      "role": "csharp-arm",
+      "pairId": "DesignPatterns/Iterator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Mediator.calr",
+      "sha256": "8d0e0c4d0510599ad89380b576396a6b17bf94b24efafb895ce913ff1911d68e",
+      "role": "calor-arm",
+      "pairId": "DesignPatterns/Mediator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Mediator.cs",
+      "sha256": "d123c0ffdc5df1b93721c343e2170adc4583f59bbbc15e8d717f7bf5a1fbc060",
+      "role": "csharp-arm",
+      "pairId": "DesignPatterns/Mediator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Observer.calr",
+      "sha256": "ad015359dd56b8a3e9ca714ec7ee2df7aece8917015dda6152b1379a27c36b39",
+      "role": "calor-arm",
+      "pairId": "DesignPatterns/Observer"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Observer.cs",
+      "sha256": "c27a9d3911068a45caf125d72df15f6d0ac56c18aa6e7c05c1fe654935cf6dba",
+      "role": "csharp-arm",
+      "pairId": "DesignPatterns/Observer"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Proxy.calr",
+      "sha256": "1355925b84202549d49f62a1a4d431d338ba4966707df32280b82a67f7afd297",
+      "role": "calor-arm",
+      "pairId": "DesignPatterns/Proxy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Proxy.cs",
+      "sha256": "dc48524b956fa876788ad1e9a0a10faa2da3e93139d3c73a1ea1e06b71118ade",
+      "role": "csharp-arm",
+      "pairId": "DesignPatterns/Proxy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Singleton.calr",
+      "sha256": "0ba645516701a6dae406fdf680aaa3d227d6dd8da04c0d3df9686d55e861a75d",
+      "role": "calor-arm",
+      "pairId": "DesignPatterns/Singleton"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Singleton.cs",
+      "sha256": "b6faa6dc40a947cc356960dd98f99dc9c61abd909fe842f4313129294dea2988",
+      "role": "csharp-arm",
+      "pairId": "DesignPatterns/Singleton"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/State.calr",
+      "sha256": "574930dcaa8f324c7a9e39638110894bf270330a2c052538cf34faeb9f233482",
+      "role": "calor-arm",
+      "pairId": "DesignPatterns/State"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/State.cs",
+      "sha256": "377a3b103c24f349bb8af59cdf2814668293e62fcad8299cfd8cc087edbdc862",
+      "role": "csharp-arm",
+      "pairId": "DesignPatterns/State"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Strategy.calr",
+      "sha256": "c179fdde1b5fc37f6a0a6d2911376f8bbe4b4ee915d022422a28fc0384caf64d",
+      "role": "calor-arm",
+      "pairId": "DesignPatterns/Strategy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Strategy.cs",
+      "sha256": "63a9189522d8848a7bdddefebbd18083c3dc66dee996bac9d10300addd1b834e",
+      "role": "csharp-arm",
+      "pairId": "DesignPatterns/Strategy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/TemplateMethod.calr",
+      "sha256": "9f9194cf0c1197965c34870d101f77adb1523778e8f01012d1ba79ecf313a417",
+      "role": "calor-arm",
+      "pairId": "DesignPatterns/TemplateMethod"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/TemplateMethod.cs",
+      "sha256": "635f9b1cd9ebf0aea6bdb916740ec6b0f764299792ed7aa60f6599b90629ac36",
+      "role": "csharp-arm",
+      "pairId": "DesignPatterns/TemplateMethod"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Visitor.calr",
+      "sha256": "e03c94ec25ebd2815f14a7972ca00cf856f1bc3d45a97068e4d5f3604a1f65b0",
+      "role": "calor-arm",
+      "pairId": "DesignPatterns/Visitor"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DesignPatterns/Visitor.cs",
+      "sha256": "e49c357b2505ef4f11768e5bd60a0f43a675bebfa0fb6156a521dea1357577d4",
+      "role": "csharp-arm",
+      "pairId": "DesignPatterns/Visitor"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/BMICalculator.calr",
+      "sha256": "87d3de029a0d9c02b91423321963899cafb2beee5838652cd5f1f5076b15ef22",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/BMICalculator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/BMICalculator.cs",
+      "sha256": "530f782c878b236e90699dbf819c18754c2854c5fe493dadbc90958c5bd1941c",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/BMICalculator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/BankAccount.calr",
+      "sha256": "a4b999cf0b326d84cae066ba341ef49eb5efa69010ab528c955997a5101ab80e",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/BankAccount"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/BankAccount.cs",
+      "sha256": "4ae448f3f9b300593b0a164898a365a2ec09f664377aa37311453ee0749e604b",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/BankAccount"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/Calendar.calr",
+      "sha256": "d296a36d865975b0f0db663d1cd6dc4e912d5bf6d3d9aaf399ae3bc9fbd5ac20",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/Calendar"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/Calendar.cs",
+      "sha256": "c7016748ed498997eeeae98216e57a2ca94cbcd12957c6354fa8ebb8b4d7f4f3",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/Calendar"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/CsvParser.calr",
+      "sha256": "dc9d0128243d2b4b85612ca5ff99c523aabc4158d3f5ef1caba9358a1121b623",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/CsvParser"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/CsvParser.cs",
+      "sha256": "cc72575d09be0ef92a410dc3826e57cf32ff4015bf46f60745a55247d01dabe4",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/CsvParser"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/CurrencyConverter.calr",
+      "sha256": "a8e6386b2a12e1f1ab05266b9950d136b89148ba135f4a40b8a988b0b3798279",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/CurrencyConverter"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/CurrencyConverter.cs",
+      "sha256": "60d5e52aae1c2579c4b49431c7df28bb71ef202c8ab79fef24550f1d62504291",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/CurrencyConverter"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/DateDiff.calr",
+      "sha256": "8c02a42a671392f3c4b2bbb81a8f36212c9205a24668fb379305b52555ba6367",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/DateDiff"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/DateDiff.cs",
+      "sha256": "256122453e9afc7c7a43d879e2ed59390bafac94e5559416af59881b3d64dbd2",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/DateDiff"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/DistanceCalculator.calr",
+      "sha256": "11b7de768a21ca9f924904821160968935d0087a12ebe07343d20879cc81a962",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/DistanceCalculator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/DistanceCalculator.cs",
+      "sha256": "eda19b957f8f5b175c426682dd1194d20955fd0a544367438b97ed75837bb65a",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/DistanceCalculator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/EmailValidator.calr",
+      "sha256": "8b77010e9da2f6863988268d4e0d26e16bbc89af6a47125e704ca11ed30e6ed1",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/EmailValidator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/EmailValidator.cs",
+      "sha256": "a657a008dd896f5f1f4dc3bfe2a85c72ae020f6c4ecca4759069bad7892fcd0e",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/EmailValidator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/GradeCalculator.calr",
+      "sha256": "d865ec1c6095981e89697ee94e1cb53372a5f76760fed45e8aa249dbf71b1265",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/GradeCalculator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/GradeCalculator.cs",
+      "sha256": "9cc4272d9e2b4f10746dc493b2dae8d56cf07d7b09381a1274e2fec6993a30b7",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/GradeCalculator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/Inventory.calr",
+      "sha256": "69a2c1c023450d0539fe4960d5116e3d2521a844686f40a88117ebbb43674fb9",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/Inventory"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/Inventory.cs",
+      "sha256": "88a616e0a8755fc149d6ddc257da4ec7d69c5879dcdc2742a7a8e04fbb0e24ad",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/Inventory"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/PasswordValidator.calr",
+      "sha256": "7b0c7325acdb53f919501533966d9429c73c2ffda32265d3a2a0cea70de74a74",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/PasswordValidator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/PasswordValidator.cs",
+      "sha256": "f4cf86fd0e068c9a0c184ea086d9b9928630c0a8a381467e5d1eb0f65ca442ff",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/PasswordValidator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/PhoneBook.calr",
+      "sha256": "4e76ac6fa26ab1a52e94ac4f7c8f8d7ec4e46f21fb000f8c2fa189fc7f6c10f4",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/PhoneBook"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/PhoneBook.cs",
+      "sha256": "b84f02ad67a82064a06b52a0923bdcc7c6c4004f5ee113148c87e60f8abe4c01",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/PhoneBook"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/ScoreBoard.calr",
+      "sha256": "16ee6f34e0e87bd56bd0c7e4c394bb0ef54fe738f9d478ed101c60be100cd9ed",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/ScoreBoard"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/ScoreBoard.cs",
+      "sha256": "689d7f6a523f4f388b90161b2b55bd115dbeec5c4335d11f10c2177ede116636",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/ScoreBoard"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/ShoppingCart.calr",
+      "sha256": "21c93bff463c22ea248902888caf68bb453c8a3ead51d228cab089a327a6c3cc",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/ShoppingCart"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/ShoppingCart.cs",
+      "sha256": "64dcd730a3f3663a9e5beb66416b3335a7b74207bd21f267104b59197ff16824",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/ShoppingCart"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/TaxCalculator.calr",
+      "sha256": "158ffe6ffb55e6571b9fddfa44c50ed16769e754bac9958d200776d3107637f2",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/TaxCalculator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/TaxCalculator.cs",
+      "sha256": "da718478b9babf0563719cd2461719091bec655c1cc25d1b18ef6dc0d855d8b4",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/TaxCalculator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/Timer.calr",
+      "sha256": "61de2788e7e00d50f7ea1cc9f4a3148ab7af329cc19aaa160a302c6e525ad2b4",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/Timer"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/Timer.cs",
+      "sha256": "5bc0db6a4b3fba4dfad665d54380272ed6d069a3c01d92d4e3763871344b2fc3",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/Timer"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/TodoList.calr",
+      "sha256": "6633ec3538b78f75056c13ffc225d81c6eab3be595c28befd80a36947c4fdbca",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/TodoList"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/TodoList.cs",
+      "sha256": "971bb5673a7fafacd832f5d4abcb0b4a6f5184471c265713210984709c90ddef",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/TodoList"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/UnitConverter.calr",
+      "sha256": "6c8b5b875f828f02211b5902382118da03a6b0bebcf55fd2bd01c4b9b0da033b",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/UnitConverter"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/UnitConverter.cs",
+      "sha256": "81b23746ad1ca9e6e1628ec8c8f1045c30707683af6e7b1fcb5ed2da1931d5da",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/UnitConverter"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/UrlParser.calr",
+      "sha256": "c559ac9085fe9c11e79799903cd850f7013d00a80fd734189f409e030dcb18d7",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/UrlParser"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/UrlParser.cs",
+      "sha256": "b0dfc0249ba4442744b4c14291acba59ee4837f457a5b9a237c26fb1886a10f2",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/UrlParser"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/VotingSystem.calr",
+      "sha256": "9ede1333d377ea8126a693ddc810768d65ffe8234abaf90c5d8ca530471f8d8b",
+      "role": "calor-arm",
+      "pairId": "DomainProblems/VotingSystem"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/DomainProblems/VotingSystem.cs",
+      "sha256": "624a13873232684d602a532e6df116bb7f4d52828d468732c812101fcfae7f0b",
+      "role": "csharp-arm",
+      "pairId": "DomainProblems/VotingSystem"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EditPrecision/Calculator_validated.calr",
+      "sha256": "a4293a276acc6cdbbcca913845b1f8c986c0f645bb8888161467a61791bae79c",
+      "role": "calor-arm",
+      "pairId": "EditPrecision/Calculator_validated"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EditPrecision/Calculator_validated.cs",
+      "sha256": "651f47eaade3d467a3950f6d5942f29e0219d1f5b90ba57f58e58c20334abfd3",
+      "role": "csharp-arm",
+      "pairId": "EditPrecision/Calculator_validated"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/ComposedEffects.calr",
+      "sha256": "a1def1b5854f4a741be315b847a1cfdb231702b2dd7a343543fb49d880f3aa51",
+      "role": "calor-arm",
+      "pairId": "EffectSoundness/ComposedEffects"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/ComposedEffects.cs",
+      "sha256": "a25d67d1685030ea0ac6b7b4198f62b1af459fd5d5d1ba6621709e12a5e81f84",
+      "role": "csharp-arm",
+      "pairId": "EffectSoundness/ComposedEffects"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/CorrectEffects.calr",
+      "sha256": "f29b9ffb1dd619d396ed0518f4fefdabf473376e3bd2d99d2a26c24be7c93921",
+      "role": "calor-arm",
+      "pairId": "EffectSoundness/CorrectEffects"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/CorrectEffects.cs",
+      "sha256": "a7ba9a94ab76095fedaf23de88fe75d3a306a095f1c8f74d0c62bdde2edd70f3",
+      "role": "csharp-arm",
+      "pairId": "EffectSoundness/CorrectEffects"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/DatabaseEffect.calr",
+      "sha256": "2d779871afdc7fdbf466356abb9d29ec5b88025ae62f295641cc4c9e12ab5bce",
+      "role": "calor-arm",
+      "pairId": "EffectSoundness/DatabaseEffect"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/DatabaseEffect.cs",
+      "sha256": "a60c62d87f4a0b0c62b1fedcf0b73d85c62280e9c902c33043e242012806aa38",
+      "role": "csharp-arm",
+      "pairId": "EffectSoundness/DatabaseEffect"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/FileEffects.calr",
+      "sha256": "5ce0f4400a804f763be5edaaaf78a83f65bf6be39bca93133366f689192af870",
+      "role": "calor-arm",
+      "pairId": "EffectSoundness/FileEffects"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/FileEffects.cs",
+      "sha256": "f7f8c494b84525ab8283a878dbd29faff17873c92cce4350d652067cd9832aa3",
+      "role": "csharp-arm",
+      "pairId": "EffectSoundness/FileEffects"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/HiddenNetworkEffect.calr",
+      "sha256": "2ea41f15130c68d0545adf3a63f5a570e502bda58c03006b18949fc1fe070774",
+      "role": "calor-arm",
+      "pairId": "EffectSoundness/HiddenNetworkEffect"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/HiddenNetworkEffect.cs",
+      "sha256": "0eef86f4665ebdd63a1c61d40d910465d3cecd35cd49bb2a106ea8188cc8ea1e",
+      "role": "csharp-arm",
+      "pairId": "EffectSoundness/HiddenNetworkEffect"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/MissingEffects.calr",
+      "sha256": "d4ca486f7245414e2c470d0fb770cc9d554fec4427488bd583fc9003215e0d25",
+      "role": "calor-arm",
+      "pairId": "EffectSoundness/MissingEffects"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/MissingEffects.cs",
+      "sha256": "716b4c081b1637d82e6b3745f46a7e812fab76622a501841e9cec4beafa2ba57",
+      "role": "csharp-arm",
+      "pairId": "EffectSoundness/MissingEffects"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/NetworkEffect.calr",
+      "sha256": "281da952ddfde204ac6f8f7834ce7bd909583d9fb816f6b162f7d312c9f56a44",
+      "role": "calor-arm",
+      "pairId": "EffectSoundness/NetworkEffect"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/NetworkEffect.cs",
+      "sha256": "65efcbc83c22ae38160917e5d8b28bb2fd3d968f33161409254385ca72975064",
+      "role": "csharp-arm",
+      "pairId": "EffectSoundness/NetworkEffect"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/PureComputation.calr",
+      "sha256": "4da5213065c96ac798034e35decf7781f09f204c98de7f2209cf1a0b2ac3c0ae",
+      "role": "calor-arm",
+      "pairId": "EffectSoundness/PureComputation"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/PureComputation.cs",
+      "sha256": "179149598592b5069028e3b8ae02c6a5419aa7b2aaa0cfcde8ecc4f036b0b83b",
+      "role": "csharp-arm",
+      "pairId": "EffectSoundness/PureComputation"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/StateEffect.calr",
+      "sha256": "384571aea874723f19e19494a67618c79f9704ea339fab95ffaa3a2aced10526",
+      "role": "calor-arm",
+      "pairId": "EffectSoundness/StateEffect"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/StateEffect.cs",
+      "sha256": "73fe72043aa9631fe8380df5c706c89d09d31a26e9d1350b8911f2623591bfa0",
+      "role": "csharp-arm",
+      "pairId": "EffectSoundness/StateEffect"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/TimerEffect.calr",
+      "sha256": "6244b9cd98c4ed48b56faef51fc55aada607eb46e87c62faffb856d398969887",
+      "role": "calor-arm",
+      "pairId": "EffectSoundness/TimerEffect"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/EffectSoundness/TimerEffect.cs",
+      "sha256": "82c97d1739337a6e2d8b1e0e5e7ef0d5547dd376a4a5dd159a33c955d525f518",
+      "role": "csharp-arm",
+      "pairId": "EffectSoundness/TimerEffect"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorDetection/ArraySum_buggy.calr",
+      "sha256": "7f0e3e7c3cdbe1fe3442cff55eed7188b3d087b02b89f0266041d037ec7014ab",
+      "role": "calor-arm",
+      "pairId": "ErrorDetection/ArraySum_buggy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorDetection/ArraySum_buggy.cs",
+      "sha256": "834339969c784a73d04cd10b3f1ed4a56294bc74f2c1e32ac36a24ec7f4c9bb0",
+      "role": "csharp-arm",
+      "pairId": "ErrorDetection/ArraySum_buggy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorDetection/DeadCode_buggy.calr",
+      "sha256": "f83b2ef882566d09acdba5d52c37dc1bc382a103dc6c6f6c0f5948b8bb6dc102",
+      "role": "calor-arm",
+      "pairId": "ErrorDetection/DeadCode_buggy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorDetection/DeadCode_buggy.cs",
+      "sha256": "564015a6fcae9497735a5b92a961884e8cb400e5ea54f7108c565249e6b02ab9",
+      "role": "csharp-arm",
+      "pairId": "ErrorDetection/DeadCode_buggy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorDetection/DeadStore_buggy.calr",
+      "sha256": "1fa41787f40374a66ab333fb5fac73c8df1998a169c9d76fdfb61d54acf88a26",
+      "role": "calor-arm",
+      "pairId": "ErrorDetection/DeadStore_buggy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorDetection/DeadStore_buggy.cs",
+      "sha256": "68d8ea422a67fc0ddc3b69722723d8346543069182e9acf052af1062f3dacffc",
+      "role": "csharp-arm",
+      "pairId": "ErrorDetection/DeadStore_buggy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorDetection/Divide_buggy.calr",
+      "sha256": "a9728380cc6a985cc43128cc53e590195276a6a01d48ce45dc17bb9bd2754373",
+      "role": "calor-arm",
+      "pairId": "ErrorDetection/Divide_buggy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorDetection/Divide_buggy.cs",
+      "sha256": "db5e9c2a631572b84017db41315edd1e0dc2187d11f5d56863256d877de08a39",
+      "role": "csharp-arm",
+      "pairId": "ErrorDetection/Divide_buggy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorDetection/MissingContract_buggy.calr",
+      "sha256": "c422ae3d1d8b54495b944b397f2e3aa0e7101dcdc9cff7f8d392a0cf9faa4e5b",
+      "role": "calor-arm",
+      "pairId": "ErrorDetection/MissingContract_buggy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorDetection/MissingContract_buggy.cs",
+      "sha256": "80147ffa84efaaf8109448f715ca5175b18b0494a275df4d8bd7b83d95250bbc",
+      "role": "csharp-arm",
+      "pairId": "ErrorDetection/MissingContract_buggy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorDetection/NullDeref_buggy.calr",
+      "sha256": "10a759fbda7895a6e77616c4c07bf5a305e7822372ee5446ce822af8d5acaa58",
+      "role": "calor-arm",
+      "pairId": "ErrorDetection/NullDeref_buggy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorDetection/NullDeref_buggy.cs",
+      "sha256": "596be30cf094942881d7c16b425356f8d26a718889ddc9f207a5bee7e5f4b86b",
+      "role": "csharp-arm",
+      "pairId": "ErrorDetection/NullDeref_buggy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorDetection/Overflow_buggy.calr",
+      "sha256": "00258049f5432b5be6ab5e2f44555d677b373dc8516955ecd48a34c0103fb46f",
+      "role": "calor-arm",
+      "pairId": "ErrorDetection/Overflow_buggy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorDetection/Overflow_buggy.cs",
+      "sha256": "8523fd3f8b5adc6d91a1731e702218195f07764748d5e7ad7f86d72b78c68498",
+      "role": "csharp-arm",
+      "pairId": "ErrorDetection/Overflow_buggy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorDetection/Uninitialized_buggy.calr",
+      "sha256": "eff420572aaa51a9f88d40acc6307d5919f705d291333bc5d014c24208f7ae7c",
+      "role": "calor-arm",
+      "pairId": "ErrorDetection/Uninitialized_buggy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorDetection/Uninitialized_buggy.cs",
+      "sha256": "caa9068993717fcc2a6273f6f833948e36238a5d48bf21a74ad3572f90c83133",
+      "role": "csharp-arm",
+      "pairId": "ErrorDetection/Uninitialized_buggy"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/BasicTryCatch.calr",
+      "sha256": "ed3bf985edff2aa5ca528bfd1880da9e71d29161a26b57bc49d68e371b325e4d",
+      "role": "calor-arm",
+      "pairId": "ErrorHandling/BasicTryCatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/BasicTryCatch.cs",
+      "sha256": "eeedefe57b0ed578fcddf8a2816aabb97a8b2eb362dfb6d5530d625967ea7e5f",
+      "role": "csharp-arm",
+      "pairId": "ErrorHandling/BasicTryCatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/CustomException.calr",
+      "sha256": "0e0893fb173850f93968af5ed0dcbfdf3ce34dfe6c1aff2722e8866f6ce5dbdf",
+      "role": "calor-arm",
+      "pairId": "ErrorHandling/CustomException"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/CustomException.cs",
+      "sha256": "03fa497fc79b092a88928d31370e5a611a78ac761dfcf9d1596b4517e8e20821",
+      "role": "csharp-arm",
+      "pairId": "ErrorHandling/CustomException"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/ErrorPropagation.calr",
+      "sha256": "5d80bbc5b5dac695c84541332d1cd53db16aac5ae17a5d8f9e2b9d393ccf0553",
+      "role": "calor-arm",
+      "pairId": "ErrorHandling/ErrorPropagation"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/ErrorPropagation.cs",
+      "sha256": "3c5bc59a2711d616737033b104d729d7285fdb3a729fc997e1e0893d2ad72f00",
+      "role": "csharp-arm",
+      "pairId": "ErrorHandling/ErrorPropagation"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/ExceptionChain.calr",
+      "sha256": "92d20590f5e28b1004164a12b2824d4ec2f16e56e3a9a33a899b454a7ff987bd",
+      "role": "calor-arm",
+      "pairId": "ErrorHandling/ExceptionChain"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/ExceptionChain.cs",
+      "sha256": "d053460be775497348b37c650ebfd69c898e21a428b9b9b85f89ed8aa5ca7d25",
+      "role": "csharp-arm",
+      "pairId": "ErrorHandling/ExceptionChain"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/GuardClause.calr",
+      "sha256": "1fb532e0680d7061603c32bd9c570fe90690130c821292b647210626529e5d9f",
+      "role": "calor-arm",
+      "pairId": "ErrorHandling/GuardClause"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/GuardClause.cs",
+      "sha256": "8927d23b536886c3cfc4c0f4e01dd92ec426f8a882714bfb8af36a3ac52acd74",
+      "role": "csharp-arm",
+      "pairId": "ErrorHandling/GuardClause"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/MultipleCatch.calr",
+      "sha256": "7a479ba8363f172e7e80ac32197811a409935af912e8b85d50764ada19b80869",
+      "role": "calor-arm",
+      "pairId": "ErrorHandling/MultipleCatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/MultipleCatch.cs",
+      "sha256": "a9af6f191c5ef84f77937a5b2d6cc4c781adc9e721dad4c6d917d2aa89cd155d",
+      "role": "csharp-arm",
+      "pairId": "ErrorHandling/MultipleCatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/NullCheck.calr",
+      "sha256": "0e43e34a9d7741c56f8e99e47f230a37bf335b3366a46841a8f9e2e0e4fe2ab9",
+      "role": "calor-arm",
+      "pairId": "ErrorHandling/NullCheck"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/NullCheck.cs",
+      "sha256": "6200f5528c678777e41871e449356c4793658b15c488eb3e13fb68304d2b15b5",
+      "role": "csharp-arm",
+      "pairId": "ErrorHandling/NullCheck"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/OptionType.calr",
+      "sha256": "cdb7280b5a4bd64f0d5a0c84fc6a2e30916fc4cc99c66f903d40be67d05a35a4",
+      "role": "calor-arm",
+      "pairId": "ErrorHandling/OptionType"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/OptionType.cs",
+      "sha256": "f617131a71231464d43ac29ab1f95b05eea0dccfcebf0726a51438cd52921e75",
+      "role": "csharp-arm",
+      "pairId": "ErrorHandling/OptionType"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/ResultType.calr",
+      "sha256": "a39e07d13002344f34b50ea9e236d1d0b57543a55d701c0386f22e5588284fe0",
+      "role": "calor-arm",
+      "pairId": "ErrorHandling/ResultType"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/ResultType.cs",
+      "sha256": "97cac08fc6f0731dac8630414cd1acf6fff02a8ae23d275623af3429d2cf3e23",
+      "role": "csharp-arm",
+      "pairId": "ErrorHandling/ResultType"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/TryFinally.calr",
+      "sha256": "b12f4c46c4ddb2a15a137e2997f2749faa3d37e95824d73c814ddd42ee580a4f",
+      "role": "calor-arm",
+      "pairId": "ErrorHandling/TryFinally"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/ErrorHandling/TryFinally.cs",
+      "sha256": "ce74967cee4df9c4fcb5ae41df98c14d9ca02c1c939299890b35d1a301922224",
+      "role": "csharp-arm",
+      "pairId": "ErrorHandling/TryFinally"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/InteropEffectCoverage/BclCoverage.calr",
+      "sha256": "8fdcb4b54d03bc3997d52ab91c76ca6155525eaa0ca0c1a05cd3d7a1bd0631db",
+      "role": "calor-arm",
+      "pairId": "InteropEffectCoverage/BclCoverage"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/InteropEffectCoverage/BclCoverage.cs",
+      "sha256": "5ea2c7c2f92f6529b311ee86892b88109ddaf9cf50622e97a1a9f2874186e9da",
+      "role": "csharp-arm",
+      "pairId": "InteropEffectCoverage/BclCoverage"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/InteropEffectCoverage/CollectionLib.calr",
+      "sha256": "e54ac31015a605ab07ebad632a51d7ad85c5ab1d14358af5aff4ba4f58801b1d",
+      "role": "calor-arm",
+      "pairId": "InteropEffectCoverage/CollectionLib"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/InteropEffectCoverage/CollectionLib.cs",
+      "sha256": "2805f15a54da07f81a67f24c30b182cf93964f3630bb4aad60bf65eabe78aa64",
+      "role": "csharp-arm",
+      "pairId": "InteropEffectCoverage/CollectionLib"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/InteropEffectCoverage/MathLib.calr",
+      "sha256": "e4ab14584d715b3e285841ebd06865f27b59b3011cb3181eeaea585c10630de0",
+      "role": "calor-arm",
+      "pairId": "InteropEffectCoverage/MathLib"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/InteropEffectCoverage/MathLib.cs",
+      "sha256": "fedb261e232718f45d8da118cbbf045267a8e2351640c46d7a472468015b9959",
+      "role": "csharp-arm",
+      "pairId": "InteropEffectCoverage/MathLib"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/InteropEffectCoverage/PureFunctions.calr",
+      "sha256": "f9a47def25847d91c88c909885809a65580055454c5625c1513ba0ee62d3d6d1",
+      "role": "calor-arm",
+      "pairId": "InteropEffectCoverage/PureFunctions"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/InteropEffectCoverage/PureFunctions.cs",
+      "sha256": "7752372a50eb4dfbd5ba8ec2d0a1265d50d1705c38fa29a43495a4b3caac7183",
+      "role": "csharp-arm",
+      "pairId": "InteropEffectCoverage/PureFunctions"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/InteropEffectCoverage/StringLib.calr",
+      "sha256": "39aaefc47b7b833e542e14f173e7a48372ff5f229b660e5a60a7b8c18e387c2f",
+      "role": "calor-arm",
+      "pairId": "InteropEffectCoverage/StringLib"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/InteropEffectCoverage/StringLib.cs",
+      "sha256": "d6608c1983ea90369a7e8c3f1e25fbc73723e4eadee1c97cef13e5d01eefad97",
+      "role": "csharp-arm",
+      "pairId": "InteropEffectCoverage/StringLib"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/AbstractClass.calr",
+      "sha256": "200c52600d1882f61b5089a9b827c39b58b820eb65a6a62fd44da23600bdfc91",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/AbstractClass"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/AbstractClass.cs",
+      "sha256": "3449a1c878729e3b7a1c0ea7596ca84cc01ac8e276dc401aa9cbbccd32b0ab7a",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/AbstractClass"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/Composition.calr",
+      "sha256": "fd94f93f3ba31495caf7d90aff162a28fb60647bc3f16e1c6d7dc96c1c71f7f4",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/Composition"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/Composition.cs",
+      "sha256": "a218f03c8ede86deb14de3d896d35007295408279e71068fd4756502919ddd0c",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/Composition"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/ConstructorInit.calr",
+      "sha256": "6049118b3fd99cf605b21381cffe5b5831fd34146b1b63b7aefaf89395c48ba6",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/ConstructorInit"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/ConstructorInit.cs",
+      "sha256": "8f577c86544b56ef97dbd856b1777c9b161322fd275fe0d0628452f836924a7e",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/ConstructorInit"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/Encapsulation.calr",
+      "sha256": "d9f285292be845c09d698caa9ff36528f2ff1d945f1b1211b12dc406052dcb94",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/Encapsulation"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/Encapsulation.cs",
+      "sha256": "39806cedf5cd6cb0924f907e2b68f314a1e29fed15338d4a107e933f36e74b52",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/Encapsulation"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/EnumType.calr",
+      "sha256": "151819871ee10221619ba34c155c55556abb23fe180ffa9ab50be3e7113b2074",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/EnumType"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/EnumType.cs",
+      "sha256": "b413bf3f0376fcabeafd06a67292ae43de9c0718559f7d678538e2b009ce8bd6",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/EnumType"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/EnumWithMethods.calr",
+      "sha256": "dbb2ff0e311e28c498bc0f319c85754b22dcbc479481afc84ca22aac7a2636a7",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/EnumWithMethods"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/EnumWithMethods.cs",
+      "sha256": "0a1ba162fbbad5ac74a377667fbdfb9102bb0db2044cfb674c4e4e6c285a4783",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/EnumWithMethods"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/GenericClass.calr",
+      "sha256": "efeb0a4a95164f847774f82d356cc87b6e92db0499b260cd761479fefebca6e5",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/GenericClass"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/GenericClass.cs",
+      "sha256": "c827e9caa3a7b987132eb6485702719f0c966e7794716f0f677f5013e9583370",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/GenericClass"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/GenericConstraints.calr",
+      "sha256": "8ca15569a8ec92a6728d9fda7ac7de75f3de21f248af7bb6f689dcc001f7bdec",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/GenericConstraints"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/GenericConstraints.cs",
+      "sha256": "f7cf769f9771251560dedbda4d171e77005cbb58706f8e0d04e2deec7a73ad7f",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/GenericConstraints"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/GenericFunction.calr",
+      "sha256": "700d19cc8cd231302d4c407dcca043b190a738c5d64afb84995c55b69b071a65",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/GenericFunction"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/GenericFunction.cs",
+      "sha256": "d516d9a967a28034c41df7b31f51e2f29c609a7294aee0ade1c62e28732c5996",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/GenericFunction"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/Inheritance.calr",
+      "sha256": "edb8deabea8b3007e2bf61d9cf1650bb8df00f05819af71762b9aef763f7aeb9",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/Inheritance"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/Inheritance.cs",
+      "sha256": "a19dadca51d7a743ba9b13803ba584ffa8a99fee5db13d6527ab657797539e02",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/Inheritance"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/InterfaceImpl.calr",
+      "sha256": "70d7b8a140faadb12c510283368da6673dda1f2d340a2168a376deaf26d07e0d",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/InterfaceImpl"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/InterfaceImpl.cs",
+      "sha256": "95806d75622b32f3895d8d68b011cd4584a71ab378ae0dd36a460140795d4406",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/InterfaceImpl"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/MethodOverloading.calr",
+      "sha256": "3d6ecf8cb2f8f200af22cae9dbf4c812609094e7db1a5b24157fa646d5b33dc2",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/MethodOverloading"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/MethodOverloading.cs",
+      "sha256": "20db88d687025b4f6ec340f996693f2a98ddeccbcdca3c2b9f347690b49e34c1",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/MethodOverloading"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/MethodOverriding.calr",
+      "sha256": "ad970b0cd3a3f7b1b1628c4755be2f9920cb2da678c4d5007fc690c133941680",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/MethodOverriding"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/MethodOverriding.cs",
+      "sha256": "ad67026ca24bbee15ffdc72e29444659a935a94103f370b6a88cec304207759d",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/MethodOverriding"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/Polymorphism.calr",
+      "sha256": "36b606d81349c07d842c145557372f5b45a65de7eb8e7c6be18e895dc1754d7e",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/Polymorphism"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/Polymorphism.cs",
+      "sha256": "9446153684e57f7e2b547736706209cf4c72588b64d1360b85f3c9acdae5853e",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/Polymorphism"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/Properties.calr",
+      "sha256": "4071f3cfd0651d4d91320f2e0a28901679eae1bf2bf8711ee3057b69ce75a81a",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/Properties"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/Properties.cs",
+      "sha256": "469b454c7ecfaf78b0bed66e5bc99a6c490482b7308ab3341188bc14947aae30",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/Properties"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/PropertyAccess.calr",
+      "sha256": "829fdf5f85e59cc227a111e942f5d0cad7995fce09d0d05979a7832892ac3bac",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/PropertyAccess"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/PropertyAccess.cs",
+      "sha256": "db0735fa8b560c35cf9f4b3a2822ff63f59f8a5481c085684ec1633ba1551cc2",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/PropertyAccess"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/RecordType.calr",
+      "sha256": "db761008f0c76765628104a58114929b514f050b824261fca231ae08198f75f2",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/RecordType"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/RecordType.cs",
+      "sha256": "5e0294efb4867c9b216c3aa7075ed9fc482cd7ec158d14a8bd54dfce8a61638c",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/RecordType"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/SealedClass.calr",
+      "sha256": "ec462a22ecc5b5fd5a1cefbe3408eb918680421af15c622ee071595f36d2606f",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/SealedClass"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/SealedClass.cs",
+      "sha256": "61abfcd21b145189abc0852bc102b90d6e2eaef84f6c7e2e7655d21202b09e1f",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/SealedClass"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/SimpleClass.calr",
+      "sha256": "383d743d80b53886f11a9fbe326ab8da99acb82a133d525bbab1dcd78b0b561b",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/SimpleClass"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/SimpleClass.cs",
+      "sha256": "3330ef4fd27b7556a4ca5aa2a1559bbe0dc7e3f58ddf49c6f4af37037097a17a",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/SimpleClass"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/StaticMembers.calr",
+      "sha256": "263292ae3a84bae17e91ada88ab2b52ca30f2a87e608509443c6697cbf954699",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/StaticMembers"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/StaticMembers.cs",
+      "sha256": "a6a7ece2327049b7f8774ed58940d66a46736a07384741234d33866c725afb8c",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/StaticMembers"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/TypeAlias.calr",
+      "sha256": "68dcef74cb6655f8183dfb91e3136152cb2358879d488204627bf57966c3aa2b",
+      "role": "calor-arm",
+      "pairId": "OOPGenerics/TypeAlias"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/OOPGenerics/TypeAlias.cs",
+      "sha256": "770a90c8c87536bf84e2d3694df8e22b6af52a958f821ed455631bdd8e520cc8",
+      "role": "csharp-arm",
+      "pairId": "OOPGenerics/TypeAlias"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/EnumMatch.calr",
+      "sha256": "cb59ce4306e4e0bbfcdd90d2b90a564c08cfd4e92fe3d7af9b285e1a6df3cc5c",
+      "role": "calor-arm",
+      "pairId": "PatternMatching/EnumMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/EnumMatch.cs",
+      "sha256": "9afe44ea41947a12455eb418c1c4180cf6aa53208a6ea494272a40869647ec6e",
+      "role": "csharp-arm",
+      "pairId": "PatternMatching/EnumMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/ExhaustiveMatch.calr",
+      "sha256": "4460dc49bf5ba31d8477b7be6a21ea3d5db420a6601860f07bc739435d0c2088",
+      "role": "calor-arm",
+      "pairId": "PatternMatching/ExhaustiveMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/ExhaustiveMatch.cs",
+      "sha256": "9f1c98c21a02d047f2e22ede524a91c9144357245b879949310c8c593a545d85",
+      "role": "csharp-arm",
+      "pairId": "PatternMatching/ExhaustiveMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/GuardMatch.calr",
+      "sha256": "351dac3a3fd58583b332410092416ae7e5918985c5098441a590ba42cd5bae6c",
+      "role": "calor-arm",
+      "pairId": "PatternMatching/GuardMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/GuardMatch.cs",
+      "sha256": "9e7ca3e2d157c233d4d0fa4a2a6f558eff83eae5ba9b5e18fe965267ae65ef97",
+      "role": "csharp-arm",
+      "pairId": "PatternMatching/GuardMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/NestedMatch.calr",
+      "sha256": "c4a3c69d7f09c3a673f2613ae9748bc7af7b137fc911f8c6ed7c370df1d17bd5",
+      "role": "calor-arm",
+      "pairId": "PatternMatching/NestedMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/NestedMatch.cs",
+      "sha256": "7c333bf07204b75ca2fd5db7e2fd429504da23421fab72af48b5a2222e216941",
+      "role": "csharp-arm",
+      "pairId": "PatternMatching/NestedMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/PropertyMatch.calr",
+      "sha256": "5772ac6993e8e252df869a7c688e9b3fa14a7598bf947dc1d8ce72217f85c6bc",
+      "role": "calor-arm",
+      "pairId": "PatternMatching/PropertyMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/PropertyMatch.cs",
+      "sha256": "a3e72c028b26a7a9b4cac81b4562b8fd3bc42a01910c10b9ff1bb6b98d8e63f7",
+      "role": "csharp-arm",
+      "pairId": "PatternMatching/PropertyMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/RangeMatch.calr",
+      "sha256": "fff7cf57ca34d2b69421c6e93855e3d5ca1752af6e9dba1b9090458453d09864",
+      "role": "calor-arm",
+      "pairId": "PatternMatching/RangeMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/RangeMatch.cs",
+      "sha256": "6d81670bf1940202a728b6c7fb889af2a3b0d6be17e83298fbd1c8cc41b71ac1",
+      "role": "csharp-arm",
+      "pairId": "PatternMatching/RangeMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/SimpleMatch.calr",
+      "sha256": "acf3ba15eba7e28c664490757e3041db3085c167b03aeefcc9f98a6204765efc",
+      "role": "calor-arm",
+      "pairId": "PatternMatching/SimpleMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/SimpleMatch.cs",
+      "sha256": "173d0289dd67259ed72639c3860ce9e76ddb73e9f96cbbbece32c4ecc4ca0420",
+      "role": "csharp-arm",
+      "pairId": "PatternMatching/SimpleMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/SwitchExpression.calr",
+      "sha256": "2f3786251da7ac2a435769994681af4fdd1d36a8c6a8482eb6ca6fa8eebfaad2",
+      "role": "calor-arm",
+      "pairId": "PatternMatching/SwitchExpression"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/SwitchExpression.cs",
+      "sha256": "b1ca6e6bbfe6b6464409814c355fa55d37c292b7025d356ead8f941dce12c1ff",
+      "role": "csharp-arm",
+      "pairId": "PatternMatching/SwitchExpression"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/TupleMatch.calr",
+      "sha256": "96a980f2b6b3455c1c525efbc76262078d92bb4fac37b8a98ad3c945e00528bf",
+      "role": "calor-arm",
+      "pairId": "PatternMatching/TupleMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/TupleMatch.cs",
+      "sha256": "8447187adc5d34875db3006a2a74b35f267e2c61ec415872893a5b00d5fa0408",
+      "role": "csharp-arm",
+      "pairId": "PatternMatching/TupleMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/TypeMatch.calr",
+      "sha256": "9008d9cb0c651d259d18f891ba22b5303bd7df887451d4ae5575d3a677f6426e",
+      "role": "calor-arm",
+      "pairId": "PatternMatching/TypeMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/TypeMatch.cs",
+      "sha256": "2e9b771194b07f075d6df7220c82ccb80a138b49adbb06fb2a06081a9415f2d2",
+      "role": "csharp-arm",
+      "pairId": "PatternMatching/TypeMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/WildcardMatch.calr",
+      "sha256": "6c5d33611cc6d180ba0ddea2b193b1b33cb3a740c170c20535bbd1ffcbe7187b",
+      "role": "calor-arm",
+      "pairId": "PatternMatching/WildcardMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/PatternMatching/WildcardMatch.cs",
+      "sha256": "9525850a4ccaa5cf8a25fea922f489f6cd25abca5b4168b53a4e350b2e82b417",
+      "role": "csharp-arm",
+      "pairId": "PatternMatching/WildcardMatch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Abs.calr",
+      "sha256": "00aacd8e3eec5b8b2561540318fd52ca385fb0756041c33ff80f510255184588",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/Abs"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Abs.cs",
+      "sha256": "2db011620cad0205fb92b8e14f00eb86c5874cc77a01fe54db2d503c1648fd7a",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/Abs"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Abs.g.cs",
+      "sha256": "a49f3153c4f9968c90403a111cfc7337bd62ea0f028b0c829e7f76386b6cfd68",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/AggregateStats.calr",
+      "sha256": "c002b58121e947d17854f168213e8f5aae0d594b17d3c9ffe0d2fc253fe6f48b",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/AggregateStats"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/AggregateStats.cs",
+      "sha256": "06f9ac4fec02892cdbb60f6369846826603b7d25d265e3fac45a19c8a5ce20b3",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/AggregateStats"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/AggregateStats.g.cs",
+      "sha256": "9f7f9ab335d7ebe8c1f3caa46739471a13b1706f8936a331d4a90258c39c9858",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/AreaOfCircle.calr",
+      "sha256": "0ebe351ad99920563650a342578dc75df2a621adcdced2514c9e69bc8d20de23",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/AreaOfCircle"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/AreaOfCircle.cs",
+      "sha256": "7ed8a049f897da8196342a7081019493b327cb2be0b7d76cbc15bc1057fee832",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/AreaOfCircle"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/AreaOfCircle.g.cs",
+      "sha256": "c3b94ebc774d16d71d9e61f12437929a0d8370418f8a209fbc14a75abdec253f",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ArraySum.calr",
+      "sha256": "7f0e3e7c3cdbe1fe3442cff55eed7188b3d087b02b89f0266041d037ec7014ab",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/ArraySum"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ArraySum.cs",
+      "sha256": "7c8fb89bf865cbdfc4ccc5f152c8d8fecd14a299e9e187ad74b098d3b087a461",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/ArraySum"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ArraySum.g.cs",
+      "sha256": "29a79810f263031d2f1692dabe11aab9836674c0a8e963342c47ae95ddf36aca",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Average.calr",
+      "sha256": "cc7c93b427b0a7680b6eeba8b941f549adc122d39b6ca889fefb1ca9048ac2cf",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/Average"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Average.cs",
+      "sha256": "72f5b9ec36adad1155bb646d249b86e5777a7418cc75c5e9da5c574d78cd6022",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/Average"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Average.g.cs",
+      "sha256": "34ae996528fc1cc473ecce17f9b1f361dc4806a6fbfbc30d25951fef136b536d",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/BinarySearch.calr",
+      "sha256": "78d735db049a3c8865e3cf40b8005ba5b738c2fc0471211a4b6afd9adcdc0430",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/BinarySearch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/BinarySearch.cs",
+      "sha256": "981fae9b38a1bd0a11bbf69b5fe876134818983fc916c1d504255052f42e7eed",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/BinarySearch"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/BinarySearch.g.cs",
+      "sha256": "068516d2067dac22b50bf7345812fa19a6b10f178cfe07c70822e8bb7e6a980c",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Calculator.calr",
+      "sha256": "d45e8b9c4913461d6173d0d671b8cd39276e41d5896254d7656edd17a18c74cc",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/Calculator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Calculator.cs",
+      "sha256": "a50195dcdf124089bfd17bf87d47ca9c20675c04c77dceed005cae8a990d7b0d",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/Calculator"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Calculator.g.cs",
+      "sha256": "660e280aecc4a9d9087907821e0d58ea1ee0c68f364b37b3ad0816296679fae1",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Capitalize.calr",
+      "sha256": "1b2ce65a7ac75b2a4204380ddf128d66dfeefcbc15709bc642b65f1fc98c2c52",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/Capitalize"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Capitalize.cs",
+      "sha256": "5f1962a4c810d168af110ea0860295f49ae86365217990469a642eb3d109026e",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/Capitalize"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Capitalize.g.cs",
+      "sha256": "bc1e53d52036f317b5c9edd9a10b7409d18a2a7e27bb7248ac957a82b2ccdb6b",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/CelsiusToKelvin.calr",
+      "sha256": "c381df82da26e9da166e964da0c1db7c590dad40fa6359f75d810258aa375633",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/CelsiusToKelvin"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/CelsiusToKelvin.cs",
+      "sha256": "deed91da343d2c58b4e949168284344dde5721860fbc8ed488de58f7e0a903e7",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/CelsiusToKelvin"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/CelsiusToKelvin.g.cs",
+      "sha256": "9c9a11044e73dd0b104207cf682536639c7e1cbc1ac6266c8216c62ce1e2bbb5",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Clamp.calr",
+      "sha256": "59365f6d10c9df405eb852f89aba889a5dd37f3811b5343c3024b93a1cd1e593",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/Clamp"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Clamp.cs",
+      "sha256": "2cfdd33f4f98b6cbf9c1a000416ba5a6d74c56deceb806fb32574491c4df4067",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/Clamp"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Clamp.g.cs",
+      "sha256": "7fc454b13710bbb211f4c8abbf792de476a230bb8e970e717edab7719d291d70",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/CompoundInterest.calr",
+      "sha256": "1ad21cd0ce40154d118169dcb514d410ab1f1cb6ba00a3da6f13c6fea3a0bee1",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/CompoundInterest"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/CompoundInterest.cs",
+      "sha256": "fdd405b1c9f7e8f24dd0968291831edeebba2b4999076ee1f37fcd8c86bd0566",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/CompoundInterest"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/CompoundInterest.g.cs",
+      "sha256": "8eb8ba209bf72fae4d21e9047fb62e6e6a22a4d470e2509bd13518f1011f7dc2",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Contains.calr",
+      "sha256": "6184d01bcdc9f99d766ce51218e87f34fb494b1b49e45f66027c473e6c0733f4",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/Contains"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Contains.cs",
+      "sha256": "eb6e4d6ab4f54bf821d95f217c203f4d6eb58f12cc6e5c3b97b05e0b2752dbd4",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/Contains"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Contains.g.cs",
+      "sha256": "5bf295e86dd96540d66134da77a94667936ed4f1247f1461ff52269e10cee4cd",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ContractedDivide.calr",
+      "sha256": "4f482e44cc5c9bf0cd65ce8a1a0dcfb6dcd483f481771f2dbd0fe1e3b138d676",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/ContractedDivide"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ContractedDivide.cs",
+      "sha256": "f85b5da54684c7435f1f530e20888ded84d1f71526ecf7d9dd0c455f64ea82c8",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/ContractedDivide"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ContractedDivide.g.cs",
+      "sha256": "1404504622d4e9ac9be076c9535d6800f2373687b1b794439afec9692e16fd7f",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/CountOccurrences.calr",
+      "sha256": "570d093f03048d844bfb9c183efd527b70dab20378b0e4c6bb22fa467a30675d",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/CountOccurrences"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/CountOccurrences.cs",
+      "sha256": "f997fcff5de8025406757ef585b50f766e8522e7094aa36ef4161341ff6cbfa1",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/CountOccurrences"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/CountOccurrences.g.cs",
+      "sha256": "314da59c73c5b2cce6d44064a753a827322ce66045ddfd59e78d02e8d6ac70b8",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/CountVowels.calr",
+      "sha256": "628dd6546c95602a4924747e02bc861e199094204691a4a8d1e827d8f51ef6f8",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/CountVowels"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/CountVowels.cs",
+      "sha256": "68febf93e68671f85d9d2030b03c280fe8fb4ae8e4bd8799a8d313c2d9e04c53",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/CountVowels"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/CountVowels.g.cs",
+      "sha256": "88d92101c5ba9273f8d4e80742a89c3b1c66a5c5b789e1bb8ba1f6bca9c7bd69",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/DigitCount.calr",
+      "sha256": "511364cadafac30cb1f44417ba0c8bc33bd417fb60456c959fa86364222ceab1",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/DigitCount"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/DigitCount.cs",
+      "sha256": "925f9aca658422541c0a4c689f23c61856f832d6b4d2d5a301d5d6d0a8329d37",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/DigitCount"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/DigitCount.g.cs",
+      "sha256": "e2d7b295838b43f47c859bbd738ec002e092169ef9782f12d10b4be7b9b39f82",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ExpressionBodied.calr",
+      "sha256": "85abfd3f5f8e4ac01bd66c4b79170b23ef644b04759b439870f5c25a81a5bd7e",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/ExpressionBodied"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ExpressionBodied.cs",
+      "sha256": "9fbb4696a2d336e687a4d6920af8db3c8cf94729a0321f1695fae12c3988edaf",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/ExpressionBodied"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ExpressionBodied.g.cs",
+      "sha256": "e91bd728f1a1e21b3d01c8352b4453e84f8f5a6b09bd1998153b69dbdbdcf2b4",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Factorial.calr",
+      "sha256": "e26f0981562e84d4b0b461cf6e5e749e9ba17a4d4efe2c68d9ee8508af4af721",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/Factorial"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Factorial.cs",
+      "sha256": "b7687487b49e8f319fb700059b93d5d9bf06df022b39176e7e53d0bca4a2fc7a",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/Factorial"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Factorial.g.cs",
+      "sha256": "9b37eae3c3258e813b1614c28e7a4bbabb670d2eb79779f3580a5996e25ef546",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Fibonacci.calr",
+      "sha256": "f80bb9497379840888e4b02d9f46503d3b5d7ce7276a3a0f8d9dd90802c88c05",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/Fibonacci"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Fibonacci.cs",
+      "sha256": "24851a6586c9f7fc65edf758dc7ee9c0208134597d7906055c7d36b1b32e7f58",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/Fibonacci"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Fibonacci.g.cs",
+      "sha256": "c8b22c6b059ca7f5e526e6a55f3d23039b844ad3ab00b0dcf8b4d4fe510a14eb",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/FizzBuzz.calr",
+      "sha256": "1d28ab907e30fc526b9ba162046a48a77ce625df418a8e1194fe8ba6b874b03b",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/FizzBuzz"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/FizzBuzz.cs",
+      "sha256": "9b329817f5d4996c6629b2277cf15daff43ee19b168ab6753a8ad6b59316bd89",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/FizzBuzz"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/FizzBuzz.g.cs",
+      "sha256": "0588288b6df59d3cd724e7977bc5c84ea0b862db53bf56a4110a5cda251c6539",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/FormatHeader.calr",
+      "sha256": "04676898bd14256dbef352a0c69df184612605f209ff9e630dfb7acaf2409d36",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/FormatHeader"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/FormatHeader.cs",
+      "sha256": "eff8b0ac490d608b8d425e75f4e7882b59536f97e3c18c2eb73269d65b472cf8",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/FormatHeader"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/FormatHeader.g.cs",
+      "sha256": "6e1ef04539789d1711f43a52a6b4605d86f735d9598def3965957f1dc8a8d14c",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/GCD.calr",
+      "sha256": "1975b19cb8153c52bf0d179af2b29e642a0b872508c8924df110f8df1d36584a",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/GCD"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/GCD.cs",
+      "sha256": "98742d8fa41901a8179015579f4c9fa8c0aadb4a8fa55866d01c9061e019242f",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/GCD"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/GCD.g.cs",
+      "sha256": "55137b8c780eb073e922b0165e54612cf9f7f9d227ff8724c0b0060b17f91b8d",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/HelloWorld.calr",
+      "sha256": "1c22817eef05cd800adfcb831956905ce6a89cae2d10d57ad99ad2dc55c61dac",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/HelloWorld"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/HelloWorld.cs",
+      "sha256": "fc8954b44f2cf2d281bcef19d2e36cf819f4cb87f61b2000a3937361c45513ff",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/HelloWorld"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/HelloWorld.g.cs",
+      "sha256": "e25edf5d98b5dcbe543b9d2f574ae425efefca3674eff961e47625e0a9cdd9f8",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Hypotenuse.calr",
+      "sha256": "056a6517079da178b80f8c2bcef31a077df463c9b25a94a79444f05a024ce94e",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/Hypotenuse"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Hypotenuse.cs",
+      "sha256": "6ed38ce0957653dcc5b5bdbf1eb0012c6647cde198e50d30ce6d89367e2a501b",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/Hypotenuse"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Hypotenuse.g.cs",
+      "sha256": "7249a7878f52dcecb669525a60cb49821b538fcdab62dca9b9b473f2d41b10be",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/IsAlpha.calr",
+      "sha256": "327841ee3e0b303a229925093fab3af2c2c069073eadcbbec36ae4f3fc0e5337",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/IsAlpha"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/IsAlpha.cs",
+      "sha256": "61b109d145f481ddbda2143f64f93f78359b7ee26c7a6c9e2f701abfdb0ac99f",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/IsAlpha"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/IsAlpha.g.cs",
+      "sha256": "8c4db171415c365e77bccc9828983337ff31d9e4cb649411e9b8171836427499",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/IsEven.calr",
+      "sha256": "f2d4767fdeda40e425e116d8308a4d6458b10efcf957f6f0625c351c2a29e350",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/IsEven"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/IsEven.cs",
+      "sha256": "b0d85134b579ac6c4e7af61d31be6d2a965f0e6b36f8bdf5ea0495ef37054f36",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/IsEven"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/IsEven.g.cs",
+      "sha256": "fee4d5cab490e8373e28b8cf74fe15deedcd4840a888efc85772a0a215186e72",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/IsOdd.calr",
+      "sha256": "8bbebac2dab552e82a7de95e669ed8cf71130871234a1431f3020e130e310e78",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/IsOdd"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/IsOdd.cs",
+      "sha256": "e12f5ce17f5e31d014dec5dcf8f8954fa4a896671d002674fba054a40c3ce67e",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/IsOdd"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/IsOdd.g.cs",
+      "sha256": "0559f5d159ec8a6ade7a0346f196a323fa398ce502531f930490a6d0dbc2eb8b",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/IsPrime.calr",
+      "sha256": "baef145debf80ee6a147382c949d5f05e2b43475b36ad56e9116109eb7f49e93",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/IsPrime"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/IsPrime.cs",
+      "sha256": "521f18b49d69df846a35b6bf08ad35ba6c8dd4e90b431a8554a2510336b70ab8",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/IsPrime"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/IsPrime.g.cs",
+      "sha256": "005db55f874bf6a20c7ee5a34f53c38379d4266db01b4189cc034759e47ed8aa",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/LeapYear.calr",
+      "sha256": "9ce528de1f481bcd2b1e672f9800dc10e095364fbf90894cc5d7fcf14fcd390a",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/LeapYear"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/LeapYear.cs",
+      "sha256": "f9fd56237b39e8cd1c52e2d7a6c3ce9239b3987d19e65cc2a1bd37704c103606",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/LeapYear"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/LeapYear.g.cs",
+      "sha256": "ac3522520ce9e30b591e97888e23deefebd292b78166a4cd0d1571e8ebaaff3d",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/LogPipeline.calr",
+      "sha256": "9f20d25b2f96c47cd673fe316370df1a4214e810caa94c47266d2ee7ae17a178",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/LogPipeline"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/LogPipeline.cs",
+      "sha256": "5210cf3a4be0375d2a6eb28076d6521a63fcce64a637a7672374a1486da19ac3",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/LogPipeline"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/LogPipeline.g.cs",
+      "sha256": "91e41d66b1d19249ce78ae12e950695f3c527ace7c3a829ae7bfabc21d2b8d0d",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/MathOperations.calr",
+      "sha256": "13562552e04a775001507ec8c3491dbed958bd7dce04b442f31c3552ee665abc",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/MathOperations"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/MathOperations.cs",
+      "sha256": "21a6ca59313479ef5f33bb9b91e2b38b22dd7bc497024b48d542a914b1cf56bd",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/MathOperations"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/MathOperations.g.cs",
+      "sha256": "7212d719a0728917b9b5d2a5240a3e52cfd9630cacc8a88fb6777040ac569559",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/MaxTwo.calr",
+      "sha256": "854a64c889ed19310e5fa902c931718d498611f43ede29fcec3631e15ef3e947",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/MaxTwo"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/MaxTwo.cs",
+      "sha256": "273038c647995f556769e6647408501496b42370b9661524f22391c9c4047fc6",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/MaxTwo"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/MaxTwo.g.cs",
+      "sha256": "9cd8aef82466f810507bf1111d4ca68f68e635f1e0e554993b527fd1f6646725",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/MaxValue.calr",
+      "sha256": "9c2d4001389332d72773c140bfb22442d86b1ba641bc2b90d9dd04023ed9a710",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/MaxValue"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/MaxValue.cs",
+      "sha256": "279fffeb74275a0511876dcb0e44343a9891f4d6d0eceff69b9efe2d18fb93db",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/MaxValue"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/MaxValue.g.cs",
+      "sha256": "bc7767a6bbc8f248f8cbdc0afa601836f2bcff937e3fc72361403636b90cd5ed",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/MinTwo.calr",
+      "sha256": "d19204eec1d00002ce4069eee233da7d05eae11003ac765f7ac723a245759b07",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/MinTwo"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/MinTwo.cs",
+      "sha256": "0d709bca19eacce5595f5b7e52bdef1d54263ba9c21cfc40abcf901e8c8b2017",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/MinTwo"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/MinTwo.g.cs",
+      "sha256": "166c79f3466c4c22a6bb159867205727d41bfae13f3a52b5df8cd7fd17208ff1",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/NamedConfig.calr",
+      "sha256": "94ef36795764adfe9cc192159166cf3699f546d6dc05dc9491fa370a8067bb69",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/NamedConfig"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/NamedConfig.cs",
+      "sha256": "9fe4e58e268378901ca426aedaadea8cab36ac2da4d1a4f0d1b5649b017e0795",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/NamedConfig"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/NamedConfig.g.cs",
+      "sha256": "4baeea49ea44a007514d520ecb3f428ddad41f4b7baa6f3b880ef59b781da1f7",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/PairLogger.calr",
+      "sha256": "e85c5064d2f4e527fb2ba402d72287c8059b320eb81efa07dbe1c1919d78f040",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/PairLogger"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/PairLogger.cs",
+      "sha256": "861288f7c7018844165bdec8cc7f2775f62147cc95a4278526092cf136186f66",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/PairLogger"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/PairLogger.g.cs",
+      "sha256": "a085b59b2917960954191361f686c6ee26fa4f8c74356a81bb10e448023fb5f7",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Palindrome.calr",
+      "sha256": "952c6cec3e96712d8abfd6e15a07f986a6c21d609f44388fecc13a033d63a5c6",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/Palindrome"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Palindrome.cs",
+      "sha256": "ba396b98f3d1b77c4bbcbbcf041f755fc76995ef2ffcafc47975922f9a6b8fef",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/Palindrome"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Palindrome.g.cs",
+      "sha256": "a76c6455d9dc6e16577c09dda7d47d8adb150be5ff7d22d8ece405f7c43b310d",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ParseAndDouble.calr",
+      "sha256": "031bbbd65baef1f163220acaf9df06c1037617fccb001c137cf631e6b1b991be",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/ParseAndDouble"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ParseAndDouble.cs",
+      "sha256": "a192ac5d956b8c811c797c7e078dd0c5018d8b200dc037f3d1f01eea3225d777",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/ParseAndDouble"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ParseAndDouble.g.cs",
+      "sha256": "f43b2cb64ea74e57423972338bb018b71b1fcf66a69fe8f23c5672e8e4d2f695",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Power.calr",
+      "sha256": "9500bb24a6b2a6b7e0ee1dbffb5e726bcadc87883fa60ef7453c141b3ed2f0cf",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/Power"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Power.cs",
+      "sha256": "3a7ad1cafa7af3b8f17a02f002e9ac7af4f56dd714380f7251d74344868a088a",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/Power"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Power.g.cs",
+      "sha256": "16922cad432ed2d23949162e67f6c46fa47a1ef58f65db75b14172b951993bea",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ReturnMapped.calr",
+      "sha256": "4786369f33df5121565faf24849da73d621952e26b29a8c04971d20f035cf471",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/ReturnMapped"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ReturnMapped.cs",
+      "sha256": "23664d4ed29719545f4a64044dc224ff7cba2612452555beea5d26cc2ed27c99",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/ReturnMapped"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ReturnMapped.g.cs",
+      "sha256": "9e26f2dabadabdf24b8d00b580a8485243695c5a7336a97eacd464c1a22e7653",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ReverseArray.calr",
+      "sha256": "4524adeec51f3c0f2c2465d42f7cfde99a1925226a3342c9717d1123580ae724",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/ReverseArray"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ReverseArray.cs",
+      "sha256": "2fbed60ff1b6436c09a00dbda3f9265f53369ab437e76267308988389e8068c7",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/ReverseArray"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ReverseArray.g.cs",
+      "sha256": "fb77918f150132b5089062bd77cf3dc6be6c301b77cdea6536d816c2dd7cd1bb",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ReverseString.calr",
+      "sha256": "baafd4c706bc12450af23b5770f16531e2f58d4ba30736f15cabc6ed5aa0c5be",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/ReverseString"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ReverseString.cs",
+      "sha256": "3f28138f08054a88a0eab3d749669cca2a250fd9b011c8670795cc34b1830526",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/ReverseString"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ReverseString.g.cs",
+      "sha256": "f18cf39a85625db87246f89d705c2590d9316bdbb40efdb3dbe15d458a80083f",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Sign.calr",
+      "sha256": "840ed750efcb6851a55f6d725e45cbb99d3d5483edb816a379188ac815888f24",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/Sign"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Sign.cs",
+      "sha256": "d50179f3e14b31b0328a8a36c87393c5589b7107116a862a3b5437bf6e2b34df",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/Sign"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/Sign.g.cs",
+      "sha256": "7f6f13d292510a8b51ab75180e9e09733232d1b111ad4e453d05aafa8d36ee5d",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/StringUtils.calr",
+      "sha256": "2ab2f7088895eb98b89bd2010015d88862f85af6fe476d21bc9c9602b6f1f484",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/StringUtils"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/StringUtils.cs",
+      "sha256": "c3f67cfbb63e4fa47be7b2955cd998162ae7673d67eaf9edf707106077e2f1c0",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/StringUtils"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/StringUtils.g.cs",
+      "sha256": "a45d8d8992ae8cf1ecd2993c17f34e73c5e787e994683d6adbe19d21b34c2f31",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/SumDigits.calr",
+      "sha256": "5587d5abb391c452d77c3a8e37af2de49d1bd26072192302f0cc9d8af547e47f",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/SumDigits"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/SumDigits.cs",
+      "sha256": "1969d9ee81c38d11644773a21c8e987885cae345b86bd689ef0f5950c78a1850",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/SumDigits"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/SumDigits.g.cs",
+      "sha256": "b3b43205721217a7fa62359c80c1c8d4a1cbb63423b219cb716fb1bdf5717184",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/SumRange.calr",
+      "sha256": "219d48e0244d9c5a525debf09b40d9480e5f621e38aea69d0c4815782f33237f",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/SumRange"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/SumRange.cs",
+      "sha256": "cabe2acc4be01894dda0c4317cdc34b814a8eb40ff5233b0c840be3ea8b3bb92",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/SumRange"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/SumRange.g.cs",
+      "sha256": "76d5e602e1db127850fd00df0fb5488ea267c3e11daf0f70aa2c96c2db677a9b",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/TemperatureConverter.calr",
+      "sha256": "460c79b2c1255ce52722b9edfcbbf03bcdd3fa03bcc6ab7a142f44519fef291c",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/TemperatureConverter"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/TemperatureConverter.cs",
+      "sha256": "97f3c7f823db4b08bb08270800f26f2ce7727adbf76627abfe572aa0dc0fa11c",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/TemperatureConverter"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/TemperatureConverter.g.cs",
+      "sha256": "a30f5e742580b39912d3336edd5d6b6a8e69ec65785a09387eae90f20ee19fa6",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/TemperatureRange.calr",
+      "sha256": "bb51d6539f28f9a230eb47fa492f3c85b6fb6e0b7c2e55c3e41d1c3490029ca8",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/TemperatureRange"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/TemperatureRange.cs",
+      "sha256": "643a9b0470ba3c2fc5e4a1ca4b61ab32b3d1c5b8cfc3cea6dbfbbb991f26ecf9",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/TemperatureRange"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/TemperatureRange.g.cs",
+      "sha256": "1a75d7e160900ac6a43e0daabb04f502212b4139f9fa92d185b6fa75f999bfc8",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/TernaryChain.calr",
+      "sha256": "73b5ed6c629fd23f95561712244cc35a8009ada0f53049c2fe14e4fd8e8c22a3",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/TernaryChain"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/TernaryChain.cs",
+      "sha256": "48624a6403656627b4059d7e289323c83b94a7cc27f20a28e46f029778b4cda4",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/TernaryChain"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/TernaryChain.g.cs",
+      "sha256": "9b1e378fa3ebb028e956bd12d6c374e340ecf09b7ef673857600470100556348",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ThreeWayMerge.calr",
+      "sha256": "88aed507decdecc6cdceb6ff2716c791209eb1398aea30929702320a41cd6209",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/ThreeWayMerge"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ThreeWayMerge.cs",
+      "sha256": "15c9d8289928b68d27e1ad6a330b13fe642d977f8fc3c7ed0ed42d0d6aeb6403",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/ThreeWayMerge"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/ThreeWayMerge.g.cs",
+      "sha256": "fdc5cf728a3549179d7280b7ac9618e0c0bd58080b6a9496bacd2adbb94218f3",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/TruncateString.calr",
+      "sha256": "77a0ca3e63699920b499fe60aaec5bf41687fda8ca8055f4ba67d03571959b6d",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/TruncateString"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/TruncateString.cs",
+      "sha256": "9910b18e8e6ba181fa3d457e752b0651cd49ddc392f0b22b549b9a3833b1c51e",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/TruncateString"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/TruncateString.g.cs",
+      "sha256": "9195dcd18bdfedceda0ffc263cdcf1eaf6b53e592a3250a20ced623aaf291af1",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/VoidSequence.calr",
+      "sha256": "4b7ffdf6cbb27674fed69d365ac6eec2b7fca1d8795f669c82a01afaaa667c93",
+      "role": "calor-arm",
+      "pairId": "TokenEconomics/VoidSequence"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/VoidSequence.cs",
+      "sha256": "191a75774514937078bc16e91b308866f07590420716a89a5aaff2242faccb49",
+      "role": "csharp-arm",
+      "pairId": "TokenEconomics/VoidSequence"
+    },
+    {
+      "path": "tests/TestData/Benchmarks/TokenEconomics/VoidSequence.g.cs",
+      "sha256": "60b6894d680038a6e4f84764e033e7c75c636df72f4398e49750a89b09c82b2a",
+      "role": "non-pair",
+      "reason": "Calor compiler output committed for a TokenEconomics .calr (regenerated by BulkBenchmarkCompilationTests); an output of the Calor arm, not an independent C# arm."
+    },
+    {
+      "path": "tests/TestData/Benchmarks/manifest.json",
+      "sha256": "5dfe89d6a5d59757791bdb764b01f5d78495c2fea318ca50265ca0d1d95a018c",
+      "role": "non-pair",
+      "reason": "Benchmark manifest: task metadata for every pair (read for task statements)."
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "cutoffCommit": "72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1",
+  "pairExclusions": [
+    {
+      "exclusionId": "X1-scenario-variant",
+      "reason": "Scenario variant of another registered pair: a bug-injected copy (manifest bugScenarios) or an edited copy (manifest editTasks) of a pair already in the benchmarks list. Counting it as a separate program pair would duplicate a program in the population, and the per-pair metric loop (BenchmarkRunner over manifest benchmarks) never reads it. The reason is structural and was fixed before any oracle run; it does not depend on any equivalence outcome.",
+      "pairs": [
+        "ErrorDetection/ArraySum_buggy",
+        "ErrorDetection/Divide_buggy",
+        "ErrorDetection/NullDeref_buggy",
+        "ErrorDetection/Overflow_buggy",
+        "ErrorDetection/MissingContract_buggy",
+        "ErrorDetection/DeadCode_buggy",
+        "ErrorDetection/Uninitialized_buggy",
+        "ErrorDetection/DeadStore_buggy",
+        "EditPrecision/Calculator_validated"
+      ]
+    }
+  ],
+  "scopeExclusions": [
+    {
+      "path": "benchmarks/",
+      "reason": "Excluded from 0.24 scope by contract 1.0.1 artifact-inventory excludedFromScope (no workflow consumes it). At the cutoff it holds 7 .calr files and no C# arm, so it contributes 0 pairs."
+    }
+  ]
+}

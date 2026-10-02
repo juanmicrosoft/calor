@@ -1,0 +1,192 @@
+{
+  "schemaVersion": 1,
+  "registrationId": "b1-1276-benchmark-registration",
+  "registrationVersion": "1.0.0",
+  "issue": 1276,
+  "epic": 1409,
+  "gate": "B1",
+  "contractVersion": "1.0.1",
+  "contractRule": "docs/plans/evidence/evidence-contract-1407/contract.json#/benchmarkEquivalence/registrationRule",
+  "document": "docs/plans/b1-1276-benchmark-registration.md",
+  "cutoff": {
+    "commit": "72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1",
+    "timestampUtc": "2026-10-01T17:36:19Z"
+  },
+  "dispositionsAssigned": false,
+  "dispositionRule": "No pair has a disposition other than UNCLASSIFIED (to be decided by the oracle) or EXCLUDED-PRE-REGISTERED in this registration, and every pair has included=false. Dispositions are assigned only after this registration merges to main, by running the registered oracle command against the merge commit.",
+  "files": {
+    "pairs": "pairs.json",
+    "corpusInventory": "corpus-inventory.json",
+    "exclusions": "exclusions.json",
+    "metricSet": "metric-set.json",
+    "hashes": "sha256.json"
+  },
+  "denominator": {
+    "pairingRule": "A pair is a .calr file and the .cs file with the same directory and stem. manifest.json names exactly these pairs: benchmarks (per-pair metric loop), bugScenarios (buggy variants), and editTasks (edited variants). Every .calr and every hand-written .cs under the corpus root at the cutoff belongs to exactly one pair; every other file is listed in corpus-inventory.json as non-pair with a reason.",
+    "locations": [
+      {
+        "path": "tests/TestData/Benchmarks",
+        "inventoryArtifact": "benchmark-corpus",
+        "role": "the corpus the static calculators read"
+      },
+      {
+        "path": "benchmarks/",
+        "inventoryArtifact": null,
+        "role": "contract scope exclusion; 7 .calr files and no C# arm at the cutoff, so 0 pairs"
+      }
+    ],
+    "pairIdRule": "pairId is the corpus-relative path of the pair without extension (for example DomainProblems/CsvParser). manifest ids are not unique at the cutoff (050 to 059 each name two pairs), so they are recorded per pair but never used as identifiers.",
+    "pairs": 226,
+    "toOracle": 217,
+    "excludedPreRegistered": 9
+  },
+  "taskStatement": {
+    "definition": "The task statement of a pair is the manifest.json entry that names it at the cutoff, rendered as 'key: value' lines (source, id, name, category, level, features, notes; or the scenario id, description, category, and the pair it is a variant of). taskStatementSha256 is the SHA-256 of that UTF-8 text.",
+    "limitation": "These are the only task statements that exist at the cutoff. They name a task but do not specify inputs, outputs, or failure behavior. The oracle therefore decides equivalence from the two arms' observable behavior on the registered inputs, not from the statement text, and an EQUIVALENT pair is equivalent to its partner, not proven to implement the statement."
+  },
+  "oracle": {
+    "id": "b1-1276-pair-oracle",
+    "version": "1",
+    "command": "dotnet run --project tests/Calor.Evaluation -c Release -- pair-oracle --registration docs/plans/evidence/b1-1276/registration --registration-commit <full SHA of the main commit that merged this registration> --output <results.json>",
+    "runs": 2,
+    "runAgreement": "Run the command twice on the same commit and machine. The two results files must be byte-identical. A pair whose verdict or observationsSha256 differs between the runs is UNCLASSIFIED (reason NONDETERMINISTIC_ACROSS_RUNS). Both runs are retained; there is no rerun-until-agreement.",
+    "implementation": [
+      {
+        "path": "tests/Calor.Evaluation/Equivalence/PairDifferentialOracle.cs",
+        "sha256": "47708cbb40cbac92fe15242cf4fcf573815ad95c89f9436aff6b788b36a87e8c"
+      },
+      {
+        "path": "tests/Calor.Evaluation/Equivalence/InputGenerator.cs",
+        "sha256": "661e87a54d2c8a14ab9245c6ca90faeec1f8a459ce4564626af98ba21c9c175c"
+      },
+      {
+        "path": "tests/Calor.Evaluation/Equivalence/PairOracleCommand.cs",
+        "sha256": "1c49f7d28fb505d3d89dca44b845573296361090b16070bcc96c7bf663d5d7fd"
+      }
+    ],
+    "isolation": "Each pair runs in its own child process (300,000 ms limit). A crash is UNCLASSIFIED (ORACLE_CRASH); exceeding the limit is UNCLASSIFIED (TIMEOUT).",
+    "steps": [
+      "1 identity: the SHA-256 of both files must equal the registered calorSha256 and csharpSha256; otherwise UNCLASSIFIED (IDENTITY_MISMATCH) and nothing runs.",
+      "2 build: the Calor arm is compiled to C# by Calor.Compiler.Program.Compile with default CompilationOptions (the compiler's default contract mode). Then each arm's C# is compiled by the same Roslyn compilation: LanguageVersion.Latest, library output, Release, nullable enabled, deterministic, the Microsoft.NET.Sdk implicit global usings, and one reference set (the oracle process's trusted platform assemblies). An error in either arm is NOT-EQUIVALENT (BUILD_FAILED_CALOR, BUILD_FAILED_CSHARP, or BUILD_FAILED_BOTH).",
+      "3 surface: each arm's observable surface is the public, non-special methods declared on its exported types (object overrides ignored). A static member's key is its lower-cased name, exact parameter types, and exact return type, without the declaring type; an instance member's key also carries its type's simple name. A static Main() or Main(string[]) is one C# entry-point member keyed by its return type alone and run once, with an empty argument array where it takes one. Types the arm defines itself key as arm-defined. A duplicated key in one arm is NOT-EQUIVALENT (SURFACE_AMBIGUOUS); a key in only one arm is NOT-EQUIVALENT (SURFACE_MISMATCH); no key at all is UNCLASSIFIED (SURFACE_EMPTY); any instance key is UNCLASSIFIED (UNSUPPORTED_SURFACE); any key whose parameter or return type the input generator does not support is UNCLASSIFIED (UNSUPPORTED_TYPE).",
+      "4 inputs: for every key, in ordinal key order, the registered input generator produces the input tuples (see inputs). Both arms receive the same tuples in the same order.",
+      "5 execution: each tuple is invoked twice per arm in the order Calor, C#, Calor, C#, with fresh copies of array and list arguments, stdout captured, stdin empty, invariant culture, a 16 MB thread stack, and a 2,000 ms limit per invocation. Any invocation over the limit makes the pair UNCLASSIFIED (TIMEOUT). An arm whose two observations of one tuple differ makes the pair UNCLASSIFIED (NONDETERMINISTIC).",
+      "6 decision: if any tuple's Calor observation differs from its C# observation, NOT-EQUIVALENT (OBSERVATION_MISMATCH), with up to 5 witnesses. Otherwise EQUIVALENT (AGREE). Every result records the surface, the number of tuples, and observationsSha256, the SHA-256 of the full observation transcript."
+    ],
+    "inputs": {
+      "generator": "b1-1276-signature-inputs-v1",
+      "supportedTypes": "bool, char, byte, short, int, long, uint, ulong, float, double, decimal, string; Nullable<T> of those; one-dimensional arrays and List<T>, IList<T>, IReadOnlyList<T>, IEnumerable<T>, ICollection<T>, IReadOnlyCollection<T> of those (passed as T[] or List<T>). Return types: the same, or void.",
+      "boundaryValues": "The fixed pools in InputGenerator.Pools (for example int: 0, 1, -1, 2, -2, 3, 5, 7, 10, 15, 100, -100, 1000, int.MaxValue, int.MinValue; string includes null and the empty string; double includes -0.0, NaN, and both infinities). Collections: null, empty, one element, three elements, four elements with a repeat, and the whole pool.",
+      "tuples": "If the product of the parameters' pool sizes is at most 256, the full cartesian product; otherwise one diagonal tuple per index of the longest pool, parameter j taking pool[(i + j) mod length]. Then 64 seeded random tuples. A member with no parameters gets one empty tuple.",
+      "seed": "SplitMix64 seeded with the first 8 bytes (big-endian) of SHA-256('b1-1276-signature-inputs-v1|' + pairId + '|' + memberKey). The seed depends only on the pair id and the member key, never on either arm's code or output.",
+      "goldenValues": "None. No input or output was computed by running either arm before registration."
+    },
+    "expectedOutputs": {
+      "rule": "cross-arm-agreement",
+      "definition": "For every registered input, the expected output of each arm is the other arm's observation: the same observation kind (return or throw), the same canonical return value (InputGenerator.Render: culture-invariant, round-trip floating point, exact strings, element-wise collections), and the same captured stdout.",
+      "limitation": "An EQUIVALENT disposition means no disagreement on this finite input set. It is not a proof of equivalence on all inputs."
+    },
+    "failureBehavior": {
+      "id": "oracle-v1-default",
+      "rule": "Failure is compared by class: on every input, either both arms return or both throw. The exception type is recorded in the evidence but not compared. A build failure in either arm is NOT-EQUIVALENT. A timeout or crash is UNCLASSIFIED. No pair registers a different failure behavior.",
+      "reasonForClassComparison": "Calor reports contract failures with Calor.Runtime exception types that a hand-written C# arm cannot raise without referencing Calor.Runtime. Requiring identical exception types would make the disposition a test of the runtime library rather than of the task. The rule applies identically to both arms."
+    },
+    "dispositionByReason": {
+      "AGREE": "EQUIVALENT",
+      "OBSERVATION_MISMATCH": "NOT-EQUIVALENT",
+      "SURFACE_MISMATCH": "NOT-EQUIVALENT",
+      "SURFACE_AMBIGUOUS": "NOT-EQUIVALENT",
+      "BUILD_FAILED_CALOR": "NOT-EQUIVALENT",
+      "BUILD_FAILED_CSHARP": "NOT-EQUIVALENT",
+      "BUILD_FAILED_BOTH": "NOT-EQUIVALENT",
+      "IDENTITY_MISMATCH": "UNCLASSIFIED",
+      "SURFACE_EMPTY": "UNCLASSIFIED",
+      "UNSUPPORTED_SURFACE": "UNCLASSIFIED",
+      "UNSUPPORTED_TYPE": "UNCLASSIFIED",
+      "TIMEOUT": "UNCLASSIFIED",
+      "NONDETERMINISTIC": "UNCLASSIFIED",
+      "NONDETERMINISTIC_ACROSS_RUNS": "UNCLASSIFIED",
+      "ORACLE_CRASH": "UNCLASSIFIED",
+      "PRE_REGISTERED_EXCLUSION": "EXCLUDED-PRE-REGISTERED"
+    },
+    "fairness": [
+      "Every step except the Calor-to-C# compilation treats both arms identically: same Roslyn version and options, same references, same global usings, same inputs in the same order, same timeouts, same stack, same culture, same comparison.",
+      "Inputs depend only on the pair id, the member key, and the parameter types. Neither arm's code or output influences them.",
+      "The oracle never reads a metric value. A disposition cannot depend on which arm is shorter.",
+      "The failure-class rule and the case-insensitive member-name match apply in both directions.",
+      "Every tuple is invoked in the same interleaved order (Calor, C#, Calor, C#), and observations are compared only after all four are recorded."
+    ],
+    "controls": {
+      "synthetic": "tests/Calor.Evaluation/Tests/PairDifferentialOracleTests.cs: synthetic pairs written for the test, none of them registered. Positive controls must be EQUIVALENT; each negative control differs in one observable respect (one boundary output, return vs throw, stdout, a CsvParser-shaped surface, a build error, changed bytes, nondeterminism, a hang) and must get its specific reason.",
+      "knownWitness": {
+        "pairId": "DomainProblems/CsvParser",
+        "expectedDisposition": "NOT-EQUIVALENT",
+        "source": "contract.json benchmarkEquivalence and section 5 name this pair as the known non-equivalence witness (#1276).",
+        "rule": "If the oracle does not return NOT-EQUIVALENT for this pair, the oracle run is invalid: no disposition from it is used, and the oracle needs an amendment before another run."
+      }
+    },
+    "limitations": [
+      "v1 drives static methods only. Pairs whose surface includes instance members, or types the arm defines itself, are UNCLASSIFIED, not EQUIVALENT.",
+      "Equivalence is checked on a finite input set and is not a proof.",
+      "Side effects other than stdout (files, network, environment) are not observed."
+    ]
+  },
+  "metrics": {
+    "file": "metric-set.json",
+    "summary": "One comparative metric (TokenEconomics CompositeTokenEconomics, a symmetric source-size ratio). Seven static metrics whose per-arm scores use language-specific rules are descriptive only."
+  },
+  "statistics": {
+    "population": "The comparative population is the set of registered pairs with source manifest.benchmarks that the oracle dispositions EQUIVALENT. The corpus is fixed and author-constructed. It was not sampled from any population of programs, tasks, or developers, so no result generalizes beyond these files.",
+    "samplingUnit": "program-pair",
+    "repeatedDeterministicRunsAreSamples": false,
+    "perPairValue": "ln r, where r is the pair's CompositeTokenEconomics AdvantageRatio from the pinned TokenEconomicsCalculator.",
+    "pointEstimate": "Geometric mean of r over included pairs: exp(mean of ln r). Overall estimate weights every included pair equally; per-category estimates use the pairs of that manifest category.",
+    "interval": {
+      "method": "percentile bootstrap over program pairs",
+      "resamples": 10000,
+      "prng": "SplitMix64 seeded with 1276",
+      "level": 0.95,
+      "statistic": "the geometric mean of each resample; the interval is its 2.5th and 97.5th percentiles",
+      "stratification": "the overall interval resamples all included pairs; a per-category interval resamples within that category",
+      "minimumPairs": 2,
+      "belowMinimum": "no interval is reported",
+      "label": "corpus-resampling interval for this fixed corpus; not a confidence interval for any population"
+    },
+    "alsoReported": [
+      "pairs per disposition and per exclusion",
+      "included pairs per category",
+      "count of included pairs with r > 1, r < 1, and r = 1",
+      "median r"
+    ],
+    "runCount": 2,
+    "runRule": "The static metric run is executed twice on the same commit. Every per-pair value must be bit-identical between the runs; any difference means no result is produced. The two runs are a determinism check, not two samples.",
+    "removed": [
+      "metrics.*.ci95 computed from a single category aggregate (zero-width interval)",
+      "intervals, standard deviations, Cohen's d, and paired t-tests over repeated deterministic runs",
+      "an overall advantage defined as the geometric mean of category geometric means",
+      "any ranking or win count that treats a descriptive-only metric as comparative"
+    ],
+    "headlineConditions": [
+      "every registered pair has an oracle disposition from a valid run (known-witness control passed, two runs agree)",
+      "no included pair has a disposition other than EQUIVALENT",
+      "the comparability key of the result equals this registration's key"
+    ]
+  },
+  "comparability": {
+    "pairManifestSha256": "0f0d760a3f247dc6c952c39d5499656ecd0b08b99e8c4148a809302e62a93a7f",
+    "metricSetSha256": "3d284bb04ec7bf247aedfbc535636914caad8ed3e1706366d3a3c1099381a0b3",
+    "metricImplementationVersion": "calor-evaluation-static-metrics@72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1",
+    "aggregationMethod": "b1-1276-agg-v1: geometric mean of r over EQUIVALENT program pairs; percentile bootstrap over pairs, 10000 resamples, SplitMix64 seed 1276, 95%; no interval below 2 pairs",
+    "samplingUnit": "program-pair",
+    "runCount": 2,
+    "generatorVersion": "b1-1276-results-generator-v1",
+    "exclusionsSha256": "37b1342da08a900c6968631bb2c5e57dbde6f7e3e2592b8da550b0c98f14e648"
+  },
+  "comparabilityNote": "pairManifestSha256 here is the hash of the registration pair manifest. The dispositioned manifest that the second #1276 PR produces is a new manifest with its own hash, so a result computed from it is not comparable to any earlier benchmark result. generatorVersion names the results generator that the second #1276 PR implements to this specification.",
+  "afterRegistration": [
+    "Any change to a pinned field (a pair's files or hashes, task statement, input set, expected outputs, failure behavior, the oracle and its command or implementation files, the metric set or implementation files, the aggregation and interval method, the sampling unit, or an exclusion) is a #1407 amendment. The registration tests fail closed when a pinned file's hash drifts.",
+    "A pair repaired, dropped, or re-dispositioned after registration stays reported with its previous disposition.",
+    "Historical benchmark artifacts (website/public/data/benchmark-results.json and its derivatives) stay historical; they are not regenerated in place or relabeled as outputs of this method."
+  ],
+  "claimRule": "Static feature scores are not coding-agent outcomes. Neither is presented as a measured language, productivity, correctness, or safety advantage."
+}
