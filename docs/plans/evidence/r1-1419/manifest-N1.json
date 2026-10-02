@@ -1,0 +1,2137 @@
+{
+  "schemaVersion": 1,
+  "baseline": "N1",
+  "commit": "88b5d38df97fd7e438882c956b9f9dcdc7a6cef5",
+  "registrationVersion": "1.0.0",
+  "binary": "nuget-package",
+  "resultPath": "bench/correctness/false-established/v024/N1/",
+  "entryPoints": {
+    "body": {
+      "path": "src/Calor.Compiler/Verification/Z3/Z3Verifier.cs",
+      "symbols": "FunctionBodyEncoder.TryEncodeResult, EncodeSequence, PreservesEntryState",
+      "blob": "56737f7da7e3406345748f6b9a543ed45b09f0ec"
+    },
+    "cache": {
+      "path": "src/Calor.Compiler/Verification/Z3/Cache/VerificationCache.cs",
+      "symbols": "VerificationCache lookup and store",
+      "blob": "e923e0f858d78ccaab805dde790d91da3d2baa66"
+    },
+    "cacheEntry": {
+      "path": "src/Calor.Compiler/Verification/Z3/Cache/VerificationCacheEntry.cs",
+      "symbols": "VerificationCacheEntry (TranslatorSemanticsVersion)",
+      "blob": "7f16012e721e008c78d6f6ba3d59c322518dee05"
+    },
+    "contractVerifier": {
+      "path": "src/Calor.Compiler/Verification/ContractVerifier.cs",
+      "symbols": "ContractVerifier.Verify (contract reference and type checks)",
+      "blob": "133da7262cccb2301a14eba13a8152869339e65d"
+    },
+    "divisor": {
+      "path": "src/Calor.Compiler/Verification/Z3/Z3Verifier.cs",
+      "symbols": "FunctionBodyEncoder.CollectDivisorNonZeroConstraints, CollectDivisorNonZeroConstraintsFromExpression",
+      "blob": "56737f7da7e3406345748f6b9a543ed45b09f0ec"
+    },
+    "emitInherit": {
+      "path": "src/Calor.Compiler/CodeGen/CSharpEmitter.cs",
+      "symbols": "CSharpEmitter inherited-contract emission",
+      "blob": "880cd5eae4a399db1827e23a09baaa0896d7d334"
+    },
+    "emitObl": {
+      "path": "src/Calor.Compiler/CodeGen/CSharpEmitter.cs",
+      "symbols": "CSharpEmitter.ShouldEmitObligationGuard, Visit(ProofObligationNode)",
+      "blob": "880cd5eae4a399db1827e23a09baaa0896d7d334"
+    },
+    "emitPost": {
+      "path": "src/Calor.Compiler/CodeGen/CSharpEmitter.cs",
+      "symbols": "CSharpEmitter.Visit(EnsuresNode) elision on Proven && !IsVacuous",
+      "blob": "880cd5eae4a399db1827e23a09baaa0896d7d334"
+    },
+    "emitQuant": {
+      "path": "src/Calor.Compiler/CodeGen/CSharpEmitter.cs",
+      "symbols": "CSharpEmitter quantifier runtime lowering (D15)",
+      "blob": "880cd5eae4a399db1827e23a09baaa0896d7d334"
+    },
+    "facts": {
+      "path": "src/Calor.Compiler/Verification/Obligations/FactCollector.cs",
+      "symbols": "FactCollector",
+      "blob": "bfd7bb2bb49edc78d4cb19e7de4aaeffa850e4ee"
+    },
+    "hasher": {
+      "path": "src/Calor.Compiler/Verification/Z3/Cache/ContractHasher.cs",
+      "symbols": "ContractHasher cache keys",
+      "blob": "3f4171bb3235503619a4ac38d0b3388b2a51b8cd"
+    },
+    "implProver": {
+      "path": "src/Calor.Compiler/Verification/Z3/Z3ImplicationProver.cs",
+      "symbols": "Z3ImplicationProver.CheckPreconditionWeakening, CheckPostconditionStrengthening",
+      "blob": "6916c5327d227c1dac22ddd2cdfa8af32faf9540"
+    },
+    "inherit": {
+      "path": "src/Calor.Compiler/Verification/ContractInheritanceChecker.cs",
+      "symbols": "ContractInheritanceChecker.Check (Calor0815 ImplicationProvenByZ3)",
+      "blob": "caf8deb70223bd1c858a7bc873eec86aab94147b"
+    },
+    "kind": {
+      "path": "src/Calor.Compiler/Verification/Z3/KInduction/KInductionProver.cs",
+      "symbols": "KInductionProver (Calor0950 info only)",
+      "blob": "f8545d4779ca052f1fce608efbc85da449457bef"
+    },
+    "module": {
+      "path": "src/Calor.Compiler/Ast/ModuleNode.cs",
+      "symbols": "ModuleNode.ShouldCheckIntegerOverflow",
+      "blob": "4d40ef65a220c59403b85b60c8a8efe3a8c395ec"
+    },
+    "oblGen": {
+      "path": "src/Calor.Compiler/Verification/Obligations/ObligationGenerator.cs",
+      "symbols": "ObligationGenerator.Generate",
+      "blob": "9022a88ee196d0dfc26dd27ea96cc0fea6f98f16"
+    },
+    "oblPolicy": {
+      "path": "src/Calor.Compiler/Verification/Obligations/ObligationPolicy.cs",
+      "symbols": "ObligationPolicy.GetAction, RequiresGuard",
+      "blob": "2ae0456c2ab9ffb4259c1d7166bcb01f5b96ee5c"
+    },
+    "oblSolve": {
+      "path": "src/Calor.Compiler/Verification/Obligations/ObligationSolver.cs",
+      "symbols": "ObligationSolver.SolveAll (not whitelist-gated)",
+      "blob": "fa153ce517a328a7411c458f2fb3504523c570c6"
+    },
+    "oblTracker": {
+      "path": "src/Calor.Compiler/Verification/Obligations/ObligationTracker.cs",
+      "symbols": "ObligationKind, ObligationStatus",
+      "blob": "1767f2814db52abfb52a2cde4d8d1b1d7b135b96"
+    },
+    "outcome": {
+      "path": "src/Calor.Compiler/Verification/ProofOutcome.cs",
+      "symbols": "ProofOutcome.Assign, ProofEvidence",
+      "blob": "ccf2491627ad88380c92df4972cc0cb6b384082d"
+    },
+    "pass": {
+      "path": "src/Calor.Compiler/Verification/ContractVerificationPass.cs",
+      "symbols": "ContractVerificationPass.Verify, EnumerateContractBearers, AdaptMethodAsFunction",
+      "blob": "eea275027c2ad6a7188e19064e7c3b5c54200746"
+    },
+    "pipeline": {
+      "path": "src/Calor.Compiler/Program.cs",
+      "symbols": "Program.Compile(string, string?, CompilationOptions) pass order",
+      "blob": "97dba62b3ca69962adffb9bcd9933ac363385331"
+    },
+    "post": {
+      "path": "src/Calor.Compiler/Verification/Z3/Z3Verifier.cs",
+      "symbols": "Z3Verifier.VerifyPostcondition (vacuity pre-check, assumption demotions)",
+      "blob": "56737f7da7e3406345748f6b9a543ed45b09f0ec"
+    },
+    "pre": {
+      "path": "src/Calor.Compiler/Verification/Z3/Z3Verifier.cs",
+      "symbols": "Z3Verifier.VerifyPrecondition",
+      "blob": "56737f7da7e3406345748f6b9a543ed45b09f0ec"
+    },
+    "refine": {
+      "path": "src/Calor.Compiler/Mcp/Tools/RefineTool.cs",
+      "symbols": "calor_refine action=obligations (agent-facing Discharged claims)",
+      "blob": "abe74d68a0126f2a9b76e591bd940ece95d9aefe"
+    },
+    "simplifier": {
+      "path": "src/Calor.Compiler/Verification/ExpressionSimplifier.cs",
+      "symbols": "ExpressionSimplifier.Visit(BinaryOperationNode), Visit(UnaryOperationNode), TryFoldIntegerBinaryOp",
+      "blob": "441f8c97a70b0facc5b19eb00cf89daffb593daa"
+    },
+    "simplpass": {
+      "path": "src/Calor.Compiler/Verification/ContractSimplificationPass.cs",
+      "symbols": "ContractSimplificationPass.Simplify (runs before verification AND before emission)",
+      "blob": "72f357dffbfb1a6b64fc36fe671a5044c3df6bfe"
+    },
+    "translator": {
+      "path": "src/Calor.Compiler/Verification/Z3/ContractTranslator.cs",
+      "symbols": "ContractTranslator.DeclareVariable, Translate, TranslateBoolExpr, GetCheckedArithmeticSafety",
+      "blob": "894ef38c5fe6f86f5d435363005f0c288223f849"
+    },
+    "verifyCmd": {
+      "path": "src/Calor.Compiler/Commands/VerifyCommand.cs",
+      "symbols": "calor verify --weakening-check (M-G4)",
+      "blob": "df4c4726edd6a5c85837fb3dd98559eec3d7de34"
+    },
+    "whitelist": {
+      "path": "src/Calor.Compiler/Verification/Z3/ContractTranslator.cs",
+      "symbols": "ModeledForms.TryValidate, ModeledForms.RenderWhitelist",
+      "blob": "894ef38c5fe6f86f5d435363005f0c288223f849"
+    }
+  },
+  "trees": {
+    "src": "484c33c914af7ad504e6b7078573dfdaa768299e",
+    "src/Calor.Compiler/Verification": "36c43f7158c7e82be5bef881f1f278feb62f4a49",
+    "src/Calor.Compiler/Parsing": "393639fbe4bff6952425ce480ab7ac1fde8e92ab",
+    "src/Calor.Compiler/Binding": "b8e0a61b1f6cac0b8df7e491b8e4f03ec4474a80",
+    "src/Calor.Compiler/TypeChecking": "dca6eb6e83d267405ca5585b76ed83e88b4307bd",
+    "src/Calor.Compiler/CodeGen": "c3c8b6cbbb6caf50a13f04b88e15cca051157414",
+    "src/Calor.Runtime": "b20bbf2ddd31d131fce545c5ca141ef78047d917"
+  },
+  "whitelistDocument": {
+    "path": "docs/verification-modeled-forms.md",
+    "sha256": "c296720f268c497cf93e3d27943f3a0a750ed09abce3badcb5822c4e0bd5e932"
+  },
+  "translatorSemanticsVersion": "z3-executable-semantics-v2",
+  "rows": [
+    {
+      "id": "N1:NUM-ARITH-ADD",
+      "row": "NUM-ARITH-ADD",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator",
+        "post",
+        "body",
+        "simplpass"
+      ],
+      "caseIds": [
+        "R1-NUM-ARITH-ADD-001",
+        "R1-NUM-ARITH-ADD-002",
+        "R1-NUM-ARITH-ADD-003",
+        "R1-NUM-ARITH-ADD-004",
+        "R1-NUM-ARITH-ADD-005",
+        "R1-NUM-ARITH-ADD-006",
+        "R1-NUM-ARITH-ADD-007",
+        "R1-NUM-ARITH-ADD-008",
+        "R1-NUM-ARITH-ADD-009",
+        "R1-NUM-ARITH-ADD-010",
+        "R1-NUM-ARITH-ADD-011",
+        "R1-NUM-ARITH-ADD-012",
+        "R1-NUM-ARITH-ADD-013",
+        "R1-NUM-ARITH-ADD-014",
+        "R1-NUM-ARITH-ADD-015",
+        "R1-NUM-ARITH-ADD-016",
+        "R1-NUM-ARITH-ADD-017",
+        "R1-NUM-ARITH-ADD-018"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-ARITH-ADD.jsonl"
+    },
+    {
+      "id": "N1:NUM-ARITH-SUB",
+      "row": "NUM-ARITH-SUB",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator",
+        "post",
+        "body",
+        "simplpass"
+      ],
+      "caseIds": [
+        "R1-NUM-ARITH-SUB-001",
+        "R1-NUM-ARITH-SUB-002",
+        "R1-NUM-ARITH-SUB-003",
+        "R1-NUM-ARITH-SUB-004",
+        "R1-NUM-ARITH-SUB-005",
+        "R1-NUM-ARITH-SUB-006",
+        "R1-NUM-ARITH-SUB-007",
+        "R1-NUM-ARITH-SUB-008",
+        "R1-NUM-ARITH-SUB-009",
+        "R1-NUM-ARITH-SUB-010",
+        "R1-NUM-ARITH-SUB-011",
+        "R1-NUM-ARITH-SUB-012",
+        "R1-NUM-ARITH-SUB-013",
+        "R1-NUM-ARITH-SUB-014",
+        "R1-NUM-ARITH-SUB-015",
+        "R1-NUM-ARITH-SUB-016",
+        "R1-NUM-ARITH-SUB-017",
+        "R1-NUM-ARITH-SUB-018"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-ARITH-SUB.jsonl"
+    },
+    {
+      "id": "N1:NUM-ARITH-MUL",
+      "row": "NUM-ARITH-MUL",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator",
+        "post",
+        "body",
+        "simplpass"
+      ],
+      "caseIds": [
+        "R1-NUM-ARITH-MUL-001",
+        "R1-NUM-ARITH-MUL-002",
+        "R1-NUM-ARITH-MUL-003",
+        "R1-NUM-ARITH-MUL-004",
+        "R1-NUM-ARITH-MUL-005",
+        "R1-NUM-ARITH-MUL-006",
+        "R1-NUM-ARITH-MUL-007",
+        "R1-NUM-ARITH-MUL-008",
+        "R1-NUM-ARITH-MUL-009",
+        "R1-NUM-ARITH-MUL-010",
+        "R1-NUM-ARITH-MUL-011",
+        "R1-NUM-ARITH-MUL-012",
+        "R1-NUM-ARITH-MUL-013",
+        "R1-NUM-ARITH-MUL-014",
+        "R1-NUM-ARITH-MUL-015",
+        "R1-NUM-ARITH-MUL-016",
+        "R1-NUM-ARITH-MUL-017",
+        "R1-NUM-ARITH-MUL-018"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-ARITH-MUL.jsonl"
+    },
+    {
+      "id": "N1:NUM-DIVMOD-LITERAL",
+      "row": "NUM-DIVMOD-LITERAL",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator",
+        "post",
+        "divisor",
+        "body"
+      ],
+      "caseIds": [
+        "R1-NUM-DIVMOD-LITERAL-001",
+        "R1-NUM-DIVMOD-LITERAL-002",
+        "R1-NUM-DIVMOD-LITERAL-003",
+        "R1-NUM-DIVMOD-LITERAL-004",
+        "R1-NUM-DIVMOD-LITERAL-005",
+        "R1-NUM-DIVMOD-LITERAL-006",
+        "R1-NUM-DIVMOD-LITERAL-007",
+        "R1-NUM-DIVMOD-LITERAL-008",
+        "R1-NUM-DIVMOD-LITERAL-009",
+        "R1-NUM-DIVMOD-LITERAL-010",
+        "R1-NUM-DIVMOD-LITERAL-011",
+        "R1-NUM-DIVMOD-LITERAL-012",
+        "R1-NUM-DIVMOD-LITERAL-013",
+        "R1-NUM-DIVMOD-LITERAL-014"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-DIVMOD-LITERAL.jsonl"
+    },
+    {
+      "id": "N1:NUM-DIVMOD-VAR-ENTAILED",
+      "row": "NUM-DIVMOD-VAR-ENTAILED",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "post",
+        "divisor"
+      ],
+      "caseIds": [
+        "R1-NUM-DIVMOD-VAR-ENTAILED-001",
+        "R1-NUM-DIVMOD-VAR-ENTAILED-002",
+        "R1-NUM-DIVMOD-VAR-ENTAILED-003",
+        "R1-NUM-DIVMOD-VAR-ENTAILED-004",
+        "R1-NUM-DIVMOD-VAR-ENTAILED-005",
+        "R1-NUM-DIVMOD-VAR-ENTAILED-006",
+        "R1-NUM-DIVMOD-VAR-ENTAILED-007",
+        "R1-NUM-DIVMOD-VAR-ENTAILED-008",
+        "R1-NUM-DIVMOD-VAR-ENTAILED-009",
+        "R1-NUM-DIVMOD-VAR-ENTAILED-010",
+        "R1-NUM-DIVMOD-VAR-ENTAILED-011",
+        "R1-NUM-DIVMOD-VAR-ENTAILED-012"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-DIVMOD-VAR-ENTAILED.jsonl"
+    },
+    {
+      "id": "N1:NUM-DIVMOD-VAR-UNGUARDED",
+      "row": "NUM-DIVMOD-VAR-UNGUARDED",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "post",
+        "divisor"
+      ],
+      "caseIds": [
+        "R1-NUM-DIVMOD-VAR-UNGUARDED-001",
+        "R1-NUM-DIVMOD-VAR-UNGUARDED-002",
+        "R1-NUM-DIVMOD-VAR-UNGUARDED-003",
+        "R1-NUM-DIVMOD-VAR-UNGUARDED-004",
+        "R1-NUM-DIVMOD-VAR-UNGUARDED-005",
+        "R1-NUM-DIVMOD-VAR-UNGUARDED-006",
+        "R1-NUM-DIVMOD-VAR-UNGUARDED-007",
+        "R1-NUM-DIVMOD-VAR-UNGUARDED-008",
+        "R1-NUM-DIVMOD-VAR-UNGUARDED-009",
+        "R1-NUM-DIVMOD-VAR-UNGUARDED-010",
+        "R1-NUM-DIVMOD-VAR-UNGUARDED-011"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-DIVMOD-VAR-UNGUARDED.jsonl"
+    },
+    {
+      "id": "N1:NUM-SHIFT",
+      "row": "NUM-SHIFT",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-NUM-SHIFT-001",
+        "R1-NUM-SHIFT-002",
+        "R1-NUM-SHIFT-003",
+        "R1-NUM-SHIFT-004",
+        "R1-NUM-SHIFT-005",
+        "R1-NUM-SHIFT-006",
+        "R1-NUM-SHIFT-007",
+        "R1-NUM-SHIFT-008",
+        "R1-NUM-SHIFT-009",
+        "R1-NUM-SHIFT-010",
+        "R1-NUM-SHIFT-011",
+        "R1-NUM-SHIFT-012",
+        "R1-NUM-SHIFT-013",
+        "R1-NUM-SHIFT-014",
+        "R1-NUM-SHIFT-015",
+        "R1-NUM-SHIFT-016",
+        "R1-NUM-SHIFT-017"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-SHIFT.jsonl"
+    },
+    {
+      "id": "N1:NUM-BITWISE",
+      "row": "NUM-BITWISE",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-NUM-BITWISE-001",
+        "R1-NUM-BITWISE-002",
+        "R1-NUM-BITWISE-003",
+        "R1-NUM-BITWISE-004",
+        "R1-NUM-BITWISE-005",
+        "R1-NUM-BITWISE-006",
+        "R1-NUM-BITWISE-007",
+        "R1-NUM-BITWISE-008",
+        "R1-NUM-BITWISE-009",
+        "R1-NUM-BITWISE-010",
+        "R1-NUM-BITWISE-011",
+        "R1-NUM-BITWISE-012",
+        "R1-NUM-BITWISE-013",
+        "R1-NUM-BITWISE-014",
+        "R1-NUM-BITWISE-015"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-BITWISE.jsonl"
+    },
+    {
+      "id": "N1:NUM-COMPARE",
+      "row": "NUM-COMPARE",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-NUM-COMPARE-001",
+        "R1-NUM-COMPARE-002",
+        "R1-NUM-COMPARE-003",
+        "R1-NUM-COMPARE-004",
+        "R1-NUM-COMPARE-005",
+        "R1-NUM-COMPARE-006",
+        "R1-NUM-COMPARE-007",
+        "R1-NUM-COMPARE-008",
+        "R1-NUM-COMPARE-009",
+        "R1-NUM-COMPARE-010",
+        "R1-NUM-COMPARE-011",
+        "R1-NUM-COMPARE-012",
+        "R1-NUM-COMPARE-013",
+        "R1-NUM-COMPARE-014",
+        "R1-NUM-COMPARE-015",
+        "R1-NUM-COMPARE-016",
+        "R1-NUM-COMPARE-017",
+        "R1-NUM-COMPARE-018"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-COMPARE.jsonl"
+    },
+    {
+      "id": "N1:NUM-EQUALITY",
+      "row": "NUM-EQUALITY",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-NUM-EQUALITY-001",
+        "R1-NUM-EQUALITY-002",
+        "R1-NUM-EQUALITY-003",
+        "R1-NUM-EQUALITY-004",
+        "R1-NUM-EQUALITY-005",
+        "R1-NUM-EQUALITY-006",
+        "R1-NUM-EQUALITY-007",
+        "R1-NUM-EQUALITY-008",
+        "R1-NUM-EQUALITY-009",
+        "R1-NUM-EQUALITY-010",
+        "R1-NUM-EQUALITY-011",
+        "R1-NUM-EQUALITY-012"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-EQUALITY.jsonl"
+    },
+    {
+      "id": "N1:NUM-NEGATE",
+      "row": "NUM-NEGATE",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator",
+        "post",
+        "body",
+        "simplifier"
+      ],
+      "caseIds": [
+        "R1-NUM-NEGATE-001",
+        "R1-NUM-NEGATE-002",
+        "R1-NUM-NEGATE-003",
+        "R1-NUM-NEGATE-004",
+        "R1-NUM-NEGATE-005",
+        "R1-NUM-NEGATE-006",
+        "R1-NUM-NEGATE-007",
+        "R1-NUM-NEGATE-008",
+        "R1-NUM-NEGATE-009",
+        "R1-NUM-NEGATE-010",
+        "R1-NUM-NEGATE-011"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-NEGATE.jsonl"
+    },
+    {
+      "id": "N1:NUM-NARROW-ARITH",
+      "row": "NUM-NARROW-ARITH",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-NUM-NARROW-ARITH-001",
+        "R1-NUM-NARROW-ARITH-002",
+        "R1-NUM-NARROW-ARITH-003",
+        "R1-NUM-NARROW-ARITH-004",
+        "R1-NUM-NARROW-ARITH-005",
+        "R1-NUM-NARROW-ARITH-006",
+        "R1-NUM-NARROW-ARITH-007",
+        "R1-NUM-NARROW-ARITH-008",
+        "R1-NUM-NARROW-ARITH-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-NARROW-ARITH.jsonl"
+    },
+    {
+      "id": "N1:NUM-NARROW-COMPARE",
+      "row": "NUM-NARROW-COMPARE",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-NUM-NARROW-COMPARE-001",
+        "R1-NUM-NARROW-COMPARE-002",
+        "R1-NUM-NARROW-COMPARE-003",
+        "R1-NUM-NARROW-COMPARE-004",
+        "R1-NUM-NARROW-COMPARE-005",
+        "R1-NUM-NARROW-COMPARE-006",
+        "R1-NUM-NARROW-COMPARE-007",
+        "R1-NUM-NARROW-COMPARE-008",
+        "R1-NUM-NARROW-COMPARE-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-NARROW-COMPARE.jsonl"
+    },
+    {
+      "id": "N1:NUM-LITERAL-TYPED",
+      "row": "NUM-LITERAL-TYPED",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "post",
+        "simplifier"
+      ],
+      "caseIds": [
+        "R1-NUM-LITERAL-TYPED-001",
+        "R1-NUM-LITERAL-TYPED-002",
+        "R1-NUM-LITERAL-TYPED-003",
+        "R1-NUM-LITERAL-TYPED-004",
+        "R1-NUM-LITERAL-TYPED-005",
+        "R1-NUM-LITERAL-TYPED-006",
+        "R1-NUM-LITERAL-TYPED-007",
+        "R1-NUM-LITERAL-TYPED-008",
+        "R1-NUM-LITERAL-TYPED-009",
+        "R1-NUM-LITERAL-TYPED-010",
+        "R1-NUM-LITERAL-TYPED-011",
+        "R1-NUM-LITERAL-TYPED-012"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-LITERAL-TYPED.jsonl"
+    },
+    {
+      "id": "N1:NUM-LITERAL-OVERSIZE",
+      "row": "NUM-LITERAL-OVERSIZE",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-NUM-LITERAL-OVERSIZE-001",
+        "R1-NUM-LITERAL-OVERSIZE-002",
+        "R1-NUM-LITERAL-OVERSIZE-003",
+        "R1-NUM-LITERAL-OVERSIZE-004"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-LITERAL-OVERSIZE.jsonl"
+    },
+    {
+      "id": "N1:NUM-MIXED-U64-SIGNED",
+      "row": "NUM-MIXED-U64-SIGNED",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-NUM-MIXED-U64-SIGNED-001",
+        "R1-NUM-MIXED-U64-SIGNED-002",
+        "R1-NUM-MIXED-U64-SIGNED-003",
+        "R1-NUM-MIXED-U64-SIGNED-004",
+        "R1-NUM-MIXED-U64-SIGNED-005",
+        "R1-NUM-MIXED-U64-SIGNED-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-MIXED-U64-SIGNED.jsonl"
+    },
+    {
+      "id": "N1:NUM-OVERFLOW-CHECKED",
+      "row": "NUM-OVERFLOW-CHECKED",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "post",
+        "module"
+      ],
+      "caseIds": [
+        "R1-NUM-OVERFLOW-CHECKED-001",
+        "R1-NUM-OVERFLOW-CHECKED-002",
+        "R1-NUM-OVERFLOW-CHECKED-003",
+        "R1-NUM-OVERFLOW-CHECKED-004",
+        "R1-NUM-OVERFLOW-CHECKED-005",
+        "R1-NUM-OVERFLOW-CHECKED-006",
+        "R1-NUM-OVERFLOW-CHECKED-007",
+        "R1-NUM-OVERFLOW-CHECKED-008",
+        "R1-NUM-OVERFLOW-CHECKED-009",
+        "R1-NUM-OVERFLOW-CHECKED-010",
+        "R1-NUM-OVERFLOW-CHECKED-011",
+        "R1-NUM-OVERFLOW-CHECKED-012"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-OVERFLOW-CHECKED.jsonl"
+    },
+    {
+      "id": "N1:NUM-OVERFLOW-UNCHECKED",
+      "row": "NUM-OVERFLOW-UNCHECKED",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "post",
+        "module"
+      ],
+      "caseIds": [
+        "R1-NUM-OVERFLOW-UNCHECKED-001",
+        "R1-NUM-OVERFLOW-UNCHECKED-002",
+        "R1-NUM-OVERFLOW-UNCHECKED-003",
+        "R1-NUM-OVERFLOW-UNCHECKED-004",
+        "R1-NUM-OVERFLOW-UNCHECKED-005",
+        "R1-NUM-OVERFLOW-UNCHECKED-006",
+        "R1-NUM-OVERFLOW-UNCHECKED-007",
+        "R1-NUM-OVERFLOW-UNCHECKED-008",
+        "R1-NUM-OVERFLOW-UNCHECKED-009",
+        "R1-NUM-OVERFLOW-UNCHECKED-010",
+        "R1-NUM-OVERFLOW-UNCHECKED-011",
+        "R1-NUM-OVERFLOW-UNCHECKED-012"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-OVERFLOW-UNCHECKED.jsonl"
+    },
+    {
+      "id": "N1:BOOL-CONNECTIVES",
+      "row": "BOOL-CONNECTIVES",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-BOOL-CONNECTIVES-001",
+        "R1-BOOL-CONNECTIVES-002",
+        "R1-BOOL-CONNECTIVES-003",
+        "R1-BOOL-CONNECTIVES-004",
+        "R1-BOOL-CONNECTIVES-005",
+        "R1-BOOL-CONNECTIVES-006",
+        "R1-BOOL-CONNECTIVES-007",
+        "R1-BOOL-CONNECTIVES-008",
+        "R1-BOOL-CONNECTIVES-009",
+        "R1-BOOL-CONNECTIVES-010",
+        "R1-BOOL-CONNECTIVES-011",
+        "R1-BOOL-CONNECTIVES-012",
+        "R1-BOOL-CONNECTIVES-013",
+        "R1-BOOL-CONNECTIVES-014",
+        "R1-BOOL-CONNECTIVES-015"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BOOL-CONNECTIVES.jsonl"
+    },
+    {
+      "id": "N1:BOOL-SHORTCIRCUIT",
+      "row": "BOOL-SHORTCIRCUIT",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "divisor",
+        "post"
+      ],
+      "caseIds": [
+        "R1-BOOL-SHORTCIRCUIT-001",
+        "R1-BOOL-SHORTCIRCUIT-002",
+        "R1-BOOL-SHORTCIRCUIT-003",
+        "R1-BOOL-SHORTCIRCUIT-004",
+        "R1-BOOL-SHORTCIRCUIT-005",
+        "R1-BOOL-SHORTCIRCUIT-006",
+        "R1-BOOL-SHORTCIRCUIT-007",
+        "R1-BOOL-SHORTCIRCUIT-008",
+        "R1-BOOL-SHORTCIRCUIT-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BOOL-SHORTCIRCUIT.jsonl"
+    },
+    {
+      "id": "N1:BOOL-CONDITIONAL",
+      "row": "BOOL-CONDITIONAL",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-BOOL-CONDITIONAL-001",
+        "R1-BOOL-CONDITIONAL-002",
+        "R1-BOOL-CONDITIONAL-003",
+        "R1-BOOL-CONDITIONAL-004",
+        "R1-BOOL-CONDITIONAL-005",
+        "R1-BOOL-CONDITIONAL-006",
+        "R1-BOOL-CONDITIONAL-007",
+        "R1-BOOL-CONDITIONAL-008",
+        "R1-BOOL-CONDITIONAL-009",
+        "R1-BOOL-CONDITIONAL-010",
+        "R1-BOOL-CONDITIONAL-011",
+        "R1-BOOL-CONDITIONAL-012"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BOOL-CONDITIONAL.jsonl"
+    },
+    {
+      "id": "N1:BOOL-IMPLICATION",
+      "row": "BOOL-IMPLICATION",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-BOOL-IMPLICATION-001",
+        "R1-BOOL-IMPLICATION-002",
+        "R1-BOOL-IMPLICATION-003",
+        "R1-BOOL-IMPLICATION-004",
+        "R1-BOOL-IMPLICATION-005",
+        "R1-BOOL-IMPLICATION-006",
+        "R1-BOOL-IMPLICATION-007",
+        "R1-BOOL-IMPLICATION-008",
+        "R1-BOOL-IMPLICATION-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BOOL-IMPLICATION.jsonl"
+    },
+    {
+      "id": "N1:BOOL-NESTING",
+      "row": "BOOL-NESTING",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-BOOL-NESTING-001",
+        "R1-BOOL-NESTING-002",
+        "R1-BOOL-NESTING-003",
+        "R1-BOOL-NESTING-004",
+        "R1-BOOL-NESTING-005",
+        "R1-BOOL-NESTING-006",
+        "R1-BOOL-NESTING-007",
+        "R1-BOOL-NESTING-008",
+        "R1-BOOL-NESTING-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BOOL-NESTING.jsonl"
+    },
+    {
+      "id": "N1:BODY-RETURN-EXPR",
+      "row": "BODY-RETURN-EXPR",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "body",
+        "post"
+      ],
+      "caseIds": [
+        "R1-BODY-RETURN-EXPR-001",
+        "R1-BODY-RETURN-EXPR-002",
+        "R1-BODY-RETURN-EXPR-003",
+        "R1-BODY-RETURN-EXPR-004",
+        "R1-BODY-RETURN-EXPR-005",
+        "R1-BODY-RETURN-EXPR-006",
+        "R1-BODY-RETURN-EXPR-007",
+        "R1-BODY-RETURN-EXPR-008",
+        "R1-BODY-RETURN-EXPR-009",
+        "R1-BODY-RETURN-EXPR-010",
+        "R1-BODY-RETURN-EXPR-011",
+        "R1-BODY-RETURN-EXPR-012",
+        "R1-BODY-RETURN-EXPR-013",
+        "R1-BODY-RETURN-EXPR-014",
+        "R1-BODY-RETURN-EXPR-015"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BODY-RETURN-EXPR.jsonl"
+    },
+    {
+      "id": "N1:BODY-IF-ELSE",
+      "row": "BODY-IF-ELSE",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "body",
+        "post"
+      ],
+      "caseIds": [
+        "R1-BODY-IF-ELSE-001",
+        "R1-BODY-IF-ELSE-002",
+        "R1-BODY-IF-ELSE-003",
+        "R1-BODY-IF-ELSE-004",
+        "R1-BODY-IF-ELSE-005",
+        "R1-BODY-IF-ELSE-006",
+        "R1-BODY-IF-ELSE-007",
+        "R1-BODY-IF-ELSE-008",
+        "R1-BODY-IF-ELSE-009",
+        "R1-BODY-IF-ELSE-010",
+        "R1-BODY-IF-ELSE-011",
+        "R1-BODY-IF-ELSE-012",
+        "R1-BODY-IF-ELSE-013",
+        "R1-BODY-IF-ELSE-014"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BODY-IF-ELSE.jsonl"
+    },
+    {
+      "id": "N1:BODY-GUARD-CLAUSE",
+      "row": "BODY-GUARD-CLAUSE",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "body",
+        "post"
+      ],
+      "caseIds": [
+        "R1-BODY-GUARD-CLAUSE-001",
+        "R1-BODY-GUARD-CLAUSE-002",
+        "R1-BODY-GUARD-CLAUSE-003",
+        "R1-BODY-GUARD-CLAUSE-004",
+        "R1-BODY-GUARD-CLAUSE-005",
+        "R1-BODY-GUARD-CLAUSE-006",
+        "R1-BODY-GUARD-CLAUSE-007",
+        "R1-BODY-GUARD-CLAUSE-008",
+        "R1-BODY-GUARD-CLAUSE-009",
+        "R1-BODY-GUARD-CLAUSE-010",
+        "R1-BODY-GUARD-CLAUSE-011",
+        "R1-BODY-GUARD-CLAUSE-012"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BODY-GUARD-CLAUSE.jsonl"
+    },
+    {
+      "id": "N1:BODY-NESTED-RETURN",
+      "row": "BODY-NESTED-RETURN",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "body",
+        "post"
+      ],
+      "caseIds": [
+        "R1-BODY-NESTED-RETURN-001",
+        "R1-BODY-NESTED-RETURN-002",
+        "R1-BODY-NESTED-RETURN-003",
+        "R1-BODY-NESTED-RETURN-004",
+        "R1-BODY-NESTED-RETURN-005",
+        "R1-BODY-NESTED-RETURN-006",
+        "R1-BODY-NESTED-RETURN-007",
+        "R1-BODY-NESTED-RETURN-008",
+        "R1-BODY-NESTED-RETURN-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BODY-NESTED-RETURN.jsonl"
+    },
+    {
+      "id": "N1:BODY-IMMUTABLE-BIND",
+      "row": "BODY-IMMUTABLE-BIND",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "body",
+        "post"
+      ],
+      "caseIds": [
+        "R1-BODY-IMMUTABLE-BIND-001",
+        "R1-BODY-IMMUTABLE-BIND-002",
+        "R1-BODY-IMMUTABLE-BIND-003",
+        "R1-BODY-IMMUTABLE-BIND-004",
+        "R1-BODY-IMMUTABLE-BIND-005",
+        "R1-BODY-IMMUTABLE-BIND-006",
+        "R1-BODY-IMMUTABLE-BIND-007",
+        "R1-BODY-IMMUTABLE-BIND-008",
+        "R1-BODY-IMMUTABLE-BIND-009",
+        "R1-BODY-IMMUTABLE-BIND-010",
+        "R1-BODY-IMMUTABLE-BIND-011",
+        "R1-BODY-IMMUTABLE-BIND-012"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BODY-IMMUTABLE-BIND.jsonl"
+    },
+    {
+      "id": "N1:BODY-WIDTH-BIND",
+      "row": "BODY-WIDTH-BIND",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "body",
+        "post"
+      ],
+      "caseIds": [
+        "R1-BODY-WIDTH-BIND-001",
+        "R1-BODY-WIDTH-BIND-002",
+        "R1-BODY-WIDTH-BIND-003",
+        "R1-BODY-WIDTH-BIND-004",
+        "R1-BODY-WIDTH-BIND-005",
+        "R1-BODY-WIDTH-BIND-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BODY-WIDTH-BIND.jsonl"
+    },
+    {
+      "id": "N1:BODY-DIVISION",
+      "row": "BODY-DIVISION",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "body",
+        "divisor",
+        "post"
+      ],
+      "caseIds": [
+        "R1-BODY-DIVISION-001",
+        "R1-BODY-DIVISION-002",
+        "R1-BODY-DIVISION-003",
+        "R1-BODY-DIVISION-004",
+        "R1-BODY-DIVISION-005",
+        "R1-BODY-DIVISION-006",
+        "R1-BODY-DIVISION-007",
+        "R1-BODY-DIVISION-008",
+        "R1-BODY-DIVISION-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BODY-DIVISION.jsonl"
+    },
+    {
+      "id": "N1:BODY-LOOP-CALL-MUTABLE",
+      "row": "BODY-LOOP-CALL-MUTABLE",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "body",
+        "post"
+      ],
+      "caseIds": [
+        "R1-BODY-LOOP-CALL-MUTABLE-001",
+        "R1-BODY-LOOP-CALL-MUTABLE-002",
+        "R1-BODY-LOOP-CALL-MUTABLE-003",
+        "R1-BODY-LOOP-CALL-MUTABLE-004",
+        "R1-BODY-LOOP-CALL-MUTABLE-005",
+        "R1-BODY-LOOP-CALL-MUTABLE-006",
+        "R1-BODY-LOOP-CALL-MUTABLE-007",
+        "R1-BODY-LOOP-CALL-MUTABLE-008"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BODY-LOOP-CALL-MUTABLE.jsonl"
+    },
+    {
+      "id": "N1:BODY-ARRAY-RETURN",
+      "row": "BODY-ARRAY-RETURN",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "body",
+        "post"
+      ],
+      "caseIds": [
+        "R1-BODY-ARRAY-RETURN-001",
+        "R1-BODY-ARRAY-RETURN-002",
+        "R1-BODY-ARRAY-RETURN-003",
+        "R1-BODY-ARRAY-RETURN-004"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BODY-ARRAY-RETURN.jsonl"
+    },
+    {
+      "id": "N1:POST-PARAM-PRESERVED",
+      "row": "POST-PARAM-PRESERVED",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "body",
+        "post"
+      ],
+      "caseIds": [
+        "R1-POST-PARAM-PRESERVED-001",
+        "R1-POST-PARAM-PRESERVED-002",
+        "R1-POST-PARAM-PRESERVED-003",
+        "R1-POST-PARAM-PRESERVED-004",
+        "R1-POST-PARAM-PRESERVED-005",
+        "R1-POST-PARAM-PRESERVED-006",
+        "R1-POST-PARAM-PRESERVED-007",
+        "R1-POST-PARAM-PRESERVED-008",
+        "R1-POST-PARAM-PRESERVED-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/POST-PARAM-PRESERVED.jsonl"
+    },
+    {
+      "id": "N1:POST-PARAM-MUTATED",
+      "row": "POST-PARAM-MUTATED",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "body",
+        "post"
+      ],
+      "caseIds": [
+        "R1-POST-PARAM-MUTATED-001",
+        "R1-POST-PARAM-MUTATED-002",
+        "R1-POST-PARAM-MUTATED-003",
+        "R1-POST-PARAM-MUTATED-004",
+        "R1-POST-PARAM-MUTATED-005",
+        "R1-POST-PARAM-MUTATED-006",
+        "R1-POST-PARAM-MUTATED-007",
+        "R1-POST-PARAM-MUTATED-008",
+        "R1-POST-PARAM-MUTATED-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/POST-PARAM-MUTATED.jsonl"
+    },
+    {
+      "id": "N1:POST-RESULT-PARAM-COLLISION",
+      "row": "POST-RESULT-PARAM-COLLISION",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "post"
+      ],
+      "caseIds": [
+        "R1-POST-RESULT-PARAM-COLLISION-001",
+        "R1-POST-RESULT-PARAM-COLLISION-002",
+        "R1-POST-RESULT-PARAM-COLLISION-003"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/POST-RESULT-PARAM-COLLISION.jsonl"
+    },
+    {
+      "id": "N1:POST-ARRAY-ALIAS",
+      "row": "POST-ARRAY-ALIAS",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "body",
+        "post"
+      ],
+      "caseIds": [
+        "R1-POST-ARRAY-ALIAS-001",
+        "R1-POST-ARRAY-ALIAS-002",
+        "R1-POST-ARRAY-ALIAS-003",
+        "R1-POST-ARRAY-ALIAS-004",
+        "R1-POST-ARRAY-ALIAS-005",
+        "R1-POST-ARRAY-ALIAS-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/POST-ARRAY-ALIAS.jsonl"
+    },
+    {
+      "id": "N1:POST-METHOD-RECEIVER",
+      "row": "POST-METHOD-RECEIVER",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "pass",
+        "body",
+        "post"
+      ],
+      "caseIds": [
+        "R1-POST-METHOD-RECEIVER-001",
+        "R1-POST-METHOD-RECEIVER-002",
+        "R1-POST-METHOD-RECEIVER-003",
+        "R1-POST-METHOD-RECEIVER-004",
+        "R1-POST-METHOD-RECEIVER-005",
+        "R1-POST-METHOD-RECEIVER-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/POST-METHOD-RECEIVER.jsonl"
+    },
+    {
+      "id": "N1:QNT-FORALL-BOUNDED",
+      "row": "QNT-FORALL-BOUNDED",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "post",
+        "emitQuant"
+      ],
+      "caseIds": [
+        "R1-QNT-FORALL-BOUNDED-001",
+        "R1-QNT-FORALL-BOUNDED-002",
+        "R1-QNT-FORALL-BOUNDED-003",
+        "R1-QNT-FORALL-BOUNDED-004",
+        "R1-QNT-FORALL-BOUNDED-005",
+        "R1-QNT-FORALL-BOUNDED-006",
+        "R1-QNT-FORALL-BOUNDED-007",
+        "R1-QNT-FORALL-BOUNDED-008",
+        "R1-QNT-FORALL-BOUNDED-009",
+        "R1-QNT-FORALL-BOUNDED-010",
+        "R1-QNT-FORALL-BOUNDED-011",
+        "R1-QNT-FORALL-BOUNDED-012"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/QNT-FORALL-BOUNDED.jsonl"
+    },
+    {
+      "id": "N1:QNT-EXISTS-BOUNDED",
+      "row": "QNT-EXISTS-BOUNDED",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "post",
+        "emitQuant"
+      ],
+      "caseIds": [
+        "R1-QNT-EXISTS-BOUNDED-001",
+        "R1-QNT-EXISTS-BOUNDED-002",
+        "R1-QNT-EXISTS-BOUNDED-003",
+        "R1-QNT-EXISTS-BOUNDED-004",
+        "R1-QNT-EXISTS-BOUNDED-005",
+        "R1-QNT-EXISTS-BOUNDED-006",
+        "R1-QNT-EXISTS-BOUNDED-007",
+        "R1-QNT-EXISTS-BOUNDED-008",
+        "R1-QNT-EXISTS-BOUNDED-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/QNT-EXISTS-BOUNDED.jsonl"
+    },
+    {
+      "id": "N1:QNT-UNBOUNDED",
+      "row": "QNT-UNBOUNDED",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "contractVerifier",
+        "emitQuant"
+      ],
+      "caseIds": [
+        "R1-QNT-UNBOUNDED-001",
+        "R1-QNT-UNBOUNDED-002",
+        "R1-QNT-UNBOUNDED-003",
+        "R1-QNT-UNBOUNDED-004",
+        "R1-QNT-UNBOUNDED-005",
+        "R1-QNT-UNBOUNDED-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/QNT-UNBOUNDED.jsonl"
+    },
+    {
+      "id": "N1:QNT-BOUND-TYPES",
+      "row": "QNT-BOUND-TYPES",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator",
+        "emitQuant"
+      ],
+      "caseIds": [
+        "R1-QNT-BOUND-TYPES-001",
+        "R1-QNT-BOUND-TYPES-002",
+        "R1-QNT-BOUND-TYPES-003",
+        "R1-QNT-BOUND-TYPES-004",
+        "R1-QNT-BOUND-TYPES-005",
+        "R1-QNT-BOUND-TYPES-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/QNT-BOUND-TYPES.jsonl"
+    },
+    {
+      "id": "N1:QNT-NESTED",
+      "row": "QNT-NESTED",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "emitQuant"
+      ],
+      "caseIds": [
+        "R1-QNT-NESTED-001",
+        "R1-QNT-NESTED-002",
+        "R1-QNT-NESTED-003",
+        "R1-QNT-NESTED-004",
+        "R1-QNT-NESTED-005",
+        "R1-QNT-NESTED-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/QNT-NESTED.jsonl"
+    },
+    {
+      "id": "N1:ARR-LENGTH",
+      "row": "ARR-LENGTH",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-ARR-LENGTH-001",
+        "R1-ARR-LENGTH-002",
+        "R1-ARR-LENGTH-003",
+        "R1-ARR-LENGTH-004",
+        "R1-ARR-LENGTH-005",
+        "R1-ARR-LENGTH-006",
+        "R1-ARR-LENGTH-007",
+        "R1-ARR-LENGTH-008",
+        "R1-ARR-LENGTH-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/ARR-LENGTH.jsonl"
+    },
+    {
+      "id": "N1:ARR-INDEX",
+      "row": "ARR-INDEX",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "post",
+        "body"
+      ],
+      "caseIds": [
+        "R1-ARR-INDEX-001",
+        "R1-ARR-INDEX-002",
+        "R1-ARR-INDEX-003",
+        "R1-ARR-INDEX-004",
+        "R1-ARR-INDEX-005",
+        "R1-ARR-INDEX-006",
+        "R1-ARR-INDEX-007",
+        "R1-ARR-INDEX-008",
+        "R1-ARR-INDEX-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/ARR-INDEX.jsonl"
+    },
+    {
+      "id": "N1:ARR-ELEMENT-TYPES",
+      "row": "ARR-ELEMENT-TYPES",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-ARR-ELEMENT-TYPES-001",
+        "R1-ARR-ELEMENT-TYPES-002",
+        "R1-ARR-ELEMENT-TYPES-003",
+        "R1-ARR-ELEMENT-TYPES-004",
+        "R1-ARR-ELEMENT-TYPES-005",
+        "R1-ARR-ELEMENT-TYPES-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/ARR-ELEMENT-TYPES.jsonl"
+    },
+    {
+      "id": "N1:ARR-COMPUTED-BASE",
+      "row": "ARR-COMPUTED-BASE",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator"
+      ],
+      "caseIds": [
+        "R1-ARR-COMPUTED-BASE-001",
+        "R1-ARR-COMPUTED-BASE-002",
+        "R1-ARR-COMPUTED-BASE-003",
+        "R1-ARR-COMPUTED-BASE-004"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/ARR-COMPUTED-BASE.jsonl"
+    },
+    {
+      "id": "N1:STR-OPS-PREDICATE",
+      "row": "STR-OPS-PREDICATE",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-STR-OPS-PREDICATE-001",
+        "R1-STR-OPS-PREDICATE-002",
+        "R1-STR-OPS-PREDICATE-003",
+        "R1-STR-OPS-PREDICATE-004",
+        "R1-STR-OPS-PREDICATE-005",
+        "R1-STR-OPS-PREDICATE-006",
+        "R1-STR-OPS-PREDICATE-007",
+        "R1-STR-OPS-PREDICATE-008",
+        "R1-STR-OPS-PREDICATE-009",
+        "R1-STR-OPS-PREDICATE-010",
+        "R1-STR-OPS-PREDICATE-011",
+        "R1-STR-OPS-PREDICATE-012"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/STR-OPS-PREDICATE.jsonl"
+    },
+    {
+      "id": "N1:STR-OPS-COUNT-INDEX",
+      "row": "STR-OPS-COUNT-INDEX",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-STR-OPS-COUNT-INDEX-001",
+        "R1-STR-OPS-COUNT-INDEX-002",
+        "R1-STR-OPS-COUNT-INDEX-003",
+        "R1-STR-OPS-COUNT-INDEX-004",
+        "R1-STR-OPS-COUNT-INDEX-005",
+        "R1-STR-OPS-COUNT-INDEX-006",
+        "R1-STR-OPS-COUNT-INDEX-007",
+        "R1-STR-OPS-COUNT-INDEX-008",
+        "R1-STR-OPS-COUNT-INDEX-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/STR-OPS-COUNT-INDEX.jsonl"
+    },
+    {
+      "id": "N1:STR-CULTURE-MODE",
+      "row": "STR-CULTURE-MODE",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator"
+      ],
+      "caseIds": [
+        "R1-STR-CULTURE-MODE-001",
+        "R1-STR-CULTURE-MODE-002",
+        "R1-STR-CULTURE-MODE-003",
+        "R1-STR-CULTURE-MODE-004",
+        "R1-STR-CULTURE-MODE-005",
+        "R1-STR-CULTURE-MODE-006",
+        "R1-STR-CULTURE-MODE-007"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/STR-CULTURE-MODE.jsonl"
+    },
+    {
+      "id": "N1:STR-UNMODELED-OPS",
+      "row": "STR-UNMODELED-OPS",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist"
+      ],
+      "caseIds": [
+        "R1-STR-UNMODELED-OPS-001",
+        "R1-STR-UNMODELED-OPS-002",
+        "R1-STR-UNMODELED-OPS-003",
+        "R1-STR-UNMODELED-OPS-004",
+        "R1-STR-UNMODELED-OPS-005",
+        "R1-STR-UNMODELED-OPS-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/STR-UNMODELED-OPS.jsonl"
+    },
+    {
+      "id": "N1:STR-NULL-NONASCII",
+      "row": "STR-NULL-NONASCII",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "post",
+        "body"
+      ],
+      "caseIds": [
+        "R1-STR-NULL-NONASCII-001",
+        "R1-STR-NULL-NONASCII-002",
+        "R1-STR-NULL-NONASCII-003",
+        "R1-STR-NULL-NONASCII-004",
+        "R1-STR-NULL-NONASCII-005",
+        "R1-STR-NULL-NONASCII-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/STR-NULL-NONASCII.jsonl"
+    },
+    {
+      "id": "N1:FLD-ACCESS",
+      "row": "FLD-ACCESS",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "pass",
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-FLD-ACCESS-001",
+        "R1-FLD-ACCESS-002",
+        "R1-FLD-ACCESS-003",
+        "R1-FLD-ACCESS-004",
+        "R1-FLD-ACCESS-005",
+        "R1-FLD-ACCESS-006",
+        "R1-FLD-ACCESS-007"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/FLD-ACCESS.jsonl"
+    },
+    {
+      "id": "N1:FLD-INHERITED-NESTED",
+      "row": "FLD-INHERITED-NESTED",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "pass",
+        "translator"
+      ],
+      "caseIds": [
+        "R1-FLD-INHERITED-NESTED-001",
+        "R1-FLD-INHERITED-NESTED-002",
+        "R1-FLD-INHERITED-NESTED-003",
+        "R1-FLD-INHERITED-NESTED-004",
+        "R1-FLD-INHERITED-NESTED-005",
+        "R1-FLD-INHERITED-NESTED-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/FLD-INHERITED-NESTED.jsonl"
+    },
+    {
+      "id": "N1:FLT-REFUSAL",
+      "row": "FLT-REFUSAL",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist",
+        "translator"
+      ],
+      "caseIds": [
+        "R1-FLT-REFUSAL-001",
+        "R1-FLT-REFUSAL-002",
+        "R1-FLT-REFUSAL-003",
+        "R1-FLT-REFUSAL-004",
+        "R1-FLT-REFUSAL-005",
+        "R1-FLT-REFUSAL-006",
+        "R1-FLT-REFUSAL-007",
+        "R1-FLT-REFUSAL-008",
+        "R1-FLT-REFUSAL-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/FLT-REFUSAL.jsonl"
+    },
+    {
+      "id": "N1:CALL-IN-CONTRACT",
+      "row": "CALL-IN-CONTRACT",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "whitelist"
+      ],
+      "caseIds": [
+        "R1-CALL-IN-CONTRACT-001",
+        "R1-CALL-IN-CONTRACT-002",
+        "R1-CALL-IN-CONTRACT-003",
+        "R1-CALL-IN-CONTRACT-004",
+        "R1-CALL-IN-CONTRACT-005",
+        "R1-CALL-IN-CONTRACT-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CALL-IN-CONTRACT.jsonl"
+    },
+    {
+      "id": "N1:GEN-REFUSAL",
+      "row": "GEN-REFUSAL",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "contractVerifier"
+      ],
+      "caseIds": [
+        "R1-GEN-REFUSAL-001",
+        "R1-GEN-REFUSAL-002",
+        "R1-GEN-REFUSAL-003",
+        "R1-GEN-REFUSAL-004"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/GEN-REFUSAL.jsonl"
+    },
+    {
+      "id": "N1:VAC-UNSAT-PRECONDITIONS",
+      "row": "VAC-UNSAT-PRECONDITIONS",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "post",
+        "emitPost"
+      ],
+      "caseIds": [
+        "R1-VAC-UNSAT-PRECONDITIONS-001",
+        "R1-VAC-UNSAT-PRECONDITIONS-002",
+        "R1-VAC-UNSAT-PRECONDITIONS-003",
+        "R1-VAC-UNSAT-PRECONDITIONS-004",
+        "R1-VAC-UNSAT-PRECONDITIONS-005",
+        "R1-VAC-UNSAT-PRECONDITIONS-006",
+        "R1-VAC-UNSAT-PRECONDITIONS-007",
+        "R1-VAC-UNSAT-PRECONDITIONS-008",
+        "R1-VAC-UNSAT-PRECONDITIONS-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/VAC-UNSAT-PRECONDITIONS.jsonl"
+    },
+    {
+      "id": "N1:VAC-PRECONDITION-SAT-CLAIM",
+      "row": "VAC-PRECONDITION-SAT-CLAIM",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "precondition",
+      "entryPoints": [
+        "pre"
+      ],
+      "caseIds": [
+        "R1-VAC-PRECONDITION-SAT-CLAIM-001",
+        "R1-VAC-PRECONDITION-SAT-CLAIM-002",
+        "R1-VAC-PRECONDITION-SAT-CLAIM-003",
+        "R1-VAC-PRECONDITION-SAT-CLAIM-004",
+        "R1-VAC-PRECONDITION-SAT-CLAIM-005",
+        "R1-VAC-PRECONDITION-SAT-CLAIM-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/VAC-PRECONDITION-SAT-CLAIM.jsonl"
+    },
+    {
+      "id": "N1:OBL-PROOF",
+      "row": "OBL-PROOF",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "obligation",
+      "entryPoints": [
+        "oblGen",
+        "oblSolve",
+        "emitObl",
+        "refine"
+      ],
+      "caseIds": [
+        "R1-OBL-PROOF-001",
+        "R1-OBL-PROOF-002",
+        "R1-OBL-PROOF-003",
+        "R1-OBL-PROOF-004",
+        "R1-OBL-PROOF-005",
+        "R1-OBL-PROOF-006",
+        "R1-OBL-PROOF-007",
+        "R1-OBL-PROOF-008",
+        "R1-OBL-PROOF-009",
+        "R1-OBL-PROOF-010",
+        "R1-OBL-PROOF-011",
+        "R1-OBL-PROOF-012"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-PROOF.jsonl"
+    },
+    {
+      "id": "N1:OBL-REFINEMENT-ENTRY",
+      "row": "OBL-REFINEMENT-ENTRY",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "obligation",
+      "entryPoints": [
+        "oblGen",
+        "oblSolve",
+        "emitObl"
+      ],
+      "caseIds": [
+        "R1-OBL-REFINEMENT-ENTRY-001",
+        "R1-OBL-REFINEMENT-ENTRY-002",
+        "R1-OBL-REFINEMENT-ENTRY-003",
+        "R1-OBL-REFINEMENT-ENTRY-004",
+        "R1-OBL-REFINEMENT-ENTRY-005",
+        "R1-OBL-REFINEMENT-ENTRY-006",
+        "R1-OBL-REFINEMENT-ENTRY-007",
+        "R1-OBL-REFINEMENT-ENTRY-008",
+        "R1-OBL-REFINEMENT-ENTRY-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-REFINEMENT-ENTRY.jsonl"
+    },
+    {
+      "id": "N1:OBL-REFINEMENT-RETURN",
+      "row": "OBL-REFINEMENT-RETURN",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "obligation",
+      "entryPoints": [
+        "oblGen",
+        "oblSolve",
+        "emitObl"
+      ],
+      "caseIds": [
+        "R1-OBL-REFINEMENT-RETURN-001",
+        "R1-OBL-REFINEMENT-RETURN-002",
+        "R1-OBL-REFINEMENT-RETURN-003",
+        "R1-OBL-REFINEMENT-RETURN-004",
+        "R1-OBL-REFINEMENT-RETURN-005",
+        "R1-OBL-REFINEMENT-RETURN-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-REFINEMENT-RETURN.jsonl"
+    },
+    {
+      "id": "N1:OBL-SUBTYPE",
+      "row": "OBL-SUBTYPE",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "obligation",
+      "entryPoints": [
+        "oblGen",
+        "oblSolve",
+        "facts"
+      ],
+      "caseIds": [
+        "R1-OBL-SUBTYPE-001",
+        "R1-OBL-SUBTYPE-002",
+        "R1-OBL-SUBTYPE-003",
+        "R1-OBL-SUBTYPE-004",
+        "R1-OBL-SUBTYPE-005",
+        "R1-OBL-SUBTYPE-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-SUBTYPE.jsonl"
+    },
+    {
+      "id": "N1:OBL-INDEX-BOUNDS",
+      "row": "OBL-INDEX-BOUNDS",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "obligation",
+      "entryPoints": [
+        "oblGen",
+        "oblSolve",
+        "emitObl"
+      ],
+      "caseIds": [
+        "R1-OBL-INDEX-BOUNDS-001",
+        "R1-OBL-INDEX-BOUNDS-002",
+        "R1-OBL-INDEX-BOUNDS-003",
+        "R1-OBL-INDEX-BOUNDS-004"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-INDEX-BOUNDS.jsonl"
+    },
+    {
+      "id": "N1:OBL-SELFREF",
+      "row": "OBL-SELFREF",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "obligation",
+      "entryPoints": [
+        "oblGen",
+        "oblSolve",
+        "translator"
+      ],
+      "caseIds": [
+        "R1-OBL-SELFREF-001",
+        "R1-OBL-SELFREF-002",
+        "R1-OBL-SELFREF-003",
+        "R1-OBL-SELFREF-004",
+        "R1-OBL-SELFREF-005",
+        "R1-OBL-SELFREF-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-SELFREF.jsonl"
+    },
+    {
+      "id": "N1:OBL-UNGATED-FORMS",
+      "row": "OBL-UNGATED-FORMS",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "obligation",
+      "entryPoints": [
+        "oblSolve",
+        "translator"
+      ],
+      "caseIds": [
+        "R1-OBL-UNGATED-FORMS-001",
+        "R1-OBL-UNGATED-FORMS-002",
+        "R1-OBL-UNGATED-FORMS-003",
+        "R1-OBL-UNGATED-FORMS-004",
+        "R1-OBL-UNGATED-FORMS-005",
+        "R1-OBL-UNGATED-FORMS-006",
+        "R1-OBL-UNGATED-FORMS-007",
+        "R1-OBL-UNGATED-FORMS-008",
+        "R1-OBL-UNGATED-FORMS-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-UNGATED-FORMS.jsonl"
+    },
+    {
+      "id": "N1:IMPL-PRECONDITION-WEAKENING",
+      "row": "IMPL-PRECONDITION-WEAKENING",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "implication",
+      "entryPoints": [
+        "inherit",
+        "implProver"
+      ],
+      "caseIds": [
+        "R1-IMPL-PRECONDITION-WEAKENING-001",
+        "R1-IMPL-PRECONDITION-WEAKENING-002",
+        "R1-IMPL-PRECONDITION-WEAKENING-003",
+        "R1-IMPL-PRECONDITION-WEAKENING-004",
+        "R1-IMPL-PRECONDITION-WEAKENING-005",
+        "R1-IMPL-PRECONDITION-WEAKENING-006",
+        "R1-IMPL-PRECONDITION-WEAKENING-007"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/IMPL-PRECONDITION-WEAKENING.jsonl"
+    },
+    {
+      "id": "N1:IMPL-POSTCONDITION-STRENGTHENING",
+      "row": "IMPL-POSTCONDITION-STRENGTHENING",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "implication",
+      "entryPoints": [
+        "inherit",
+        "implProver"
+      ],
+      "caseIds": [
+        "R1-IMPL-POSTCONDITION-STRENGTHENING-001",
+        "R1-IMPL-POSTCONDITION-STRENGTHENING-002",
+        "R1-IMPL-POSTCONDITION-STRENGTHENING-003",
+        "R1-IMPL-POSTCONDITION-STRENGTHENING-004",
+        "R1-IMPL-POSTCONDITION-STRENGTHENING-005",
+        "R1-IMPL-POSTCONDITION-STRENGTHENING-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/IMPL-POSTCONDITION-STRENGTHENING.jsonl"
+    },
+    {
+      "id": "N1:IMPL-DIVISION-TOTALIZED",
+      "row": "IMPL-DIVISION-TOTALIZED",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "implication",
+      "entryPoints": [
+        "implProver",
+        "verifyCmd"
+      ],
+      "caseIds": [
+        "R1-IMPL-DIVISION-TOTALIZED-001",
+        "R1-IMPL-DIVISION-TOTALIZED-002",
+        "R1-IMPL-DIVISION-TOTALIZED-003",
+        "R1-IMPL-DIVISION-TOTALIZED-004"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/IMPL-DIVISION-TOTALIZED.jsonl"
+    },
+    {
+      "id": "N1:INH-INHERITED-GUARD-EMISSION",
+      "row": "INH-INHERITED-GUARD-EMISSION",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "guard-emission",
+      "entryPoints": [
+        "inherit",
+        "emitInherit",
+        "post"
+      ],
+      "caseIds": [
+        "R1-INH-INHERITED-GUARD-EMISSION-001",
+        "R1-INH-INHERITED-GUARD-EMISSION-002",
+        "R1-INH-INHERITED-GUARD-EMISSION-003",
+        "R1-INH-INHERITED-GUARD-EMISSION-004"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/INH-INHERITED-GUARD-EMISSION.jsonl"
+    },
+    {
+      "id": "N1:CACHE-BODY-CHANGE",
+      "row": "CACHE-BODY-CHANGE",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "cache",
+        "hasher",
+        "cacheEntry"
+      ],
+      "caseIds": [
+        "R1-CACHE-BODY-CHANGE-001",
+        "R1-CACHE-BODY-CHANGE-002",
+        "R1-CACHE-BODY-CHANGE-003",
+        "R1-CACHE-BODY-CHANGE-004",
+        "R1-CACHE-BODY-CHANGE-005",
+        "R1-CACHE-BODY-CHANGE-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CACHE-BODY-CHANGE.jsonl"
+    },
+    {
+      "id": "N1:CACHE-PRECONDITION-CHANGE",
+      "row": "CACHE-PRECONDITION-CHANGE",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "cache",
+        "hasher"
+      ],
+      "caseIds": [
+        "R1-CACHE-PRECONDITION-CHANGE-001",
+        "R1-CACHE-PRECONDITION-CHANGE-002",
+        "R1-CACHE-PRECONDITION-CHANGE-003",
+        "R1-CACHE-PRECONDITION-CHANGE-004",
+        "R1-CACHE-PRECONDITION-CHANGE-005",
+        "R1-CACHE-PRECONDITION-CHANGE-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CACHE-PRECONDITION-CHANGE.jsonl"
+    },
+    {
+      "id": "N1:CACHE-DEPENDENCY-CHANGE",
+      "row": "CACHE-DEPENDENCY-CHANGE",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "cache",
+        "hasher",
+        "pass"
+      ],
+      "caseIds": [
+        "R1-CACHE-DEPENDENCY-CHANGE-001",
+        "R1-CACHE-DEPENDENCY-CHANGE-002",
+        "R1-CACHE-DEPENDENCY-CHANGE-003",
+        "R1-CACHE-DEPENDENCY-CHANGE-004"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CACHE-DEPENDENCY-CHANGE.jsonl"
+    },
+    {
+      "id": "N1:CACHE-SEMANTICS-VERSION",
+      "row": "CACHE-SEMANTICS-VERSION",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "cache",
+        "cacheEntry"
+      ],
+      "caseIds": [
+        "R1-CACHE-SEMANTICS-VERSION-001",
+        "R1-CACHE-SEMANTICS-VERSION-002",
+        "R1-CACHE-SEMANTICS-VERSION-003"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CACHE-SEMANTICS-VERSION.jsonl"
+    },
+    {
+      "id": "N1:SIMP-CONSTANT-FOLDING",
+      "row": "SIMP-CONSTANT-FOLDING",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "simplifier",
+        "simplpass",
+        "pipeline"
+      ],
+      "caseIds": [
+        "R1-SIMP-CONSTANT-FOLDING-001",
+        "R1-SIMP-CONSTANT-FOLDING-002",
+        "R1-SIMP-CONSTANT-FOLDING-003",
+        "R1-SIMP-CONSTANT-FOLDING-004",
+        "R1-SIMP-CONSTANT-FOLDING-005",
+        "R1-SIMP-CONSTANT-FOLDING-006",
+        "R1-SIMP-CONSTANT-FOLDING-007",
+        "R1-SIMP-CONSTANT-FOLDING-008",
+        "R1-SIMP-CONSTANT-FOLDING-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/SIMP-CONSTANT-FOLDING.jsonl"
+    },
+    {
+      "id": "N1:SIMP-H1-UNARY-FOLD",
+      "row": "SIMP-H1-UNARY-FOLD",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "simplifier",
+        "simplpass",
+        "whitelist"
+      ],
+      "caseIds": [
+        "R1-SIMP-H1-UNARY-FOLD-001",
+        "R1-SIMP-H1-UNARY-FOLD-002",
+        "R1-SIMP-H1-UNARY-FOLD-003",
+        "R1-SIMP-H1-UNARY-FOLD-004",
+        "R1-SIMP-H1-UNARY-FOLD-005",
+        "R1-SIMP-H1-UNARY-FOLD-006",
+        "R1-SIMP-H1-UNARY-FOLD-007",
+        "R1-SIMP-H1-UNARY-FOLD-008",
+        "R1-SIMP-H1-UNARY-FOLD-009"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/SIMP-H1-UNARY-FOLD.jsonl"
+    },
+    {
+      "id": "N1:MIX-QNT-ARRAY",
+      "row": "MIX-QNT-ARRAY",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "post",
+        "emitQuant"
+      ],
+      "caseIds": [
+        "R1-MIX-QNT-ARRAY-001",
+        "R1-MIX-QNT-ARRAY-002",
+        "R1-MIX-QNT-ARRAY-003",
+        "R1-MIX-QNT-ARRAY-004"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/MIX-QNT-ARRAY.jsonl"
+    },
+    {
+      "id": "N1:MIX-STR-COND",
+      "row": "MIX-STR-COND",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-MIX-STR-COND-001",
+        "R1-MIX-STR-COND-002",
+        "R1-MIX-STR-COND-003"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/MIX-STR-COND.jsonl"
+    },
+    {
+      "id": "N1:MIX-DIV-IMPL",
+      "row": "MIX-DIV-IMPL",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "divisor",
+        "post"
+      ],
+      "caseIds": [
+        "R1-MIX-DIV-IMPL-001",
+        "R1-MIX-DIV-IMPL-002",
+        "R1-MIX-DIV-IMPL-003"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/MIX-DIV-IMPL.jsonl"
+    },
+    {
+      "id": "N1:CTRL-POSITIVE",
+      "row": "CTRL-POSITIVE",
+      "classification": "modeled",
+      "releaseCritical": false,
+      "channel": "postcondition",
+      "entryPoints": [
+        "post"
+      ],
+      "caseIds": [
+        "R1-CTRL-POSITIVE-001",
+        "R1-CTRL-POSITIVE-002",
+        "R1-CTRL-POSITIVE-003",
+        "R1-CTRL-POSITIVE-004",
+        "R1-CTRL-POSITIVE-005",
+        "R1-CTRL-POSITIVE-006",
+        "R1-CTRL-POSITIVE-007",
+        "R1-CTRL-POSITIVE-008"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CTRL-POSITIVE.jsonl"
+    },
+    {
+      "id": "N1:CTRL-NEGATIVE",
+      "row": "CTRL-NEGATIVE",
+      "classification": "modeled",
+      "releaseCritical": false,
+      "channel": "postcondition",
+      "entryPoints": [
+        "post"
+      ],
+      "caseIds": [
+        "R1-CTRL-NEGATIVE-001",
+        "R1-CTRL-NEGATIVE-002",
+        "R1-CTRL-NEGATIVE-003",
+        "R1-CTRL-NEGATIVE-004",
+        "R1-CTRL-NEGATIVE-005",
+        "R1-CTRL-NEGATIVE-006"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CTRL-NEGATIVE.jsonl"
+    },
+    {
+      "id": "N1:CTRL-MUTATION",
+      "row": "CTRL-MUTATION",
+      "classification": "modeled",
+      "releaseCritical": false,
+      "channel": "postcondition",
+      "entryPoints": [
+        "post"
+      ],
+      "caseIds": [
+        "R1-CTRL-MUTATION-001",
+        "R1-CTRL-MUTATION-002",
+        "R1-CTRL-MUTATION-003",
+        "R1-CTRL-MUTATION-004"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CTRL-MUTATION.jsonl"
+    },
+    {
+      "id": "N1:CTRL-RETRO-845",
+      "row": "CTRL-RETRO-845",
+      "classification": "modeled",
+      "releaseCritical": false,
+      "channel": "postcondition",
+      "entryPoints": [
+        "translator",
+        "post"
+      ],
+      "caseIds": [
+        "R1-CTRL-RETRO-845-001",
+        "R1-CTRL-RETRO-845-002",
+        "R1-CTRL-RETRO-845-003",
+        "R1-CTRL-RETRO-845-004"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CTRL-RETRO-845.jsonl"
+    },
+    {
+      "id": "N1:CTRL-RETRO-FIXED",
+      "row": "CTRL-RETRO-FIXED",
+      "classification": "modeled",
+      "releaseCritical": false,
+      "channel": "postcondition",
+      "entryPoints": [
+        "post",
+        "translator",
+        "emitQuant",
+        "body"
+      ],
+      "caseIds": [
+        "R1-CTRL-RETRO-FIXED-001",
+        "R1-CTRL-RETRO-FIXED-002",
+        "R1-CTRL-RETRO-FIXED-003",
+        "R1-CTRL-RETRO-FIXED-004",
+        "R1-CTRL-RETRO-FIXED-005",
+        "R1-CTRL-RETRO-FIXED-006",
+        "R1-CTRL-RETRO-FIXED-007",
+        "R1-CTRL-RETRO-FIXED-008"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CTRL-RETRO-FIXED.jsonl"
+    },
+    {
+      "id": "N1:XCL-KINDUCTION",
+      "row": "XCL-KINDUCTION",
+      "classification": "not-investigated",
+      "releaseCritical": false,
+      "channel": "none",
+      "entryPoints": [
+        "kind"
+      ],
+      "caseIds": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/XCL-KINDUCTION.jsonl"
+    },
+    {
+      "id": "N1:XCL-BUGPATTERNS",
+      "row": "XCL-BUGPATTERNS",
+      "classification": "not-investigated",
+      "releaseCritical": false,
+      "channel": "none",
+      "entryPoints": [],
+      "caseIds": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/XCL-BUGPATTERNS.jsonl"
+    },
+    {
+      "id": "N1:XCL-SURFACE-PARITY",
+      "row": "XCL-SURFACE-PARITY",
+      "classification": "not-investigated",
+      "releaseCritical": false,
+      "channel": "none",
+      "entryPoints": [
+        "pipeline",
+        "refine"
+      ],
+      "caseIds": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/XCL-SURFACE-PARITY.jsonl"
+    },
+    {
+      "id": "N1:XCL-HEAP-GENERICS",
+      "row": "XCL-HEAP-GENERICS",
+      "classification": "not-investigated",
+      "releaseCritical": false,
+      "channel": "none",
+      "entryPoints": [],
+      "caseIds": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/XCL-HEAP-GENERICS.jsonl"
+    }
+  ]
+}

@@ -1,0 +1,2724 @@
+{
+  "schemaVersion": 1,
+  "issue": 1419,
+  "gate": "R1",
+  "epic": 1409,
+  "executedBy": 1311,
+  "dispositionedBy": 1413,
+  "registrationVersion": "1.0.0",
+  "status": "FROZEN-AT-MERGE",
+  "freeze": {
+    "event": "The merge commit on main of the PR that adds this file. #1311 records that full SHA as registrationCommit in its pins before its first case.",
+    "decisionBearingInspectionBeforeFreeze": false,
+    "executedInR1": [
+      "The independent oracle (O1) on the 13 registered oracleControls in templates.json. These compile and run registrant-written C# only; no Calor compiler code runs.",
+      "Lex-and-parse validity of every generated case, and compile validity (VerifyContracts=false, VerifyRefinements=false) of every case outside the unsupported-refused rows, on the working tree (whose src/ tree equals B1's). Only the presence of error diagnostics is asserted; no verification, obligation, or implication outcome is read or printed. Cases in the IMPL-*, SIMP-*, and CTRL-RETRO-845 rows are parse-only, because full compilation would run the always-on inheritance checker (Z3) or the simplifier under test. unsupported-refused rows are parse-only so that their front-end acceptance or rejection is first observed by #1311.",
+      "Oracle compilation of every generated case (registrant C# against BCL references only)."
+    ],
+    "preFreezeTemplateFixes": "The validity check found defects in 7 templates, fixed before the freeze: front-end rejections in FLD-INHERITED-NESTED (inheritance syntax), OBL-REFINEMENT-ENTRY and OBL-SUBTYPE (binding an unrefined value to a refined type is a type error; templates now use refined parameters), MIX-QNT-ARRAY (a quantifier bounded by §LEN cannot be lowered; the bound is now a parameter); lex/parse errors in BODY-LOOP-CALL-MUTABLE and STR-CULTURE-MODE that would otherwise have passed as refusals. QNT-NESTED was reclassified modeled -> unsupported-refused because B1's front end rejects runtime lowering of nested quantifiers (Calor0326), a front-end fact, not a verifier outcome.",
+    "notExecutedInR1": [
+      "No B1 or N1 verifier outcome was produced or inspected for any registered row.",
+      "Hypothesis H1 was not tested.",
+      "The #845 pre-fix discriminating control was not run on 17d253dff964e37538a5f503d3744b576bd2fb52."
+    ]
+  },
+  "contract": {
+    "path": "docs/plans/v0.24-evidence-contract.md",
+    "packet": "docs/plans/evidence/evidence-contract-1407/",
+    "contractVersion": "1.0.1",
+    "cutoffCommit": "72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1",
+    "consumes": [
+      "cutoff",
+      "baselines",
+      "outcome-vocabulary",
+      "authority-capacity",
+      "failure-amendment-stopping",
+      "retrospective"
+    ],
+    "precedence": "Where this registration and contract.json disagree, contract.json governs and the disagreement is a defect fixed by a #1407 amendment. This registration may narrow, never widen, what counts as established."
+  },
+  "baselines": [
+    {
+      "id": "B1",
+      "role": "primary released baseline",
+      "commit": "72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1",
+      "tag": "v0.22.0",
+      "declaredVersion": "0.22.0",
+      "manifest": "docs/plans/evidence/r1-1419/manifest-B1.json",
+      "binary": {
+        "kind": "built-from-tag",
+        "reason": "No NuGet package exists for 0.22.0 (contract §2).",
+        "procedure": [
+          "git worktree add --detach <dir> 72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1",
+          "<dir>/src/Calor.Compiler/scripts/download-z3.sh (verifies the upstream Z3 4.15.7 archives against <dir>/src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256)",
+          "dotnet build <dir>/src/Calor.Compiler/Calor.Compiler.csproj -c Release",
+          "Record SHA-256 of calor.dll, Calor.Runtime.dll, Microsoft.Z3.dll, and the platform libz3 native library from the build output in pins.json before the first case. The binary is immutable for the whole sweep; a rebuild with a different calor.dll hash invalidates every earlier B1 attempt (they stay archived as invalid)."
+        ],
+        "z3": "Z3 4.15.7 from the developer bootstrap (upstream archives). At registration the osx-arm64 libz3.dylib from that bootstrap hashed 8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada and Microsoft.Z3.dll 59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175."
+      }
+    },
+    {
+      "id": "N1",
+      "role": "second investigated baseline (the binary users install)",
+      "commit": "88b5d38df97fd7e438882c956b9f9dcdc7a6cef5",
+      "declaredVersion": "0.21.0",
+      "manifest": "docs/plans/evidence/r1-1419/manifest-N1.json",
+      "binary": {
+        "kind": "nuget-package",
+        "package": "calor 0.21.0",
+        "url": "https://api.nuget.org/v3-flatcontainer/calor/0.21.0/calor.0.21.0.nupkg",
+        "nupkgSha256": "8a1937ce645f4708b258615e2bbd7b995bf6f012ebb25fa358107a3e4462836c",
+        "nupkgSha512Base64": "0KbgH5KSwU97EiYWPQhdzC7D3g+F9n2iMwuB99z65MRN6H2dxulUSvbE/yzur47N5jrblhLjmq+brkSxJRO3AA==",
+        "catalogPackageHash": "Equal to nupkgSha512Base64 (nuget.org catalog entry 2026.09.12.01.17.58/calor.0.21.0.json, published 2026-09-12T01:11:04.2Z, 61,869,455 bytes); checked at registration.",
+        "contents": {
+          "tools/net10.0/any/calor.dll": "794b28d4956f786fe41e0e5ab2199cad1ab1271a2893ee42d9f9d303289b515b",
+          "tools/net10.0/any/Microsoft.Z3.dll": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175",
+          "tools/net10.0/any/runtimes/osx-arm64/native/libz3.dylib": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+          "tools/net10.0/any/runtimes/linux-x64/native/libz3.so": "3e70217bc6b05b6204912698becf9f853a7a2f07bb5338dad84aef79aee9bec8"
+        },
+        "procedure": [
+          "Download the URL; verify nupkgSha256 and nupkgSha512Base64; refuse to run on mismatch.",
+          "Extract tools/net10.0/any/ and verify every hash in contents; the platform libz3 actually loaded is hashed into pins.json.",
+          "The N1 compiler is the package's calor.dll. The 88b5d38 source is used only to read entry points and to minimize findings; it is never rebuilt to stand in for the package."
+        ]
+      },
+      "sourceRelationToB1": "src/Calor.Compiler/Verification is tree-identical at N1 and B1 (tree 36c43f7158c7e82be5bef881f1f278feb62f4a49). The front end differs: 25 files under src/ changed between N1 and B1 (Binding, TypeChecking, Parsing/AttributeHelper, Migration, Analysis/Security/TaintAnalysis, Effects, Diagnostics). Identical verifier source does not make the baselines interchangeable: the binaries, front ends, and Z3 provenance paths differ."
+    },
+    {
+      "id": "P845",
+      "role": "retrospective pre-fix control baseline (control rows only; never a sweep baseline)",
+      "commit": "17d253dff964e37538a5f503d3744b576bd2fb52",
+      "binary": {
+        "kind": "built-from-commit",
+        "procedure": "As B1, at this commit. Runs only the CTRL-RETRO-845 cases."
+      }
+    }
+  ],
+  "noPooling": {
+    "rule": "B1 and N1 are separate sweeps over the same frozen case list. Every result row carries exactly one baseline id. No count, rate, row status, disposition, or finding is computed over the union, and a result on one baseline never substitutes for a missing, invalid, timed-out, or not-investigated result on the other.",
+    "resultPaths": {
+      "B1": "bench/correctness/false-established/v024/B1/",
+      "N1": "bench/correctness/false-established/v024/N1/",
+      "P845": "bench/correctness/false-established/v024/P845/"
+    },
+    "crossBaselineUse": "A finding on one baseline is re-run on the other baseline from the minimization reserve and recorded as that baseline's own result (reproduces / does-not-reproduce / not-run). The other baseline's row status uses only its own results."
+  },
+  "denominator": {
+    "derivation": "Rows are derived from the verifier source at B1 (equal to N1 for src/Calor.Compiler/Verification): ModeledForms in ContractTranslator.cs (scalar types, array element types, expression kinds, binary/unary operators, string operations, comparison modes, quantifier bound-variable types), the assumption demotions and refusals in Z3Verifier.cs and FunctionBodyEncoder, the obligation kinds in ObligationTracker.cs (solver not whitelist-gated), the implication prover used by ContractInheritanceChecker and calor verify --weakening-check, the verification cache, the contract simplification pass that runs before both verification and emission, and the elision sites in CSharpEmitter.cs.",
+    "frozenWhitelist": [
+      "scalar-types: i8, i16, i32, i64, u8, u16, u32, u64, bool, str",
+      "array-element-types: i8, i16, i32, i64, u8, u16, u32, u64 (with synthetic $length)",
+      "expression-kinds: IntLiteralNode, BoolLiteralNode, StringLiteralNode, ReferenceNode, BinaryOperationNode, UnaryOperationNode, ConditionalExpressionNode, ForallExpressionNode, ExistsExpressionNode, ImplicationExpressionNode, ArrayAccessNode, ArrayLengthNode, FieldAccessNode, StringOperationNode, SelfRefNode",
+      "binary-operators: Add, Subtract, Multiply, Divide, Modulo, Equal, NotEqual, LessThan, LessOrEqual, GreaterThan, GreaterOrEqual, And, Or, BitwiseAnd, BitwiseOr, BitwiseXor, LeftShift, RightShift",
+      "unary-operators: Not, Negate",
+      "string-operations: Length, Contains, StartsWith, EndsWith, Equals, IsNullOrEmpty, IndexOf, Substring, SubstringFrom, Concat",
+      "string-comparison-modes: Ordinal only — a non-ordinal mode is refused, and StartsWith/EndsWith/IndexOf require ':ordinal' EXPLICITLY (.NET resolves their no-mode overloads to CurrentCulture; Contains/Equals are ordinal)",
+      "quantifier-bound-variable-types: any declarable type except floating-point (unmodeled types become uninterpreted sorts)"
+    ],
+    "frozenWhitelistSource": "ModeledForms.RenderWhitelist() at B1, byte-equal to the generated appendix of docs/verification-modeled-forms.md at B1 (file SHA-256 c296720f268c497cf93e3d27943f3a0a750ed09abce3badcb5822c4e0bd5e932, the hash DifferentialGate pins).",
+    "whitelistCoverageMap": [
+      {
+        "line": "scalar-types",
+        "member": "i8",
+        "rows": [
+          "NUM-BITWISE",
+          "NUM-COMPARE",
+          "NUM-SHIFT"
+        ],
+        "token": "i8"
+      },
+      {
+        "line": "scalar-types",
+        "member": "i16",
+        "rows": [
+          "NUM-BITWISE",
+          "NUM-COMPARE",
+          "NUM-SHIFT"
+        ],
+        "token": "i16"
+      },
+      {
+        "line": "scalar-types",
+        "member": "i32",
+        "rows": [
+          "NUM-BITWISE",
+          "NUM-COMPARE",
+          "NUM-SHIFT"
+        ],
+        "token": "i32"
+      },
+      {
+        "line": "scalar-types",
+        "member": "i64",
+        "rows": [
+          "NUM-BITWISE",
+          "NUM-COMPARE",
+          "NUM-SHIFT"
+        ],
+        "token": "i64"
+      },
+      {
+        "line": "scalar-types",
+        "member": "u8",
+        "rows": [
+          "NUM-BITWISE",
+          "NUM-COMPARE",
+          "NUM-SHIFT"
+        ],
+        "token": "u8"
+      },
+      {
+        "line": "scalar-types",
+        "member": "u16",
+        "rows": [
+          "NUM-BITWISE",
+          "NUM-COMPARE",
+          "NUM-SHIFT"
+        ],
+        "token": "u16"
+      },
+      {
+        "line": "scalar-types",
+        "member": "u32",
+        "rows": [
+          "NUM-BITWISE",
+          "NUM-COMPARE",
+          "NUM-SHIFT"
+        ],
+        "token": "u32"
+      },
+      {
+        "line": "scalar-types",
+        "member": "u64",
+        "rows": [
+          "NUM-BITWISE",
+          "NUM-COMPARE",
+          "NUM-SHIFT"
+        ],
+        "token": "u64"
+      },
+      {
+        "line": "scalar-types",
+        "member": "bool",
+        "rows": [
+          "BOOL-CONNECTIVES",
+          "BOOL-NESTING"
+        ],
+        "token": "bool:"
+      },
+      {
+        "line": "scalar-types",
+        "member": "str",
+        "rows": [
+          "STR-OPS-PREDICATE",
+          "STR-OPS-COUNT-INDEX"
+        ],
+        "token": "str:"
+      },
+      {
+        "line": "array-element-types",
+        "member": "i8",
+        "rows": [
+          "ARR-ELEMENT-TYPES"
+        ],
+        "token": "i8[]"
+      },
+      {
+        "line": "array-element-types",
+        "member": "i16",
+        "rows": [
+          "ARR-ELEMENT-TYPES"
+        ],
+        "token": "i16[]"
+      },
+      {
+        "line": "array-element-types",
+        "member": "i32",
+        "rows": [
+          "ARR-ELEMENT-TYPES"
+        ],
+        "token": "i32[]"
+      },
+      {
+        "line": "array-element-types",
+        "member": "i64",
+        "rows": [
+          "ARR-ELEMENT-TYPES"
+        ],
+        "token": "i64[]"
+      },
+      {
+        "line": "array-element-types",
+        "member": "u8",
+        "rows": [
+          "ARR-ELEMENT-TYPES"
+        ],
+        "token": "u8[]"
+      },
+      {
+        "line": "array-element-types",
+        "member": "u16",
+        "rows": [
+          "ARR-ELEMENT-TYPES"
+        ],
+        "token": "u16[]"
+      },
+      {
+        "line": "array-element-types",
+        "member": "u32",
+        "rows": [
+          "ARR-ELEMENT-TYPES"
+        ],
+        "token": "u32[]"
+      },
+      {
+        "line": "array-element-types",
+        "member": "u64",
+        "rows": [
+          "ARR-ELEMENT-TYPES"
+        ],
+        "token": "u64[]"
+      },
+      {
+        "line": "expression-kinds",
+        "member": "IntLiteralNode",
+        "rows": [
+          "NUM-COMPARE",
+          "NUM-LITERAL-TYPED"
+        ],
+        "token": "INT:"
+      },
+      {
+        "line": "expression-kinds",
+        "member": "BoolLiteralNode",
+        "rows": [
+          "BOOL-CONNECTIVES"
+        ],
+        "token": "BOOL:true"
+      },
+      {
+        "line": "expression-kinds",
+        "member": "StringLiteralNode",
+        "rows": [
+          "STR-OPS-PREDICATE"
+        ],
+        "token": "STR:"
+      },
+      {
+        "line": "expression-kinds",
+        "member": "ReferenceNode",
+        "rows": [
+          "NUM-COMPARE"
+        ],
+        "token": "x"
+      },
+      {
+        "line": "expression-kinds",
+        "member": "BinaryOperationNode",
+        "rows": [
+          "NUM-ARITH-ADD"
+        ],
+        "token": "(+ "
+      },
+      {
+        "line": "expression-kinds",
+        "member": "UnaryOperationNode",
+        "rows": [
+          "NUM-NEGATE",
+          "BOOL-CONNECTIVES"
+        ],
+        "token": "(- x)"
+      },
+      {
+        "line": "expression-kinds",
+        "member": "ConditionalExpressionNode",
+        "rows": [
+          "BOOL-CONDITIONAL"
+        ],
+        "token": "(? "
+      },
+      {
+        "line": "expression-kinds",
+        "member": "ForallExpressionNode",
+        "rows": [
+          "QNT-FORALL-BOUNDED"
+        ],
+        "token": "(forall "
+      },
+      {
+        "line": "expression-kinds",
+        "member": "ExistsExpressionNode",
+        "rows": [
+          "QNT-EXISTS-BOUNDED"
+        ],
+        "token": "(exists "
+      },
+      {
+        "line": "expression-kinds",
+        "member": "ImplicationExpressionNode",
+        "rows": [
+          "BOOL-IMPLICATION"
+        ],
+        "token": "(-> "
+      },
+      {
+        "line": "expression-kinds",
+        "member": "ArrayAccessNode",
+        "rows": [
+          "ARR-INDEX"
+        ],
+        "token": "a{k}"
+      },
+      {
+        "line": "expression-kinds",
+        "member": "ArrayLengthNode",
+        "rows": [
+          "ARR-LENGTH"
+        ],
+        "token": "§LEN"
+      },
+      {
+        "line": "expression-kinds",
+        "member": "FieldAccessNode",
+        "rows": [
+          "FLD-ACCESS",
+          "FLD-INHERITED-NESTED"
+        ],
+        "token": "this."
+      },
+      {
+        "line": "expression-kinds",
+        "member": "StringOperationNode",
+        "rows": [
+          "STR-OPS-PREDICATE",
+          "STR-OPS-COUNT-INDEX"
+        ],
+        "token": "(len "
+      },
+      {
+        "line": "expression-kinds",
+        "member": "SelfRefNode",
+        "rows": [
+          "OBL-SELFREF"
+        ],
+        "token": "#"
+      },
+      {
+        "line": "binary-operators",
+        "member": "Add",
+        "rows": [
+          "NUM-ARITH-ADD"
+        ],
+        "token": "+"
+      },
+      {
+        "line": "binary-operators",
+        "member": "Subtract",
+        "rows": [
+          "NUM-ARITH-SUB"
+        ],
+        "token": "-"
+      },
+      {
+        "line": "binary-operators",
+        "member": "Multiply",
+        "rows": [
+          "NUM-ARITH-MUL"
+        ],
+        "token": "*"
+      },
+      {
+        "line": "binary-operators",
+        "member": "Divide",
+        "rows": [
+          "NUM-DIVMOD-LITERAL",
+          "NUM-DIVMOD-VAR-ENTAILED"
+        ],
+        "token": "/"
+      },
+      {
+        "line": "binary-operators",
+        "member": "Modulo",
+        "rows": [
+          "NUM-DIVMOD-LITERAL",
+          "NUM-DIVMOD-VAR-ENTAILED"
+        ],
+        "token": "%"
+      },
+      {
+        "line": "binary-operators",
+        "member": "Equal",
+        "rows": [
+          "NUM-EQUALITY"
+        ],
+        "token": "=="
+      },
+      {
+        "line": "binary-operators",
+        "member": "NotEqual",
+        "rows": [
+          "NUM-EQUALITY"
+        ],
+        "token": "!="
+      },
+      {
+        "line": "binary-operators",
+        "member": "LessThan",
+        "rows": [
+          "NUM-COMPARE"
+        ],
+        "token": "<"
+      },
+      {
+        "line": "binary-operators",
+        "member": "LessOrEqual",
+        "rows": [
+          "NUM-COMPARE"
+        ],
+        "token": "<="
+      },
+      {
+        "line": "binary-operators",
+        "member": "GreaterThan",
+        "rows": [
+          "NUM-COMPARE"
+        ],
+        "token": ">"
+      },
+      {
+        "line": "binary-operators",
+        "member": "GreaterOrEqual",
+        "rows": [
+          "NUM-COMPARE"
+        ],
+        "token": ">="
+      },
+      {
+        "line": "binary-operators",
+        "member": "And",
+        "rows": [
+          "BOOL-CONNECTIVES"
+        ],
+        "token": "&&"
+      },
+      {
+        "line": "binary-operators",
+        "member": "Or",
+        "rows": [
+          "BOOL-CONNECTIVES"
+        ],
+        "token": "||"
+      },
+      {
+        "line": "binary-operators",
+        "member": "BitwiseAnd",
+        "rows": [
+          "NUM-BITWISE"
+        ],
+        "token": "&"
+      },
+      {
+        "line": "binary-operators",
+        "member": "BitwiseOr",
+        "rows": [
+          "NUM-BITWISE"
+        ],
+        "token": "|"
+      },
+      {
+        "line": "binary-operators",
+        "member": "BitwiseXor",
+        "rows": [
+          "NUM-BITWISE"
+        ],
+        "token": "^"
+      },
+      {
+        "line": "binary-operators",
+        "member": "LeftShift",
+        "rows": [
+          "NUM-SHIFT"
+        ],
+        "token": "<<"
+      },
+      {
+        "line": "binary-operators",
+        "member": "RightShift",
+        "rows": [
+          "NUM-SHIFT"
+        ],
+        "token": ">>"
+      },
+      {
+        "line": "unary-operators",
+        "member": "Not",
+        "rows": [
+          "BOOL-CONNECTIVES",
+          "BOOL-NESTING"
+        ],
+        "token": "(! "
+      },
+      {
+        "line": "unary-operators",
+        "member": "Negate",
+        "rows": [
+          "NUM-NEGATE"
+        ],
+        "token": "(- x)"
+      },
+      {
+        "line": "string-operations",
+        "member": "Length",
+        "rows": [
+          "STR-OPS-COUNT-INDEX"
+        ],
+        "token": "(len s)"
+      },
+      {
+        "line": "string-operations",
+        "member": "Contains",
+        "rows": [
+          "STR-OPS-PREDICATE"
+        ],
+        "token": "(contains "
+      },
+      {
+        "line": "string-operations",
+        "member": "StartsWith",
+        "rows": [
+          "STR-OPS-PREDICATE"
+        ],
+        "token": "(starts "
+      },
+      {
+        "line": "string-operations",
+        "member": "EndsWith",
+        "rows": [
+          "STR-OPS-PREDICATE"
+        ],
+        "token": "(ends "
+      },
+      {
+        "line": "string-operations",
+        "member": "Equals",
+        "rows": [
+          "STR-OPS-PREDICATE"
+        ],
+        "token": "(equals "
+      },
+      {
+        "line": "string-operations",
+        "member": "IsNullOrEmpty",
+        "rows": [
+          "STR-OPS-PREDICATE"
+        ],
+        "token": "(isempty "
+      },
+      {
+        "line": "string-operations",
+        "member": "IndexOf",
+        "rows": [
+          "STR-OPS-COUNT-INDEX"
+        ],
+        "token": "(indexof "
+      },
+      {
+        "line": "string-operations",
+        "member": "Substring",
+        "rows": [
+          "STR-OPS-COUNT-INDEX"
+        ],
+        "token": "(substr s INT:1 INT:1)"
+      },
+      {
+        "line": "string-operations",
+        "member": "SubstringFrom",
+        "rows": [
+          "STR-OPS-COUNT-INDEX"
+        ],
+        "token": "(substr s INT:1)"
+      },
+      {
+        "line": "string-operations",
+        "member": "Concat",
+        "rows": [
+          "STR-OPS-PREDICATE"
+        ],
+        "token": "(concat "
+      },
+      {
+        "line": "string-comparison-modes",
+        "member": "Ordinal",
+        "rows": [
+          "STR-OPS-PREDICATE",
+          "STR-OPS-COUNT-INDEX"
+        ],
+        "token": ":ordinal"
+      },
+      {
+        "line": "quantifier-bound-variable-types",
+        "member": "declarable non-float",
+        "rows": [
+          "QNT-BOUND-TYPES"
+        ],
+        "token": "((v "
+      }
+    ],
+    "whitelistCoverage": "Every whitelist member maps to at least one row with cases (enforced by SoundnessRegistrationTests). Members outside the whitelist that the code can still reach are registered as refusal rows (Power and other operators, BitwiseNot outside the obligation solver, floating point, calls, Replace and other string operations, non-ordinal modes).",
+    "classifications": {
+      "modeled": "Proven (non-vacuous) or Discharged may be produced and may remove a guard; the oracle decides whether it is true.",
+      "assumed": "The form must not produce an unconditional Proven/Discharged; Assumed is the strongest legitimate outcome (string-model, reference-model, checked-arithmetic, exceptional-path or contract-division assumptions).",
+      "unsupported-refused": "The form must produce Unsupported or be rejected by the compiler before verification.",
+      "not-investigated": "Excluded before execution with a recorded reason; never release-critical; zero cases."
+    },
+    "entryPointCatalog": {
+      "whitelist": {
+        "path": "src/Calor.Compiler/Verification/Z3/ContractTranslator.cs",
+        "symbols": "ModeledForms.TryValidate, ModeledForms.RenderWhitelist"
+      },
+      "translator": {
+        "path": "src/Calor.Compiler/Verification/Z3/ContractTranslator.cs",
+        "symbols": "ContractTranslator.DeclareVariable, Translate, TranslateBoolExpr, GetCheckedArithmeticSafety"
+      },
+      "pre": {
+        "path": "src/Calor.Compiler/Verification/Z3/Z3Verifier.cs",
+        "symbols": "Z3Verifier.VerifyPrecondition"
+      },
+      "post": {
+        "path": "src/Calor.Compiler/Verification/Z3/Z3Verifier.cs",
+        "symbols": "Z3Verifier.VerifyPostcondition (vacuity pre-check, assumption demotions)"
+      },
+      "body": {
+        "path": "src/Calor.Compiler/Verification/Z3/Z3Verifier.cs",
+        "symbols": "FunctionBodyEncoder.TryEncodeResult, EncodeSequence, PreservesEntryState"
+      },
+      "divisor": {
+        "path": "src/Calor.Compiler/Verification/Z3/Z3Verifier.cs",
+        "symbols": "FunctionBodyEncoder.CollectDivisorNonZeroConstraints, CollectDivisorNonZeroConstraintsFromExpression"
+      },
+      "pass": {
+        "path": "src/Calor.Compiler/Verification/ContractVerificationPass.cs",
+        "symbols": "ContractVerificationPass.Verify, EnumerateContractBearers, AdaptMethodAsFunction"
+      },
+      "outcome": {
+        "path": "src/Calor.Compiler/Verification/ProofOutcome.cs",
+        "symbols": "ProofOutcome.Assign, ProofEvidence"
+      },
+      "simplifier": {
+        "path": "src/Calor.Compiler/Verification/ExpressionSimplifier.cs",
+        "symbols": "ExpressionSimplifier.Visit(BinaryOperationNode), Visit(UnaryOperationNode), TryFoldIntegerBinaryOp"
+      },
+      "simplpass": {
+        "path": "src/Calor.Compiler/Verification/ContractSimplificationPass.cs",
+        "symbols": "ContractSimplificationPass.Simplify (runs before verification AND before emission)"
+      },
+      "pipeline": {
+        "path": "src/Calor.Compiler/Program.cs",
+        "symbols": "Program.Compile(string, string?, CompilationOptions) pass order"
+      },
+      "contractVerifier": {
+        "path": "src/Calor.Compiler/Verification/ContractVerifier.cs",
+        "symbols": "ContractVerifier.Verify (contract reference and type checks)"
+      },
+      "emitPost": {
+        "path": "src/Calor.Compiler/CodeGen/CSharpEmitter.cs",
+        "symbols": "CSharpEmitter.Visit(EnsuresNode) elision on Proven && !IsVacuous"
+      },
+      "emitObl": {
+        "path": "src/Calor.Compiler/CodeGen/CSharpEmitter.cs",
+        "symbols": "CSharpEmitter.ShouldEmitObligationGuard, Visit(ProofObligationNode)"
+      },
+      "emitQuant": {
+        "path": "src/Calor.Compiler/CodeGen/CSharpEmitter.cs",
+        "symbols": "CSharpEmitter quantifier runtime lowering (D15)"
+      },
+      "emitInherit": {
+        "path": "src/Calor.Compiler/CodeGen/CSharpEmitter.cs",
+        "symbols": "CSharpEmitter inherited-contract emission"
+      },
+      "oblGen": {
+        "path": "src/Calor.Compiler/Verification/Obligations/ObligationGenerator.cs",
+        "symbols": "ObligationGenerator.Generate"
+      },
+      "oblSolve": {
+        "path": "src/Calor.Compiler/Verification/Obligations/ObligationSolver.cs",
+        "symbols": "ObligationSolver.SolveAll (not whitelist-gated)"
+      },
+      "oblPolicy": {
+        "path": "src/Calor.Compiler/Verification/Obligations/ObligationPolicy.cs",
+        "symbols": "ObligationPolicy.GetAction, RequiresGuard"
+      },
+      "facts": {
+        "path": "src/Calor.Compiler/Verification/Obligations/FactCollector.cs",
+        "symbols": "FactCollector"
+      },
+      "oblTracker": {
+        "path": "src/Calor.Compiler/Verification/Obligations/ObligationTracker.cs",
+        "symbols": "ObligationKind, ObligationStatus"
+      },
+      "implProver": {
+        "path": "src/Calor.Compiler/Verification/Z3/Z3ImplicationProver.cs",
+        "symbols": "Z3ImplicationProver.CheckPreconditionWeakening, CheckPostconditionStrengthening"
+      },
+      "inherit": {
+        "path": "src/Calor.Compiler/Verification/ContractInheritanceChecker.cs",
+        "symbols": "ContractInheritanceChecker.Check (Calor0815 ImplicationProvenByZ3)"
+      },
+      "cache": {
+        "path": "src/Calor.Compiler/Verification/Z3/Cache/VerificationCache.cs",
+        "symbols": "VerificationCache lookup and store"
+      },
+      "hasher": {
+        "path": "src/Calor.Compiler/Verification/Z3/Cache/ContractHasher.cs",
+        "symbols": "ContractHasher cache keys"
+      },
+      "cacheEntry": {
+        "path": "src/Calor.Compiler/Verification/Z3/Cache/VerificationCacheEntry.cs",
+        "symbols": "VerificationCacheEntry (TranslatorSemanticsVersion)"
+      },
+      "module": {
+        "path": "src/Calor.Compiler/Ast/ModuleNode.cs",
+        "symbols": "ModuleNode.ShouldCheckIntegerOverflow"
+      },
+      "kind": {
+        "path": "src/Calor.Compiler/Verification/Z3/KInduction/KInductionProver.cs",
+        "symbols": "KInductionProver (Calor0950 info only)"
+      },
+      "refine": {
+        "path": "src/Calor.Compiler/Mcp/Tools/RefineTool.cs",
+        "symbols": "calor_refine action=obligations (agent-facing Discharged claims)"
+      },
+      "verifyCmd": {
+        "path": "src/Calor.Compiler/Commands/VerifyCommand.cs",
+        "symbols": "calor verify --weakening-check (M-G4)"
+      }
+    },
+    "rows": [
+      {
+        "id": "NUM-ARITH-ADD",
+        "family": "numeric",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator",
+          "post",
+          "body",
+          "simplpass"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 18,
+        "title": "Add over 32/64-bit signed and unsigned operands; checked overflow demotes to Assumed unless entailed",
+        "templates": [
+          "T-ADD-PARAM",
+          "T-ADD-RESULT"
+        ]
+      },
+      {
+        "id": "NUM-ARITH-SUB",
+        "family": "numeric",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator",
+          "post",
+          "body",
+          "simplpass"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 18,
+        "title": "Subtract, same widths and overflow rule",
+        "templates": [
+          "T-SUB-PARAM",
+          "T-SUB-RESULT"
+        ]
+      },
+      {
+        "id": "NUM-ARITH-MUL",
+        "family": "numeric",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator",
+          "post",
+          "body",
+          "simplpass"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 18,
+        "title": "Multiply, same widths and overflow rule",
+        "templates": [
+          "T-MUL-PARAM",
+          "T-MUL-RESULT"
+        ]
+      },
+      {
+        "id": "NUM-DIVMOD-LITERAL",
+        "family": "numeric",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator",
+          "post",
+          "divisor",
+          "body"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 14,
+        "title": "Divide/Modulo by a literal divisor outside {0, -1}; no side condition needed",
+        "templates": [
+          "T-DIVLIT-POS",
+          "T-DIVLIT-NEG",
+          "T-DIVLIT-RESULT"
+        ]
+      },
+      {
+        "id": "NUM-DIVMOD-VAR-ENTAILED",
+        "family": "numeric",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "post",
+          "divisor"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 12,
+        "title": "Divide/Modulo by a variable when §Q entails divisor > 0",
+        "templates": [
+          "T-DIVVAR-ENTAILED"
+        ]
+      },
+      {
+        "id": "NUM-DIVMOD-VAR-UNGUARDED",
+        "family": "numeric",
+        "classification": "assumed",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "post",
+          "divisor"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 11,
+        "title": "Divide/Modulo by a variable without full entailment (zero divisor or MinValue / -1): Assumed (contract-division) required",
+        "templates": [
+          "T-DIVVAR-UNGUARDED",
+          "T-DIVVAR-NOPRE"
+        ]
+      },
+      {
+        "id": "NUM-SHIFT",
+        "family": "numeric",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 17,
+        "title": "Left/right shift with literal and bounded variable counts; C# count masking (D11)",
+        "templates": [
+          "T-SHIFT-LIT",
+          "T-SHIFT-VAR"
+        ]
+      },
+      {
+        "id": "NUM-BITWISE",
+        "family": "numeric",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 15,
+        "title": "Bitwise and/or/xor across all eight widths",
+        "templates": [
+          "T-BIT"
+        ]
+      },
+      {
+        "id": "NUM-COMPARE",
+        "family": "numeric",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 18,
+        "title": "Ordered comparison with mixed signedness/width (D10 promotions)",
+        "templates": [
+          "T-CMP-MIXED",
+          "T-CMP-LIT"
+        ]
+      },
+      {
+        "id": "NUM-EQUALITY",
+        "family": "numeric",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 12,
+        "title": "Equality against small signed literals, including -1 versus unsigned",
+        "templates": [
+          "T-EQ-SMALL"
+        ]
+      },
+      {
+        "id": "NUM-NEGATE",
+        "family": "numeric",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator",
+          "post",
+          "body",
+          "simplifier"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 11,
+        "title": "Unary negate on i32/i64/u32 (u32 promotes to long); MinValue overflow under checked",
+        "templates": [
+          "T-NEG-PARAM",
+          "T-NEG-RESULT"
+        ]
+      },
+      {
+        "id": "NUM-NARROW-ARITH",
+        "family": "numeric",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 9,
+        "title": "Arithmetic with both operands sub-32-bit: refused (D1)",
+        "templates": [
+          "T-NARROW-ARITH"
+        ]
+      },
+      {
+        "id": "NUM-NARROW-COMPARE",
+        "family": "numeric",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 9,
+        "title": "Comparisons over narrow operands (extension matches promotion)",
+        "templates": [
+          "T-NARROW-CMP"
+        ]
+      },
+      {
+        "id": "NUM-LITERAL-TYPED",
+        "family": "numeric",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "post",
+          "simplifier"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 12,
+        "title": "LONG/UINT/ULONG typed literals including bounds near ulong.MaxValue (#845 territory)",
+        "templates": [
+          "T-LIT-TYPED"
+        ]
+      },
+      {
+        "id": "NUM-LITERAL-OVERSIZE",
+        "family": "numeric",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 4,
+        "title": "INT: literals outside int32 range: refused (D2)",
+        "templates": [
+          "T-LIT-OVERSIZE"
+        ]
+      },
+      {
+        "id": "NUM-MIXED-U64-SIGNED",
+        "family": "numeric",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 6,
+        "title": "u64 mixed with a signed operand: refused (no common C# type); exact-integer oracle",
+        "templates": [
+          "T-U64-MIXED"
+        ]
+      },
+      {
+        "id": "NUM-OVERFLOW-CHECKED",
+        "family": "numeric",
+        "classification": "assumed",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "post",
+          "module"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 12,
+        "title": "Overflow-sensitive contract shapes under the default checked module: Assumed (checked-arithmetic) unless entailed",
+        "templates": [
+          "T-OVF-CHECKED-0",
+          "T-OVF-CHECKED-1",
+          "T-OVF-CHECKED-2",
+          "T-OVF-CHECKED-3"
+        ]
+      },
+      {
+        "id": "NUM-OVERFLOW-UNCHECKED",
+        "family": "numeric",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "post",
+          "module"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 12,
+        "title": "The same shapes under overflow=unchecked: wrapping semantics",
+        "templates": [
+          "T-OVF-UNCHECKED-0",
+          "T-OVF-UNCHECKED-1",
+          "T-OVF-UNCHECKED-2",
+          "T-OVF-UNCHECKED-3"
+        ]
+      },
+      {
+        "id": "BOOL-CONNECTIVES",
+        "family": "boolean",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 15,
+        "title": "And/Or/Not grouping over bool and i8 (exhaustive domain)",
+        "templates": [
+          "T-BOOL-CONN",
+          "T-BOOL-LIT"
+        ]
+      },
+      {
+        "id": "BOOL-SHORTCIRCUIT",
+        "family": "boolean",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "divisor",
+          "post"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 9,
+        "title": "Division in a short-circuit right operand or ?: arm: refused (conditional-position divisor, D8)",
+        "templates": [
+          "T-BOOL-SC-DIV",
+          "T-BOOL-COND-DIV"
+        ]
+      },
+      {
+        "id": "BOOL-CONDITIONAL",
+        "family": "boolean",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 12,
+        "title": "?: expressions across widths",
+        "templates": [
+          "T-BOOL-COND"
+        ]
+      },
+      {
+        "id": "BOOL-IMPLICATION",
+        "family": "boolean",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 9,
+        "title": "Implication (->) across widths",
+        "templates": [
+          "T-BOOL-IMPL"
+        ]
+      },
+      {
+        "id": "BOOL-NESTING",
+        "family": "boolean",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 9,
+        "title": "Depth-4 boolean composition (exhaustive domain)",
+        "templates": [
+          "T-BOOL-NEST"
+        ]
+      },
+      {
+        "id": "BODY-RETURN-EXPR",
+        "family": "body",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "body",
+          "post"
+        ],
+        "samplingDimensions": [
+          "early-returns",
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 15,
+        "title": "Single return expression bound to result; body arithmetic may demote",
+        "templates": [
+          "T-BODY-RET"
+        ]
+      },
+      {
+        "id": "BODY-IF-ELSE",
+        "family": "body",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "body",
+          "post"
+        ],
+        "samplingDimensions": [
+          "early-returns"
+        ],
+        "casesPerBaseline": 14,
+        "title": "if/elseif/else returns",
+        "templates": [
+          "T-BODY-IFELSE"
+        ]
+      },
+      {
+        "id": "BODY-GUARD-CLAUSE",
+        "family": "body",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "body",
+          "post"
+        ],
+        "samplingDimensions": [
+          "early-returns"
+        ],
+        "casesPerBaseline": 12,
+        "title": "Guard-clause fall-through early returns",
+        "templates": [
+          "T-BODY-GUARD"
+        ]
+      },
+      {
+        "id": "BODY-NESTED-RETURN",
+        "family": "body",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "body",
+          "post"
+        ],
+        "samplingDimensions": [
+          "early-returns"
+        ],
+        "casesPerBaseline": 9,
+        "title": "Nested if returns with arithmetic",
+        "templates": [
+          "T-BODY-NESTED"
+        ]
+      },
+      {
+        "id": "BODY-IMMUTABLE-BIND",
+        "family": "body",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "body",
+          "post"
+        ],
+        "samplingDimensions": [
+          "mutation"
+        ],
+        "casesPerBaseline": 12,
+        "title": "Width-neutral immutable §B bindings (SSA substitution)",
+        "templates": [
+          "T-BODY-BIND"
+        ]
+      },
+      {
+        "id": "BODY-WIDTH-BIND",
+        "family": "body",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "body",
+          "post"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 6,
+        "title": "Width-changing §B binding in a result-bound body: refused",
+        "templates": [
+          "T-BODY-WIDTHBIND"
+        ]
+      },
+      {
+        "id": "BODY-DIVISION",
+        "family": "body",
+        "classification": "assumed",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "body",
+          "divisor",
+          "post"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 9,
+        "title": "Body division: Assumed (exceptional-paths:division) required",
+        "templates": [
+          "T-BODY-DIV"
+        ]
+      },
+      {
+        "id": "BODY-LOOP-CALL-MUTABLE",
+        "family": "body",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "body",
+          "post"
+        ],
+        "samplingDimensions": [
+          "mutation"
+        ],
+        "casesPerBaseline": 8,
+        "title": "Loops and mutable bindings in a result-bound body: refused",
+        "templates": [
+          "T-BODY-LOOP",
+          "T-BODY-MUTABLE"
+        ]
+      },
+      {
+        "id": "BODY-ARRAY-RETURN",
+        "family": "body",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "body",
+          "post"
+        ],
+        "samplingDimensions": [
+          "arrays"
+        ],
+        "casesPerBaseline": 4,
+        "title": "Array-returning body with a result-length postcondition: refused",
+        "templates": [
+          "T-BODY-ARRRET"
+        ]
+      },
+      {
+        "id": "POST-PARAM-PRESERVED",
+        "family": "post-state",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "body",
+          "post"
+        ],
+        "samplingDimensions": [
+          "mutation"
+        ],
+        "casesPerBaseline": 9,
+        "title": "Parameter-only §S over a non-mutating body",
+        "templates": [
+          "T-POST-PRESERVED"
+        ]
+      },
+      {
+        "id": "POST-PARAM-MUTATED",
+        "family": "post-state",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "body",
+          "post"
+        ],
+        "samplingDimensions": [
+          "mutation"
+        ],
+        "casesPerBaseline": 9,
+        "title": "Parameter-only §S over a body that assigns the parameter: refused",
+        "templates": [
+          "T-POST-MUTATED"
+        ]
+      },
+      {
+        "id": "POST-RESULT-PARAM-COLLISION",
+        "family": "post-state",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "post"
+        ],
+        "samplingDimensions": [
+          "aliases"
+        ],
+        "casesPerBaseline": 3,
+        "title": "Parameter named result: refused (G1 review C1)",
+        "templates": [
+          "T-POST-COLLIDE"
+        ]
+      },
+      {
+        "id": "POST-ARRAY-ALIAS",
+        "family": "post-state",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "body",
+          "post"
+        ],
+        "samplingDimensions": [
+          "aliases",
+          "mutation",
+          "arrays"
+        ],
+        "casesPerBaseline": 6,
+        "title": "Array element write through a possibly aliased parameter: refused",
+        "templates": [
+          "T-POST-ARRAY-ALIAS"
+        ]
+      },
+      {
+        "id": "POST-METHOD-RECEIVER",
+        "family": "post-state",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "pass",
+          "body",
+          "post"
+        ],
+        "samplingDimensions": [
+          "mutation",
+          "aliases"
+        ],
+        "casesPerBaseline": 6,
+        "title": "Method contract over a receiver field mutated by the body: refused",
+        "templates": [
+          "T-POST-RECEIVER"
+        ]
+      },
+      {
+        "id": "QNT-FORALL-BOUNDED",
+        "family": "quantifier",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "post",
+          "emitQuant"
+        ],
+        "samplingDimensions": [
+          "quantifiers",
+          "guard-elision"
+        ],
+        "casesPerBaseline": 12,
+        "title": "Bounded forall with extra antecedent conjuncts (D15 lowering)",
+        "templates": [
+          "T-QNT-FORALL"
+        ]
+      },
+      {
+        "id": "QNT-EXISTS-BOUNDED",
+        "family": "quantifier",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "post",
+          "emitQuant"
+        ],
+        "samplingDimensions": [
+          "quantifiers"
+        ],
+        "casesPerBaseline": 9,
+        "title": "Bounded exists",
+        "templates": [
+          "T-QNT-EXISTS"
+        ]
+      },
+      {
+        "id": "QNT-UNBOUNDED",
+        "family": "quantifier",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "contractVerifier",
+          "emitQuant"
+        ],
+        "samplingDimensions": [
+          "quantifiers"
+        ],
+        "casesPerBaseline": 6,
+        "title": "Unbounded quantifier: rejected at compile (Calor0326) or refused",
+        "templates": [
+          "T-QNT-UNBOUNDED"
+        ]
+      },
+      {
+        "id": "QNT-BOUND-TYPES",
+        "family": "quantifier",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator",
+          "emitQuant"
+        ],
+        "samplingDimensions": [
+          "quantifiers",
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 6,
+        "title": "Bound variables of u8/i8/i16/i64",
+        "templates": [
+          "T-QNT-BOUNDTYPES"
+        ]
+      },
+      {
+        "id": "QNT-NESTED",
+        "family": "quantifier",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "emitQuant"
+        ],
+        "samplingDimensions": [
+          "quantifiers"
+        ],
+        "casesPerBaseline": 6,
+        "title": "Nested bounded forall: the front end rejects runtime lowering (Calor0326) at B1",
+        "templates": [
+          "T-QNT-NESTED"
+        ]
+      },
+      {
+        "id": "ARR-LENGTH",
+        "family": "array",
+        "classification": "assumed",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [
+          "arrays"
+        ],
+        "casesPerBaseline": 9,
+        "title": "Array length: Assumed (reference-model, D14) required",
+        "templates": [
+          "T-ARR-LEN"
+        ]
+      },
+      {
+        "id": "ARR-INDEX",
+        "family": "array",
+        "classification": "assumed",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "post",
+          "body"
+        ],
+        "samplingDimensions": [
+          "arrays"
+        ],
+        "casesPerBaseline": 9,
+        "title": "Element access: Assumed (reference-model) required",
+        "templates": [
+          "T-ARR-INDEX"
+        ]
+      },
+      {
+        "id": "ARR-ELEMENT-TYPES",
+        "family": "array",
+        "classification": "assumed",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [
+          "arrays",
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 6,
+        "title": "u8[] and i64[] elements: Assumed required",
+        "templates": [
+          "T-ARR-ELEM"
+        ]
+      },
+      {
+        "id": "ARR-COMPUTED-BASE",
+        "family": "array",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator"
+        ],
+        "samplingDimensions": [
+          "arrays"
+        ],
+        "casesPerBaseline": 4,
+        "title": "Computed array base: refused",
+        "templates": [
+          "T-ARR-COMPUTED"
+        ]
+      },
+      {
+        "id": "STR-OPS-PREDICATE",
+        "family": "string",
+        "classification": "assumed",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [
+          "strings"
+        ],
+        "casesPerBaseline": 12,
+        "title": "Predicate string operations: Assumed (string-model, D3/D12) required",
+        "templates": [
+          "T-STR-PRED"
+        ]
+      },
+      {
+        "id": "STR-OPS-COUNT-INDEX",
+        "family": "string",
+        "classification": "assumed",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [
+          "strings"
+        ],
+        "casesPerBaseline": 9,
+        "title": "Length/IndexOf/Substring: Assumed required (D12/D13)",
+        "templates": [
+          "T-STR-COUNT"
+        ]
+      },
+      {
+        "id": "STR-CULTURE-MODE",
+        "family": "string",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator"
+        ],
+        "samplingDimensions": [
+          "strings"
+        ],
+        "casesPerBaseline": 7,
+        "title": "Non-ordinal or missing comparison mode: refused (D4)",
+        "templates": [
+          "T-STR-CULTURE"
+        ]
+      },
+      {
+        "id": "STR-UNMODELED-OPS",
+        "family": "string",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist"
+        ],
+        "samplingDimensions": [
+          "strings"
+        ],
+        "casesPerBaseline": 6,
+        "title": "Replace/upper/lower/trim: refused (D9)",
+        "templates": [
+          "T-STR-UNMODELED"
+        ]
+      },
+      {
+        "id": "STR-NULL-NONASCII",
+        "family": "string",
+        "classification": "assumed",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "post",
+          "body"
+        ],
+        "samplingDimensions": [
+          "strings"
+        ],
+        "casesPerBaseline": 6,
+        "title": "Non-ASCII and null witnesses through result-bound bodies: Assumed required",
+        "templates": [
+          "T-STR-NONASCII"
+        ]
+      },
+      {
+        "id": "FLD-ACCESS",
+        "family": "user-type",
+        "classification": "assumed",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "pass",
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [
+          "aliases"
+        ],
+        "casesPerBaseline": 7,
+        "title": "Receiver field access in method contracts: Assumed (reference-model) required",
+        "templates": [
+          "T-FLD-ACCESS"
+        ]
+      },
+      {
+        "id": "FLD-INHERITED-NESTED",
+        "family": "user-type",
+        "classification": "assumed",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "pass",
+          "translator"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 6,
+        "title": "Inherited field access: Assumed required, or refused when unregistered",
+        "templates": [
+          "T-FLD-INHERITED"
+        ]
+      },
+      {
+        "id": "FLT-REFUSAL",
+        "family": "refusal",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist",
+          "translator"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 9,
+        "title": "Floating-point parameters, literals, NaN: refused",
+        "templates": [
+          "T-FLT"
+        ]
+      },
+      {
+        "id": "CALL-IN-CONTRACT",
+        "family": "refusal",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "whitelist"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 6,
+        "title": "Calls in contracts: refused",
+        "templates": [
+          "T-CALL"
+        ]
+      },
+      {
+        "id": "GEN-REFUSAL",
+        "family": "refusal",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "contractVerifier"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 4,
+        "title": "object, List<T>, Option<T> parameters: refused or uninterpreted (no unconditional proof)",
+        "templates": [
+          "T-GENERIC"
+        ]
+      },
+      {
+        "id": "VAC-UNSAT-PRECONDITIONS",
+        "family": "vacuity",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "post",
+          "emitPost"
+        ],
+        "samplingDimensions": [
+          "guard-elision"
+        ],
+        "casesPerBaseline": 9,
+        "title": "Unsatisfiable §Q set: ProvenVacuous required; guard kept",
+        "templates": [
+          "T-VAC-UNSAT"
+        ]
+      },
+      {
+        "id": "VAC-PRECONDITION-SAT-CLAIM",
+        "family": "vacuity",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "precondition",
+        "entryPoints": [
+          "pre"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 6,
+        "title": "Precondition satisfiability claims (Proven = satisfiable)",
+        "templates": [
+          "T-VAC-PRESAT"
+        ]
+      },
+      {
+        "id": "OBL-PROOF",
+        "family": "obligation",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "obligation",
+        "entryPoints": [
+          "oblGen",
+          "oblSolve",
+          "emitObl",
+          "refine"
+        ],
+        "samplingDimensions": [
+          "guard-elision"
+        ],
+        "casesPerBaseline": 12,
+        "title": "§PROOF obligations (Discharged needs a registered non-vacuity check)",
+        "templates": [
+          "T-OBL-PROOF"
+        ]
+      },
+      {
+        "id": "OBL-REFINEMENT-ENTRY",
+        "family": "obligation",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "obligation",
+        "entryPoints": [
+          "oblGen",
+          "oblSolve",
+          "emitObl"
+        ],
+        "samplingDimensions": [
+          "guard-elision"
+        ],
+        "casesPerBaseline": 9,
+        "title": "Refined local bindings and inline parameter refinements",
+        "templates": [
+          "T-OBL-ENTRY",
+          "T-OBL-INLINE"
+        ]
+      },
+      {
+        "id": "OBL-REFINEMENT-RETURN",
+        "family": "obligation",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "obligation",
+        "entryPoints": [
+          "oblGen",
+          "oblSolve",
+          "emitObl"
+        ],
+        "samplingDimensions": [
+          "guard-elision"
+        ],
+        "casesPerBaseline": 6,
+        "title": "Refined return types",
+        "templates": [
+          "T-OBL-RETURN"
+        ]
+      },
+      {
+        "id": "OBL-SUBTYPE",
+        "family": "obligation",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "obligation",
+        "entryPoints": [
+          "oblGen",
+          "oblSolve",
+          "facts"
+        ],
+        "samplingDimensions": [
+          "guard-elision"
+        ],
+        "casesPerBaseline": 6,
+        "title": "Unrefined-to-refined assignment",
+        "templates": [
+          "T-OBL-SUBTYPE"
+        ]
+      },
+      {
+        "id": "OBL-INDEX-BOUNDS",
+        "family": "obligation",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "obligation",
+        "entryPoints": [
+          "oblGen",
+          "oblSolve",
+          "emitObl"
+        ],
+        "samplingDimensions": [
+          "arrays",
+          "guard-elision"
+        ],
+        "casesPerBaseline": 4,
+        "title": "Indexed-type §IDX bounds obligations",
+        "templates": [
+          "T-OBL-INDEX"
+        ]
+      },
+      {
+        "id": "OBL-SELFREF",
+        "family": "obligation",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "obligation",
+        "entryPoints": [
+          "oblGen",
+          "oblSolve",
+          "translator"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 6,
+        "title": "Self-reference (#) predicates",
+        "templates": [
+          "T-OBL-SELFREF"
+        ]
+      },
+      {
+        "id": "OBL-UNGATED-FORMS",
+        "family": "obligation",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "obligation",
+        "entryPoints": [
+          "oblSolve",
+          "translator"
+        ],
+        "samplingDimensions": [
+          "guard-elision"
+        ],
+        "casesPerBaseline": 9,
+        "title": "Forms outside ModeledForms reaching the ungated obligation solver (bitwise not, calls, overflow)",
+        "templates": [
+          "T-OBL-UNGATED"
+        ]
+      },
+      {
+        "id": "IMPL-PRECONDITION-WEAKENING",
+        "family": "implication",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "implication",
+        "entryPoints": [
+          "inherit",
+          "implProver"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 7,
+        "title": "Interface §Q implies implementer §Q (Calor0815)",
+        "templates": [
+          "T-IMPL-PRE"
+        ]
+      },
+      {
+        "id": "IMPL-POSTCONDITION-STRENGTHENING",
+        "family": "implication",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "implication",
+        "entryPoints": [
+          "inherit",
+          "implProver"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 6,
+        "title": "Implementer §S implies interface §S",
+        "templates": [
+          "T-IMPL-POST"
+        ]
+      },
+      {
+        "id": "IMPL-DIVISION-TOTALIZED",
+        "family": "implication",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "implication",
+        "entryPoints": [
+          "implProver",
+          "verifyCmd"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 4,
+        "title": "Implication over dividing contracts (documented residual: totalized division)",
+        "templates": [
+          "T-IMPL-DIV"
+        ]
+      },
+      {
+        "id": "INH-INHERITED-GUARD-EMISSION",
+        "family": "implication",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "guard-emission",
+        "entryPoints": [
+          "inherit",
+          "emitInherit",
+          "post"
+        ],
+        "samplingDimensions": [
+          "guard-elision"
+        ],
+        "casesPerBaseline": 4,
+        "title": "Inherited interface §S on an implementer without contracts",
+        "templates": [
+          "T-INH-GUARD"
+        ]
+      },
+      {
+        "id": "CACHE-BODY-CHANGE",
+        "family": "cache",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "cache",
+          "hasher",
+          "cacheEntry"
+        ],
+        "samplingDimensions": [
+          "caches"
+        ],
+        "casesPerBaseline": 6,
+        "title": "Primed proof, then body change",
+        "templates": [
+          "T-CACHE-BODY"
+        ]
+      },
+      {
+        "id": "CACHE-PRECONDITION-CHANGE",
+        "family": "cache",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "cache",
+          "hasher"
+        ],
+        "samplingDimensions": [
+          "caches"
+        ],
+        "casesPerBaseline": 6,
+        "title": "Primed proof, then precondition change",
+        "templates": [
+          "T-CACHE-PRE"
+        ]
+      },
+      {
+        "id": "CACHE-DEPENDENCY-CHANGE",
+        "family": "cache",
+        "classification": "assumed",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "cache",
+          "hasher",
+          "pass"
+        ],
+        "samplingDimensions": [
+          "caches"
+        ],
+        "casesPerBaseline": 4,
+        "title": "Primed proof, then user-type field width change",
+        "templates": [
+          "T-CACHE-DEP"
+        ]
+      },
+      {
+        "id": "CACHE-SEMANTICS-VERSION",
+        "family": "cache",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "cache",
+          "cacheEntry"
+        ],
+        "samplingDimensions": [
+          "caches"
+        ],
+        "casesPerBaseline": 3,
+        "title": "Primed entries rewritten to another translator semantics version",
+        "templates": [
+          "T-CACHE-SEMVER"
+        ]
+      },
+      {
+        "id": "SIMP-CONSTANT-FOLDING",
+        "family": "simplifier",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "simplifier",
+          "simplpass",
+          "pipeline"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 9,
+        "title": "Literal-literal folding before verification and emission",
+        "templates": [
+          "T-SIMP-FOLD"
+        ]
+      },
+      {
+        "id": "SIMP-H1-UNARY-FOLD",
+        "family": "simplifier",
+        "classification": "modeled",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "simplifier",
+          "simplpass",
+          "whitelist"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 9,
+        "title": "HYPOTHESIS H1 (R0): unary Negate/BitwiseNot folding versus IsUnsigned/IsLong literals; not executed in R1",
+        "templates": [
+          "T-SIMP-H1"
+        ]
+      },
+      {
+        "id": "MIX-QNT-ARRAY",
+        "family": "cross-feature",
+        "classification": "assumed",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "post",
+          "emitQuant"
+        ],
+        "samplingDimensions": [
+          "quantifiers",
+          "arrays"
+        ],
+        "casesPerBaseline": 4,
+        "title": "Bounded forall over array elements: Assumed (reference-model) required",
+        "templates": [
+          "T-MIX-QNT-ARR"
+        ]
+      },
+      {
+        "id": "MIX-STR-COND",
+        "family": "cross-feature",
+        "classification": "assumed",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [
+          "strings"
+        ],
+        "casesPerBaseline": 3,
+        "title": "String length under ?: : Assumed (string-model) required",
+        "templates": [
+          "T-MIX-STR-COND"
+        ]
+      },
+      {
+        "id": "MIX-DIV-IMPL",
+        "family": "cross-feature",
+        "classification": "unsupported-refused",
+        "releaseCritical": true,
+        "channel": "postcondition",
+        "entryPoints": [
+          "divisor",
+          "post"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 3,
+        "title": "Division in an implication consequent: refused (conditional-position divisor)",
+        "templates": [
+          "T-MIX-DIV-IMPL"
+        ]
+      },
+      {
+        "id": "CTRL-POSITIVE",
+        "family": "control",
+        "classification": "modeled",
+        "releaseCritical": false,
+        "channel": "postcondition",
+        "entryPoints": [
+          "post"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 8,
+        "title": "Positive controls: known-true modeled properties",
+        "templates": [
+          "C-POS-RANGE",
+          "C-POS-BOOL"
+        ]
+      },
+      {
+        "id": "CTRL-NEGATIVE",
+        "family": "control",
+        "classification": "modeled",
+        "releaseCritical": false,
+        "channel": "postcondition",
+        "entryPoints": [
+          "post"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 6,
+        "title": "Negative controls: known-false properties; counterexample replay",
+        "templates": [
+          "C-NEG-WRAP",
+          "C-NEG-RANGE"
+        ]
+      },
+      {
+        "id": "CTRL-MUTATION",
+        "family": "control",
+        "classification": "modeled",
+        "releaseCritical": false,
+        "channel": "postcondition",
+        "entryPoints": [
+          "post"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 4,
+        "title": "Behavior- and contract-preserving mutation pairs",
+        "templates": [
+          "C-MUT-BEHAVIOR-A",
+          "C-MUT-BEHAVIOR-B",
+          "C-MUT-CONTRACT-A",
+          "C-MUT-CONTRACT-B"
+        ]
+      },
+      {
+        "id": "CTRL-RETRO-845",
+        "family": "control",
+        "classification": "modeled",
+        "releaseCritical": false,
+        "channel": "postcondition",
+        "entryPoints": [
+          "translator",
+          "post"
+        ],
+        "samplingDimensions": [
+          "numeric-widths"
+        ],
+        "casesPerBaseline": 4,
+        "title": "Retrospective discriminating control #845 / PR #961",
+        "templates": [
+          "C-RETRO-845-SAT",
+          "C-RETRO-845-VIOL"
+        ]
+      },
+      {
+        "id": "CTRL-RETRO-FIXED",
+        "family": "control",
+        "classification": "modeled",
+        "releaseCritical": false,
+        "channel": "postcondition",
+        "entryPoints": [
+          "post",
+          "translator",
+          "emitQuant",
+          "body"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 8,
+        "title": "Post-fix-only controls for fixed vectors D3, D4, D8, D11, D14, D15, #807, G1-C1",
+        "templates": [
+          "C-RETRO-D3",
+          "C-RETRO-D4",
+          "C-RETRO-D8",
+          "C-RETRO-D11",
+          "C-RETRO-D14",
+          "C-RETRO-D15",
+          "C-RETRO-807",
+          "C-RETRO-G1C1"
+        ]
+      },
+      {
+        "id": "XCL-KINDUCTION",
+        "family": "excluded",
+        "classification": "not-investigated",
+        "releaseCritical": false,
+        "channel": "none",
+        "entryPoints": [
+          "kind"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 0,
+        "title": "k-induction loop invariants: off by default; emits Calor0950 info only; removes no guard",
+        "templates": []
+      },
+      {
+        "id": "XCL-BUGPATTERNS",
+        "family": "excluded",
+        "classification": "not-investigated",
+        "releaseCritical": false,
+        "channel": "none",
+        "entryPoints": [],
+        "samplingDimensions": [],
+        "casesPerBaseline": 0,
+        "title": "Bug-pattern analyses use Z3 for findings, not proof outcomes",
+        "templates": []
+      },
+      {
+        "id": "XCL-SURFACE-PARITY",
+        "family": "excluded",
+        "classification": "not-investigated",
+        "releaseCritical": false,
+        "channel": "none",
+        "entryPoints": [
+          "pipeline",
+          "refine"
+        ],
+        "samplingDimensions": [],
+        "casesPerBaseline": 0,
+        "title": "MSBuild/LSP/MCP compile surfaces: they call Program.Compile; per-surface option plumbing is not separately investigated",
+        "templates": []
+      },
+      {
+        "id": "XCL-HEAP-GENERICS",
+        "family": "excluded",
+        "classification": "not-investigated",
+        "releaseCritical": false,
+        "channel": "none",
+        "entryPoints": [],
+        "samplingDimensions": [],
+        "casesPerBaseline": 0,
+        "title": "Heap model, generic contents, delegates: no model exists; adding one is a non-goal (#1311)",
+        "templates": []
+      }
+    ]
+  },
+  "channels": {
+    "CH-CONTRACT": "Program.Compile(source, \"case.calr\", CompilationOptions { VerifyContracts = true, VerifyRefinements = false, EnableTypeChecking = TypeCheckingDefault, ContractMode = Debug, VerificationTimeoutMs = 5000, VerificationCacheOptions = { Enabled = false } }) run twice: ElideProvenGuards = true (the default user path) and ElideProvenGuards = false. Outcomes are read from options.VerificationResults (ContractVerificationResult.EffectiveOutcome: Status, IsVacuous, Assumptions).",
+    "CH-OBLIGATION": "As CH-CONTRACT with VerifyRefinements = true; outcomes are read from options.ObligationResults (Obligation.Outcome, Status, Kind). This is the path behind calor_refine (MCP) and the public API; the CLI and MSBuild task do not solve obligations at B1/N1.",
+    "CH-IMPLICATION": "The inheritance checker that Program.Compile always runs (Z3 when available). Outcomes are the Calor0815 info diagnostic (ImplicationStatus.Proven) and the StrongerPrecondition / incompatible-contract error diagnostics (Disproven), attributed by span to the implementing method.",
+    "CH-CACHE": "CH-CONTRACT with VerificationCacheOptions { Enabled = true, ProjectDirectory = <fresh per-case temp dir> }: compile calorPrime, then calor, in the same directory; then a cold compile of calor in a new directory. CACHE-SEMANTICS-VERSION rewrites every primed entry's translator semantics version string to 'r1-stale-version' between the two compiles.",
+    "CH-CLI-CROSSCHECK": "For CTRL-* cases only: the baseline CLI (calor --input case.calr --output case.g.cs --verify --format json --no-telemetry) must report, per contract diagnostic, the same status as the in-process channel. Disagreement makes the run invalid (harness defect), not a finding.",
+    "invocation": "In-process: the baseline's calor.dll is loaded into a collectible AssemblyLoadContext with its own Microsoft.Z3.dll and native libz3, and Calor.Compiler.Program.Compile and CompilationOptions are bound by reflection by name. If the N1 or B1 assembly cannot be loaded this way, the registered fallback is the CLI for CH-CONTRACT (envelope verification payload + emitted .g.cs) and calor mcp (calor_refine action=obligations) for CH-OBLIGATION; the fallback choice is made on the CTRL-* cases before any sweep case and recorded in pins.json."
+  },
+  "observation": {
+    "perCase": [
+      "Compile the case once per channel listed for its row; record raw statuses, IsVacuous, assumption lists, counterexample models, diagnostics, and both emitted C# texts.",
+      "Map each claim-bearing raw status to exactly one contract §4 token: Proven, ProvenVacuous, Discharged, Assumed, Unsupported, TimeoutOrUnavailable, Failed, Boundary. Map from ProofOutcome (Status, IsVacuous, Assumptions), never from a legacy enum. An unmapped status is a harness error (contract E001), never the nearest token.",
+      "A case the baseline compiler rejects with an error diagnostic before verification is recorded as compile-rejected (no token), with its error codes. For an unsupported-refused row this validates the refusal only if no error code is a lexer or parser code (Calor0001-Calor0199): every case lexes and parses cleanly at B1 (SoundnessRegistrationTests), so a lexer/parser rejection is a template or front-end defect and the case is harness-invalid. For any other row a compile rejection is harness-invalid for that baseline.",
+      "Guard observation: in the elision-enabled emission the claim's guard must be absent iff the token is Proven (postcondition, non-vacuous) or Discharged with an ObligationPolicy action needing no guard; in the forced emission it must be present."
+    ],
+    "claimSite": "Exactly one claim per case, fixed by the template's claimSite. Other contracts in the same case are archived but not adjudicated.",
+    "translatorSemanticsVersion": "Recorded per run from the loaded assembly's ContractTranslator.SemanticsVersion (z3-executable-semantics-v2 at B1 and N1)."
+  },
+  "oracle": {
+    "id": "R1-O1",
+    "kind": "independent behavioral oracle by execution",
+    "definition": "For each case, the registrant-authored C# in templates.json (rendered per case by SweepCaseGenerator) is compiled with Roslyn against BCL assemblies only and executed over the case's registered input domain, under CultureInfo en-US and the module's overflow mode (checked unless the template says unchecked). It never references or loads a Calor assembly and never calls the verifier's translator, simplifier, emitter, solver, or cache. Implementation: tests/Calor.Compiler.Tests/SoundnessRegistration/IndependentOracle.cs.",
+    "semantics": [
+      "forall claims (postcondition, obligation, implication): for every input with Hyp true and a normally-returning Body, Prop must evaluate to true without throwing. Inputs where Hyp is false are excluded; inputs where Hyp or Body throws are excluded and counted (normal-return semantics, D5). A Prop that is false or throws is a violation.",
+      "exists claims (precondition satisfiability): a witness is an input where Prop is true.",
+      "Exhaustive when every domain parameter is bool or an 8/16-bit integer without an override list and the product is at most 65,536 inputs; otherwise the domain is the per-type boundary table plus 6 seeded values per parameter, capped at 4,096 tuples by seeded subsampling. A sampled domain can show violation but never establishes truth.",
+      "Where C# defines no semantics (u64 mixed with a signed operand; unary minus on ulong in H1), the oracle uses exact mathematical integers (System.Numerics.BigInteger) and the row is a refusal or hypothesis row."
+    ],
+    "verdicts": [
+      "violated",
+      "holds-exhaustive",
+      "holds-sampled",
+      "vacuous-in-domain",
+      "witness-found",
+      "no-witness-exhaustive",
+      "no-witness-sampled",
+      "oracle-invalid"
+    ],
+    "evaluationBudget": "60 s wall clock per case; exceeding it is oracle-invalid.",
+    "corroboration": {
+      "id": "R1-O2",
+      "definition": "The baseline's emitted C# with forced guards (ElideProvenGuards = false) is compiled with the baseline's Calor.Runtime.dll and executed on every O1 witness (via the template's replay expression, or Probe(args) by position). O2 records whether the forced guard throws ContractViolationException / InvalidOperationException on the witness.",
+      "role": "Corroboration and divergence detection only. O2 runs post-simplification code (ContractSimplificationPass rewrites contracts before emission), so it shares the simplifier's assumptions and can never be the sole oracle."
+    },
+    "divergence": "If O1 says the property is violated on an input and the forced O2 guard does not throw on that input (or the reverse), the case additionally gets a semantic-divergence record for #1413. The O1 verdict is not changed by O2."
+  },
+  "generation": {
+    "method": "Deterministic template expansion. templates.json holds every template; each template has a row, an instance count, holes, Calor text, and oracle text. Case ids are R1-<row>-<nnn> numbered within the row in template order. Each case uses SplitMix64 seeded with masterSeed XOR the first 8 bytes (little-endian) of SHA-256(caseId).",
+    "masterSeed": "1419002401",
+    "generator": "tests/Calor.Compiler.Tests/SoundnessRegistration/SweepCaseGenerator.cs",
+    "templates": "docs/plans/evidence/r1-1419/templates.json",
+    "caseIndex": "docs/plans/evidence/r1-1419/cases-index.json",
+    "caseIndexRule": "cases-index.json lists every case id with its row, template, claim, exhaustive flag, and the SHA-256 of its Calor text, prime text, and oracle text. A test regenerates the cases and fails on any byte difference, so the case set cannot change without a visible edit to a hashed file.",
+    "sameCasesBothBaselines": true
+  },
+  "budget": {
+    "contractCeilings": {
+      "s1-generated-cases": 1500,
+      "s1-timebox-days": 10,
+      "s1-agent-hours": 20,
+      "s1-ci-minutes": 600,
+      "s1-local-machine-hours": 10,
+      "paid-spend-usd": 0
+    },
+    "unit": "One case execution = one case run on one baseline through all of its row's channels (including both emissions and O2 replay). The 1,500 ceiling counts case executions across B1, N1, and P845 combined; the existing 1,170-cell verifier-runtime differential and existing regression tests are not counted and are not re-run by #1311.",
+    "allocation": {
+      "B1": {
+        "sweep": 678,
+        "controls": 30
+      },
+      "N1": {
+        "sweep": 678,
+        "controls": 30
+      },
+      "P845": {
+        "controls": 4
+      },
+      "minimizationReserve": 80,
+      "total": 1500
+    },
+    "reserveUse": "Only for (a) minimizing a candidate finding, (b) re-running a finding's case on the other baseline, (c) the single permitted retry of an inconclusive attempt. Reserve executions are labeled and never raise a row to clean.",
+    "retryCost": "A retry is a case execution and is charged to the reserve."
+  },
+  "execution": {
+    "order": "Round-robin by case index across rows (case 1 of every row, then case 2, ...), in row order of this file; B1 and N1 alternate per case; controls run first on each baseline. A timebox stop therefore leaves coverage spread across rows instead of chosen.",
+    "timeouts": {
+      "solverMsPerQuery": 5000,
+      "caseWallClockSeconds": 120,
+      "oracleSeconds": 60
+    },
+    "retry": "A case whose claim token is TimeoutOrUnavailable, or whose execution crashed or exceeded caseWallClockSeconds, is retried exactly once with identical inputs. Both attempts are retained. If the attempts disagree the case status is flaky (never established). If any attempt is Proven or Discharged with an O1 violation, that is a finding regardless of the other attempt. There is no third attempt.",
+    "environment": {
+      "dotnetSdk": "global.json at each baseline pins 10.0.100 with rollForward latestMinor; the exact `dotnet --version` is recorded in pins.json and must not change within a baseline's sweep (the registrant's machine reported 10.0.401).",
+      "os": "Recorded (uname -a or Windows build) in pins.json; one OS/architecture per baseline sweep.",
+      "culture": "CultureInfo.CurrentCulture = en-US for O1 and O2 execution; restored afterwards.",
+      "z3Seed": "No seed is injected into the baseline compiler; production behavior is what is under test. Nondeterminism is handled by the retry rule (determinism itself is #1421/#1135, out of scope).",
+      "parallelism": "Cases run sequentially within a baseline process."
+    },
+    "invalidRunPolicy": [
+      "A run is invalid if: a pinned binary or native hash differs; dotnet --version changes mid-sweep; any oracleControl does not produce its registered verdict on the executing machine; CH-CLI-CROSSCHECK disagrees; or more than 10% of a baseline's cases crash in the harness (not in the compiler).",
+      "Invalid runs are archived under attempts/ with the reason and are never used for row status.",
+      "After an invalid run the harness may be fixed and the baseline restarted from its first case with the same case list. At most 3 invalid runs per baseline; a fourth makes every unexecuted release-critical row of that baseline BLOCKED.",
+      "A compiler crash or compile rejection on a case is a case result, not a harness crash."
+    ]
+  },
+  "caseResults": {
+    "classes": {
+      "false-unconditional-proof": "Claim token Proven (non-vacuous) or Discharged with a passed non-vacuity check, and O1 verdict violated. The contract's release-blocking finding.",
+      "false-proof-unconfirmed-vacuity": "Discharged, O1 violated, but the non-vacuity check did not pass. Still a finding for #1413.",
+      "required-demotion-absent": "Proven/Discharged on an assumed or unsupported-refused row without an O1 violation in the domain.",
+      "guard-elided-without-proof": "The claim's guard is absent in the elision-enabled emission while the token is not Proven/Discharged, or is absent in the forced emission.",
+      "vacuity-mislabel": "Proven reported non-vacuous while O1 is exhaustive and vacuous-in-domain, or ProvenVacuous while O1 found a reached input.",
+      "spurious-refutation": "Failed whose replayed counterexample (or, for exhaustive domains, any input) does not violate the property under O1. A completeness defect; needs a disposition.",
+      "stale-cache-proof": "A warm (cached) compile yields Proven/Discharged where the cold compile of the same text does not.",
+      "semantic-divergence": "O1 and O2 disagree on an input (see oracle.divergence).",
+      "candidate-unconfirmed": "A finding whose minimization or standalone C# reproduction did not complete inside capacity. Stays a finding.",
+      "validated-proof": "Proven/Discharged (non-vacuous, non-vacuity check passed for Discharged) on a modeled row, O1 holds-exhaustive or holds-sampled with at least one reached input. Sampled means no counterexample was found within the domain, not that the property holds.",
+      "refusal-validated": "Assumed, Unsupported, or compile-rejected where the row requires that, with guards retained.",
+      "no-claim": "Assumed, Unsupported, TimeoutOrUnavailable, Failed (with a genuine counterexample), or Boundary on a modeled row. Establishes nothing.",
+      "harness-invalid": "The case could not be evaluated on this baseline (oracle-invalid, compile-rejected on a modeled or assumed row, unmappable status). Counted and reported; never replaced by another case."
+    },
+    "nonVacuityCheck": "For every Discharged (and every Proven) claim, O1 must report at least one reached input (Hyp true, Body returned normally). Recorded as nonVacuityCheck {id: \"R1-O1-reached\", result: \"passed\" | \"failed\"}. Required by contract §4 condition 5 for Discharged.",
+    "rowStatus": [
+      "FALSE-PROOF if any case is false-unconditional-proof.",
+      "else FINDING if any case is any other finding class.",
+      "else INCOMPLETE if any allocated case is unexecuted, or harness-invalid cases exceed 20% of the row's cases, or (modeled rows only) every executed case is no-claim because of TimeoutOrUnavailable.",
+      "else CLEAN-WITHIN-BUDGET, reported with the counts of validated-proof, refusal-validated, and no-claim cases and the share of exhaustive domains."
+    ],
+    "rowStatusToContract": "CLEAN-WITHIN-BUDGET is the only status #1413 may disposition VALIDATED, and it means no counterexample was found within this matrix and budget. INCOMPLETE release-critical rows are BLOCKED at the timebox (contract §8 stopping condition 2). Row status is per baseline."
+  },
+  "findingRecord": {
+    "path": "bench/correctness/false-established/v024/<baseline>/findings/<findingId>.json",
+    "fields": {
+      "findingId": "F-<baseline>-<nnn>",
+      "baseline": "B1 | N1 | P845",
+      "registrationCommit": "full SHA of the merge that froze this registration",
+      "rowId": "row id",
+      "caseId": "case id",
+      "templateId": "template id",
+      "caseSha256": {
+        "calor": "",
+        "oracle": "",
+        "prime": "or null"
+      },
+      "class": "one caseResults class",
+      "claim": {
+        "site": "",
+        "token": "",
+        "rawStatus": "",
+        "isVacuous": false,
+        "assumptions": [],
+        "guardInElidedEmission": true,
+        "guardInForcedEmission": true
+      },
+      "witness": {
+        "inputs": "rendered tuple",
+        "o1": "verdict and violation kind",
+        "o2": "guard threw | did not throw | not-run"
+      },
+      "nonVacuityCheck": {
+        "id": "R1-O1-reached",
+        "result": "passed | failed"
+      },
+      "minimized": {
+        "calorSource": "",
+        "csharpReproduction": "standalone C# that shows the property false without Calor",
+        "sha256": ""
+      },
+      "environment": {
+        "calorDllSha256": "",
+        "z3NativeSha256": "",
+        "dotnetVersion": "",
+        "os": "",
+        "translatorSemanticsVersion": ""
+      },
+      "attempts": "every attempt with timestamps and raw output paths",
+      "otherBaseline": {
+        "id": "",
+        "result": "reproduces | does-not-reproduce | not-run"
+      },
+      "affectedGuarantee": "the modeled form, the guard-elision path, and any public claim or experiment that relies on it",
+      "filedIssue": "issue number once filed",
+      "disposition": "null until #1413 records exactly one of the frozen findingDispositions"
+    }
+  },
+  "dispositionHandoff": {
+    "vocabulary": [
+      "VALIDATED",
+      "FIX-IN-0.24",
+      "DEMOTE-IN-0.24",
+      "NOT-INVESTIGATED",
+      "MILESTONE-FAILED"
+    ],
+    "source": "contract.json findingDispositions (#1413)",
+    "rules": [
+      "Every registered row on each baseline and every finding gets exactly one disposition from #1413, recorded per baseline.",
+      "VALIDATED only for CLEAN-WITHIN-BUDGET rows; never for a row with a finding.",
+      "NOT-INVESTIGATED only for the not-investigated rows of this registration (XCL-*). An unexecuted registered row is not eligible: it is BLOCKED or MILESTONE-FAILED.",
+      "A false-unconditional-proof needs FIX-IN-0.24 or DEMOTE-IN-0.24 within the contract's s2-repairs (6 PRs) and s2-repair-size (600 lines) ceilings, or MILESTONE-FAILED. A retained guard does not cure it.",
+      "A fix or demotion lands on the post-repair candidate (#1423); the N1 package and the B1 tag are immutable, so their findings stay recorded as findings against those releases with the candidate-side disposition."
+    ]
+  },
+  "controls": {
+    "oracleControls": "templates.json oracleControls: 13 registrant C# properties with known verdicts (positive: holds; negative: violated with a registered witness; exists and vacuity cases). Executed in R1 by SoundnessRegistrationTests and re-executed by #1311 on its machine before any case (invalid-run policy).",
+    "verifierControls": "CTRL-POSITIVE, CTRL-NEGATIVE, CTRL-MUTATION, CTRL-RETRO-845, and CTRL-RETRO-FIXED cases carry expectedOutcome. #1311 runs them first on each baseline. A control whose observed token differs from expectedOutcome is reported; if the control is a retrospective false-proof vector and the observation is Proven with an O1 violation, it is a false-unconditional-proof finding like any other.",
+    "mutationControls": "CTRL-MUTATION pairs M1 (behavior-preserving rewrite) and M2 (contract-preserving rewrite). The oracle verdicts within a pair must be equal; the verifier tokens may differ, and a differing token alone is not a finding (changed behavior is not a false proof).",
+    "retrospective845": {
+      "issue": 845,
+      "fixPr": 961,
+      "fixMerge": "e8bb373150f7ccdf303740d24af0180ada8e9220",
+      "preFixParent": "17d253dff964e37538a5f503d3744b576bd2fb52",
+      "cases": "CTRL-RETRO-845 (4 cases): ULONG bounds near ulong.MaxValue that are satisfiable (expected Proven) and violated (expected Failed).",
+      "discrimination": "On P845 the pair must show the pre-fix defect (a Proven on a violated case, or a non-Proven on a satisfiable case); on B1 and N1 it must not. If P845 shows no defect, the control does not discriminate and is reported as non-discriminating, not as a pass.",
+      "residual": "#845 stays open; its named regression is not identified as a closing test (contract §11)."
+    },
+    "existingDifferential": "bench/phase0-agent-native/verifier-runtime-differential.json (65 forms, 1,170 cells) is cited as an existing control on the cutoff tree. It runs in CI on the current tree, not on the B1/N1 binaries, and is not part of this sweep's denominator or budget."
+  },
+  "hypotheses": [
+    {
+      "id": "H1",
+      "row": "SIMP-H1-UNARY-FOLD",
+      "source": "Contract §11 retrospective note for #845 (R0).",
+      "statement": "ExpressionSimplifier folds unary Negate and BitwiseNot over IntLiteralNode without regard to IsUnsigned or IsLong, which could reach an established proof.",
+      "readingAtRegistration": "Source reading at B1 (not execution): ExpressionSimplifier.Visit(UnaryOperationNode) returns early unless the operand is an IntLiteralNode with IsLong=false and IsUnsigned=false, so the unsigned/long case appears gated; BitwiseNot is folded although it is not in ModeledForms.UnaryOperators, so a folded literal can enter the whitelisted surface. Both readings are hypotheses; neither was tested.",
+      "status": "registered, not executed",
+      "cases": "The SIMP-H1-UNARY-FOLD row (casesPerBaseline in denominator.rows); exact-integer oracle, except that negating int.MinValue throws under checked C#."
+    }
+  ],
+  "stopping": {
+    "contractRules": "Contract §8 stopping conditions 1-5 apply unchanged.",
+    "s1": [
+      "Stop at the first of: 10 calendar days after this registration's merge; 20 agent-hours; 1,500 case executions; 600 CI runner-minutes; 10 local machine-hours. Record which ceiling stopped the sweep.",
+      "At a stop, unreached cases are not-investigated; every release-critical row with an unreached case is INCOMPLETE and therefore BLOCKED unless a reviewed #1407 amendment raising the ceiling merges first.",
+      "A finding does not stop the sweep. It is minimized from the reserve, filed, and the sweep continues in registered order.",
+      "No row, template, case, classification, oracle rule, or result class changes after the freeze except by a versioned amendment to this registration (version, UTC timestamp, justification, reviewed PR, afterDecisionBearingInspection flag). An amendment cannot remove a row or case; removed items stay reported with their last status. Cases added after the freeze are labeled post-registration: they can add findings but never contribute to CLEAN-WITHIN-BUDGET."
+    ]
+  },
+  "owners": {
+    "implementation": "Claude Code agent under #1311 (one branch, at most 2 PRs per the agent-prs-per-gate ceiling); agents never merge.",
+    "review": "@juanmicrosoft reviews and merges #1419, #1311, and #1413 PRs.",
+    "decisionAndAmendment": "@juanmicrosoft (contract §9); the recorded independence deviation applies.",
+    "templateAuthorship": "The #1311 executor does not edit templates.json, the generator, or the oracle; a defect in them is fixed only by amendment."
+  },
+  "amendmentLog": []
+}
