@@ -3,10 +3,11 @@
   "issue": 1407,
   "epic": 1409,
   "milestone": "0.24",
-  "contractVersion": "1.0.0",
-  "status": "PROPOSED",
+  "contractVersion": "1.0.1",
+  "status": "FROZEN",
   "statusNote": "Proposed in the R0 pull request. The contract is frozen at the commit that merges it to main. Capacity ceilings are PROPOSED until the maintainer accepts them by merging; the R0 gate is NOT MET before that merge.",
-  "gateStatus": "NOT-MET",
+  "gateStatus": "MET",
+  "acceptance": { "mergeCommit": "669e535c8a9dac967a73c70b28f9f2d0bcf84c80", "mergedAtUtc": "2026-10-02T13:10:12Z", "pr": 1466 },
   "lifecycle": {
     "states": ["PROPOSED", "FROZEN"],
     "proposed": "status PROPOSED, gateStatus NOT-MET, capacity and every ceiling PROPOSED, no acceptance record. This is the state committed in the R0 pull request and in the merge commit that freezes it.",
@@ -300,26 +301,26 @@
       "amendable": "A versioned amendment may name an independent reviewer who neither implemented, directed, nor merged the producer or repair. It lifts the cap only for rows that reviewer adjudicates after the amendment; earlier rows are re-adjudicated, not relabeled."
     },
     "capacity": {
-      "status": "PROPOSED",
+      "status": "ACCEPTED",
       "acceptance": "PROPOSED — pending maintainer acceptance in PR review. Accepted only when the maintainer merges this contract. No downstream gate starts before acceptance.",
       "ceilings": [
-        { "id": "milestone-timebox", "value": 56, "unit": "calendar days from the R0 merge", "status": "PROPOSED" },
-        { "id": "maintainer-review-total", "value": 40, "unit": "maintainer review hours across the milestone", "status": "PROPOSED" },
-        { "id": "maintainer-review-per-pr", "value": 2, "unit": "maintainer review hours per PR, all rounds", "status": "PROPOSED" },
-        { "id": "review-rounds-per-pr", "value": 3, "unit": "review rounds per PR before the PR is closed and re-scoped", "status": "PROPOSED" },
-        { "id": "agent-prs-per-gate", "value": 2, "unit": "PRs per gate issue (one primary, one follow-up)", "status": "PROPOSED" },
-        { "id": "pr-size", "value": 1500, "unit": "changed lines per PR, excluding committed evidence data and test fixtures", "status": "PROPOSED" },
-        { "id": "s2-repairs", "value": 6, "unit": "accepted FIX-IN-0.24 or DEMOTE-IN-0.24 PRs in total", "status": "PROPOSED" },
-        { "id": "s2-repair-size", "value": 600, "unit": "changed non-test lines per S2 repair PR", "status": "PROPOSED" },
-        { "id": "s1-timebox", "value": 10, "unit": "calendar days from the #1419 merge", "status": "PROPOSED" },
-        { "id": "s1-agent-hours", "value": 20, "unit": "agent execution hours for #1311", "status": "PROPOSED" },
-        { "id": "s1-generated-cases", "value": 1500, "unit": "generated probe cases beyond the existing 1,170-cell differential controls", "status": "PROPOSED" },
-        { "id": "s1-compute", "value": 600, "unit": "CI runner-minutes for #1311 (plus at most 10 local machine-hours)", "status": "PROPOSED" },
-        { "id": "determinism-compute", "value": 2000, "unit": "CI runner-minutes for #1421/#1135 repeated runs", "status": "PROPOSED" },
-        { "id": "regeneration-compute", "value": 1500, "unit": "CI runner-minutes per complete #1424 regeneration", "status": "PROPOSED" },
-        { "id": "regenerations", "value": 2, "unit": "complete #1424 regenerations (one rerun after a candidate-changing fix)", "status": "PROPOSED" },
-        { "id": "ordinary-ci", "value": 15000, "unit": "CI runner-minutes for ordinary PR checks across the milestone", "status": "PROPOSED" },
-        { "id": "paid-spend", "value": 0, "unit": "USD for LLM, agent, or other paid compute", "status": "PROPOSED" }
+        { "id": "milestone-timebox", "value": 56, "unit": "calendar days from the R0 merge", "status": "ACCEPTED" },
+        { "id": "maintainer-review-total", "value": 40, "unit": "maintainer review hours across the milestone", "status": "ACCEPTED" },
+        { "id": "maintainer-review-per-pr", "value": 2, "unit": "maintainer review hours per PR, all rounds", "status": "ACCEPTED" },
+        { "id": "review-rounds-per-pr", "value": 3, "unit": "review rounds per PR before the PR is closed and re-scoped", "status": "ACCEPTED" },
+        { "id": "agent-prs-per-gate", "value": 2, "unit": "PRs per gate issue (one primary, one follow-up)", "status": "ACCEPTED" },
+        { "id": "pr-size", "value": 1500, "unit": "changed lines per PR, excluding committed evidence data and test fixtures", "status": "ACCEPTED" },
+        { "id": "s2-repairs", "value": 6, "unit": "accepted FIX-IN-0.24 or DEMOTE-IN-0.24 PRs in total", "status": "ACCEPTED" },
+        { "id": "s2-repair-size", "value": 600, "unit": "changed non-test lines per S2 repair PR", "status": "ACCEPTED" },
+        { "id": "s1-timebox", "value": 10, "unit": "calendar days from the #1419 merge", "status": "ACCEPTED" },
+        { "id": "s1-agent-hours", "value": 20, "unit": "agent execution hours for #1311", "status": "ACCEPTED" },
+        { "id": "s1-generated-cases", "value": 1500, "unit": "generated probe cases beyond the existing 1,170-cell differential controls", "status": "ACCEPTED" },
+        { "id": "s1-compute", "value": 600, "unit": "CI runner-minutes for #1311 (plus at most 10 local machine-hours)", "status": "ACCEPTED" },
+        { "id": "determinism-compute", "value": 2000, "unit": "CI runner-minutes for #1421/#1135 repeated runs", "status": "ACCEPTED" },
+        { "id": "regeneration-compute", "value": 1500, "unit": "CI runner-minutes per complete #1424 regeneration", "status": "ACCEPTED" },
+        { "id": "regenerations", "value": 2, "unit": "complete #1424 regenerations (one rerun after a candidate-changing fix)", "status": "ACCEPTED" },
+        { "id": "ordinary-ci", "value": 15000, "unit": "CI runner-minutes for ordinary PR checks across the milestone", "status": "ACCEPTED" },
+        { "id": "paid-spend", "value": 0, "unit": "USD for LLM, agent, or other paid compute", "status": "ACCEPTED" }
       ],
       "estimateNote": "The ordinary-ci ceiling assumes roughly 250 runner-minutes per full test.yml push. That figure is an unmeasured estimate."
     }
@@ -381,5 +382,7 @@
     }
   ],
 
-  "amendmentLog": []
+  "amendmentLog": [
+    { "version": "1.0.1", "justification": "acceptance write-back", "reviewedInPr": 1470, "timestampUtc": "2026-10-02T13:10:12Z", "afterDecisionBearingInspection": false }
+  ]
 }
