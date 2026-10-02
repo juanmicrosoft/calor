@@ -1658,7 +1658,8 @@
         "R1-OBL-LOOP-FACTS-001",
         "R1-OBL-LOOP-FACTS-002",
         "R1-OBL-LOOP-FACTS-003",
-        "R1-OBL-LOOP-FACTS-004"
+        "R1-OBL-LOOP-FACTS-004",
+        "R1-OBL-LOOP-FACTS-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/OBL-LOOP-FACTS.jsonl"
     },
@@ -1823,8 +1824,7 @@
         "R1-OBL-UNGATED-REFERENCE-002",
         "R1-OBL-UNGATED-REFERENCE-003",
         "R1-OBL-UNGATED-REFERENCE-004",
-        "R1-OBL-UNGATED-REFERENCE-005",
-        "R1-OBL-UNGATED-REFERENCE-006"
+        "R1-OBL-UNGATED-REFERENCE-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/OBL-UNGATED-REFERENCE.jsonl"
     },

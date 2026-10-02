@@ -2,11 +2,11 @@
   "algorithm": "SHA-256 over LF-normalized UTF-8 bytes",
   "files": {
     "docs/plans/v0.24-r1-soundness-registration.md": "410ea131a8ca6a5f877006aea728605033f7078e287e9d237ba9c5d3ddb99b53",
-    "docs/plans/evidence/r1-1419/registration.json": "dd31847e0cfd5ee97548d8e1d44595ebede31b7fc747a6faed72be65f85edc35",
-    "docs/plans/evidence/r1-1419/templates.json": "0004aaf6bed9f2ec0948883137e6529c01cd7af2af9354718846f8d6c4ef78d1",
-    "docs/plans/evidence/r1-1419/cases-index.json": "1aed7d79fa51e2b78b625d2bd2ae8d66fb05a14d21be0500aed01b3893e66c84",
-    "docs/plans/evidence/r1-1419/manifest-B1.json": "ac47f1a8be178f5a9a8dc22e326b7a1669f652cd57c9a5002249c7865b51e1e1",
-    "docs/plans/evidence/r1-1419/manifest-N1.json": "73e4028841b3bf790c20c828dd5f54e437b747a1346f3c2d0098b88df3a2dbe5",
+    "docs/plans/evidence/r1-1419/registration.json": "efe4d3d0ad9b001900825b480f680b36122ad20a585431090874333409edf2b7",
+    "docs/plans/evidence/r1-1419/templates.json": "71e7fc1f3adc92902e919d6ba7661eabe65c65ccdb0396fab47f1fb90e4dd792",
+    "docs/plans/evidence/r1-1419/cases-index.json": "083512b623cb3b7ee558f6eb913d5433fcbcbe979a8c6cf3f51e3a5fbfc25d40",
+    "docs/plans/evidence/r1-1419/manifest-B1.json": "59dffdd9f2c9e615642d7c66ba40973a0bb5d969b92334f896a9eb07ad0efcad",
+    "docs/plans/evidence/r1-1419/manifest-N1.json": "717b8a062493df44e89286c2e444ee6aba68ed004334bd5c64c6fa6682f0e42c",
     "docs/plans/evidence/r1-1419/derive-manifests.py": "d1d47b6d8e1ae65a194ea23ff5771125e300831b58c9977ee29c24195b7dc5b5"
   }
 }

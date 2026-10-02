@@ -2057,9 +2057,10 @@
         "samplingDimensions": [
           "guard-elision"
         ],
-        "casesPerBaseline": 4,
+        "casesPerBaseline": 5,
         "title": "Inclusive §L loop-bound facts",
         "templates": [
+          "T-OBL-LOOP-PARAM",
           "T-OBL-LOOP"
         ]
       },
@@ -2217,7 +2218,7 @@
           "arrays",
           "aliases"
         ],
-        "casesPerBaseline": 6,
+        "casesPerBaseline": 5,
         "title": "String, array, and field forms in the ungated obligation solver: Assumed required (null references)",
         "templates": [
           "T-OBL-UNGATED-REF"

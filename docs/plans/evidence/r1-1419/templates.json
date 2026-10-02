@@ -4725,9 +4725,70 @@
       "obligationKind": "ProofObligation"
     },
     {
+      "id": "T-OBL-LOOP-PARAM",
+      "row": "OBL-LOOP-FACTS",
+      "instances": 3,
+      "claimSite": "obligation",
+      "holes": {
+        "lo": {
+          "cyclePairs": [
+            [
+              "0",
+              "0"
+            ],
+            [
+              "1",
+              "1"
+            ],
+            [
+              "2",
+              "2"
+            ]
+          ]
+        },
+        "S": {
+          "oneOf": [
+            ">=",
+            "<=",
+            ">",
+            "<",
+            "==",
+            "!="
+          ]
+        },
+        "c1": {
+          "intIn": [
+            -3,
+            52
+          ]
+        }
+      },
+      "calor": [
+        "  §F{f1:Probe:priv} (i8:n) -> i32",
+        "    §E{}",
+        "    §Q (&& (>= n INT:0) (<= n INT:50))",
+        "    §L{l1:i:{lo}:n:1}",
+        "      §PROOF{p1:claim} ({S} n {c1})",
+        "    §R INT:0"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "n",
+            "type": "i8"
+          }
+        ],
+        "hyp": "n >= 0 && n <= 50 && {lo} <= n",
+        "prop": "n {S} {c1}",
+        "note": "claim about the declared parameter inside the loop body: only the loop-bound fact (lo <= i <= n) relates it to lo"
+      },
+      "obligationKind": "ProofObligation",
+      "minInstances": 3
+    },
+    {
       "id": "T-OBL-LOOP",
       "row": "OBL-LOOP-FACTS",
-      "instances": 4,
+      "instances": 2,
       "claimSite": "obligation",
       "holes": {
         "lo": {
@@ -4811,11 +4872,10 @@
       "calor": [
         "  §F{f1:Probe:priv} (i32:x) -> i32",
         "    §E{}",
-        "    §B{~v:i32} x",
-        "    §IF{if1} ({A} v {c1})",
-        "      §ASSIGN v {c2}",
-        "      §PROOF{p1:claim} ({A} v {c1})",
-        "    §R v"
+        "    §IF{if1} ({A} x {c1})",
+        "      §ASSIGN x {c2}",
+        "      §PROOF{p1:claim} ({A} x {c1})",
+        "    §R x"
       ],
       "oracle": {
         "domain": [
@@ -4826,9 +4886,9 @@
         ],
         "hyp": "x {A} {c1}",
         "result": "int",
-        "body": "int v = x; v = {c2}; return v;",
+        "body": "x = {c2}; return x;",
         "prop": "result {A} {c1}",
-        "note": "the guard fact must be killed by the assignment; oracle result = v at the proof"
+        "note": "the guard on parameter x must be killed by the assignment (the solver declares parameters, not locals); oracle result = x at the proof"
       },
       "obligationKind": "ProofObligation"
     },
@@ -5244,7 +5304,7 @@
     {
       "id": "T-OBL-UNGATED-REF",
       "row": "OBL-UNGATED-REFERENCE",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "obligation",
       "holes": {
         "E": {
