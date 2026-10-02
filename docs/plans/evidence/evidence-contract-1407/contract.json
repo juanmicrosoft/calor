@@ -302,7 +302,7 @@
     },
     "capacity": {
       "status": "ACCEPTED",
-      "acceptance": "ACCEPTED by the maintainer through the merge of PR #1466 (669e535c8a9dac967a73c70b28f9f2d0bcf84c80, 2026-10-02T13:10:12Z) at the merged values.",
+      "acceptance": "PROPOSED — pending maintainer acceptance in PR review. Accepted only when the maintainer merges this contract. No downstream gate starts before acceptance.",
       "ceilings": [
         { "id": "milestone-timebox", "value": 56, "unit": "calendar days from the R0 merge", "status": "ACCEPTED" },
         { "id": "maintainer-review-total", "value": 40, "unit": "maintainer review hours across the milestone", "status": "ACCEPTED" },
