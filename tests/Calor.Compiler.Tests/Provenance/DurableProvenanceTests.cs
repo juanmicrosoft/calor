@@ -195,9 +195,8 @@ public sealed class DurableProvenanceTests : IDisposable
     {
         _world.CommitOnMain(("src/a.cs", "a"), ("manifest.json", "{}"));
         _world.PushMain();
-        var (measured, ledgerText) = MeasureOnBranch();
+        var (measured, pending) = MeasureOnBranch();
         _world.PushBranch("feature");
-        var pending = PendingEntry(_world.Dev, measured, ledgerText);
 
         var squash = _world.SquashMergeAndDeleteBranch("feature");
         var later = _world.CommitOnMain(("docs/later.md", "after the landing; same src and manifest"));
@@ -229,16 +228,20 @@ public sealed class DurableProvenanceTests : IDisposable
     {
         _world.CommitOnMain(("src/a.cs", "a"), ("manifest.json", "{}"));
         _world.PushMain();
-        var (measured, ledgerText) = MeasureOnBranch();
+        var (_, pending) = MeasureOnBranch();
         var merge = _world.MergeCommitInto("feature");
         var clone = _world.FreshClone();
 
-        var pending = PendingEntry(clone, measured, ledgerText);
         var (completed, failure) = DurableProvenance.CompleteWriteBack(clone, pending);
-
         Assert.Null(failure);
         Assert.Equal(merge, completed!["commit"]!.GetValue<string>());
-        Assert.Empty(Verify(clone, WithIdentity(pending, completed)).Findings);
+        var complete = WithIdentity(pending, completed);
+        Assert.Empty(Verify(clone, complete).Findings);
+
+        // Round 2: the artifact changing after the write-back (same stamp, new numbers) needs a new identity.
+        _world.CommitOnMain((Ledger, Stamp(pending.GetProperty("measuredCommit").GetString()!) + "{}\n"));
+        _world.PushMain();
+        AssertOnly(Verify(_world.FreshClone(), complete), DurableProvenance.Codes.WriteBackInvalid);
     }
 
     [Theory]
@@ -248,9 +251,8 @@ public sealed class DurableProvenanceTests : IDisposable
     {
         _world.CommitOnMain(("src/a.cs", "a"), ("manifest.json", "{}"));
         _world.PushMain();
-        var (measured, ledgerText) = MeasureOnBranch();
+        var (_, pending) = MeasureOnBranch();
         _world.PushBranch("feature");
-        var pending = PendingEntry(_world.Dev, measured, ledgerText);
         _world.CommitOnMain((changedOnMain, "someone else's change"));
         _world.PushMain();
         var squash = _world.SquashMergeAndDeleteBranch("feature");
@@ -260,25 +262,24 @@ public sealed class DurableProvenanceTests : IDisposable
         Assert.Null(completed);
         Assert.Equal(DurableProvenance.Codes.WriteBackInvalid, failure!.Code);
 
-        // A hand-written completion that records the landed values is caught by the retained phase 1.
-        var p1 = JsonNode.Parse(pending.GetProperty("durableIdentity").GetProperty("phase1").GetRawText())!;
-        var forged = WithIdentity(pending, new JsonObject
+        // Hand-written completions recording the landed values: one keeps the reviewed phase 1
+        // (caught by the comparison), one also rewrites phase 1 to match (round 2: caught because
+        // phase 1 must equal the pending record committed in the index at the landing commit).
+        var landedTrees = new JsonObject { ["/"] = clone.RevParse(squash + "^{tree}"), ["src"] = clone.RevParse(squash + ":src") };
+        var landedContents = Contents(clone, squash, "manifest.json");
+        var writeBack = new JsonObject();
+        foreach (var p in pending.GetProperty("durableIdentity").GetProperty("phase1").EnumerateObject())
+            writeBack[p.Name == "pr" ? "pr" : "phase1" + char.ToUpperInvariant(p.Name[0]) + p.Name[1..]] = JsonNode.Parse(p.Value.GetRawText());
+        JsonElement Forged(JsonObject wb) => WithIdentity(pending, new JsonObject
         {
-            ["status"] = "complete",
-            ["commit"] = squash,
-            ["resolvedVia"] = DurableProvenance.ProtectedMainRef,
-            ["treeHashes"] = new JsonObject { ["/"] = clone.RevParse(squash + "^{tree}"), ["src"] = clone.RevParse(squash + ":src") },
-            ["inputContentHashes"] = Contents(clone, squash, "manifest.json"),
-            ["writeBack"] = new JsonObject
-            {
-                ["phase1HeadCommit"] = measured,
-                ["pr"] = 1,
-                ["phase1TreeHashes"] = p1["treeHashes"]!.DeepClone(),
-                ["phase1InputContentHashes"] = p1["inputContentHashes"]!.DeepClone(),
-                ["phase1ArtifactSha256"] = p1["artifactSha256"]!.DeepClone(),
-            },
+            ["status"] = "complete", ["commit"] = squash, ["resolvedVia"] = DurableProvenance.ProtectedMainRef,
+            ["treeHashes"] = landedTrees.DeepClone(), ["inputContentHashes"] = landedContents.DeepClone(), ["writeBack"] = wb,
         });
-        AssertOnly(Verify(clone, forged), DurableProvenance.Codes.WriteBackInvalid);
+        AssertOnly(Verify(clone, Forged(writeBack)), DurableProvenance.Codes.WriteBackInvalid);
+        var rewritten = writeBack.DeepClone().AsObject();
+        rewritten["phase1TreeHashes"] = new JsonObject { ["src"] = landedTrees["src"]!.DeepClone() };
+        rewritten["phase1InputContentHashes"] = landedContents.DeepClone();
+        AssertOnly(Verify(clone, Forged(rewritten)), DurableProvenance.Codes.WriteBackInvalid);
     }
 
     [Fact]
@@ -295,8 +296,13 @@ public sealed class DurableProvenanceTests : IDisposable
         Assert.Empty(ok.Findings);
         Assert.Empty(ok.Authoritative);
 
-        var drifted = Verify(clone, PendingEntry(clone, measured, ledgerText + " "));
-        AssertOnly(drifted, DurableProvenance.Codes.WriteBackInvalid);
+        AssertOnly(Verify(clone, PendingEntry(clone, measured, ledgerText + " ")), DurableProvenance.Codes.WriteBackInvalid);
+        // Round 2: phase 1 must claim the measured compiler, and a new measurement drops the #1199 field.
+        AssertOnly(Verify(clone, Edit(PendingEntry(clone, measured, ledgerText),
+            n => n["durableIdentity"]!["phase1"]!["treeHashes"] = new JsonObject { ["manifest.json"] = clone.RevParse(measured + ":manifest.json") })),
+            DurableProvenance.Codes.WriteBackInvalid);
+        AssertOnly(Verify(clone, Edit(PendingEntry(clone, measured, ledgerText), n => n["resolvableOnMain"] = measured)),
+            DurableProvenance.Codes.WriteBackInvalid);
     }
 
     [Fact]
@@ -341,13 +347,18 @@ public sealed class DurableProvenanceTests : IDisposable
 
     private static string Stamp(string commit) => $"{{\"measuredCommit\": \"{commit}\"}}\n";
 
-    /// <summary>Measures on branch "feature": a compiler change, then the stamped ledger.</summary>
-    private (string Measured, string LedgerText) MeasureOnBranch()
+    /// <summary>
+    /// Measures on branch "feature": a compiler change, then the stamped ledger committed together
+    /// with its pending phase-1 entry in the index, as the measuring PR would.
+    /// </summary>
+    private (string Measured, JsonElement Pending) MeasureOnBranch()
     {
         var measured = _world.CommitOnBranch("feature", ("src/a.cs", "new compiler"));
         var ledgerText = Stamp(measured);
-        _world.CommitOnBranch("feature", (Ledger, ledgerText));
-        return (measured, ledgerText);
+        var pending = PendingEntry(_world.Dev, measured, ledgerText);
+        var index = new JsonObject { ["ledgers"] = new JsonArray(), ["publicationStamps"] = new JsonArray(JsonNode.Parse(pending.GetRawText())) };
+        _world.CommitOnBranch("feature", (Ledger, ledgerText), (DurableProvenance.IndexPath, index.ToJsonString()));
+        return (measured, pending);
     }
 
     private static DurableProvenance.Result Verify(GitRepo git, JsonElement entry)
@@ -443,6 +454,13 @@ public sealed class DurableProvenanceTests : IDisposable
             ["artifactSha256"] = DurableProvenance.Sha256(Encoding.UTF8.GetBytes(ledgerText)),
             ["treeHashes"] = new JsonObject { ["src"] = git.RevParse(landing + ":src") },
         };
+        return JsonDocument.Parse(node.ToJsonString()).RootElement.Clone();
+    }
+
+    private static JsonElement Edit(JsonElement entry, Action<JsonObject> edit)
+    {
+        var node = JsonNode.Parse(entry.GetRawText())!.AsObject();
+        edit(node);
         return JsonDocument.Parse(node.ToJsonString()).RootElement.Clone();
     }
 

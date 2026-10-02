@@ -87,7 +87,8 @@ discriminating tests.**
 | Identity without the whole tree | `ClaimedTreeAndManifestHashesAreReRead` | `P007` |
 | Shallow clone | `ShallowCloneFailsInsteadOfSkipping` | `P006` |
 | Clone without `origin/main` | `CloneWithoutFetchedMainFails` | `P004` |
-| Merge changed a measured tree or manifest; completion naming a non-landing commit | `WriteBackFailsClosedWhenTheMergeChangedAMeasuredInput`, `SquashMergeWriteBackResolvesFromAFreshClone` | `P013` |
+| Merge changed a measured tree or manifest; forged completion, with or without a rewritten phase 1; completion naming a non-landing commit | `WriteBackFailsClosedWhenTheMergeChangedAMeasuredInput`, `SquashMergeWriteBackResolvesFromAFreshClone` | `P013` |
+| Artifact changed after write-back; phase 1 without `src`; pending entry carrying `resolvableOnMain` | `MergeCommitWriteBackNamesTheMergeCommit`, `PendingIdentityIsNeverAuthoritativeAndMustDescribeTheCommittedArtifact` | `P013` |
 | Measured-on-top-of without, or with a wrong, landing | `MeasuredOnTopOfMustNameTheLandingOfTheRepair` | `P010` |
 
 Each control asserts its code and that no other code fired. The controls were also run against
@@ -99,6 +100,9 @@ deliberately broken verifiers:
   accepted `v*` tags, an identical-tree claim without `src`, no phase-1 manifest comparison, and no
   landing check on write-back. 4 of 22 tests failed.
 - Turning off only the `src` requirement failed `FalseIdenticalTreeClaimIsRejected`.
+- **After review round 2**, four more defects were reintroduced together: no comparison with the
+  committed pending record, no `src` requirement in phase 1, no current-artifact check on a
+  completed write-back, and `resolvableOnMain` allowed on a pending entry. 4 of 22 tests failed.
 
 The real verifier passes all 22. `fresh-clone.log` repeats the shallow and unfetched cases on the
 real repository: the test fails with `P006` and `P004`. Nothing is skipped.
@@ -150,10 +154,11 @@ This PR introduces no pending identity: every durable commit above is already on
 write-back, whether it is merged by squash or by merge commit. For later measurements on a branch,
 such as #1422's benchmark publication:
 
-1. **In the PR**, record `durableIdentity {status: "pending", phase1 {headCommit (= measuredCommit),
-   pr, treeHashes, inputContentHashes, artifactSha256}}` with basis `post-merge-write-back`. The
-   verifier then:
-   - checks the record's shape;
+1. **In the PR**, commit the artifact together with an index entry
+   `durableIdentity {status: "pending", phase1 {headCommit (= measuredCommit), pr, treeHashes,
+   inputContentHashes, artifactSha256}}` with basis `post-merge-write-back` and no
+   `resolvableOnMain`. The verifier then:
+   - checks the record's shape, including that `treeHashes` claims `src` and not `"/"`;
    - checks the committed artifact against `artifactSha256`;
    - checks the trees and manifests at the head, while the head exists.
 
@@ -161,10 +166,14 @@ such as #1422's benchmark publication:
 2. **After merge**, run `git fetch origin main`, then
    `CALOR_PROVENANCE_WRITEBACK=1 dotnet test tests/Calor.Compiler.Tests --filter "FullyQualifiedName~LedgerCommitStampTests.PendingIdentities"`,
    and open the write-back PR. The run finds the first-parent commit on `main` that landed the
-   artifact. It re-verifies every phase-1 tree and manifest there, and keeps the phase-1 record
-   under `writeBack`. Every later run re-checks that record against the landed commit, and checks
-   that this commit is the one that landed the artifact. If any input differs, the run fails and the
-   numbers are re-measured; it never records a weaker identity on its own.
+   artifact, re-verifies every phase-1 tree and manifest there, and copies the phase-1 record under
+   `writeBack`. If any input differs, the run fails and the numbers are re-measured; it never
+   records a weaker identity on its own.
+
+   Every later run checks four things. The `writeBack` copy must equal the pending entry as
+   committed in the index *at the landing commit*: that is the reviewed record, and it cannot be
+   edited afterwards. Every phase-1 input must still match the landed commit. The landed commit
+   must be the one that landed the artifact. The committed artifact must still be those bytes.
 
 ## Residuals from §11 (#1159 row)
 
