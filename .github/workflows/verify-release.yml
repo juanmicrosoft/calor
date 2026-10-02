@@ -92,6 +92,8 @@ jobs:
 
       - name: Install calor ${{ inputs.version }} from nuget.org
         shell: bash
+        env:
+          VER: ${{ inputs.version }}
         run: |
           set -euo pipefail
           # Explicit --add-source pins the install to nuget.org and bypasses
@@ -99,10 +101,11 @@ jobs:
           # Fresh --tool-path per run so a stale install can't mask a real
           # 'not found' — matches the create-release skill's guidance.
           rm -rf "$RUNNER_TEMP/calorcheck"
+          [[ "$VER" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || { echo "::error::invalid version"; exit 1; }
           dotnet tool install \
             --tool-path "$RUNNER_TEMP/calorcheck" \
             calor \
-            --version "${{ inputs.version }}" \
+            --version "$VER" \
             --add-source https://api.nuget.org/v3/index.json
 
       - name: Print installed version

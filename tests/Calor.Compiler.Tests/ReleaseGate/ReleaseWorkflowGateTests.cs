@@ -54,24 +54,95 @@ public class ReleaseWorkflowGateTests
         {
             var name = Path.GetFileName(path);
             if (Exempt.Contains(name)) continue;
-            foreach (var (job, lines) in Jobs(File.ReadAllLines(path)))
-            {
-                var gateSeen = false;
-                foreach (var line in lines)
-                {
-                    var code = line.TrimStart();
-                    if (code.StartsWith('#')) continue;
-                    if (code.Contains(Verifier)) gateSeen = true;
-                    else if (Publishing.IsMatch(code))
-                    {
-                        publishing++;
-                        if (!gateSeen) violations.Add($"{name}:{job}: '{code}' runs before the adjudication gate");
-                    }
-                }
-            }
+            publishing += GateViolations(name, File.ReadAllLines(path), violations);
         }
         Assert.True(violations.Count == 0, string.Join("\n", violations));
         Assert.True(publishing >= 7, $"expected the known publishing commands, found {publishing}");
+    }
+
+    [Theory]
+    [InlineData("python3 scripts/verify_release_adjudication.py --identity \"$ID\" || true")]
+    [InlineData("python3 scripts/verify_release_adjudication.py --identity \"$ID\" \\\n            --expect-head || echo skipped")]
+    public void GateCheckerRejectsASuppressedGate(string gate)
+    {
+        // Mutation control: the structural check itself must not accept a fail-open gate.
+        var lines = $"jobs:\n  publish:\n    steps:\n      - run: |\n          {gate}\n          dotnet nuget push x.nupkg\n".Split('\n');
+        var violations = new List<string>();
+        GateViolations("mutant.yml", lines, violations);
+        Assert.NotEmpty(violations);
+    }
+
+    [Fact]
+    public void GateCheckerRejectsContinueOnErrorOnTheGateStep()
+    {
+        var lines = ("jobs:\n  publish:\n    steps:\n      - continue-on-error: true\n        run: python3 scripts/verify_release_adjudication.py --identity x\n"
+            + "      - run: dotnet nuget push x.nupkg\n").Split('\n');
+        var violations = new List<string>();
+        GateViolations("mutant.yml", lines, violations);
+        Assert.NotEmpty(violations);
+    }
+
+    [Theory]
+    [MemberData(nameof(GatedWorkflows))]
+    public void DispatchInputsAreNeverInterpolatedIntoShell(string workflow)
+    {
+        // An input such as $(...) inside a run block would execute before the gate.
+        var lines = File.ReadAllLines(Path.Combine(WorkflowDir(), workflow));
+        var runIndent = -1;
+        foreach (var line in lines)
+        {
+            var indent = line.Length - line.TrimStart().Length;
+            if (runIndent >= 0 && line.Trim().Length > 0 && indent <= runIndent) runIndent = -1;
+            var run = Regex.Match(line, @"^(\s*)(?:- )?run:");
+            if (run.Success) runIndent = run.Groups[1].Length;
+            if (runIndent >= 0)
+                Assert.DoesNotMatch(new Regex(@"\$\{\{\s*(?:github\.event\.)?inputs\."), line);
+        }
+    }
+
+    /// <summary>
+    /// Counts publishing commands and records each that is not preceded, in its job, by an
+    /// unsuppressed run of the gate, and any gate step in a publishing job that uses continue-on-error.
+    /// </summary>
+    private static int GateViolations(string name, string[] workflow, List<string> violations)
+    {
+        var publishing = 0;
+        foreach (var (job, lines) in Jobs(workflow))
+        {
+            var gateSeen = false;
+            var jobPublishes = false;
+            var inGate = false;
+            foreach (var line in lines)
+            {
+                var code = line.TrimStart();
+                if (code.StartsWith('#')) continue;
+                if (code.Contains(Verifier) || inGate)
+                {
+                    if (Regex.IsMatch(code, @"\|\|\s*(?:true|:|echo)\b|;\s*true\b"))
+                        violations.Add($"{name}:{job}: the gate's failure is suppressed: '{code}'");
+                    else if (code.Contains(Verifier))
+                        gateSeen = true;
+                    inGate = code.EndsWith('\\');
+                }
+                else if (Publishing.IsMatch(code))
+                {
+                    publishing++;
+                    jobPublishes = true;
+                    if (!gateSeen) violations.Add($"{name}:{job}: '{code}' runs before the adjudication gate");
+                }
+            }
+            // A gate step that may fail without failing the job is no gate.
+            var steps = new List<List<string>>();
+            foreach (var line in lines)
+            {
+                if (Regex.IsMatch(line, @"^\s{6}- ")) steps.Add(new List<string>());
+                if (steps.Count > 0) steps[^1].Add(line);
+            }
+            if (jobPublishes && steps.Any(step => step.Any(l => l.Contains(Verifier))
+                    && step.Any(l => Regex.IsMatch(l, @"^\s*-?\s*continue-on-error:\s*true"))))
+                violations.Add($"{name}:{job}: a gate step uses continue-on-error");
+        }
+        return publishing;
     }
 
     [Fact]

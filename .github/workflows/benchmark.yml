@@ -100,19 +100,28 @@ jobs:
       - name: Build
         run: dotnet build -c Release --no-restore
 
+      # #1410: dispatch inputs reach the shell only through the environment, validated,
+      # never interpolated into the script (a `$(...)` value would run before the gate).
       - name: Run static benchmarks
+        env:
+          RUNS: ${{ github.event.inputs.statistical_runs || '30' }}
         run: |
+          set -euo pipefail
+          [[ "$RUNS" =~ ^[1-9][0-9]{0,3}$ ]] || { echo "::error::statistical_runs must be an integer from 1 to 9999"; exit 1; }
           dotnet run --project tests/Calor.Evaluation -c Release -- run \
             --statistical \
-            --runs "${{ github.event.inputs.statistical_runs || '30' }}" \
+            --runs "$RUNS" \
             --format website \
             --output website/public/data/benchmark-results.json \
             --verbose
 
       - name: Run statistical analysis
         if: github.event.inputs.statistical_runs != ''
+        env:
+          RUNS: ${{ github.event.inputs.statistical_runs || '30' }}
         run: |
-          RUNS="${{ github.event.inputs.statistical_runs || '30' }}"
+          set -euo pipefail
+          [[ "$RUNS" =~ ^[1-9][0-9]{0,3}$ ]] || { echo "::error::statistical_runs must be an integer from 1 to 9999"; exit 1; }
           dotnet run --project tests/Calor.Evaluation -c Release -- run \
             --statistical \
             --runs "$RUNS" \
@@ -210,11 +219,13 @@ jobs:
       # measurement must not be presented as a comparable movement in the score.
       - name: Check the result is not a weaker measurement (#1157)
         id: methodology
+        env:
+          ALLOW_WEAKER: ${{ github.event.inputs.allow_weaker_methodology }}
         run: |
           git show HEAD:website/public/data/benchmark-results.json > /tmp/benchmark-baseline.json \
             || echo '{}' > /tmp/benchmark-baseline.json
           ARGS=""
-          if [ "${{ github.event.inputs.allow_weaker_methodology }}" = "true" ]; then
+          if [ "$ALLOW_WEAKER" = "true" ]; then
             ARGS="--allow-weaker"
           fi
           {
