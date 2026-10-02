@@ -3,7 +3,7 @@
   "issue": 1407,
   "epic": 1409,
   "milestone": "0.24",
-  "contractVersion": "1.0.1",
+  "contractVersion": "1.1.0",
   "status": "FROZEN",
   "statusNote": "Proposed in the R0 pull request. The contract is frozen at the commit that merges it to main. Capacity ceilings are PROPOSED until the maintainer accepts them by merging; the R0 gate is NOT MET before that merge.",
   "gateStatus": "MET",
@@ -197,13 +197,19 @@
     "pairRowStringFields": ["pairId", "calorPath", "calorSha256", "csharpPath", "csharpSha256", "taskStatementSha256", "failureBehavior", "disposition", "reviewer"],
     "pairRowTypeRule": "Fields in pairRowStringFields are non-empty JSON strings; *Sha256 fields are 64 lowercase hex digits; the remaining required fields are non-empty strings, objects, or arrays; included is a JSON boolean. The comparability key's samplingUnit equals samplingUnit.",
     "equivalenceDefinition": "Both sides implement the same task statement, accept the same inputs, produce the same outputs, and fail on the same inputs in the same observable way. Evidence is an executed differential check, not inspection of names.",
+    "taskStatementRule": {
+      "amendment": "1.1.0",
+      "rule": "'Implement the same task statement' means both sides of a pair share one registered task statement (one taskStatementSha256) and exhibit the same observable behavior under the registered differential oracle: the same accepted inputs, the same outputs, and the same failures on the same inputs. Equivalence does not assert that either side is correct with respect to the statement. Correctness with respect to the statement is outside #1276's scope, and no published benchmark text, headline, table, or release note may state or imply it.",
+      "expectedOutputsConsequence": "Under this reading the registered expectedOutputs of a pair may be the cross-arm agreement rule of the registered oracle (each side's observed output is the expected output of the other side) with no golden values. Every other pinned field in registrationRule is unchanged and still pinned before the oracle runs.",
+      "declinedReading": "The stricter reading, per-pair expected-behavior assertions that check each side against its statement, was considered and declined. A fair size and token comparison needs behavioral identity between the two sides, which the differential oracle establishes; it does not need conformance to the statement. Conformance would be a separate correctness claim, and 0.24 makes no such claim. Adopting the stricter reading later is a #1407 amendment made before the registered oracle runs."
+    },
     "inclusionRule": "Only EQUIVALENT pairs enter comparative metrics. An included UNCLASSIFIED pair blocks headline generation. NOT-EQUIVALENT and EXCLUDED-PRE-REGISTERED pairs are counted and published in the denominator, never silently dropped. A pair whose either side fails to parse or compile is NOT-EQUIVALENT unless its registered failure behavior says otherwise.",
     "comparabilityKey": ["pairManifestSha256", "metricSetSha256", "metricImplementationVersion", "aggregationMethod", "samplingUnit", "runCount", "generatorVersion", "exclusionsSha256"],
     "comparabilityRule": "Two results are comparable only when every comparabilityKey field is equal. Otherwise no delta, ratio change, or advantage movement is printed; the result is labeled incomparable, and a method change needs a previously merged #1407 amendment.",
     "samplingUnit": "program-pair",
     "repeatedDeterministicRunsAreSamples": false,
     "intervalRule": "Uncertainty is computed only by resampling over independent program pairs. Repeated runs of a deterministic calculator are a determinism check (all runs must agree), not samples. A category with fewer than 2 included pairs reports no interval. Because the corpus is a fixed, non-random set, any interval describes corpus-resampling sensitivity of this corpus only and must be labeled so.",
-    "claimRule": "Static feature scores are not coding-agent outcomes. Neither is presented as a measured language, productivity, correctness, or safety advantage."
+    "claimRule": "Static feature scores are not coding-agent outcomes. Neither is presented as a measured language, productivity, correctness, or safety advantage. An EQUIVALENT disposition is never presented as evidence that either side is correct with respect to its task statement (taskStatementRule, amendment 1.1.0)."
   },
 
   "provenanceIdentity": {
@@ -229,7 +235,72 @@
       { "id": "agent-refactoring-results", "trigger": "workflow_dispatch with agent_refactoring=true", "producer": ".github/workflows/benchmark.yml agent-refactoring-benchmark job", "gate": "none; commits directly to main with [skip ci]", "consumesAdjudication": false },
       { "id": "installed-tool-verification", "trigger": "workflow_dispatch", "producer": ".github/workflows/verify-release.yml", "gate": "manual, after publication", "consumesAdjudication": false }
     ],
-    "publicationSeparation": "Regeneration never publishes. #1424 regenerates publication surfaces only as unpublished candidates with content hashes: candidate-packages (packed, not pushed), release metadata generated from them, the website built but not deployed, and release notes rendered but not posted. Registry push, GitHub release creation, release-asset upload, and Pages deployment are publication; they happen only after #1408 records MILESTONE-SUCCEEDED, through the #1410 gate, and consume the exact adjudicated hashes. nuget-packages is therefore never regenerated by #1424. Pinned inputs (z3-release-binaries, z3-upstream-pins, toolchain-pins, corpus-submodules) are re-materialized and checksum-verified, never rebuilt or republished; no regeneration command may run a workflow that pushes packages, creates or edits a release, uploads release assets, opens a publication PR, commits to main, or deploys. Uploading Actions artifacts to retain evidence is not publication.",
+    "publicationSeparation": "Regeneration never publishes. #1424 regenerates publication surfaces only as unpublished candidates with content hashes: candidate-packages (packed, not pushed), release metadata generated from them, the website built but not deployed, and release notes rendered but not posted. Registry push, GitHub release creation, release-asset upload, and Pages deployment are publication; they happen only after #1408 records MILESTONE-SUCCEEDED, through the #1410 gate, and consume the exact adjudicated hashes. nuget-packages is therefore never regenerated by #1424. Pinned inputs (z3-release-binaries, z3-upstream-pins, toolchain-pins, corpus-submodules) are re-materialized and checksum-verified, never rebuilt or republished; no regeneration command may run a workflow that pushes packages, creates or edits a release, uploads release assets, opens a publication PR, commits to main, or deploys. Uploading Actions artifacts to retain evidence is not publication. The only exception is the documentation-only website deploy defined in documentationOnlyDeploy (amendment 1.1.0); it is not regeneration, is not adjudicated, and publishes nothing else.",
+    "documentationOnlyDeploy": {
+      "amendment": "1.1.0",
+      "rule": "Before #1408 records MILESTONE-SUCCEEDED, .github/workflows/nextjs-gh-pages.yml may deploy the website without an adjudication identity only for a documentation-only change, and only when the #1410 verifier proves every condition below. Every other website deployment stays blocked until #1408 records MILESTONE-SUCCEEDED and then consumes one matching adjudication identity through the #1410 gate. The classifier fails closed: a path it cannot classify, a base it cannot establish, a check it cannot complete, or any API or git failure refuses the deploy.",
+      "window": "Open while no #1408 terminal record with outcome MILESTONE-SUCCEEDED exists on protected main. A documentation-only deploy is never evidence and never an adjudication. It does not repair or reclassify the website-deployment or website-benchmark-pages artifacts, which stay stale, and it does not count as a release surface consuming an adjudication identity for terminal condition 7.",
+      "noOtherPublication": "The deploying run creates no package, GitHub release, tag, or release asset; changes no benchmark data and no release notes; and changes no claim or number about 0.24 evidence, verification results, or a Calor advantage. No deployed text may describe 0.24 evidence as independently adjudicated or independently verified; the #1410 wording rule (a phrase allowed only directly after a literal 'not', 'no', or 'without') applies to every text file of the built site.",
+      "buildInputs": ["website/"],
+      "buildInputsRule": "The diff is taken over every build input. At the cutoff the website build (npm ci, npm run build in website/) reads only files under website/, including website/public/data/** through src/components imports. If the build reads any path outside buildInputs, the classifier refuses until an amendment adds that path here.",
+      "allowedPaths": [
+        "website/content/cli/**/*.mdx",
+        "website/content/getting-started/**/*.mdx",
+        "website/content/syntax-reference/**/*.mdx",
+        "website/content/semantics/**/*.mdx",
+        "website/content/guides/**/*.mdx",
+        "website/content/contributing/**/*.mdx"
+      ],
+      "deniedPaths": [
+        "website/public/data/**",
+        "website/content/benchmarking/**",
+        "website/content/philosophy/**",
+        "website/content/changelog.mdx",
+        "website/content/index.mdx",
+        "website/content/guides/verification-guarantees.mdx",
+        "website/content/contributing/adding-benchmarks.mdx",
+        "website/content/cli/benchmark.mdx",
+        "website/content/cli/evaluation.mdx"
+      ],
+      "pathRule": "A changed path (added, modified, deleted, or either side of a rename, from git diff --no-renames --name-only <base> <deployed> -- <buildInputs>) is documentation-only when it matches an allowedPaths pattern, matches no deniedPaths pattern, is not a path of any inventory artifact, and contains no '..' segment. Patterns are case-sensitive globs: '**/' matches zero or more directories and '*' matches within one path segment. Everything else under buildInputs (website/src/**, website/public/**, package files, configuration, tests) is not documentation-only.",
+      "base": {
+        "rule": "The diff base is the source commit of the most recent website deployment, which must be one of: the last deployment before this contract (preContractDeploy), a documentation-only deployment whose audit record is committed on protected main, or a deployment that consumed an adjudication identity through the #1410 gate (none can precede a documentation-only deploy inside the window under this amendment; the kind is listed so the base rule is total). If GitHub reports a successful github-pages deployment newer than the base that has neither a committed audit record nor an adjudication identity, the classifier refuses.",
+        "preContractDeploy": { "runId": 34999741475, "commit": "72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1", "event": "release (v0.22.0)" }
+      },
+      "auditRecord": {
+        "schema": "calor.docs-only-deploy-audit/1",
+        "location": "docs/plans/evidence/r2-1410/docs-deploys/<runId>.json, committed to protected main by a reviewed PR after the run; the run also uploads it as an Actions artifact, which is not durable. Until a deploy's record is committed, it cannot serve as a base, so the next documentation-only deploy refuses.",
+        "fields": [
+          "schema: calor.docs-only-deploy-audit/1",
+          "contractVersion: the contract version in force at the deploy, 1.1.0 or later",
+          "workflow: .github/workflows/nextjs-gh-pages.yml",
+          "runId: the deploying run id (positive integer)",
+          "deployedCommit: full SHA on protected main that was built and deployed",
+          "baseKind: pre-contract-deploy | audited-docs-deploy | adjudicated-deploy",
+          "baseCommit: full SHA (the preContractDeploy commit for pre-contract-deploy)",
+          "baseRunId: the base deployment's run id",
+          "changedPaths: every path from the pathRule diff, each documentation-only",
+          "allowlistCheck: { result: 'passed', disallowedPaths: [] }",
+          "wordingCheck: { result: 'passed' }",
+          "publishes: { package: false, githubRelease: false, tag: false, benchmarkData: false, releaseNotes: false }",
+          "terminalSuccessRecordPresent: false",
+          "attestation: { by: the dispatching maintainer, statement: attestationStatement verbatim }",
+          "recordedAtUtc: UTC timestamp"
+        ],
+        "attestationStatement": "This deploy changes no claim or number about 0.24 evidence, verification results, or a Calor advantage.",
+        "enforcedBy": "EvidenceContractValidator.ValidateDocsDeployAudit (D001-D006) checks the record's shape and re-classifies every changedPaths entry against this contract and the inventory; it does not re-run git. The #1410 verifier recomputes the diff and the checks from git and the GitHub API."
+      },
+      "verifierChecks": [
+        "The run is a workflow_dispatch from refs/heads/main; the deployed commit is a full SHA that is an ancestor of fetched refs/remotes/origin/main (provenanceIdentity commitRule), and the clone is not shallow.",
+        "No #1408 terminal record with outcome MILESTONE-SUCCEEDED exists on protected main.",
+        "The base satisfies base.rule; a successful github-pages deployment newer than the base without a committed audit record or adjudication identity refuses.",
+        "Every path in git diff --no-renames --name-only <base> <deployed> -- website/ satisfies pathRule; any other path refuses. The build reads nothing outside buildInputs.",
+        "The built site passes the #1410 wording scan.",
+        "The run has no step that pushes a package, creates or edits a release or tag, uploads a release asset, opens a publication PR, or commits to main.",
+        "The audit record is produced with every auditRecord field and passes ValidateDocsDeployAudit; the deployed Pages artifact is the one built from deployedCommit.",
+        "Negative tests for each check above are part of #1410's closure evidence."
+      ]
+    },
     "statusChecks": {
       "branch": "main",
       "protected": true,
@@ -254,6 +325,7 @@
     "amendment": "Any scope or rule change after decision-bearing inspection is a versioned amendment with a justification and a reviewed PR. It cannot remove a failing row; removed rows stay reported with their last status.",
     "discovery": "Discovery may create bounded repair issues within the accepted capacity. Every finding is fixed, visibly demoted, excluded by this pre-registered scope, or makes the milestone fail. It cannot become ordinary follow-up while 0.24 is reported as successful.",
     "retrospective": "Evidence recorded at or before the cutoff is retrospective. It is a control, never confirmatory 0.24 evidence by itself.",
+    "platformDeterminism": "Platform (operating system and runtime identifier) is a determinism dimension (amendment 1.1.0). A verifier verdict, translator output, or committed oracle report that differs by platform on the same tree is verdict instability. It is release-blocking for the affected modeled form until resolved under these rules (fixed, or visibly demoted under #1413), exactly like any other verdict instability. Deselecting a case on a platform, as G1's z3-consumer-matrix does, is never a resolution and never makes the case established on that platform. The registered rows are in determinismRows.",
     "stopping": [
       "A ceiling in capacity is reached: stop the gate, record the overrun, and either merge a reviewed amendment raising the ceiling before more work or record the gate BLOCKED.",
       "#1311 reaches its timebox: stop, publish the report; unreached rows are not-investigated; an unreached row registered as release-critical is BLOCKED.",
@@ -270,7 +342,7 @@
         "Zero unresolved false unconditional proofs: every one is fixed or visibly demoted under #1413.",
         "Every #1413 finding has a findingDisposition other than NOT-INVESTIGATED or MILESTONE-FAILED.",
         "Every authoritative and derived inventory artifact was regenerated by #1424 on the frozen #1423 candidate, with no stale input.",
-        "Every release surface in releasePath consumes one matching adjudication identity (#1410 negative tests pass).",
+        "Every release surface in releasePath consumes one matching adjudication identity (#1410 negative tests pass). The only path that publishes without one is releasePath.documentationOnlyDeploy, inside its window, and its negative tests are part of #1410's.",
         "Every adjudication row records independence = reduced-maintainer-adjudicated and no row is SUPPORTED while the deviation stands (validator T002).",
         "No capacity ceiling was exceeded without a merged amendment raising it."
       ],
@@ -322,6 +394,7 @@
         { "id": "ordinary-ci", "value": 15000, "unit": "CI runner-minutes for ordinary PR checks across the milestone", "status": "ACCEPTED" },
         { "id": "paid-spend", "value": 0, "unit": "USD for LLM, agent, or other paid compute", "status": "ACCEPTED" }
       ],
+      "evidenceDataRule": "For the pr-size ceiling, committed evidence data includes a gate's machine-readable closure inventory when the gate's closureEvidence in children names that inventory (for G1 #1420, the consumer and RID inventory eng/z3-consumers.json). The exclusion covers data files only: scripts, tests, workflows, and code that read the inventory still count (amendment 1.1.0).",
       "estimateNote": "The ordinary-ci ceiling assumes roughly 250 runner-minutes per full test.yml push. That figure is an unmeasured estimate."
     }
   },
@@ -331,17 +404,28 @@
     { "issue": 1311, "gate": "S1", "dependsOn": [1419], "consumes": ["baselines", "outcome-vocabulary", "authority-capacity", "failure-amendment-stopping"], "closureEvidence": "Every registered row for both B1 and N1 executed or recorded not-investigated within the s1 ceilings, which cover the combined B1 and N1 work; archived probes, independent-oracle results, controls, and a reproducible report, including zero-finding and timebox-stopped outcomes." },
     { "issue": 1413, "gate": "S2", "dependsOn": [1311], "consumes": ["outcome-vocabulary", "failure-amendment-stopping", "authority-capacity"], "closureEvidence": "One reviewed disposition per row and witness from findingDispositions; accepted repairs within s2 ceilings attached to #1409 and blocking #1423; no unresolved false unconditional proof keeps guard-removal or claim eligibility." },
     { "issue": 1420, "gate": "G1", "dependsOn": [1407], "consumes": ["artifact-inventory", "retrospective"], "closureEvidence": "Consumer and RID inventory; no unowned Z3 seeding workaround; no implicit network download; discriminating fresh-checkout tests for absent, wrong, and propagated assets." },
-    { "issue": 1421, "gate": "G2", "dependsOn": [1407, 1420], "consumes": ["outcome-vocabulary", "authority-capacity", "failure-amendment-stopping"], "closureEvidence": "Merged machine-readable determinism protocol (case IDs, environment pins, run count, timeouts, retry and failure rules) within the determinism-compute ceiling, before decision-bearing runs." },
-    { "issue": 1135, "gate": "G3", "dependsOn": [1420, 1421], "consumes": ["outcome-vocabulary", "artifact-inventory"], "closureEvidence": "Repaired oracle executed under the #1421 protocol with every attempt retained and agreement under the frozen failure rule." },
+    { "issue": 1421, "gate": "G2", "dependsOn": [1407, 1420], "consumes": ["outcome-vocabulary", "authority-capacity", "failure-amendment-stopping"], "closureEvidence": "Merged machine-readable determinism protocol (case IDs, environment pins, run count, timeouts, retry and failure rules) within the determinism-compute ceiling, before decision-bearing runs. The protocol treats platform as a determinism dimension and registers every determinismRows entry (amendment 1.1.0)." },
+    { "issue": 1135, "gate": "G3", "dependsOn": [1420, 1421], "consumes": ["outcome-vocabulary", "artifact-inventory"], "closureEvidence": "Repaired oracle executed under the #1421 protocol with every attempt retained and agreement under the frozen failure rule, on every platform the protocol registers; every determinismRows entry is resolved under rules.platformDeterminism (amendment 1.1.0)." },
     { "issue": 1241, "gate": "G4", "dependsOn": [1407, 1420], "consumes": ["artifact-inventory", "outcome-vocabulary"], "closureEvidence": "Checkout-pinned Tier 2 run with explicit positive/negative/multifile expectations, no build-output duplicates, no empty advertised selections, AST-roundtrip claims matching the work performed, and negative self-tests." },
     { "issue": 1417, "gate": "P1", "dependsOn": [1407], "consumes": ["provenance-identity", "artifact-inventory", "retrospective"], "closureEvidence": "Fresh-clone resolution of every authoritative identity after squash merge; failing tests for branch-only replacement, false identical-tree claims, and shallow-clone skips; historical stamps unchanged." },
     { "issue": 1276, "gate": "B1", "dependsOn": [1407], "consumes": ["benchmark-equivalence", "artifact-inventory", "retrospective"], "closureEvidence": "A benchmark registration per benchmarkEquivalence.registrationRule merged before any repair, differential check, or recomputation; then a content-addressed pair manifest with every benchmarkEquivalence pair field and a disposition produced by the registered oracle for every registered pair, the declared sampling unit and population, and historical artifacts left historical." },
     { "issue": 1422, "gate": "B2", "dependsOn": [1276, 1417], "consumes": ["benchmark-equivalence", "provenance-identity", "release-path", "retrospective"], "closureEvidence": "End-to-end tests: refusal fails the workflow and leaves no publication PR; unclassified or changed pairs block headlines; methodology change needs a prior amendment, not a workflow input." },
-    { "issue": 1410, "gate": "R2", "dependsOn": [1407], "consumes": ["release-path", "provenance-identity", "authority-capacity"], "closureEvidence": "Negative tests proving release, package, website, notes, and benchmark publication cannot proceed without one matching successful adjudication identity; GitHub release created only after adjudication." },
+    { "issue": 1410, "gate": "R2", "dependsOn": [1407], "consumes": ["release-path", "provenance-identity", "authority-capacity"], "closureEvidence": "Negative tests proving release, package, website, notes, and benchmark publication cannot proceed without one matching successful adjudication identity; GitHub release created only after adjudication. For the documentation-only website deploy (releasePath.documentationOnlyDeploy, amendment 1.1.0): an implementation of every verifierChecks entry with a negative test for each, and an audit record per deploy." },
     { "issue": 1423, "gate": "C1", "dependsOn": [1413, 1420, 1135, 1241, 1417, 1276, 1422, 1410], "consumes": ["artifact-inventory", "provenance-identity", "failure-amendment-stopping"], "closureEvidence": "Committed immutable candidate manifest including the SHA-256 of this contract packet (sha256.json) and its amendment log; tested invalidation classifier." },
     { "issue": 1424, "gate": "C2", "dependsOn": [1423], "consumes": ["artifact-inventory", "outcome-vocabulary", "authority-capacity"], "closureEvidence": "Every authoritative and derived inventory artifact regenerated on the candidate (publication surfaces only as unpublished candidates per releasePath.publicationSeparation; #1424 publishes nothing) within the regeneration ceilings, all attempts retained in durable storage, fresh-clone reproduction of the deterministic subset." },
     { "issue": 1408, "gate": "A1", "dependsOn": [1424, 1410], "consumes": ["outcome-vocabulary", "authority-capacity", "failure-amendment-stopping", "benchmark-equivalence", "release-path"], "closureEvidence": "One adjudication outcome per registered artifact and claim, capped at BOUNDED under the recorded independence deviation, and a machine-readable terminal record." }
   ],
+
+  "determinismRows": {
+    "amendment": "1.1.0",
+    "source": "Observed by G1 (#1420, PR #1471) in z3-consumer-matrix run 37020428891 on win-x64 and win-arm64 and registered in eng/z3-consumers.json testHosts.platformDivergences. An incidental observation in G1's CI, not a #1421-protocol run. Not repaired by G1.",
+    "rows": [
+      { "id": "platform-StringInBodyOnly_StillNeverElides", "test": "Calor.Verification.Tests.IntegrationTests.StringInBodyOnly_StillNeverElides", "platforms": ["win-x64", "win-arm64"], "observed": "Windows reports Calor0712 (postcondition may be violated, counterexample result=1) where linux and macOS report the expected Assumed demotion.", "kind": "verdict", "owners": [1421, 1135], "releaseBlocking": true },
+      { "id": "platform-TranslatorOutputMatchesCommittedBaseline", "test": "Calor.Verification.Tests.ContractTranslatorSemanticsVersionGuardTests.TranslatorOutputMatchesCommittedBaseline", "platforms": ["win-x64", "win-arm64"], "observed": "Translator fixture hash differs on Windows with the same SemanticsVersion.", "kind": "translator-output", "owners": [1421, 1135], "releaseBlocking": true },
+      { "id": "platform-CommittedReportsMatchGeneratedOracle", "test": "Calor.Verification.Tests.VerifierRuntimeDifferential.VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle", "platforms": ["win-x64", "win-arm64"], "observed": "The regenerated oracle report contains CR bytes on Windows.", "kind": "oracle-report", "owners": [1421, 1135], "releaseBlocking": true }
+    ],
+    "rule": "rules.platformDeterminism. Each row is release-blocking for the affected modeled form or artifact until resolved under the section 8 rules. #1421 registers each row in its protocol before decision-bearing runs; #1135 resolves each row and retains every attempt. A row caused only by a line-ending or fixture-encoding difference is resolved by a repair that makes the bytes platform-independent, never by a per-platform baseline."
+  },
 
   "retrospective": [
     {
@@ -383,6 +467,20 @@
   ],
 
   "amendmentLog": [
-    { "version": "1.0.1", "justification": "acceptance write-back", "reviewedInPr": 1470, "timestampUtc": "2026-10-02T13:10:12Z", "afterDecisionBearingInspection": false }
+    { "version": "1.0.1", "justification": "acceptance write-back", "reviewedInPr": 1470, "timestampUtc": "2026-10-02T13:10:12Z", "afterDecisionBearingInspection": false },
+    {
+      "version": "1.1.0",
+      "justification": "Maintainer decisions approved 2026-10-02 by @juanmicrosoft on findings from open gate PRs R2 #1474/#1475, G1 #1471, P1 #1472, and B1 #1473: (1) a documentation-only website deploy path before #1408 succeeds (releasePath.documentationOnlyDeploy); (2) the B1 task-statement reading (benchmarkEquivalence.taskStatementRule), resolving B1 review round 2 BLOCKING #1; (3) pending inventory updates from G1 #1471 and P1 #1472, applied by a write-back after each PR merges (inventory pendingUpdates); (4) a gate's machine-readable closure inventory counts as evidence data for the pr-size ceiling (capacity.evidenceDataRule); (5) G1's Windows-only verifier divergences routed to #1421/#1135 as release-blocking determinism rows (rules.platformDeterminism, determinismRows).",
+      "reviewedInPr": 0,
+      "timestampUtc": "2026-10-02T23:11:32Z",
+      "afterDecisionBearingInspection": false,
+      "inspectionStatement": "No decision follows decision-bearing inspection. At this amendment no #1419 registration or #1311 sweep result exists, the #1276 registration is unmerged and its oracle has not run (every registered pair is UNCLASSIFIED, pending-oracle), and no #1421 or #1135 protocol run exists. The three Windows observations in decision 5 come from G1's consumer-matrix CI run 37020428891, not from a determinism protocol; decision 5 only adds release-blocking rows and removes no requirement.",
+      "weakens": [
+        "Decision 1 narrows releasePath.publicationSeparation: before this amendment no Pages deployment could happen before #1408 records MILESTONE-SUCCEEDED; after it, a documentation-only deploy that meets documentationOnlyDeploy can.",
+        "Decision 4 widens the pr-size exclusion to a gate's machine-readable closure inventory named in its closureEvidence.",
+        "Decision 2 fixes the reading of 'implement the same task statement': EQUIVALENT does not mean correct with respect to the statement, and registered expected outputs may be the oracle's cross-arm agreement rule. The definition text is unchanged."
+      ],
+      "removedRows": []
+    }
   ]
 }

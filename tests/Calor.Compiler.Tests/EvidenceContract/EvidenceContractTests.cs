@@ -960,7 +960,7 @@ public class EvidenceContractTests
     {
         // The whole write-back packet: contract and inventory move to 1.0.1 together.
         var contract = FrozenContract();
-        var inventory = Inventory();
+        var inventory = ProposedInventory();
         inventory["contractVersion"] = "1.0.1";
         var violations = EvidenceContractValidator.ValidateContract(contract)
             .Concat(EvidenceContractValidator.ValidateInventory(contract, inventory)).ToList();
@@ -1036,6 +1036,256 @@ public class EvidenceContractTests
     }
 
     // ------------------------------------------------------------------
+    // Amendment 1.1.0: documentation-only website deploy (C013, D001-D006)
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void WellFormedDocsDeployAuditPasses()
+    {
+        var violations = EvidenceContractValidator.ValidateDocsDeployAudit(Contract(), Inventory(), DocsDeployAudit());
+        Assert.True(violations.Count == 0, Describe(violations));
+    }
+
+    [Fact]
+    public void DocsDeployAuditOnAnAuditedBasePasses()
+    {
+        var record = DocsDeployAudit();
+        record["baseKind"] = "audited-docs-deploy";
+        record["baseCommit"] = "4444444444444444444444444444444444444444";
+        record["baseRunId"] = 37000000001L;
+        var violations = EvidenceContractValidator.ValidateDocsDeployAudit(Contract(), Inventory(), record);
+        Assert.True(violations.Count == 0, Describe(violations));
+    }
+
+    [Fact]
+    public void CommittedDocsDeployRuleNeverAllowsAWebsiteInventoryPath()
+    {
+        // Every inventoried website path (benchmark pages, data files, changelog) is refused, so a
+        // documentation-only deploy can never change a stale or historical publication surface.
+        var websitePaths = Inventory()["artifacts"]!.AsArray()
+            .SelectMany(a => a!["paths"]!.AsArray().Select(p => p!.GetValue<string>()))
+            .Where(p => p.StartsWith("website/", StringComparison.Ordinal))
+            .ToList();
+        Assert.NotEmpty(websitePaths);
+        foreach (var path in websitePaths)
+        {
+            var record = DocsDeployAudit();
+            record["changedPaths"] = new JsonArray(path);
+            AssertViolation(EvidenceContractValidator.ValidateDocsDeployAudit(Contract(), Inventory(), record), "D003");
+        }
+    }
+
+    [Theory]
+    [InlineData("website/public/data/benchmark-results.json")]
+    [InlineData("website/public/data/new-claims.json")]
+    [InlineData("website/content/benchmarking/methodology.mdx")]
+    [InlineData("website/content/philosophy/static-verification.mdx")]
+    [InlineData("website/content/changelog.mdx")]
+    [InlineData("website/content/index.mdx")]
+    [InlineData("website/content/guides/verification-guarantees.mdx")]
+    [InlineData("website/content/contributing/adding-benchmarks.mdx")]
+    [InlineData("website/content/cli/benchmark.mdx")]
+    [InlineData("website/src/components/landing/BenchmarkChart.tsx")]
+    [InlineData("website/package.json")]
+    [InlineData("website/next.config.js")]
+    [InlineData("website/public/images/diagram.png")]
+    [InlineData("website/content/cli/compile.tsx")]
+    [InlineData("website/content/cli/../benchmarking/results.mdx")]
+    [InlineData("Website/content/cli/compile.mdx")]
+    [InlineData("/website/content/cli/compile.mdx")]
+    [InlineData("src/Calor.Compiler/Program.cs")]
+    public void NonDocumentationPathFails(string path)
+    {
+        var record = DocsDeployAudit();
+        record["changedPaths"]!.AsArray().Add(path);
+        AssertViolation(EvidenceContractValidator.ValidateDocsDeployAudit(Contract(), Inventory(), record), "D003");
+    }
+
+    [Fact]
+    public void DocsDeployAuditWithoutChangedPathsFails()
+    {
+        var record = DocsDeployAudit();
+        record.Remove("changedPaths");
+        AssertViolation(EvidenceContractValidator.ValidateDocsDeployAudit(Contract(), Inventory(), record), "D003");
+    }
+
+    [Theory]
+    [InlineData("package")]
+    [InlineData("githubRelease")]
+    [InlineData("tag")]
+    [InlineData("benchmarkData")]
+    [InlineData("releaseNotes")]
+    public void DocsDeployThatPublishesAnythingElseFails(string flag)
+    {
+        var record = DocsDeployAudit();
+        record["publishes"]![flag] = true;
+        AssertViolation(EvidenceContractValidator.ValidateDocsDeployAudit(Contract(), Inventory(), record), "D005");
+
+        record["publishes"]!.AsObject().Remove(flag);
+        AssertViolation(EvidenceContractValidator.ValidateDocsDeployAudit(Contract(), Inventory(), record), "D005");
+    }
+
+    [Fact]
+    public void DocsDeployAfterTerminalSuccessFails()
+    {
+        var record = DocsDeployAudit();
+        record["terminalSuccessRecordPresent"] = true;
+        AssertViolation(EvidenceContractValidator.ValidateDocsDeployAudit(Contract(), Inventory(), record), "D006");
+
+        record.Remove("terminalSuccessRecordPresent");
+        AssertViolation(EvidenceContractValidator.ValidateDocsDeployAudit(Contract(), Inventory(), record), "D006");
+    }
+
+    [Theory]
+    [InlineData("other-base-commit")]
+    [InlineData("other-base-run")]
+    [InlineData("unknown-base-kind")]
+    [InlineData("short-deployed-commit")]
+    [InlineData("own-base")]
+    public void DocsDeployWithAnInvalidBaseFails(string mutation)
+    {
+        var record = DocsDeployAudit();
+        switch (mutation)
+        {
+            case "other-base-commit": record["baseCommit"] = "5555555555555555555555555555555555555555"; break;
+            case "other-base-run": record["baseRunId"] = 34999741476L; break;
+            case "unknown-base-kind": record["baseKind"] = "last-successful-deploy"; break;
+            case "short-deployed-commit": record["deployedCommit"] = "72a0a855"; break;
+            case "own-base":
+                record["baseKind"] = "audited-docs-deploy";
+                record["baseRunId"] = record["runId"]!.DeepClone();
+                break;
+        }
+        AssertViolation(EvidenceContractValidator.ValidateDocsDeployAudit(Contract(), Inventory(), record), "D002");
+    }
+
+    [Theory]
+    [InlineData("allowlist-failed")]
+    [InlineData("allowlist-disallowed")]
+    [InlineData("wording-failed")]
+    [InlineData("attestation-reworded")]
+    [InlineData("attestation-unsigned")]
+    public void DocsDeployWithAFailedOrMissingCheckFails(string mutation)
+    {
+        var record = DocsDeployAudit();
+        switch (mutation)
+        {
+            case "allowlist-failed": record["allowlistCheck"]!["result"] = "skipped"; break;
+            case "allowlist-disallowed": record["allowlistCheck"]!["disallowedPaths"] = new JsonArray("website/package.json"); break;
+            case "wording-failed": record["wordingCheck"]!["result"] = "failed"; break;
+            case "attestation-reworded": record["attestation"]!["statement"] = "No benchmark numbers changed."; break;
+            case "attestation-unsigned": record["attestation"]!.AsObject().Remove("by"); break;
+        }
+        AssertViolation(EvidenceContractValidator.ValidateDocsDeployAudit(Contract(), Inventory(), record), "D004");
+    }
+
+    [Theory]
+    [InlineData("schema")]
+    [InlineData("contract-before-amendment")]
+    [InlineData("workflow")]
+    [InlineData("run-id")]
+    public void DocsDeployAuditWithWrongIdentityFails(string mutation)
+    {
+        var record = DocsDeployAudit();
+        switch (mutation)
+        {
+            case "schema": record["schema"] = "calor.docs-only-deploy-audit/0"; break;
+            case "contract-before-amendment": record["contractVersion"] = "1.0.1"; break;
+            case "workflow": record["workflow"] = ".github/workflows/benchmark.yml"; break;
+            case "run-id": record["runId"] = "37000000002"; break;
+        }
+        AssertViolation(EvidenceContractValidator.ValidateDocsDeployAudit(Contract(), Inventory(), record), "D001");
+    }
+
+    [Fact]
+    public void ContractWithoutTheDocsDeployRuleRefusesEveryAudit()
+    {
+        var contract = Contract();
+        contract["releasePath"]!.AsObject().Remove("documentationOnlyDeploy");
+        AssertViolation(EvidenceContractValidator.ValidateDocsDeployAudit(contract, Inventory(), DocsDeployAudit()), "D001");
+    }
+
+    [Theory]
+    [InlineData("website/public/data/**")]
+    [InlineData("website/src/**/*.mdx")]
+    [InlineData("website/content/**/*.json")]
+    [InlineData("website/content/../public/data/*.mdx")]
+    public void DocsDeployAllowlistWidenedBeyondDocumentationFails(string pattern)
+    {
+        var contract = Contract();
+        contract["releasePath"]!["documentationOnlyDeploy"]!["allowedPaths"]!.AsArray().Add(pattern);
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C013");
+    }
+
+    [Fact]
+    public void DocsDeployDenylistWithoutWebsiteDataFails()
+    {
+        var contract = Contract();
+        var denied = contract["releasePath"]!["documentationOnlyDeploy"]!["deniedPaths"]!.AsArray();
+        denied.Remove(denied.First(p => p!.GetValue<string>() == "website/public/data/**"));
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C013");
+    }
+
+    [Theory]
+    [InlineData("website/content/cli/**/*.mdx", "website/content/cli/compile.mdx", true)]
+    [InlineData("website/content/cli/**/*.mdx", "website/content/cli/nested/page.mdx", true)]
+    [InlineData("website/content/cli/**/*.mdx", "website/content/cli.mdx", false)]
+    [InlineData("website/content/cli/**/*.mdx", "website/content/client/page.mdx", false)]
+    [InlineData("website/content/cli/**/*.mdx", "website/content/cli/page.mdx.bak", false)]
+    [InlineData("website/public/data/**", "website/public/data/a/b.json", true)]
+    [InlineData("website/content/changelog.mdx", "website/content/changelogXmdx", false)]
+    public void DocsDeployGlobsMatchWholePaths(string glob, string path, bool matches)
+        => Assert.Equal(matches, EvidenceContractValidator.GlobRegex(glob).IsMatch(path));
+
+    // ------------------------------------------------------------------
+    // Amendment 1.1.0: pending inventory updates (I013)
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void PendingUpdateChangesNoArtifact()
+    {
+        // A pending update is recorded, not applied: the artifacts the validator reads are the ones
+        // committed, and evidence rows are judged against them.
+        var inventory = Inventory();
+        inventory["pendingUpdates"] = new JsonArray(PendingUpdate());
+        var before = Artifact(Inventory(), "ledger-provenance-index").ToJsonString();
+        Assert.Equal(before, Artifact(inventory, "ledger-provenance-index").ToJsonString());
+        var violations = EvidenceContractValidator.ValidateInventory(Contract(), inventory);
+        Assert.True(violations.Count == 0, Describe(violations));
+    }
+
+    [Theory]
+    [InlineData("unknown-artifact")]
+    [InlineData("no-pr")]
+    [InlineData("unknown-amendment")]
+    [InlineData("applied-status")]
+    [InlineData("unknown-classification")]
+    [InlineData("no-changes")]
+    [InlineData("paraphrased-defect")]
+    [InlineData("resolution-without-pr")]
+    [InlineData("duplicate-id")]
+    public void MalformedPendingUpdateFails(string mutation)
+    {
+        var update = PendingUpdate();
+        var inventory = Inventory();
+        var updates = new JsonArray(update);
+        inventory["pendingUpdates"] = updates;
+        switch (mutation)
+        {
+            case "unknown-artifact": update["artifact"] = "ledger-index"; break;
+            case "no-pr": update.Remove("repairingPr"); break;
+            case "unknown-amendment": update["recordedInAmendment"] = "1.0.9"; break;
+            case "applied-status": update["status"] = "applied"; break;
+            case "unknown-classification": update["classificationAfter"] = "repaired"; break;
+            case "no-changes": update.Remove("changes"); break;
+            case "paraphrased-defect": update["defectResolutions"]![0]!["defect"] = "HEAD reachability."; break;
+            case "resolution-without-pr": update["defectResolutions"]![0]!.AsObject().Remove("resolvedByPr"); break;
+            case "duplicate-id": updates.Add(PendingUpdate()); break;
+        }
+        AssertViolation(EvidenceContractValidator.ValidateInventory(Contract(), inventory), "I013");
+    }
+
+    // ------------------------------------------------------------------
     // Packet hash manifest coverage
     // ------------------------------------------------------------------
 
@@ -1089,15 +1339,22 @@ public class EvidenceContractTests
         ["included"] = included,
     };
 
+    /// <summary>A well-formed amendment one MINOR version above the committed contract.</summary>
     private static JsonObject Amendment() => new()
     {
-        ["version"] = "1.1.0",
+        ["version"] = NextMinorVersion(),
         ["timestampUtc"] = "2026-10-20T00:00:00Z",
         ["reviewedInPr"] = 9999,
         ["afterDecisionBearingInspection"] = false,
         ["justification"] = "Control fixture for the amendment rule.",
         ["removedRows"] = new JsonArray(),
     };
+
+    private static string NextMinorVersion()
+    {
+        var parts = Contract()["contractVersion"]!.GetValue<string>().Split('.').Select(int.Parse).ToArray();
+        return $"{parts[0]}.{parts[1] + 1}.0";
+    }
 
     private static JsonNode AmendedContract(JsonObject amendment, JsonNode? baseContract = null)
     {
@@ -1110,16 +1367,15 @@ public class EvidenceContractTests
     /// <summary>
     /// The committed contract in the PROPOSED lifecycle state, whatever state is committed. After the
     /// acceptance write-back merges, this undoes it in memory so the proposed-state controls keep
-    /// testing the proposed state instead of silently changing meaning.
+    /// testing the proposed state instead of silently changing meaning. The proposed state precedes
+    /// every amendment, so the log is emptied (later amendments, such as 1.1.0, follow the freeze).
     /// </summary>
     private static JsonNode ProposedContract()
     {
         var contract = Contract();
         contract.AsObject().Remove("acceptance");
-        var log = contract["amendmentLog"]!.AsArray();
-        foreach (var entry in log.Where(e => e!["justification"]?.GetValue<string>() == "acceptance write-back").ToList())
-            log.Remove(entry);
-        contract["contractVersion"] = log.Count == 0 ? "1.0.0" : log[^1]!["version"]!.GetValue<string>();
+        contract["amendmentLog"]!.AsArray().Clear();
+        contract["contractVersion"] = "1.0.0";
         contract["status"] = "PROPOSED";
         contract["gateStatus"] = "NOT-MET";
         contract["authorityCapacity"]!["capacity"]!["status"] = "PROPOSED";
@@ -1132,6 +1388,7 @@ public class EvidenceContractTests
     private static JsonNode ProposedInventory()
     {
         var inventory = Inventory();
+        inventory.AsObject().Remove("pendingUpdates"); // recorded by amendments after the freeze
         inventory["contractVersion"] = ProposedContract()["contractVersion"]!.DeepClone();
         return inventory;
     }
@@ -1156,6 +1413,56 @@ public class EvidenceContractTests
         };
         return contract;
     }
+
+    /// <summary>A well-formed audit record of a documentation-only deploy on the pre-contract base.</summary>
+    private static JsonObject DocsDeployAudit()
+    {
+        var rule = Contract()["releasePath"]!["documentationOnlyDeploy"]!;
+        return new JsonObject
+        {
+            ["schema"] = "calor.docs-only-deploy-audit/1",
+            ["contractVersion"] = Contract()["contractVersion"]!.DeepClone(),
+            ["workflow"] = ".github/workflows/nextjs-gh-pages.yml",
+            ["runId"] = 37000000002L,
+            ["deployedCommit"] = "6666666666666666666666666666666666666666",
+            ["baseKind"] = "pre-contract-deploy",
+            ["baseCommit"] = rule["base"]!["preContractDeploy"]!["commit"]!.DeepClone(),
+            ["baseRunId"] = rule["base"]!["preContractDeploy"]!["runId"]!.DeepClone(),
+            ["changedPaths"] = new JsonArray("website/content/cli/compile.mdx", "website/content/guides/telemetry.mdx"),
+            ["allowlistCheck"] = new JsonObject { ["result"] = "passed", ["disallowedPaths"] = new JsonArray() },
+            ["wordingCheck"] = new JsonObject { ["result"] = "passed" },
+            ["publishes"] = new JsonObject
+            {
+                ["package"] = false, ["githubRelease"] = false, ["tag"] = false,
+                ["benchmarkData"] = false, ["releaseNotes"] = false,
+            },
+            ["terminalSuccessRecordPresent"] = false,
+            ["attestation"] = new JsonObject
+            {
+                ["by"] = "@juanmicrosoft",
+                ["statement"] = rule["auditRecord"]!["attestationStatement"]!.DeepClone(),
+            },
+            ["recordedAtUtc"] = "2026-10-10T00:00:00Z",
+        };
+    }
+
+    /// <summary>A well-formed pending inventory update, independent of what is committed.</summary>
+    private static JsonObject PendingUpdate() => new()
+    {
+        ["id"] = "fixture-ledger-provenance-index",
+        ["artifact"] = "ledger-provenance-index",
+        ["repairingPr"] = 9003,
+        ["recordedInAmendment"] = Contract()["contractVersion"]!.DeepClone(),
+        ["status"] = "pending-merge",
+        ["classificationAfter"] = "authoritative",
+        ["changes"] = new JsonObject(),
+        ["defectResolutions"] = new JsonArray(new JsonObject
+        {
+            ["defect"] = Artifact(Inventory(), "ledger-provenance-index")["openDefects"]![0]!.DeepClone(),
+            ["resolvedByPr"] = 9003,
+            ["scope"] = "fixture",
+        }),
+    };
 
     private static JsonObject ComparabilityKey() => new()
     {
