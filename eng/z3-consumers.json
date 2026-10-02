@@ -72,7 +72,26 @@
     "guard": "tests/Shared/Z3ConsumerGuardTests.cs",
     "guardClass": "Z3ConsumerGuardTests",
     "projects": "Every project in eng/test-manifest.json. Each one references Calor.Compiler directly or transitively and links the guard.",
-    "expectedRidVariable": "CALOR_Z3_EXPECTED_RID"
+    "expectedRidVariable": "CALOR_Z3_EXPECTED_RID",
+    "platformDivergences": {
+      "note": "Calor.Verification.Tests cases that load Z3 and run, but give a different result on Windows than on Linux and macOS. They are not Z3-delivery failures and G1 does not repair them; they are reported for the determinism and soundness gates (#1421, #1135, #1419). z3-consumer-matrix deselects exactly these on the listed RIDs, and its TRX check requires every other case to pass with zero skips. Observed on PR #1471, run 37020428891.",
+      "rids": ["win-x64", "win-arm64"],
+      "project": "tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj",
+      "tests": [
+        {
+          "name": "Calor.Verification.Tests.IntegrationTests.StringInBodyOnly_StillNeverElides",
+          "observed": "Windows reports Calor0712 (postcondition may be violated, counterexample result=1) where Linux and macOS report the expected Assumed demotion. Platform-dependent verifier verdict."
+        },
+        {
+          "name": "Calor.Verification.Tests.ContractTranslatorSemanticsVersionGuardTests.TranslatorOutputMatchesCommittedBaseline",
+          "observed": "Translator fixture hash 4df8978f... on Windows against committed 95e8039c... (same SemanticsVersion); the committed baseline is platform-specific."
+        },
+        {
+          "name": "Calor.Verification.Tests.VerifierRuntimeDifferential.VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle",
+          "observed": "The regenerated differential report contains CR (13) bytes on Windows; the committed report is LF-only."
+        }
+      ]
+    }
   },
   "projects": {
     "note": "Every project outside eng/test-manifest.json whose ProjectReference closure reaches Calor.Compiler (scripts/test_z3_hermetic.py computes the closure and requires this list to match it exactly). All of them receive the same AddZ3AssetsToOutput items; the role says what each does with them.",

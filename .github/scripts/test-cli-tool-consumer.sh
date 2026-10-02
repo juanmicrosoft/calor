@@ -104,13 +104,14 @@ echo "== 3. clean-consumer install from the feed =="
 export NUGET_PACKAGES="$WORK/packages"   # cold cache: the install must come from the feed
 # #1420: the local feed is the ONLY source. With --add-source, a same-version
 # package on another configured feed could win and the Z3 bytes checked above
-# would not be the bytes installed.
+# would not be the bytes installed. The feed path is relative to the config
+# file ($WORK), so no POSIX path reaches native NuGet on Windows.
 cat >"$WORK/nuget.config" <<NUGETCONFIG
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
   <packageSources>
     <clear />
-    <add key="local" value="$FEED" />
+    <add key="local" value="feed" />
   </packageSources>
 </configuration>
 NUGETCONFIG

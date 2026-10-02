@@ -92,7 +92,18 @@ def matrix_pairs(job: str) -> list[tuple[str, str]]:
     return re.findall(r"(?m)^ +- runner: (\S+)\n +rid: (\S+)$", job)
 
 
-def check_guard_trx(trx: Path, min_passed: int) -> list[str]:
+def divergences(rid: str, project: str) -> list[str]:
+    entry = load_registry()["testHosts"]["platformDivergences"]
+    if rid not in entry["rids"] or project != entry["project"]:
+        return []
+    return [test["name"] for test in entry["tests"]]
+
+
+def divergence_filter(rid: str, project: str) -> str:
+    return "&".join(f"FullyQualifiedName!={name}" for name in divergences(rid, project))
+
+
+def check_guard_trx(trx: Path, min_passed: int, exact: bool = False) -> list[str]:
     root = ET.parse(trx).getroot()
     results = root.findall("./{*}Results/{*}UnitTestResult")
     errors: list[str] = []
@@ -106,6 +117,8 @@ def check_guard_trx(trx: Path, min_passed: int) -> list[str]:
             passed += 1
     if passed < min_passed:
         errors.append(f"only {passed} passed results; expected at least {min_passed}")
+    if exact and len(results) != min_passed:
+        errors.append(f"{len(results)} results; expected exactly {min_passed}")
     names = [result.attrib.get("testName", "") for result in results]
     for fact in GUARD_FACTS:
         if not any(f"Z3ConsumerGuardTests.{fact}" in name for name in names):
@@ -172,7 +185,7 @@ class Z3HermeticTests(unittest.TestCase):
         links = {}
         for item in add.iter("None"):
             links[item.attrib["Link"].replace("\\", "/")] = item.attrib
-            self.assertEqual("PreserveNewest", item.attrib.get("CopyToOutputDirectory"))
+            self.assertEqual("Always", item.attrib.get("CopyToOutputDirectory"))
         expected = {
             f"runtimes/{rid}/native/{entry['native']}" for rid, entry in self.supported().items()
         }
@@ -311,6 +324,22 @@ class Z3HermeticTests(unittest.TestCase):
         consumers = {cell["consumer"] for cell in self.registry["matrix"]}
         self.assertEqual({"test-hosts", "sdk-package", "cli-tool-package"}, consumers)
 
+    def test_platform_divergences_are_narrow_and_enforced(self) -> None:
+        entry = self.registry["testHosts"]["platformDivergences"]
+        self.assertTrue(set(entry["rids"]) <= set(self.supported()))
+        self.assertLessEqual(len(entry["tests"]), 3)
+        self.assertTrue(all(test["observed"] for test in entry["tests"]))
+        for test in entry["tests"]:
+            self.assertNotIn("Z3ConsumerGuardTests", test["name"])
+        source = "\n".join(p.read_text(encoding="utf-8") for p in (REPO_ROOT / "tests/Calor.Verification.Tests").rglob("*.cs"))
+        for test in entry["tests"]:
+            self.assertIn(f"void {test['name'].rsplit('.', 1)[1]}(", source)
+        job = workflow_jobs((REPO_ROOT / ".github/workflows/test.yml").read_text(encoding="utf-8"))["z3-consumer-matrix"]
+        self.assertIn("--divergence-filter", job)
+        self.assertIn(f"--check-trx artifacts/z3/verification.trx --project {entry['project']}", job)
+        self.assertEqual("", divergence_filter("linux-arm64", entry["project"]))
+        self.assertEqual(3, divergence_filter("win-x64", entry["project"]).count("FullyQualifiedName!="))
+
     def test_negative_controls_are_registered_steps(self) -> None:
         workflows = self.workflows()
         for control in self.registry["negativeControls"]:
@@ -399,9 +428,20 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check-trx", type=Path)
     parser.add_argument("--min-passed", type=int, default=len(GUARD_FACTS))
+    parser.add_argument("--project", help="with --check-trx: require the manifest total minus registered divergences")
+    parser.add_argument("--rid")
+    parser.add_argument("--divergence-filter", action="store_true", help="print the dotnet test filter for --rid/--project")
     args, rest = parser.parse_known_args()
+    if args.divergence_filter:
+        print(divergence_filter(args.rid, args.project))
+        return 0
     if args.check_trx:
-        errors = check_guard_trx(args.check_trx, args.min_passed)
+        min_passed = args.min_passed
+        if args.project:
+            manifest = json.loads((REPO_ROOT / "eng/test-manifest.json").read_text(encoding="utf-8"))
+            total = next(p["expectedTotal"] for p in manifest["projects"] if p["path"] == args.project)
+            min_passed = total - len(divergences(args.rid or "", args.project))
+        errors = check_guard_trx(args.check_trx, min_passed, exact=bool(args.project))
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
         if not errors:

@@ -1,0 +1,15 @@
+# G1 (#1420) review round 2 — Codex (cross-family adversarial)
+
+- Reviewed SHA: `cf1f85a6bea899c1b829f3cec78001063a4d7461`
+- Command and prompt: as in round 1 (`git diff origin/main` on stdin).
+
+## Verbatim output
+
+1. **BLOCKING — The new local-feed config breaks Windows CLI probes.** `.github/scripts/test-cli-tool-consumer.sh:113` writes `$FEED` directly into XML. Git Bash paths such as `/tmp/...` reach native NuGet unchanged inside that file; unlike command arguments, file contents receive no [MSYS path conversion](https://www.msys2.org/docs/filesystem-paths/). NuGet consequently searches a different Windows directory. This blocks the win-x64 and win-arm64 legs registered at `.github/workflows/test.yml:1248`. **Fix:** use `value="feed"` relative to the config’s directory, or convert the feed with `cygpath -m` before serializing XML; verify both Windows installs.
+
+2. **MAJOR — Incremental builds can retain an unverified solver in the Tasks output.** `src/Calor.Compiler/Calor.Compiler.csproj:125` replaces the former unconditional copy target with `PreserveNewest`. MSBuild skips copying when the destination is newer, so replacing `Calor.Tasks/bin/Release/net10.0/libz3.*` with an older solver and giving it a newer timestamp survives a successful build: validation hashes only the source assets. The new matrix can still pass because `Z3ConsumerGuardTests.cs:68` checks the test host’s directory, while `CompileCalorIntegrationTests.cs:1441` checks only whether *any* native filename exists in Tasks output. The actual task can load the retained solver first. **Fix:** use `IfDifferent` or verified destination copying, hash the correct RID’s native in Tasks output, and add an incremental negative control with a newer, wrong destination asset.
+
+## Dispositions
+
+1. **BLOCKING — accepted, fixed.** The generated `nuget.config` now sets `value="feed"`, a path relative to the config file's own directory (`$WORK`), so no POSIX path reaches native NuGet on Windows. Local osx-arm64 run: PASS. The Windows legs are verified by `cli-tool-consumer (win-x64)` and `(win-arm64)` on this PR.
+2. **MAJOR — accepted, fixed.** Every `AddZ3AssetsToOutput` item now uses `CopyToOutputDirectory="Always"`. The copy still skips files whose size and timestamp both match, but a replaced destination is overwritten from the verified source on the next build. `test_z3_hermetic.py` pins `Always`. `CompileCalorIntegrationTests.VerifyGate_NativeZ3_DeployedToTasksOutputRoot` now requires the host RID's native at the Tasks output root and byte-compares it with the bootstrapped source asset that `ValidateZ3Assets` hash-checked, instead of accepting any `libz3.*` filename. Local incremental negative control on osx-arm64: plant the linux-x64 `libz3.so` bytes as `src/Calor.Tasks/bin/Release/net10.0/libz3.dylib` with a newer timestamp, rebuild, and the file is the pinned osx-arm64 dylib again (`8d1f5438…`). The strengthened test passes after the rebuild and fails against the planted file when no rebuild intervenes.
