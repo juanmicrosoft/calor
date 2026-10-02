@@ -2,12 +2,11 @@
 """Build the #1276 (0.24 B1) benchmark registration packet from the cutoff tree with `git show`.
 
 Pairs each .calr with its same-stem .cs and never compiles, runs, or compares a pair.
-Usage: python3 scripts/b1_1276_registration.py [--check]   (--check fails if the packet is stale)
+Usage: python3 scripts/b1_1276_registration.py   (the registration tests fail if the committed packet differs)
 """
 
 from __future__ import annotations
 
-import argparse
 import hashlib
 import json
 import subprocess
@@ -141,17 +140,8 @@ def build(root: Path) -> dict[str, str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--check", action="store_true")
-    args = parser.parse_args()
     root = Path(git(Path.cwd(), "rev-parse", "--show-toplevel").decode().strip())
     files = build(root)
-    stale = [n for n, t in files.items() if not (root / PACKET / n).exists()
-             or (root / PACKET / n).read_bytes() != t.encode("utf-8")]
-    if args.check:
-        for name in stale:
-            print(f"stale: {PACKET / name}", file=sys.stderr)
-        return 1 if stale else 0
     for name, text in files.items():
         (root / PACKET / name).write_bytes(text.encode("utf-8"))
     print(f"wrote {len(files)} files; seal (SHA-256 of sha256.json) {sha(files['sha256.json'].encode())}")

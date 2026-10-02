@@ -29,10 +29,10 @@ outputs, so the oracle checks the arms against each other, not against the state
 
 `b1-1276-pair-oracle` v1 (`tests/Calor.Evaluation/Equivalence/`, hashes pinned), run twice with
 `dotnet run --project tests/Calor.Evaluation -c Release -- pair-oracle` (the second run with
-`--compare-with` the first). It refuses to run unless HEAD is the registration commit and every
-seal and pin matches. Per pair, in its own process: identity check; Calor to C# with default
-options, then one Roslyn setup for both arms (build error: `NOT-EQUIVALENT`); public static methods
-must match (one-sided: `NOT-EQUIVALENT`; any other public member or unsupported type:
+`--compare-with` the first). It refuses to run unless the checkout is the clean registration
+commit and every seal and pin matches. Per pair, in its own process: identity check; Calor to C# with default
+options, then one Roslyn setup for both arms (build error: `NOT-EQUIVALENT`); public static methods of
+static classes must match (one-sided: `NOT-EQUIVALENT`; any other public member or unsupported type:
 `UNCLASSIFIED`); inputs from boundary pools and SplitMix64 seeded by pair id and member key, never
 by either arm; each tuple runs Calor, C#, Calor, C# with fresh copies, a fresh working directory,
 and a 2,000 ms limit. A difference in return vs throw, value, exception type, stdout, argument state
@@ -67,3 +67,7 @@ means are removed.
 2. **One comparative metric:** reinstating a language-specific metric needs a symmetric definition
    and an amendment.
 3. **Scenario variants** are excluded rather than run.
+4. **"Implement the same task statement"** is read relationally: the arms share one statement and
+   compute the same observable function. Requiring conformance to the statement needs per-pair task
+   assertions registered by amendment before the oracle runs (`registration.json`
+   `taskStatement.interpretation`).

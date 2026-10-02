@@ -61,14 +61,18 @@ public class PairDifferentialOracleTests
     }
 
     [Theory]
-    [InlineData("public static void Sort(int[] xs) => System.Array.Sort(xs);", "public static void Sort(int[] xs) { }", "NOT-EQUIVALENT")]
-    [InlineData("public static void Save(string s) => System.IO.File.WriteAllText(\"out.txt\", s);", "public static void Save(string s) { }", "NOT-EQUIVALENT")]
-    [InlineData("public static int P => 1; public static int F(int x) => x;", "public static int F(int x) => x;", "UNCLASSIFIED")]
-    [InlineData("public static void Sort(int[] xs) => System.Array.Sort(xs);", "public static void Sort(int[] xs) => System.Array.Sort(xs);", "EQUIVALENT")]
-    public void MutationsFileEffectsAndUnsupportedMembersAreObserved(string left, string right, string expected)
+    [InlineData("public static void Sort(int[] xs) => System.Array.Sort(xs);", "public static void Sort(int[] xs) { }", "OBSERVATION_MISMATCH")]
+    [InlineData("public static void Save(string s) => System.IO.File.WriteAllText(\"out.txt\", s);", "public static void Save(string s) { }", "OBSERVATION_MISMATCH")]
+    [InlineData("public static int P => 1; public static int F(int x) => x;", "public static int F(int x) => x;", "UNSUPPORTED_SURFACE")]
+    [InlineData("public static void Sort(int[] xs) => System.Array.Sort(xs);", "public static void Sort(int[] xs) => System.Array.Sort(xs);", "AGREE")]
+    [InlineData("public static IEnumerable<int> F(int n) => throw new InvalidOperationException();", "public static IEnumerable<int> F(int n) { if (n == n) throw new InvalidOperationException(); yield break; }", "OBSERVATION_MISMATCH")]
+    [InlineData("public static int F() => 1; } public class Box { public Box() => throw new Exception(); } static class Pad {", "public static int F() => 1;", "UNSUPPORTED_SURFACE")]
+    [InlineData("private static int _n; public static int Next() => _n++;", "public static int Next() => 0;", "NONDETERMINISTIC")]
+    [InlineData("public static bool F(int n) { while (n == n) System.Threading.Thread.Sleep(50); return true; }", "public static bool F(int n) => true;", "TIMEOUT")]
+    public void EffectsSurfacesAndRunawayArmsAreClassified(string left, string right, string reason)
     {
         var pair = new OraclePairInput("control", "a", [], "", "b", [], "");
-        Assert.Equal(expected, PairDifferentialOracle.EvaluateCSharpArms(pair, CSharp(left), CSharp(right)).Disposition);
+        Assert.Equal(reason, PairDifferentialOracle.EvaluateCSharpArms(pair, CSharp(left), CSharp(right)).Reason);
     }
 
     [Fact]
@@ -76,14 +80,29 @@ public class PairDifferentialOracleTests
     {
         static JsonArray Rows(params (string Id, string Disposition)[] rows) => new(rows.Select(r => (JsonNode?)JsonSerializer.SerializeToNode(
             new OracleVerdict(r.Id, r.Disposition, "R", [], 1, null, [], ""))).ToArray());
+        var header = new JsonObject { ["registrationCommit"] = new string('a', 40), ["environment"] = "env" };
+        JsonObject First(JsonArray rows, string commit = "") => new()
+        {
+            ["registrationCommit"] = commit.Length > 0 ? commit : new string('a', 40), ["environment"] = "env", ["runResults"] = rows.DeepClone(),
+        };
         var good = Rows((PairOracleCommand.KnownWitness, "NOT-EQUIVALENT"), ("A/Pair", "EQUIVALENT"));
-        Assert.Empty(PairOracleCommand.Reconcile(good, good.DeepClone().AsArray()).Problems);
-        Assert.NotEmpty(PairOracleCommand.Reconcile(good, null).Problems);
-        var (results, problems) = PairOracleCommand.Reconcile(good, Rows((PairOracleCommand.KnownWitness, "NOT-EQUIVALENT"), ("A/Pair", "NOT-EQUIVALENT")));
+        Assert.Empty(PairOracleCommand.Reconcile(header, good, First(good)).Problems);
+        Assert.NotEmpty(PairOracleCommand.Reconcile(header, good, null).Problems);
+        Assert.NotEmpty(PairOracleCommand.Reconcile(header, good, First(good, new string('b', 40))).Problems);
+        Assert.NotEmpty(PairOracleCommand.Reconcile(header, good, First(Rows((PairOracleCommand.KnownWitness, "NOT-EQUIVALENT"), ("B/Pair", "EQUIVALENT")))).Problems);
+        var (results, problems) = PairOracleCommand.Reconcile(header, good, First(Rows((PairOracleCommand.KnownWitness, "NOT-EQUIVALENT"), ("A/Pair", "NOT-EQUIVALENT"))));
         Assert.Empty(problems);
         Assert.Equal("NONDETERMINISTIC_ACROSS_RUNS", results[1]!["Reason"]!.GetValue<string>());
         var badWitness = Rows((PairOracleCommand.KnownWitness, "EQUIVALENT"));
-        Assert.Contains(PairOracleCommand.Reconcile(badWitness, badWitness.DeepClone().AsArray()).Problems, p => p.Contains("known witness", StringComparison.Ordinal));
+        Assert.Contains(PairOracleCommand.Reconcile(header, badWitness, First(badWitness)).Problems, p => p.Contains("known witness", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void PreflightRefusesAnotherCommitOrAMalformedSha()
+    {
+        var registration = Path.Combine(PairOracleCommand.RepoRoot(AppContext.BaseDirectory), "docs/plans/evidence/b1-1276/registration");
+        Assert.Contains("full 40-hex", PairOracleCommand.Preflight(registration, "72a0a855"), StringComparison.Ordinal);
+        Assert.Contains("HEAD is not", PairOracleCommand.Preflight(registration, new string('0', 40)), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -124,20 +143,6 @@ public class PairDifferentialOracleTests
         var verdict = PairDifferentialOracle.Evaluate(new OraclePairInput("ctl", "ctl.calr", calor,
             PairDifferentialOracle.Sha256Hex(calor), "ctl.cs", csharp, new string('0', 64)));
         Assert.Equal(("UNCLASSIFIED", "IDENTITY_MISMATCH"), Reason(verdict));
-    }
-
-    [Fact]
-    public void NondeterministicArmIsUnclassified()
-    {
-        var verdict = Run("§M{m001:Ctl}\n  §F{f001:Next:pub} () -> i32\n    §R 0\n", CSharp("private static int _n; public static int Next() => _n++;"));
-        Assert.Equal(("UNCLASSIFIED", "NONDETERMINISTIC"), Reason(verdict));
-    }
-
-    [Fact]
-    public void HangingArmIsUnclassifiedTimeout()
-    {
-        var verdict = Run(CalorIsEven, CSharp("public static bool IsEven(int n) { while (n == n) { } return true; }"));
-        Assert.Equal(("UNCLASSIFIED", "TIMEOUT"), Reason(verdict));
     }
 
     [Fact]

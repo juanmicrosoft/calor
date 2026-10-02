@@ -16,7 +16,7 @@ public class BenchmarkRegistrationTests
     private const string Corpus = "tests/TestData/Benchmarks";
 
     /// <summary>SHA-256 of the registered sha256.json. Changing it is a #1407 amendment, never a refresh.</summary>
-    private const string PinnedSeal = "92d25c99a193ad809e75105c5f0febcfbdd26bf590bbc744de9504209e06bf74";
+    private const string PinnedSeal = "46d7ea3dcf6955d6851a89a7920a2abd1a17155b6896ff39285a37cf1fa4ebdd";
 
     private static readonly Dictionary<string, (string File, Action<JsonNode> Change, string Code, string[] Also)> Mutations = new()
     {

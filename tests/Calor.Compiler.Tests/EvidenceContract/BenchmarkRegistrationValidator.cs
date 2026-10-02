@@ -22,10 +22,10 @@ internal static partial class EvidenceContractValidator
         ["TokenEconomics", "GenerationAccuracy", "Comprehension", "EditPrecision", "ErrorDetection",
          "InformationDensity", "RefactoringStability", "Correctness"];
 
-    /// <param name="packet">Packet file name to its committed text (the five JSON files and sha256.json).</param>
-    /// <param name="readRepoFile">Reads a repository-relative file's bytes, or null when it is absent.</param>
-    /// <param name="corpusFiles">Repository-relative paths of every file now under the corpus root.</param>
-    /// <param name="pinnedSeal">SHA-256 of the registered sha256.json; null skips B008 (for single-rule controls).</param>
+    /// <summary>
+    /// <paramref name="packet"/> maps packet file names to text; <paramref name="readRepoFile"/> returns null for an absent file;
+    /// a null <paramref name="pinnedSeal"/> skips B008 (for single-rule controls).
+    /// </summary>
     public static IReadOnlyList<ContractViolation> ValidateBenchmarkRegistration(
         JsonNode contract, IReadOnlyDictionary<string, string> packet,
         Func<string, byte[]?> readRepoFile, IReadOnlyCollection<string> corpusFiles, string? pinnedSeal)

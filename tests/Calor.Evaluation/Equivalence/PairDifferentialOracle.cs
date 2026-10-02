@@ -111,18 +111,15 @@ public static class PairDifferentialOracle
             foreach (var args in InputGenerator.Generate(pair.PairId, key, calor.Members[key]))
             {
                 inputCount++;
-                var observed = new Observation[4];
-                observed[0] = Invoke(calor.Members[key], args);
-                observed[1] = Invoke(csharp.Members[key], args);
-                observed[2] = Invoke(calor.Members[key], args);
-                observed[3] = Invoke(csharp.Members[key], args);
+                var (c, cs) = (calor.Members[key], csharp.Members[key]);
+                var observed = new[] { Invoke(c, args), Invoke(cs, args), Invoke(c, args), Invoke(cs, args) };
                 var label = $"{key} {InputGenerator.Render(args)}";
                 if (observed.Any(o => o.Kind == "timeout"))
                     return Verdict(pair, "UNCLASSIFIED", "TIMEOUT", label, keys, inputCount);
-                if (!observed[0].SameAs(observed[2]) || !observed[1].SameAs(observed[3]))
+                if (!observed[0].Equals(observed[2]) || !observed[1].Equals(observed[3]))
                     return Verdict(pair, "UNCLASSIFIED", "NONDETERMINISTIC", label, keys, inputCount);
                 transcript.Append(label).Append(" => ").Append(observed[0]).Append(" || ").Append(observed[1]).Append('\n');
-                if (!observed[0].SameAs(observed[1]) && witnesses.Count < MaxWitnesses)
+                if (!observed[0].Equals(observed[1]) && witnesses.Count < MaxWitnesses)
                     witnesses.Add($"{label}: calor {observed[0]} / csharp {observed[1]}");
             }
         }
@@ -140,10 +137,8 @@ public static class PairDifferentialOracle
         var compilation = CSharpCompilation.Create(assemblyName,
             [CSharpSyntaxTree.ParseText(SdkImplicitUsings, parse), CSharpSyntaxTree.ParseText(source, parse)],
             References.Value,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
-                optimizationLevel: OptimizationLevel.Release,
-                nullableContextOptions: NullableContextOptions.Enable,
-                deterministic: true));
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release,
+                nullableContextOptions: NullableContextOptions.Enable, deterministic: true));
         using var stream = new MemoryStream();
         var emit = compilation.Emit(stream);
         errors = emit.Diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
@@ -151,17 +146,19 @@ public static class PairDifferentialOracle
         return emit.Success ? stream.ToArray() : null;
     }
 
-    /// <summary>
-    /// Public static methods of exported types, keyed without their declaring type (the arms may name
-    /// their containers differently). Every other public member (instance methods, fields, properties,
-    /// events, constructors with parameters) is listed as unsupported, so the pair is UNCLASSIFIED.
-    /// </summary>
+    /// <summary>Public static methods of exported static classes, keyed without the declaring type. Any other exported
+    /// type (constructor, override, or inherited behavior) or public member is unsupported: the pair is UNCLASSIFIED.</summary>
     internal static ArmSurface Surface(Assembly assembly)
     {
         var members = new Dictionary<string, MethodInfo>(StringComparer.Ordinal);
         var (ambiguous, unsupported) = (new List<string>(), new List<string>());
         foreach (var type in assembly.GetExportedTypes().OrderBy(t => t.FullName, StringComparer.Ordinal))
         {
+            if (!(type.IsClass && type.IsAbstract && type.IsSealed))
+            {
+                unsupported.Add($"non-static type {type.FullName}");
+                continue;
+            }
             const BindingFlags flags = BindingFlags.Public | BindingFlags.DeclaredOnly | BindingFlags.Static | BindingFlags.Instance;
             foreach (var member in type.GetMembers(flags).OrderBy(m => m.ToString(), StringComparer.Ordinal))
             {
@@ -178,14 +175,8 @@ public static class PairDifferentialOracle
         return new ArmSurface(members, ambiguous, unsupported);
     }
 
-    /// <summary>Accessors are covered by their property; a parameterless constructor or an object override alone is not behavior.</summary>
-    private static bool IsIgnorable(MemberInfo member) => member switch
-    {
-        MethodInfo { IsSpecialName: true } => true,
-        ConstructorInfo c => c.GetParameters().Length == 0,
-        MethodInfo m => m.Name is "ToString" or "Equals" or "GetHashCode" && m.GetBaseDefinition().DeclaringType == typeof(object),
-        _ => false,
-    };
+    /// <summary>In a static class: accessors are covered by their property, and the type initializer runs on first call (observed).</summary>
+    private static bool IsIgnorable(MemberInfo member) => member is MethodInfo { IsSpecialName: true } or ConstructorInfo { IsStatic: true } or Type;
 
     /// <summary>C# entry points <c>Main()</c> and <c>Main(string[])</c> are one member, run once with no arguments.</summary>
     internal const string EntryKeyPrefix = "main(entry)->";
@@ -201,11 +192,8 @@ public static class PairDifferentialOracle
             ? t.ToString()
             : "arm-defined:" + t.Name;
 
-    /// <summary>
-    /// One invocation: fresh argument copies, captured stdout, empty stdin, a fresh empty working
-    /// directory, invariant culture. Observes the return or exception type, stdout, the arguments
-    /// after the call, and the files created in the working directory.
-    /// </summary>
+    /// <summary>One invocation with fresh argument copies, captured stdout, empty stdin, and a fresh working directory;
+    /// observes the result or exception type, stdout, argument state after the call, and created files.</summary>
     private static Observation Invoke(MethodInfo method, object?[] args)
     {
         var stdout = new StringWriter(CultureInfo.InvariantCulture);
@@ -216,14 +204,24 @@ public static class PairDifferentialOracle
         string value = "", exception = "";
         var thread = new Thread(() =>
         {
+            // Invocation and rendering (which enumerates lazy results) fail as different observation kinds.
+            object? returned;
             try
             {
-                var returned = method.Invoke(null, actual);
-                (kind, value) = ("return", method.ReturnType == typeof(void) ? "void" : InputGenerator.Render(returned));
+                returned = method.Invoke(null, actual);
             }
             catch (Exception ex)
             {
                 (kind, exception) = ("throw", ((ex as TargetInvocationException)?.InnerException ?? ex).GetType().FullName ?? "?");
+                return;
+            }
+            try
+            {
+                (kind, value) = ("return", method.ReturnType == typeof(void) ? "void" : InputGenerator.Render(returned));
+            }
+            catch (Exception ex)
+            {
+                (kind, exception) = ("throw-while-reading-result", ex.GetType().FullName ?? "?");
             }
         }, 16 * 1024 * 1024) { IsBackground = true, CurrentCulture = CultureInfo.InvariantCulture, CurrentUICulture = CultureInfo.InvariantCulture };
         Console.SetOut(stdout);
@@ -248,21 +246,18 @@ public static class PairDifferentialOracle
         }
     }
 
-    private static OracleVerdict Verdict(OraclePairInput pair, string disposition, string reason, string detail,
-        IReadOnlyList<string>? surface = null, int inputs = 0) =>
-        new(pair.PairId, disposition, reason, surface ?? [], inputs, null, [], detail);
+    private static OracleVerdict Verdict(OraclePairInput pair, string disposition, string reason, string detail, IReadOnlyList<string>? surface = null, int inputs = 0)
+        => new(pair.PairId, disposition, reason, surface ?? [], inputs, null, [], detail);
 
     internal static string Decode(byte[] bytes) => new UTF8Encoding(false).GetString(bytes).TrimStart('﻿');
 
     public static string Sha256Hex(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 }
 
-public sealed record OraclePairInput(
-    string PairId, string CalorPath, byte[] CalorBytes, string ExpectedCalorSha256,
+public sealed record OraclePairInput(string PairId, string CalorPath, byte[] CalorBytes, string ExpectedCalorSha256,
     string CSharpPath, byte[] CSharpBytes, string ExpectedCSharpSha256);
 
-public sealed record OracleVerdict(
-    string PairId, string Disposition, string Reason, IReadOnlyList<string> Surface, int InputCount,
+public sealed record OracleVerdict(string PairId, string Disposition, string Reason, IReadOnlyList<string> Surface, int InputCount,
     string? ObservationsSha256, IReadOnlyList<string> Witnesses, string Detail);
 
 internal sealed record ArmSurface(Dictionary<string, MethodInfo> Members, List<string> Ambiguous, List<string> Unsupported);
@@ -270,8 +265,6 @@ internal sealed record ArmSurface(Dictionary<string, MethodInfo> Members, List<s
 /// <summary>One observation; two are the same only when every field is equal, exception type included.</summary>
 internal sealed record Observation(string Kind, string Value, string Stdout, string ExceptionType, string ArgsAfter, string Files)
 {
-    public bool SameAs(Observation other) => Equals(other);
-
     public override string ToString() =>
-        $"{Kind}{(Kind == "throw" ? "(" + ExceptionType + ")" : "")} {Value} args={ArgsAfter} stdout={InputGenerator.Render(Stdout)} files=[{Files}]";
+        $"{Kind}{(Kind.StartsWith("throw", StringComparison.Ordinal) ? "(" + ExceptionType + ")" : "")} {Value} args={ArgsAfter} stdout={InputGenerator.Render(Stdout)} files=[{Files}]";
 }

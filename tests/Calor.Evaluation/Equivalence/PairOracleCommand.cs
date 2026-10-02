@@ -10,16 +10,16 @@ namespace Calor.Evaluation.Equivalence;
 
 /// <summary>
 /// <c>pair-oracle</c>: assigns #1276 dispositions. Each UNCLASSIFIED registered pair runs in its own
-/// child process, so a crash or hang in one arm cannot affect another pair; EXCLUDED-PRE-REGISTERED
-/// pairs are recorded without running. Before anything runs, both modes check that HEAD is the
-/// registration commit, the packet matches its seals, and the oracle sources match their pins. The
-/// second run (<c>--compare-with</c> the first) reconciles the runs and the known-witness control
-/// and exits nonzero unless the result is valid.
+/// child process; EXCLUDED-PRE-REGISTERED pairs are recorded without running. Both modes refuse
+/// (exit 2) unless the checkout is the clean registration commit with matching seals and pins. The
+/// first run exits 4 (not a result); the second (<c>--compare-with</c> the first) reconciles the
+/// runs and the known witness and exits 0 only when valid, otherwise 3.
 /// </summary>
 public static class PairOracleCommand
 {
     public const int PairProcessTimeoutMs = 300_000;
     public const string KnownWitness = "DomainProblems/CsvParser";
+    private static readonly string[] ProvenanceFields = ["oracleId", "oracleVersion", "inputGeneratorVersion", "registrationCommit", "pairsSha256", "environment"];
 
     public static Command Create()
     {
@@ -31,41 +31,41 @@ public static class PairOracleCommand
         var compareWith = new Option<string?>("--compare-with", "First run's results; makes this the reconciling second run");
         foreach (var option in new Option[] { registration, commit, output, pair, compareWith })
             command.AddOption(option);
-        command.SetHandler(async (reg, sha, outPath, pairId, first) =>
+        command.SetHandler(async context =>
         {
+            var (reg, sha, pairId) = (context.ParseResult.GetValueForOption(registration)!, context.ParseResult.GetValueForOption(commit)!, context.ParseResult.GetValueForOption(pair));
             var problem = Preflight(reg, sha);
             if (problem is not null)
                 Console.Error.WriteLine("pair-oracle refused: " + problem);
-            Environment.ExitCode = problem is not null ? 2
-                : pairId is null ? await RunAllAsync(reg, sha, outPath, first)
-                : RunOne(reg, pairId);
-        }, registration, commit, output, pair, compareWith);
+            context.ExitCode = problem is not null ? 2
+                : pairId is not null ? RunOne(reg, pairId)
+                : await RunAllAsync(reg, sha, context.ParseResult.GetValueForOption(output)!, context.ParseResult.GetValueForOption(compareWith));
+        });
         return command;
     }
 
     private static int RunOne(string registrationDir, string pairId)
     {
         var row = Pairs(registrationDir).Single(p => p?["pairId"]?.GetValue<string>() == pairId)!;
-        var root = RepoRoot(registrationDir);
-        string Rel(string field) => Path.Combine(root, row[field]!.GetValue<string>());
-        var verdict = PairDifferentialOracle.Evaluate(new OraclePairInput(
-            pairId,
-            row["calorPath"]!.GetValue<string>(), File.ReadAllBytes(Rel("calorPath")), row["calorSha256"]!.GetValue<string>(),
-            row["csharpPath"]!.GetValue<string>(), File.ReadAllBytes(Rel("csharpPath")), row["csharpSha256"]!.GetValue<string>()));
+        string Field(string name) => row[name]!.GetValue<string>();
+        byte[] Read(string field) => File.ReadAllBytes(Path.Combine(RepoRoot(registrationDir), Field(field)));
+        var verdict = PairDifferentialOracle.Evaluate(new OraclePairInput(pairId,
+            Field("calorPath"), Read("calorPath"), Field("calorSha256"), Field("csharpPath"), Read("csharpPath"), Field("csharpSha256")));
         Console.Out.Flush();
         Console.WriteLine("@@VERDICT " + JsonSerializer.Serialize(verdict));
         return 0;
     }
 
-    /// <summary>Null when the executing tree is the sealed, pinned registration at its merge commit.</summary>
+    /// <summary>Null when the checkout is the clean registration commit and every seal and pin matches.</summary>
     internal static string? Preflight(string registrationDir, string registrationCommit)
     {
         if (!Regex.IsMatch(registrationCommit, "^[0-9a-f]{40}$"))
             return "--registration-commit must be a full 40-hex SHA";
         var root = RepoRoot(registrationDir);
-        var head = Process.Start(new ProcessStartInfo("git", ["-C", root, "rev-parse", "HEAD"]) { RedirectStandardOutput = true })!;
-        if (head.StandardOutput.ReadToEnd().Trim() != registrationCommit)
+        if (Git(root, "rev-parse", "HEAD").Trim() != registrationCommit)
             return "HEAD is not the registration commit";
+        if (Git(root, "status", "--porcelain", "--untracked-files=no").Length > 0)
+            return "tracked files differ from the registration commit (compiler, oracle, or packet edited)";
         var seals = JsonNode.Parse(File.ReadAllText(Path.Combine(registrationDir, "sha256.json")))!["files"]!.AsObject();
         var registration = JsonNode.Parse(File.ReadAllText(Path.Combine(registrationDir, "registration.json")))!;
         var pins = seals.Select(f => (f.Key, f.Value!.GetValue<string>()))
@@ -80,17 +80,20 @@ public static class PairOracleCommand
     }
 
     /// <summary>
-    /// Second-run reconciliation: a pair whose verdict differs between the runs is UNCLASSIFIED
-    /// (NONDETERMINISTIC_ACROSS_RUNS); a missing second run or a known witness that is not
-    /// NOT-EQUIVALENT makes the whole result invalid.
+    /// Second-run reconciliation. The first run must have the same provenance and exactly the same
+    /// pair ids; a pair whose verdict differs is UNCLASSIFIED (NONDETERMINISTIC_ACROSS_RUNS); a
+    /// known witness that is not NOT-EQUIVALENT makes the result invalid.
     /// </summary>
-    internal static (JsonArray Results, List<string> Problems) Reconcile(JsonArray current, JsonArray? first)
+    internal static (JsonArray Results, List<string> Problems) Reconcile(JsonObject header, JsonArray current, JsonNode? first)
     {
         var problems = new List<string>();
-        var prior = first?.ToDictionary(r => r!["PairId"]!.GetValue<string>(), r => r!.ToJsonString());
-        if (prior is null)
+        var prior = first?["runResults"]?.AsArray().ToDictionary(r => r!["PairId"]!.GetValue<string>(), r => r!.ToJsonString());
+        if (first is null || prior is null)
             problems.Add("single run: dispositions need a second run with --compare-with");
-        else if (prior.Count != current.Count)
+        foreach (var field in ProvenanceFields.Where(f => first is not null && first[f]?.ToJsonString() != header[f]?.ToJsonString()))
+            problems.Add($"the first run's {field} differs; the runs are not of the same registration, oracle, and environment");
+        var ids = current.Select(r => r!["PairId"]!.GetValue<string>()).ToList();
+        if (prior is not null && !prior.Keys.Order(StringComparer.Ordinal).SequenceEqual(ids.Order(StringComparer.Ordinal)))
             problems.Add("the two runs cover different pairs");
         var results = new JsonArray();
         foreach (var row in current)
@@ -116,14 +119,12 @@ public static class PairOracleCommand
             {
                 "EXCLUDED-PRE-REGISTERED" => Node(new OracleVerdict(pairId, registered, "PRE_REGISTERED_EXCLUSION", [], 0, null, [], row["exclusionId"]?.GetValue<string>() ?? "")),
                 "UNCLASSIFIED" => await RunChildAsync(registrationDir, registrationCommit, pairId),
-                _ => throw new InvalidOperationException($"pair {pairId}: registration disposition '{registered}' is not runnable; dispositions are assigned only by this command"),
+                _ => throw new InvalidOperationException($"pair {pairId}: registration disposition '{registered}' is not runnable"),
             };
             Console.WriteLine($"{pairId}: {verdict["Disposition"]} ({verdict["Reason"]})");
             results.Add(verdict);
         }
 
-        var first = firstRunPath is null ? null : JsonNode.Parse(await File.ReadAllTextAsync(firstRunPath))!["runResults"]!.AsArray();
-        var (reconciled, problems) = Reconcile(results, first);
         var document = new JsonObject
         {
             ["oracleId"] = PairDifferentialOracle.OracleId,
@@ -132,13 +133,15 @@ public static class PairOracleCommand
             ["registrationCommit"] = registrationCommit,
             ["pairsSha256"] = PairDifferentialOracle.Sha256Hex(File.ReadAllBytes(Path.Combine(registrationDir, "pairs.json"))),
             ["environment"] = $"{RuntimeInformation.FrameworkDescription}; {RuntimeInformation.OSDescription}; {RuntimeInformation.ProcessArchitecture}; Roslyn {typeof(Microsoft.CodeAnalysis.Compilation).Assembly.GetName().Version}",
-            ["valid"] = problems.Count == 0,
-            ["problems"] = new JsonArray(problems.Select(p => (JsonNode?)p).ToArray()),
-            ["runResults"] = results,
-            ["results"] = reconciled,
         };
+        var first = firstRunPath is null ? null : JsonNode.Parse(await File.ReadAllTextAsync(firstRunPath));
+        var (reconciled, problems) = Reconcile(document, results, first);
+        document["valid"] = problems.Count == 0;
+        document["problems"] = new JsonArray(problems.Select(p => (JsonNode?)p).ToArray());
+        document["runResults"] = results;
+        document["results"] = reconciled;
         await File.WriteAllTextAsync(outputPath, document.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n");
-        return first is null || problems.Count == 0 ? 0 : 3;
+        return first is null ? 4 : problems.Count == 0 ? 0 : 3;
     }
 
     private static async Task<JsonNode> RunChildAsync(string registrationDir, string registrationCommit, string pairId)
@@ -149,7 +152,6 @@ public static class PairOracleCommand
             start.ArgumentList.Add(typeof(PairOracleCommand).Assembly.Location);
         foreach (var arg in new[] { "pair-oracle", "--registration", registrationDir, "--registration-commit", registrationCommit, "--pair", pairId })
             start.ArgumentList.Add(arg);
-
         using var process = Process.Start(start)!;
         var stdout = process.StandardOutput.ReadToEndAsync();
         _ = process.StandardError.ReadToEndAsync();
@@ -158,11 +160,18 @@ public static class PairOracleCommand
             process.Kill(entireProcessTree: true);
             return Node(new OracleVerdict(pairId, "UNCLASSIFIED", "TIMEOUT", [], 0, null, [], $"pair process exceeded {PairProcessTimeoutMs} ms"));
         }
-
         var line = (await stdout).Split('\n').LastOrDefault(l => l.StartsWith("@@VERDICT ", StringComparison.Ordinal));
         return process.ExitCode == 0 && line is not null
             ? JsonNode.Parse(line["@@VERDICT ".Length..])!
             : Node(new OracleVerdict(pairId, "UNCLASSIFIED", "ORACLE_CRASH", [], 0, null, [], $"pair process exit code {process.ExitCode}"));
+    }
+
+    private static string Git(string root, params string[] args)
+    {
+        using var process = Process.Start(new ProcessStartInfo("git", ["-C", root, .. args]) { RedirectStandardOutput = true })!;
+        var text = process.StandardOutput.ReadToEnd();
+        process.WaitForExit();
+        return process.ExitCode == 0 ? text : "<git failed>";
     }
 
     private static JsonNode Node(OracleVerdict verdict) => JsonSerializer.SerializeToNode(verdict)!;
@@ -170,7 +179,7 @@ public static class PairOracleCommand
     private static JsonArray Pairs(string registrationDir) =>
         JsonNode.Parse(File.ReadAllText(Path.Combine(registrationDir, "pairs.json")))!["pairs"]!.AsArray();
 
-    private static string RepoRoot(string start)
+    internal static string RepoRoot(string start)
     {
         var dir = Path.GetFullPath(start);
         while (!Directory.Exists(Path.Combine(dir, ".git")) && !File.Exists(Path.Combine(dir, ".git")))

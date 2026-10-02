@@ -42,35 +42,36 @@
   },
   "taskStatement": {
     "definition": "The task statement of a pair is the manifest.json entry that names it at the cutoff, rendered as 'key: value' lines (source, id, name, category, level, features, notes; or the scenario id, description, category, and the pair it is a variant of). taskStatementSha256 is the SHA-256 of that UTF-8 text.",
-    "limitation": "These are the only task statements that exist at the cutoff. Both arms of a pair are registered against the same statement, but it specifies no inputs, outputs, or failure behavior. The contract defines equivalence relationally (same inputs, same outputs, same failures) and requires an executed differential check as evidence, which the oracle provides. The oracle does not check either arm against the statement: two arms that are wrong in the same way are EQUIVALENT to each other, and no result may claim that a pair implements its statement."
+    "limitation": "These are the only task statements that exist at the cutoff. Both arms of a pair are registered against the same statement, but it specifies no inputs, outputs, or failure behavior. The contract defines equivalence relationally (same inputs, same outputs, same failures) and requires an executed differential check as evidence, which the oracle provides. The oracle does not check either arm against the statement: two arms that are wrong in the same way are EQUIVALENT to each other, and no result may claim that a pair implements its statement.",
+    "interpretation": "The contract's equivalenceDefinition says both sides 'implement the same task statement'. This registration reads that relationally: both arms are registered against one shared statement, and the executed differential check establishes that they compute the same observable function. It does not establish that either arm satisfies the statement, because the cutoff statements specify no outputs. If the maintainer reads the clause as requiring conformance to the statement, EQUIVALENT additionally needs per-pair task assertions registered by an amendment before the oracle runs (or a #1407 amendment); until then no pair may be reported as conforming to its statement."
   },
   "oracle": {
     "id": "b1-1276-pair-oracle",
     "version": "1",
     "command": "dotnet run --project tests/Calor.Evaluation -c Release -- pair-oracle --registration docs/plans/evidence/b1-1276/registration --registration-commit <full SHA of the main commit that merged this registration> --output run1.json; then the same command with --compare-with run1.json --output results.json",
     "runs": 2,
-    "runAgreement": "The second run (--compare-with the first) reconciles the two: a pair whose verdict differs between the runs is UNCLASSIFIED (NONDETERMINISTIC_ACROSS_RUNS). The second run's file keeps both its raw verdicts (runResults) and the reconciled ones (results), and exits nonzero unless valid. Both files are retained; there is no rerun-until-agreement.",
+    "runAgreement": "The first run exits 4: it is not a result. The second run (--compare-with the first) reconciles them. It is invalid unless the first run has the same oracleId, oracleVersion, inputGeneratorVersion, registrationCommit, pairsSha256, and environment and exactly the same pair ids. A pair whose verdict differs between the runs is UNCLASSIFIED (NONDETERMINISTIC_ACROSS_RUNS). The second file keeps its raw verdicts (runResults) and the reconciled ones (results) and exits 0 only when valid, otherwise 3. Both files are retained; there is no rerun-until-agreement.",
     "implementation": [
       {
         "path": "tests/Calor.Evaluation/Equivalence/PairDifferentialOracle.cs",
-        "sha256": "f399256c3515d15191053e845989541ba8dd1d817274ba31a3c4d1d35b9a964a"
+        "sha256": "d50ead4e5aba7a4d1709ad850eea32e5abccc2cacb3a9b3e0c7fa40630fa98e9"
       },
       {
         "path": "tests/Calor.Evaluation/Equivalence/InputGenerator.cs",
-        "sha256": "7f094e3c6e08034906b507fff003d7ee5bbd324aa8cacca12b156d170bd55da2"
+        "sha256": "d461e4b20bb254d75b60ad800a51908916d690ff2a9cd3012a4b519efce9b7bc"
       },
       {
         "path": "tests/Calor.Evaluation/Equivalence/PairOracleCommand.cs",
-        "sha256": "6c1c4c1fa97e218b289ed30a281722e4d459ec59382c42e57aeaacf838d283cb"
+        "sha256": "16745b2810d268e1dcc21ec8b861955cace982378d9d154cc9a4b84d513d35fb"
       }
     ],
     "isolation": "Each pair runs in its own child process (300,000 ms limit). A crash is UNCLASSIFIED (ORACLE_CRASH); exceeding the limit is UNCLASSIFIED (TIMEOUT).",
     "steps": [
       "1 identity: the SHA-256 of both files must equal the registered calorSha256 and csharpSha256; otherwise UNCLASSIFIED (IDENTITY_MISMATCH) and nothing runs.",
       "2 build: the Calor arm is compiled to C# by Calor.Compiler.Program.Compile with default CompilationOptions (the compiler's default contract mode). Then each arm's C# is compiled by the same Roslyn compilation: LanguageVersion.Latest, library output, Release, nullable enabled, deterministic, the Microsoft.NET.Sdk implicit global usings, and one reference set (the oracle process's trusted platform assemblies). An error in either arm is NOT-EQUIVALENT (BUILD_FAILED_CALOR, BUILD_FAILED_CSHARP, or BUILD_FAILED_BOTH).",
-      "3 surface: each arm's surface is the public static methods declared on its exported types, keyed by lower-cased name, exact parameter types, and exact return type, without the declaring type. A static Main() or Main(string[]) is one C# entry-point member keyed by its return type alone and run once, with an empty argument array where it takes one. Types the arm defines itself key as arm-defined. Every other public member (instance methods, fields, properties, events, constructors with parameters; accessors, parameterless constructors, and object overrides are not separate behavior) is unsupported. A duplicated key in one arm is NOT-EQUIVALENT (SURFACE_AMBIGUOUS); a key in only one arm is NOT-EQUIVALENT (SURFACE_MISMATCH); otherwise any unsupported member is UNCLASSIFIED (UNSUPPORTED_SURFACE); no key at all is UNCLASSIFIED (SURFACE_EMPTY); any key whose parameter or return type the input generator does not support is UNCLASSIFIED (UNSUPPORTED_TYPE).",
+      "3 surface: each arm's surface is the public static methods of its exported static classes, keyed by lower-cased name, exact parameter types, and exact return type, without the declaring type. A static Main() or Main(string[]) is one C# entry-point member keyed by its return type alone and run once, with an empty argument array where it takes one. Types the arm defines itself key as arm-defined. Any other exported type (class, struct, record, interface, enum, delegate: these can carry constructor, override, or inherited behavior) and any other public member of a static class (field, property, event) is unsupported; accessors and the type initializer are not separate members (a type initializer runs on the first call and its failure is observed). A duplicated key in one arm is NOT-EQUIVALENT (SURFACE_AMBIGUOUS); a key in only one arm is NOT-EQUIVALENT (SURFACE_MISMATCH); otherwise anything unsupported is UNCLASSIFIED (UNSUPPORTED_SURFACE); no key at all is UNCLASSIFIED (SURFACE_EMPTY); any key whose parameter or return type the input generator does not support is UNCLASSIFIED (UNSUPPORTED_TYPE).",
       "4 inputs: for every key, in ordinal key order, the registered input generator produces the input tuples (see inputs). Both arms receive the same tuples in the same order.",
-      "5 execution: each tuple is invoked twice per arm in the order Calor, C#, Calor, C#, each time with fresh copies of array and list arguments, stdout captured, stdin empty, a fresh empty working directory, invariant culture, a 16 MB thread stack, and a 2,000 ms limit. An observation is: return or throw, the canonical return value, the exception's full type name, stdout, the arguments after the call, and the name and SHA-256 of every file created in the working directory. Any invocation over the limit makes the pair UNCLASSIFIED (TIMEOUT). An arm whose two observations of one tuple differ makes the pair UNCLASSIFIED (NONDETERMINISTIC).",
+      "5 execution: each tuple is invoked twice per arm in the order Calor, C#, Calor, C#, each time with fresh copies of array and list arguments, stdout captured, stdin empty, a fresh empty working directory, invariant culture, a 16 MB thread stack, and a 2,000 ms limit. An observation is: return, throw (the call threw), or throw-while-reading-result (the call returned but enumerating or rendering the result threw), the canonical return value, the exception's full type name, stdout, the arguments after the call, and the name and SHA-256 of every file created in the working directory. Any invocation over the limit makes the pair UNCLASSIFIED (TIMEOUT). An arm whose two observations of one tuple differ makes the pair UNCLASSIFIED (NONDETERMINISTIC).",
       "6 decision: if any field of any tuple's Calor observation differs from its C# observation, NOT-EQUIVALENT (OBSERVATION_MISMATCH), with up to 5 witnesses. Otherwise EQUIVALENT (AGREE). Every result records the surface, the number of tuples, and observationsSha256, the SHA-256 of the full observation transcript."
     ],
     "inputs": {
@@ -117,7 +118,7 @@
       "Every tuple is invoked in the same interleaved order (Calor, C#, Calor, C#), and observations are compared only after all four are recorded."
     ],
     "controls": {
-      "synthetic": "tests/Calor.Evaluation/Tests/PairDifferentialOracleTests.cs: synthetic pairs written for the test, none of them registered. Positive controls must be EQUIVALENT; each negative control differs in one observable respect (one boundary output, return vs throw, exception type, stdout, argument mutation, a created file, a CsvParser-shaped surface, an unsupported property, a build error, changed bytes, nondeterminism, a hang) and must get its specific reason. The reconciliation step is tested on synthetic verdicts.",
+      "synthetic": "tests/Calor.Evaluation/Tests/PairDifferentialOracleTests.cs: synthetic pairs written for the test, none of them registered. Positive controls must be EQUIVALENT; each negative control differs in one observable respect (one boundary output, return vs throw, exception type, stdout, argument mutation, a created file, a CsvParser-shaped surface, an unsupported property, a non-static class, a result that fails only when enumerated, a build error, changed bytes, nondeterminism, a hang) and must get its specific reason. Reconciliation (provenance, pair-id set, cross-run changes, known witness) is tested on synthetic verdicts, and the preflight's commit checks on this checkout.",
       "knownWitness": {
         "pairId": "DomainProblems/CsvParser",
         "expectedDisposition": "NOT-EQUIVALENT",
@@ -126,11 +127,11 @@
       }
     },
     "limitations": [
-      "v1 drives static methods only. Pairs with any other public member, or with types the arm defines itself, are UNCLASSIFIED, not EQUIVALENT.",
+      "v1 drives static methods of static classes only. Pairs with any other exported type or public member, or with types the arm defines itself, are UNCLASSIFIED, not EQUIVALENT.",
       "Equivalence is checked on a finite input set and is not a proof.",
       "Effects other than return values, exceptions, stdout, argument state, and files created under the working directory (absolute paths, network, environment, static state between tuples) are not observed."
     ],
-    "preflight": "Before any pair runs, in both the parent and the per-pair child mode, the command refuses (exit 2) unless HEAD equals --registration-commit, every file in sha256.json matches its seal, and every oracle implementation file matches its pinned hash. The compiler and its default options are the ones at that commit. The output records the .NET runtime, OS, architecture, and Roslyn version."
+    "preflight": "Before any pair runs, in both the parent and the per-pair child mode, the command refuses (exit 2) unless HEAD equals --registration-commit, no tracked file differs from that commit (so the compiler, oracle, metrics, and packet are the committed ones), every file in sha256.json matches its seal, and every oracle implementation file matches its pinned hash. The output records the .NET runtime, OS, architecture, and Roslyn version."
   },
   "metrics": {
     "file": "metric-set.json",

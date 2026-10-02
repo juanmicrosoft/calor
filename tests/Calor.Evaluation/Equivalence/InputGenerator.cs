@@ -7,10 +7,8 @@ using System.Text;
 namespace Calor.Evaluation.Equivalence;
 
 /// <summary>
-/// The registered input generator (<c>b1-1276-signature-inputs-v1</c>). Inputs are a pure function
-/// of (pair id, member key, parameter types): boundary values, a capped cartesian product, and
-/// seeded random tuples. The member key is shared by both arms, so both arms receive the same
-/// inputs in the same order. No value depends on either arm's code or output.
+/// The registered input generator (<c>b1-1276-signature-inputs-v1</c>): a pure function of (pair id,
+/// member key, parameter types), so both arms get the same inputs and no value depends on either arm.
 /// </summary>
 public static class InputGenerator
 {
@@ -136,10 +134,8 @@ public static class InputGenerator
 
     private static object Make(Type collectionType, object?[] items)
     {
-        var e = ElementType(collectionType)!;
-        var array = Array.CreateInstance(e, items.Length);
-        for (var i = 0; i < items.Length; i++)
-            array.SetValue(items[i], i);
+        var (e, array) = (ElementType(collectionType)!, Array.CreateInstance(ElementType(collectionType)!, items.Length));
+        Array.Copy(items, array, items.Length);
         return collectionType.IsArray ? array : Activator.CreateInstance(typeof(List<>).MakeGenericType(e), array)!;
     }
 
