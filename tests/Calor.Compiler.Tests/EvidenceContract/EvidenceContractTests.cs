@@ -1097,6 +1097,7 @@ public class EvidenceContractTests
     [InlineData("website/content/cli/../benchmarking/results.mdx")]
     [InlineData("Website/content/cli/compile.mdx")]
     [InlineData("/website/content/cli/compile.mdx")]
+    [InlineData("website/content/cli/compile.mdx\n")]
     [InlineData("src/Calor.Compiler/Program.cs")]
     public void NonDocumentationPathFails(string path)
     {
@@ -1299,6 +1300,7 @@ public class EvidenceContractTests
     [InlineData("website/content/cli/**/*.mdx", "website/content/cli/page.mdx.bak", false)]
     [InlineData("website/public/data/**", "website/public/data/a/b.json", true)]
     [InlineData("website/content/changelog.mdx", "website/content/changelogXmdx", false)]
+    [InlineData("website/content/cli/**/*.mdx", "website/content/cli/compile.mdx\n", false)]
     public void DocsDeployGlobsMatchWholePaths(string glob, string path, bool matches)
         => Assert.Equal(matches, EvidenceContractValidator.GlobRegex(glob).IsMatch(path));
 
@@ -1340,13 +1342,27 @@ public class EvidenceContractTests
     public void PendingUpdateChangesNoArtifact()
     {
         // A pending update is recorded, not applied: the artifacts the validator reads are the ones
-        // committed, and evidence rows are judged against them.
+        // committed, and evidence rows are judged against them. The fixture would reclassify a stale
+        // artifact and resolve its defect; neither may take effect.
         var inventory = Inventory();
-        inventory["pendingUpdates"] = new JsonArray(PendingUpdate());
-        var before = Artifact(Inventory(), "ledger-provenance-index").ToJsonString();
-        Assert.Equal(before, Artifact(inventory, "ledger-provenance-index").ToJsonString());
+        var update = PendingUpdate();
+        update["artifact"] = "benchmark-provenance";
+        update["classificationAfter"] = "authoritative";
+        update["changes"] = new JsonObject { ["reason"] = "fixture: repaired" };
+        update["defectResolutions"]![0]!["defect"] = Artifact(inventory, "benchmark-provenance")["openDefects"]![0]!.DeepClone();
+        inventory["pendingUpdates"] = new JsonArray(update);
+        var before = Artifact(Inventory(), "benchmark-provenance").ToJsonString();
+
         var violations = EvidenceContractValidator.ValidateInventory(Contract(), inventory);
         Assert.True(violations.Count == 0, Describe(violations));
+        Assert.Equal(before, Artifact(inventory, "benchmark-provenance").ToJsonString());
+
+        var row = Row();
+        row["artifact"] = "benchmark-provenance";
+        row["openDefectsResolvedBy"] = new JsonArray(9003);
+        var rows = EvidenceContractValidator.ValidateEvidenceRows(
+            Contract(), inventory, new JsonArray(row), Candidate, SemanticsVersion);
+        AssertViolation(rows, "E005"); // still stale: the pending classification is not read
     }
 
     [Theory]

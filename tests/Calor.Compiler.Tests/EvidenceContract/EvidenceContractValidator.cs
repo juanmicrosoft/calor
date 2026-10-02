@@ -908,7 +908,7 @@ internal static class EvidenceContractValidator
     /// <summary>A case-sensitive glob: '**/' matches zero or more directories, '*' stays within one segment.</summary>
     internal static Regex GlobRegex(string glob)
     {
-        var pattern = new System.Text.StringBuilder("^");
+        var pattern = new System.Text.StringBuilder(@"\A");
         for (var i = 0; i < glob.Length; i++)
         {
             if (glob[i] == '*' && i + 1 < glob.Length && glob[i + 1] == '*')
@@ -929,7 +929,7 @@ internal static class EvidenceContractValidator
             else
                 pattern.Append(Regex.Escape(glob[i].ToString()));
         }
-        return new Regex(pattern.Append('$').ToString(), RegexOptions.CultureInvariant);
+        return new Regex(pattern.Append(@"\z").ToString(), RegexOptions.CultureInvariant);
     }
 
     // ------------------------------------------------------------------
