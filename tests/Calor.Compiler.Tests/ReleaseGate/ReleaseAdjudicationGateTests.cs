@@ -571,6 +571,24 @@ public class ReleaseAdjudicationGateTests
     }
 
     // ------------------------------------------------------------------
+    // Round 3 review controls: package README, JSON escapes combined with markup
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void IndependentClaimInThePackageReadmeFails()
+    {
+        using var repo = GateRepo.Build(readme: "# Calor\n\n0.24 evidence is independently verified.\n");
+        AssertCodes(repo, new[] { "G012" }, "--nuget-dir", repo.NugetDir);
+    }
+
+    [Fact]
+    public void JsonEscapedClaimSplitByMarkupFails()
+    {
+        using var repo = GateRepo.Build(benchmark: "{\"description\":\"\\u0049ndependently <b>verified</b> evidence\"}\n");
+        AssertCodes(repo, new[] { "G012" }, "--benchmark-worktree");
+    }
+
+    // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 

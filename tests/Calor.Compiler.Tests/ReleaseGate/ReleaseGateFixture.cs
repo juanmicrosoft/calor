@@ -39,6 +39,7 @@ internal sealed class GateRepo : IDisposable
         string website = "<p>Calor 0.24.0</p>",
         string description = "Calor compiler",
         string? freezeManifest = null,
+        string? readme = null,
         string benchmark = "{\"overallAdvantage\":1.0}\n")
     {
         var baseDir = Path.Combine(Path.GetTempPath(), "calor-r2-" + Guid.NewGuid().ToString("N")[..12]);
@@ -91,7 +92,7 @@ internal sealed class GateRepo : IDisposable
 
         var notesText = notes ?? $"## [{ReleaseVersion}] - 2026-11-01\n\nEvidence is {Limitation}.\n";
         File.WriteAllText(repo.NotesPath, notesText);
-        WritePackage(Path.Combine(repo.NugetDir, $"Calor.{ReleaseVersion}.nupkg"), "Calor", description);
+        WritePackage(Path.Combine(repo.NugetDir, $"Calor.{ReleaseVersion}.nupkg"), "Calor", description, readme: readme);
         WritePackage(Path.Combine(repo.NugetDir, $"Calor.Sdk.{ReleaseVersion}.nupkg"), "Calor.Sdk", description);
         File.WriteAllText(Path.Combine(repo.MetadataDir, "sbom.json"), "{\"sbom\":true}\n");
         File.WriteAllText(Path.Combine(repo.WebsiteDir, "index.html"), website);
@@ -232,13 +233,16 @@ internal sealed class GateRepo : IDisposable
     }
 
     /// <summary>A minimal .nupkg: a zip with a nuspec carrying the package description.</summary>
-    public static void WritePackage(string path, string id, string description, bool signed = false)
+    public static void WritePackage(string path, string id, string description, bool signed = false, string? readme = null)
     {
         using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
         using (var writer = new StreamWriter(archive.CreateEntry($"{id}.nuspec").Open()))
             writer.Write($"<package><metadata><id>{id}</id><description>{description}</description></metadata></package>");
         using (var writer = new StreamWriter(archive.CreateEntry("lib/net10.0/_._").Open()))
             writer.Write(id);
+        if (readme is not null)
+            using (var writer = new StreamWriter(archive.CreateEntry("README.md").Open()))
+                writer.Write(readme);
         if (signed)
             using (var writer = new StreamWriter(archive.CreateEntry(".signature.p7s").Open()))
                 writer.Write("repository signature");

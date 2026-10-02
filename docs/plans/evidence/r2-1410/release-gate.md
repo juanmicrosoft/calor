@@ -90,10 +90,10 @@ Identity-level controls that apply to every surface: `MissingOrMalformedIdentity
 
 **Wording.** No surface may call 0.24 evidence "independently adjudicated" or "independently
 verified" (§9). The gate scans release notes, the release body, website text files, and changed
-benchmark text files, and package `.nuspec` descriptions for `independently adjudicated|verified`
+benchmark text files, and every text entry of each package (`.nuspec`, the README nuget.org renders) for `independently adjudicated|verified`
 and `independent adjudication|verification`. Each text is scanned as written, with HTML entities
 decoded, with markup replaced by a space and removed outright, and with Markdown emphasis removed.
-JSON files are also scanned as their decoded string values. A phrase is allowed only directly after
+JSON files are also scanned as their decoded string values, through the same decoding and markup removal. A phrase is allowed only directly after
 `not`, `no`, or `without`, as in the required limitation, and only when that negation is literal in
 the source: a negation that appears only after markup is removed (for example a hidden `not `) fails.
 

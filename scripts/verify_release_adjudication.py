@@ -127,33 +127,40 @@ def json_strings(value: object) -> list[str]:
     return []
 
 
-def renderings(label: str, text: str) -> list[str]:
-    """The text as written, with entities decoded, and with markup removed two ways."""
-    decoded = html.unescape(text)
-    variants = [text, decoded]
+def sources(label: str, text: str) -> list[str]:
+    """The text as written and, for JSON, its decoded string values."""
+    found = [text]
     if label.endswith(".json"):
         try:
-            variants.append("\n".join(json_strings(json.loads(text))))
+            found.append("\n".join(json_strings(json.loads(text))))
         except ValueError:
             pass
-    if label.endswith((".html", ".htm", ".xml", ".nuspec", ".rss")) or "<" in decoded:
+    return found
+
+
+def renderings(source: str) -> list[str]:
+    """One source as written, entity-decoded, with markup replaced by a space and removed, and
+    with Markdown emphasis removed from each of those."""
+    decoded = html.unescape(source)
+    variants = [source, decoded]
+    if "<" in decoded:
         variants.append(re.sub(r"<[^>]+>", " ", decoded))
         variants.append(re.sub(r"<[^>]+>", "", decoded))
-    variants.append(re.sub(r"[*_`~]", "", variants[-1]))
-    return variants
+    return variants + [re.sub(r"[*_`~]", "", v) for v in variants]
 
 
 def scan_text(gate: Gate, label: str, text: str) -> None:
     # A negation counts only where it is literal in the source. If removing markup produces a
     # negated phrase the source does not literally contain (for example a hidden "not "), the
     # negation came from markup and the rendered page still makes the claim.
-    _, literal_negations = forbidden_wording(html.unescape(text))
     hits: set[str] = set()
-    for variant in renderings(label, text):
-        found, negated = forbidden_wording(variant)
-        hits.update(found)
-        if negated > literal_negations:
-            hits.add("negation supplied by markup")
+    for source in sources(label, text):
+        _, literal_negations = forbidden_wording(html.unescape(source))
+        for variant in renderings(source):
+            found, negated = forbidden_wording(variant)
+            hits.update(found)
+            if negated > literal_negations:
+                hits.add("negation supplied by markup")
     for hit in sorted(hits):
         gate.fail("G012", f"{label}: forbidden wording '{hit}'; 0.24 evidence is not independently adjudicated")
 
@@ -420,8 +427,9 @@ def check_surfaces(gate: Gate, identity: str, record: dict, args: argparse.Names
         check_files(gate, "nuget-packages", surface(record, "nuget-packages").get("files"), packages)
         for name, path in sorted(local.items()):
             with zipfile.ZipFile(path) as archive:
+                # The nuspec and every text entry, including the README nuget.org renders.
                 for entry in archive.namelist():
-                    if entry.endswith(".nuspec"):
+                    if entry.endswith(".nuspec") or Path(entry).suffix.lower() in TEXT_SUFFIXES:
                         scan_text(gate, f"{name}/{entry}", archive.read(entry).decode("utf-8", "replace"))
         if args.registry_dir:
             # nuget.org adds a repository signature, so an existing version is compared entry by
