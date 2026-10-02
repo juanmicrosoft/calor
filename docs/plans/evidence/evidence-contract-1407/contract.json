@@ -8,9 +8,6 @@
   "statusNote": "Proposed in the R0 pull request. The contract is frozen at the commit that merges it to main. Capacity ceilings are PROPOSED until the maintainer accepts them by merging; the R0 gate is NOT MET before that merge.",
   "gateStatus": "MET",
   "acceptance": { "mergeCommit": "669e535c8a9dac967a73c70b28f9f2d0bcf84c80", "mergedAtUtc": "2026-10-02T13:10:12Z", "pr": 1466 },
-  "amendmentLog": [
-    { "version": "1.0.1", "justification": "acceptance write-back", "reviewedInPr": 0, "timestampUtc": "2026-10-02T13:10:12Z", "afterDecisionBearingInspection": false }
-  ],
   "lifecycle": {
     "states": ["PROPOSED", "FROZEN"],
     "proposed": "status PROPOSED, gateStatus NOT-MET, capacity and every ceiling PROPOSED, no acceptance record. This is the state committed in the R0 pull request and in the merge commit that freezes it.",
@@ -385,5 +382,7 @@
     }
   ],
 
-  "amendmentLog": []
+  "amendmentLog": [
+    { "version": "1.0.1", "justification": "acceptance write-back", "reviewedInPr": 1470, "timestampUtc": "2026-10-02T13:10:12Z", "afterDecisionBearingInspection": false }
+  ]
 }
