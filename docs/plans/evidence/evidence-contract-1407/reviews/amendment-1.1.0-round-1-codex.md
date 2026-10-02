@@ -21,4 +21,5 @@ open a release bypass, launder anything, or retroactively change a frozen rule a
 Also in this round, at the maintainer's direction (same session): **decision 6**, the per-PR ceiling
 exception for B1 PR #1473 (1,520 lines, `capacity.exceptions`), with `C011` shape checks and controls.
 
-Test count after round 1: EvidenceContractTests 166 → 256 (+90).
+Test count after round 1: EvidenceContractTests 166 → 256 (+90). Round 2 replaced the two-phase
+record of #2 with a single record committed before publication (see round 2).

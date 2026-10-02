@@ -269,20 +269,19 @@
       ],
       "pathRule": "A changed path (added, modified, deleted, or either side of a rename, from git diff --no-renames --name-only <base> <deployed> -- <buildInputs>) is documentation-only when it matches an allowedPaths pattern, matches no deniedPaths pattern, is not a path of any inventory artifact, and contains no '..' segment. Patterns are case-sensitive globs: '**/' matches zero or more directories and '*' matches within one path segment. Everything else under buildInputs (website/src/**, website/public/**, package files, configuration, tests) is not documentation-only.",
       "fileRule": "Every added or modified changed path is a regular, non-executable file at the deployed commit (git mode 100644); a symlink, submodule, or executable file refuses.",
-      "mdxRule": "MDX is compiled, so a changed page may only carry documentation. In its added or modified lines, outside fenced code blocks and inline code spans, a changed .mdx file contains no import or export statement, no JavaScript expression in braces, and no JSX element other than the components registered in website/src/components/mdx at the base commit and plain HTML elements other than script, iframe, object, embed, style, and link.",
+      "mdxRule": "MDX is compiled, so a changed page may only carry documentation. Each changed .mdx file is parsed in full as it stands at the deployed commit (not only its added lines, so deleting a code fence cannot activate unchanged text). Outside fenced code blocks and inline code spans it contains no import or export statement, no JavaScript expression in braces, and no JSX element other than the components registered in website/src/components/mdx at the base commit and plain HTML elements other than script, iframe, object, embed, style, and link.",
       "base": {
-        "rule": "The diff base is the source commit of the most recent website deployment, which must be one of: the last deployment before this contract (preContractDeploy), a documentation-only deployment whose audit record is committed on protected main with status deployed, or a deployment that consumed an adjudication identity through the #1410 gate (none can precede a documentation-only deploy inside the window under this amendment; the kind is listed so the base rule is total). If GitHub reports a successful github-pages deployment newer than the base that has neither a committed deployed audit record nor an adjudication identity, the classifier refuses.",
+        "rule": "The diff base is the source commit of the most recent website deployment, which must be one of: the last deployment before this contract (preContractDeploy), a documentation-only deployment whose audit record is committed on protected main, or a deployment that consumed an adjudication identity through the #1410 gate (none can precede a documentation-only deploy inside the window under this amendment; the kind is listed so the base rule is total). If GitHub reports a successful github-pages deployment newer than the base that has neither a committed audit record nor an adjudication identity, the classifier refuses.",
         "preContractDeploy": { "runId": 34999741475, "commit": "72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1", "event": "release (v0.22.0)" }
       },
       "auditRecord": {
         "schema": "calor.docs-only-deploy-audit/1",
-        "location": "docs/plans/evidence/r2-1410/docs-deploys/<deployedCommit>.json on protected main, in two reviewed phases. Authorization: before dispatch, a reviewed PR commits the record with status 'authorized' and every field except runId; the deploying run refuses unless that record is on protected main and its deployedCommit, base, changedPaths, and machineryChanges equal the run's own recomputation. Completion: after the run, a reviewed PR sets status 'deployed' and runId and changes nothing else. An authorized record without completion cannot serve as a base, so the next documentation-only deploy refuses until the completion merges. The run's Actions-artifact copy is not durable and is not the record.",
+        "location": "docs/plans/evidence/r2-1410/docs-deploys/<runId>.json on protected main, committed by a reviewed PR before anything is published. The run's build job computes the record (including its own run id) and uploads it as a draft; the maintainer commits it through a reviewed PR; the deploy job, which waits for that (for example through a required-reviewer environment), refuses unless the record for its own run id is on protected main and every field equals the run's recomputation and the built artifact. A deployment therefore never exists without its committed record. The Actions-artifact draft is not durable and is not the record.",
         "fields": [
           "schema: calor.docs-only-deploy-audit/1",
-          "status: authorized | deployed",
           "contractVersion: a contractVersion recorded in the amendment log, 1.1.0 or later, in force at the deploy",
           "workflow: .github/workflows/nextjs-gh-pages.yml",
-          "runId: the deploying run id (positive integer); present only when status is deployed",
+          "runId: the deploying run id (positive integer), known to the build job and committed before the deploy job publishes",
           "deployedCommit: full SHA on protected main that is built and deployed",
           "baseKind: pre-contract-deploy | audited-docs-deploy | adjudicated-deploy",
           "baseCommit: full SHA (the preContractDeploy commit for pre-contract-deploy)",
@@ -304,13 +303,13 @@
       "verifierChecks": [
         "The run is a workflow_dispatch from refs/heads/main; the deployed commit is a full SHA that is an ancestor of fetched refs/remotes/origin/main (provenanceIdentity commitRule), and the clone is not shallow.",
         "No #1408 terminal record with outcome MILESTONE-SUCCEEDED exists on protected main.",
-        "An authorized audit record for the deployed commit is on protected main and matches the run's recomputation.",
-        "The base satisfies base.rule; a successful github-pages deployment newer than the base without a committed deployed audit record or adjudication identity refuses.",
+        "Before deploy-pages runs, the audit record for this run id is on protected main and every field matches the run's recomputation; otherwise the deploy job refuses.",
+        "The base satisfies base.rule; a successful github-pages deployment newer than the base without a committed audit record or adjudication identity refuses.",
         "Every path in git diff --no-renames --name-only <base> <deployed> -- website/ satisfies pathRule, fileRule, and mdxRule; any other path refuses.",
         "Every machinery path changed since the base is listed in machineryChanges with a merged, maintainer-reviewed PR; the build reads nothing outside buildInputs and the enumerated machinery.",
         "Every changed path passes wordingRule, and the built site passes the #1410 wording scan.",
         "The run has no step that pushes a package, creates or edits a release or tag, uploads a release asset, opens a publication PR, or commits to main.",
-        "The deployed Pages artifact is the one built from deployedCommit, and the completion record passes ValidateDocsDeployAudit.",
+        "The deployed Pages artifact is the one built from deployedCommit, and the committed record passes ValidateDocsDeployAudit.",
         "Negative tests for each check above are part of #1410's closure evidence."
       ]
     },
@@ -355,7 +354,7 @@
         "Zero unresolved false unconditional proofs: every one is fixed or visibly demoted under #1413.",
         "Every #1413 finding has a findingDisposition other than NOT-INVESTIGATED or MILESTONE-FAILED.",
         "Every authoritative and derived inventory artifact was regenerated by #1424 on the frozen #1423 candidate, with no stale input.",
-        "Every release surface in releasePath consumes one matching adjudication identity (#1410 negative tests pass). The only path that publishes without one is releasePath.documentationOnlyDeploy, inside its window, and its negative tests are part of #1410's.",
+        "Every release surface in releasePath consumes one matching adjudication identity (#1410 negative tests pass). The only path that publishes without one is releasePath.documentationOnlyDeploy, inside its window, and its negative tests are part of #1410's (amendment 1.1.0).",
         "Every adjudication row records independence = reduced-maintainer-adjudicated and no row is SUPPORTED while the deviation stands (validator T002).",
         "No capacity ceiling was exceeded without a merged amendment raising it."
       ],
@@ -421,7 +420,7 @@
     { "issue": 1413, "gate": "S2", "dependsOn": [1311], "consumes": ["outcome-vocabulary", "failure-amendment-stopping", "authority-capacity"], "closureEvidence": "One reviewed disposition per row and witness from findingDispositions; accepted repairs within s2 ceilings attached to #1409 and blocking #1423; no unresolved false unconditional proof keeps guard-removal or claim eligibility." },
     { "issue": 1420, "gate": "G1", "dependsOn": [1407], "consumes": ["artifact-inventory", "retrospective"], "closureEvidence": "Consumer and RID inventory; no unowned Z3 seeding workaround; no implicit network download; discriminating fresh-checkout tests for absent, wrong, and propagated assets." },
     { "issue": 1421, "gate": "G2", "dependsOn": [1407, 1420], "consumes": ["outcome-vocabulary", "authority-capacity", "failure-amendment-stopping"], "closureEvidence": "Merged machine-readable determinism protocol (case IDs, environment pins, run count, timeouts, retry and failure rules) within the determinism-compute ceiling, before decision-bearing runs. The protocol treats platform as a determinism dimension and registers every determinismRows entry (amendment 1.1.0)." },
-    { "issue": 1135, "gate": "G3", "dependsOn": [1420, 1421], "consumes": ["outcome-vocabulary", "artifact-inventory"], "closureEvidence": "Repaired oracle executed under the #1421 protocol with every attempt retained and agreement under the frozen failure rule, on every platform the protocol registers; every determinismRows entry is resolved under rules.platformDeterminism (amendment 1.1.0)." },
+    { "issue": 1135, "gate": "G3", "dependsOn": [1420, 1421], "consumes": ["outcome-vocabulary", "artifact-inventory"], "closureEvidence": "Repaired oracle executed under the #1421 protocol with every attempt retained and agreement under the frozen failure rule. It runs on every platform the protocol registers, and every determinismRows entry is resolved under rules.platformDeterminism (amendment 1.1.0)." },
     { "issue": 1241, "gate": "G4", "dependsOn": [1407, 1420], "consumes": ["artifact-inventory", "outcome-vocabulary"], "closureEvidence": "Checkout-pinned Tier 2 run with explicit positive/negative/multifile expectations, no build-output duplicates, no empty advertised selections, AST-roundtrip claims matching the work performed, and negative self-tests." },
     { "issue": 1417, "gate": "P1", "dependsOn": [1407], "consumes": ["provenance-identity", "artifact-inventory", "retrospective"], "closureEvidence": "Fresh-clone resolution of every authoritative identity after squash merge; failing tests for branch-only replacement, false identical-tree claims, and shallow-clone skips; historical stamps unchanged." },
     { "issue": 1276, "gate": "B1", "dependsOn": [1407], "consumes": ["benchmark-equivalence", "artifact-inventory", "retrospective"], "closureEvidence": "A benchmark registration per benchmarkEquivalence.registrationRule merged before any repair, differential check, or recomputation; then a content-addressed pair manifest with every benchmarkEquivalence pair field and a disposition produced by the registered oracle for every registered pair, the declared sampling unit and population, and historical artifacts left historical." },

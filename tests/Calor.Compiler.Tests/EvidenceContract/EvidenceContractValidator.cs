@@ -124,23 +124,20 @@ internal static class EvidenceContractValidator
         var amendmentVersions = Array(contract["amendmentLog"]).Select(a => Str(a?["version"])).OfType<string>().ToHashSet(StringComparer.Ordinal);
         foreach (var exception in Array(capacity?["exceptions"]))
         {
-            // A per-PR raise (stopping rule 1): a known ceiling, one PR, a value above the ceiling,
-            // a justification, and the amendment that recorded it.
+            // A per-PR raise (stopping rule 1) is valid only exactly as an amendment registered it,
+            // in an amendment that is in the log: a different PR, value, or ceiling needs a new
+            // amendment and a validator change, which review sees.
             var ceilingId = Str(exception?["ceiling"]);
-            var subject = $"exception {ceilingId ?? "?"} #{Int(exception?["pr"])?.ToString(CultureInfo.InvariantCulture) ?? "?"}";
-            var ceiling = ceilings.FirstOrDefault(c => Str(c?["id"]) == ceilingId);
-            double? limit = ceiling?["value"] is JsonValue lv && lv.TryGetValue<double>(out var l) ? l : null;
+            var pr = Int(exception?["pr"]);
+            var subject = $"exception {ceilingId ?? "?"} #{pr?.ToString(CultureInfo.InvariantCulture) ?? "?"}";
             double? raised = exception?["value"] is JsonValue rv && rv.TryGetValue<double>(out var r) ? r : null;
-            if (ceiling is null)
-                v.Add(new("C011", subject, $"exception names unknown ceiling '{ceilingId}'"));
-            if (Int(exception?["pr"]) is not > 0)
-                v.Add(new("C011", subject, "exception must name the one PR it applies to"));
-            if (raised is null || limit is null || raised <= limit)
-                v.Add(new("C011", subject, "exception value must be numeric and above the ceiling it raises"));
+            var recordedIn = Str(exception?["amendment"]);
+            var registered = RegisteredCeilingExceptions.Any(e =>
+                e.Ceiling == ceilingId && e.Pr == pr && e.Value == raised && e.Amendment == recordedIn);
+            if (!registered || recordedIn is null || !amendmentVersions.Contains(recordedIn))
+                v.Add(new("C011", subject, "ceiling exception is not one registered by a logged amendment (1.1.0: pr-size, #1473, 1520)"));
             if (string.IsNullOrWhiteSpace(Str(exception?["justification"])))
                 v.Add(new("C011", subject, "exception needs a justification"));
-            if (Str(exception?["amendment"]) is not { } recordedIn || !amendmentVersions.Contains(recordedIn))
-                v.Add(new("C011", subject, "exception must name the amendment that recorded it"));
         }
         var anyProposed = Str(capacity?["status"]) == "PROPOSED"
             || ceilings.Any(c => Str(c?["status"]) == "PROPOSED");
@@ -205,6 +202,12 @@ internal static class EvidenceContractValidator
         if (Str(rule["auditRecord"]?["attestationStatement"]) != RegisteredDocsAttestation)
             yield return new("C013", "documentationOnlyDeploy", "the attestation statement is the one registered by amendment 1.1.0");
     }
+
+    /// <summary>Per-PR ceiling raises registered by amendments (stopping rule 1).</summary>
+    private static readonly (string Ceiling, int Pr, double Value, string Amendment)[] RegisteredCeilingExceptions =
+    [
+        ("pr-size", 1473, 1520, "1.1.0"),
+    ];
 
     private static readonly HashSet<string> RegisteredDocsAllowedPaths = new(StringComparer.Ordinal)
     {
@@ -797,17 +800,12 @@ internal static class EvidenceContractValidator
         }
         var subject = $"deploy of {Str(record["deployedCommit"]) ?? "?"}";
 
-        // D001: identity of the record and the run. An authorized record (committed before the
-        // dispatch) has no run yet; a deployed record (the completion) names it.
+        // D001: identity of the record and the run. The record is committed before the deploy job
+        // publishes, and it names the run that will publish.
         if (Str(record["schema"]) != Str(rule["auditRecord"]?["schema"]))
             v.Add(new("D001", subject, $"schema must be '{Str(rule["auditRecord"]?["schema"])}'"));
-        var status = Str(record["status"]);
-        if (status is not ("authorized" or "deployed"))
-            v.Add(new("D001", subject, $"status '{status}' is not 'authorized' or 'deployed'"));
-        else if (status == "deployed" && Long(record["runId"]) is not > 0)
-            v.Add(new("D001", subject, "a deployed record names the deploying run id"));
-        else if (status == "authorized" && record["runId"] is not null)
-            v.Add(new("D001", subject, "an authorization is committed before the run and names no run id"));
+        if (Long(record["runId"]) is not > 0)
+            v.Add(new("D001", subject, "runId must be the deploying run id"));
         if (Str(record["workflow"]) != ".github/workflows/nextjs-gh-pages.yml")
             v.Add(new("D001", subject, "workflow must be .github/workflows/nextjs-gh-pages.yml"));
         // The record's contract version must be one the log actually records, at or after the
@@ -839,8 +837,6 @@ internal static class EvidenceContractValidator
                 v.Add(new("D002", subject, "a pre-contract-deploy base must be the contract's recorded pre-contract deployment"));
         }
         if (Long(record["baseRunId"]) is { } baseRun && baseRun == Long(record["runId"]))
-            v.Add(new("D002", subject, "a deploy cannot be its own base"));
-        if (baseKind == "audited-docs-deploy" && Str(record["baseCommit"]) == Str(record["deployedCommit"]))
             v.Add(new("D002", subject, "a deploy cannot be its own base"));
 
         // D003: every changed path is documentation-only, re-classified here.

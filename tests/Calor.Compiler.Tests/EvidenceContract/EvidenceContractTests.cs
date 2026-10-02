@@ -982,6 +982,10 @@ public class EvidenceContractTests
         var violations = EvidenceContractValidator.ValidateContract(contract)
             .Concat(EvidenceContractValidator.ValidateInventory(contract, ProposedInventory())).ToList();
         Assert.True(violations.Count == 0, Describe(violations));
+        // The proposed fixture carries nothing a later amendment added.
+        var text = contract.ToJsonString();
+        foreach (var added in new[] { "1.1.0", "documentationOnlyDeploy", "taskStatementRule", "determinismRows", "platformDeterminism", "evidenceDataRule" })
+            Assert.DoesNotContain(added, text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1188,9 +1192,7 @@ public class EvidenceContractTests
     [InlineData("contract-before-amendment")]
     [InlineData("workflow")]
     [InlineData("run-id")]
-    [InlineData("deployed-without-run")]
-    [InlineData("authorized-with-run")]
-    [InlineData("unknown-status")]
+    [InlineData("no-run-id")]
     [InlineData("unlogged-future-version")]
     public void DocsDeployAuditWithWrongIdentityFails(string mutation)
     {
@@ -1201,9 +1203,7 @@ public class EvidenceContractTests
             case "contract-before-amendment": record["contractVersion"] = "1.0.1"; break;
             case "workflow": record["workflow"] = ".github/workflows/benchmark.yml"; break;
             case "run-id": record["runId"] = "37000000002"; break;
-            case "deployed-without-run": record.Remove("runId"); break;
-            case "authorized-with-run": record["status"] = "authorized"; break;
-            case "unknown-status": record["status"] = "pending"; break;
+            case "no-run-id": record.Remove("runId"); break;
             case "unlogged-future-version": record["contractVersion"] = "9.9.9"; break;
         }
         AssertViolation(EvidenceContractValidator.ValidateDocsDeployAudit(Contract(), Inventory(), record), "D001");
@@ -1262,17 +1262,6 @@ public class EvidenceContractTests
     }
 
     [Fact]
-    public void AuthorizedDocsDeployRecordPasses()
-    {
-        // Phase 1: committed before the dispatch, so it has no run id yet.
-        var record = DocsDeployAudit();
-        record["status"] = "authorized";
-        record.Remove("runId");
-        var violations = EvidenceContractValidator.ValidateDocsDeployAudit(Contract(), Inventory(), record);
-        Assert.True(violations.Count == 0, Describe(violations));
-    }
-
-    [Fact]
     public void InventoriedPathIsRefusedEvenWhenTheAllowlistMatches()
     {
         // Isolates the inventory-path exclusion: the path is allowed and not denied, so only its
@@ -1303,33 +1292,6 @@ public class EvidenceContractTests
     // ------------------------------------------------------------------
 
     [Theory]
-    [InlineData("unknown-ceiling")]
-    [InlineData("not-a-raise")]
-    [InlineData("no-pr")]
-    [InlineData("no-justification")]
-    [InlineData("unlogged-amendment")]
-    public void MalformedCeilingExceptionFails(string mutation)
-    {
-        var contract = Contract();
-        var exception = new JsonObject
-        {
-            ["ceiling"] = "pr-size", ["pr"] = 9004, ["value"] = 1600.0,
-            ["amendment"] = contract["contractVersion"]!.DeepClone(), ["justification"] = "fixture",
-        };
-        contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray().Add(exception);
-        Assert.True(EvidenceContractValidator.ValidateContract(contract).Count == 0, "the well-formed fixture must pass");
-        switch (mutation)
-        {
-            case "unknown-ceiling": exception["ceiling"] = "pr-lines"; break;
-            case "not-a-raise": exception["value"] = 1500.0; break;
-            case "no-pr": exception.Remove("pr"); break;
-            case "no-justification": exception["justification"] = " "; break;
-            case "unlogged-amendment": exception["amendment"] = "1.0.9"; break;
-        }
-        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C011");
-    }
-
-    [Theory]
     [InlineData("website/content/cli/**/*.mdx", "website/content/cli/compile.mdx", true)]
     [InlineData("website/content/cli/**/*.mdx", "website/content/cli/nested/page.mdx", true)]
     [InlineData("website/content/cli/**/*.mdx", "website/content/cli.mdx", false)]
@@ -1339,6 +1301,36 @@ public class EvidenceContractTests
     [InlineData("website/content/changelog.mdx", "website/content/changelogXmdx", false)]
     public void DocsDeployGlobsMatchWholePaths(string glob, string path, bool matches)
         => Assert.Equal(matches, EvidenceContractValidator.GlobRegex(glob).IsMatch(path));
+
+    [Theory]
+    [InlineData("other-value")]
+    [InlineData("other-pr")]
+    [InlineData("other-ceiling")]
+    [InlineData("unlogged-amendment")]
+    [InlineData("no-justification")]
+    [InlineData("added-exception")]
+    public void CeilingExceptionOtherThanTheRegisteredOneFails(string mutation)
+    {
+        // Decision 6 raises one ceiling for one PR to one value; nothing else passes without a new
+        // amendment and a validator change.
+        var contract = Contract();
+        var exceptions = contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray();
+        var exception = exceptions.First(e => e!["pr"]!.GetValue<int>() == 1473)!;
+        switch (mutation)
+        {
+            case "other-value": exception["value"] = 2000.0; break;
+            case "other-pr": exception["pr"] = 1474; break;
+            case "other-ceiling": exception["ceiling"] = "s2-repair-size"; break;
+            case "unlogged-amendment": exception["amendment"] = "1.0.9"; break;
+            case "no-justification": exception["justification"] = " "; break;
+            case "added-exception":
+                var added = exception.DeepClone();
+                added["pr"] = 9004;
+                exceptions.Add(added);
+                break;
+        }
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C011");
+    }
 
     // ------------------------------------------------------------------
     // Amendment 1.1.0: pending inventory updates (I013)
@@ -1480,6 +1472,9 @@ public class EvidenceContractTests
     private static JsonNode ProposedContract()
     {
         var contract = Contract();
+        // Sentences that amendment 1.1.0 appended to frozen text are marked "(amendment 1.1.0)" or
+        // "amendment 1.1.0)"; strip them so the fixture is the original text, not a hybrid.
+        RevertAmendedSentences(contract, "amendment 1.1.0");
         contract.AsObject().Remove("acceptance");
         contract["amendmentLog"]!.AsArray().Clear();
         contract["contractVersion"] = "1.0.0";
@@ -1496,6 +1491,33 @@ public class EvidenceContractTests
         foreach (var ceiling in contract["authorityCapacity"]!["capacity"]!["ceilings"]!.AsArray())
             ceiling!["status"] = "PROPOSED";
         return contract;
+    }
+
+    private static void RevertAmendedSentences(JsonNode node, string marker)
+    {
+        switch (node)
+        {
+            case JsonObject obj:
+                foreach (var key in obj.Select(p => p.Key).ToList())
+                {
+                    if (obj[key] is JsonValue value && value.TryGetValue<string>(out var text) && text.Contains(marker, StringComparison.Ordinal))
+                        obj[key] = string.Join(" ", System.Text.RegularExpressions.Regex.Split(text, @"(?<=\.)\s+")
+                            .Where(sentence => !sentence.Contains(marker, StringComparison.Ordinal)));
+                    else if (obj[key] is { } child)
+                        RevertAmendedSentences(child, marker);
+                }
+                break;
+            case JsonArray array:
+                for (var i = 0; i < array.Count; i++)
+                {
+                    if (array[i] is JsonValue value && value.TryGetValue<string>(out var text) && text.Contains(marker, StringComparison.Ordinal))
+                        array[i] = string.Join(" ", System.Text.RegularExpressions.Regex.Split(text, @"(?<=\.)\s+")
+                            .Where(sentence => !sentence.Contains(marker, StringComparison.Ordinal)));
+                    else if (array[i] is { } child)
+                        RevertAmendedSentences(child, marker);
+                }
+                break;
+        }
     }
 
     /// <summary>The inventory matching <see cref="ProposedContract"/>.</summary>
@@ -1528,14 +1550,13 @@ public class EvidenceContractTests
         return contract;
     }
 
-    /// <summary>A well-formed completed (deployed) audit record of a documentation-only deploy on the pre-contract base.</summary>
+    /// <summary>A well-formed audit record of a documentation-only deploy on the pre-contract base.</summary>
     private static JsonObject DocsDeployAudit()
     {
         var rule = Contract()["releasePath"]!["documentationOnlyDeploy"]!;
         return new JsonObject
         {
             ["schema"] = "calor.docs-only-deploy-audit/1",
-            ["status"] = "deployed",
             ["contractVersion"] = Contract()["contractVersion"]!.DeepClone(),
             ["workflow"] = ".github/workflows/nextjs-gh-pages.yml",
             ["runId"] = 37000000002L,
