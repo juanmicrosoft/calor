@@ -1101,8 +1101,7 @@
         "R1-POST-ARRAY-ALIAS-002",
         "R1-POST-ARRAY-ALIAS-003",
         "R1-POST-ARRAY-ALIAS-004",
-        "R1-POST-ARRAY-ALIAS-005",
-        "R1-POST-ARRAY-ALIAS-006"
+        "R1-POST-ARRAY-ALIAS-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/POST-ARRAY-ALIAS.jsonl"
     },
@@ -1122,8 +1121,7 @@
         "R1-POST-METHOD-RECEIVER-002",
         "R1-POST-METHOD-RECEIVER-003",
         "R1-POST-METHOD-RECEIVER-004",
-        "R1-POST-METHOD-RECEIVER-005",
-        "R1-POST-METHOD-RECEIVER-006"
+        "R1-POST-METHOD-RECEIVER-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/POST-METHOD-RECEIVER.jsonl"
     },
@@ -1191,8 +1189,7 @@
         "R1-QNT-UNBOUNDED-002",
         "R1-QNT-UNBOUNDED-003",
         "R1-QNT-UNBOUNDED-004",
-        "R1-QNT-UNBOUNDED-005",
-        "R1-QNT-UNBOUNDED-006"
+        "R1-QNT-UNBOUNDED-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/QNT-UNBOUNDED.jsonl"
     },
@@ -1212,8 +1209,7 @@
         "R1-QNT-BOUND-TYPES-002",
         "R1-QNT-BOUND-TYPES-003",
         "R1-QNT-BOUND-TYPES-004",
-        "R1-QNT-BOUND-TYPES-005",
-        "R1-QNT-BOUND-TYPES-006"
+        "R1-QNT-BOUND-TYPES-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/QNT-BOUND-TYPES.jsonl"
     },
@@ -1232,8 +1228,7 @@
         "R1-QNT-NESTED-002",
         "R1-QNT-NESTED-003",
         "R1-QNT-NESTED-004",
-        "R1-QNT-NESTED-005",
-        "R1-QNT-NESTED-006"
+        "R1-QNT-NESTED-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/QNT-NESTED.jsonl"
     },
@@ -1300,8 +1295,7 @@
         "R1-ARR-ELEMENT-TYPES-005",
         "R1-ARR-ELEMENT-TYPES-006",
         "R1-ARR-ELEMENT-TYPES-007",
-        "R1-ARR-ELEMENT-TYPES-008",
-        "R1-ARR-ELEMENT-TYPES-009"
+        "R1-ARR-ELEMENT-TYPES-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/ARR-ELEMENT-TYPES.jsonl"
     },
@@ -1407,8 +1401,7 @@
         "R1-STR-UNMODELED-OPS-002",
         "R1-STR-UNMODELED-OPS-003",
         "R1-STR-UNMODELED-OPS-004",
-        "R1-STR-UNMODELED-OPS-005",
-        "R1-STR-UNMODELED-OPS-006"
+        "R1-STR-UNMODELED-OPS-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/STR-UNMODELED-OPS.jsonl"
     },
@@ -1428,8 +1421,7 @@
         "R1-STR-NULL-NONASCII-002",
         "R1-STR-NULL-NONASCII-003",
         "R1-STR-NULL-NONASCII-004",
-        "R1-STR-NULL-NONASCII-005",
-        "R1-STR-NULL-NONASCII-006"
+        "R1-STR-NULL-NONASCII-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/STR-NULL-NONASCII.jsonl"
     },
@@ -1470,8 +1462,7 @@
         "R1-FLD-INHERITED-NESTED-002",
         "R1-FLD-INHERITED-NESTED-003",
         "R1-FLD-INHERITED-NESTED-004",
-        "R1-FLD-INHERITED-NESTED-005",
-        "R1-FLD-INHERITED-NESTED-006"
+        "R1-FLD-INHERITED-NESTED-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/FLD-INHERITED-NESTED.jsonl"
     },
@@ -1529,8 +1520,7 @@
         "R1-CALL-IN-CONTRACT-002",
         "R1-CALL-IN-CONTRACT-003",
         "R1-CALL-IN-CONTRACT-004",
-        "R1-CALL-IN-CONTRACT-005",
-        "R1-CALL-IN-CONTRACT-006"
+        "R1-CALL-IN-CONTRACT-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/CALL-IN-CONTRACT.jsonl"
     },
@@ -1588,8 +1578,7 @@
         "R1-VAC-PRECONDITION-SAT-CLAIM-002",
         "R1-VAC-PRECONDITION-SAT-CLAIM-003",
         "R1-VAC-PRECONDITION-SAT-CLAIM-004",
-        "R1-VAC-PRECONDITION-SAT-CLAIM-005",
-        "R1-VAC-PRECONDITION-SAT-CLAIM-006"
+        "R1-VAC-PRECONDITION-SAT-CLAIM-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/VAC-PRECONDITION-SAT-CLAIM.jsonl"
     },
@@ -1640,7 +1629,10 @@
         "R1-OBL-BRANCH-FACTS-007",
         "R1-OBL-BRANCH-FACTS-008",
         "R1-OBL-BRANCH-FACTS-009",
-        "R1-OBL-BRANCH-FACTS-010"
+        "R1-OBL-BRANCH-FACTS-010",
+        "R1-OBL-BRANCH-FACTS-011",
+        "R1-OBL-BRANCH-FACTS-012",
+        "R1-OBL-BRANCH-FACTS-013"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/OBL-BRANCH-FACTS.jsonl"
     },
@@ -1657,9 +1649,7 @@
       "caseIds": [
         "R1-OBL-LOOP-FACTS-001",
         "R1-OBL-LOOP-FACTS-002",
-        "R1-OBL-LOOP-FACTS-003",
-        "R1-OBL-LOOP-FACTS-004",
-        "R1-OBL-LOOP-FACTS-005"
+        "R1-OBL-LOOP-FACTS-003"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/OBL-LOOP-FACTS.jsonl"
     },
@@ -1677,9 +1667,28 @@
         "R1-OBL-MUTATION-KILL-001",
         "R1-OBL-MUTATION-KILL-002",
         "R1-OBL-MUTATION-KILL-003",
-        "R1-OBL-MUTATION-KILL-004"
+        "R1-OBL-MUTATION-KILL-004",
+        "R1-OBL-MUTATION-KILL-005",
+        "R1-OBL-MUTATION-KILL-006",
+        "R1-OBL-MUTATION-KILL-007"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/OBL-MUTATION-KILL.jsonl"
+    },
+    {
+      "id": "B1:OBL-LOOP-VARIABLE",
+      "row": "OBL-LOOP-VARIABLE",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "obligation",
+      "entryPoints": [
+        "facts",
+        "oblSolve"
+      ],
+      "caseIds": [
+        "R1-OBL-LOOP-VARIABLE-001",
+        "R1-OBL-LOOP-VARIABLE-002"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/B1/rows/OBL-LOOP-VARIABLE.jsonl"
     },
     {
       "id": "B1:OBL-REFINEMENT-ENTRY",
@@ -1700,8 +1709,7 @@
         "R1-OBL-REFINEMENT-ENTRY-005",
         "R1-OBL-REFINEMENT-ENTRY-006",
         "R1-OBL-REFINEMENT-ENTRY-007",
-        "R1-OBL-REFINEMENT-ENTRY-008",
-        "R1-OBL-REFINEMENT-ENTRY-009"
+        "R1-OBL-REFINEMENT-ENTRY-008"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/OBL-REFINEMENT-ENTRY.jsonl"
     },
@@ -1721,8 +1729,7 @@
         "R1-OBL-REFINEMENT-RETURN-002",
         "R1-OBL-REFINEMENT-RETURN-003",
         "R1-OBL-REFINEMENT-RETURN-004",
-        "R1-OBL-REFINEMENT-RETURN-005",
-        "R1-OBL-REFINEMENT-RETURN-006"
+        "R1-OBL-REFINEMENT-RETURN-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/OBL-REFINEMENT-RETURN.jsonl"
     },
@@ -1742,8 +1749,7 @@
         "R1-OBL-SUBTYPE-002",
         "R1-OBL-SUBTYPE-003",
         "R1-OBL-SUBTYPE-004",
-        "R1-OBL-SUBTYPE-005",
-        "R1-OBL-SUBTYPE-006"
+        "R1-OBL-SUBTYPE-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/OBL-SUBTYPE.jsonl"
     },
@@ -1782,8 +1788,7 @@
         "R1-OBL-SELFREF-002",
         "R1-OBL-SELFREF-003",
         "R1-OBL-SELFREF-004",
-        "R1-OBL-SELFREF-005",
-        "R1-OBL-SELFREF-006"
+        "R1-OBL-SELFREF-005"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/OBL-SELFREF.jsonl"
     },
@@ -1869,14 +1874,32 @@
       "resultPath": "bench/correctness/false-established/v024/B1/rows/IMPL-POSTCONDITION-STRENGTHENING.jsonl"
     },
     {
+      "id": "B1:IMPL-ASSUMPTION-FORMS",
+      "row": "IMPL-ASSUMPTION-FORMS",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "implication",
+      "entryPoints": [
+        "inherit",
+        "implProver"
+      ],
+      "caseIds": [
+        "R1-IMPL-ASSUMPTION-FORMS-001",
+        "R1-IMPL-ASSUMPTION-FORMS-002",
+        "R1-IMPL-ASSUMPTION-FORMS-003",
+        "R1-IMPL-ASSUMPTION-FORMS-004",
+        "R1-IMPL-ASSUMPTION-FORMS-005"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/B1/rows/IMPL-ASSUMPTION-FORMS.jsonl"
+    },
+    {
       "id": "B1:IMPL-DIVISION-TOTALIZED",
       "row": "IMPL-DIVISION-TOTALIZED",
       "classification": "modeled",
       "releaseCritical": true,
       "channel": "implication",
       "entryPoints": [
-        "implProver",
-        "verifyCmd"
+        "implProver"
       ],
       "caseIds": [
         "R1-IMPL-DIVISION-TOTALIZED-001",
@@ -1964,6 +1987,22 @@
       "resultPath": "bench/correctness/false-established/v024/B1/rows/CACHE-DEPENDENCY-CHANGE.jsonl"
     },
     {
+      "id": "B1:CACHE-LITERAL-WIDTH",
+      "row": "CACHE-LITERAL-WIDTH",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "cache",
+        "hasher"
+      ],
+      "caseIds": [
+        "R1-CACHE-LITERAL-WIDTH-001",
+        "R1-CACHE-LITERAL-WIDTH-002"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/B1/rows/CACHE-LITERAL-WIDTH.jsonl"
+    },
+    {
       "id": "B1:CACHE-SEMANTICS-VERSION",
       "row": "CACHE-SEMANTICS-VERSION",
       "classification": "modeled",
@@ -2028,6 +2067,22 @@
         "R1-SIMP-H1-UNARY-FOLD-011"
       ],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/SIMP-H1-UNARY-FOLD.jsonl"
+    },
+    {
+      "id": "B1:SIMP-H1-INVALID-TYPING",
+      "row": "SIMP-H1-INVALID-TYPING",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "channel": "postcondition",
+      "entryPoints": [
+        "simplifier",
+        "whitelist"
+      ],
+      "caseIds": [
+        "R1-SIMP-H1-INVALID-TYPING-001",
+        "R1-SIMP-H1-INVALID-TYPING-002"
+      ],
+      "resultPath": "bench/correctness/false-established/v024/B1/rows/SIMP-H1-INVALID-TYPING.jsonl"
     },
     {
       "id": "B1:MIX-QNT-ARRAY",
@@ -2217,6 +2272,30 @@
       ],
       "caseIds": [],
       "resultPath": "bench/correctness/false-established/v024/B1/rows/XCL-SURFACE-PARITY.jsonl"
+    },
+    {
+      "id": "B1:XCL-WEAKENING-CHECK",
+      "row": "XCL-WEAKENING-CHECK",
+      "classification": "not-investigated",
+      "releaseCritical": false,
+      "channel": "none",
+      "entryPoints": [
+        "verifyCmd"
+      ],
+      "caseIds": [],
+      "resultPath": "bench/correctness/false-established/v024/B1/rows/XCL-WEAKENING-CHECK.jsonl"
+    },
+    {
+      "id": "B1:XCL-QNT-NONNUMERIC-BOUND",
+      "row": "XCL-QNT-NONNUMERIC-BOUND",
+      "classification": "not-investigated",
+      "releaseCritical": false,
+      "channel": "none",
+      "entryPoints": [
+        "emitQuant"
+      ],
+      "caseIds": [],
+      "resultPath": "bench/correctness/false-established/v024/B1/rows/XCL-QNT-NONNUMERIC-BOUND.jsonl"
     },
     {
       "id": "B1:XCL-HEAP-GENERICS",

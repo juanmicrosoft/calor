@@ -3139,7 +3139,7 @@
     {
       "id": "T-POST-ARRAY-ALIAS",
       "row": "POST-ARRAY-ALIAS",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "postcondition",
       "holes": {
         "c0": {
@@ -3184,7 +3184,7 @@
     {
       "id": "T-POST-RECEIVER",
       "row": "POST-METHOD-RECEIVER",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "postcondition",
       "holes": {
         "c0": {
@@ -3371,7 +3371,7 @@
     {
       "id": "T-QNT-UNBOUNDED",
       "row": "QNT-UNBOUNDED",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "postcondition",
       "holes": {
         "Q": {
@@ -3425,11 +3425,11 @@
     {
       "id": "T-QNT-BOUNDTYPES",
       "row": "QNT-BOUND-TYPES",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "postcondition",
       "holes": {
         "VT": {
-          "oneOf": [
+          "cycle": [
             "u8",
             "i8",
             "i16",
@@ -3479,12 +3479,13 @@
         "hyp": "n > 0 && n < 300",
         "prelude": "    static bool All(long lo, long hi, Func<long, bool> p) { for (long i = lo; i < hi; i++) if (!p(i)) return false; return true; }\n    static bool InType(string t, long v) => t switch { \"u8\" => v >= 0 && v <= 255, \"i8\" => v >= -128 && v <= 127, \"i16\" => v >= -32768 && v <= 32767, _ => true };",
         "prop": "All(0, n, v => !InType(\"{VT}\", v) || v {S} {c1})"
-      }
+      },
+      "minInstances": 4
     },
     {
       "id": "T-QNT-NESTED",
       "row": "QNT-NESTED",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "postcondition",
       "holes": {
         "S": {
@@ -3652,7 +3653,7 @@
     {
       "id": "T-ARR-ELEM",
       "row": "ARR-ELEMENT-TYPES",
-      "instances": 9,
+      "instances": 8,
       "claimSite": "postcondition",
       "holes": {
         "AT": {
@@ -3920,7 +3921,7 @@
     {
       "id": "T-STR-UNMODELED",
       "row": "STR-UNMODELED-OPS",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "postcondition",
       "holes": {
         "E": {
@@ -3967,7 +3968,7 @@
     {
       "id": "T-STR-NONASCII",
       "row": "STR-NULL-NONASCII",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "postcondition",
       "holes": {
         "L": {
@@ -4103,7 +4104,7 @@
     {
       "id": "T-FLD-INHERITED",
       "row": "FLD-INHERITED-NESTED",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "postcondition",
       "holes": {
         "S": {
@@ -4283,7 +4284,7 @@
     {
       "id": "T-CALL",
       "row": "CALL-IN-CONTRACT",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "postcondition",
       "holes": {
         "S": {
@@ -4415,7 +4416,7 @@
     {
       "id": "T-VAC-PRESAT",
       "row": "VAC-PRECONDITION-SAT-CLAIM",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "precondition",
       "holes": {
         "T": {
@@ -4677,39 +4678,29 @@
       "instances": 3,
       "claimSite": "obligation",
       "holes": {
-        "A": {
-          "oneOf": [
-            ">=",
-            "<=",
-            ">",
-            "<",
-            "==",
-            "!="
+        "G": {
+          "cyclePairs": [
+            [
+              "(> x INT:10)",
+              "x > 10"
+            ],
+            [
+              "(== x INT:-1)",
+              "x == -1"
+            ],
+            [
+              "(<= x INT:-5)",
+              "x <= -5"
+            ]
           ]
-        },
-        "S": {
-          "oneOf": [
-            ">=",
-            "<=",
-            ">",
-            "<",
-            "==",
-            "!="
-          ]
-        },
-        "c1": {
-          "literalOf": "i32"
-        },
-        "c2": {
-          "literalOf": "i32"
         }
       },
       "calor": [
         "  §F{f1:Probe:priv} (i32:x) -> i32",
         "    §E{}",
-        "    §IF{if1} ({A} x {c1})",
+        "    §IF{if1} {G}",
         "      §B{t:i32} INT:0",
-        "    §PROOF{p1:claim} ({S} x {c2})",
+        "    §PROOF{p1:claim} {G}",
         "    §R INT:0"
       ],
       "oracle": {
@@ -4720,10 +4711,57 @@
           }
         ],
         "hyp": "true",
-        "prop": "x {S} {c2}",
-        "note": "proof after a non-returning if: the guard must not leak"
+        "prop": "{G}",
+        "note": "the goal is exactly the then-guard: only a leaked fact could discharge it; false on reached inputs outside the branch"
       },
-      "obligationKind": "ProofObligation"
+      "obligationKind": "ProofObligation",
+      "minInstances": 3
+    },
+    {
+      "id": "T-OBL-SIBLING",
+      "row": "OBL-BRANCH-FACTS",
+      "instances": 3,
+      "claimSite": "obligation",
+      "holes": {
+        "G": {
+          "cyclePairs": [
+            [
+              "(> x INT:10)",
+              "x > 10"
+            ],
+            [
+              "(== x INT:-1)",
+              "x == -1"
+            ],
+            [
+              "(<= x INT:-5)",
+              "x <= -5"
+            ]
+          ]
+        }
+      },
+      "calor": [
+        "  §F{f1:Probe:priv} (i32:x) -> i32",
+        "    §E{}",
+        "    §IF{if1} {G}",
+        "      §B{t:i32} INT:0",
+        "    §EL",
+        "      §PROOF{p1:claim} {G}",
+        "    §R INT:0"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "x",
+            "type": "i32"
+          }
+        ],
+        "hyp": "!({G})",
+        "prop": "{G}",
+        "note": "else-branch goal equal to the then-guard: false on every reached input; any Discharged is false"
+      },
+      "obligationKind": "ProofObligation",
+      "minInstances": 3
     },
     {
       "id": "T-OBL-LOOP-PARAM",
@@ -4788,7 +4826,7 @@
     },
     {
       "id": "T-OBL-LOOP",
-      "row": "OBL-LOOP-FACTS",
+      "row": "OBL-LOOP-VARIABLE",
       "instances": 2,
       "claimSite": "obligation",
       "holes": {
@@ -4848,6 +4886,49 @@
       "obligationKind": "ProofObligation"
     },
     {
+      "id": "T-OBL-KILL-PRE",
+      "row": "OBL-MUTATION-KILL",
+      "instances": 3,
+      "claimSite": "obligation",
+      "holes": {
+        "A": {
+          "oneOf": [
+            ">",
+            ">=",
+            "=="
+          ]
+        },
+        "c1": {
+          "literalOf": "i32"
+        },
+        "c2": {
+          "literalOf": "i32"
+        }
+      },
+      "calor": [
+        "  §F{f1:Probe:priv} (i32:x) -> i32",
+        "    §E{}",
+        "    §Q ({A} x {c1})",
+        "    §ASSIGN x {c2}",
+        "    §PROOF{p1:claim} ({A} x {c1})",
+        "    §R x"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "x",
+            "type": "i32"
+          }
+        ],
+        "hyp": "x {A} {c1}",
+        "result": "int",
+        "body": "x = {c2}; return x;",
+        "prop": "result {A} {c1}",
+        "note": "entry precondition on x versus x's value after reassignment; oracle result = x at the proof"
+      },
+      "obligationKind": "ProofObligation"
+    },
+    {
       "id": "T-OBL-KILL",
       "row": "OBL-MUTATION-KILL",
       "instances": 4,
@@ -4896,7 +4977,7 @@
     {
       "id": "T-OBL-ENTRY",
       "row": "OBL-REFINEMENT-ENTRY",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "obligation",
       "holes": {
         "Q": {
@@ -5004,7 +5085,7 @@
     {
       "id": "T-OBL-RETURN",
       "row": "OBL-REFINEMENT-RETURN",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "obligation",
       "holes": {
         "Q": {
@@ -5072,7 +5153,7 @@
     {
       "id": "T-OBL-SUBTYPE",
       "row": "OBL-SUBTYPE",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "obligation",
       "holes": {
         "T": {
@@ -5193,7 +5274,7 @@
     {
       "id": "T-OBL-SELFREF",
       "row": "OBL-SELFREF",
-      "instances": 6,
+      "instances": 5,
       "claimSite": "obligation",
       "holes": {
         "T": {
@@ -5482,6 +5563,66 @@
       }
     },
     {
+      "id": "T-IMPL-ASSUME",
+      "row": "IMPL-ASSUMPTION-FORMS",
+      "instances": 5,
+      "claimSite": "implication",
+      "holes": {
+        "E": {
+          "cyclePairs": [
+            [
+              "(>= (len s) INT:0)",
+              "s!.Length >= 0"
+            ],
+            [
+              "(> (+ x INT:1) x)",
+              "x + 1 > x"
+            ],
+            [
+              "(|| (! (isempty s)) (== s STR:\"\"))",
+              "!string.IsNullOrEmpty(s) || s == \"\""
+            ],
+            [
+              "(>= (* x x) INT:0)",
+              "x * x >= 0"
+            ]
+          ]
+        }
+      },
+      "calor": [
+        "  §IFACE{i1:IProbe}",
+        "    §MT{m1:Run}",
+        "      §I{i32:x}",
+        "      §I{str:s}",
+        "      §O{i32}",
+        "      §Q (>= x INT:0)",
+        "  §CL{c1:Impl:pub}",
+        "    §IMPL{IProbe}",
+        "    §MT{mt1:Run:pub}",
+        "      §I{i32:x}",
+        "      §I{str:s}",
+        "      §O{i32}",
+        "      §Q {E}",
+        "      §R INT:0"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "x",
+            "type": "i32"
+          },
+          {
+            "name": "s",
+            "type": "str"
+          }
+        ],
+        "hyp": "x >= 0",
+        "prop": "{E}",
+        "note": "string-model and checked-arithmetic forms that the contract path demotes; the implication prover has no demotion, and a throwing implementer check is a violation"
+      },
+      "minInstances": 4
+    },
+    {
       "id": "T-IMPL-DIV",
       "row": "IMPL-DIVISION-TOTALIZED",
       "instances": 4,
@@ -5562,7 +5703,7 @@
       "id": "T-INH-GUARD",
       "row": "INH-INHERITED-GUARD-EMISSION",
       "instances": 4,
-      "claimSite": "postcondition",
+      "claimSite": "guard-emission",
       "holes": {
         "A": {
           "oneOf": [
@@ -5612,7 +5753,8 @@
         "result": "int",
         "body": "return x {OP} {c2};",
         "prop": "result {A} {c1}",
-        "replay": "new Impl().Run(x)"
+        "replay": "new Impl().Run(x)",
+        "note": "no proof token is produced (the implementer has no contracts); the inherited interface guard must be present in both emissions"
       }
     },
     {
@@ -5750,6 +5892,65 @@
       "note": "field width change u8 -> signed; any warm/cold outcome difference is a stale-cache finding"
     },
     {
+      "id": "T-CACHE-LITWIDTH",
+      "row": "CACHE-LITERAL-WIDTH",
+      "instances": 2,
+      "claimSite": "postcondition",
+      "overflow": "unchecked",
+      "holes": {
+        "FIN": {
+          "cyclePairs": [
+            [
+              "INT:1",
+              "1"
+            ],
+            [
+              "LONG:1",
+              "1L"
+            ]
+          ]
+        },
+        "PRIME": {
+          "cyclePairs": [
+            [
+              "LONG:1",
+              "LONG:1"
+            ],
+            [
+              "INT:1",
+              "INT:1"
+            ]
+          ]
+        }
+      },
+      "calor": [
+        "  §F{f1:Probe:pub} (i32:x) -> i32",
+        "    §E{}",
+        "    §Q (== x INT:2147483647)",
+        "    §S (> (+ x {FIN}) INT:0)",
+        "    §R INT:0"
+      ],
+      "calorPrime": [
+        "  §F{f1:Probe:pub} (i32:x) -> i32",
+        "    §E{}",
+        "    §Q (== x INT:2147483647)",
+        "    §S (> (+ x {PRIME}) INT:0)",
+        "    §R INT:0"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "x",
+            "type": "i32"
+          }
+        ],
+        "hyp": "x == 2147483647",
+        "prop": "x + {FIN} > 0"
+      },
+      "minInstances": 2,
+      "note": "prime and final differ only in literal width (LONG:1 vs INT:1); warm must equal cold"
+    },
+    {
       "id": "T-CACHE-SEMVER",
       "row": "CACHE-SEMANTICS-VERSION",
       "instances": 3,
@@ -5784,7 +5985,7 @@
         "hyp": "true",
         "prop": "x > {c1}"
       },
-      "cacheProcedure": "Prime (expected Failed). Variant A: rewrite the primed entry's outcome to proven only, recompile: Proven is required (proves the tamper reaches the cache; otherwise the case is harness-invalid). Variant B: re-prime, rewrite the outcome to proven AND the translator semantics version to 'r1-stale-version', recompile: the stale entry must be ignored (warm token equals the cold token); Proven is a stale-cache-proof finding."
+      "cacheProcedure": "Prime (expected Failed). Variant A is the tamper-reachability control, never adjudicated as a finding: rewrite the primed entry's outcome to proven only and recompile; Proven is required, otherwise the case is harness-invalid. Variant B is the adjudicated attempt: re-prime, rewrite the outcome to proven AND the translator semantics version to 'r1-stale-version', recompile; the warm token must equal the cold token, and a Proven is a stale-cache-proof finding (and a false-unconditional-proof, since O1 shows the property false)."
     },
     {
       "id": "T-SIMP-FOLD",
@@ -5936,7 +6137,115 @@
     {
       "id": "T-SIMP-H1-UNSIGNED",
       "row": "SIMP-H1-UNARY-FOLD",
-      "instances": 5,
+      "instances": 2,
+      "claimSite": "postcondition",
+      "holes": {
+        "S": {
+          "oneOf": [
+            ">=",
+            "<=",
+            ">",
+            "<",
+            "==",
+            "!="
+          ]
+        },
+        "E": {
+          "cyclePairs": [
+            [
+              "(~ ULONG:0)",
+              "(BigInteger)(~0UL)"
+            ],
+            [
+              "(~ UINT:0)",
+              "(BigInteger)(~0U)"
+            ]
+          ]
+        }
+      },
+      "calor": [
+        "  §F{f1:Probe:pub} (u64:x) -> i32",
+        "    §E{}",
+        "    §S ({S} x {E})",
+        "    §R INT:0"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "x",
+            "type": "u64"
+          }
+        ],
+        "hyp": "true",
+        "prop": "(BigInteger)x {S} {E}"
+      },
+      "hypothesis": "H1",
+      "minInstances": 2
+    },
+    {
+      "id": "T-SIMP-H1-PINNED",
+      "row": "SIMP-H1-UNARY-FOLD",
+      "instances": 3,
+      "claimSite": "postcondition",
+      "holes": {
+        "PRE": {
+          "cyclePairs": [
+            [
+              "(== x INT:-1)",
+              "x == -1"
+            ],
+            [
+              "(== x LONG:4294967295)",
+              "x == 4294967295L"
+            ],
+            [
+              "(== x LONG:4294967290)",
+              "x == 4294967290L"
+            ]
+          ]
+        },
+        "POST": {
+          "cyclePairs": [
+            [
+              "(== x (~ UINT:0))",
+              "x == ~0U"
+            ],
+            [
+              "(== x (- UINT:1))",
+              "x == -1U"
+            ],
+            [
+              "(== x (~ INT:5))",
+              "x == ~5"
+            ]
+          ]
+        }
+      },
+      "calor": [
+        "  §F{f1:Probe:pub} (i64:x) -> i32",
+        "    §E{}",
+        "    §Q {PRE}",
+        "    §S {POST}",
+        "    §R INT:0"
+      ],
+      "oracle": {
+        "domain": [
+          {
+            "name": "x",
+            "type": "i64"
+          }
+        ],
+        "hyp": "{PRE}",
+        "prop": "{POST}",
+        "note": "x is pinned to the value a wrong fold would produce, so a wrong fold turns a false property into an unconditional proof"
+      },
+      "hypothesis": "H1",
+      "minInstances": 3
+    },
+    {
+      "id": "T-SIMP-H1-INVALID",
+      "row": "SIMP-H1-INVALID-TYPING",
+      "instances": 2,
       "claimSite": "postcondition",
       "holes": {
         "S": {
@@ -5954,14 +6263,6 @@
             [
               "(- ULONG:1)",
               "-(BigInteger)1UL"
-            ],
-            [
-              "(~ ULONG:0)",
-              "(BigInteger)(~0UL)"
-            ],
-            [
-              "(~ UINT:0)",
-              "(BigInteger)(~0U)"
             ],
             [
               "(- UINT:1)",
@@ -5984,11 +6285,11 @@
           }
         ],
         "hyp": "true",
-        "prop": "(BigInteger)x {S} {E}"
+        "prop": "(BigInteger)x {S} {E}",
+        "note": "no C# typing exists (unary minus on ulong; ulong versus long); exact integers"
       },
       "hypothesis": "H1",
-      "minInstances": 4,
-      "note": "u64 operand; exact integers where C# has no typing (unary minus on ulong; ulong vs long)"
+      "minInstances": 2
     },
     {
       "id": "T-MIX-QNT-ARR",

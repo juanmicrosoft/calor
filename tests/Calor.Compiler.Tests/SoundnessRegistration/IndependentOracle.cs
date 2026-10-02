@@ -122,6 +122,8 @@ internal static class IndependentOracle
             if (!(bool)hypValue!)
                 continue;
             held++;
+            // Rendered before Body runs: a body may mutate (aliased) inputs, and replay needs entry values.
+            var entry = Render(input);
             object? result = null;
             if (hasBody && !TryInvoke(body, [input], out result))
             {
@@ -130,7 +132,7 @@ internal static class IndependentOracle
             }
             reached++;
             if (reachedSample.Count < ReplaySampleSize)
-                reachedSample.Add(Render(input));
+                reachedSample.Add(entry);
             var ok = TryInvoke(prop, [input, result], out var propValue);
             var holds = ok && (bool)propValue!;
             if (claim == "exists")
@@ -138,7 +140,7 @@ internal static class IndependentOracle
                 if (holds)
                 {
                     satisfied++;
-                    witness ??= Render(input);
+                    witness ??= entry;
                 }
                 continue;
             }
@@ -147,7 +149,7 @@ internal static class IndependentOracle
                 violations++;
                 if (witness == null)
                 {
-                    witness = Render(input) + (hasBody ? $" -> result={Render([result])}" : "");
+                    witness = entry + (hasBody ? $" -> result={Render([result])}" : "");
                     violationKind = ok ? "prop-false" : "prop-throws";
                 }
             }
