@@ -301,8 +301,36 @@ public sealed class DurableProvenanceTests : IDisposable
         AssertOnly(Verify(clone, Edit(PendingEntry(clone, measured, ledgerText),
             n => n["durableIdentity"]!["phase1"]!["treeHashes"] = new JsonObject { ["manifest.json"] = clone.RevParse(measured + ":manifest.json") })),
             DurableProvenance.Codes.WriteBackInvalid);
-        AssertOnly(Verify(clone, Edit(PendingEntry(clone, measured, ledgerText), n => n["resolvableOnMain"] = measured)),
-            DurableProvenance.Codes.WriteBackInvalid);
+        var withLegacy = Edit(PendingEntry(clone, measured, ledgerText), n => n["resolvableOnMain"] = measured);
+        AssertOnly(Verify(clone, withLegacy), DurableProvenance.Codes.WriteBackInvalid);
+        // Round 3: the write-back refuses an entry the verifier rejects, rather than writing it.
+        Assert.Equal(DurableProvenance.Codes.WriteBackInvalid, DurableProvenance.CompleteWriteBack(clone, withLegacy).Failure!.Code);
+    }
+
+    /// <summary>
+    /// Round 3: before merge, a phase-1 head that does not exist cannot be checked, so it is
+    /// rejected; only after the artifact has landed on main may a squash have discarded it.
+    /// </summary>
+    [Fact]
+    public void UnlandedPhase1MustNameAnExistingHead()
+    {
+        _world.CommitOnMain(("src/a.cs", "a"), ("manifest.json", "{}"));
+        _world.PushMain();
+        var (measured, pending) = MeasureOnBranch();
+        _world.PushBranch("feature");
+        var clone = _world.FreshClone();
+        clone.Run("checkout", "--quiet", "feature");   // the PR's checkout: artifact committed, not on main
+
+        Assert.Empty(Verify(clone, pending).Findings);
+        var invented = new string('e', 40);
+        var forged = Edit(pending, n =>
+        {
+            n["measuredCommit"] = invented;
+            n["durableIdentity"]!["phase1"]!["headCommit"] = invented;
+        });
+        AssertOnly(Verify(clone, forged), DurableProvenance.Codes.WriteBackInvalid);
+        Assert.False(clone.CommitExists(invented));
+        Assert.NotEqual(invented, measured);
     }
 
     [Fact]

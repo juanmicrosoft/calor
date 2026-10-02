@@ -282,8 +282,13 @@ public static class DurableProvenance
             fail(code, "pending identity without a phase1 record.");
             return;
         }
-        if (ReadPhase1(git, p1, "phase1", measured, fail).ArtifactSha256 is { } sha)
-            CheckCommittedArtifact(git, ArtifactPath(entry), sha, code, fail);
+        if (ReadPhase1(git, p1, "phase1", measured, fail).ArtifactSha256 is not { } sha) return;
+        CheckCommittedArtifact(git, ArtifactPath(entry), sha, code, fail);
+        // Round 3: before merge the phase-1 head must exist so its hashes are checked; only once the
+        // artifact has landed on main may a squash have discarded it.
+        if (!(Str(p1, "headCommit") is { } head && FullSha.IsMatch(head) && git.CommitExists(head))
+            && FindLanding(git, ArtifactPath(entry), sha) == null)
+            fail(code, $"phase-1 head {Str(p1, "headCommit")} does not resolve and the artifact has not landed on {ProtectedMainRef}; an unlanded phase-1 claim must name a commit present in the PR.");
     }
 
     private sealed record Phase1(Dictionary<string, string> Trees, Dictionary<string, string> Contents, string? ArtifactSha256);
@@ -363,16 +368,14 @@ public static class DurableProvenance
     /// </summary>
     public static (JsonObject? Completed, Finding? Failure) CompleteWriteBack(GitRepo git, JsonElement entry)
     {
+        // Round 3: the pending entry must verify before, and the completed entry after; a write-back
+        // that the verifier would reject is never written.
+        if (Verify(git, new[] { entry }).Findings is [var invalid, ..]) return (null, invalid);
         var subject = Subject(entry);
+        if (git.RevParse(ProtectedMainRef + "^{commit}") == null)
+            return (null, new Finding(Codes.RefNotFetched, subject, "write-back needs fetched protected main."));
         var p1 = entry.GetProperty("durableIdentity").GetProperty("phase1");
-        var artifactPath = ArtifactPath(entry);
-        var artifactSha = p1.GetProperty("artifactSha256").GetString()!;
-        if (git.IsShallow() != false || git.RevParse(ProtectedMainRef + "^{commit}") == null)
-            return (null, new Finding(Codes.RefNotFetched, subject, "write-back needs a full clone with fetched protected main."));
-
-        var (_, log, _) = git.Run("log", "--first-parent", "--format=%H", ProtectedMainRef, "--", artifactPath);
-        var landing = log.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Reverse().FirstOrDefault(c => BlobSha(git, c, artifactPath) == artifactSha);
+        var landing = FindLanding(git, ArtifactPath(entry), p1.GetProperty("artifactSha256").GetString()!);
         if (landing == null) return (null, null);
 
         var trees = p1.GetProperty("treeHashes");
@@ -389,7 +392,7 @@ public static class DurableProvenance
         var writeBack = new JsonObject();
         foreach (var field in Phase1Fields)
             writeBack[Phase1Key("writeBack", field)] = JsonNode.Parse(p1.GetProperty(field).GetRawText());
-        return (new JsonObject
+        var completed = new JsonObject
         {
             ["status"] = "complete",
             ["commit"] = landing,
@@ -397,7 +400,20 @@ public static class DurableProvenance
             ["treeHashes"] = landedTrees,
             ["inputContentHashes"] = JsonNode.Parse(contents.GetRawText()),
             ["writeBack"] = writeBack,
-        }, null);
+        };
+        var node = JsonNode.Parse(entry.GetRawText())!.AsObject();
+        node["durableIdentity"] = completed.DeepClone();
+        using var after = JsonDocument.Parse(node.ToJsonString());
+        return Verify(git, new[] { after.RootElement.Clone() }).Findings is [var rejected, ..] ? (null, rejected) : (completed, null);
+    }
+
+    /// <summary>The first first-parent commit on protected main holding the artifact bytes, if any.</summary>
+    private static string? FindLanding(GitRepo git, string artifactPath, string artifactSha)
+    {
+        if (git.RevParse(ProtectedMainRef + "^{commit}") == null) return null;
+        var (_, log, _) = git.Run("log", "--first-parent", "--format=%H", ProtectedMainRef, "--", artifactPath);
+        return log.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Reverse().FirstOrDefault(c => BlobSha(git, c, artifactPath) == artifactSha);
     }
 
     /// <summary>The commit holds the artifact bytes and its first parent does not: it landed them.</summary>
