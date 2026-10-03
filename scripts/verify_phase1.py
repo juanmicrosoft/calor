@@ -6,14 +6,10 @@ Runs the Tier 1 checks in order. Designed to complete in < 60 seconds
 on a developer machine (per v6 §3.1.a). On budget overrun, the
 remediation order is §3.6.
 
-Components (repaired by #1241):
-    1. fixture_compile_check.py on samples/ (or samples/ + tests/ with
-       --corpus all); compiles once, no AST round trip.
+Components (#1241 removed an empty `Unit`-trait test run and a file-vs-itself
+"identity check"; exit 3 is TimeoutOrUnavailable, never OK):
+    1. fixture_compile_check.py on samples/ (+ tests/ with --corpus all)
     2. token-delta spot check on a single fixture (informational)
-
-Removed by #1241: a `dotnet test` run on the `Unit` category trait (it
-selected zero tests) and a byte-preservation "identity check" comparing a
-file with itself. Exit 3 from a checker is TimeoutOrUnavailable, not OK.
 
 Exit codes:
     0  all checks PASS
@@ -23,7 +19,6 @@ Exit codes:
 Usage:
     python3 scripts/verify_phase1.py
     python3 scripts/verify_phase1.py --corpus all       # extended
-    python3 scripts/verify_phase1.py --report fixtures.json
     python3 scripts/verify_phase1.py --self-test
 """
 
@@ -92,14 +87,11 @@ def main(argv: list[str] | None = None) -> int:
         ) != 0:
             failures.append("fixture_compile_check")
         # Token-delta spot check is informational; not gating.
-        sys.path.insert(0, str(SCRIPTS))
-        import checkout_compiler
-        tracked = checkout_compiler.tracked_calr(REPO_ROOT, ["samples"])
-        if tracked:
+        any_calr = REPO_ROOT / "samples/FizzBuzz/fizzbuzz.calr"
+        if any_calr.is_file():
             run_step(
                 "token_delta_spot (informational)",
-                [py, str(SCRIPTS / "token_delta_spot.py"),
-                 str(REPO_ROOT / tracked[0])],
+                [py, str(SCRIPTS / "token_delta_spot.py"), str(any_calr)],
             )
 
     elapsed = time.monotonic() - start

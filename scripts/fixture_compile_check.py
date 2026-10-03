@@ -1,40 +1,23 @@
 #!/usr/bin/env python3
 """
-fixture_compile_check.py — compile every tracked `.calr` fixture once and
-compare the outcome with its registered expectation (#1241).
+fixture_compile_check.py — compile every tracked `.calr` fixture once (or
+each registered multi-file group) with the checkout-built compiler and
+compare the outcome with its expectation in
+eng/tier2-fixture-expectations.json (#1241). It does not perform an AST round
+trip. Its predecessor, `ast_roundtrip_check.py`, claimed one but did not.
 
-It compiles each fixture (or registered multi-file group) once with the
-compiler built from this checkout (scripts/checkout_compiler.py). It does
-not perform an AST round trip: it never re-parses emitted output and
-compares no ASTs. Its predecessor, `ast_roundtrip_check.py`, claimed one
-without doing that work; the claim is removed.
+Every tracked fixture under the selected roots needs exactly one entry:
+`compile` (must compile), `reject` (must fail with exactly the registered
+error signature; negativeKind says whether it is designed to fail or is
+incidentally invalid Calor nothing compiles), or `known-failure` (a real
+compiler failure, kept as a failure). Only `passed` and `expected-negative`
+are successes; `known-failure`, `failed`, `unexpected-pass`, `unclassified`,
+`invalid`, `crashed`, and `TimeoutOrUnavailable` all fail. There is no skip
+path; an empty selection fails. Exit 0 = PASS, 1 = FAIL, 2 = unusable
+compiler or bad arguments.
 
-Expectations live in eng/tier2-fixture-expectations.json. Every tracked
-fixture under the selected roots must appear there exactly once, with:
-
-  expect = compile        must compile; the outcome is `passed`.
-  expect = reject         a negative: must fail with exactly the registered
-                          error signature (`expected-negative`). negativeKind
-                          says whether the fixture is designed to fail or is
-                          incidentally invalid Calor that nothing compiles.
-  expect = known-failure  a real compiler failure, retained as a failure:
-                          must fail with exactly the registered signature.
-
-Only `passed` and `expected-negative` are successes. `known-failure`,
-`failed` (wrong outcome or signature), `unexpected-pass`, `unclassified`
-(no expectation), `invalid` (malformed or stale entry), `crashed` (no
-parseable result), and `TimeoutOrUnavailable` all fail. There is no skip
-path; an empty selection fails.
-
-Exit codes:
-    0  PASS
-    1  FAIL (see the report)
-    2  bad arguments, or the checkout-built compiler cannot be used
-
-Usage:
-    python3 scripts/fixture_compile_check.py --root samples --root tests \\
-        [--report report.json] [--jobs N]
-    python3 scripts/fixture_compile_check.py --self-test
+Usage: fixture_compile_check.py --root samples [--root tests]
+       [--report report.json] [--jobs N] | --self-test
 """
 
 from __future__ import annotations
@@ -86,11 +69,10 @@ def errors_of(diagnostics: list[dict]) -> list[dict]:
 
 
 def signature(diagnostics: list[dict]) -> list[str]:
-    """One `file|code` entry per error, sorted, duplicates kept.
-
-    `file` is the base name of the reported location, so an error on the
-    wrong module of a workspace, or one more error of the same code, changes
-    the signature. Calor1002 carries its Roslyn code.
+    """One `file|code|declaration|message` entry per error, sorted, with
+    duplicates kept, so an error with another location, declaration, or
+    cause, or one more error, changes the signature. `file` is the base
+    name; Calor1002 carries its Roslyn code; whitespace is collapsed.
     """
     sig = []
     for d in errors_of(diagnostics):
@@ -99,7 +81,8 @@ def signature(diagnostics: list[dict]) -> list[str]:
             m = CS_CODE.search(str(d.get("message", "")))
             code = f"Calor1002:{m.group(1)}" if m else "Calor1002"
         where = Path(str((d.get("location") or {}).get("file") or "-")).name
-        sig.append(f"{where}|{code}")
+        msg = " ".join(str(d.get("message", "")).split())
+        sig.append(f"{where}|{code}|{d.get('declarationId') or '-'}|{msg}")
     return sorted(sig)
 
 
@@ -334,25 +317,18 @@ def _report(manifest: dict, roots: list[str], discovered: list[str],
     }
 
 
-def print_summary(report: dict, out=sys.stdout) -> None:
+def print_summary(report: dict) -> None:
     print(f"fixture_compile_check: {report['trackedFixtures']} tracked "
-          f"fixture(s) under {report['roots']} (compiled once each; no AST "
-          "round trip)", file=out)
+          f"fixture(s) under {report['roots']} (compiled once; no AST round "
+          "trip)")
     for s, n in report["counts"].items():
-        if n:
-            print(f"  {s:<22} {n}", file=out)
-    for r in report["rows"]:
-        if r["status"] in SUCCESS:
-            continue
-        files = ", ".join(r["files"]) or "-"
-        extra = r.get("detail") or ""
-        if r.get("signature") or r.get("expectedSignature"):
-            extra = (f"got {r.get('signature')} expected "
-                     f"{r.get('expectedSignature', '[]')} {extra}").strip()
-        print(f"  [{r['status']}] {files} {extra}", file=out)
-    print(f"fixture_compile_check: {report['verdict']}"
-          + (f" ({'; '.join(report['failReasons'])})"
-             if report["failReasons"] else ""), file=out)
+        print(f"  {s:<22} {n}") if n else None
+    for r in (r for r in report["rows"] if r["status"] not in SUCCESS):
+        print(f"  [{r['status']}] {', '.join(r['files']) or '-'} "
+              f"{r.get('detail', '')} got {r.get('signature')} expected "
+              f"{r.get('expectedSignature', [])}")
+    print(f"fixture_compile_check: {report['verdict']} "
+          f"{'; '.join(report['failReasons'])}")
 
 
 # -------------------------------------------------------------- self-test
@@ -370,10 +346,10 @@ def self_test() -> int:
     cases = [  # (source, expect, errors, wanted status)
         (good, "compile", [], "passed"),
         (broken, "compile", [], "failed"),
-        (good, "reject", ["Calor0410"], "unexpected-pass"),
-        (effect, "reject", ["Calor0410"], "expected-negative"),
-        (effect, "reject", ["Calor0411"], "failed"),
-        (effect, "known-failure", ["Calor0410"], "known-failure"),
+        (good, "reject", ["Calor0410|f001|Function 'Hi' uses effect 'cw' but does not declare it"], "unexpected-pass"),
+        (effect, "reject", ["Calor0410|f001|Function 'Hi' uses effect 'cw' but does not declare it"], "expected-negative"),
+        (effect, "reject", ["Calor0410|f001|Function 'Hi' uses effect 'db' but does not declare it"], "failed"),
+        (effect, "known-failure", ["Calor0410|f001|Function 'Hi' uses effect 'cw' but does not declare it"], "known-failure"),
     ]
     failures = 0
     with tempfile.TemporaryDirectory() as td:

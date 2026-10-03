@@ -38,31 +38,33 @@ if args[:2] == ["fix", "--help"]:
     print(open(h).read() if os.path.exists(h) else "")
     sys.exit(0)
 if args[:1] == ["fix"]:  # rewrites "§/F{" <-> "§/F[" unless fake.noop exists
-    n, dry, rev = 0, "--dry-run" in args, "--revert" in args
+    fixes, dry, rev = [], "--dry-run" in args, "--revert" in args
     for d, _, names in os.walk(args[1]):
         for p in (os.path.join(d, x) for x in names if x.endswith(".calr")):
             t = open(p, encoding="utf-8").read()
             new = t.replace("§/F[", "§/F{") if rev else t.replace("§/F{", "§/F[")
             new += "!" if rev and "CORRUPT" in t else ""
             if new == t or os.path.exists(sys.argv[0] + ".noop"): continue
-            n += 1
+            fixes.append({"file": os.path.relpath(p, args[1]), "count": 1})
             if not dry or "DRYWRITE" in t:
                 open(p, "w", encoding="utf-8").write(new)
-    print(f"files_changed={n}"); sys.exit(0)
+    if os.path.exists(sys.argv[0] + ".skipcontrol"):
+        fixes = [{"file": "fx/a.calr", "count": 1}]
+    print(json.dumps({"data": {"fixes": fixes}})); sys.exit(0)
 inputs = [args[i + 1] for i, a in enumerate(args) if a == "--input"]
 out = args[args.index("--output") + 1] if "--output" in args else None
 texts = {os.path.basename(p): open(p, encoding="utf-8").read() for p in inputs}
 blob = "\\n".join(texts.values())
 if "HANG" in blob: time.sleep(30)
 if "CRASH" in blob: sys.exit(134)
-err = lambda f, c: {"code": c, "severity": "error", "location": {"file": f},
-                    "message": "Generated C# failed compilation (CS0266): x"}
+err = lambda f, c, m="x": {"code": c, "severity": "error", "location": {"file": f},
+    "message": "Generated C# failed compilation (CS0266): x" if c == "Calor1002" else m}
 if "ZEROERR" in blob:
     print(json.dumps({"diagnostics": [err("z.calr", "Calor0410")]})); sys.exit(0)
-codes = [(f, l.split("FAIL:", 1)[1].strip()) for f, t in texts.items()
+codes = [(f, *l.split("FAIL:", 1)[1].strip().split(":", 1)) for f, t in texts.items()
          for l in t.splitlines() if "FAIL:" in l]
 if "NEEDS2" in blob and len(inputs) < 2: codes.append(("a.calr", "Calor0200"))
-diags = [err(f, c) for f, c in codes]
+diags = [err(*c) for c in codes]
 diags.append({"code": "Calor0411", "severity": "warning", "message": "w"})
 print(json.dumps({"diagnostics": diags}))
 if codes: sys.exit(1)
@@ -125,6 +127,7 @@ class FixtureCheckControls(unittest.TestCase):
         self.repo = FakeRepo(self, {
             "fx/ok.calr": "fine", "fx/broken.calr": "FAIL:Calor0100",
             "fx/two.calr": "FAIL:Calor0410\nFAIL:Calor0410",
+            "fx/sub.calr": "FAIL:Calor0410:effect db",
             "fx/ws/a.calr": "FAIL:Calor0410", "fx/ws/b.calr": "fine",
             "fx/neg.calr": "FAIL:Calor0410", "fx/codegen.calr": "FAIL:Calor1002",
             "fx/crash.calr": "CRASH", "fx/noout.calr": "NOOUT",
@@ -136,17 +139,20 @@ class FixtureCheckControls(unittest.TestCase):
             (self.repo.root / copy).write_text("FAIL:Calor0100")
 
     def test_single_fixture_outcomes(self):
-        neg = {"errors": ["neg.calr|Calor0410"]}
-        kf = {"errors": ["codegen.calr|Calor1002:CS0266"]}
+        neg = {"errors": ["neg.calr|Calor0410|-|x"]}
+        kf = {"errors": ["codegen.calr|Calor1002:CS0266|-|Generated C# failed "
+                         "compilation (CS0266): x"]}
         cases = [
             ("fx/ok.calr", "compile", {}, "passed"),
             ("fx/broken.calr", "compile", {}, "failed"),
             ("fx/ok.calr", "reject", neg, "unexpected-pass"),
             ("fx/neg.calr", "reject", neg, "expected-negative"),
-            ("fx/neg.calr", "reject", {"errors": ["neg.calr|Calor0411"]},
+            ("fx/neg.calr", "reject", {"errors": ["neg.calr|Calor0411|-|x"]},
              "failed"),
-            ("fx/two.calr", "reject", {"errors": ["two.calr|Calor0410"]},
+            ("fx/two.calr", "reject", {"errors": ["two.calr|Calor0410|-|x"]},
              "failed"),  # one more error of the same code
+            ("fx/sub.calr", "reject", {"errors": ["sub.calr|Calor0410|-|x"]},
+             "failed"),  # same file and code, another cause
             ("fx/codegen.calr", "known-failure", kf, "known-failure"),
             ("fx/ok.calr", "known-failure", kf, "unexpected-pass"),
             ("fx/crash.calr", "compile", {}, "crashed"),
@@ -154,25 +160,21 @@ class FixtureCheckControls(unittest.TestCase):
             ("fx/zeroerr.calr", "compile", {}, "crashed"),
             ("fx/gone.calr", "compile", {}, "invalid"),
             ("fx/obj/copy.calr", "compile", {}, "invalid"),
+            ("fx/hang.calr", "compile", {}, "TimeoutOrUnavailable"),
         ]
         for f, expect, extra, want in cases:
             with self.subTest(f=f, expect=expect, want=want):
-                r = self.repo.run_one(group("g", [f], expect, **extra))
+                r = self.repo.run_one(group("g", [f], expect, **extra),
+                                      timeout=2)
                 self.assertEqual(statuses(r)[f], want)
                 self.assertEqual(r["verdict"],
                                  "PASS" if want in fcc.SUCCESS else "FAIL")
                 self.assertFalse(r["astRoundTrip"])
 
-    def test_timeout_is_not_a_pass(self):
-        r = self.repo.run_one(group("h", ["fx/hang.calr"], "reject",
-                                    errors=["hang.calr|Calor0410"]), timeout=2)
-        self.assertEqual(statuses(r)["fx/hang.calr"], "TimeoutOrUnavailable")
-        self.assertEqual(r["verdict"], "FAIL")
-
     def test_negative_error_must_come_from_the_registered_file(self):
         ws = ["fx/ws/a.calr", "fx/ws/b.calr"]
-        for errs, want in ((["a.calr|Calor0410"], "expected-negative"),
-                           (["b.calr|Calor0410"], "failed")):
+        for errs, want in ((["a.calr|Calor0410|-|x"], "expected-negative"),
+                           (["b.calr|Calor0410|-|x"], "failed")):
             r = self.repo.run_one(group("w", ws, "reject", "together",
                                         errors=errs))
             self.assertEqual(statuses(r)["fx/ws/a.calr"], want)
@@ -180,10 +182,12 @@ class FixtureCheckControls(unittest.TestCase):
                 self.assertEqual(r["rows"][0]["errorDiagnostics"][0]["code"],
                                  "Calor0410")
 
-    def test_unclassified_fixture_fails(self):
+    def test_unclassified_fixture_and_empty_selection_fail(self):
         r = self.repo.check([group("ok", ["fx/ok.calr"])])
         self.assertEqual(statuses(r)["fx/broken.calr"], "unclassified")
         self.assertEqual(r["verdict"], "FAIL")
+        r = self.repo.check([group("ok", ["fx/ok.calr"])], roots=["nothing"])
+        self.assertEqual((r["trackedFixtures"], r["verdict"]), (0, "FAIL"))
 
     def test_build_output_is_never_discovered(self):
         found = checkout_compiler.tracked_calr(self.repo.root, ["fx"])
@@ -194,12 +198,10 @@ class FixtureCheckControls(unittest.TestCase):
         with self.assertRaises(checkout_compiler.CompilerResolutionError):
             checkout_compiler.tracked_calr(self.repo.root, ["fx"])
 
-    def test_double_registration_is_invalid(self):
-        r = self.repo.run_one(group("a", ["fx/ok.calr"]),
-                              group("b", ["fx/ok.calr"]))
-        self.assertIn("invalid", [x["status"] for x in r["rows"]])
-
     def test_malformed_entries_are_invalid(self):
+        r = self.repo.run_one(group("a", ["fx/ok.calr"]),
+                              group("b", ["fx/ok.calr"]))  # double registration
+        self.assertIn("invalid", [x["status"] for x in r["rows"]])
         bad = [
             group("o", ["fx/ok.calr"], options=["--help"]),
             group("r", ["fx/neg.calr"], "reject", errors=["n|Calor0410"],
@@ -229,10 +231,6 @@ class FixtureCheckControls(unittest.TestCase):
         r = self.repo.check([group("p", pair)], ["fx/pair"])
         self.assertEqual(statuses(r)["fx/pair/a.calr"], "failed")
 
-    def test_empty_selection_fails(self):
-        r = self.repo.check([group("ok", ["fx/ok.calr"])], roots=["nothing"])
-        self.assertEqual((r["trackedFixtures"], r["verdict"]), (0, "FAIL"))
-
 
 class PinnedCompilerControls(unittest.TestCase):
     def setUp(self):
@@ -240,49 +238,61 @@ class PinnedCompilerControls(unittest.TestCase):
             "Directory.Build.props": "<Project><PropertyGroup><TargetFramework>"
                                      "net10.0</TargetFramework></PropertyGroup>"
                                      "</Project>",
-            "src/Calor.Compiler/A.cs": "class A {}",
+            "src/Calor.Compiler/Sub/A.cs": "class A {}",
+            "src/Calor.Compiler/C.csproj":
+                '<EmbeddedResource Include="..\\..\\bench\\m.json" />',
+            "bench/m.json": "{}",
         })
-        git(self.repo.root, "-c", "user.name=t", "-c", "user.email=t@t", "-c",
-            "commit.gpgsign=false", "commit", "-q", "-m", "init")
+        self.git = lambda *a: git(self.repo.root, "-c", "user.name=t", "-c",
+                                  "user.email=t@t", "-c", "commit.gpgsign=false",
+                                  *a)
+        self.git("commit", "-q", "-m", "init")
+        (self.repo.root / "src/Calor.Compiler/Sub/U.json").write_text("{}")
         self.dll = (self.repo.root
                     / "src/Calor.Compiler/bin/Release/net10.0/calor.dll")
-
-    def test_missing_build_never_falls_back_to_installed_tool(self):
-        tool = self.repo.root / "pathbin" / "calor"
-        tool.parent.mkdir()
-        tool.write_text("#!/bin/sh\nexit 0\n")
-        tool.chmod(0o755)
-        path = f"{tool.parent}{os.pathsep}{os.environ.get('PATH', '')}"
-        with mock.patch.dict(os.environ, {"PATH": path}):
-            with self.assertRaises(checkout_compiler.CompilerResolutionError):
-                checkout_compiler.resolve(self.repo.root)
-
-    def test_stale_build_is_refused_and_fresh_build_is_pinned(self):
         self.dll.parent.mkdir(parents=True)
         self.dll.write_bytes(b"dll")
-        os.utime(self.dll, (1_000_000, 1_000_000))
-        with self.assertRaises(checkout_compiler.CompilerResolutionError):
-            checkout_compiler.resolve(self.repo.root)
-        os.utime(self.dll)
-        pinned = checkout_compiler.resolve(self.repo.root)
-        self.assertEqual(pinned.command, ["dotnet", str(self.dll.resolve())])
-        os.utime(self.dll, (2_000_000_000, 2_000_000_000))  # newer than all
-        for change in ("src/Calor.Compiler/Res.json", "src/Calor.Compiler/A.cs"):
-            p = self.repo.root / change  # an added resource, then a deletion
-            p.unlink() if p.exists() else p.write_text("{}")
-            os.utime(p, (2_100_000_000,) * 2) if p.exists() else None
+        for d, _, names in os.walk(self.repo.root):  # inputs older than dll
+            for x in [d, *(os.path.join(d, n) for n in names)]:
+                os.utime(x, (1_000_000_000,) * 2)
+        os.utime(self.dll, (1_500_000_000,) * 2)
+
+    def test_missing_build_never_falls_back_to_installed_tool(self):
+        self.dll.unlink()  # `calor` on PATH is never consulted (see guards)
+        with mock.patch.dict(os.environ, {"PATH": str(self.repo.root)}):
+            (self.repo.root / "calor").write_text("#!/bin/sh\n")
             with self.assertRaises(checkout_compiler.CompilerResolutionError):
                 checkout_compiler.resolve(self.repo.root)
-            p.unlink() if p.exists() else None
+
+    def test_fresh_build_is_pinned_and_any_input_change_is_stale(self):
+        pinned = checkout_compiler.resolve(self.repo.root)
+        self.assertEqual(pinned.command, ["dotnet", str(self.dll.resolve())])
+        f = lambda rel: self.repo.root / rel  # noqa: E731 (fresh repo per case)
+        a = "src/Calor.Compiler/Sub/A.cs"
+        changes = {
+            "edited source": lambda: f(a).write_text("class B {}"),
+            "edited untracked": lambda: f("src/Calor.Compiler/Sub/U.json")
+            .write_text("[]"),
+            "linked resource": lambda: f("bench/m.json").write_text("[]"),
+            "unstaged deletion": lambda: f(a).unlink(),
+            "committed deletion": lambda: (self.git("rm", "-q", a),
+                                           self.git("commit", "-q", "-m", "d")),
+        }
+        for name, change in changes.items():
+            with self.subTest(name):
+                self.setUp()
+                change()
+                with self.assertRaises(checkout_compiler.CompilerResolutionError):
+                    checkout_compiler.resolve(self.repo.root)
 
 
 class MigratorAndDriverControls(unittest.TestCase):
-    def run_migrator(self, module, help_text, files, noop=False):
+    def run_migrator(self, module, help_text, files, flag=None):
         repo = FakeRepo(self, files)
         (repo.root / "fx").mkdir(exist_ok=True)
         Path(str(repo.fake) + ".help").write_text(help_text)
-        if noop:
-            Path(str(repo.fake) + ".noop").write_text("")
+        if flag:  # fake.noop: rewrite nothing; fake.skipcontrol: omit it
+            Path(f"{repo.fake}.{flag}").write_text("")
         fake = mock.Mock(command=repo.cmd)
         err = io.StringIO()
         with mock.patch.object(checkout_compiler, "resolve",
@@ -299,35 +309,47 @@ class MigratorAndDriverControls(unittest.TestCase):
     def test_migrators_fail_closed(self):
         flags = "--drop-structural-ids --dry-run --revert --log"
         ok = {"fx/a.calr": "§/F{x}"}
-        cases = [  # (modules, help, files, noop, exit, stderr text)
-            ((dryrun, revert), "no flags", ok, False, dryrun.UNAVAILABLE,
+        cases = [  # (modules, help, files, fake flag, exit, stderr text)
+            ((dryrun, revert), "no flags", ok, None, dryrun.UNAVAILABLE,
              "TimeoutOrUnavailable"),
-            ((dryrun, revert), flags, {"other/a.calr": "x"}, False, 1,
+            ((dryrun, revert), flags, {"other/a.calr": "x"}, None, 1,
              "empty selection"),
-            ((dryrun, revert), flags, ok, True, 1, "exercised nothing"),
-            ((dryrun, revert), flags, ok, False, 0, ""),
-            ((dryrun,), flags, {"fx/a.calr": "§/F{x} DRYWRITE"}, False, 1,
+            ((dryrun, revert), flags, ok, "noop", 1, "exercised nothing"),
+            ((dryrun,), flags, ok, "skipcontrol", 1, "exercised nothing"),
+            ((dryrun, revert), flags, ok, None, 0, ""),
+            ((dryrun,), flags, {"fx/a.calr": "§/F{x} DRYWRITE"}, None, 1,
              "changed despite --dry-run"),
-            ((revert,), flags, {"fx/a.calr": "§/F{x} CORRUPT"}, False, 1,
+            ((revert,), flags, {"fx/a.calr": "§/F{x} CORRUPT"}, None, 1,
              "byte-mismatch post-revert"),
         ]
-        for modules, help_text, files, noop, want, message in cases:
+        for modules, help_text, files, flag, want, message in cases:
             for module in modules:
                 with self.subTest(module=module.__name__, case=message):
-                    rc, err = self.run_migrator(module, help_text, files, noop)
+                    rc, err = self.run_migrator(module, help_text, files, flag)
                     self.assertEqual(rc, want, err)
                     self.assertIn(message, err)
 
-    def test_drivers_never_pass_an_unavailable_or_failed_step(self):
+    def test_each_failed_or_unavailable_step_fails_its_driver(self):
         import verify_corpus
         self.assertEqual(verify_phase1.status_of(3), "TimeoutOrUnavailable")
-        for module in (verify_phase1, verify_corpus):
-            for rc in (1, 2, 3):
-                with self.subTest(module=module.__name__, rc=rc), \
-                        mock.patch.object(module, "run_step", return_value=rc), \
-                        contextlib.redirect_stdout(io.StringIO()), \
-                        contextlib.redirect_stderr(io.StringIO()):
-                    self.assertEqual(module.main([]), 1)
+        for module, argv in ((verify_phase1, []), (verify_phase1, ["--self-test"]),
+                             (verify_corpus, [])):
+            names = []
+            with mock.patch.object(module, "run_step", side_effect=lambda n, c:
+                                   names.append(n) or 0), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(module.main(argv), 0)
+            self.assertGreaterEqual(len(names), 2)
+            for bad in names:
+                for rc in (1, 2, 3):
+                    want = 0 if "informational" in bad else 1
+                    with self.subTest(module=module.__name__, argv=argv,
+                                      step=bad, rc=rc), \
+                            mock.patch.object(module, "run_step", side_effect=(
+                                lambda n, c: rc if n == bad else 0)), \
+                            contextlib.redirect_stdout(io.StringIO()), \
+                            contextlib.redirect_stderr(io.StringIO()):
+                        self.assertEqual(module.main(argv), want)
 
 
 class RepositoryGuards(unittest.TestCase):
@@ -389,13 +411,12 @@ class RepositoryGuards(unittest.TestCase):
                 self.assertFalse(banned in text, f"{name} uses {banned}")
 
     def test_workflows_run_the_repaired_drivers(self):
-        tier2 = (REPO_ROOT / ".github/workflows/tier2.yml").read_text()
-        for needle in ("set -o pipefail", "scripts/verify_corpus.py --report",
-                       "tier2-fixtures.json"):
-            self.assertIn(needle, tier2)
-        test = (REPO_ROOT / ".github/workflows/test.yml").read_text()
-        self.assertIn("scripts/verify_phase1.py --self-test", test)
-        self.assertIn("python3 scripts/test_tier2_verification.py", test)
+        wf = REPO_ROOT / ".github/workflows"
+        for name, needle in (("tier2", "set -o pipefail"),
+                             ("tier2", "scripts/verify_corpus.py --report"),
+                             ("test", "scripts/verify_phase1.py --self-test"),
+                             ("test", "scripts/test_tier2_verification.py")):
+            self.assertIn(needle, (wf / f"{name}.yml").read_text())
 
 
 if __name__ == "__main__":

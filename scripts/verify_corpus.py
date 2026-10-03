@@ -7,8 +7,7 @@ fixtures only. 1. Tier 1 extended: samples/ + tests/ against
 eng/tier2-fixture-expectations.json (known failures keep Tier 2 red;
 not an AST round trip). 2. Migrator dry run. 3. Token-delta counterfactual
 (informational). 4. Migrator revert round trip (source bytes, not AST).
-Removed: a `dotnet test` run on the `DiagnosticSnapshot` category trait,
-which selected zero tests.
+Removed: an empty `DiagnosticSnapshot`-trait test run.
 
 Runtime target: < 30 minutes on a developer machine.
 

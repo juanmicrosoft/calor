@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import re
+import json
 import subprocess
 import sys
 import tempfile
@@ -108,16 +108,21 @@ def main(argv: list[str] | None = None) -> int:
         copies = [work / r for r in rels] + [control]
         hashes_before = {f: file_sha1(f) for f in copies}
         cp = subprocess.run(
-            calor_cmd + ["fix", str(work), f"--{args.mode}", "--dry-run"],
+            calor_cmd + ["fix", str(work), f"--{args.mode}", "--dry-run",
+                         "--format", "json"],
             capture_output=True, text=True, cwd=REPO_ROOT)
         if cp.returncode != 0:
             print(f"  FAIL: migrator exit {cp.returncode}", file=sys.stderr)
             print(f"    {cp.stderr.strip()[-1000:]}", file=sys.stderr)
             return 1
-        m = re.search(r"files_changed=(\d+)", cp.stdout)
-        if not m or int(m.group(1)) < 1:
-            print("  FAIL: the dry run reported no change, not even for the "
-                  "control file; the check exercised nothing",
+        try:
+            fixes = json.loads(cp.stdout[cp.stdout.find("{"):])["data"]["fixes"]
+        except (ValueError, KeyError, TypeError):
+            fixes = []
+        if not any(f.get("file") == "__control__/control.calr"
+                   and f.get("count", 0) > 0 for f in fixes):
+            print("  FAIL: the dry run proposed no change to the control "
+                  "file; the check exercised nothing",
                   file=sys.stderr)
             return 1
         # Verify no file was actually modified by dry-run.

@@ -10,6 +10,7 @@ obj/ copies are never selected.
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import shutil
 import subprocess
@@ -44,13 +45,10 @@ class PinnedCompiler:
         return ["dotnet", str(self.dll)]
 
     def provenance(self) -> dict:
-        return {
-            "compiler": "checkout-built calor.dll (installed tools are never used)",
-            "dll": str(self.dll.relative_to(self.dll.parents[5])),
-            "dllSha256": self.sha256,
-            "head": self.head,
-            "worktreeDirty": self.dirty,
-        }
+        return {"compiler": "checkout-built calor.dll, never an installed tool",
+                "dll": str(self.dll.relative_to(self.dll.parents[5])),
+                "dllSha256": self.sha256, "head": self.head,
+                "worktreeDirty": self.dirty}
 
 
 def _target_framework(repo_root: Path) -> str:
@@ -82,13 +80,18 @@ def resolve(repo_root: Path = REPO_ROOT) -> PinnedCompiler:
             "`dotnet build src/Calor.Compiler -c Release` first. An installed "
             "`calor` tool is never used instead.")
     built = dll.stat().st_mtime
-    inputs = (*SOURCE_DIRS, *ROOT_BUILD_FILES)
-    deleted = [f for f in _git(repo_root, "ls-files", "-z", "--deleted", "--",
-                               *inputs).split("\0") if f]
+    # Files a project links from elsewhere (EmbeddedResource Include="..\..").
+    linked = [os.path.normpath(f"{d}/{m}".replace("\\", "/"))
+              for d in SOURCE_DIRS for p in (repo_root / d).glob("*.csproj")
+              for m in re.findall(r'Include="(\.\.[^"]+)"', p.read_text())]
+    inputs = (*SOURCE_DIRS, *ROOT_BUILD_FILES, *linked)
     files = _git(repo_root, "ls-files", "-z", "-co", "--exclude-standard",
                  "--", *inputs).split("\0")
-    stale = deleted + [f for f in files if f
-                       and (repo_root / f).is_file()
+    # Deleting or adding a file (even in a commit) bumps its directory.
+    dirs = {str(Path(f).parent) for f in files
+            if f.startswith(tuple(d + "/" for d in SOURCE_DIRS))}
+    stale = [f for f in [*files, *dirs, *SOURCE_DIRS] if f
+                       and (repo_root / f).exists()
                        and (repo_root / f).stat().st_mtime > built]
     if stale:
         raise CompilerResolutionError(
