@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "issue": 1276,
+  "gate": "B1",
+  "machine": {
+    "os": "macOS 27.0.1 (build 26A434)",
+    "architecture": "arm64",
+    "cpu": "Apple M4 Max",
+    "dotnetSdk": "10.0.401 (global.json 10.0.100, rollForward latestMinor)",
+    "oracleEnvironmentString": ".NET 10.0.12; macOS 27.0.1; Arm64; Roslyn 5.3.0.0",
+    "paidComputeUsd": 0
+  },
+  "oracleRuns": {
+    "checkout": "isolated git worktree, detached HEAD at f0e0eb682a8658364170ad49aff2d2c433d570f8 (the main merge commit of registration PR #1473)",
+    "setup": "src/Calor.Compiler/scripts/download-z3.sh (pinned Z3 assets, verified against committed size/hash pins; gitignored), then dotnet build tests/Calor.Evaluation -c Release; git status --porcelain --untracked-files=all was empty before each run",
+    "run1": {
+      "command": "dotnet run --project tests/Calor.Evaluation -c Release -- pair-oracle --registration docs/plans/evidence/b1-1276/registration --registration-commit f0e0eb682a8658364170ad49aff2d2c433d570f8 --output <scratch>/run1.json",
+      "exitCode": 4,
+      "exitMeaning": "first run, not a result (registration.json oracle.runAgreement)",
+      "finishedLocal": "2026-10-03T14:09:29-04:00",
+      "output": "oracle-run-1.json",
+      "log": "oracle-run-1.log"
+    },
+    "run2": {
+      "command": "dotnet run --project tests/Calor.Evaluation -c Release -- pair-oracle --registration docs/plans/evidence/b1-1276/registration --registration-commit f0e0eb682a8658364170ad49aff2d2c433d570f8 --compare-with <scratch>/run1.json --output <scratch>/run2.json",
+      "exitCode": 0,
+      "exitMeaning": "valid reconciled result",
+      "finishedLocal": "2026-10-03T14:13:24-04:00",
+      "output": "oracle-run-2.json",
+      "log": "oracle-run-2.log"
+    },
+    "rawOutputs": "oracle-run-1.json and oracle-run-2.json are byte-for-byte copies of the files the runs wrote outside the repository; the logs are the runs' combined stdout and stderr with an appended exit line"
+  },
+  "metricRuns": {
+    "commit": "935345a9e8aa349b718f242953e63642e2bf6383",
+    "commitNote": "Results-branch commit that adds only the results generator (PairResultsCommand.cs, two Program.cs lines, one .gitattributes line) on top of main bf584fb7, whose code and corpus are identical to the registration merge commit (main changed only documentation after it). pair-metrics re-checks every metric implementation file and every included arm against its registered SHA-256 before computing.",
+    "commands": [
+      "dotnet run --project tests/Calor.Evaluation -c Release -- pair-metrics --registration docs/plans/evidence/b1-1276/registration --oracle-result <scratch>/run2.json --output <scratch>/metrics1.json",
+      "the same command with --output <scratch>/metrics2.json"
+    ],
+    "exitCodes": [0, 0],
+    "bitIdentical": true,
+    "outputs": ["metrics-run-1.json", "metrics-run-2.json"],
+    "logs": ["metrics-run-1.log", "metrics-run-2.log"]
+  },
+  "aggregation": {
+    "commit": "935345a9e8aa349b718f242953e63642e2bf6383",
+    "command": "dotnet run --project tests/Calor.Evaluation -c Release -- pair-results --registration docs/plans/evidence/b1-1276/registration --first-oracle-result oracle-run-1.json --oracle-result oracle-run-2.json --metrics metrics-run-1.json metrics-run-2.json --output docs/plans/evidence/b1-1276/results",
+    "exitCode": 0,
+    "outputs": ["pair-manifest.json", "results.json"]
+  }
+}
