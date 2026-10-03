@@ -224,6 +224,7 @@ public class InteropScopeTests
         return c is null ? null : Encoding.UTF8.GetBytes(new JsonObject
         {
             ["candidate"] = parts[1], ["caseId"] = parts[0], ["requirementSha256"] = Requirement(c), ["result"] = "passed",
+            ["cells"] = new JsonObject((c["cells"]?.AsArray() ?? []).Select(x => KeyValuePair.Create(x!.GetValue<string>(), (JsonNode?)"passed"))),
         }.ToJsonString());
     };
 
