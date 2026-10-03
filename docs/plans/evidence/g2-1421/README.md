@@ -179,23 +179,36 @@ attempt, determinism row, gate, rule, or budget value changes, and no registered
 | Guard | Where | Negative control (`test_determinism_protocol.py`) |
 |---|---|---|
 | Dispatch only: no automatic trigger; `plan` refuses any other event | `D013` (`workflow_problems`), `plan_problems` | `test_automatic_trigger_is_rejected` |
-| No re-run: `GITHUB_RUN_ATTEMPT` must be 1 in every job; no attempt runs twice; no reused execution id | `refuse_rerun`, `run_job` | `test_retry_rerun_or_reused_id_is_refused`, `test_every_attempt_runs_once_in_its_own_isolated_home` |
+| No re-run or copied workflow: the first step of every job and every command require `GITHUB_RUN_ATTEMPT` 1 and this workflow's `GITHUB_WORKFLOW_REF`; no attempt runs twice; no reused execution id; no other workflow may call the runner | isolate step, `refuse_foreign`, `run_job`, `D013` | `test_retry_rerun_or_reused_id_is_refused`, `test_every_attempt_runs_once_in_its_own_isolated_home` |
 | No run-until-green: every attempt is recorded once, failures included | `run_job`, `fill_missing` | `test_a_failing_invocation_is_recorded_and_never_retried` |
 | A commit is executed at most once | `plan_problems` | `test_second_execution_of_a_commit_is_refused` |
 | A repair after an unsuccessful execution changes a path outside `docs/` | `plan_problems` (git diff) | `test_docs_only_repair_is_refused` |
-| Budget from the API run inventory, with every unfinished run's worst case reserved; run limits | `plan_problems`, `fetch_inventory` | `test_budget_exceeded_is_refused` |
+| Budget from the API run inventory (fail closed on short or duplicate pages), reconciled with the ledger, with every unfinished run's worst case reserved; run limits | `plan_problems`, `fetch_inventory`, `paged` | `test_budget_exceeded_is_refused`, `test_deleted_or_foreign_runs_are_refused`, `test_inventory_and_ledger_come_from_the_api` |
 | No normalization option anywhere; no masked status, `continue-on-error`, or `fail-fast` | `workflow_problems`, `D009` | `test_normalization_flag_or_masked_status_is_rejected` |
-| Fresh, empty `HOME`/`USERPROFILE`/`DOTNET_CLI_HOME` under the job's output directory for every invocation | `invocation_env`, `check_isolation` | `test_missing_isolated_home_is_refused` |
-| Exact toolchain in the private root, OS, CPU, memory, Z3 pins, commit, `autocrlf`, clean tree | `judge` | `test_environment_check_rejects_any_other_toolchain_or_runner` |
+| Job homes under the runner temp directory; a fresh, empty `HOME`/`USERPROFILE`/`DOTNET_CLI_HOME` under the job's output directory for every invocation | isolate step, `invocation_env`, `check_isolation` | `test_missing_isolated_home_is_refused` |
+| Exact toolchain in the private root, OS, CPU, memory, Z3 pins, commit, `autocrlf`, clean tree (also after the build), image, home probe; re-judged by the decider | `judge`, `_record_problem` | `test_environment_check_rejects_any_other_toolchain_or_runner` |
 
-Three choices are stricter than the registration (`workflow.deviations`): an execution run
-that did not conclude `success` is treated as possibly `NON-DETERMINISTIC` or `FAILING`; a run
-whose title the plan cannot read is charged as an execution; and `env-check` probes whether
-.NET resolves `SpecialFolder.UserProfile` (the root of the verifier's default user-level cache)
-to the isolated home. If it does not, as may happen on Windows, every attempt there is an
-`environment-violation` (`limitations`). Residual (`workflow.residual`): a dispatch runs the
-workflow and harness bytes of the dispatched ref, so #1135 decides with main's decider and
-records every run in the ledger (`ledger-check`).
+Deviations (`workflow.deviations`):
+
+- `toolchain.installRoot` named `setup-dotnet`, which first installs a floating LTS runtime.
+  The machinery runs setup-dotnet's own install script, pinned by commit and SHA-256, with only
+  the SDK version.
+- An execution run that did not conclude `success` is treated as possibly `NON-DETERMINISTIC`
+  or `FAILING`, and a run whose title the plan cannot read is counted as an execution.
+- `env-check` runs a file-based app on the pinned runtime to check that
+  `SpecialFolder.UserProfile` (the root of the verifier's default user-level cache) follows the
+  isolated home. If it does not, as may happen on Windows, every attempt there is an
+  `environment-violation` (`limitations`).
+- The decider re-judges every attempt's environment observations and rejects an invocation
+  whose home already held `.calor`. `harnessSha256` now covers the validator, the runner, and
+  the workflow.
+- Contract amendment 1.2.0 charges #1424's candidate-time execution to
+  `regeneration-compute`. The plan cannot yet verify a qualifying run (the #1423 manifest and
+  the #1424 ledger do not exist), so it charges every dispatched run to `determinism-compute`
+  and over-counts.
+
+Residual (`workflow.residual`): a plan job's minutes are spent before it can refuse, and a run
+deleted before #1135 records it in the ledger leaves no history.
 
 No control run was dispatched: `workflow_dispatch` needs the workflow on the default branch.
 

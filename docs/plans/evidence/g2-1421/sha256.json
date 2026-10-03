@@ -1,9 +1,9 @@
 {
   "algorithm": "SHA-256 over LF-normalized UTF-8 bytes",
   "files": {
-    "docs/plans/evidence/g2-1421/protocol.json": "eea0ae47cecc1c46a0967885e606e41941c9b38828400f9a88aa9f3f467ee0a2",
+    "docs/plans/evidence/g2-1421/protocol.json": "2d2c8e3af49b8ca1d87dff7fa3c60892dc7bd0414c71924defd76f85b696df1e",
     "docs/plans/evidence/g2-1421/cases.json": "253f591fed185ddfd66865f6e0f81502dc62085555a2cb2dff32ee22be023317",
-    "docs/plans/evidence/g2-1421/README.md": "9282000ba6ca6aaa76de215c40c6f6da636d702f38c87a1f0ecec664b28dafd2",
+    "docs/plans/evidence/g2-1421/README.md": "38833d54f64c2064134d4a92acbda3403025570e69bfc3587f119ab6e7728fa4",
     "scripts/determinism_protocol.py": "27e3fe808eb1f4149ff00b5e2534d3f3acb9f9184e58e4863e55056b0f9db433",
     "scripts/test_determinism_protocol.py": "4b32a50d3fc7e6d91f1d7cdebe3b72e8d8f3e7d1f7c193b542e86df056bbf1ed",
     "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DeterminismRecord.cs": "843ca71153522985c90010fe71ff3a2e6d94ff1d2bb48535c3cfd7de9d3a9498",
