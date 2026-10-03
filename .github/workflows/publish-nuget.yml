@@ -1,19 +1,56 @@
 name: Publish to NuGet
 
+# #1410 (0.24 R2): this workflow is the only release path. It no longer runs on
+# `release: created` and takes no version override. It publishes only the candidate
+# named by one successful #1408 adjudication identity, in this order: adjudication
+# gate -> release test gates -> NuGet push -> GitHub release -> release metadata ->
+# website and benchmark dispatch. The publishing job re-runs
+# scripts/verify_release_adjudication.py against the bytes it is about to publish.
+# Design: docs/plans/evidence/r2-1410/release-gate.md.
 on:
-  release:
-    types: [created]
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version override (leave empty to use project version)'
-        required: false
+      adjudication_identity:
+        description: 'calor-adjudication:v1:<adjudication commit>:<terminal record sha256> (#1410)'
+        required: true
         type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-publication
+  cancel-in-progress: false
 
 env:
   Z3_VERSION: "4.15.7"
+  ADJUDICATION_IDENTITY: ${{ inputs.adjudication_identity }}
 
 jobs:
+  adjudication-gate:
+    runs-on: ubuntu-latest
+    outputs:
+      candidate: ${{ steps.gate.outputs.candidate }}
+      version: ${{ steps.gate.outputs.version }}
+      tag: ${{ steps.gate.outputs.tag }}
+      prerelease: ${{ steps.gate.outputs.prerelease }}
+    steps:
+      - name: Refuse a dispatch from any ref but main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::publish-nuget runs only from main (got $GITHUB_REF); the candidate comes from the adjudication identity"
+          exit 1
+
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify the adjudication identity (#1410)
+        id: gate
+        run: python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY"
+
   # Truthful release gates (#790, W1 Slice 4): publishing is impossible unless
   # the full test suite and the M-A1 packaged-SDK consumer check pass on the
   # same commit being published.
@@ -33,6 +70,7 @@ jobs:
     # there. The gate is unchanged in strength — `publish` still needs every leg
     # green on the commit being released — only the packing changes.
     name: test (${{ matrix.name }})
+    needs: adjudication-gate
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -69,6 +107,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: ${{ needs.adjudication-gate.outputs.candidate }}
           submodules: recursive
           # #1159: LedgerCommitStampTests decides whether a ledger's MeasuredCommit
           # is reachable, which needs history. Under a depth-1 checkout it SKIPS —
@@ -182,6 +221,7 @@ jobs:
     # M-A1: a template consumer restores/builds/tests green against the
     # packaged Calor.Sdk from a local feed (wedge plan v0.11 D-W1.2, PP-A1).
     name: sdk-consumer (${{ matrix.rid }})
+    needs: adjudication-gate
     strategy:
       fail-fast: false
       matrix:
@@ -201,6 +241,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.adjudication-gate.outputs.candidate }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -219,11 +261,12 @@ jobs:
       - name: Run M-A1 consumer check
         env:
           CALOR_SDK_REQUIRE_ALL_RIDS: "1"
-          CALOR_SDK_VERSION: ${{ github.event.inputs.version }}
+          CALOR_SDK_VERSION: ${{ needs.adjudication-gate.outputs.version }}
           CALOR_SDK_EXPECTED_RID: ${{ matrix.rid }}
         run: bash .github/scripts/test-sdk-package.sh
 
   release-quality:
+    needs: adjudication-gate
     runs-on: ubuntu-latest
     # Main CI allows 50m; this gate also runs 100 flake trials and the full corpus.
     timeout-minutes: 60
@@ -232,6 +275,7 @@ jobs:
       - name: Checkout code and round-trip corpus
         uses: actions/checkout@v4
         with:
+          ref: ${{ needs.adjudication-gate.outputs.candidate }}
           submodules: recursive
           # Keep ledger provenance tests active, as in main CI and release tests.
           fetch-depth: 0
@@ -336,15 +380,20 @@ jobs:
 
   publish:
     runs-on: ubuntu-latest
-    needs: [test, sdk-consumer, release-quality]
+    needs: [adjudication-gate, test, sdk-consumer, release-quality]
     permissions:
       contents: write
       id-token: write
       attestations: write
+      actions: write
 
     steps:
-      - name: Checkout code
+      - name: Checkout the adjudicated candidate with full history
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.adjudication-gate.outputs.candidate }}
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -409,12 +458,10 @@ jobs:
       - name: Pack CLI + SDK
         run: |
           set -euo pipefail
-          VERSION_ARG=""
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION_ARG="/p:Version=${{ github.event.inputs.version }}"
-          fi
-          dotnet pack src/Calor.Compiler/Calor.Compiler.csproj -c Release --no-build -o ./nupkg $VERSION_ARG
-          dotnet pack src/Calor.Sdk/Calor.Sdk.csproj -c Release -o ./nupkg /p:CalorSdkRequireAllRids=true $VERSION_ARG
+          # No version override (#1410): the version is the candidate's Directory.Build.props,
+          # which the gate has already matched to the adjudicated version.
+          dotnet pack src/Calor.Compiler/Calor.Compiler.csproj -c Release --no-build -o ./nupkg
+          dotnet pack src/Calor.Sdk/Calor.Sdk.csproj -c Release -o ./nupkg /p:CalorSdkRequireAllRids=true
 
       - name: Inspect Calor.Sdk package contents
         run: |
@@ -425,11 +472,30 @@ jobs:
       - name: Generate SBOM and provenance
         run: |
           python3 scripts/generate-release-metadata.py \
-            --name "calor-nuget-${{ github.sha }}" \
+            --name "calor-nuget-${{ needs.adjudication-gate.outputs.candidate }}" \
             --artifacts ./nupkg \
             --output ./release-metadata \
             --repository "${{ github.server_url }}/${{ github.repository }}" \
-            --commit "${{ github.sha }}"
+            --commit "${{ needs.adjudication-gate.outputs.candidate }}"
+
+      # The gate re-runs here, in the job that publishes, against the exact packages,
+      # metadata, and notes it is about to publish, before anything is attested or pushed.
+      - name: Render release notes from the candidate CHANGELOG
+        env:
+          VER: ${{ needs.adjudication-gate.outputs.version }}
+        run: |
+          set -euo pipefail
+          awk -v v="$VER" '$0 ~ "^## \\[" v "\\]" {f=1; print; next} f && /^## \[/ {exit} f' \
+            CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          test -s "$RUNNER_TEMP/notes.md"
+
+      - name: Verify packages, metadata, and notes against the adjudication (#1410)
+        env:
+          VER: ${{ needs.adjudication-gate.outputs.version }}
+        run: |
+          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+            --expect-head --version "$VER" --nuget-dir ./nupkg --metadata-dir ./release-metadata \
+            --release-notes "$RUNNER_TEMP/notes.md"
 
       - name: Attest NuGet packages
         uses: actions/attest-build-provenance@v2
@@ -438,8 +504,51 @@ jobs:
             ./nupkg/*.nupkg
             ./release-metadata/*.json
 
+      # --skip-duplicate alone would accept a different package already on nuget.org. An
+      # existing version is downloaded and must match the adjudicated package entry for
+      # entry (only the repository signature may differ).
+      - name: Compare any version already on nuget.org (#1410)
+        env:
+          VER: ${{ needs.adjudication-gate.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/registry"
+          for id in calor calor.sdk; do
+            url="https://api.nuget.org/v3-flatcontainer/$id/$VER/$id.$VER.nupkg"
+            code="$(curl -sS -L -o "$RUNNER_TEMP/registry/$id.$VER.nupkg" -w '%{http_code}' "$url")"
+            case "$code" in
+              200) echo "nuget.org already has $id $VER; comparing" ;;
+              404) rm -f "$RUNNER_TEMP/registry/$id.$VER.nupkg" ;;
+              *) echo "::error::cannot tell whether nuget.org has $id $VER (HTTP $code)"; exit 1 ;;
+            esac
+          done
+          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+            --expect-head --version "$VER" --nuget-dir ./nupkg --registry-dir "$RUNNER_TEMP/registry"
+
       - name: Push to NuGet
         run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      # A pre-push 404 followed by a 409 from --skip-duplicate would leave an unverified
+      # package in place. Wait until nuget.org serves both packages, then compare them with
+      # the adjudicated packages before anything else is published.
+      - name: Verify the packages nuget.org serves (#1410)
+        env:
+          VER: ${{ needs.adjudication-gate.outputs.version }}
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/served" && mkdir -p "$RUNNER_TEMP/served"
+          for id in calor calor.sdk; do
+            url="https://api.nuget.org/v3-flatcontainer/$id/$VER/$id.$VER.nupkg"
+            for attempt in $(seq 1 60); do
+              code="$(curl -sS -L -o "$RUNNER_TEMP/served/$id.$VER.nupkg" -w '%{http_code}' "$url" || echo 000)"
+              [ "$code" = 200 ] && break
+              rm -f "$RUNNER_TEMP/served/$id.$VER.nupkg"
+              sleep 30
+            done
+            test -s "$RUNNER_TEMP/served/$id.$VER.nupkg" || { echo "::error::nuget.org does not serve $id $VER after 30 minutes"; exit 1; }
+          done
+          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+            --expect-head --version "$VER" --nuget-dir ./nupkg --registry-dir "$RUNNER_TEMP/served"
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
@@ -449,8 +558,70 @@ jobs:
             ./nupkg/*.nupkg
             ./release-metadata/*.json
 
-      - name: Attach release metadata
-        if: github.event_name == 'release'
+      # The GitHub release is created only here: after adjudication and after the packages
+      # are on nuget.org. Its body is the adjudicated notes plus the identity trailer that
+      # every downstream surface checks. The remote tag is checked at this moment, not at
+      # checkout time: it must be absent or already point at the candidate. An existing
+      # release is accepted only if its body verifies; it is never edited.
+      - name: Create the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" ./release-metadata/*.json --clobber
+          TAG: ${{ needs.adjudication-gate.outputs.tag }}
+          CANDIDATE: ${{ needs.adjudication-gate.outputs.candidate }}
+          PRERELEASE: ${{ needs.adjudication-gate.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          shopt -s inherit_errexit
+          # Only a confirmed absence counts as absent; any API failure stops the job.
+          remote_tag() {
+            local found
+            found="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$TAG" --jq "[.[] | select(.ref == \"refs/tags/$TAG\")] | length")"
+            if [ "$found" = 0 ]; then return 0; fi
+            gh api "repos/$GITHUB_REPOSITORY/commits/refs/tags/$TAG" --jq .sha
+          }
+          existing="$(remote_tag)"
+          if [ -n "$existing" ] && [ "$existing" != "$CANDIDATE" ]; then
+            echo "::error::tag $TAG already points at $existing, not the candidate $CANDIDATE"; exit 1
+          fi
+          if gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/existing.md" 2>/dev/null; then
+            TITLE="$(gh release view "$TAG" --json name --jq .name)"
+            python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+              --expect-head --release-body "$RUNNER_TEMP/existing.md" --release-tag "$TAG" --release-title "$TITLE"
+          else
+            { cat "$RUNNER_TEMP/notes.md"; printf '\n<!-- calor-adjudication: %s -->\n' "$ADJUDICATION_IDENTITY"; } > "$RUNNER_TEMP/body.md"
+            FLAG=""
+            if [ "$PRERELEASE" = "true" ]; then FLAG="--prerelease"; fi
+            gh release create "$TAG" --target "$CANDIDATE" --title "$TAG" --notes-file "$RUNNER_TEMP/body.md" $FLAG
+          fi
+          if [ "$(remote_tag)" != "$CANDIDATE" ]; then
+            echo "::error::after release creation tag $TAG does not point at the candidate $CANDIDATE"; exit 1
+          fi
+
+      # No --clobber (#1410): an asset already attached must be byte-identical to the verified
+      # file; a missing one is uploaded; a different one fails. This keeps re-dispatch safe.
+      - name: Attach release metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.adjudication-gate.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/assets"
+          for file in ./release-metadata/*.json; do
+            name="$(basename "$file")"
+            if gh release download "$TAG" -p "$name" -D "$RUNNER_TEMP/assets" 2>/dev/null; then
+              cmp -s "$file" "$RUNNER_TEMP/assets/$name" || { echo "::error::release asset $name differs from the verified file"; exit 1; }
+            else
+              gh release upload "$TAG" "$file"
+            fi
+          done
+
+      # Releases created with GITHUB_TOKEN raise no `release` events, so the downstream
+      # surfaces are dispatched explicitly, from main, with the same identity. Each one
+      # re-runs the gate, checks out the candidate, and checks this release's body.
+      - name: Dispatch website and benchmark publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run nextjs-gh-pages.yml --ref main -f adjudication_identity="$ADJUDICATION_IDENTITY"
+          gh workflow run benchmark.yml --ref main -f adjudication_identity="$ADJUDICATION_IDENTITY"

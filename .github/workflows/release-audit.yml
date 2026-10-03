@@ -1,0 +1,43 @@
+name: Release audit (adjudication identity)
+
+# #1410 (0.24 R2): GitHub cannot stop a person with write access from running
+# `gh release create` by hand, and a release created that way raises a `release`
+# event (releases created by publish-nuget with GITHUB_TOKEN do not). No publishing
+# workflow listens to `release` events any more, so a hand-made release publishes
+# nothing else. This audit makes such a release visible: it fails, red, unless the
+# release body ends with an adjudication identity that verifies against the release's
+# own tag and notes. It changes nothing; correcting the release is a maintainer action.
+# Design: docs/plans/evidence/r2-1410/release-gate.md.
+on:
+  release:
+    types: [created, published, edited, prereleased, released]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify the release against its adjudication identity
+        env:
+          BODY: ${{ github.event.release.body }}
+          TAG: ${{ github.event.release.tag_name }}
+          TITLE: ${{ github.event.release.name }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$BODY" | tr -d '\r' > "$RUNNER_TEMP/release-body.md"
+          IDENTITY="$(sed -n 's/^<!-- calor-adjudication: \([^ ]*\) -->$/\1/p' "$RUNNER_TEMP/release-body.md" | tail -1)"
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::release $TAG carries no adjudication identity; it did not come through the gated release path (#1410)"
+            exit 1
+          fi
+          python3 scripts/verify_release_adjudication.py --identity "$IDENTITY" \
+            --version "${TAG#v}" --require-tag --release-body "$RUNNER_TEMP/release-body.md" \
+            --release-tag "$TAG" --release-title "$TITLE"
