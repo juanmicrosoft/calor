@@ -19,6 +19,24 @@ All notable changes to this project will be documented in this file.
 - **Older website benchmark numbers are labeled historical.** They stay published, marked as not
   comparable under the 0.24 method.
 
+### Fixed
+
+- **An empty clause body no longer swallows the next statement (#1485).** A
+  clause such as `§CA` (catch) with no indented lines used to pull the next
+  statement at the same column into its body. The program compiled with no
+  diagnostic and behaved differently: the converted X-TRYCATCH-01 program
+  returned `1` instead of `2`. A clause now owns only the lines indented
+  under it, so an empty body stays empty. The fix covers every construct with
+  an indented body: `§IF`/`§EI`/`§EL`, `§L`, `§WH`, `§DO`, `§EACH`, `§EACHKV`,
+  `§USE`, `§TR`/`§CA`/`§FI`, `§SYNC`, `§UNSAFE`, `§FIXED`, `§W` and its `§K`
+  cases, `§LAM`, `§PP`/`§PPE`, property and event accessors, `§F`/`§AF`, `§CL`,
+  `§EN`, `§EEXT`, `§DC`, and `§CT`. Two committed programs were parsed wrongly
+  before: an empty abstract class in a conversion snapshot used to adopt the
+  next three classes as nested classes, and a one-line `§CT` context in an
+  edit-script fixture used to swallow the module's only function. A tolerated
+  explicit closer such as `§/TR{id}` still ends a body written at the
+  opener's own column.
+
 ## [0.22.0] - 2026-09-15
 
 ### Benchmark Results (Statistical: 30 runs)
