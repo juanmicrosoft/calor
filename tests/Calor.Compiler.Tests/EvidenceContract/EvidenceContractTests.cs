@@ -1128,6 +1128,7 @@ public class EvidenceContractTests
     [InlineData("reordered-conditions")]
     [InlineData("replaced-scope")]
     [InlineData("other-justification")]
+    [InlineData("conditions-moved-into-justification")]
     [InlineData("other-added-executions")]
     [InlineData("no-added-executions")]
     public void GateCeilingExceptionOtherThanTheRegisteredOneFails(string mutation)
@@ -1158,6 +1159,12 @@ public class EvidenceContractTests
                 break;
             case "replaced-scope": exception["scope"] = "Repeated selective sweeps until every row is clean."; break;
             case "other-justification": exception["justification"] = "Fixture justification."; break;
+            case "conditions-moved-into-justification":
+                // The same text, but five conditions are no longer conditions (review round 2).
+                var all = exception["conditions"]!.AsArray().Select(c => c!.GetValue<string>()).ToList();
+                exception["conditions"] = new JsonArray(all.Take(5).Select(c => (JsonNode)JsonValue.Create(c)!).ToArray());
+                exception["justification"] = string.Join("\n", all.Skip(5).Append(exception["justification"]!.GetValue<string>()));
+                break;
             case "other-added-executions": exception["addedExecutions"] = 3008; break;
             case "no-added-executions": exception.AsObject().Remove("addedExecutions"); break;
         }
@@ -1167,17 +1174,21 @@ public class EvidenceContractTests
     [Fact]
     public void RegisteredTextHashesMatchTheCommittedEntries()
     {
-        // The committed packet is the registered text; CRLF in a checkout does not change the hash.
+        // The committed packet is the registered text: its exception and charge rule pass C011 as committed.
         var capacity = Contract()["authorityCapacity"]!["capacity"]!;
-        var s1 = S1Exception(Contract());
-        var parts = new List<string?> { s1["scope"]!.GetValue<string>() };
-        parts.AddRange(s1["conditions"]!.AsArray().Select(c => c!.GetValue<string>()));
-        parts.Add(s1["justification"]!.GetValue<string>());
-        Assert.Equal(EvidenceContractValidator.TextSha256(parts),
-            EvidenceContractValidator.TextSha256(parts.Select(p => p!.Replace("\n", "\r\n", StringComparison.Ordinal))));
         var violations = EvidenceContractValidator.ValidateContract(Contract());
         Assert.DoesNotContain(violations, v => v.Code == "C011");
         Assert.Single(capacity["chargeRules"]!.AsArray());
+    }
+
+    [Fact]
+    public void TextHashNormalizesLineEndingsAndFramesParts()
+    {
+        // CRLF and LF inputs hash alike; text cannot move across a part boundary unnoticed.
+        Assert.Equal(EvidenceContractValidator.TextSha256(["a\nb", "c"]), EvidenceContractValidator.TextSha256(["a\r\nb", "c"]));
+        Assert.NotEqual(EvidenceContractValidator.TextSha256(["a\nb", "c"]), EvidenceContractValidator.TextSha256(["a", "b\nc"]));
+        Assert.NotEqual(EvidenceContractValidator.TextSha256(["a", "b"]), EvidenceContractValidator.TextSha256(["a\nb"]));
+        Assert.NotEqual(EvidenceContractValidator.TextSha256(["a", ""]), EvidenceContractValidator.TextSha256(["a"]));
     }
 
     [Fact]

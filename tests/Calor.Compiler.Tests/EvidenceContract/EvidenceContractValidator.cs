@@ -245,7 +245,7 @@ internal static partial class EvidenceContractValidator
     private static readonly (string Ceiling, int? Pr, int? Issue, double Value, string Amendment, int? Added, string? TextSha256)[] RegisteredCeilingExceptions =
     [
         ("pr-size", 1473, 1276, 1520, "1.1.0", null, null),
-        ("s1-generated-cases", null, 1311, 3008, "1.2.0", 1508, "1a1264e7865d72da924a1871462705ce66c133aa3bec255bb67d7a6e8fd85f98"),
+        ("s1-generated-cases", null, 1311, 3008, "1.2.0", 1508, "166a99f1bdda97509c3c29f329c69420ef405a84c8a94d5c67cd34078024df77"),
     ];
 
     /// <summary>
@@ -254,17 +254,24 @@ internal static partial class EvidenceContractValidator
     /// </summary>
     private static readonly (string Id, string ChargedTo, string NotChargedTo, string Amendment, string TextSha256)[] RegisteredChargeRules =
     [
-        ("c2-candidate-determinism-protocol", "regeneration-compute", "determinism-compute", "1.2.0", "c12f5d86fc664af8e8f46830a730a4ff9117b48a4793c1e1fba78532f1636269"),
+        ("c2-candidate-determinism-protocol", "regeneration-compute", "determinism-compute", "1.2.0", "603d579b53a09c0d8e756817b7fbe5acfee2b97a8bdbd6a5fced854132ae03d0"),
     ];
 
     /// <summary>
-    /// SHA-256 (lowercase hex) of the UTF-8 bytes of the given strings joined by LF, each with CRLF
-    /// normalized to LF; a missing string is empty. Binds registered prose to the validator.
+    /// SHA-256 (lowercase hex) of a framed encoding of the given strings, binding registered prose to
+    /// the validator. Each string has CRLF normalized to LF (a missing string is empty). The encoding
+    /// is the part count, LF, then for each part its UTF-8 byte length, ':', its bytes, and LF, so
+    /// text cannot move between parts (for example from a condition into the justification) without
+    /// changing the hash.
     /// </summary>
     internal static string TextSha256(IEnumerable<string?> parts)
     {
-        var text = string.Join("\n", parts.Select(p => (p ?? "").Replace("\r\n", "\n", StringComparison.Ordinal)));
-        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
+        var normalized = parts.Select(p => (p ?? "").Replace("\r\n", "\n", StringComparison.Ordinal)).ToList();
+        var framed = new StringBuilder();
+        framed.Append(normalized.Count.ToString(CultureInfo.InvariantCulture)).Append('\n');
+        foreach (var part in normalized)
+            framed.Append(Encoding.UTF8.GetByteCount(part).ToString(CultureInfo.InvariantCulture)).Append(':').Append(part).Append('\n');
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(framed.ToString())));
     }
 
     private static IEnumerable<ContractViolation> ValidateGraph(List<JsonNode?> children, HashSet<int> childIssues)
