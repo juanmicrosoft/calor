@@ -1,6 +1,6 @@
 # Amendment 1.1.0, withdrawal of decision 1 — review round 1 (Codex)
 
-Reviewer: codex-cli, `codex exec -s read-only --ephemeral -c model_reasoning_effort="high"`. Reviewed diff: `6f030f6d7902c2e6541538df97c7b02ba7797a19..273747e8` (withdrawal of decision 1 before 1.1.0 merges; maintainer decision 2026-10-03). Scope: anything of decision 1 left behind, faithful restoration of the 1.0.1 text, no change to decisions 2–6, record honesty, `sha256.json` and `eng/test-manifest.json` consistency.
+Reviewer: codex-cli 0.159.2, `codex exec -s read-only --ephemeral -c model_reasoning_effort="high"`. Reviewed diff: `6f030f6d7902c2e6541538df97c7b02ba7797a19..273747e8` (withdrawal of decision 1 before 1.1.0 merges; maintainer decision 2026-10-03). Scope: anything of decision 1 left behind, faithful restoration of the 1.0.1 text, no change to decisions 2–6, record honesty, `sha256.json` and `eng/test-manifest.json` consistency.
 
 ## Codex checks (verbatim excerpt)
 
