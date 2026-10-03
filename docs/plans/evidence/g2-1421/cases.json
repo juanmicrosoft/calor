@@ -3,7 +3,7 @@
  "issue": 1421,
  "protocolVersion": "1.0.0",
  "derivation": {
-  "tests": "dotnet test <project> -c Release --no-build --list-tests at registrationBase.commit plus the G2 change (osx-arm64, SDK 10.0.401). The listed names, as a multiset, equal the testName fields of the ordinary-CI TRX files of run 37137354219 (linux-x64) for the same projects, before G2 added one test.",
+  "tests": "dotnet test <project> -c Release --no-build --list-tests at registrationBase.commit plus the G2 change (osx-arm64, SDK 10.0.401). The listed names, as a multiset, equal the testName fields of the ordinary-CI TRX files of run 37137354219 (linux-x64) for the same projects, before G2 added one test. Regenerate: dotnet test <project> -c Release --no-build --list-tests; take every line indented by four spaces; count repeats as multiplicity; sort names by UTF-8 bytes. compiler-verifier keeps only names under its classes.",
   "compilerClasses": "Calor.Compiler.Tests classes in files that construct the verifier or Z3 directly (Z3ContextFactory, VerifyContracts = true, ContractVerificationPass, ObligationSolver, Z3ImplicationProver, Z3.IsAvailable) at the registration base.",
   "cells": "derive_cells over bench/phase0-agent-native/verifier-runtime-differential.json: applicable forms in report order x positions (precondition, postcondition, obligation) x depth 1..3 x polarity (provable, refutable), numbered case-000001 upward exactly as DifferentialGate.GenerateCases numbers them."
  },
@@ -12084,11 +12084,27 @@
  "artifacts": [
   {
    "name": "verifier-runtime-differential.json",
-   "committedPath": "bench/phase0-agent-native/verifier-runtime-differential.json"
+   "committedPath": "bench/phase0-agent-native/verifier-runtime-differential.json",
+   "profiles": [
+    "oracle-isolated",
+    "verification-full"
+   ]
   },
   {
    "name": "verifier-runtime-differential.md",
-   "committedPath": "bench/phase0-agent-native/verifier-runtime-differential.md"
+   "committedPath": "bench/phase0-agent-native/verifier-runtime-differential.md",
+   "profiles": [
+    "oracle-isolated",
+    "verification-full"
+   ]
+  },
+  {
+   "name": "translator-fixture",
+   "source": "tests/Calor.Verification.Tests/ContractTranslatorSemanticsVersionGuardTests.cs",
+   "expected": "95e8039c7ea350581bc5c32b530d75576ae296c26850eec2056235d6847f0d86|z3-executable-semantics-v2",
+   "profiles": [
+    "verification-full"
+   ]
   }
  ]
 }

@@ -1,113 +1,137 @@
 # 0.24 G2 (#1421): verifier determinism protocol — registration
 
 Gate G2 of the frozen 0.24 contract (`docs/plans/v0.24-evidence-contract.md`, contract
-1.1.0). This packet registers how #1135 (G3) and the #1424 candidate regeneration decide
-whether the release-critical verifier oracle and its test host give the same verdicts on
-the same tree. **Registration only.** No registered case was run under this protocol; the
-first decision-bearing execution happens in #1135, after this packet merges.
+1.1.0). This packet registers how #1135 (G3) decides whether the release-critical verifier
+oracle and its test host give the same verdicts on the same tree, on every supported
+platform. **Registration only.** No registered case was run under this protocol; the first
+decision-bearing execution happens in #1135.
+
+G2 uses its two PRs (§9) this way:
+
+1. **This PR** freezes the protocol: cases, environments, pins, run plan, agreement and failure
+   rules, retry policy, budget, record formats, the validator, and the decider.
+2. **The second G2 PR** adds the execution machinery the protocol already specifies
+   (`protocol.json` `workflow.requirements`): the workflow, environment check, attempt runner,
+   and the plan step's budget, history, and amendment guards. It registers them by a recorded
+   protocol amendment. Until then the validator rejects their presence (`D013`), so nothing can
+   execute this protocol.
 
 Sections consumed: §4 (outcome vocabulary: timeout, skipped, unavailable, and flaky rows are
 never established), §8 (failure, amendment, stopping, and `platformDeterminism` rules;
-`determinismRows`), §9 (capacity: `determinism-compute` 2,000 runner-minutes; 2 PRs per gate;
-1,500 changed lines per PR excluding evidence data; $0).
+`determinismRows`), §9 (`determinism-compute` 2,000 runner-minutes; 2 PRs per gate; 1,500
+changed lines per PR excluding evidence data; $0).
 
-`protocol.json` governs. This document summarizes it; if they disagree, the JSON wins and the
+`protocol.json` governs. If this summary and the JSON disagree, the JSON wins and the
 difference is a defect to fix by amendment.
 
 ## Files
 
 | File | Role |
 |---|---|
-| `protocol.json` | The protocol: cases, environments, pins, run plan, agreement and failure rules, retry policy, budget, record formats, amendments |
-| `cases.json` | Frozen case registry: 411 + 554 test names with multiplicities, 1,170 oracle cells, 2 oracle artifacts |
-| `freeze_cases.py` | Builds `cases.json` from `dotnet test --list-tests` output (run once, at registration) |
-| `sha256.json` | SHA-256 (LF-normalized) of the packet, the harness, its tests, and the workflow (validator code `D015`) |
-| `scripts/determinism_protocol.py` | Harness: `validate`, `plan`, `env-check`, `run-job`, `fill-missing`, `decide`, `check-ledger`, `budget` |
-| `scripts/test_determinism_protocol.py` | Positive and negative controls (run in the required `test` job) |
-| `.github/workflows/determinism-protocol.yml` | The workflow #1135 dispatches (`plan` → `attempts` matrix → `decide`) |
+| `protocol.json` | The protocol |
+| `cases.json` | Frozen case registry: 411 + 554 test names with multiplicities, 1,170 oracle cells, 3 artifacts |
+| `sha256.json` | SHA-256 (LF-normalized) of the packet, the harness, and its tests (`D015`) |
+| `scripts/determinism_protocol.py` | `validate` (D001–D016) and `decide` (the frozen agreement rule) |
+| `scripts/test_determinism_protocol.py` | Positive and negative controls; run in the required `calor-first-guard` job together with `validate --baseline-ref origin/main` |
+
+`cases.json` was built from `dotnet test <project> -c Release --no-build --list-tests` on the
+registration base plus this change: every line indented by four spaces is a name, repeats are
+its multiplicity, names are sorted by UTF-8 bytes, and the compiler group keeps only names under
+its 18 registered classes. The validator re-derives the cells from the committed oracle report.
 
 ## What is registered
 
-**Which oracle.** The release-critical verifier oracle that changed verdict on an identical
-tree (#1135: runs 33137941806 success and 33139062112 failure on commit `04b32afa`) is
+**Which oracle.** The release-critical oracle that changed verdict on an identical tree (#1135:
+runs 33137941806 success and 33139062112 failure on commit `04b32afa`) is
 `Calor.Verification.Tests.VerifierRuntimeDifferential.VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle`,
-the F-4 solver-versus-runtime differential over 65 forms and 1,170 matrix cells that
-byte-checks `bench/phase0-agent-native/verifier-runtime-differential.{json,md}`. It runs at
-three gate sites: `test.yml` job `test` step "Run verifier-runtime differential gate" (the
-required check `test`, oracle alone), `test.yml` `tests (verification)` (the full suite), and
-`publish-nuget.yml` `test (verification)`.
+the F-4 solver-versus-runtime differential over 65 forms and 1,170 cells that byte-checks
+`bench/phase0-agent-native/verifier-runtime-differential.{json,md}`. Its gate sites: `test.yml`
+job `test` step "Run verifier-runtime differential gate" (required check `test`, oracle alone),
+`test.yml` `tests (verification)`, and `publish-nuget.yml` `test (verification)`. The validator
+fails if any of these stops running the registered command or project (`D014`).
 
-**Cases (deterministic set).** All are frozen in `cases.json`:
+**Cases (deterministic set).**
 
-| Kind | Count | Value compared |
+| Key | Count | Value compared |
 |---|---|---|
-| `test:verification:<name>` | 411 tests (407 distinct names; theory rows with identical display names keep a multiplicity) | Sorted TRX outcomes for that name |
-| `test:compiler-verifier:<name>` | 554 tests in the 18 Calor.Compiler.Tests classes that construct the verifier or Z3 directly | Sorted TRX outcomes |
-| `cell:case-NNNNNN` | 1,170 F-4 cells (form × position × depth × polarity) | SHA-256 of every `CaseResult` field |
+| `test:verification:<name>` | 411 tests (407 distinct display names) | Sorted TRX outcomes for that name, with exact multiplicity |
+| `test:compiler-verifier:<name>` | 554 tests in the 18 Calor.Compiler.Tests classes that construct the verifier or Z3 directly | Same |
+| `cell:case-NNNNNN` | 1,170 F-4 cells | SHA-256 over every `CaseResult` field |
 | `artifact:verifier-runtime-differential.{json,md}` | 2 | SHA-256 of the exact generated bytes |
+| `artifact:translator-fixture` | 1 | SHA-256 of the translator fixture hash and `SemanticsVersion`, written before the guard asserts |
+| `invocation:<profile>` | 1 per profile | Exit code and TRX run outcome |
 
-**Timing-sensitive set: empty.** No registered case asserts on elapsed time. A Z3 timeout
-that changes a verdict is instability, not an allowance. Moving a case into the set needs a
-reviewed #1407 amendment, a protocol amendment, and a complete new execution; earlier results
-stay reported.
+**Not covered** (`scope.notCovered`, with reasons): Calor.Tasks.Tests `VerifyGate_*`,
+`TaskGenAddressabilityTests`, and the packaged-SDK verifier canary. Nothing may cite this
+protocol for them.
+
+**Timing-sensitive set: empty.** No registered case asserts on elapsed time. A Z3 timeout that
+changes a verdict is instability, not an allowance. Moving a case into the set needs a reviewed
+#1407 amendment, a protocol amendment, and a complete new execution.
 
 **Determinism rows.** The three contract rows from G1 (win-x64 and win-arm64:
-`StringInBodyOnly_StillNeverElides`, `TranslatorOutputMatchesCommittedBaseline`,
-`CommittedReportsMatchGeneratedOracle` CR bytes) plus the #1135 identical-tree row. A row is
-resolved only when every mapped case is `AGREE-PASS` in an execution that ran every
-environment the row names. No row is deselected anywhere in this protocol.
+`StringInBodyOnly_StillNeverElides`, `TranslatorOutputMatchesCommittedBaseline` with its
+translator-fixture bytes, and `CommittedReportsMatchGeneratedOracle` with both report artifacts)
+plus the #1135 identical-tree row. A row is resolved only when every mapped case is `AGREE-PASS`
+in an execution that ran every environment the row names. No case is deselected on any
+platform.
 
-**Profiles.** Each attempt runs, in a fresh `dotnet test --no-build` process:
-`verification-full` (all of Calor.Verification.Tests), `oracle-isolated` (the oracle alone,
-the `test` job's command), and, on linux-x64 only, `compiler-verifier`. Process timeouts: 15,
-5, and 15 minutes.
+**Profiles.** Each attempt runs, each in a fresh `dotnet test --no-build` process:
+`verification-full` (all of Calor.Verification.Tests), `oracle-isolated` (the oracle alone, the
+`test` job's command), and on linux-x64 only `compiler-verifier`. Process timeouts: 15, 5, and
+15 minutes.
 
-**Environments.** One per supported Z3 RID in `eng/z3-consumers.json`:
+**Environments** (one per supported Z3 RID in `eng/z3-consumers.json`):
 
-| Environment | Runner label | OS / arch | Logical CPUs | Job timeout |
-|---|---|---|---|---|
-| linux-x64 | `ubuntu-24.04` | Linux / X64 | 4 | 70 min |
-| linux-arm64 | `ubuntu-24.04-arm` | Linux / ARM64 | 4 | 50 min |
-| osx-arm64 | `macos-14` | macOS / ARM64 | 3 | 50 min |
-| win-x64 | `windows-2025` | Windows / X64 | 4 | 50 min |
-| win-arm64 | `windows-11-arm` | Windows / ARM64 | 4 | 50 min |
+| Environment | Runner label | OS / arch | CPUs | Memory | Job timeout |
+|---|---|---|---|---|---|
+| linux-x64 | `ubuntu-24.04` | Linux / X64 | 4 | 16 GiB | 70 min |
+| linux-arm64 | `ubuntu-24.04-arm` | Linux / ARM64 | 4 | 16 GiB | 50 min |
+| osx-arm64 | `macos-14` | macOS / ARM64 | 3 | 7 GiB | 50 min |
+| win-x64 | `windows-2025` | Windows / X64 | 4 | 16 GiB | 50 min |
+| win-arm64 | `windows-11-arm` | Windows / ARM64 | 4 | 16 GiB | 50 min |
 
-**Pins.** SDK 10.0.401 and runtime Microsoft.NETCore.App 10.0.12, in a private dotnet root
-that holds nothing else (the values the 0.22 Stage B packet recorded; CI's floating `10.0.x`
-is the `toolchain-pins` open defect). Z3 4.15.7 through the owned bootstrap, both pin files by
-SHA-256, and every attempt's native and managed asset hashes against the pins. Z3
-`random_seed` 42 (`tests/Shared/Z3TestSeeding.cs`) and per-case timeout 5,000 ms
-(`VerificationOptions.DefaultTimeoutMs`): the validator checks both against the tree, so a
-change is an amendment. Checkout with `core.autocrlf=false`, so inputs are byte-identical on
-every platform. xUnit runs with project defaults (no runner configuration file exists).
+A different processor count, or memory below 90% of the registered value, is an
+`environment-violation`. Hosted runners cannot cap a process tree's memory; a memory kill is a
+`Crash` value.
+
+**Pins.** SDK 10.0.401 and runtime 10.0.12 in a private dotnet root that holds nothing else
+(the values the 0.22 Stage B packet recorded; CI's floating `10.0.x` is the `toolchain-pins`
+open defect). Z3 4.15.7 through the owned bootstrap, both pin files by SHA-256, each attempt's
+asset hashes checked against the pins. Z3 `random_seed` 42 and per-case timeout 5,000 ms, both
+checked against the tree (`D006`). Checkout with `core.autocrlf=false`. xUnit runs with project
+defaults.
 
 **Run plan.** 2 jobs × 15 attempts per environment: 30 attempts per environment, 150 per
-execution for Calor.Verification.Tests cases. No early stop. With zero disagreement, the 95%
+execution for a Calor.Verification.Tests case. No early stop. With zero disagreement, the 95%
 upper bound on the per-attempt disagreement probability is about 9.5% per environment and 2.0%
-across all 150 attempts. The protocol bounds non-determinism; it does not prove its absence.
+across 150 attempts. The protocol bounds non-determinism; it does not prove its absence.
 
 ## Agreement and failure rules
 
 - **Agreement rate 1.0.** A case agrees only if every expected contribution is present and
   identical across all attempts, jobs, profiles, and environments.
-- **No normalization.** `normalizationRules` is empty. CRLF is never converted; a Windows-only
-  CR byte is a `DISAGREE`. The only projections are declared up front: TRX keeps test name and
-  outcome and drops timing, host, and message text; each cell object is re-serialized with
-  sorted keys and no field dropped.
-- **Classes.** `AGREE-PASS`, `AGREE-FAIL`, `DISAGREE` (with `platformDependent`), `INCOMPLETE`.
-- **Verdicts,** in precedence order: `INVALID`, `NON-DETERMINISTIC`, `FAILING`, `INCOMPLETE`,
+- **No normalization.** `normalizationRules` is empty; CRLF is never converted. The only
+  projections are declared up front: TRX keeps test name, outcome, and the run outcome; each
+  cell object is re-serialized with sorted keys and no field dropped.
+- **Classes:** `AGREE-PASS`, `AGREE-FAIL`, `DISAGREE` (with `platformDependent`), `INCOMPLETE`.
+  **Verdicts,** in precedence order: `INVALID`, `NON-DETERMINISTIC`, `FAILING`, `INCOMPLETE`,
   `DETERMINISTIC`. Only `DETERMINISTIC` establishes anything.
-- **Statuses.** `timeout`, `crash`, `Skipped`, and Z3-unavailable failures are values that never
-  equal a pass. `infrastructure-failure`, `environment-violation`, and `invalid` attempts are
-  retained and contribute no value, so the execution cannot be `DETERMINISTIC`.
-- **No run-until-green.** No retries; GitHub job re-runs are rejected (`INVALID`). Every
-  attempt is retained. Executions on the same commit are pooled, so a later execution cannot
-  erase a disagreement. A commit that was `NON-DETERMINISTIC` or `FAILING` is never executed
-  again; the next execution needs a commit that changes a path outside `docs/` and a ledger
-  entry naming the repair. `check-ledger` also fails when a dispatched run is missing from the
-  ledger.
-- **Release-blocking.** Any `DISAGREE` is non-deterministic and release-blocking for the
-  affected form, test, or artifact until resolved under §8.
+- **Statuses.** Timeout, crash, `Skipped`, and Z3-unavailable failures are values that never
+  equal a pass. Every observed value is kept; only an unobserved value is filled. Values from an
+  `invalid` attempt are still compared. `infrastructure-failure` and `environment-violation`
+  attempts contribute nothing, so the execution cannot be `DETERMINISTIC`.
+- **Strict records.** The decider binds each record to the dispatched commit and the run id,
+  rejects re-run jobs, other protocol or harness bytes, duplicate or reordered profiles, and any
+  test, cell, or artifact set or multiplicity that differs from the registry (`INVALID`).
+- **No run-until-green.** No retries, no job re-runs, and a commit is executed at most once.
+  After `NON-DETERMINISTIC` or `FAILING`, the next execution needs a commit that changes a path
+  outside `docs/` and a ledger entry naming the repair. Every execution stays reported.
+- **Release-blocking.** Any `DISAGREE` is release-blocking for the affected form, test, or
+  artifact until resolved under §8.
+- **Amendments.** After merge, the required `calor-first-guard` job validates every change
+  against the packet on `main` (`D016`): an unrecorded change, or one that removes a case,
+  environment, determinism row, or attempt, fails.
 
 ## Compute plan
 
@@ -116,45 +140,38 @@ Runner-minutes are each job's duration rounded up to a minute, with no OS multip
 | Item | Worst case (timeouts) | Expected |
 |---|---|---|
 | One execution: plan 5 + decide 10 + 2 × 70 (linux-x64) + 8 × 50 | 555 | about 340 |
-| One dispatched control run: plan 5 + decide 10 + 5 × 20 | 115 | about 40 |
-| Ceiling use: 3 executions + 2 dispatched control runs | **1,895 of 2,000** | about 1,100 |
+| One dispatched control run: plan 5 + decide 10 + 5 × 20 | 115 | 13 measured |
+| 3 executions + 2 dispatched control runs | **1,895 of 2,000** | about 1,050 |
 
-`plan` refuses a run that would exceed the ceiling, `maxExecutions` (3), or
-`maxDispatchedControlRuns` (2), using #1135's ledger. Control runs started by `pull_request`
-check a change to the workflow or harness, run no registered case, and are charged to
-`ordinary-ci`. #1424's execution on the frozen candidate is charged to `regeneration-compute`
-(dispatched with `charge=regeneration-compute`).
-
-## Records
-
-Each attempt writes `attempt-<env>-j<job>-a<NN>.json` (fields in
-`protocol.json` `recordFormats.attempt`), including the environment check, run id and run
-attempt, commit, protocol and harness SHA-256, and per profile the status, exit code, every
-registered test value, every cell value, and every artifact hash. `decide` writes `result.json`
-with the verdict, attempt status counts, every case class (values by environment for any
-non-pass case), and each determinism row's status. #1135 commits `result.json`, a gzip tarball
-of the attempt records, and a ledger entry per run under `docs/plans/evidence/g3-1135/`.
+Already spent: 13 runner-minutes (the dry run below). Every `workflow_dispatch` run is charged
+here, counted from the GitHub API run inventory, with the worst case of unfinished runs
+reserved. Pull-request control runs are ordinary CI.
 
 ## What G2 executed
 
 - `dotnet test --list-tests` for the two projects (names only; no test ran).
-- The `testName` fields only of the ordinary-CI TRX files of run 37137354219, to confirm the
-  listed names equal what a run reports.
-- The unit test `DeterminismRecordWritesCompactCellsAndExactGeneratedBytes` (synthetic cell;
-  no verifier).
-- The harness on the unregistered control project, locally (environment check bypassed, so
-  labeled a dry run) and in control mode on the G2 pull request.
-- The ordinary CI checks of the G2 pull request, which run the oracle as on every PR. They
-  are not protocol attempts, and their per-cell output does not exist (the record directory is
-  unset).
+- The `testName` fields only of the ordinary-CI TRX files of run 37137354219.
+- The unit test `DeterminismRecordWritesCompactCellsAndExactGeneratedBytes` (synthetic cell).
+- A control-mode dry run of a first harness draft on this PR (run 37142264571, 13
+  runner-minutes): Calor.Semantics.Tests, not a registered case, on all five environments. It
+  confirmed the runner labels, 4/4/3/4/4 logical processors, SDK 10.0.401 with exactly runtime
+  10.0.12 in the private root, and no `~/.calor`. That draft moves to the second PR.
+- The ordinary CI checks of this PR, which run the oracle as on every PR. They are not protocol
+  attempts and write no per-cell record.
 
-## Harness change to the oracle's test code
+## Changes to the oracle's test code
 
-`DifferentialGate.Run` and `CommittedReportsMatchGeneratedOracle` gained an opt-in
-`DeterminismRecord` call that writes the per-cell results and the generated report bytes when
+`DifferentialGate.Run`, `CommittedReportsMatchGeneratedOracle`, and
+`TranslatorOutputMatchesCommittedBaseline` gained an opt-in `DeterminismRecord` call that writes
+the per-cell results, the generated report bytes, and the translator fixture value when
 `CALOR_DETERMINISM_RECORD_DIR` is set. It writes before any assertion, writes nothing when the
-variable is unset, and changes no verdict, report byte, or assertion. The verifier is
-unchanged.
+variable is unset, and changes no verdict, report byte, or assertion. The verifier is unchanged.
+
+## Open questions
+
+- #1424's execution on the frozen candidate is charged to `determinism-compute` under this
+  protocol, and the plan leaves 105 runner-minutes, less than one execution. Charging it to
+  `regeneration-compute` needs an amendment binding that charge to the #1423 candidate.
 
 ## Limitations
 
@@ -162,4 +179,6 @@ unchanged.
   image change.
 - A Windows checkout with `core.autocrlf=true` is not covered.
 - `compiler-verifier` is covered on linux-x64 only, the only platform its gates use.
+- Theory rows with identical display names are compared as a multiset per name: any failure is
+  detected, but not which row.
 - Thirty attempts per environment bound, but cannot exclude, rare non-determinism.

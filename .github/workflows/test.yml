@@ -87,6 +87,7 @@ jobs:
           python3 scripts/test_supply_chain.py
           python3 scripts/test_z3_hermetic.py
           python3 scripts/test_determinism_protocol.py
+          python3 scripts/determinism_protocol.py validate --baseline-ref origin/main
 
       # #881 pinned reproduction: the epoch cost metric must count subagent
       # and compaction-segment output tokens. Pure Python, no build needed.
