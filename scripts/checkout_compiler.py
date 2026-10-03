@@ -46,7 +46,7 @@ class PinnedCompiler:
     def provenance(self) -> dict:
         return {
             "compiler": "checkout-built calor.dll (installed tools are never used)",
-            "dll": str(self.dll),
+            "dll": str(self.dll.relative_to(self.dll.parents[5])),
             "dllSha256": self.sha256,
             "head": self.head,
             "worktreeDirty": self.dirty,
