@@ -175,4 +175,6 @@ gives both counts.
 
 ## Reviews
 
-`reviews/` holds the Codex adversarial review rounds and the verification-only pass.
+`reviews/` holds the Codex adversarial review rounds and the verification-only pass. Rounds 1, 2,
+and 3 requested changes (5, 5, and 3 findings); each was fixed or, for two pinning residuals, recorded
+as a limitation above. The verification-only pass on the round-3 fixes is CLEAN.
