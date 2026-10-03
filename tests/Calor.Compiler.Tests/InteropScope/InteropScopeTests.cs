@@ -19,7 +19,7 @@ public class InteropScopeTests
     /// 1.0.0; later scope changes are amendments, never edits to this list. A packet that drops a
     /// case from both the cases and the frozen list passes the validator but fails this pin.
     /// </summary>
-    private const string DenominatorV1Seal = "83e0aa391d4c24e50b93a8f6718608a885b7f1278b9f441838f4f88e9ed80522";
+    private const string DenominatorV1Seal = "53403f940d0ee71720796880cbb6e83f6612d3a4a394d2aff0a1a08d1a1dc442";
 
     [Fact]
     public void CommittedPacketIsValid()
@@ -37,7 +37,7 @@ public class InteropScopeTests
         var scope = Scope();
         Remove(scope["cases"]!, "F5-ARRAY-02");
         Remove(scope["denominatorV1"]!, "F5-ARRAY-02");
-        Assert.Empty(Run(scope, withoutFixture: "F5-ARRAY-02.cs"));
+        Assert.Empty(Run(scope, withoutFixture: "F5-ARRAY-02.cs.txt"));
         Assert.NotEqual(DenominatorV1Seal, Seal(scope));
     }
 
@@ -125,7 +125,7 @@ public class InteropScopeTests
             // These two also edit the frozen entry, so the control isolates S002 from S004.
             case "role outside vocabulary": SetBoth(scope, "F5-ARRAY-03", "role", "nice-to-have"); break;
             case "measured status without baseline": SetBoth(scope, "F6-REPORT-04", "baselineStatus", "reproduces"); break;
-            case "fixture hash drift": read = p => p.EndsWith("F5-ARRAY-03.cs") ? Encoding.UTF8.GetBytes("// edited") : ReadRepo(p); break;
+            case "fixture hash drift": read = p => p.EndsWith("F5-ARRAY-03.cs.txt") ? Encoding.UTF8.GetBytes("// edited") : ReadRepo(p); break;
             case "case removed silently": Remove(scope["cases"]!, "F2-INTERP-03"); break;
             case "case reclassified silently": Case(scope, "F4-ITER-01")["expected"] = "rejected"; break;
             case "baseline status relabeled silently": Case(scope, "F1-REFOUT-08")["baselineStatus"] = "control-passes"; break;
@@ -167,7 +167,7 @@ public class InteropScopeTests
     [Fact]
     public void UnregisteredFixtureFileFails()
     {
-        var violations = Run(Scope(), extraFixture: InteropScopeValidator.PacketDir + "/fixtures/F9-NEW-01.cs");
+        var violations = Run(Scope(), extraFixture: InteropScopeValidator.PacketDir + "/fixtures/F9-NEW-01.cs.txt");
         Assert.Single(violations);
         Assert.Equal("S003", violations[0].Code);
     }

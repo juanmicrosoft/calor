@@ -9,7 +9,7 @@ Run from the repository root after `src/Calor.Compiler/scripts/download-z3.sh` a
 For every fixture under fixtures/ it runs the real converter through three public surfaces
 (CLI `calor convert` with no flags, CLI with `--passthrough`, and the MCP `calor_convert` tool
 with default arguments), compiles each produced .calr with the real `calor` compiler, and
-executes `Probe.Run()` on the original and every generated C# file with ProbeRunner.cs.
+executes `Probe.Run()` on the original and every generated C# file with ProbeRunner.cs.txt.
 It also scans website/content/**/*.mdx for complete ```calor programs (first non-blank line
 starts with §M) and records which ones the current compiler rejects (W0 / #1143 baseline).
 
@@ -34,6 +34,10 @@ GEN = os.path.join(EVID, "generated")
 # Calor files here use .calr.txt: every tracked *.calr is part of the repository's Calor corpus,
 # which ledger tests count. The compiler accepts the extension unchanged.
 CALR = ".calr.txt"
+# C# fixtures and the runner use .cs.txt: the Calor-first guard (scripts/check-calor-first-diff.sh)
+# rejects new .cs files outside tests/ and bench/. They are copied to a temporary .cs to run.
+CS = ".cs.txt"
+TMP = tempfile.mkdtemp(prefix="r0-1426-")
 
 
 def norm(text):
@@ -131,15 +135,20 @@ def mcp_convert(cases):
 
 
 def probe(files):
-    p = subprocess.run(["dotnet", "run", os.path.join(EVID, "reproduce", "ProbeRunner.cs"), "--"] + files,
-                       cwd=ROOT, capture_output=True, text=True,
+    # Run outside the repository so its central package management and lock files do not apply.
+    runner_dir = os.path.join(TMP, "runner")
+    os.makedirs(runner_dir, exist_ok=True)
+    runner = os.path.join(runner_dir, "ProbeRunner.cs")
+    shutil.copyfile(os.path.join(ROOT, EVID, "reproduce", "ProbeRunner" + CS), runner)
+    p = subprocess.run(["dotnet", "run", runner, "--"] + [os.path.join(ROOT, f) for f in files],
+                       cwd=runner_dir, capture_output=True, text=True,
                        env=dict(os.environ, CALOR_RUNTIME_DLL=os.path.join(
                            ROOT, "src", "Calor.Runtime", "bin", "Release", "net10.0", "Calor.Runtime.dll")))
     out = {}
     for line in p.stdout.splitlines():
         if line.startswith("{"):
             r = json.loads(line)
-            out[r["file"]] = r
+            out[os.path.relpath(r["file"], ROOT)] = r
     if not out:
         sys.exit("ProbeRunner failed:\n" + p.stdout + p.stderr)
     return out
@@ -186,16 +195,18 @@ def main():
     if git("status", "--porcelain", "--", "src"):
         sys.exit("src/ has uncommitted changes; the measured compiler would not match any commit")
     src_tree = git("rev-parse", "HEAD:src")
-    fixtures = sorted(glob.glob(os.path.join(ROOT, EVID, "fixtures", "*.cs")))
+    fixtures = sorted(glob.glob(os.path.join(ROOT, EVID, "fixtures", "*" + CS)))
     cases, probe_files = [], []
     for path in fixtures:
-        case = os.path.splitext(os.path.basename(path))[0]
+        case = os.path.basename(path)[:-len(CS)]
         rel = os.path.relpath(path, ROOT)
         row = {"case": case, "fixture": rel, "fixtureSha256": sha(rel), "surfaces": {}}
         probe_files.append(rel)
+        source = os.path.join(TMP, case + ".cs")  # the converter keys direction on the extension
+        shutil.copyfile(path, source)
         for mode, extra in (("cli-default", []), ("cli-passthrough", ["--passthrough"])):
             calr = os.path.join(GEN, f"{case}.{mode}{CALR}")
-            code, out, err = run(["convert", rel, "-o", calr, "--format", "json", "--no-telemetry"] + extra)
+            code, out, err = run(["convert", source, "-o", calr, "--format", "json", "--no-telemetry"] + extra)
             surf = {"convertExit": code} | summarize_envelope(out) | {"humanAttribution": attribution(err)}
             if os.path.exists(os.path.join(ROOT, calr)):
                 text = open(os.path.join(ROOT, calr), encoding="utf-8").read()

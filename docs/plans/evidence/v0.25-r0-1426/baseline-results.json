@@ -1,6 +1,6 @@
 {
   "schema": "v0.25-r0-1426-baseline/1",
-  "measuredCommit": "93ad0192ec8631f15ad7632b370c8a636c9fe608",
+  "measuredCommit": "2a499e5394ee87770e23b88137e3ae1544b392b8",
   "srcTree": "ee3c9db987d844a9348b8d0bab75e603cc01797c",
   "environment": {
     "dotnetSdk": "10.0.401",
@@ -13,7 +13,7 @@
   "cases": [
     {
       "case": "F1-REFOUT-01",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-01.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-01.cs.txt",
       "fixtureSha256": "46268d5042b214df9d23772bb1e1e61f89a7cfbff3f565ac24a988808f7ed7b0",
       "surfaces": {
         "cli-default": {
@@ -137,7 +137,7 @@
     },
     {
       "case": "F1-REFOUT-02",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-02.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-02.cs.txt",
       "fixtureSha256": "0936b4c0e172e18f621d5efba290ed3150a57669f7494ab402521cd8b774d8a2",
       "surfaces": {
         "cli-default": {
@@ -277,7 +277,7 @@
     },
     {
       "case": "F1-REFOUT-03",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-03.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-03.cs.txt",
       "fixtureSha256": "9a02ee5807cfa332de2672660f2ab6696ceeff8bfc890ce69d71d6768517fbe5",
       "surfaces": {
         "cli-default": {
@@ -401,7 +401,7 @@
     },
     {
       "case": "F1-REFOUT-04",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-04.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-04.cs.txt",
       "fixtureSha256": "27ce08c1219b26c85fd12c552d8a9d23b8afddaf993eef350e876aaf2ceca389",
       "surfaces": {
         "cli-default": {
@@ -515,7 +515,7 @@
     },
     {
       "case": "F1-REFOUT-05",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-05.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-05.cs.txt",
       "fixtureSha256": "14fd512e352fc64ac431427b4259f4cc2a523c16f046debad6b5cf9ad2328a9b",
       "surfaces": {
         "cli-default": {
@@ -639,7 +639,7 @@
     },
     {
       "case": "F1-REFOUT-06",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-06.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-06.cs.txt",
       "fixtureSha256": "72723f89d0c1493a1e5953ffbafaedd8d331acde01664bc7d92d62d830947931",
       "surfaces": {
         "cli-default": {
@@ -763,7 +763,7 @@
     },
     {
       "case": "F1-REFOUT-07",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-07.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-07.cs.txt",
       "fixtureSha256": "a9ecef3fde04a3eb6566fce5b7289311ef29522331e4ecb1d3779acf0ba30b64",
       "surfaces": {
         "cli-default": {
@@ -883,7 +883,7 @@
     },
     {
       "case": "F1-REFOUT-08",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-08.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-08.cs.txt",
       "fixtureSha256": "cc2fcdb6713cab9b05948f37f9cf004da19fe29dede4869ebb2bcc63ad091650",
       "surfaces": {
         "cli-default": {
@@ -1055,7 +1055,7 @@
     },
     {
       "case": "F2-INTERP-01",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-01.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-01.cs.txt",
       "fixtureSha256": "a60dbcf6ba85d93ab20e47fbea05cf495e6c8fd7a027e7d22215cfb580c3856f",
       "surfaces": {
         "cli-default": {
@@ -1187,7 +1187,7 @@
     },
     {
       "case": "F2-INTERP-02",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-02.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-02.cs.txt",
       "fixtureSha256": "9d988a99732e3e3c046e1b6d871a0ea423e068fb3cf81ad58f9fc6881278f7f1",
       "surfaces": {
         "cli-default": {
@@ -1359,7 +1359,7 @@
     },
     {
       "case": "F2-INTERP-03",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-03.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-03.cs.txt",
       "fixtureSha256": "632bd63c1ee8d2310a67ec1b7b3872ea785267ff6a37aa72d01cf48093efe641",
       "surfaces": {
         "cli-default": {
@@ -1479,7 +1479,7 @@
     },
     {
       "case": "F2-INTERP-04",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-04.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-04.cs.txt",
       "fixtureSha256": "ff11d343cb9171f61354ba165db287d749d5a2be3f329b315d19cf678b02c79d",
       "surfaces": {
         "cli-default": {
@@ -1603,7 +1603,7 @@
     },
     {
       "case": "F2-INTERP-07",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-07.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-07.cs.txt",
       "fixtureSha256": "84fca44ef923afbc1623710353095d49bce1dc5ad533969ccc8ec0928cb7c33e",
       "surfaces": {
         "cli-default": {
@@ -1775,7 +1775,7 @@
     },
     {
       "case": "F3-LOCAL-01",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-01.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-01.cs.txt",
       "fixtureSha256": "f323c3f90e8936fe5fec785a5083e5033ed2d0e0e50f83ca81020665379f1f4e",
       "surfaces": {
         "cli-default": {
@@ -1955,7 +1955,7 @@
     },
     {
       "case": "F3-LOCAL-02",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-02.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-02.cs.txt",
       "fixtureSha256": "1b7d5a367c5f8e3e30045d11b9bfdb55e28ed3bbf19cda346131b633adbbbddd",
       "surfaces": {
         "cli-default": {
@@ -2135,7 +2135,7 @@
     },
     {
       "case": "F3-LOCAL-03",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-03.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-03.cs.txt",
       "fixtureSha256": "677a392baa87e118ce915adf7fcec4c6983f3a4ba874c525674bbacfecfb8326",
       "surfaces": {
         "cli-default": {
@@ -2315,7 +2315,7 @@
     },
     {
       "case": "F4-ITER-01",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-01.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-01.cs.txt",
       "fixtureSha256": "0a1a21be9eac4d82bcf51a02705607d6b9de6fe98c50e649a532ae8f63f5db9e",
       "surfaces": {
         "cli-default": {
@@ -2429,7 +2429,7 @@
     },
     {
       "case": "F4-ITER-02",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-02.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-02.cs.txt",
       "fixtureSha256": "3a7a1da86ae98ee3ab5c935f8849701e38e2bfdaa7adc10b95b1a394e38a3820",
       "surfaces": {
         "cli-default": {
@@ -2543,7 +2543,7 @@
     },
     {
       "case": "F5-ARRAY-01",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-01.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-01.cs.txt",
       "fixtureSha256": "984f6a6bf85c56b9120f7053d207e98c254fd486d65b9f27a938ca3ed4dac5ae",
       "surfaces": {
         "cli-default": {
@@ -2679,7 +2679,7 @@
     },
     {
       "case": "F5-ARRAY-02",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-02.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-02.cs.txt",
       "fixtureSha256": "e235ce21ba8e2abca01e9c93d89f4beff240e384410307ee2fe0b9e5247bc674",
       "surfaces": {
         "cli-default": {
@@ -2793,7 +2793,7 @@
     },
     {
       "case": "F5-ARRAY-03",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-03.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-03.cs.txt",
       "fixtureSha256": "e90768eca604330a7e503944136d3a3309bc87730bf4a424527935b5da5d36f0",
       "surfaces": {
         "cli-default": {
@@ -2917,7 +2917,7 @@
     },
     {
       "case": "F5-ARRAY-04",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-04.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-04.cs.txt",
       "fixtureSha256": "1df08bb7a06b2fe17d12a629ff4966d5c5a0f4b79d7ef0248033bd804e7b73b8",
       "surfaces": {
         "cli-default": {
@@ -3031,7 +3031,7 @@
     },
     {
       "case": "X-TRYCATCH-01",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/X-TRYCATCH-01.cs",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/X-TRYCATCH-01.cs.txt",
       "fixtureSha256": "ecac78a73149c52923c76f12b0b6534910f94b36c628df87be3c583b41b16c62",
       "surfaces": {
         "cli-default": {
