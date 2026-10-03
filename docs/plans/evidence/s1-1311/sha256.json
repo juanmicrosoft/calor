@@ -1796,7 +1796,7 @@
     "docs/plans/evidence/s1-1311/findings.json": "57c04eb3a0d1a2789b0a7b48dd5bf90ae41566c0ce925e032039bd46f3fad31b",
     "docs/plans/evidence/s1-1311/gate-status.json": "7f8063d733b7e1de687cb3918c3acef5f4108ff2cc002f4794caacca1f6a8605",
     "docs/plans/evidence/s1-1311/harness-corrections.json": "864f7cc5f2906e1599ab4dd58a864dac546907f3390ad34f4d7a8a55c87aebe0",
-    "docs/plans/evidence/s1-1311/pins.json": "2affef53c489604c855ee0946c3c87fd0f2cedba4411038806f45b040ea9551d",
+    "docs/plans/evidence/s1-1311/pins.json": "f3ad568148719f7baf4bdb089dd4a020c661d740a8533aeb22a661ae0ebede03",
     "docs/plans/evidence/s1-1311/preflight.json": "f4206b6e3825099955f34ffdab4af8addf84bb2e8864932d3bf113742571ff1b",
     "docs/plans/evidence/s1-1311/results-summary.json": "d278a3c38f5b73af655c0ac28e4cb07f35c71ab134d88b364d1ae35a7dea0e72",
     "docs/plans/evidence/s1-1311/reviews/round-1.json": "0cec54d8df2553351b1ca1115194d3f08d3ff36193a9caa1214984b71f7e045e",
@@ -1806,7 +1806,7 @@
     "tools/Calor.Soundness.Sweep/Calor.Soundness.Sweep.csproj": "b7bd026cd61089c57f63037588aaf9e792dcd8157b41533dfd8dbdb0fed8f879",
     "tools/Calor.Soundness.Sweep/CaseExecutor.cs": "5a6bc9cbfa6517562e69e68c82eda02f774613a4eef51e46d5022cf1f9a1b10e",
     "tools/Calor.Soundness.Sweep/OracleRuntime.cs": "2f52f759b16771dc9813de227213355dde2a2b0a508074215fa574f600daff9c",
-    "tools/Calor.Soundness.Sweep/Program.cs": "d00ea524cc8c2e8ba300771193db04c64038e2b191db58edf5d806d37aefe2e9",
-    "tools/Calor.Soundness.Sweep/Report.cs": "47b73856339b31089dedb27d3f74d3f65425ea7c7473b8329db5a4e6768becaf"
+    "tools/Calor.Soundness.Sweep/Program.cs": "9041cd670da617e2a291b79aa63ca6b93174ec859b9935b25eac776628f628eb",
+    "tools/Calor.Soundness.Sweep/Report.cs": "83fb4fd2472b43aae09648d4f65c0c7a8c95e56a1747849a3fc92822aab42185"
   }
 }
