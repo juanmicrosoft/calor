@@ -7,3 +7,4 @@
 /tests/TestData/Benchmarks/** -text
 /tests/Calor.Evaluation/Core/*.cs -text
 /tests/Calor.Evaluation/Metrics/*.cs -text
+/docs/plans/evidence/b1-1276/results/* -text
