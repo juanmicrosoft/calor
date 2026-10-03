@@ -1,6 +1,7 @@
 {
   "schema": "v0.25-r0-1426-baseline/1",
-  "measuredCommit": "bf584fb71db140ca19e5c956a241a0da7dd02f60",
+  "measuredCommit": "2e13471c30ec4565577f2c877926afe612a7efe0",
+  "srcTree": "ee3c9db987d844a9348b8d0bab75e603cc01797c",
   "environment": {
     "dotnetSdk": "10.0.401",
     "platform": "Darwin arm64",
@@ -637,6 +638,422 @@
       }
     },
     {
+      "case": "F1-REFOUT-06",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-06.cs",
+      "fixtureSha256": "72723f89d0c1493a1e5953ffbafaedd8d331acde01664bc7d92d62d830947931",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 15,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "humanAttribution": null,
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F1-REFOUT-06.cli-default.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "True:3|False:0|True:2|False:True",
+            "exception": null,
+            "compileMode": "default",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 15,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "humanAttribution": null,
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F1-REFOUT-06.cli-passthrough.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "True:3|False:0|True:2|False:True",
+            "exception": null,
+            "compileMode": "default",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "nativeConversions": 15,
+          "interopPreservations": 0,
+          "lossySubstitutions": 0,
+          "drops": 0,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F1-REFOUT-06.mcp-default.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "True:3|False:0|True:2|False:True",
+            "exception": null,
+            "compileMode": "default",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "nativeConversions": 15,
+          "interopPreservations": 0,
+          "lossySubstitutions": 0,
+          "drops": 0,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F1-REFOUT-06.mcp-passthroughOnError.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "True:3|False:0|True:2|False:True",
+            "exception": null,
+            "compileMode": "default",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "True:3|False:0|True:2|False:True",
+        "exception": null
+      }
+    },
+    {
+      "case": "F1-REFOUT-07",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-07.cs",
+      "fixtureSha256": "a9ecef3fde04a3eb6566fce5b7289311ef29522331e4ecb1d3779acf0ba30b64",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 16,
+          "interopPreservationCount": 2,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "null-forgiving-expression",
+            "post-validation-fallback"
+          ],
+          "errorCodes": [],
+          "humanAttribution": "(1 via --passthrough fallback)",
+          "csharpInteropBlocks": 1,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F1-REFOUT-07.cli-default.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "True:5|False:True|True:one|False:True",
+            "exception": null,
+            "compileMode": "default",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 16,
+          "interopPreservationCount": 2,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "null-forgiving-expression",
+            "post-validation-fallback"
+          ],
+          "errorCodes": [],
+          "humanAttribution": "(1 via --passthrough fallback)",
+          "csharpInteropBlocks": 1,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F1-REFOUT-07.cli-passthrough.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "True:5|False:True|True:one|False:True",
+            "exception": null,
+            "compileMode": "default",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        },
+        "mcp-default": {
+          "isError": true,
+          "success": false,
+          "nativeConversions": 16,
+          "interopPreservations": 1,
+          "lossySubstitutions": 0,
+          "drops": 0,
+          "lossFeatures": [
+            "null-forgiving-expression"
+          ],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 1,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0208"
+            ],
+            "warningCodes": [],
+            "firstError": "No overload of internal call 'TryCast' matches <STRING>(INT, out STRING?). Candidates: Probe.TryCast<T>(any, out T) [calor://source/workspace%3Adocs%2Fplans%2Fevidence%2Fv0.25-r0-1426%2Fgenerated%2FF1-REFOUT-07.mcp-default.calr.txt/module/m001/class/ast%3Ac001/method/ast%3Am002]",
+            "firstErrorLine": 25
+          }
+        },
+        "mcp-passthroughOnError": {
+          "isError": true,
+          "success": false,
+          "nativeConversions": 16,
+          "interopPreservations": 1,
+          "lossySubstitutions": 0,
+          "drops": 0,
+          "lossFeatures": [
+            "null-forgiving-expression"
+          ],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 1,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0208"
+            ],
+            "warningCodes": [],
+            "firstError": "No overload of internal call 'TryCast' matches <STRING>(INT, out STRING?). Candidates: Probe.TryCast<T>(any, out T) [calor://source/workspace%3Adocs%2Fplans%2Fevidence%2Fv0.25-r0-1426%2Fgenerated%2FF1-REFOUT-07.mcp-passthroughOnError.calr.txt/module/m001/class/ast%3Ac001/method/ast%3Am002]",
+            "firstErrorLine": 25
+          }
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "True:5|False:True|True:one|False:True",
+        "exception": null
+      }
+    },
+    {
+      "case": "F1-REFOUT-08",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-08.cs",
+      "fixtureSha256": "cc2fcdb6713cab9b05948f37f9cf004da19fe29dede4869ebb2bcc63ad091650",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 9,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "humanAttribution": null,
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 14
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F1-REFOUT-08.cli-default.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "1",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "errors": [],
+            "matchesOriginal": false
+          }
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 9,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "humanAttribution": null,
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 14
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F1-REFOUT-08.cli-passthrough.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "1",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "errors": [],
+            "matchesOriginal": false
+          }
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "nativeConversions": 9,
+          "interopPreservations": 0,
+          "lossySubstitutions": 0,
+          "drops": 0,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 13
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F1-REFOUT-08.mcp-default.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "1",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "errors": [],
+            "matchesOriginal": false
+          }
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "nativeConversions": 9,
+          "interopPreservations": 0,
+          "lossySubstitutions": 0,
+          "drops": 0,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 13
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F1-REFOUT-08.mcp-passthroughOnError.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "1",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "errors": [],
+            "matchesOriginal": false
+          }
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "2",
+        "exception": null
+      }
+    },
+    {
       "case": "F2-INTERP-01",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-01.cs",
       "fixtureSha256": "a60dbcf6ba85d93ab20e47fbea05cf495e6c8fd7a027e7d22215cfb580c3856f",
@@ -1027,7 +1444,7 @@
               "Calor0208"
             ],
             "warningCodes": [],
-            "firstError": "No overload of internal call 'Log' matches (STRING). Candidates: Probe.Log(RecordingHandler) [calor://source/workspace%3Adocs%2Fplans%2Fevidence%2Fv0.25-r0-1426%2Fgenerated%2FF2-INTERP-03.mcp-default.calr/module/m001/class/ast%3Ac001/method/ast%3Am002]",
+            "firstError": "No overload of internal call 'Log' matches (STRING). Candidates: Probe.Log(RecordingHandler) [calor://source/workspace%3Adocs%2Fplans%2Fevidence%2Fv0.25-r0-1426%2Fgenerated%2FF2-INTERP-03.mcp-default.calr.txt/module/m001/class/ast%3Ac001/method/ast%3Am002]",
             "firstErrorLine": 12
           }
         },
@@ -1049,7 +1466,7 @@
               "Calor0208"
             ],
             "warningCodes": [],
-            "firstError": "No overload of internal call 'Log' matches (STRING). Candidates: Probe.Log(RecordingHandler) [calor://source/workspace%3Adocs%2Fplans%2Fevidence%2Fv0.25-r0-1426%2Fgenerated%2FF2-INTERP-03.mcp-passthroughOnError.calr/module/m001/class/ast%3Ac001/method/ast%3Am002]",
+            "firstError": "No overload of internal call 'Log' matches (STRING). Candidates: Probe.Log(RecordingHandler) [calor://source/workspace%3Adocs%2Fplans%2Fevidence%2Fv0.25-r0-1426%2Fgenerated%2FF2-INTERP-03.mcp-passthroughOnError.calr.txt/module/m001/class/ast%3Ac001/method/ast%3Am002]",
             "firstErrorLine": 12
           }
         }
@@ -1181,6 +1598,178 @@
       "original": {
         "compiled": true,
         "result": "${x}|{x}|9",
+        "exception": null
+      }
+    },
+    {
+      "case": "F2-INTERP-07",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-07.cs",
+      "fixtureSha256": "84fca44ef923afbc1623710353095d49bce1dc5ad533969ccc8ec0928cb7c33e",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 9,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "humanAttribution": null,
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 8
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F2-INTERP-07.cli-default.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "1.234,5|1234,5|1,234.5",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 9,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "humanAttribution": null,
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 8
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F2-INTERP-07.cli-passthrough.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "1.234,5|1234,5|1,234.5",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "nativeConversions": 9,
+          "interopPreservations": 0,
+          "lossySubstitutions": 0,
+          "drops": 0,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 7
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F2-INTERP-07.mcp-default.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "1.234,5|1234,5|1,234.5",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "nativeConversions": 9,
+          "interopPreservations": 0,
+          "lossySubstitutions": 0,
+          "drops": 0,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 7
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F2-INTERP-07.mcp-passthroughOnError.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "1.234,5|1234,5|1,234.5",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "1.234,5|1234,5|1,234.5",
         "exception": null
       }
     },
@@ -1545,6 +2134,186 @@
       }
     },
     {
+      "case": "F3-LOCAL-03",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-03.cs",
+      "fixtureSha256": "677a392baa87e118ce915adf7fcec4c6983f3a4ba874c525674bbacfecfb8326",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 10,
+          "interopPreservationCount": 3,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "method"
+          ],
+          "errorCodes": [],
+          "humanAttribution": "",
+          "csharpInteropBlocks": 3,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 46
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F3-LOCAL-03.cli-default.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "6|5|60|3000|502",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 10,
+          "interopPreservationCount": 3,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "method"
+          ],
+          "errorCodes": [],
+          "humanAttribution": "",
+          "csharpInteropBlocks": 3,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 46
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F3-LOCAL-03.cli-passthrough.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "6|5|60|3000|502",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "nativeConversions": 10,
+          "interopPreservations": 3,
+          "lossySubstitutions": 0,
+          "drops": 0,
+          "lossFeatures": [
+            "method"
+          ],
+          "csharpInteropBlocks": 3,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 45
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F3-LOCAL-03.mcp-default.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "6|5|60|3000|502",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "nativeConversions": 10,
+          "interopPreservations": 3,
+          "lossySubstitutions": 0,
+          "drops": 0,
+          "lossFeatures": [
+            "method"
+          ],
+          "csharpInteropBlocks": 3,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 45
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F3-LOCAL-03.mcp-passthroughOnError.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "6|5|60|3000|502",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "6|5|60|3000|502",
+        "exception": null
+      }
+    },
+    {
       "case": "F4-ITER-01",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-01.cs",
       "fixtureSha256": "0a1a21be9eac4d82bcf51a02705607d6b9de6fe98c50e649a532ae8f63f5db9e",
@@ -1655,6 +2424,120 @@
       "original": {
         "compiled": true,
         "result": "0|1|3|3",
+        "exception": null
+      }
+    },
+    {
+      "case": "F4-ITER-02",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-02.cs",
+      "fixtureSha256": "3a7a1da86ae98ee3ab5c935f8849701e38e2bfdaa7adc10b95b1a394e38a3820",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 25,
+          "interopPreservationCount": 2,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "post-validation-fallback"
+          ],
+          "errorCodes": [],
+          "humanAttribution": "(2 via --passthrough fallback)",
+          "csharpInteropBlocks": 2,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F4-ITER-02.cli-default.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "sf|7:late",
+            "exception": null,
+            "compileMode": "default",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 25,
+          "interopPreservationCount": 2,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "post-validation-fallback"
+          ],
+          "errorCodes": [],
+          "humanAttribution": "(2 via --passthrough fallback)",
+          "csharpInteropBlocks": 2,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F4-ITER-02.cli-passthrough.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "sf|7:late",
+            "exception": null,
+            "compileMode": "default",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        },
+        "mcp-default": {
+          "isError": true,
+          "success": false,
+          "nativeConversions": 25,
+          "interopPreservations": 0,
+          "lossySubstitutions": 0,
+          "drops": 0,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0209"
+            ],
+            "warningCodes": [],
+            "firstError": "'§YIELD' is illegal inside a property/indexer accessor.",
+            "firstErrorLine": 12
+          }
+        },
+        "mcp-passthroughOnError": {
+          "isError": true,
+          "success": false,
+          "nativeConversions": 25,
+          "interopPreservations": 0,
+          "lossySubstitutions": 0,
+          "drops": 0,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0209"
+            ],
+            "warningCodes": [],
+            "firstError": "'§YIELD' is illegal inside a property/indexer accessor.",
+            "firstErrorLine": 12
+          }
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "sf|7:late",
         "exception": null
       }
     },
@@ -2033,6 +2916,120 @@
       }
     },
     {
+      "case": "F5-ARRAY-04",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-04.cs",
+      "fixtureSha256": "1df08bb7a06b2fe17d12a629ff4966d5c5a0f4b79d7ef0248033bd804e7b73b8",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 17,
+          "interopPreservationCount": 1,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "post-validation-fallback"
+          ],
+          "errorCodes": [],
+          "humanAttribution": "(1 via --passthrough fallback)",
+          "csharpInteropBlocks": 1,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F5-ARRAY-04.cli-default.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "1|2|boom|123",
+            "exception": null,
+            "compileMode": "default",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 17,
+          "interopPreservationCount": 1,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "post-validation-fallback"
+          ],
+          "errorCodes": [],
+          "humanAttribution": "(1 via --passthrough fallback)",
+          "csharpInteropBlocks": 1,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-r0-1426/generated/F5-ARRAY-04.cli-passthrough.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "1|2|boom|123",
+            "exception": null,
+            "compileMode": "default",
+            "errors": [],
+            "matchesOriginal": true
+          }
+        },
+        "mcp-default": {
+          "isError": true,
+          "success": false,
+          "nativeConversions": 17,
+          "interopPreservations": 0,
+          "lossySubstitutions": 0,
+          "drops": 0,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor1002"
+            ],
+            "warningCodes": [],
+            "firstError": "Generated C# failed compilation (CS0201): Only assignment, call, increment, decrement, await, and new object expressions can be used as a statement",
+            "firstErrorLine": 17
+          }
+        },
+        "mcp-passthroughOnError": {
+          "isError": true,
+          "success": false,
+          "nativeConversions": 17,
+          "interopPreservations": 0,
+          "lossySubstitutions": 0,
+          "drops": 0,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor1002"
+            ],
+            "warningCodes": [],
+            "firstError": "Generated C# failed compilation (CS0201): Only assignment, call, increment, decrement, await, and new object expressions can be used as a statement",
+            "firstErrorLine": 17
+          }
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "1|2|boom|123",
+        "exception": null
+      }
+    },
+    {
       "case": "X-TRYCATCH-01",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/X-TRYCATCH-01.cs",
       "fixtureSha256": "ecac78a73149c52923c76f12b0b6534910f94b36c628df87be3c583b41b16c62",
@@ -2160,7 +3157,7 @@
   "calorCases": [
     {
       "case": "F2-INTERP-05",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-05.calr",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-05.calr.txt",
       "fixtureSha256": "419003b22f7036b3fd20e56752be6727db8750d8833495a79497e32c932fd9a7",
       "compile": {
         "exit": 1,
@@ -2174,7 +3171,7 @@
     },
     {
       "case": "F2-INTERP-06",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-06.calr",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-06.calr.txt",
       "fixtureSha256": "f4554251c0e9a27ce3ea1bc392d6351500c84ecdf82aa69cef5b257023c6d35c",
       "compile": {
         "exit": 0,

@@ -19,7 +19,7 @@ public class InteropScopeTests
     /// 1.0.0; later scope changes are amendments, never edits to this list. A packet that drops a
     /// case from both the cases and the frozen list passes the validator but fails this pin.
     /// </summary>
-    private const string DenominatorV1Seal = "4bc2bd22ab0125fdafd133d554ee615a4a4269377c76b7721a7822246773f80a";
+    private const string DenominatorV1Seal = "8daa21950578b7e26ea68fce5bed13623fd10d609b3215d73ac200a2266fd0ef";
 
     [Fact]
     public void CommittedPacketIsValid()
@@ -114,7 +114,7 @@ public class InteropScopeTests
         Func<string, byte[]?>? read = null;
         switch (mutation)
         {
-            case "family missing": scope["families"]!.AsArray().Remove(Family(scope, "F3")); Remove(scope["cases"]!, "F3-LOCAL-01", "F3-LOCAL-02"); Keep(scope, "F3-LOCAL-01", "F3-LOCAL-02"); break;
+            case "family missing": scope["families"]!.AsArray().Remove(Family(scope, "F3")); Remove(scope["cases"]!, "F3-LOCAL-01", "F3-LOCAL-02", "F3-LOCAL-03"); Keep(scope, "F3-LOCAL-01", "F3-LOCAL-02", "F3-LOCAL-03"); break;
             case "family tracks another issue": Family(scope, "F2")["issue"] = 9999; break;
             case "unknown family": var extra = Family(scope, "F6").DeepClone(); extra["id"] = "F7"; scope["families"]!.AsArray().Add(extra); var c7 = Case(scope, "F6-REPORT-04").DeepClone(); c7["id"] = "F7-X"; c7["family"] = "F7"; scope["cases"]!.AsArray().Add(c7); break;
             case "duplicate case id": scope["cases"]!.AsArray().Add(Case(scope, "F5-ARRAY-03").DeepClone()); break;
@@ -228,7 +228,7 @@ public class InteropScopeTests
     {
         ["status"] = "READY",
         ["candidate"] = new JsonObject { ["commit"] = "1111111111111111111111111111111111111111" },
-        ["cases"] = new JsonArray(new JsonObject { ["id"] = "F4-ITER-01", ["result"] = "passed" }),
+        ["cases"] = new JsonArray(new JsonObject { ["id"] = "F4-ITER-01", ["result"] = "passed" }, new JsonObject { ["id"] = "F4-ITER-02", ["result"] = "passed" }),
         ["tests"] = new JsonArray(new JsonObject { ["project"] = "tests/Calor.Conversion.Tests", ["total"] = 12, ["failed"] = 0 }),
         ["websiteExamples"] = new JsonArray("website/content/guides/interop.mdx#iterator-accessors"),
         ["reviews"] = new JsonArray(new JsonObject { ["reviewer"] = "codex", ["record"] = "docs/plans/evidence/x/reviews/round-1.md" }),

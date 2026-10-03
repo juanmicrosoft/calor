@@ -1,0 +1,32 @@
+§M{m001:F1REFOUT07:overflow=unchecked}
+  §U{System}
+  §U{System.Diagnostics.CodeAnalysis}
+
+  §CL{c001:Probe:pub:stat}
+    §MT{m002:TryCast<T>:pub:stat} (any:o, T:value:out) -> bool
+      §IF{if003} (is o T)
+        §B{T:t} (cast T o)
+        §ASSIGN value t
+        §R true
+      §ASSIGN value §CS{default!}
+      §R false
+
+    §MT{m004:TryName:pub:stat}
+      §I{i32:id}
+      §I{?str:name:out}[@NotNullWhen(true)]
+      §O{bool}
+      §ASSIGN name (? (== id 1) "one" null)
+      §R (!= name null)
+
+    §MT{m005:Run:pub:stat} () -> str
+      §B{~five:i32}
+      §B{bool:okInt} §C{TryCast<i32>} §A 5 §A{out} five §/C
+      §B{~s:?str}
+      §B{bool:okStr} §C{TryCast<str>} §A 5 §A{out} s §/C
+      §B{~n1:?str}
+      §B{bool:named} §C{TryName} §A 1 §A{out} n1 §/C
+      §B{~n2:?str}
+      §B{bool:unnamed} §C{TryName} §A 2 §A{out} n2 §/C
+      §R (+ (+ (+ (+ (+ (+ (+ (+ (+ (+ (+ (+ (+ (+ okInt ":") five) "|") okStr) ":") (== s null)) "|") named) ":") n1) "|") unnamed) ":") (== n2 null))
+
+

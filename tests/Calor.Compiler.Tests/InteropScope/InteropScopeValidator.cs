@@ -184,8 +184,9 @@ internal static class InteropScopeValidator
             v.Add(new("S010", "paid-spend", "the paid-spend ceiling must be registered at 0"));
 
         // S013: every recorded baseline is derived from the committed results.
-        if (Str(results["measuredCommit"]) != Str(scope["identities"]?["measuredCommit"]) || !IsFullSha(Str(results["measuredCommit"])))
-            v.Add(new("S013", "measuredCommit", "results and scope must name the same full measured commit"));
+        if (Str(results["srcTree"]) != Str(scope["identities"]?["srcTree"]) || !IsFullSha(Str(results["srcTree"]))
+            || !IsFullSha(Str(results["measuredCommit"])))
+            v.Add(new("S013", "srcTree", "results must come from a full commit whose src/ tree is the registered compiler source tree"));
         var byCase = Arr(results["cases"]).ToDictionary(c => Str(c["case"])!, c => c);
         var byCalr = Arr(results["calorCases"]).ToDictionary(c => Str(c["case"])!, c => c);
         foreach (var c in cases.Concat(Arr(scope["discovered"])))
@@ -200,8 +201,9 @@ internal static class InteropScopeValidator
             }
             foreach (var o in Arr(c["observations"]))
             {
-                var node = byCase.GetValueOrDefault(Str(o["case"]) ?? "")?["surfaces"]?[Str(o["surface"]) ?? ""]?[Str(o["path"]) ?? ""];
-                if (node is null || !JsonNode.DeepEquals(node, o["equals"]))
+                var surface = byCase.GetValueOrDefault(Str(o["case"]) ?? "")?["surfaces"]?[Str(o["surface"]) ?? ""] as JsonObject;
+                var path = Str(o["path"]) ?? "";
+                if (surface is null || !surface.ContainsKey(path) || !JsonNode.DeepEquals(surface[path], o["equals"]))
                     v.Add(new("S013", id, $"observation {Str(o["case"])}/{Str(o["surface"])}/{Str(o["path"])} does not match the results"));
             }
         }

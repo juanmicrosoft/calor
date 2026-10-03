@@ -31,6 +31,9 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..",
 EVID = os.path.relpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."), ROOT)
 CALOR = os.path.join("src", "Calor.Compiler", "bin", "Release", "net10.0", "calor.dll")
 GEN = os.path.join(EVID, "generated")
+# Calor files here use .calr.txt: every tracked *.calr is part of the repository's Calor corpus,
+# which ledger tests count. The compiler accepts the extension unchanged.
+CALR = ".calr.txt"
 
 
 def norm(text):
@@ -176,7 +179,13 @@ def website_scan():
 def main():
     shutil.rmtree(os.path.join(ROOT, GEN), ignore_errors=True)
     os.makedirs(os.path.join(ROOT, GEN))
-    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+    git = lambda *a: subprocess.run(["git", *a], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+    head = git("rev-parse", "HEAD")
+    # The compiler under test is identified by its source tree, so a rerun on a docs-only commit
+    # on top of the measured base is comparable; uncommitted src/ changes are refused.
+    if git("status", "--porcelain", "--", "src"):
+        sys.exit("src/ has uncommitted changes; the measured compiler would not match any commit")
+    src_tree = git("rev-parse", "HEAD:src")
     fixtures = sorted(glob.glob(os.path.join(ROOT, EVID, "fixtures", "*.cs")))
     cases, probe_files = [], []
     for path in fixtures:
@@ -185,7 +194,7 @@ def main():
         row = {"case": case, "fixture": rel, "fixtureSha256": sha(rel), "surfaces": {}}
         probe_files.append(rel)
         for mode, extra in (("cli-default", []), ("cli-passthrough", ["--passthrough"])):
-            calr = os.path.join(GEN, f"{case}.{mode}.calr")
+            calr = os.path.join(GEN, f"{case}.{mode}{CALR}")
             code, out, err = run(["convert", rel, "-o", calr, "--format", "json", "--no-telemetry"] + extra)
             surf = {"convertExit": code} | summarize_envelope(out) | {"humanAttribution": attribution(err)}
             if os.path.exists(os.path.join(ROOT, calr)):
@@ -200,9 +209,9 @@ def main():
 
     # Native Calor witnesses (no C# original): compile only and record diagnostics with lines.
     calr_cases = []
-    for path in sorted(glob.glob(os.path.join(ROOT, EVID, "fixtures", "*.calr"))):
+    for path in sorted(glob.glob(os.path.join(ROOT, EVID, "fixtures", "*" + CALR))):
         rel = os.path.relpath(path, ROOT)
-        case = os.path.splitext(os.path.basename(path))[0]
+        case = os.path.basename(path)[:-len(CALR)]
         calr_cases.append({"case": case, "fixture": rel, "fixtureSha256": sha(rel),
                            "compile": compile_calr(rel, os.path.join(GEN, f"{case}.g.cs"))})
 
@@ -218,7 +227,7 @@ def main():
                 surf[k] = loss.get(k)
             surf["lossFeatures"] = sorted({l.get("feature") for l in loss.get("locations") or []})
             if isinstance(calor, str):
-                calr = os.path.join(GEN, f"{row['case']}.mcp-{mode}.calr")
+                calr = os.path.join(GEN, f"{row['case']}.mcp-{mode}{CALR}")
                 open(os.path.join(ROOT, calr), "w", encoding="utf-8").write(calor)
                 surf["csharpInteropBlocks"] = calor.count("§CSHARP{")
                 surf["inlineInteropExpressions"] = calor.count("§CS{")
@@ -243,7 +252,7 @@ def main():
                     and (g.get("result"), g.get("exception")) == (original.get("result"), original.get("exception"))}
 
     sdk = subprocess.run(["dotnet", "--version"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
-    report = {"schema": "v0.25-r0-1426-baseline/1", "measuredCommit": head,
+    report = {"schema": "v0.25-r0-1426-baseline/1", "measuredCommit": head, "srcTree": src_tree,
               "environment": {"dotnetSdk": sdk, "platform": f"{os.uname().sysname} {os.uname().machine}",
                               "python": sys.version.split()[0], "compiler": CALOR,
                               "compilerConfiguration": "Release", "generatedCSharpRetained": False},
