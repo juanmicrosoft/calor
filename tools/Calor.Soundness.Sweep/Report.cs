@@ -124,7 +124,7 @@ internal static class Report
                 ["o2"] = o2For == null ? "not-run" : S(o2For["o2"]) switch { "guard-threw" => "guard threw", "returned" or "o2-other-exception" => "did not throw", _ => "not-run" },
                 ["o2Detail"] = o2For?.DeepClone(),
             },
-            ["nonVacuityCheck"] = attempt["nonVacuityCheck"]?.DeepClone(), ["classReason"] = r["classReason"]?.DeepClone(),
+            ["nonVacuityCheck"] = attempt["nonVacuityCheck"]?.DeepClone(), ["classReason"] = (attempt["classReason"] ?? r["classReason"])?.DeepClone(),
             ["minimized"] = new JsonObject
             {
                 ["status"] = "registered-case: a single-function probe generated from one template; not reduced further", ["calorSource"] = c.CalorSource,

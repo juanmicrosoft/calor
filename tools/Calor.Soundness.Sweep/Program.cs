@@ -260,7 +260,7 @@ internal static partial class Program
         var (_, templates, cases, rows) = Load(Path.GetFullPath(opts["repo"]));
         var (caseById, ledger, scratch) = (ById(cases), new Ledger(Path.Combine(outRoot, "ledger.jsonl")), Scratch("cross"));
         var hosts = Pair.ToDictionary(id => id, id => new BaselineHost(id, opts[id.ToLowerInvariant()]));
-        bool Drift() => hosts.Values.Any(h => Pins(h, "") is var now && JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, h.Id, "pins.json"))) is var then && (Native(now, h.Directory) != Native(then, h.Directory)
+        bool Drift() => hosts.Values.Any(h => Pins(h, "") is var now && JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, h.Id, "pins.json"))) is var then && (Native(now, h.Directory) is null || Native(now, h.Directory) != Native(then, h.Directory)
             || new[] { "calorDllSha256", "calorRuntimeDllSha256", "microsoftZ3DllSha256", "dotnetVersion", "os" }.Any(k => now[k]?.ToJsonString() != then![k]?.ToJsonString())));
         if (Drift()) return Fail("INVALID: a pin (binary, native image, or SDK) differs before crossrun", 4);
         string[] priority = ["false-unconditional-proof", "stale-cache-proof", "required-demotion-absent", "spurious-refutation"];
