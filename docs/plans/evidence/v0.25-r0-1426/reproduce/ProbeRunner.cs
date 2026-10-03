@@ -1,0 +1,58 @@
+#:package Microsoft.CodeAnalysis.CSharp
+#:property Nullable=enable
+#:property TreatWarningsAsErrors=false
+#:property RestorePackagesWithLockFile=false
+#:property RestoreLockedMode=false
+#:property PublishAot=false
+
+// 0.25 R0 (#1426) behavioral oracle. For each C# file given on the command line, compile it in
+// memory with Roslyn against the running runtime's assemblies (plus an optional Calor.Runtime.dll),
+// load it in a collectible context, call the static `Probe.Run()` and print one JSON line:
+// {"file", "compiled", "errors", "result", "exception"}. The R0 baseline compares the original
+// fixture's line with the generated C#'s line. It is a baseline instrument, not a T1 oracle.
+using System.Reflection;
+using System.Runtime.Loader;
+using System.Text.Json;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+
+var runtimeDll = Environment.GetEnvironmentVariable("CALOR_RUNTIME_DLL");
+var refs = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
+    .Split(Path.PathSeparator)
+    .Select(p => (MetadataReference)MetadataReference.CreateFromFile(p))
+    .ToList();
+if (!string.IsNullOrEmpty(runtimeDll)) refs.Add(MetadataReference.CreateFromFile(runtimeDll));
+
+foreach (var file in args)
+{
+    var tree = CSharpSyntaxTree.ParseText(File.ReadAllText(file),
+        new CSharpParseOptions(LanguageVersion.Preview), path: file);
+    var comp = CSharpCompilation.Create("Probe_" + Guid.NewGuid().ToString("N"), new[] { tree }, refs,
+        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+            nullableContextOptions: NullableContextOptions.Enable, allowUnsafe: true));
+    using var ms = new MemoryStream();
+    var emit = comp.Emit(ms);
+    var errors = emit.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error)
+        .Select(d => d.Id + ": " + d.GetMessage()).ToArray();
+    string? result = null, exception = null;
+    if (emit.Success)
+    {
+        var alc = new AssemblyLoadContext(file, isCollectible: true);
+        if (!string.IsNullOrEmpty(runtimeDll)) alc.LoadFromAssemblyPath(Path.GetFullPath(runtimeDll));
+        ms.Position = 0;
+        var asm = alc.LoadFromStream(ms);
+        var probe = asm.GetTypes().FirstOrDefault(t => t.Name == "Probe");
+        var run = probe?.GetMethod("Run", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+        try
+        {
+            result = run is null ? null : run.Invoke(null, null)?.ToString();
+            if (run is null) exception = "no static Probe.Run()";
+        }
+        catch (TargetInvocationException e)
+        {
+            exception = e.InnerException?.GetType().Name + ": " + e.InnerException?.Message;
+        }
+        alc.Unload();
+    }
+    Console.WriteLine(JsonSerializer.Serialize(new { file, compiled = emit.Success, errors, result, exception }));
+}

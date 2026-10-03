@@ -1,0 +1,16 @@
+§M{m001:F5ARRAY03:overflow=unchecked}
+  §U{System}
+
+  §CL{c001:Probe:pub:stat}
+    §MT{m002:Run:pub:stat} () -> str
+      §E{alloc}
+      §ARR{one:i32}
+        3
+        1
+        2
+      §B{i32[,]:two} §ARR2D{arr2d004:two:i32}
+        §ROW 1 2
+        §ROW 3 4
+      §R (+ (+ (+ (+ (+ (+ §IDX{one} 0 "|") (len one)) "|") §IDX2D two 1 0) "|") (len two))
+
+

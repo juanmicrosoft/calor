@@ -1,0 +1,28 @@
+§M{m001:F3-LOCAL-01:overflow=unchecked}
+  §U{System}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §MT{m004:Run:pub:stat} () -> str
+        §R (+ (+ §C{UseAdd} §/C "|") §C{Fact} §A 5 §/C)
+
+      §CSHARP{    public static int UseAdd()
+    {
+        int Add(int x) => x + 1;
+        return Add(2);
+    }
+      }§/CSHARP
+
+      §CSHARP{
+    public static int Fact(int n)
+    {
+        int Go(int k)
+        {
+            return k <= 1 ? 1 : k * Go(k - 1);
+        }
+        return Go(n);
+    }
+      }§/CSHARP
+
+
+

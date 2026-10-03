@@ -1,0 +1,25 @@
+§M{m001:F2INTERP01:overflow=unchecked}
+  §U{System}
+  §U{System.Globalization}
+
+  §CL{c001:Probe:pub:stat}
+    §FLD{i32:calls:priv:stat} = 0
+
+    §MT{m002:Next:pub:stat} () -> i32
+      §ASSIGN calls (+ calls 1)
+      §R calls
+
+    §MT{m003:Run:pub:stat} () -> str
+      §E{mut}
+      §ASSIGN CultureInfo.CurrentCulture CultureInfo.InvariantCulture
+      §B{f64:amount} 3.14159
+      §B{i32:n} 42
+      §B{?str:missing} null
+      §B{str:formatted} "${amount:F2}"
+      §B{str:aligned} "[${n,5}][${n,-4}]"
+      §B{str:braces} "{${n}}"
+      §B{str:nulls} "<${missing}>"
+      §B{str:order} "${Next()}-${Next()}"
+      §R (+ (+ (+ (+ (+ (+ (+ (+ formatted "|") aligned) "|") braces) "|") nulls) "|") order)
+
+

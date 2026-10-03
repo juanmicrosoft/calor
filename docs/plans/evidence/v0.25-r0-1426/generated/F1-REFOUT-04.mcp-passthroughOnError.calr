@@ -1,0 +1,29 @@
+§M{m001:F1REFOUT04:overflow=unchecked}
+  §U{System}
+
+  §CL{c001:Probe:pub:stat}
+    §MT{m002:Div:pub:stat} (i32:a, i32:b, i32:remainder:out) -> i32
+      §ASSIGN remainder (% a b)
+      §R (/ a b)
+
+    §MT{m003:Twice:pub:stat} (i32:x:in) -> i32
+      §R (* x 2)
+
+    §MT{m004:SetThenThrow:pub:stat} (i32:r:out)
+      §E{throw,alloc}
+      §ASSIGN r 1
+      §TH §NEW{InvalidOperationException} §A "boom" §/NEW
+
+    §MT{m005:Run:pub:stat} () -> str
+      §E{throw,alloc}
+      §B{~rem:i32} `default`
+      §B{i32:q} §C{Div} §A{out}[remainder] rem §A[b] 2 §A[a] 7 §/C
+      §B{i32:seven} 7
+      §B{i32:t} §C{Twice} §A{in} seven §/C
+      §B{~r:i32} 5
+      §TR{try006}
+        §C{SetThenThrow} §A{out} r §/C
+      §CA{InvalidOperationException:}
+      §R (+ (+ (+ (+ (+ (+ q "|") rem) "|") t) "|") r)
+
+
