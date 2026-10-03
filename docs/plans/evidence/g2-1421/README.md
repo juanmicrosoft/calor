@@ -136,8 +136,22 @@ across 150 attempts. The protocol bounds non-determinism; it does not prove its 
 - **Amendments.** After merge, the required `calor-first-guard` job runs main's copy of the
   validator and this tree's copy against the packet on `main` (`D016`): an unrecorded change, or
   one that lowers any case's contributions per environment (including test multiplicity) or
-  narrows a determinism row, fails. An unreadable baseline fails closed. The oracle's gate step
-  may not be conditional or masked, and the instrumentation call sites must stay (`D014`).
+  narrows a determinism row, fails. An unreadable baseline fails closed.
+- **Gates (`D014`, structural).** The validator parses the workflows (a minimal parser for the
+  job/step subset; no YAML library is available) and checks every registered gate step in
+  `protocol.json` `gates`: the oracle step in `test`, and three steps in `calor-first-guard` that
+  fetch main's validator, run it on this tree, and run this tree's validator and controls. Each
+  must exist once as its own run step with no `if:`, no `continue-on-error`, and no shell
+  override, in an unconditional job, after its registered earlier steps, with its frozen script
+  line for line. Its first command must be `set -euo pipefail`, and each gate command must be a
+  top-level command: not inside `if`/`for`/`while`/`case`, braces, a subshell, or a heredoc, with
+  no `exit`, `set +e`, or `ERR` trap before it. The two matrix shard steps (`tests (…)`,
+  `publish-nuget` `test (…)`) must start with `set -euo pipefail`, run `dotnet test`, and swallow
+  no status. A later step that runs after a failure must only upload artifacts or be registered.
+  The instrumentation call sites must stay. Residual: a change that rewrites the workflow and
+  every copy of the validator it runs at once is visible only to review.
+- **Home directory.** Every invocation gets its own `HOME`/`USERPROFILE` under the job's output
+  directory; harness files may not look up the real home directory at all (`home_safe`, `D013`).
 
 ## Compute plan
 

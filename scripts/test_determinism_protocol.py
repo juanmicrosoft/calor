@@ -150,18 +150,40 @@ class NegativeRegistrationControls(unittest.TestCase):
         self.only("D014", texts={".github/workflows/test.yml": test_yml.replace(
             "VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle\"", "VerifierRuntimeDifferentialTests\"")})
         self.only("D014", texts={".github/workflows/publish-nuget.yml": ""})
-        step = "- name: Run verifier-runtime differential gate\n"
-        self.only("D014", texts={".github/workflows/test.yml": test_yml.replace(step, step + "        if: false\n")})
-        self.only("D014", texts={".github/workflows/test.yml": test_yml.replace(dp.TRUSTED_STEP, "true")})
         self.only("D014", texts={".github/workflows/test.yml": test_yml.replace("git show origin/main:scripts", "git show HEAD:scripts")})
-        self.only("D014", texts={".github/workflows/test.yml": test_yml.replace(
-            "--root . --baseline-ref origin/main\n          fi", "--root . --baseline-ref origin/main || true\n          fi")})
-        self.only("D014", texts={".github/workflows/test.yml": test_yml.replace(
-            '"FullyQualifiedName~VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle"\n',
-            '"FullyQualifiedName~VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle" || true\n')})
+        gate = "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DifferentialGate.cs"
+        self.only("D014", texts={gate: (ROOT / gate).read_text(encoding="utf-8").replace("DeterminismRecord.WriteCells(results);", "")})
+
+    def test_d014_structural_bypasses(self) -> None:
+        """The two bypasses open after round 3, plus continue-on-error, || true, and a reorder."""
+        test_yml = (ROOT / ".github/workflows/test.yml").read_text(encoding="utf-8")
+        main = '          python3 "$RUNNER_TEMP/determinism_protocol_main.py" validate --root . --baseline-ref origin/main\n'
+        oracle_step = "      - name: Run verifier-runtime differential gate\n"
+        own_step = "      - name: Validate the determinism protocol and its controls (#1421)\n"
+        main_step = "      - name: Validate the determinism protocol with main's validator (#1421)\n"
+        main_block = test_yml[test_yml.index(main_step):test_yml.index(own_step)]
         publish = (ROOT / ".github/workflows/publish-nuget.yml").read_text(encoding="utf-8")
-        self.only("D014", texts={".github/workflows/publish-nuget.yml": publish.replace(
-            "      - name: Run project tests\n", "      - name: Run project tests\n        if: false\n", 1)})
+        for path, mutated in (
+            (".github/workflows/test.yml", test_yml.replace(main, "          if false; then\n  " + main + "          fi\n")),
+            (".github/workflows/publish-nuget.yml", publish.replace(
+                "      - name: Run project tests\n", "      - name: Run project tests\n        if: ${{ 1 == 2 }}\n", 1)),
+            (".github/workflows/test.yml", test_yml.replace(oracle_step, oracle_step + "        if: ${{ 1 == 2 }}\n")),
+            (".github/workflows/test.yml", test_yml.replace(main_step, main_step + "        continue-on-error: true\n")),
+            (".github/workflows/test.yml", test_yml.replace(main, main.rstrip("\n") + " || true\n")),
+            (".github/workflows/test.yml", test_yml.replace(main_block, "").replace(  # reorder: main's validator after this tree's
+                "      # #881 pinned reproduction", main_block + "      # #881 pinned reproduction", 1)),
+            (".github/workflows/publish-nuget.yml", publish.replace(
+                "          set -euo pipefail\n          mkdir -p artifacts/test\n", "          set -euo pipefail\n          mkdir -p artifacts/test\n          set +e\n", 1)),
+        ):
+            self.assertIn(path, (".github/workflows/test.yml", ".github/workflows/publish-nuget.yml"))
+            self.assertNotEqual(mutated, (ROOT / path).read_text(encoding="utf-8"))
+            self.only("D014", texts={path: mutated})
+
+    def test_harness_never_touches_the_real_home(self) -> None:
+        self.assertTrue(dp.home_safe((ROOT / dp.HARNESS).read_text(encoding="utf-8")))
+        for bad in ("shutil.rmtree(Path.home() / '.calor')", "os.path.expanduser('~/.calor')", "os.environ.get('HOME')", "os.getenv(\"USERPROFILE\")"):
+            self.assertFalse(dp.home_safe(bad), bad)
+        self.only("D013", texts={dp.HARNESS: (ROOT / dp.HARNESS).read_text(encoding="utf-8") + "\nshutil.rmtree(Path.home() / '.calor')\n"})
         gate = "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DifferentialGate.cs"
         self.only("D014", texts={gate: (ROOT / gate).read_text(encoding="utf-8").replace("DeterminismRecord.WriteCells(results);", "")})
 

@@ -43,25 +43,136 @@ CALL_SITES = {"tests/Calor.Verification.Tests/VerifierRuntimeDifferential/Differ
 CELL_FIELDS = {"id": str, "formId": str, "category": str, "position": str, "nestingDepth": int, "polarity": str, "solverStatus": str,
                "runtimeVerdict": str, "guardForced": bool, "elidedWhenEnabled": bool, "solverHandled": bool, "mismatch": bool,
                "detail": (str, type(None))}
-TRUSTED_STEP = """          # #1421 D016: main's validator (not this tree's) judges this tree against main's packet.
-          if git cat-file -e origin/main:scripts/determinism_protocol.py 2>/dev/null; then
-            git show origin/main:scripts/determinism_protocol.py > "$RUNNER_TEMP/determinism_protocol_main.py"
-            python3 "$RUNNER_TEMP/determinism_protocol_main.py" validate --root . --baseline-ref origin/main
-          fi
-          python3 scripts/determinism_protocol.py validate --root . --baseline-ref origin/main
-"""
-TRUSTED_STEP_NAME = "- name: Check test manifest, skips, and assertion quality"
 MODES = {"execution", "control"}
 
 
-def job_blocks(workflow: str) -> list[str]:
-    return re.split(r"\n(?=  [A-Za-z0-9_-]+:\n)", workflow)
+def parse_workflow(text: str) -> dict:
+    """Minimal parser for the GitHub workflow subset the gates use (no YAML library is available):
+    jobs at indent 2, job keys at 4, steps as '- ' items at 6 with keys at 8, block scalars kept.
+    Returns {job: {"keys": {key: value}, "steps": [{key: value}]}}."""
+    lines, jobs, i = text.splitlines(), {}, 0
+    while i < len(lines) and lines[i] != "jobs:":
+        i += 1
+    job = step = None
+    while i + 1 < len(lines):
+        i += 1
+        line = lines[i]
+        indent, body = len(line) - len(line.lstrip(" ")), line.strip()
+        if not body or body.startswith("#") or indent == 0:
+            continue
+        if indent == 2 and body.endswith(":"):
+            job, step = jobs.setdefault(body[:-1], {"keys": {}, "steps": []}), None
+            continue
+        if job is None:
+            continue
+        if indent == 6 and body.startswith("- "):
+            step = {}
+            job["steps"].append(step)
+            body, indent = body[2:], 8
+        target = step if indent == 8 and step is not None else job["keys"] if indent == 4 else None
+        match = re.match(r"^([A-Za-z0-9_-]+):(?: (.*))?$", body) if target is not None else None
+        if match is None:
+            continue
+        key, value = match.group(1), (match.group(2) or "").strip()
+        if key == "steps" and target is job["keys"]:
+            continue
+        if value in ("|", ">-", ">", "|-") or value == "":
+            block = []
+            while i + 1 < len(lines) and (not lines[i + 1].strip() or len(lines[i + 1]) - len(lines[i + 1].lstrip(" ")) > indent):
+                i += 1
+                block.append(lines[i])
+            width = min((len(b) - len(b.lstrip(" ")) for b in block if b.strip()), default=0)
+            block = [b[width:].rstrip() for b in block]
+            value = (" ".join(b for b in block if b) if value.startswith(">") else "\n".join(block).strip("\n")) if value else "\n".join(block)
+        target[key] = value.strip("'\"") if value[:1] in "'\"" and value[-1:] == value[:1] else value
+    return jobs
 
 
-def masked(block: str) -> bool:
-    """A gate block that cannot fail: skipped, allowed to fail, or with a swallowed exit status."""
-    return bool(re.search(r"continue-on-error|if: *(\$\{\{ *)?false|\n    if:", block)) or any(
-        re.search(r"\|\| *(true|exit 0|:)\b", line) and "trap " not in line for line in block.splitlines())
+def shell_commands(script: str) -> list[tuple[int, str]]:
+    """Logical commands of a bash script with their nesting depth (if/for/while/case/{/( blocks);
+    heredoc bodies and comments are skipped."""
+    out, depth, heredoc, pending = [], 0, None, ""
+    for raw in script.splitlines():
+        if heredoc is not None:
+            heredoc = None if raw.strip() == heredoc else heredoc
+            continue
+        line = pending + raw.strip()
+        if line.endswith("\\"):
+            pending = line[:-1] + " "
+            continue
+        pending = ""
+        if not line or line.startswith("#"):
+            continue
+        tag = re.search(r"<<-?\s*'?\"?([A-Za-z_]+)'?\"?", line)
+        heredoc = tag.group(1) if tag else None
+        first = re.split(r"[\s;]", line, 1)[0]
+        if first in ("fi", "done", "esac", "}", ")") or line.startswith(")"):
+            depth -= 1
+        out.append((depth, line))
+        opens = first in ("if", "for", "while", "until", "case", "{", "(") or line.startswith("(") or line.endswith(("{", "("))
+        closes = bool(re.search(r"(;|\s)(fi|done|esac)$", line)) or (line.endswith("}") and "{" in line and first != "}")
+        depth += 1 if opens and not closes else 0
+    return out
+
+
+def top_level_ok(script: str, command: str) -> bool:
+    """The command is an unconditional top-level line after an effective 'set -euo pipefail',
+    with no operator that can swallow its status and nothing before it that disables errexit or exits."""
+    cmds = shell_commands(script)
+    if not cmds or cmds[0] != (0, "set -euo pipefail"):
+        return False
+    for depth, line in cmds[1:]:
+        if line == command:
+            return depth == 0
+        if depth == 0 and re.match(r"^(exit|return|set \+[a-z]*e|trap\b.*\bERR\b)", line):
+            return False
+    return False
+
+
+def home_safe(source: str) -> bool:
+    """The harness never touches the real home directory (it isolates HOME under the job temp dir):
+    no home-directory lookup, user expansion, or read of the HOME or USERPROFILE variables."""
+    return not re.search(r"Path\.home\(|expanduser\(|getenv\(\s*['\"](HOME|USERPROFILE)|environ(\.get\(|\[)\s*['\"](HOME|USERPROFILE)", source)
+
+
+def check_gates(protocol, text) -> list[str]:
+    """D014 structural check of every registered gate step (protocol.json gates)."""
+    problems, parsed = [], {}
+    gates = protocol.get("gates", {})
+    always = re.compile(r"always\(\)|failure\(\)|cancelled\(\)")
+    for gate in gates.get("steps", []) + gates.get("shardSteps", []):
+        wf = parsed.setdefault(gate["workflow"], parse_workflow(text(gate["workflow"])))
+        job = wf.get(gate["job"])
+        where = f"{gate['workflow']} {gate['job']} '{gate['step']}'"
+        if job is None or "if" in job["keys"] or "continue-on-error" in job["keys"]:
+            problems.append(f"{where}: job missing, conditional, or allowed to fail")
+            continue
+        names = [s.get("name") for s in job["steps"]]
+        if names.count(gate["step"]) != 1:
+            problems.append(f"{where}: not exactly one step with this name")
+            continue
+        index = names.index(gate["step"])
+        step, script = job["steps"][index], job["steps"][index].get("run", "")
+        if set(step) - {"name", "run", "env"} or step.get("shell", "bash") != "bash":
+            problems.append(f"{where}: step has a condition, continue-on-error, a shell override, or is not a run step")
+        if any(a not in names[:index] for a in gate.get("after", [])):
+            problems.append(f"{where}: a required earlier step is missing or after it")
+        for later in job["steps"][index + 1:]:
+            if always.search(later.get("if", "")) and not later.get("uses", "").startswith("actions/upload-artifact@") \
+                    and later.get("name") not in gates.get("alwaysAllowed", []):
+                problems.append(f"{where}: later step '{later.get('name')}' runs after a failure and is not registered")
+        if "script" in gate:
+            lines = [ln for ln in script.splitlines() if ln.strip()]
+            if lines != gate["script"] or any(not top_level_ok(script, c) for c in gate.get("commands", [])):
+                problems.append(f"{where}: script differs from the frozen script or a gate command is not top-level")
+        else:
+            cmds = shell_commands(script)
+            masked = any(re.search(r"\|\|\s*(true|:|exit 0)\b|^set \+[a-z]*e", c) and not c.startswith("trap ") for _, c in cmds)
+            if not cmds or cmds[0] != (0, "set -euo pipefail") or masked or not any("dotnet test" in c for _, c in cmds):
+                problems.append(f"{where}: shard script lacks set -euo pipefail, runs no dotnet test, or masks a status")
+    return problems
+
+
 ATTEMPT_STATUSES = ["completed", "timeout", "crash", "infrastructure-failure", "environment-violation", "invalid"]
 VALUE_STATUSES = {"completed", "timeout", "crash"}
 CASE_CLASSES = ["AGREE-PASS", "AGREE-FAIL", "DISAGREE", "INCOMPLETE"]
@@ -332,20 +443,17 @@ def validate(root: Path, protocol=None, cases=None, contract=None, texts=None, b
     elif wf.get("status") != "registered" or wf.get("amendment") not in amended or not all((root / wf.get(k, "missing")).exists() for k in ("path", "runner")):
         add("D013", "execution machinery must be registered by a recorded amendment")
 
+    if any(not home_safe(text(rel)) for rel in [HARNESS] + [f for f in wf.get("frozenFiles", []) if f.endswith(".py")]):
+        add("D013", "a harness file references the real home directory")
+
     # D014 every declared gate site still runs the registered command; no runner configuration appeared.
     test_yml, publish = text(".github/workflows/test.yml"), text(".github/workflows/publish-nuget.yml")
     iso = profiles.get("oracle-isolated", {})
     if f"--filter \"{iso.get('filter')}\"" not in test_yml or any(f"project: {p['project']}" not in y for p in profiles.values()
                                                                    for y in (test_yml, publish)):
         add("D014", "a registered gate site no longer runs the registered oracle command or project")
-    step = test_yml.split("- name: Run verifier-runtime differential gate", 1)[-1].split("- name:", 1)[0]
-    trusted = test_yml.split(TRUSTED_STEP_NAME, 1)[-1].split("- name:", 1)[0]
-    if "if:" in step or "continue-on-error" in step or "||" in step or TRUSTED_STEP not in trusted \
-            or "if:" in trusted or "continue-on-error" in trusted:
-        add("D014", "the oracle step or the trusted baseline validation step is missing, altered, conditional, or masked")
-    gate_jobs = [b for y in (test_yml, publish) for b in job_blocks(y) if any(f"project: {p['project']}" in b for p in profiles.values())]
-    if len(gate_jobs) < 2 or any(masked(b) for b in gate_jobs) or masked(step):
-        add("D014", "a registered gate job is skipped, allowed to fail, or swallows an exit status")
+    for problem in check_gates(protocol, text):
+        add("D014", problem)
     if any(any((root / p["project"]).parent.glob(g)) for p in profiles.values() for g in ("xunit.runner.json", "*.runsettings")):
         add("D014", "a registered project gained a runner configuration file")
     if any(site not in text(rel) for rel, sites in CALL_SITES.items() for site in sites):
@@ -369,6 +477,8 @@ def validate(root: Path, protocol=None, cases=None, contract=None, texts=None, b
         old_rows = {r["id"]: r for r in old_p["determinismRows"]}
         weaker = [name for name, bad in (
             ("cases or contributions removed", any(new_m.get(k, 0) < n for k, n in old_m.items())),
+            ("a gate was removed or changed", any(g not in protocol.get("gates", {}).get(k, []) for k in ("steps", "shardSteps")
+                                                  for g in old_p.get("gates", {}).get(k, []))),
             ("a registered cell or artifact was repurposed", new_cells[:len(old_c["cells"]["ids"])] != old_c["cells"]["ids"]
              or any(a not in new_arts for a in old_c["artifacts"])),
             ("determinism row mapping narrowed", any(not (set(r["cases"]) <= set(rows.get(i, {}).get("cases", []))

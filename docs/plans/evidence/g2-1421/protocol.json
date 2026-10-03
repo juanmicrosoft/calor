@@ -161,7 +161,7 @@
   },
   "isolation": {
     "perInvocation": [
-      "~/.calor must not exist when the job starts (the environment check fails otherwise; the harness never deletes user state). Before every invocation, a ~/.calor created by an earlier invocation of the job is deleted, and whether it existed is recorded.",
+      "Each invocation runs with HOME, USERPROFILE, and DOTNET_CLI_HOME set to a fresh directory under the job's own output directory (NUGET_PACKAGES pinned explicitly to the path the build step used), so the verifier's user-level cache starts empty and the real home directory is never read, written, or deleted. Harness files may not look up the real home directory at all (validator: home_safe, D013).",
       "Remove every CALOR_UPDATE_* variable from the invocation environment, so no test rewrites a committed baseline.",
       "Set CALOR_Z3_EXPECTED_RID to the environment's RID and CALOR_DETERMINISM_RECORD_DIR to a fresh directory for the invocation."
     ]
@@ -422,11 +422,11 @@
     "requirements": [
       "Jobs plan -> attempts matrix -> decide. fail-fast false; no continue-on-error, no masked exit status; runner labels, timeouts, and SDK from this file.",
       "Exact SDK and runtime installed into a private dotnet root by a procedure that installs nothing else; the environment check rejects any other SDK or Microsoft.NETCore.App runtime.",
-      "Absolute paths for every record directory passed to a test host.",
       "Each attempt record written after every profile invocation, so a later failure cannot discard earlier observations; a TRX that exists after a timeout is still read.",
       "plan validates this protocol against the packet on protected main (D016), refuses a commit already executed, refuses a repair that changes only docs/, and enforces the budget from the API run inventory.",
       "decide receives the dispatched commit SHA and the run id; records from any other commit or run are INVALID.",
-      "Pull-request runs are control mode only."
+      "Pull-request runs are control mode only.",
+      "Absolute paths for every record directory passed to a test host, and an isolated HOME/USERPROFILE under the job temp directory for every invocation; no code path deletes or writes the real home directory."
     ]
   },
   "recordFormats": {
@@ -528,5 +528,99 @@
     "recorder": "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DeterminismRecord.cs",
     "schema": "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DifferentialModels.cs (CaseResult)",
     "rule": "The recorder and the CaseResult schema are frozen by sha256.json (D015); the three call sites (DifferentialGate.Run, CommittedReportsMatchGeneratedOracle, TranslatorOutputMatchesCommittedBaseline) must stay (D014). Changing either is a protocol amendment."
+  },
+  "gates": {
+    "rule": "D014 parses each workflow (a minimal parser for the job/step subset; no YAML library is available) and requires every gate step below to exist exactly once as its own run step with no if:, no continue-on-error, and no shell override, in a job with no if: or continue-on-error, after its registered earlier steps. A gate with a frozen script must match it line for line, its first command must be 'set -euo pipefail', and each gate command must be a top-level command (not inside if/for/while/case, braces, a subshell, or a heredoc; no ||, &&, ;, &) with no exit, return, set +e, or ERR trap before it. A shard step (a matrix job whose dotnet test runs in a per-shard branch) must start with 'set -euo pipefail', run dotnet test, and contain no '|| true', '|| :', '|| exit 0', or set +e. A later step in the same job that runs after a failure (always(), failure(), cancelled()) must upload artifacts or be registered in alwaysAllowed. Removing or changing a gate is an amendment checked by D016.",
+    "steps": [
+      {
+        "workflow": ".github/workflows/test.yml",
+        "job": "test",
+        "step": "Run verifier-runtime differential gate",
+        "after": [
+          "Bootstrap verified Z3 assets",
+          "Build"
+        ],
+        "script": [
+          "set -euo pipefail",
+          "dotnet test tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj -c Release --no-build --filter \"FullyQualifiedName~VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle\" --verbosity normal"
+        ],
+        "commands": [
+          "dotnet test tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj -c Release --no-build --filter \"FullyQualifiedName~VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle\" --verbosity normal"
+        ]
+      },
+      {
+        "workflow": ".github/workflows/test.yml",
+        "job": "calor-first-guard",
+        "step": "Fetch main's determinism protocol validator (#1421)",
+        "after": [
+          "Checkout code"
+        ],
+        "script": [
+          "set -euo pipefail",
+          "git rev-parse --verify origin/main",
+          "git show origin/main:scripts/determinism_protocol.py > \"$RUNNER_TEMP/determinism_protocol_main.py\" || cp scripts/determinism_protocol.py \"$RUNNER_TEMP/determinism_protocol_main.py\""
+        ],
+        "commands": [
+          "git rev-parse --verify origin/main"
+        ]
+      },
+      {
+        "workflow": ".github/workflows/test.yml",
+        "job": "calor-first-guard",
+        "step": "Validate the determinism protocol with main's validator (#1421)",
+        "after": [
+          "Checkout code",
+          "Fetch main's determinism protocol validator (#1421)"
+        ],
+        "script": [
+          "set -euo pipefail",
+          "python3 \"$RUNNER_TEMP/determinism_protocol_main.py\" validate --root . --baseline-ref origin/main"
+        ],
+        "commands": [
+          "python3 \"$RUNNER_TEMP/determinism_protocol_main.py\" validate --root . --baseline-ref origin/main"
+        ]
+      },
+      {
+        "workflow": ".github/workflows/test.yml",
+        "job": "calor-first-guard",
+        "step": "Validate the determinism protocol and its controls (#1421)",
+        "after": [
+          "Checkout code",
+          "Fetch main's determinism protocol validator (#1421)",
+          "Validate the determinism protocol with main's validator (#1421)"
+        ],
+        "script": [
+          "set -euo pipefail",
+          "python3 scripts/test_determinism_protocol.py",
+          "python3 scripts/determinism_protocol.py validate --root . --baseline-ref origin/main"
+        ],
+        "commands": [
+          "python3 scripts/test_determinism_protocol.py",
+          "python3 scripts/determinism_protocol.py validate --root . --baseline-ref origin/main"
+        ]
+      }
+    ],
+    "shardSteps": [
+      {
+        "workflow": ".github/workflows/test.yml",
+        "job": "remaining-tests",
+        "step": "Run project tests",
+        "after": [
+          "Bootstrap verified Z3 assets"
+        ]
+      },
+      {
+        "workflow": ".github/workflows/publish-nuget.yml",
+        "job": "test",
+        "step": "Run project tests",
+        "after": [
+          "Build"
+        ]
+      }
+    ],
+    "alwaysAllowed": [
+      "Runner resource probe (#1150)"
+    ],
+    "residual": "The workflow file is part of the tree under review. A change that rewrites both the workflow and every copy of the validator it runs is visible only to review; main's copy of the validator, run by the gate above, rejects any other change to these steps."
   }
 }
