@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    #1311 (0.24 S1) sweep harness. It executes the frozen #1419 case set against released compiler
+    binaries loaded by path (B1, N1, P845). It deliberately references NO Calor project: the compiler
+    under test is bound by reflection inside a collectible AssemblyLoadContext, and the generator and
+    independent oracle are the registered, unmodified sources linked from the test project.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../tests/Calor.Compiler.Tests/SoundnessRegistration/SweepCaseGenerator.cs" Link="Registered/SweepCaseGenerator.cs" />
+    <Compile Include="../../tests/Calor.Compiler.Tests/SoundnessRegistration/IndependentOracle.cs" Link="Registered/IndependentOracle.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="selftest-templates.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
