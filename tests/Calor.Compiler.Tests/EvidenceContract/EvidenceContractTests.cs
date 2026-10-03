@@ -984,7 +984,7 @@ public class EvidenceContractTests
         Assert.True(violations.Count == 0, Describe(violations));
         // The proposed fixture carries nothing a later amendment added.
         var text = contract.ToJsonString();
-        foreach (var added in new[] { "1.1.0", "1.2.0", "taskStatementRule", "determinismRows", "platformDeterminism", "evidenceDataRule", "chargeRules" })
+        foreach (var added in new[] { "1.1.0", "1.2.0", "1.2.1", "ExecutionCeiling", "taskStatementRule", "determinismRows", "platformDeterminism", "evidenceDataRule", "chargeRules" })
             Assert.DoesNotContain(added, text, StringComparison.Ordinal);
     }
 
@@ -1106,8 +1106,7 @@ public class EvidenceContractTests
         var rule = Assert.Single(capacity["chargeRules"]!.AsArray())!;
         Assert.Equal("regeneration-compute", rule["chargedTo"]!.GetValue<string>());
         Assert.Equal("determinism-compute", rule["notChargedTo"]!.GetValue<string>());
-        var amendment = contract["amendmentLog"]!.AsArray().Last()!;
-        Assert.Equal("1.2.0", amendment["version"]!.GetValue<string>());
+        var amendment = contract["amendmentLog"]!.AsArray().Single(a => a!["version"]!.GetValue<string>() == "1.2.0")!;
         Assert.True(amendment["afterDecisionBearingInspection"]!.GetValue<bool>());
     }
 
@@ -1194,10 +1193,11 @@ public class EvidenceContractTests
     [Fact]
     public void GateCeilingExceptionWithoutItsAmendmentInTheLogFails()
     {
-        // Removing amendment 1.2.0 from the log leaves its exception and charge rule unregistered.
+        // Removing amendments 1.2.1 and 1.2.0 from the log leaves the exception and charge rule unregistered.
         var contract = Contract();
         var log = contract["amendmentLog"]!.AsArray();
-        log.RemoveAt(log.Count - 1);
+        while (log.Last()!["version"]!.GetValue<string>() is "1.2.1" or "1.2.0")
+            log.RemoveAt(log.Count - 1);
         contract["contractVersion"] = log.Last()!["version"]!.DeepClone();
         var violations = EvidenceContractValidator.ValidateContract(contract);
         AssertViolation(violations, "C011");
@@ -1248,6 +1248,78 @@ public class EvidenceContractTests
             case "other-justification": rule["justification"] = "Fixture justification."; break;
         }
         AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C011");
+    }
+
+    // ------------------------------------------------------------------
+    // Amendment 1.2.1: condition 4 of the #1311 exception (run-2 harness ceiling constant)
+    // ------------------------------------------------------------------
+
+    private const string Amended4 = "changed in exactly two ways (amendment 1.2.1): (a) it adds the loaded-image capture, and (b) it changes the single constant ExecutionCeiling in the sweep tool's Program.cs (tools/Calor.Soundness.Sweep/Program.cs at that commit, or the same file after a path-only move) from 1500 to 1508, the run-2 budget this exception approves.";
+
+    [Fact]
+    public void CommittedContractRecordsAmendment121AsTheOnlyChangeToCondition4()
+    {
+        // 1.2.1 changes condition 4 only; the ceiling value, addedExecutions, and the other nine
+        // conditions keep their 1.2.0 text (bound by the registered hash).
+        var contract = Contract();
+        var s1 = S1Exception(contract);
+        Assert.Equal("1.2.0", s1["amendment"]!.GetValue<string>());
+        Assert.Equal(3008, s1["value"]!.GetValue<int>());
+        Assert.Equal(1508, s1["addedExecutions"]!.GetValue<int>());
+        var conditions = s1["conditions"]!.AsArray().Select(c => c!.GetValue<string>()).ToList();
+        Assert.Equal(10, conditions.Count);
+        Assert.StartsWith("Same harness.", conditions[3], StringComparison.Ordinal);
+        Assert.Contains(Amended4, conditions[3], StringComparison.Ordinal);
+        Assert.Single(conditions, c => c.Contains("ExecutionCeiling", StringComparison.Ordinal));
+        var last = contract["amendmentLog"]!.AsArray().Last()!;
+        Assert.Equal("1.2.1", last["version"]!.GetValue<string>());
+        Assert.Equal("1.2.1", contract["contractVersion"]!.GetValue<string>());
+        Assert.True(last["afterDecisionBearingInspection"]!.GetValue<bool>());
+        Assert.True(last["reviewedInPr"]!.GetValue<int>() > 1484);
+        Assert.Single(last["weakens"]!.AsArray());
+        Assert.Empty(last["removedRows"]!.AsArray());
+    }
+
+    [Theory]
+    [InlineData("1.2.0-text")]
+    [InlineData("other-constant-value")]
+    [InlineData("other-constant")]
+    [InlineData("no-capture")]
+    [InlineData("further-change")]
+    public void Condition4OtherThanTheAmendedTextFails(string mutation)
+    {
+        var contract = Contract();
+        var conditions = S1Exception(contract)["conditions"]!.AsArray();
+        var text = conditions[3]!.GetValue<string>();
+        Assert.Contains(Amended4, text, StringComparison.Ordinal);
+        conditions[3] = mutation switch
+        {
+            "1.2.0-text" => text.Replace(Amended4, "changed only to add the loaded-image capture.", StringComparison.Ordinal),
+            "other-constant-value" => text.Replace("from 1500 to 1508", "from 1500 to 1600", StringComparison.Ordinal),
+            "other-constant" => text.Replace("constant ExecutionCeiling", "constant Reserve", StringComparison.Ordinal),
+            "no-capture" => text.Replace("(a) it adds the loaded-image capture, and (b) it", "it", StringComparison.Ordinal),
+            "further-change" => text.Replace("the run-2 budget this exception approves.", "the run-2 budget this exception approves, and any other constant as needed.", StringComparison.Ordinal),
+            _ => throw new ArgumentOutOfRangeException(nameof(mutation)),
+        };
+        Assert.NotEqual(text, conditions[3]!.GetValue<string>());
+        var violations = EvidenceContractValidator.ValidateContract(contract);
+        AssertViolation(violations, "C011");
+        Assert.Contains(violations, v => v.Subject == "exception s1-generated-cases issue #1311");
+    }
+
+    [Fact]
+    public void AmendedConditionTextWithoutAmendment121InTheLogFails()
+    {
+        // The 1.2.1 text is registered by 1.2.1: dropping 1.2.1 from the log fails the exception,
+        // while the 1.2.0 charge rule stays registered.
+        var contract = Contract();
+        var log = contract["amendmentLog"]!.AsArray();
+        Assert.Equal("1.2.1", log.Last()!["version"]!.GetValue<string>());
+        log.RemoveAt(log.Count - 1);
+        contract["contractVersion"] = "1.2.0";
+        var violations = EvidenceContractValidator.ValidateContract(contract);
+        Assert.Contains(violations, v => v.Code == "C011" && v.Subject == "exception s1-generated-cases issue #1311");
+        Assert.DoesNotContain(violations, v => v.Subject == "charge rule c2-candidate-determinism-protocol");
     }
 
     private static JsonNode S1Exception(JsonNode contract)
