@@ -275,6 +275,8 @@ class PinnedCompilerControls(unittest.TestCase):
             .write_text("[]"),
             "linked resource": lambda: f("bench/m.json").write_text("[]"),
             "unstaged deletion": lambda: f(a).unlink(),
+            "committed linked deletion": lambda: (self.git("rm", "-q", "bench/m.json"),
+                                                  self.git("commit", "-qm", "d")),
             "committed deletion": lambda: (self.git("rm", "-q", a),
                                            self.git("commit", "-q", "-m", "d")),
         }
@@ -332,14 +334,21 @@ class MigratorAndDriverControls(unittest.TestCase):
     def test_each_failed_or_unavailable_step_fails_its_driver(self):
         import verify_corpus
         self.assertEqual(verify_phase1.status_of(3), "TimeoutOrUnavailable")
-        for module, argv in ((verify_phase1, []), (verify_phase1, ["--self-test"]),
-                             (verify_corpus, [])):
-            names = []
-            with mock.patch.object(module, "run_step", side_effect=lambda n, c:
-                                   names.append(n) or 0), \
+        required = {  # (driver, argv): commands that must run, independently
+            (verify_phase1, ()): ["fixture_compile_check.py --root samples"],
+            (verify_phase1, ("--self-test",)): [
+                "byte_preservation_check.py --self-test",
+                "fixture_compile_check.py --self-test"],
+            (verify_corpus, ()): ["verify_phase1.py --corpus all",
+                                  "migrator_corpus_dryrun.py", "migrator_revert"]}
+        for (module, argv), needed in required.items():
+            names, cmds, argv = [], [], list(argv)
+            with mock.patch.object(module, "run_step", side_effect=lambda n, c: (
+                    names.append(n), cmds.append(" ".join(c)), 0)[2]), \
                     contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(module.main(argv), 0)
-            self.assertGreaterEqual(len(names), 2)
+            for need in needed:
+                self.assertTrue(any(need in c for c in cmds), need)
             for bad in names:
                 for rc in (1, 2, 3):
                     want = 0 if "informational" in bad else 1
@@ -402,11 +411,10 @@ class RepositoryGuards(unittest.TestCase):
         self.assertFalse((REPO_ROOT / "scripts/ast_roundtrip_check.py").exists())
 
     def test_tier_scripts_never_resolve_an_installed_tool(self):
-        for name in ("fixture_compile_check.py", "checkout_compiler.py",
-                     "migrator_corpus_dryrun.py", "migrator_revert_roundtrip.py",
-                     "verify_phase1.py", "verify_corpus.py",
-                     "token_delta_corpus.py"):
-            text = (REPO_ROOT / "scripts" / name).read_text(encoding="utf-8")
+        for name in ("fixture_compile_check", "checkout_compiler", "verify_phase1",
+                     "migrator_corpus_dryrun", "migrator_revert_roundtrip",
+                     "verify_corpus", "token_delta_corpus"):
+            text = (REPO_ROOT / f"scripts/{name}.py").read_text(encoding="utf-8")
             for banned in ('which("calor")', '["calor"]', "rglob("):
                 self.assertFalse(banned in text, f"{name} uses {banned}")
 

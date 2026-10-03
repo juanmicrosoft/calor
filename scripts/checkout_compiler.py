@@ -70,7 +70,6 @@ def _git(repo_root: Path, *args: str) -> str:
 
 
 def resolve(repo_root: Path = REPO_ROOT) -> PinnedCompiler:
-    """Return the Release compiler built from this checkout, or raise."""
     repo_root = repo_root.resolve()
     dll = (repo_root / COMPILER_PROJECT / "bin" / "Release"
            / _target_framework(repo_root) / "calor.dll")
@@ -85,12 +84,13 @@ def resolve(repo_root: Path = REPO_ROOT) -> PinnedCompiler:
               for d in SOURCE_DIRS for p in (repo_root / d).glob("*.csproj")
               for m in re.findall(r'Include="(\.\.[^"]+)"', p.read_text())]
     inputs = (*SOURCE_DIRS, *ROOT_BUILD_FILES, *linked)
+    missing = [m for m in linked if not (repo_root / m).exists()]
     files = _git(repo_root, "ls-files", "-z", "-co", "--exclude-standard",
                  "--", *inputs).split("\0")
     # Deleting or adding a file (even in a commit) bumps its directory.
     dirs = {str(Path(f).parent) for f in files
-            if f.startswith(tuple(d + "/" for d in SOURCE_DIRS))}
-    stale = [f for f in [*files, *dirs, *SOURCE_DIRS] if f
+            if f.startswith(tuple(d + "/" for d in SOURCE_DIRS)) or f in linked}
+    stale = missing + [f for f in [*files, *dirs, *SOURCE_DIRS] if f
                        and (repo_root / f).exists()
                        and (repo_root / f).stat().st_mtime > built]
     if stale:
@@ -126,7 +126,6 @@ def tracked_calr(repo_root: Path, roots: list[str]) -> list[str]:
 
 
 def copy_tracked(repo_root: Path, files: list[str], dest: Path) -> None:
-    """Copy repo-relative files into `dest`, keeping their relative paths."""
     for rel in files:
         target = dest / rel
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -134,7 +133,6 @@ def copy_tracked(repo_root: Path, files: list[str], dest: Path) -> None:
 
 
 def untracked_calr_count(repo_root: Path, roots: list[str]) -> dict:
-    """Count untracked `.calr` files on disk that discovery ignores."""
     out = _git(repo_root, "ls-files", "-z", "-o", "--",
                *[f"{r.rstrip('/')}/*.calr" for r in roots]).split("\0")
     build = sum(1 for f in out if f and is_build_output(f))

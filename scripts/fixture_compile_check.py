@@ -155,11 +155,8 @@ def _parse_result(rc: int, stdout: str) -> tuple:
 
 def run_unit(compiler_cmd: list[str], repo_root: Path, files: list[str],
              options: list[str], timeout: float) -> tuple:
-    """Compile one unit: one file, or one multi-file group, in a scratch dir.
-
-    Inputs are copied so that nothing is written into the checkout (the CLI
-    writes multi-file outputs next to each input).
-    """
+    """Compile one file or multi-file group from a scratch copy (the CLI
+    writes multi-file outputs next to each input; never into the checkout)."""
     with tempfile.TemporaryDirectory(prefix="fixture-check-") as td:
         work = Path(td)
         common = Path(os.path.commonpath([str(Path(f).parent) for f in files]))
