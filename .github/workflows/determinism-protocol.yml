@@ -4,7 +4,7 @@ name: determinism-protocol
 # (docs/plans/evidence/g2-1421/protocol.json, amendment 1.1.0). #1135 executes it. Dispatch
 # only: no automatic trigger. Every dispatched run is charged to determinism-compute, and the
 # plan job refuses a re-run, an executed commit, a docs-only repair, or a run over the budget.
-# scripts/determinism_runner.py checks this file's structure (workflow_problems).
+# scripts/determinism_protocol.py checks this file's structure (workflow_problems, D013).
 
 run-name: determinism ${{ inputs.mode }} ${{ inputs.execution_id }}
 
@@ -36,6 +36,21 @@ jobs:
       mode: ${{ steps.plan.outputs.mode }}
       execution: ${{ steps.plan.outputs.execution }}
     steps:
+      # Every job starts here: a re-run stops before any action runs, and HOME, USERPROFILE,
+      # DOTNET_CLI_HOME, git's global config, and NuGet packages move under the runner temp
+      # directory, so no later step reads or writes the runner's real home directory.
+      - name: Isolate the home directory and refuse a re-run
+        run: |
+          set -euo pipefail
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          home="$RUNNER_TEMP/determinism-home"
+          mkdir -p "$home"
+          printf 'HOME=%s\nUSERPROFILE=%s\nDOTNET_CLI_HOME=%s\n' "$home" "$home" "$home" >> "$GITHUB_ENV"
+          printf 'NUGET_PACKAGES=%s\nOUT=%s\n' "$RUNNER_TEMP/determinism-nuget" "$RUNNER_TEMP/determinism" >> "$GITHUB_ENV"
+          printf 'JOB_STARTED=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
+          if [ "$RUNNER_OS" = Windows ]; then echo "PY=python" >> "$GITHUB_ENV"; else echo "PY=python3" >> "$GITHUB_ENV"; fi
+          HOME="$home" git config --global core.autocrlf false
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -51,7 +66,7 @@ jobs:
         run: |
           set -euo pipefail
           git show origin/main:scripts/determinism_protocol.py > "$RUNNER_TEMP/determinism_protocol_main.py"
-          python3 scripts/determinism_runner.py plan --mode "$MODE" --execution-id "$EXECUTION" \
+          "$PY" scripts/determinism_runner.py plan --mode "$MODE" --execution-id "$EXECUTION" \
             --main-validator "$RUNNER_TEMP/determinism_protocol_main.py" --github-output "$GITHUB_OUTPUT"
 
   attempts:
@@ -70,27 +85,30 @@ jobs:
       DOTNET_NOLOGO: '1'
       MSBUILDDISABLENODEREUSE: '1'
     steps:
-      # The global git config, NuGet packages, and every home directory live under the job's temp
-      # directory, so no step reads or writes the runner's real home directory.
-      - name: Check out committed line endings
+      # Every job starts here: a re-run stops before any action runs, and HOME, USERPROFILE,
+      # DOTNET_CLI_HOME, git's global config, and NuGet packages move under the runner temp
+      # directory, so no later step reads or writes the runner's real home directory.
+      - name: Isolate the home directory and refuse a re-run
         run: |
           set -euo pipefail
-          echo "GIT_CONFIG_GLOBAL=$RUNNER_TEMP/determinism-gitconfig" >> "$GITHUB_ENV"
-          echo "NUGET_PACKAGES=$RUNNER_TEMP/determinism-nuget" >> "$GITHUB_ENV"
-          echo "OUT=$RUNNER_TEMP/determinism" >> "$GITHUB_ENV"
-          GIT_CONFIG_GLOBAL="$RUNNER_TEMP/determinism-gitconfig" git config --global core.autocrlf false
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          home="$RUNNER_TEMP/determinism-home"
+          mkdir -p "$home"
+          printf 'HOME=%s\nUSERPROFILE=%s\nDOTNET_CLI_HOME=%s\n' "$home" "$home" "$home" >> "$GITHUB_ENV"
+          printf 'NUGET_PACKAGES=%s\nOUT=%s\n' "$RUNNER_TEMP/determinism-nuget" "$RUNNER_TEMP/determinism" >> "$GITHUB_ENV"
+          printf 'JOB_STARTED=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
+          if [ "$RUNNER_OS" = Windows ]; then echo "PY=python" >> "$GITHUB_ENV"; else echo "PY=python3" >> "$GITHUB_ENV"; fi
+          HOME="$home" git config --global core.autocrlf false
 
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Setup .NET (pinned, private root)
-        uses: actions/setup-dotnet@v4
-        env:
-          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet-1421
-        with:
-          dotnet-version: ${{ matrix.sdk }}
+      - name: Install the pinned SDK into a private root
+        run: |
+          set -euo pipefail
+          "$PY" scripts/determinism_runner.py install-sdk --root "$RUNNER_TEMP/dotnet-1421" --work "$RUNNER_TEMP/determinism-installer"
 
       - name: Bootstrap verified Z3 assets
         uses: ./.github/actions/bootstrap-z3
@@ -98,14 +116,10 @@ jobs:
       - name: Check and record the environment
         run: |
           set -euo pipefail
-          py="$(command -v python3 || command -v python)"
-          "$py" scripts/determinism_runner.py env-check --env "${{ matrix.env }}" --dotnet-root "$RUNNER_TEMP/dotnet-1421" --out "$OUT"
+          "$PY" scripts/determinism_runner.py env-check --env "${{ matrix.env }}" --dotnet-root "$RUNNER_TEMP/dotnet-1421" --out "$OUT"
 
       - name: Build the registered test hosts
         env:
-          HOME: ${{ runner.temp }}/determinism-build-home
-          USERPROFILE: ${{ runner.temp }}/determinism-build-home
-          DOTNET_CLI_HOME: ${{ runner.temp }}/determinism-build-home
           PROJECTS: ${{ matrix.projects }}
         run: |
           set -euo pipefail
@@ -114,19 +128,17 @@ jobs:
           done
 
       - name: Run every attempt of this job
-        timeout-minutes: ${{ matrix.stepTimeout }}
         run: |
           set -euo pipefail
-          py="$(command -v python3 || command -v python)"
-          "$py" scripts/determinism_runner.py run-job --env "${{ matrix.env }}" --job "${{ matrix.job }}" \
-            --mode "${{ needs.plan.outputs.mode }}" --execution-id "${{ needs.plan.outputs.execution }}" --out "$OUT"
+          "$PY" scripts/determinism_runner.py run-job --env "${{ matrix.env }}" --job "${{ matrix.job }}" \
+            --mode "${{ needs.plan.outputs.mode }}" --execution-id "${{ needs.plan.outputs.execution }}" --out "$OUT" \
+            --job-timeout "${{ matrix.timeout }}"
 
       - name: Record attempts that did not run
         if: always()
         run: |
           set -euo pipefail
-          py="$(command -v python3 || command -v python)"
-          "$py" scripts/determinism_runner.py fill-missing --env "${{ matrix.env }}" --job "${{ matrix.job }}" \
+          "$PY" scripts/determinism_runner.py fill-missing --env "${{ matrix.env }}" --job "${{ matrix.job }}" \
             --mode "${{ needs.plan.outputs.mode }}" --execution-id "${{ needs.plan.outputs.execution }}" --out "$OUT"
 
       - name: Upload attempt records
@@ -144,6 +156,21 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+      # Every job starts here: a re-run stops before any action runs, and HOME, USERPROFILE,
+      # DOTNET_CLI_HOME, git's global config, and NuGet packages move under the runner temp
+      # directory, so no later step reads or writes the runner's real home directory.
+      - name: Isolate the home directory and refuse a re-run
+        run: |
+          set -euo pipefail
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          home="$RUNNER_TEMP/determinism-home"
+          mkdir -p "$home"
+          printf 'HOME=%s\nUSERPROFILE=%s\nDOTNET_CLI_HOME=%s\n' "$home" "$home" "$home" >> "$GITHUB_ENV"
+          printf 'NUGET_PACKAGES=%s\nOUT=%s\n' "$RUNNER_TEMP/determinism-nuget" "$RUNNER_TEMP/determinism" >> "$GITHUB_ENV"
+          printf 'JOB_STARTED=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
+          if [ "$RUNNER_OS" = Windows ]; then echo "PY=python" >> "$GITHUB_ENV"; else echo "PY=python3" >> "$GITHUB_ENV"; fi
+          HOME="$home" git config --global core.autocrlf false
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -152,14 +179,14 @@ jobs:
       - name: Download every attempt record
         uses: actions/download-artifact@v4
         with:
-          pattern: attempts-${{ needs.plan.outputs.execution }}-*
+          pattern: attempts-${{ needs.plan.outputs.execution }}-*-r1
           path: ${{ runner.temp }}/records
 
       # Exits non-zero unless DETERMINISTIC (CONTROL-DETERMINISTIC in control mode).
       - name: Decide agreement under the frozen rule
         run: |
           set -euo pipefail
-          python3 scripts/determinism_runner.py decide --records "$RUNNER_TEMP/records" \
+          "$PY" scripts/determinism_runner.py decide --records "$RUNNER_TEMP/records" \
             --execution-id "${{ needs.plan.outputs.execution }}" --mode "${{ needs.plan.outputs.mode }}" \
             --out "$RUNNER_TEMP/result/result.json"
 
