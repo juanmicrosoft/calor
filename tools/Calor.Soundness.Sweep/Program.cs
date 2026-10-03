@@ -35,8 +35,56 @@ internal static partial class Program
             "selftest" => SelfTest(opts),
             "reclassify" => Reclassify(opts),
             "native-check" => NativeCheck(opts),
+            "crossrun" => CrossRun(opts),
             _ => Usage(),
         };
+    }
+
+    /// <summary>
+    /// noPooling.crossBaselineUse: each finding case is re-run on the other baseline from the reserve
+    /// and recorded as that baseline's own result, in priority order (false proofs first) until the
+    /// 1,500-execution ceiling. These executions never enter row status (cross-baseline.jsonl).
+    /// </summary>
+    private static int CrossRun(Dictionary<string, string> opts)
+    {
+        var repo = Path.GetFullPath(opts["repo"]);
+        var outRoot = Path.GetFullPath(opts["out"]);
+        var (_, templates, cases, rows) = Load(repo);
+        var templateById = templates["templates"]!.AsArray().ToDictionary(t => t!["id"]!.GetValue<string>(), t => t!, StringComparer.Ordinal);
+        var caseById = cases.ToDictionary(c => c.Id, StringComparer.Ordinal);
+        var hosts = new[] { "B1", "N1" }.ToDictionary(id => id, id => new BaselineHost(id, opts[id.ToLowerInvariant()]));
+        var ledger = new Ledger(Path.Combine(outRoot, "ledger.jsonl"));
+        var scratch = Path.Combine(Path.GetTempPath(), "r1-cross-" + Environment.ProcessId);
+        Directory.CreateDirectory(scratch);
+        string[] priority = ["false-unconditional-proof", "stale-cache-proof", "required-demotion-absent", "spurious-refutation"];
+        var work = new List<(int Rank, string Target, string CaseId)>();
+        foreach (var source in new[] { "B1", "N1" })
+            foreach (var g in JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, source, "findings-index.json")))!.AsArray().GroupBy(f => f!["caseId"]!.GetValue<string>()))
+                work.Add((g.Min(f => Array.IndexOf(priority, f!["class"]!.GetValue<string>()) is var i and >= 0 ? i : priority.Length), source == "B1" ? "N1" : "B1", g.Key));
+        foreach (var (_, target, caseId) in work.OrderBy(w => w.Rank).ThenBy(w => w.CaseId, StringComparer.Ordinal).ThenBy(w => w.Target, StringComparer.Ordinal))
+        {
+            var path = Path.Combine(outRoot, target, "cross-baseline.jsonl");
+            if (File.Exists(path) && File.ReadLines(path).Any(l => JsonNode.Parse(l)!["caseId"]!.GetValue<string>() == caseId))
+                continue;
+            var c = caseById[caseId];
+            JsonObject line;
+            if (ledger.Total >= ExecutionCeiling)
+                line = new JsonObject { ["caseId"] = caseId, ["baseline"] = target, ["status"] = "not-run", ["reason"] = "1,500-execution ceiling reached" };
+            else
+            {
+                var a = Attempt(hosts[target], c, rows[c.RowId], templateById[c.TemplateId], "reserve-cross-baseline", 1, ledger, outRoot, scratch);
+                line = new JsonObject
+                {
+                    ["caseId"] = caseId, ["baseline"] = target, ["status"] = a["status"]!.DeepClone(), ["token"] = a["claim"]?["token"]?.DeepClone(),
+                    ["class"] = a["class"]?.DeepClone(), ["addedFindings"] = a["addedFindings"]?.DeepClone(),
+                    ["path"] = $"attempts/{caseId}/reserve-cross-baseline-attempt-1.json",
+                };
+            }
+            File.AppendAllText(path, line.ToJsonString() + "\n");
+            Console.WriteLine($"{target} {caseId}: {line["status"]} {line["token"]} {line["class"]}");
+        }
+        Console.WriteLine($"ledger {ledger.Total}, reserve used {ledger.ReserveUsed}");
+        return 0;
     }
 
     /// <summary>
@@ -95,6 +143,17 @@ internal static partial class Program
                         };
                         var o1 = JsonSerializer.Deserialize<IndependentOracle.Verdict>(record["o1"]!.ToJsonString())!;
                         var (elided, forced) = CaseExecutor.Emissions(record);
+                        if (opts.ContainsKey("rereplay"))
+                        {
+                            // R1-O2 re-run from the retained forced emission and the pinned Calor.Runtime.dll
+                            // (no compiler call); the run-time O2 record is kept as runtimeO2.
+                            record["runtimeO2"] ??= record["o2"]?.DeepClone();
+                            var t = templateById[c.TemplateId];
+                            var runtimeDll = Path.Combine(opts[b.ToLowerInvariant()], "Calor.Runtime.dll");
+                            record["o2"] = CaseExecutor.Replay(c, t, o1, forced["emitted"]!.GetValue<string>(), runtimeDll,
+                                t["claimSite"]!.GetValue<string>(), t["obligationKind"]?.GetValue<string>());
+                            record["o2ReplayedBy"] = opts["harness"];
+                        }
                         CaseExecutor.Adjudicate(record, c, rows[c.RowId], templateById[c.TemplateId], o1, elided, forced);
                         record["reclassifiedBy"] = opts["harness"];
                         File.WriteAllText(file, record.ToJsonString(Indented));
@@ -217,6 +276,13 @@ internal static partial class Program
                 File.WriteAllText(pinsPath(id), pins.ToJsonString(Indented));
         }
 
+        foreach (var id in hosts.Keys)
+            if (JsonNode.Parse(File.ReadAllText(pinsPath(id)))!["processLoadedZ3"] is not JsonArray { Count: > 0 })
+            {
+                Console.Error.WriteLine($"INVALID RUN: {id} native solver image not pinned before the first case");
+                return 4;
+            }
+
         var byRow = cases.GroupBy(c => c.RowId).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
         var sw = Stopwatch.StartNew();
         CaseResult Exec(string baseline, SweepCaseGenerator.Case c, string bucket) =>
@@ -278,9 +344,12 @@ internal static partial class Program
         {
             var after = Pins(host, opts["registration-commit"]);
             var before = JsonNode.Parse(File.ReadAllText(pinsPath(id)))!;
-            foreach (var key in new[] { "calorDllSha256", "calorRuntimeDllSha256", "microsoftZ3DllSha256", "nativeZ3Sha256" })
-                if (before[key]?.ToJsonString() != after[key]?.ToJsonString() && before[key] != null)
-                    Console.Error.WriteLine($"PIN CHANGED AFTER RUN: {id} {key}");
+            foreach (var key in new[] { "calorDllSha256", "calorRuntimeDllSha256", "microsoftZ3DllSha256" })
+                if (before[key]?.ToJsonString() != after[key]?.ToJsonString() || before[key] == null)
+                {
+                    Console.Error.WriteLine($"INVALID RUN: {id} pin {key} missing or changed after the run");
+                    return 4;
+                }
         }
         File.AppendAllText(Path.Combine(outRoot, "sessions.jsonl"), new JsonObject
         {
@@ -340,7 +409,12 @@ internal static partial class Program
         if (task.Wait(TimeSpan.FromSeconds(CaseWallClockSeconds)))
             record = task.Result;
         else
+        {
             record = new JsonObject { ["baseline"] = host.Id, ["caseId"] = c.Id, ["status"] = "over-time" };
+            // In-process work cannot be killed: wait (bounded) so a retry never overlaps it, and keep its result.
+            if (task.Wait(TimeSpan.FromMinutes(10)))
+                record["lateObservation"] = task.Result;
+        }
         if (row.Id.StartsWith("CTRL-", StringComparison.Ordinal) && record["status"]?.GetValue<string>() == "executed")
             record["cliCrosscheck"] = CliCrosscheck.Run(host, c, record, scratch);
         record["attempt"] = n;

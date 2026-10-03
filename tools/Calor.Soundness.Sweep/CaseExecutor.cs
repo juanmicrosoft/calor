@@ -317,30 +317,36 @@ internal static partial class CaseExecutor
     }
 
     private static JsonObject O2(BaselineHost host, SweepCaseGenerator.Case c, JsonNode template, IndependentOracle.Verdict o1,
-        JsonObject forced, string claimSite, string? obligationKind)
+        JsonObject forced, string claimSite, string? obligationKind) =>
+        Replay(c, template, o1, forced["emitted"]!.GetValue<string>(), Path.Combine(host.Directory, "Calor.Runtime.dll"), claimSite, obligationKind);
+
+    /// <summary>R1-O2 from a forced emission (live or retained) and the baseline's own Calor.Runtime.dll.</summary>
+    internal static JsonObject Replay(SweepCaseGenerator.Case c, JsonNode template, IndependentOracle.Verdict o1,
+        string emitted, string runtimeDll, string claimSite, string? obligationKind)
     {
         if (claimSite is "implication" or "precondition")
             return new JsonObject { ["status"] = "not-applicable" };
         if (o1.Kind == "oracle-invalid")
             return new JsonObject { ["status"] = "not-run-oracle-invalid" };
-        var emitted = forced["emitted"]!.GetValue<string>();
         if (emitted.Length == 0)
             return new JsonObject { ["status"] = "not-run-no-emission" };
         using var program = new OracleProgram(c.OracleSource);
         var wanted = new List<string>();
         if (o1.Kind == "violated" && o1.Witness != null)
         {
-            var w = o1.Witness;
-            var arrow = w.IndexOf(" -> result=", StringComparison.Ordinal);
-            wanted.Add(arrow >= 0 ? w[..arrow] : w);
+            var arrow = o1.Witness.IndexOf(" -> result=", StringComparison.Ordinal);
+            wanted.Add(arrow >= 0 ? o1.Witness[..arrow] : o1.Witness);
         }
-        wanted.AddRange(o1.ReachedSample ?? []);
-        wanted = wanted.Distinct().ToList();
-        var recovered = program.Recover(wanted);
-        var inputs = wanted.Where(recovered.ContainsKey).Select(r => (r, recovered[r], program.PointVerdict(recovered[r]))).ToList();
-        var record = EmittedReplay.Run(emitted, Path.Combine(host.Directory, "Calor.Runtime.dll"), program.Parameters,
+        wanted = wanted.Concat(o1.ReachedSample ?? []).Distinct().ToList();
+        // Two independent recoveries: the O1 point verdict runs the oracle body, which may mutate
+        // (aliased) inputs, so O2 receives its own untouched entry values.
+        var forVerdict = program.Recover(wanted);
+        var verdicts = forVerdict.ToDictionary(kv => kv.Key, kv => program.PointVerdict(kv.Value));
+        var forReplay = program.Recover(wanted);
+        var inputs = wanted.Where(forReplay.ContainsKey).Select(r => (r, forReplay[r], verdicts[r])).ToList();
+        var record = EmittedReplay.Run(emitted, runtimeDll, program.Parameters,
             template["oracle"]!["replay"]?.GetValue<string>(), inputs, claimSite, obligationKind);
-        record["unrecovered"] = new JsonArray(wanted.Where(w => !recovered.ContainsKey(w)).Select(w => (JsonNode)w).ToArray());
+        record["unrecovered"] = new JsonArray(wanted.Where(w => !forReplay.ContainsKey(w)).Select(w => (JsonNode)w).ToArray());
         return record;
     }
 
@@ -365,7 +371,10 @@ internal static partial class CaseExecutor
         else if (claimSite == "guard-emission")
             (primary, reason) = ("no-claim", "guard-emission claim: no proof token; judged on the inherited guard only");
         else if (token != forcedClaim["token"]?.GetValue<string>())
-            (primary, reason) = ("flaky", $"elided and forced compiles disagree ({token} vs {forcedClaim["token"]})");
+            (primary, reason) = c.Claim != "exists" && o1.Kind == "violated"
+                && (token is "Proven" or "Discharged" || forcedClaim["token"]?.GetValue<string>() is "Proven" or "Discharged")
+                ? ("false-unconditional-proof", $"elided and forced compiles disagree ({token} vs {forcedClaim["token"]}); a proof with an O1 violation is a finding regardless")
+                : ("flaky", $"elided and forced compiles disagree ({token} vs {forcedClaim["token"]})");
         else if (token == "TimeoutOrUnavailable")
             (primary, reason) = ("timed-out", "TimeoutOrUnavailable");
         else if (c.Claim == "exists")

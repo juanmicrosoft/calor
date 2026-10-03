@@ -127,9 +127,15 @@ internal static class Report
         var claim = attempt["claim"];
         var o1 = attempt["o1"];
         var witness = o1?["Witness"]?.GetValue<string>();
-        var o2Run = attempt["o2"]?["runs"]?.AsArray().FirstOrDefault(x => witness != null && witness.StartsWith(x!["input"]!.GetValue<string>(), StringComparison.Ordinal));
-        string otherResultText = otherResult == null ? "not-run"
-            : (otherResult["class"]!.GetValue<string>() == cls || otherResult["addedFindings"]!.AsArray().Any(x => x!.GetValue<string>() == cls)) ? "reproduces" : "does-not-reproduce";
+        static string Repro(JsonObject? x, string cls) => x == null || x["status"]?.GetValue<string>() != "executed" ? "not-run"
+            : x["class"]?.GetValue<string>() == cls || (x["addedFindings"]?.AsArray().Any(y => y!.GetValue<string>() == cls) ?? false) ? "reproduces" : "does-not-reproduce";
+        var crossPath = Path.Combine(outRoot, other, "cross-baseline.jsonl");
+        var cross = File.Exists(crossPath) ? File.ReadLines(crossPath).Select(l => JsonNode.Parse(l)!.AsObject()).LastOrDefault(x => x["caseId"]!.GetValue<string>() == r["caseId"]!.GetValue<string>()) : null;
+        var otherResultText = Repro(cross, cls);
+        var replay = claim?["modelReplay"];
+        var useModel = cls == "spurious-refutation" && replay?["input"] is JsonValue;
+        var witnessInput = useModel ? replay!["input"]!.GetValue<string>() : witness ?? replay?["input"]?.ToString();
+        var o2For = attempt["o2"]?["runs"]?.AsArray().FirstOrDefault(x => witnessInput != null && witnessInput.StartsWith(x!["input"]!.GetValue<string>(), StringComparison.Ordinal));
         return new JsonObject
         {
             ["findingId"] = id,
@@ -152,9 +158,11 @@ internal static class Report
             },
             ["witness"] = new JsonObject
             {
-                ["inputs"] = witness ?? claim?["modelReplay"]?["input"]?.DeepClone()?.ToString(),
-                ["o1"] = $"{o1?["Kind"]} {o1?["ViolationKind"]}".Trim(),
-                ["o2"] = o2Run == null ? (attempt["o2"]?["status"]?.GetValue<string>() ?? "not-run") : o2Run["o2"]!.GetValue<string>() == "guard-threw" ? "guard threw" : "did not throw",
+                ["inputs"] = witnessInput,
+                ["source"] = useModel ? "the solver counterexample model, replayed under O1" : "the O1 witness",
+                ["o1"] = useModel ? $"model input: {replay!["o1"]}; case verdict: {o1?["Kind"]}" : $"{o1?["Kind"]} {o1?["ViolationKind"]}".Trim(),
+                ["o2"] = o2For == null ? "not-run" : o2For["o2"]!.GetValue<string>() switch { "guard-threw" => "guard threw", "returned" or "o2-other-exception" => "did not throw", _ => "not-run" },
+                ["o2Detail"] = o2For?.DeepClone(),
             },
             ["nonVacuityCheck"] = attempt["nonVacuityCheck"]?.DeepClone(),
             ["classReason"] = r["classReason"]?.DeepClone(),
@@ -176,11 +184,37 @@ internal static class Report
                 ["translatorSemanticsVersion"] = pins["translatorSemanticsVersion"]?.DeepClone(),
             },
             ["attempts"] = r["attempts"]!.DeepClone(),
-            ["otherBaseline"] = new JsonObject { ["id"] = other, ["result"] = otherResultText, ["source"] = "the other baseline's own execution of the same frozen case", ["otherClass"] = otherResult?["class"]?.DeepClone(), ["otherToken"] = otherResult?["token"]?.DeepClone() },
-            ["affectedGuarantee"] = null,
+            ["otherBaseline"] = new JsonObject
+            {
+                ["id"] = other, ["result"] = otherResultText,
+                ["rerun"] = cross?.DeepClone(),
+                ["otherSweepResult"] = new JsonObject { ["token"] = otherResult?["token"]?.DeepClone(), ["class"] = otherResult?["class"]?.DeepClone(), ["result"] = Repro(otherResult, cls) },
+            },
+            ["affectedGuarantee"] = Affected(rowId, attempt["claimSite"]?.GetValue<string>(), registration),
             ["filedIssue"] = null,
             ["disposition"] = null,
         };
+    }
+
+    private static string Affected(string rowId, string? site, JsonNode registration)
+    {
+        var title = registration["denominator"]!["rows"]!.AsArray().First(x => x!["id"]!.GetValue<string>() == rowId)!["title"]!.GetValue<string>();
+        var path = site switch
+        {
+            "obligation" => "a Discharged obligation drops its emitted runtime guard under the default ObligationPolicy (Discharged = Ignore) with ElideProvenGuards on (CSharpEmitter obligation sites)",
+            "implication" => "no emitted guard; a Proven implication makes ContractInheritanceChecker accept the implementer contract (no LSP-violation error)",
+            "precondition" => "none (precondition satisfiability removes no guard)",
+            _ when rowId.StartsWith("CACHE-", StringComparison.Ordinal) => "a cached (warm) Proven postcondition is elided from the emitted C# by default (verification cache, then CSharpEmitter postcondition site)",
+            _ => "a non-vacuous Proven postcondition is elided from the emitted C# by default (ElideProvenGuards, CSharpEmitter postcondition site)",
+        };
+        var surfaces = site switch
+        {
+            "obligation" => "website/content/syntax-reference/refinement-types.mdx, website/content/guides/verification-guarantees.mdx",
+            "implication" => "website/content/syntax-reference/inheritance.mdx, website/content/cli/verify.mdx",
+            _ => "docs/verification-modeled-forms.md, website/content/guides/verification-guarantees.mdx, website/content/cli/compile.mdx",
+        };
+        return $"Form: {title} (row {rowId}). Guard path: {path}. Public surfaces that describe this form: {surfaces} (located by search; their wording was not audited by S1). "
+            + "No experiment relying on this form was identified by S1; S2 (#1413) confirms.";
     }
 
     /// <summary>

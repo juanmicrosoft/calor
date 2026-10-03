@@ -33,6 +33,12 @@
       "calor": ["  §F{f1:Probe:pub} (i32:x) -> i32", "    §E{}", "    §S (> x INT:7)", "    §R INT:0"],
       "calorPrime": ["  §F{f1:Probe:pub} (i32:x) -> i32", "    §E{}", "    §S (> x INT:7)", "    §R INT:0"],
       "oracle": { "domain": [{ "name": "x", "type": "i32" }], "hyp": "true", "prop": "x > 7" } },
+    { "id": "ST-OBJ-PARAM", "row": "ST", "classification": "assumed", "instances": 1, "claimSite": "obligation", "obligationKind": "ProofObligation",
+      "calor": ["  §CL{c1:Box:pub}", "    §FLD{u8:Value:pub}", "  §F{f1:Probe:priv} (Box:p, str:s) -> i32", "    §E{}", "    §PROOF{p1:claim} (>= p.Value INT:0)", "    §R INT:0"],
+      "oracle": { "domain": [{ "name": "p", "type": "Box", "values": ["null", "new Box { Value = 7 }"] }, { "name": "s", "type": "str" }], "prelude": "    public sealed class Box { public byte Value; }", "hyp": "true", "prop": "p!.Value >= 0" } },
+    { "id": "ST-ALIAS", "row": "ST", "classification": "unsupported-refused", "instances": 1, "claimSite": "postcondition",
+      "calor": ["  §F{f1:Probe:pub} (i32[]:a, i32[]:b) -> i32", "    §E{mut}", "    §Q (&& (> §LEN a INT:0) (> §LEN b INT:0))", "    §Q (== a{0} INT:5)", "    §S (== a{0} INT:5)", "    §ASSIGN b{0} INT:9", "    §R INT:0"],
+      "oracle": { "domain": [{ "name": "a", "type": "i32[]", "values": ["new[] { 5 }"] }, { "name": "alias", "type": "bool" }], "hyp": "a != null && a.Length > 0 && a[0] == 5", "result": "int", "body": "var b = alias ? a : new[] { 0 }; b![0] = 9; return a![0];", "prop": "result == 5", "replay": "Probe(a, alias ? a : new[] { 0 })" } },
     { "id": "ST-FLOAT", "row": "ST", "classification": "unsupported-refused", "instances": 1, "claimSite": "postcondition",
       "calor": ["  §F{f1:Probe:pub} (f64:x) -> i32", "    §E{}", "    §S (>= (* x x) FLOAT:0.0)", "    §R INT:0"],
       "oracle": { "domain": [{ "name": "x", "type": "f64", "values": ["0.0", "double.NaN"] }], "hyp": "true", "prop": "x * x >= 0.0" } }

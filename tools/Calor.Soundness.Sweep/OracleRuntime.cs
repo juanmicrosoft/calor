@@ -191,9 +191,16 @@ internal static class EmittedReplay
         IReadOnlyList<(string Rendered, object?[] Input, string O1)> inputs, string claimKind, string? obligationKind)
     {
         var record = new JsonObject();
-        var signature = string.Join(", ", parameters.Select(p => $"{CSharpName(p.ParameterType)} {p.Name}"));
-        var call = replay ?? $"Probe({string.Join(", ", parameters.Select(p => p.Name))})";
-        var driver = $"public static object? __R1Run({signature}) {{ return (object?)({call}); }}";
+        // Parameters typed object or declared by the oracle (e.g. its own Box) cannot be passed to the
+        // emitted Probe directly: they are copied by member name into the emitted type and bound
+        // dynamically; an input the emitted signature cannot accept is recorded, never coerced.
+        static bool Bcl(Type t) => t.IsArray ? Bcl(t.GetElementType()!) : t.IsPrimitive || t == typeof(string);
+        var signature = string.Join(", ", parameters.Select(p => $"{(Bcl(p.ParameterType) ? CSharpName(p.ParameterType) : "object?")} {p.Name}"));
+        var call = replay ?? $"Probe({string.Join(", ", parameters.Select(p => Bcl(p.ParameterType) ? p.Name : $"(dynamic?)__R1Copy({p.Name})"))})";
+        const string Copy = "static object? __R1Copy(object? v) { if (v == null || v.GetType().Assembly == typeof(object).Assembly) return v; "
+            + "var t = System.Linq.Enumerable.First(System.Reflection.Assembly.GetExecutingAssembly().GetTypes(), x => x.Name == v.GetType().Name); var o = System.Activator.CreateInstance(t)!; "
+            + "foreach (var f in v.GetType().GetFields()) { var m = t.GetField(f.Name); if (m != null) m.SetValue(o, f.GetValue(v)); else t.GetProperty(f.Name)!.SetValue(o, f.GetValue(v)); } return o; }";
+        var driver = $"public static object? __R1Run({signature}) {{ return (object?)({call}); }} {Copy}";
         string source;
         const string ModuleClass = "public static class R1CaseModule";
         var at = emitted.IndexOf(ModuleClass, StringComparison.Ordinal);
@@ -239,7 +246,8 @@ internal static class EmittedReplay
                 {
                     var inner = ex.InnerException!;
                     exception = inner.GetType().FullName + ": " + inner.Message;
-                    o2 = GuardFired(inner, claimKind, obligationKind) ? "guard-threw" : "o2-other-exception";
+                    o2 = inner.GetType().FullName == "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException" ? "not-run-input-not-representable"
+                        : GuardFired(inner, claimKind, obligationKind) ? "guard-threw" : "o2-other-exception";
                 }
                 var divergence = (o1 == "violated" && o2 == "returned") || (o1 == "holds" && o2 == "guard-threw");
                 runs.Add(new JsonObject { ["input"] = rendered, ["o1"] = o1, ["o2"] = o2, ["exception"] = exception, ["divergence"] = divergence });
