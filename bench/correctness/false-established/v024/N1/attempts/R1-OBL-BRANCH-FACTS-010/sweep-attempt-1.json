@@ -164,7 +164,7 @@
     "elidedWithoutProof": false
   },
   "o2": {
-    "driver": "public static object? __R1Run(int x) { return (object?)(Probe(x)); }",
+    "driver": "public static object? __R1Run(int x) { return (object?)(Probe(x)); } static object? __R1Copy(object? v) { if (v == null || v.GetType().Assembly == typeof(object).Assembly) return v; var t = System.Linq.Enumerable.First(System.Reflection.Assembly.GetExecutingAssembly().GetTypes(), x =\u003E x.Name == v.GetType().Name); var o = System.Activator.CreateInstance(t)!; foreach (var f in v.GetType().GetFields()) { var m = t.GetField(f.Name); if (m != null) m.SetValue(o, f.GetValue(v)); else t.GetProperty(f.Name)!.SetValue(o, f.GetValue(v)); } return o; }",
     "status": "run",
     "runs": [
       {
@@ -339,5 +339,118 @@
     "nonVacuityCheck": null,
     "coldToken": null
   },
-  "reclassifiedBy": "e33d4339d1e815be2ad63a6049c879038fde5971"
+  "reclassifiedBy": "15aa06ca4c017e86a91954fc812220f7f521b6bc",
+  "runtimeO2": {
+    "driver": "public static object? __R1Run(int x) { return (object?)(Probe(x)); }",
+    "status": "run",
+    "runs": [
+      {
+        "input": "(-2)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "System.InvalidOperationException: Proof obligation [p1: claim] violated",
+        "divergence": false
+      },
+      {
+        "input": "(-2147483648)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-2147483647)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-2074987712)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-1732217009)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-1726750414)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-1)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "System.InvalidOperationException: Proof obligation [p1: claim] violated",
+        "divergence": false
+      },
+      {
+        "input": "(0)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "System.InvalidOperationException: Proof obligation [p1: claim] violated",
+        "divergence": false
+      },
+      {
+        "input": "(1)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "System.InvalidOperationException: Proof obligation [p1: claim] violated",
+        "divergence": false
+      },
+      {
+        "input": "(2)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "System.InvalidOperationException: Proof obligation [p1: claim] violated",
+        "divergence": false
+      },
+      {
+        "input": "(325202187)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "System.InvalidOperationException: Proof obligation [p1: claim] violated",
+        "divergence": false
+      },
+      {
+        "input": "(785464377)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "System.InvalidOperationException: Proof obligation [p1: claim] violated",
+        "divergence": false
+      },
+      {
+        "input": "(965733535)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "System.InvalidOperationException: Proof obligation [p1: claim] violated",
+        "divergence": false
+      },
+      {
+        "input": "(2147483646)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "System.InvalidOperationException: Proof obligation [p1: claim] violated",
+        "divergence": false
+      },
+      {
+        "input": "(2147483647)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "System.InvalidOperationException: Proof obligation [p1: claim] violated",
+        "divergence": false
+      }
+    ],
+    "unrecovered": []
+  },
+  "o2ReplayedBy": "dcd6f34a59e9276ef28e45e543a64865ed819a05"
 }

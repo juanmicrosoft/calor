@@ -143,7 +143,7 @@
     "elidedWithoutProof": false
   },
   "o2": {
-    "driver": "public static object? __R1Run(int[] a, int[] b, bool c) { return (object?)(Probe(a, b, c)); }",
+    "driver": "public static object? __R1Run(int[] a, int[] b, bool c) { return (object?)(Probe(a, b, c)); } static object? __R1Copy(object? v) { if (v == null || v.GetType().Assembly == typeof(object).Assembly) return v; var t = System.Linq.Enumerable.First(System.Reflection.Assembly.GetExecutingAssembly().GetTypes(), x =\u003E x.Name == v.GetType().Name); var o = System.Activator.CreateInstance(t)!; foreach (var f in v.GetType().GetFields()) { var m = t.GetField(f.Name); if (m != null) m.SetValue(o, f.GetValue(v)); else t.GetProperty(f.Name)!.SetValue(o, f.GetValue(v)); } return o; }",
     "status": "run",
     "runs": [
       {
@@ -311,5 +311,125 @@
     "nonVacuityCheck": null,
     "coldToken": null
   },
-  "reclassifiedBy": "e33d4339d1e815be2ad63a6049c879038fde5971"
+  "reclassifiedBy": "15aa06ca4c017e86a91954fc812220f7f521b6bc",
+  "runtimeO2": {
+    "driver": "public static object? __R1Run(int[] a, int[] b, bool c) { return (object?)(Probe(a, b, c)); }",
+    "status": "run",
+    "runs": [
+      {
+        "input": "(null, null, False)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, null, True)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, [], False)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: (c ? a : b).Length \u003E 0",
+        "divergence": false
+      },
+      {
+        "input": "(null, [], True)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, [0], False)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, [0], True)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, [-1], False)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, [-1], True)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, [2147483647], False)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, [2147483647], True)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, [1, 2, 3], False)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, [1, 2, 3], True)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, [5, 4, 3, 2, 1], False)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, [5, 4, 3, 2, 1], True)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, [-2147483648, 0, 2147483647], False)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, [-2147483648, 0, 2147483647], True)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      }
+    ],
+    "unrecovered": []
+  },
+  "o2ReplayedBy": "dcd6f34a59e9276ef28e45e543a64865ed819a05"
 }

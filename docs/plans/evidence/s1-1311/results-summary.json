@@ -71,6 +71,10 @@
         "spurious-refutation": 17,
         "false-unconditional-proof": 7,
         "stale-cache-proof": 2
+      },
+      "otherBaselineRerun": {
+        "reproduces": 30,
+        "not-run": 4
       }
     },
     "N1": {
@@ -142,6 +146,10 @@
         "spurious-refutation": 17,
         "false-unconditional-proof": 7,
         "stale-cache-proof": 2
+      },
+      "otherBaselineRerun": {
+        "reproduces": 30,
+        "not-run": 4
       }
     }
   }

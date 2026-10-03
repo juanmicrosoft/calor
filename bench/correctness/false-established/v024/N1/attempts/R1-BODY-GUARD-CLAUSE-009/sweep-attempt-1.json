@@ -235,7 +235,7 @@
     "elidedWithoutProof": false
   },
   "o2": {
-    "driver": "public static object? __R1Run(uint x, uint y) { return (object?)(Probe(x, y)); }",
+    "driver": "public static object? __R1Run(uint x, uint y) { return (object?)(Probe(x, y)); } static object? __R1Copy(object? v) { if (v == null || v.GetType().Assembly == typeof(object).Assembly) return v; var t = System.Linq.Enumerable.First(System.Reflection.Assembly.GetExecutingAssembly().GetTypes(), x =\u003E x.Name == v.GetType().Name); var o = System.Activator.CreateInstance(t)!; foreach (var f in v.GetType().GetFields()) { var m = t.GetField(f.Name); if (m != null) m.SetValue(o, f.GetValue(v)); else t.GetProperty(f.Name)!.SetValue(o, f.GetValue(v)); } return o; }",
     "status": "run",
     "runs": [
       {
@@ -433,5 +433,125 @@
     "nonVacuityCheck": null,
     "coldToken": null
   },
-  "reclassifiedBy": "e33d4339d1e815be2ad63a6049c879038fde5971"
+  "reclassifiedBy": "15aa06ca4c017e86a91954fc812220f7f521b6bc",
+  "runtimeO2": {
+    "driver": "public static object? __R1Run(uint x, uint y) { return (object?)(Probe(x, y)); }",
+    "status": "run",
+    "runs": [
+      {
+        "input": "(2837459041, 0)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: __calorPostconditionResult0 == 4294967295U",
+        "divergence": false
+      },
+      {
+        "input": "(2837459041, 1)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: __calorPostconditionResult0 == 4294967295U",
+        "divergence": false
+      },
+      {
+        "input": "(2837459041, 2)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: __calorPostconditionResult0 == 4294967295U",
+        "divergence": false
+      },
+      {
+        "input": "(2837459041, 251364582)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: __calorPostconditionResult0 == 4294967295U",
+        "divergence": false
+      },
+      {
+        "input": "(2837459041, 479997889)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: __calorPostconditionResult0 == 4294967295U",
+        "divergence": false
+      },
+      {
+        "input": "(2837459041, 1469693811)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: __calorPostconditionResult0 == 4294967295U",
+        "divergence": false
+      },
+      {
+        "input": "(2837459041, 1469693812)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: __calorPostconditionResult0 == 4294967295U",
+        "divergence": false
+      },
+      {
+        "input": "(2837459041, 1469693813)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: __calorPostconditionResult0 == 4294967295U",
+        "divergence": false
+      },
+      {
+        "input": "(2837459041, 1600517666)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: __calorPostconditionResult0 == 4294967295U",
+        "divergence": false
+      },
+      {
+        "input": "(2837459041, 2147483647)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: __calorPostconditionResult0 == 4294967295U",
+        "divergence": false
+      },
+      {
+        "input": "(2837459041, 2147483648)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: __calorPostconditionResult0 == 4294967295U",
+        "divergence": false
+      },
+      {
+        "input": "(2837459041, 2147483649)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: __calorPostconditionResult0 == 4294967295U",
+        "divergence": false
+      },
+      {
+        "input": "(2837459041, 2605812204)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: __calorPostconditionResult0 == 4294967295U",
+        "divergence": false
+      },
+      {
+        "input": "(2837459041, 2674062878)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: __calorPostconditionResult0 == 4294967295U",
+        "divergence": false
+      },
+      {
+        "input": "(2837459041, 2837459040)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: __calorPostconditionResult0 == 4294967295U",
+        "divergence": false
+      },
+      {
+        "input": "(2837459041, 2837459041)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: __calorPostconditionResult0 == 4294967295U",
+        "divergence": false
+      }
+    ],
+    "unrecovered": []
+  },
+  "o2ReplayedBy": "dcd6f34a59e9276ef28e45e543a64865ed819a05"
 }

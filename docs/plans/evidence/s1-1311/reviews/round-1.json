@@ -1,0 +1,59 @@
+{
+  "round": 1,
+  "reviewer": "codex exec -s read-only --ephemeral -c model_reasoning_effort=high",
+  "reviewedCommit": "dbf09516",
+  "verdict": "REQUEST-CHANGES",
+  "output": "1. **BLOCKING \u2014 O2 replays mutated exit state as entry state.** `tools/Calor.Soundness.Sweep/CaseExecutor.cs:340` calls `PointVerdict` on the recovered input before passing it to O2. `OracleRuntime.cs:56` executes the oracle body on that input; cloning at line 230 happens too late. In both baselines\u2019 `R1-POST-ARRAY-ALIAS-001` attempts, the recorded input contains `2147483647`, but O2 fails the precondition requiring that value because O1 already replaced it with `152524390`. All five alias cases exhibit this defect while their row is clean. **Fix:** give O1 and O2 independent copies of the original entry values, preserving aliases. Retain the old observations and perform corrected, ledgered executions; reclassification alone cannot repair this.\n\n2. **BLOCKING \u2014 Harness-caused O2 failures contribute to clean rows.** `OracleRuntime.cs:194` derives driver types from oracle CLR types. This generates invalid `R1Oracle+Box` parameters for `OBL-UNGATED-REFERENCE-001` through `-005`, and incompatible `object` parameters for `GEN-REFUSAL-002` and `-004`. These seven cases per baseline have `not-run-compile-error`, yet contribute `refusal-validated` to `CLEAN-WITHIN-BUDGET` rows. `CaseExecutor.cs:421` considers only successful O2 runs when adding findings. Disclosure at results-document lines 160\u2013162 does not complete the registered replay. **Fix:** repair replay adapters without changing registered O1 semantics, and retain unresolved replay failures as blocking completion. Any exemption or change to incompatible frozen inputs requires an amendment.\n\n3. **BLOCKING \u2014 Native solver identity was not pinned before execution.** Every raw `<baseline>/pins.json` has null `nativeZ3Path` and `nativeZ3Sha256`; every finding consequently has a null native hash. The registration\u2019s B1 acquisition procedure explicitly requires the native hash before case 1, and N1 requires hashing the platform library actually loaded. `native-z3-check.json` observes a different process at 17:09, after the sweep ended at 16:53. Matching post-run files cannot establish the original process\u2019s loaded image. Additionally, `Program.cs:282` skips comparisons against null pins and merely prints detected changes. **Fix:** supply contemporaneous retained pin evidence if available; otherwise archive this provenance gap and obtain the capacity/amendment needed for valid execution. Missing or changed required pins must fail closed and prevent ordinary row-status reporting.\n\n4. **BLOCKING \u2014 Required reserve reruns were replaced with ordinary sweep results.** Results-document lines 175\u2013178 explicitly decline the reruns required by frozen `noPooling.crossBaselineUse`. `Report.cs:179` nevertheless records the other baseline\u2019s ordinary execution as \u201creproduces.\u201d Separate ordinary sweeps correctly avoid pooling, but do not satisfy the additional registered rerun requirement. The capacity explanation also undercounts: each baseline has **32 distinct finding cases**, not 30; complete reciprocal reruns require **64 executions**, exceeding the remaining 56 by eight. **Fix:** record required reruns as not-run until executed, correct the arithmetic, and obtain a reviewed amendment before exceeding capacity or changing this requirement.\n\n5. **BLOCKING \u2014 The PR exceeds the accepted size ceiling.** The five new harness `.cs` files alone add **1,916 lines**, exceeding contract \u00a79\u2019s 1,500-line ceiling before counting the project file or results document. Harness implementation is outside the evidence-data and fixture exclusions; amendment 1.1.0 grants its exception only to PR #1473. The capacity packet omits this ceiling. **Fix:** record the overrun and re-scope within the permitted PR allocation, or obtain a reviewed ceiling amendment before continuing.\n\n6. **BLOCKING \u2014 Required finding handoff information is empty.** `Report.cs:180` unconditionally writes `affectedGuarantee: null`; all 68 finding records contain that null. Frozen `findingRecord` requires the affected modeled form, guard-elision path, and dependent public claim or experiment. Only `disposition` is explicitly deferred to S2. **Fix:** populate affected guarantees per finding, identifying dependent claims or explicitly recording that none were identified.\n\n7. **NON-BLOCKING \u2014 Finding witnesses sometimes demonstrate a different outcome from the classified defect.** `Report.cs:155` prefers the general O1 violation over the replayed solver model. For `F-B1-009` and `F-N1-009`, the finding is spurious because the solver\u2019s empty-string model yields `excluded-body-threw`; the finding\u2019s witness instead reports `\"abc\"` violating the property. Other records write `\"run\"` into `witness.o2`, outside the registered `guard threw | did not throw | not-run` vocabulary. The attempts preserve the necessary evidence. **Fix:** distinguish the defect witness from the general oracle witness, include the model replay verdict, and normalize the registered witness fields.\n\n8. **NON-BLOCKING \u2014 Status disagreement can suppress a false-proof finding.** `CaseExecutor.cs:367` assigns `flaky` before checking whether a produced `Proven`/`Discharged` claim has an O1 violation. A forced-only proof is likewise missed. `Program.Combine` preserves false proofs only when an attempt already has that primary class. This branch was not exercised by the retained sweep, but violates the rule that an observed false proof survives disagreement. **Fix:** independently retain false-proof findings from both emissions before applying disagreement status, and select the finding-bearing attempt when generating its record.\n\n9. **NON-BLOCKING \u2014 The case timeout leaves execution running and discards eventual observations.** `Program.cs:335\u2013343` times out `Task.Wait` without stopping the task, then immediately permits a retry against the same host. An over-time case can therefore overlap its retry and finish with an unretained proof or exception. No retained case hit this branch. **Fix:** use execution isolation that can be terminated, retain available observations, and ensure the first execution has ended before retrying.\n\n10. **NON-BLOCKING \u2014 HC1\u2013HC3\u2019s inspection chronology is contradictory.** `harness-corrections.json:2` says corrections occurred \u201cbefore any report\u201d; results-document line 138 says they followed inspection of the first report. The sampled corrections themselves faithfully implement the frozen direction, guard-presence, and model-replay rules, and the original classifications are retained; reclassification from those observations is justified. **Fix:** consistently record that inspection occurred after the first report, with correction timestamps, without claiming it preceded decision-bearing inspection.\n\nVERDICT: REQUEST-CHANGES",
+  "responses": [
+    {
+      "item": 1,
+      "severity": "BLOCKING",
+      "response": "Fixed (HC4, dcd6f34a): O1 point verdicts and O2 use independently recovered entry values; O2 re-run for every executed attempt from the retained forced emission (no compiler call). No class changed."
+    },
+    {
+      "item": 2,
+      "severity": "BLOCKING",
+      "response": "Fixed (HC5): the driver adapts oracle-defined and object parameters. O2 now runs on 675 of 684 applicable cases per baseline; the remaining 9 were rejected by the compiler itself (Calor1002), so no runnable emission exists. The registered rowStatus does not list O2 not-run as blocking; it is disclosed, not used to change status."
+    },
+    {
+      "item": 3,
+      "severity": "BLOCKING",
+      "response": "Cannot be re-executed within the 1,500 ceiling. Recorded as a provenance gap for the maintainer with the strongest available evidence: pre-run file hashes (preflight.json), a same-layout post-run mapping check, and no other libz3 on the search paths. The harness now fails closed on a missing or changed pin, including the native image, for any future run. Finding records carry the native hash with its source."
+    },
+    {
+      "item": 4,
+      "severity": "BLOCKING",
+      "response": "Fixed: 56 reserve re-runs executed (false proofs first); all reproduce. The 1,500 ceiling stopped the last 8, recorded not-run. otherBaseline.result now comes from the re-run; the ordinary sweep result is reported separately. Arithmetic corrected (32 finding cases per baseline, 64 needed)."
+    },
+    {
+      "item": 5,
+      "severity": "BLOCKING",
+      "response": "Fixed: the harness was compacted (behavior-identical: reclassify and report reproduce byte-identical case results, controls, row status, and findings), the self-test command and lock file were removed from the final tree, and the results document was shortened. Non-evidence changed lines are under 1,500."
+    },
+    {
+      "item": 6,
+      "severity": "BLOCKING",
+      "response": "Fixed: every finding carries affectedGuarantee (form, guard path, public surfaces located by search, experiments: none identified by S1)."
+    },
+    {
+      "item": 7,
+      "severity": "NON-BLOCKING",
+      "response": "Fixed: spurious-refutation findings use the replayed solver model as the witness; witness.o2 uses the registered vocabulary, with o2Detail."
+    },
+    {
+      "item": 8,
+      "severity": "NON-BLOCKING",
+      "response": "Fixed: a Proven/Discharged with an O1 violation in either emission is a false-unconditional-proof even when the emissions disagree. Not exercised by the retained data."
+    },
+    {
+      "item": 9,
+      "severity": "NON-BLOCKING",
+      "response": "Fixed for future runs: an over-time execution is awaited (bounded, 10 min) before any retry and its late observation retained. No retained case hit this branch."
+    },
+    {
+      "item": 10,
+      "severity": "NON-BLOCKING",
+      "response": "Fixed: harness-corrections.json records that every correction followed inspection of results, with commit times."
+    }
+  ]
+}

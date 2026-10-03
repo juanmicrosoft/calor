@@ -257,7 +257,7 @@
     "elidedWithoutProof": false
   },
   "o2": {
-    "driver": "public static object? __R1Run(int x, int y) { return (object?)(Probe(x, y)); }",
+    "driver": "public static object? __R1Run(int x, int y) { return (object?)(Probe(x, y)); } static object? __R1Copy(object? v) { if (v == null || v.GetType().Assembly == typeof(object).Assembly) return v; var t = System.Linq.Enumerable.First(System.Reflection.Assembly.GetExecutingAssembly().GetTypes(), x =\u003E x.Name == v.GetType().Name); var o = System.Activator.CreateInstance(t)!; foreach (var f in v.GetType().GetFields()) { var m = t.GetField(f.Name); if (m != null) m.SetValue(o, f.GetValue(v)); else t.GetProperty(f.Name)!.SetValue(o, f.GetValue(v)); } return o; }",
     "status": "run",
     "runs": [
       {
@@ -455,5 +455,125 @@
     "nonVacuityCheck": null,
     "coldToken": null
   },
-  "reclassifiedBy": "e33d4339d1e815be2ad63a6049c879038fde5971"
+  "reclassifiedBy": "15aa06ca4c017e86a91954fc812220f7f521b6bc",
+  "runtimeO2": {
+    "driver": "public static object? __R1Run(int x, int y) { return (object?)(Probe(x, y)); }",
+    "status": "run",
+    "runs": [
+      {
+        "input": "(1846896997, -2147483648)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.OverflowException: Arithmetic operation resulted in an overflow.",
+        "divergence": false
+      },
+      {
+        "input": "(1846896997, -2147483647)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.OverflowException: Arithmetic operation resulted in an overflow.",
+        "divergence": false
+      },
+      {
+        "input": "(1846896997, -1319625453)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.OverflowException: Arithmetic operation resulted in an overflow.",
+        "divergence": false
+      },
+      {
+        "input": "(1846896997, -2)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.OverflowException: Arithmetic operation resulted in an overflow.",
+        "divergence": false
+      },
+      {
+        "input": "(1846896997, -1)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: checked(x * y) \u003E 875589769",
+        "divergence": false
+      },
+      {
+        "input": "(1846896997, 0)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: checked(x * y) \u003E 875589769",
+        "divergence": false
+      },
+      {
+        "input": "(1846896997, 1)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(1846896997, 2)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.OverflowException: Arithmetic operation resulted in an overflow.",
+        "divergence": false
+      },
+      {
+        "input": "(1846896997, 92577688)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.OverflowException: Arithmetic operation resulted in an overflow.",
+        "divergence": false
+      },
+      {
+        "input": "(1846896997, 353075376)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.OverflowException: Arithmetic operation resulted in an overflow.",
+        "divergence": false
+      },
+      {
+        "input": "(1846896997, 875589768)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.OverflowException: Arithmetic operation resulted in an overflow.",
+        "divergence": false
+      },
+      {
+        "input": "(1846896997, 875589769)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.OverflowException: Arithmetic operation resulted in an overflow.",
+        "divergence": false
+      },
+      {
+        "input": "(1846896997, 875589770)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.OverflowException: Arithmetic operation resulted in an overflow.",
+        "divergence": false
+      },
+      {
+        "input": "(1846896997, 1198503711)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.OverflowException: Arithmetic operation resulted in an overflow.",
+        "divergence": false
+      },
+      {
+        "input": "(1846896997, 1583877400)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.OverflowException: Arithmetic operation resulted in an overflow.",
+        "divergence": false
+      },
+      {
+        "input": "(1846896997, 1846896996)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.OverflowException: Arithmetic operation resulted in an overflow.",
+        "divergence": false
+      }
+    ],
+    "unrecovered": []
+  },
+  "o2ReplayedBy": "dcd6f34a59e9276ef28e45e543a64865ed819a05"
 }

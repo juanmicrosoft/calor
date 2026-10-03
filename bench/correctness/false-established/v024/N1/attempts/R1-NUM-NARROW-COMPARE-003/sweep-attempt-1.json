@@ -235,7 +235,7 @@
     "elidedWithoutProof": false
   },
   "o2": {
-    "driver": "public static object? __R1Run(short x, short y) { return (object?)(Probe(x, y)); }",
+    "driver": "public static object? __R1Run(short x, short y) { return (object?)(Probe(x, y)); } static object? __R1Copy(object? v) { if (v == null || v.GetType().Assembly == typeof(object).Assembly) return v; var t = System.Linq.Enumerable.First(System.Reflection.Assembly.GetExecutingAssembly().GetTypes(), x =\u003E x.Name == v.GetType().Name); var o = System.Activator.CreateInstance(t)!; foreach (var f in v.GetType().GetFields()) { var m = t.GetField(f.Name); if (m != null) m.SetValue(o, f.GetValue(v)); else t.GetProperty(f.Name)!.SetValue(o, f.GetValue(v)); } return o; }",
     "status": "run",
     "runs": [
       {
@@ -433,5 +433,125 @@
     "nonVacuityCheck": null,
     "coldToken": null
   },
-  "reclassifiedBy": "e33d4339d1e815be2ad63a6049c879038fde5971"
+  "reclassifiedBy": "15aa06ca4c017e86a91954fc812220f7f521b6bc",
+  "runtimeO2": {
+    "driver": "public static object? __R1Run(short x, short y) { return (object?)(Probe(x, y)); }",
+    "status": "run",
+    "runs": [
+      {
+        "input": "(-32767, -32768)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: x \u003C= y",
+        "divergence": false
+      },
+      {
+        "input": "(-32768, -32767)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-32768, -28479)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-32768, -23891)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-32768, -17899)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-32768, -15051)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-32768, -12514)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-32768, -8485)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-32768, -2)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-32768, -1)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-32768, 0)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-32768, 1)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-32768, 2)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-32768, 32766)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-32768, 32767)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(-32767, -28479)",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      }
+    ],
+    "unrecovered": []
+  },
+  "o2ReplayedBy": "dcd6f34a59e9276ef28e45e543a64865ed819a05"
 }

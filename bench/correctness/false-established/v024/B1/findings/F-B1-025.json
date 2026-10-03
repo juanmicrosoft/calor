@@ -22,8 +22,10 @@
   },
   "witness": {
     "inputs": "(0)",
-    "o1": "holds-sampled",
-    "o2": "run"
+    "source": "the solver counterexample model, replayed under O1",
+    "o1": "model input: excluded-hyp-false; case verdict: holds-sampled",
+    "o2": "not-run",
+    "o2Detail": null
   },
   "nonVacuityCheck": null,
   "classReason": "model (0) does not violate the property under O1 (excluded-hyp-false)",
@@ -31,13 +33,14 @@
     "status": "registered-case: a single-function probe generated from one template; not reduced further",
     "calorSource": "\u00A7M{m1:R1Case}\n  \u00A7RTYPE{r1:Ref:i32} (\u003E= (\u0026 # INT:2147483647) INT:2147483646)\n  \u00A7F{f1:Probe:pub}\n    \u00A7I{Ref:x}\n    \u00A7O{i32}\n    \u00A7E{}\n    \u00A7B{y:Ref} x\n    \u00A7R INT:0\n",
     "calorPrimeSource": null,
-    "csharpReproduction": "// R1 #1419 independent oracle for R1-OBL-SELFREF-004\nusing System;\nusing System.Collections.Generic;\nusing System.Linq;\nusing System.Numerics;\npublic static class R1Oracle\n{\n    public const string Claim = \u0022forall\u0022;\n    public const bool Exhaustive = false;\n    public const bool Checked = true;\n    public static bool Hyp(int x) =\u003E (x \u0026 2147483647) \u003E= 2147483646;\n    public static bool Prop(int x) =\u003E (x \u0026 2147483647) \u003E= 2147483646;\n    public static bool HypO(object?[] a) =\u003E Hyp((int)a[0]!);\n    public static bool HasBody =\u003E false;\n    public static object? BodyO(object?[] a) =\u003E null;\n    public static bool PropO(object?[] a, object? r) =\u003E Prop((int)a[0]!);\n    public static IEnumerable\u003Cobject?[]\u003E Inputs()\n    {\n        yield return new object?[] { (int)((-2147483648)) };\n        yield return new object?[] { (int)((-2147483647)) };\n        yield return new object?[] { (int)((-1739001250)) };\n        yield return new object?[] { (int)((-1329794386)) };\n        yield return new object?[] { (int)((-952315552)) };\n        yield return new object?[] { (int)((-467938474)) };\n        yield return new object?[] { (int)((-2)) };\n        yield return new object?[] { (int)((-1)) };\n        yield return new object?[] { (int)(0) };\n        yield return new object?[] { (int)(1) };\n        yield return new object?[] { (int)(2) };\n        yield return new object?[] { (int)(1539091876) };\n        yield return new object?[] { (int)(1804465529) };\n        yield return new object?[] { (int)(2147483645) };\n        yield return new object?[] { (int)(2147483646) };\n        yield return new object?[] { (int)(2147483647) };\n    }\n}\n\npublic static class Repro\n{\n    public static int Main()\n    {\n        int reached = 0;\n        foreach (var a in R1Oracle.Inputs())\n        {\n            bool hyp;\n            try { hyp = R1Oracle.HypO(a); } catch { continue; }\n            if (!hyp) continue;\n            object? r = null;\n            if (R1Oracle.HasBody) { try { r = R1Oracle.BodyO(a); } catch { continue; } }\n            reached\u002B\u002B;\n            string why;\n            bool ok;\n            try { ok = R1Oracle.PropO(a, r); why = \u0022false\u0022; } catch (Exception e) { ok = false; why = \u0022throws \u0022 \u002B e.GetType().Name; }\n            var shown = \u0022(\u0022 \u002B string.Join(\u0022, \u0022, a.Select(v =\u003E v is null ? \u0022null\u0022 : v is Array arr ? \u0022[\u0022 \u002B string.Join(\u0022, \u0022, arr.Cast\u003Cobject\u003E()) \u002B \u0022]\u0022 : v is string s ? \u0022\\\u0022\u0022 \u002B s \u002B \u0022\\\u0022\u0022 : Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture))) \u002B \u0022)\u0022;\n            if (R1Oracle.Claim == \u0022exists\u0022) { if (ok) { Console.WriteLine(\u0022witness \u0022 \u002B shown); return 0; } continue; }\n            if (!ok) { Console.WriteLine(\u0022property \u0022 \u002B why \u002B \u0022 at \u0022 \u002B shown \u002B (R1Oracle.HasBody ? \u0022 result=\u0022 \u002B Convert.ToString(r, System.Globalization.CultureInfo.InvariantCulture) : \u0022\u0022)); return 1; }\n        }\n        Console.WriteLine((R1Oracle.Claim == \u0022exists\u0022 ? \u0022no witness\u0022 : \u0022no violation\u0022) \u002B \u0022 in the registered domain; reached inputs: \u0022 \u002B reached);\n        return 0;\n    }\n}",
+    "csharpReproduction": "// R1 #1419 independent oracle for R1-OBL-SELFREF-004\nusing System;\nusing System.Collections.Generic;\nusing System.Linq;\nusing System.Numerics;\npublic static class R1Oracle\n{\n    public const string Claim = \u0022forall\u0022;\n    public const bool Exhaustive = false;\n    public const bool Checked = true;\n    public static bool Hyp(int x) =\u003E (x \u0026 2147483647) \u003E= 2147483646;\n    public static bool Prop(int x) =\u003E (x \u0026 2147483647) \u003E= 2147483646;\n    public static bool HypO(object?[] a) =\u003E Hyp((int)a[0]!);\n    public static bool HasBody =\u003E false;\n    public static object? BodyO(object?[] a) =\u003E null;\n    public static bool PropO(object?[] a, object? r) =\u003E Prop((int)a[0]!);\n    public static IEnumerable\u003Cobject?[]\u003E Inputs()\n    {\n        yield return new object?[] { (int)((-2147483648)) };\n        yield return new object?[] { (int)((-2147483647)) };\n        yield return new object?[] { (int)((-1739001250)) };\n        yield return new object?[] { (int)((-1329794386)) };\n        yield return new object?[] { (int)((-952315552)) };\n        yield return new object?[] { (int)((-467938474)) };\n        yield return new object?[] { (int)((-2)) };\n        yield return new object?[] { (int)((-1)) };\n        yield return new object?[] { (int)(0) };\n        yield return new object?[] { (int)(1) };\n        yield return new object?[] { (int)(2) };\n        yield return new object?[] { (int)(1539091876) };\n        yield return new object?[] { (int)(1804465529) };\n        yield return new object?[] { (int)(2147483645) };\n        yield return new object?[] { (int)(2147483646) };\n        yield return new object?[] { (int)(2147483647) };\n    }\n}\n\npublic static class Repro\n{\n    public static int Main()\n    {\n        int reached = 0;\n        foreach (var a in R1Oracle.Inputs())\n        {\n            bool hyp; object? r = null; bool ok; string why;\n            try { hyp = R1Oracle.HypO(a); } catch { continue; }\n            if (!hyp) continue;\n            if (R1Oracle.HasBody) { try { r = R1Oracle.BodyO(a); } catch { continue; } }\n            reached\u002B\u002B;\n            try { ok = R1Oracle.PropO(a, r); why = \u0022false\u0022; } catch (Exception e) { ok = false; why = \u0022throws \u0022 \u002B e.GetType().Name; }\n            var shown = \u0022(\u0022 \u002B string.Join(\u0022, \u0022, a.Select(v =\u003E v is null ? \u0022null\u0022 : v is Array arr ? \u0022[\u0022 \u002B string.Join(\u0022, \u0022, arr.Cast\u003Cobject\u003E()) \u002B \u0022]\u0022 : v is string s ? \u0022\\\u0022\u0022 \u002B s \u002B \u0022\\\u0022\u0022 : Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture))) \u002B \u0022)\u0022;\n            if (R1Oracle.Claim == \u0022exists\u0022) { if (ok) { Console.WriteLine(\u0022witness \u0022 \u002B shown); return 0; } continue; }\n            if (!ok) { Console.WriteLine(\u0022property \u0022 \u002B why \u002B \u0022 at \u0022 \u002B shown \u002B (R1Oracle.HasBody ? \u0022 result=\u0022 \u002B Convert.ToString(r, System.Globalization.CultureInfo.InvariantCulture) : \u0022\u0022)); return 1; }\n        }\n        Console.WriteLine((R1Oracle.Claim == \u0022exists\u0022 ? \u0022no witness\u0022 : \u0022no violation\u0022) \u002B \u0022 in the registered domain; reached inputs: \u0022 \u002B reached);\n        return 0;\n    }\n}",
     "reproductionOutput": "no violation in the registered domain; reached inputs: 4 (exit 0)",
     "sha256": "959db95bf8df1c2235fd069d94b37114cdf3eabd2a1d7608a56fbfdc68b01d82"
   },
   "environment": {
     "calorDllSha256": "79839f6c8681bb7132df876c624339385969cc69c5b9914eea09fdfbf48e6651",
-    "z3NativeSha256": null,
+    "z3NativeSha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+    "z3NativeSource": "post-run native-check.json (same process layout)",
     "dotnetVersion": "10.0.401",
     "os": "macOS 27.0.1",
     "translatorSemanticsVersion": "z3-executable-semantics-v2"
@@ -57,11 +60,22 @@
   "otherBaseline": {
     "id": "N1",
     "result": "reproduces",
-    "source": "the other baseline\u0027s own execution of the same frozen case",
-    "otherClass": "spurious-refutation",
-    "otherToken": "Failed"
+    "rerun": {
+      "caseId": "R1-OBL-SELFREF-004",
+      "baseline": "N1",
+      "status": "executed",
+      "token": "Failed",
+      "class": "spurious-refutation",
+      "addedFindings": [],
+      "path": "attempts/R1-OBL-SELFREF-004/reserve-cross-baseline-attempt-1.json"
+    },
+    "otherSweepResult": {
+      "token": "Failed",
+      "class": "spurious-refutation",
+      "result": "reproduces"
+    }
   },
-  "affectedGuarantee": null,
+  "affectedGuarantee": "Form: Self-reference (#) predicates (row OBL-SELFREF). Guard path: a Discharged obligation drops its emitted runtime guard under the default ObligationPolicy (Discharged = Ignore) with ElideProvenGuards on (CSharpEmitter obligation sites). Public surfaces that describe this form: website/content/syntax-reference/refinement-types.mdx, website/content/guides/verification-guarantees.mdx (located by search; their wording was not audited by S1). No experiment relying on this form was identified by S1; S2 (#1413) confirms.",
   "filedIssue": null,
   "disposition": null
 }

@@ -235,7 +235,7 @@
     "elidedWithoutProof": false
   },
   "o2": {
-    "driver": "public static object? __R1Run(int[] a, int k) { return (object?)(Probe(a, k)); }",
+    "driver": "public static object? __R1Run(int[] a, int k) { return (object?)(Probe(a, k)); } static object? __R1Copy(object? v) { if (v == null || v.GetType().Assembly == typeof(object).Assembly) return v; var t = System.Linq.Enumerable.First(System.Reflection.Assembly.GetExecutingAssembly().GetTypes(), x =\u003E x.Name == v.GetType().Name); var o = System.Activator.CreateInstance(t)!; foreach (var f in v.GetType().GetFields()) { var m = t.GetField(f.Name); if (m != null) m.SetValue(o, f.GetValue(v)); else t.GetProperty(f.Name)!.SetValue(o, f.GetValue(v)); } return o; }",
     "status": "run",
     "runs": [
       {
@@ -433,5 +433,125 @@
     "nonVacuityCheck": null,
     "coldToken": null
   },
-  "reclassifiedBy": "e33d4339d1e815be2ad63a6049c879038fde5971"
+  "reclassifiedBy": "15aa06ca4c017e86a91954fc812220f7f521b6bc",
+  "runtimeO2": {
+    "driver": "public static object? __R1Run(int[] a, int k) { return (object?)(Probe(a, k)); }",
+    "status": "run",
+    "runs": [
+      {
+        "input": "(null, -2147483648)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, -2147483647)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, -1273237640)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, -911368861)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, -175690632)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, -2)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, -1)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, 0)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, 1)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, 2)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "([], -2147483648)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: a.Length \u003E= 3",
+        "divergence": false
+      },
+      {
+        "input": "([], -2147483647)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: a.Length \u003E= 3",
+        "divergence": false
+      },
+      {
+        "input": "([], -1273237640)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: a.Length \u003E= 3",
+        "divergence": false
+      },
+      {
+        "input": "([], -911368861)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: a.Length \u003E= 3",
+        "divergence": false
+      },
+      {
+        "input": "([], -175690632)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: a.Length \u003E= 3",
+        "divergence": false
+      },
+      {
+        "input": "([], -2)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: a.Length \u003E= 3",
+        "divergence": false
+      }
+    ],
+    "unrecovered": []
+  },
+  "o2ReplayedBy": "dcd6f34a59e9276ef28e45e543a64865ed819a05"
 }

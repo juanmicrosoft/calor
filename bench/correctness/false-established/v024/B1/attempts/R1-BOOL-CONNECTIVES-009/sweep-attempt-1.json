@@ -251,7 +251,7 @@
     "elidedWithoutProof": false
   },
   "o2": {
-    "driver": "public static object? __R1Run(bool a, bool b, sbyte x) { return (object?)(Probe(a, b, x)); }",
+    "driver": "public static object? __R1Run(bool a, bool b, sbyte x) { return (object?)(Probe(a, b, x)); } static object? __R1Copy(object? v) { if (v == null || v.GetType().Assembly == typeof(object).Assembly) return v; var t = System.Linq.Enumerable.First(System.Reflection.Assembly.GetExecutingAssembly().GetTypes(), x =\u003E x.Name == v.GetType().Name); var o = System.Activator.CreateInstance(t)!; foreach (var f in v.GetType().GetFields()) { var m = t.GetField(f.Name); if (m != null) m.SetValue(o, f.GetValue(v)); else t.GetProperty(f.Name)!.SetValue(o, f.GetValue(v)); } return o; }",
     "status": "run",
     "runs": [
       {
@@ -457,5 +457,125 @@
     "nonVacuityCheck": null,
     "coldToken": null
   },
-  "reclassifiedBy": "e33d4339d1e815be2ad63a6049c879038fde5971"
+  "reclassifiedBy": "15aa06ca4c017e86a91954fc812220f7f521b6bc",
+  "runtimeO2": {
+    "driver": "public static object? __R1Run(bool a, bool b, sbyte x) { return (object?)(Probe(a, b, x)); }",
+    "status": "run",
+    "runs": [
+      {
+        "input": "(False, False, 27)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: (a || b) \u0026\u0026 x \u003E -56",
+        "divergence": false
+      },
+      {
+        "input": "(False, False, 28)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: (a || b) \u0026\u0026 x \u003E -56",
+        "divergence": false
+      },
+      {
+        "input": "(False, False, 29)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: (a || b) \u0026\u0026 x \u003E -56",
+        "divergence": false
+      },
+      {
+        "input": "(False, False, 30)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: (a || b) \u0026\u0026 x \u003E -56",
+        "divergence": false
+      },
+      {
+        "input": "(False, False, 31)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: (a || b) \u0026\u0026 x \u003E -56",
+        "divergence": false
+      },
+      {
+        "input": "(False, False, 32)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: (a || b) \u0026\u0026 x \u003E -56",
+        "divergence": false
+      },
+      {
+        "input": "(False, False, 33)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: (a || b) \u0026\u0026 x \u003E -56",
+        "divergence": false
+      },
+      {
+        "input": "(False, False, 34)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: (a || b) \u0026\u0026 x \u003E -56",
+        "divergence": false
+      },
+      {
+        "input": "(False, False, 35)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: (a || b) \u0026\u0026 x \u003E -56",
+        "divergence": false
+      },
+      {
+        "input": "(False, False, 36)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: (a || b) \u0026\u0026 x \u003E -56",
+        "divergence": false
+      },
+      {
+        "input": "(False, False, 37)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: (a || b) \u0026\u0026 x \u003E -56",
+        "divergence": false
+      },
+      {
+        "input": "(False, False, 38)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: (a || b) \u0026\u0026 x \u003E -56",
+        "divergence": false
+      },
+      {
+        "input": "(False, False, 39)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: (a || b) \u0026\u0026 x \u003E -56",
+        "divergence": false
+      },
+      {
+        "input": "(False, False, 40)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: (a || b) \u0026\u0026 x \u003E -56",
+        "divergence": false
+      },
+      {
+        "input": "(False, False, 41)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: (a || b) \u0026\u0026 x \u003E -56",
+        "divergence": false
+      },
+      {
+        "input": "(False, False, 42)",
+        "o1": "violated",
+        "o2": "guard-threw",
+        "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: (a || b) \u0026\u0026 x \u003E -56",
+        "divergence": false
+      }
+    ],
+    "unrecovered": []
+  },
+  "o2ReplayedBy": "dcd6f34a59e9276ef28e45e543a64865ed819a05"
 }

@@ -149,9 +149,122 @@
     "elidedWithoutProof": false
   },
   "o2": {
-    "driver": "public static object? __R1Run(R1Oracle\u002BBox p, string s, int[] a) { return (object?)(Probe(p, s, a)); }",
-    "status": "not-run-compile-error",
-    "errors": "(19,39): error CS1001: Identifier expected; (19,39): error CS1003: Syntax error, \u0027,\u0027 expected; (19,40): error CS1003: Syntax error, \u0027,\u0027 expected; (19,31): error CS0246: The type or namespace name \u0027R1Oracle\u0027 could not be found (are you missing a using directive or an assembly reference?)",
+    "driver": "public static object? __R1Run(object? p, string s, int[] a) { return (object?)(Probe((dynamic?)__R1Copy(p), s, a)); } static object? __R1Copy(object? v) { if (v == null || v.GetType().Assembly == typeof(object).Assembly) return v; var t = System.Linq.Enumerable.First(System.Reflection.Assembly.GetExecutingAssembly().GetTypes(), x =\u003E x.Name == v.GetType().Name); var o = System.Activator.CreateInstance(t)!; foreach (var f in v.GetType().GetFields()) { var m = t.GetField(f.Name); if (m != null) m.SetValue(o, f.GetValue(v)); else t.GetProperty(f.Name)!.SetValue(o, f.GetValue(v)); } return o; }",
+    "status": "run",
+    "runs": [
+      {
+        "input": "(null, null, null)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, null, [])",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, null, [0])",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, null, [-1])",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, null, [2147483647])",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, null, [1, 2, 3])",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, null, [5, 4, 3, 2, 1])",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, null, [-2147483648, 0, 2147483647])",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, \u0022\u0022, null)",
+        "o1": "violated",
+        "o2": "o2-other-exception",
+        "exception": "System.NullReferenceException: Object reference not set to an instance of an object.",
+        "divergence": false
+      },
+      {
+        "input": "(null, \u0022\u0022, [])",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, \u0022\u0022, [0])",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, \u0022\u0022, [-1])",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, \u0022\u0022, [2147483647])",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, \u0022\u0022, [1, 2, 3])",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, \u0022\u0022, [5, 4, 3, 2, 1])",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      },
+      {
+        "input": "(null, \u0022\u0022, [-2147483648, 0, 2147483647])",
+        "o1": "holds",
+        "o2": "returned",
+        "exception": null,
+        "divergence": false
+      }
+    ],
     "unrecovered": []
   },
   "status": "executed",
@@ -206,5 +319,12 @@
     "nonVacuityCheck": null,
     "coldToken": null
   },
-  "reclassifiedBy": "e33d4339d1e815be2ad63a6049c879038fde5971"
+  "reclassifiedBy": "15aa06ca4c017e86a91954fc812220f7f521b6bc",
+  "runtimeO2": {
+    "driver": "public static object? __R1Run(R1Oracle\u002BBox p, string s, int[] a) { return (object?)(Probe(p, s, a)); }",
+    "status": "not-run-compile-error",
+    "errors": "(19,39): error CS1001: Identifier expected; (19,39): error CS1003: Syntax error, \u0027,\u0027 expected; (19,40): error CS1003: Syntax error, \u0027,\u0027 expected; (19,31): error CS0246: The type or namespace name \u0027R1Oracle\u0027 could not be found (are you missing a using directive or an assembly reference?)",
+    "unrecovered": []
+  },
+  "o2ReplayedBy": "dcd6f34a59e9276ef28e45e543a64865ed819a05"
 }

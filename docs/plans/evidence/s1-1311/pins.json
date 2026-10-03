@@ -3,8 +3,9 @@
   "registrationMergedUtc": "2026-10-03T00:36:51Z",
   "harnessCommits": {
     "run": "8e33f08019303cf805e5098775032face6017a27",
-    "reclassify": "e33d4339d1e815be2ad63a6049c879038fde5971",
-    "report": "38f1aed7ef9cfeefca031a4f42d26753dcab92d1"
+    "o2ReReplayAndCrossRun": "dcd6f34a59e9276ef28e45e543a64865ed819a05",
+    "reclassify": "15aa06ca4c017e86a91954fc812220f7f521b6bc",
+    "report": "838c6fce90ec046ed55748f0d21662464c357454"
   },
   "baselines": {
     "B1": {
@@ -70,7 +71,7 @@
   },
   "nativeSolverImageCheck": {
     "file": "bench/correctness/false-established/v024/native-z3-check.json",
-    "note": "The in-run pins left nativeZ3Path null: the load-context hook was not called for libz3, so the image was not captured during the run. A post-run process with the same layout (B1, N1, P845 loaded in that order) mapped B1bin/libz3.dylib for B1, N1bin/runtimes/osx-arm64/native/libz3.dylib for N1, and P845bin/libz3.dylib for P845; every libz3.dylib in the three binary directories hashes 8d1f5438...59ada, the value registered for osx-arm64."
+    "note": "PROVENANCE GAP: the registration asks for the platform libz3 hash in pins.json before case 1 (B1) and for the image actually loaded (N1). The in-run pins left nativeZ3Path null: the load-context hook was not called for libz3, so the mapped image was not captured during the run. The file hashes were taken before the run (preflight.json preRunBinaryHashes). A post-run process with the same layout (B1, N1, P845 loaded in that order) mapped B1bin/libz3.dylib for B1, N1bin/runtimes/osx-arm64/native/libz3.dylib for N1, and P845bin/libz3.dylib for P845; every libz3.dylib in the three binary directories hashes 8d1f5438...59ada, the value registered for osx-arm64."
   },
   "acquisition": {
     "B1": {

@@ -1,7 +1,7 @@
 {
-  "note": "Mapping defects found by the executor audit after the run and before any report. Each correction implements registered text; no observation (diagnostic, outcome, emitted code, O1, O2) changed and no case was re-executed. The run-time classification is retained in every attempt (runtimeClassification) and in <baseline>/case-results.runtime-8e33f080.jsonl.",
+  "note": "Chronology: the sweep ran 16:50:44Z-16:53:50Z with harness 8e33f080. The executor then inspected the first generated report (decision-bearing results) and audited it; HC1-HC3 were committed at 17:05:52Z and 17:06:34Z (6f3a6e83, e33d4339). Codex review round 1 found HC4-HC5; they were committed at 17:26:51Z (dcd6f34a). Every correction follows inspection of results and implements registered text; no registered rule changed. No verifier channel was re-executed: HC1-HC3 re-apply the mapping to retained observations, and HC4/HC5 re-run R1-O2 from the retained forced emission with the pinned Calor.Runtime.dll. Run-time values are retained in every attempt (runtimeClassification, runtimeO2) and in <baseline>/case-results.runtime-8e33f080.jsonl.",
   "runtimeHarnessCommit": "8e33f08019303cf805e5098775032face6017a27",
-  "reclassifyHarnessCommit": "e33d4339d1e815be2ad63a6049c879038fde5971",
+  "reclassifyHarnessCommit": "15aa06ca4c017e86a91954fc812220f7f521b6bc (behavior-identical compaction of dcd6f34a; outputs byte-identical)",
   "corrections": [
     {
       "id": "HC1",
@@ -20,6 +20,18 @@
       "registeredText": "caseResults.classes.spurious-refutation: \"Failed whose replayed counterexample model does not violate the property under O1\"",
       "defect": "The run-time harness treated models with string-typed parameters as not replayable, which made such Failed results no-claim without replay.",
       "fix": "String parameters are replayed from the SMT-LIB string literal Z3 prints. Arrays and user-type objects remain not replayable (the model has no length or field values)."
+    },
+    {
+      "id": "HC4",
+      "registeredText": "oracle.corroboration (R1-O2): the forced emission is executed on every O1 witness and the first 16 reached inputs",
+      "defect": "The O1 point verdict ran the oracle body on the same input objects later passed to O2, so a body that mutates an (aliased) array changed the entry values O2 received (e.g. POST-ARRAY-ALIAS).",
+      "fix": "O1 point verdicts and O2 receive independently recovered input tuples. O2 was re-run for every executed attempt from the retained forced emission (no compiler call); no class changed and no semantic-divergence appeared."
+    },
+    {
+      "id": "HC5",
+      "registeredText": "oracle.corroboration (R1-O2): the emitted function is called with the tuple (or the template replay expression)",
+      "defect": "The replay driver declared oracle-defined (Box) and object parameters with the oracle CLR type, so 7 cases per baseline (OBL-UNGATED-REFERENCE 001-005, GEN-REFUSAL 002, 004) did not compile and O2 did not run.",
+      "fix": "Such parameters are copied by member name into the emitted type and bound dynamically; an input the emitted signature cannot accept (new object() for a double[] parameter) is recorded as not-run-input-not-representable. After HC5, O2 runs on 675 of 684 applicable cases per baseline; the other 9 are cases the compiler itself rejected (Calor1002), so there is no runnable emission."
     }
   ],
   "changedCases": [
