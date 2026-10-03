@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
@@ -144,18 +146,30 @@ internal static partial class EvidenceContractValidator
                 v.Add(new("C011", subject, "ceiling exception is not one registered by a logged amendment (1.1.0: pr-size, #1473, 1520; 1.2.0: s1-generated-cases, issue #1311, 3008)"));
             if (string.IsNullOrWhiteSpace(Str(exception?["justification"])))
                 v.Add(new("C011", subject, "exception needs a justification"));
-            // A per-gate exception authorizes work, not just a number: it must state its scope and
-            // the conditions that bound that work.
-            if (match.Ceiling is not null && match.Pr is null
-                && (string.IsNullOrWhiteSpace(Str(exception?["scope"]))
-                    || Array(exception?["conditions"]).Count == 0
-                    || Array(exception?["conditions"]).Any(c => string.IsNullOrWhiteSpace(Str(c)))))
-                v.Add(new("C011", subject, "a per-gate exception needs a scope and non-empty conditions"));
+            // A per-gate exception authorizes work, not just a number. Its scope, conditions, and
+            // justification are the registered text, bound by hash: weakening, dropping, adding, or
+            // reordering a condition needs a new amendment and a validator change.
+            if (match.Ceiling is not null && match.Pr is null)
+            {
+                var conditions = Array(exception?["conditions"]);
+                if (string.IsNullOrWhiteSpace(Str(exception?["scope"])) || conditions.Count == 0
+                    || conditions.Any(c => string.IsNullOrWhiteSpace(Str(c))))
+                    v.Add(new("C011", subject, "a per-gate exception needs a scope and non-empty conditions"));
+                var text = TextSha256([Str(exception?["scope"]), .. conditions.Select(Str), Str(exception?["justification"])]);
+                if (text != match.TextSha256)
+                    v.Add(new("C011", subject, "per-gate exception scope, conditions, or justification differ from the registered text"));
+                if (Int(exception?["addedExecutions"]) != match.Added)
+                    v.Add(new("C011", subject, $"per-gate exception must record addedExecutions {match.Added}"));
+            }
         }
+        // One exception per identity: a per-PR exception is identified by ceiling and PR, a per-gate
+        // one by ceiling and issue (the same identities the matching above uses).
         var seenExceptions = new HashSet<string>(StringComparer.Ordinal);
         foreach (var exception in Array(capacity?["exceptions"]))
         {
-            var key = $"{Str(exception?["ceiling"])}|{Int(exception?["pr"])}|{Int(exception?["issue"])}|{exception?["pr"] is not null}";
+            var key = exception?["pr"] is not null
+                ? $"pr|{Str(exception?["ceiling"])}|{Int(exception?["pr"])}"
+                : $"gate|{Str(exception?["ceiling"])}|{Int(exception?["issue"])}";
             if (!seenExceptions.Add(key))
                 v.Add(new("C011", $"exception {Str(exception?["ceiling"]) ?? "?"}", "duplicate ceiling exception"));
         }
@@ -163,6 +177,7 @@ internal static partial class EvidenceContractValidator
         // Charge rules (1.2.0) move named work from one ceiling to another without changing any
         // value. Each is valid only exactly as an amendment registered it.
         var ceilingIds = ceilings.Select(c => Str(c?["id"])).OfType<string>().ToHashSet(StringComparer.Ordinal);
+        var seenRules = new HashSet<string>(StringComparer.Ordinal);
         foreach (var rule in Array(capacity?["chargeRules"]))
         {
             var id = Str(rule?["id"]);
@@ -170,9 +185,9 @@ internal static partial class EvidenceContractValidator
             var chargedTo = Str(rule?["chargedTo"]);
             var notChargedTo = Str(rule?["notChargedTo"]);
             var recordedIn = Str(rule?["amendment"]);
-            var registered = RegisteredChargeRules.Any(c =>
+            var registered = RegisteredChargeRules.FirstOrDefault(c =>
                 c.Id == id && c.ChargedTo == chargedTo && c.NotChargedTo == notChargedTo && c.Amendment == recordedIn);
-            if (!registered || recordedIn is null || !amendmentVersions.Contains(recordedIn))
+            if (registered.Id is null || recordedIn is null || !amendmentVersions.Contains(recordedIn))
                 v.Add(new("C011", subject, "charge rule is not one registered by a logged amendment (1.2.0: c2-candidate-determinism-protocol, determinism-compute -> regeneration-compute)"));
             if (chargedTo is null || !ceilingIds.Contains(chargedTo) || notChargedTo is null || !ceilingIds.Contains(notChargedTo))
                 v.Add(new("C011", subject, "charge rule must name two existing ceilings"));
@@ -181,6 +196,13 @@ internal static partial class EvidenceContractValidator
                 if (string.IsNullOrWhiteSpace(Str(rule?[field])))
                     v.Add(new("C011", subject, $"charge rule needs {field}"));
             }
+            // The work, rule, and justification carry the binding to the #1423 candidate, the
+            // ledger, and the one-execution limit; they are the registered text, bound by hash.
+            if (registered.Id is not null
+                && TextSha256([Str(rule?["work"]), Str(rule?["rule"]), Str(rule?["justification"])]) != registered.TextSha256)
+                v.Add(new("C011", subject, "charge rule work, rule, or justification differ from the registered text"));
+            if (id is not null && !seenRules.Add(id))
+                v.Add(new("C011", subject, "duplicate charge rule"));
         }
         var anyProposed = Str(capacity?["status"]) == "PROPOSED"
             || ceilings.Any(c => Str(c?["status"]) == "PROPOSED");
@@ -217,18 +239,33 @@ internal static partial class EvidenceContractValidator
     /// <summary>
     /// Ceiling raises registered by amendments (stopping rule 1). A per-PR raise names its PR; a
     /// per-gate raise (amendment 1.2.0) has no PR and is keyed by the gate's issue.
+    /// A per-gate raise also binds its scope, conditions, and justification by
+    /// <see cref="TextSha256"/> and its added executions.
     /// </summary>
-    private static readonly (string Ceiling, int? Pr, int? Issue, double Value, string Amendment)[] RegisteredCeilingExceptions =
+    private static readonly (string Ceiling, int? Pr, int? Issue, double Value, string Amendment, int? Added, string? TextSha256)[] RegisteredCeilingExceptions =
     [
-        ("pr-size", 1473, 1276, 1520, "1.1.0"),
-        ("s1-generated-cases", null, 1311, 3008, "1.2.0"),
+        ("pr-size", 1473, 1276, 1520, "1.1.0", null, null),
+        ("s1-generated-cases", null, 1311, 3008, "1.2.0", 1508, "1a1264e7865d72da924a1871462705ce66c133aa3bec255bb67d7a6e8fd85f98"),
     ];
 
-    /// <summary>Charge reallocations registered by amendments; they change no ceiling value.</summary>
-    private static readonly (string Id, string ChargedTo, string NotChargedTo, string Amendment)[] RegisteredChargeRules =
+    /// <summary>
+    /// Charge reallocations registered by amendments; they change no ceiling value. The work, rule,
+    /// and justification are bound by <see cref="TextSha256"/>.
+    /// </summary>
+    private static readonly (string Id, string ChargedTo, string NotChargedTo, string Amendment, string TextSha256)[] RegisteredChargeRules =
     [
-        ("c2-candidate-determinism-protocol", "regeneration-compute", "determinism-compute", "1.2.0"),
+        ("c2-candidate-determinism-protocol", "regeneration-compute", "determinism-compute", "1.2.0", "c12f5d86fc664af8e8f46830a730a4ff9117b48a4793c1e1fba78532f1636269"),
     ];
+
+    /// <summary>
+    /// SHA-256 (lowercase hex) of the UTF-8 bytes of the given strings joined by LF, each with CRLF
+    /// normalized to LF; a missing string is empty. Binds registered prose to the validator.
+    /// </summary>
+    internal static string TextSha256(IEnumerable<string?> parts)
+    {
+        var text = string.Join("\n", parts.Select(p => (p ?? "").Replace("\r\n", "\n", StringComparison.Ordinal)));
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
+    }
 
     private static IEnumerable<ContractViolation> ValidateGraph(List<JsonNode?> children, HashSet<int> childIssues)
     {

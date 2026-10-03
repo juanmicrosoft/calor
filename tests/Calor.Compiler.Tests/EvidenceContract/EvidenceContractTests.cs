@@ -1050,6 +1050,7 @@ public class EvidenceContractTests
     [InlineData("unlogged-amendment")]
     [InlineData("no-justification")]
     [InlineData("added-exception")]
+    [InlineData("duplicate-other-issue")]
     public void CeilingExceptionOtherThanTheRegisteredOneFails(string mutation)
     {
         // Decision 6 raises one ceiling for one PR to one value; nothing else passes without a new
@@ -1068,6 +1069,12 @@ public class EvidenceContractTests
                 var added = exception.DeepClone();
                 added["pr"] = 9004;
                 exceptions.Add(added);
+                break;
+            case "duplicate-other-issue":
+                // Per-PR identity is ceiling and PR; a different issue does not make it distinct.
+                var copy = exception.DeepClone();
+                copy["issue"] = 1311;
+                exceptions.Add(copy);
                 break;
         }
         AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C011");
@@ -1115,6 +1122,14 @@ public class EvidenceContractTests
     [InlineData("no-conditions")]
     [InlineData("blank-condition")]
     [InlineData("duplicated")]
+    [InlineData("weakened-condition")]
+    [InlineData("dropped-condition")]
+    [InlineData("added-condition")]
+    [InlineData("reordered-conditions")]
+    [InlineData("replaced-scope")]
+    [InlineData("other-justification")]
+    [InlineData("other-added-executions")]
+    [InlineData("no-added-executions")]
     public void GateCeilingExceptionOtherThanTheRegisteredOneFails(string mutation)
     {
         var contract = Contract();
@@ -1132,8 +1147,37 @@ public class EvidenceContractTests
             case "no-conditions": exception["conditions"] = new JsonArray(); break;
             case "blank-condition": exception["conditions"]!.AsArray().Add(" "); break;
             case "duplicated": exceptions.Add(exception.DeepClone()); break;
+            case "weakened-condition": exception["conditions"]![5] = "Choose the better run."; break;
+            case "dropped-condition": exception["conditions"]!.AsArray().RemoveAt(6); break;
+            case "added-condition": exception["conditions"]!.AsArray().Add("Repeated selective sweeps are permitted."); break;
+            case "reordered-conditions":
+                var conditions = exception["conditions"]!.AsArray();
+                var first = conditions[0]!.DeepClone();
+                conditions.RemoveAt(0);
+                conditions.Add(first);
+                break;
+            case "replaced-scope": exception["scope"] = "Repeated selective sweeps until every row is clean."; break;
+            case "other-justification": exception["justification"] = "Fixture justification."; break;
+            case "other-added-executions": exception["addedExecutions"] = 3008; break;
+            case "no-added-executions": exception.AsObject().Remove("addedExecutions"); break;
         }
         AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C011");
+    }
+
+    [Fact]
+    public void RegisteredTextHashesMatchTheCommittedEntries()
+    {
+        // The committed packet is the registered text; CRLF in a checkout does not change the hash.
+        var capacity = Contract()["authorityCapacity"]!["capacity"]!;
+        var s1 = S1Exception(Contract());
+        var parts = new List<string?> { s1["scope"]!.GetValue<string>() };
+        parts.AddRange(s1["conditions"]!.AsArray().Select(c => c!.GetValue<string>()));
+        parts.Add(s1["justification"]!.GetValue<string>());
+        Assert.Equal(EvidenceContractValidator.TextSha256(parts),
+            EvidenceContractValidator.TextSha256(parts.Select(p => p!.Replace("\n", "\r\n", StringComparison.Ordinal))));
+        var violations = EvidenceContractValidator.ValidateContract(Contract());
+        Assert.DoesNotContain(violations, v => v.Code == "C011");
+        Assert.Single(capacity["chargeRules"]!.AsArray());
     }
 
     [Fact]
@@ -1159,6 +1203,10 @@ public class EvidenceContractTests
     [InlineData("no-rule")]
     [InlineData("no-justification")]
     [InlineData("added-rule")]
+    [InlineData("duplicated")]
+    [InlineData("broadened-work")]
+    [InlineData("dropped-candidate-binding")]
+    [InlineData("other-justification")]
     public void ChargeRuleOtherThanTheRegisteredOneFails(string mutation)
     {
         var contract = Contract();
@@ -1181,6 +1229,12 @@ public class EvidenceContractTests
                 added["id"] = "s1-to-ordinary-ci";
                 rules.Add(added);
                 break;
+            case "duplicated": rules.Add(rule.DeepClone()); break;
+            case "broadened-work": rule["work"] = "Every execution of the #1421 determinism protocol."; break;
+            case "dropped-candidate-binding":
+                rule["rule"] = rule["rule"]!.GetValue<string>().Replace("the #1423 manifest names", "any commit names", StringComparison.Ordinal);
+                break;
+            case "other-justification": rule["justification"] = "Fixture justification."; break;
         }
         AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C011");
     }
