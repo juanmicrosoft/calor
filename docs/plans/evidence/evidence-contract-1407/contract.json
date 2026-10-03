@@ -3,7 +3,7 @@
   "issue": 1407,
   "epic": 1409,
   "milestone": "0.24",
-  "contractVersion": "1.1.0",
+  "contractVersion": "1.1.1",
   "status": "FROZEN",
   "statusNote": "Proposed in the R0 pull request. The contract is frozen at the commit that merges it to main. Capacity ceilings are PROPOSED until the maintainer accepts them by merging; the R0 gate is NOT MET before that merge.",
   "gateStatus": "MET",
@@ -433,6 +433,23 @@
           "sequencing": "R2 (#1410; PRs #1474 and #1475) merges last, immediately before C1 #1423. Until R2 merges, website and documentation deploys continue under the workflows that exist before R2. After R2 merges, no release surface, including the website, publishes without one matching adjudication identity, as in contract 1.0.1. This sequencing adds no exception and changes no capacity ceiling."
         }
       ]
+    },
+    {
+      "version": "1.1.1",
+      "justification": "Inventory write-back for amendment 1.1.0 decision 3. G1 PR #1471 (#1420) merged as 24a9b0bad4749d723814d7b320a5f7c8d2f38f77 at 2026-10-03T17:16:38Z, and P1 PR #1472 (#1417) merged as 39b5edecc505bdefcd8811c8a8c073fbf1241361 at 2026-10-03T00:01:21Z. As the pendingUpdates rule requires, this amendment copies each pending entry's changes into its artifact, records its defectResolutions beside openDefects, and removes the entry: 1.1.0-g1-z3-release-binaries and 1.1.0-g1-z3-upstream-pins (repairing PR #1471), and 1.1.0-p1-ledger-provenance-index, 1.1.0-p1-benchmark-provenance, and 1.1.0-p1-test-manifest (repairing PR #1472). These five were every pending entry. openDefects are unchanged, and no classification changes: every entry's classificationAfter equals the artifact's classification (benchmark-provenance stays stale). Nothing else changes.",
+      "reviewedInPr": 1478,
+      "timestampUtc": "2026-10-03T17:19:34Z",
+      "afterDecisionBearingInspection": false,
+      "inspectionStatement": "This write-back follows no decision-bearing inspection. Its author has inspected no decision-bearing result. S1 #1311 is executing on a branch but has no merged result. B1 PR #1473 is unmerged and its oracle has not run. No #1421 or #1135 protocol run exists. The amendment applies edits fixed in 1.1.0 and checks only that the repairing PRs merged.",
+      "appliedPendingUpdates": [
+        { "id": "1.1.0-g1-z3-release-binaries", "repairingPr": 1471, "mergeCommit": "24a9b0bad4749d723814d7b320a5f7c8d2f38f77", "mergedAtUtc": "2026-10-03T17:16:38Z" },
+        { "id": "1.1.0-g1-z3-upstream-pins", "repairingPr": 1471, "mergeCommit": "24a9b0bad4749d723814d7b320a5f7c8d2f38f77", "mergedAtUtc": "2026-10-03T17:16:38Z" },
+        { "id": "1.1.0-p1-ledger-provenance-index", "repairingPr": 1472, "mergeCommit": "39b5edecc505bdefcd8811c8a8c073fbf1241361", "mergedAtUtc": "2026-10-03T00:01:21Z" },
+        { "id": "1.1.0-p1-benchmark-provenance", "repairingPr": 1472, "mergeCommit": "39b5edecc505bdefcd8811c8a8c073fbf1241361", "mergedAtUtc": "2026-10-03T00:01:21Z" },
+        { "id": "1.1.0-p1-test-manifest", "repairingPr": 1472, "mergeCommit": "39b5edecc505bdefcd8811c8a8c073fbf1241361", "mergedAtUtc": "2026-10-03T00:01:21Z" }
+      ],
+      "weakens": [],
+      "removedRows": []
     }
   ]
 }

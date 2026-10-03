@@ -1426,7 +1426,7 @@ public class EvidenceContractTests
     /// <paramref name="code"/> and the explicitly <paramref name="alsoAllowed"/> codes, so a control
     /// cannot pass because some unrelated rule fired.
     /// </summary>
-    private static void AssertViolation(IReadOnlyList<ContractViolation> violations, string code, params string[] alsoAllowed)
+    internal static void AssertViolation(IReadOnlyList<ContractViolation> violations, string code, params string[] alsoAllowed)
     {
         Assert.True(violations.Any(v => v.Code == code),
             $"expected a {code} violation; got:{Environment.NewLine}{Describe(violations)}");
@@ -1435,7 +1435,7 @@ public class EvidenceContractTests
             $"expected only {code}; also got:{Environment.NewLine}{Describe(unexpected)}");
     }
 
-    private static string Describe(IReadOnlyList<ContractViolation> violations)
+    internal static string Describe(IReadOnlyList<ContractViolation> violations)
         => violations.Count == 0 ? "(none)" : string.Join(Environment.NewLine, violations);
 
     private static JsonNode Artifact(JsonNode inventory, string id)
@@ -1461,7 +1461,7 @@ public class EvidenceContractTests
         return Convert.ToHexStringLower(SHA256.HashData(new UTF8Encoding(false).GetBytes(text)));
     }
 
-    private static string RepoRoot()
+    internal static string RepoRoot()
     {
         var dir = AppContext.BaseDirectory;
         while (dir != null
