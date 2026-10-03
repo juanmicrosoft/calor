@@ -153,6 +153,15 @@ class NegativeRegistrationControls(unittest.TestCase):
         step = "- name: Run verifier-runtime differential gate\n"
         self.only("D014", texts={".github/workflows/test.yml": test_yml.replace(step, step + "        if: false\n")})
         self.only("D014", texts={".github/workflows/test.yml": test_yml.replace(dp.TRUSTED_STEP, "true")})
+        self.only("D014", texts={".github/workflows/test.yml": test_yml.replace("git show origin/main:scripts", "git show HEAD:scripts")})
+        self.only("D014", texts={".github/workflows/test.yml": test_yml.replace(
+            "--root . --baseline-ref origin/main\n          fi", "--root . --baseline-ref origin/main || true\n          fi")})
+        self.only("D014", texts={".github/workflows/test.yml": test_yml.replace(
+            '"FullyQualifiedName~VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle"\n',
+            '"FullyQualifiedName~VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle" || true\n')})
+        publish = (ROOT / ".github/workflows/publish-nuget.yml").read_text(encoding="utf-8")
+        self.only("D014", texts={".github/workflows/publish-nuget.yml": publish.replace(
+            "      - name: Run project tests\n", "      - name: Run project tests\n        if: false\n", 1)})
         gate = "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DifferentialGate.cs"
         self.only("D014", texts={gate: (ROOT / gate).read_text(encoding="utf-8").replace("DeterminismRecord.WriteCells(results);", "")})
 
@@ -163,6 +172,8 @@ class NegativeRegistrationControls(unittest.TestCase):
         self.assertIn("D016", codes(baseline=(bigger, CASES, HASHES)))
         more = mutate(lambda c: c["groups"]["verification"]["tests"][0].update(multiplicity=9), CASES)
         self.assertIn("D016", codes(baseline=(PROTOCOL, more, HASHES)))
+        renamed = mutate(lambda c: c["cells"]["ids"][0].update(formId="replacement:scalar-type:i8"), CASES)
+        self.assertIn("D016", codes(baseline=(PROTOCOL, renamed, HASHES)))
         no_cells = mutate(lambda p: p["profiles"][1].update(oracle=False))
         self.assertIn("D016", codes(protocol=no_cells, baseline=(PROTOCOL, CASES, HASHES)))
 
@@ -242,6 +253,12 @@ class DecisionControls(unittest.TestCase):
         r["profiles"][0]["tests"][ORACLE] = "Failed"
         self.assertEqual("NON-DETERMINISTIC", self.decide(records)["verdict"])
         records = passing_records(self.protocol)
+        r = find(records, "linux-x64")
+        r["status"] = prof(r, "verification-full")["status"] = "invalid"
+        prof(r, "verification-full").update(exitCode=1, invocation="1|Completed")
+        prof(r, "verification-full")["tests"][ORACLE] = "Failed"
+        self.assertEqual("NON-DETERMINISTIC", self.decide(records)["verdict"])
+        records = passing_records(self.protocol)
         find(records, "linux-x64")["status"] = "invalid"
         result = self.decide(records)
         self.assertEqual(("INCOMPLETE", False), (result["verdict"], result["complete"]))
@@ -274,6 +291,10 @@ class DecisionControls(unittest.TestCase):
             self.assertEqual("INVALID", self.decide(records)["verdict"])
         records = passing_records(self.protocol) + passing_records(self.protocol, "E2")
         self.assertEqual("INVALID", self.decide(records, {"E1": RUN, "E2": RUN})["verdict"])
+        records = passing_records(self.protocol)
+        for r in records:
+            r["mode"] = "not-a-registered-mode"
+        self.assertEqual("INVALID", dp.decide(ROOT, records, {"E1": RUN}, COMMIT, "not-a-registered-mode", self.protocol, CASES)["verdict"])
 
 
 class ValueControls(unittest.TestCase):

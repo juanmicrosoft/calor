@@ -43,7 +43,25 @@ CALL_SITES = {"tests/Calor.Verification.Tests/VerifierRuntimeDifferential/Differ
 CELL_FIELDS = {"id": str, "formId": str, "category": str, "position": str, "nestingDepth": int, "polarity": str, "solverStatus": str,
                "runtimeVerdict": str, "guardForced": bool, "elidedWhenEnabled": bool, "solverHandled": bool, "mismatch": bool,
                "detail": (str, type(None))}
-TRUSTED_STEP = 'python3 "$RUNNER_TEMP/determinism_protocol_main.py" validate --root . --baseline-ref origin/main'
+TRUSTED_STEP = """          # #1421 D016: main's validator (not this tree's) judges this tree against main's packet.
+          if git cat-file -e origin/main:scripts/determinism_protocol.py 2>/dev/null; then
+            git show origin/main:scripts/determinism_protocol.py > "$RUNNER_TEMP/determinism_protocol_main.py"
+            python3 "$RUNNER_TEMP/determinism_protocol_main.py" validate --root . --baseline-ref origin/main
+          fi
+          python3 scripts/determinism_protocol.py validate --root . --baseline-ref origin/main
+"""
+TRUSTED_STEP_NAME = "- name: Check test manifest, skips, and assertion quality"
+MODES = {"execution", "control"}
+
+
+def job_blocks(workflow: str) -> list[str]:
+    return re.split(r"\n(?=  [A-Za-z0-9_-]+:\n)", workflow)
+
+
+def masked(block: str) -> bool:
+    """A gate block that cannot fail: skipped, allowed to fail, or with a swallowed exit status."""
+    return bool(re.search(r"continue-on-error|if: *(\$\{\{ *)?false|\n    if:", block)) or any(
+        re.search(r"\|\| *(true|exit 0|:)\b", line) and "trap " not in line for line in block.splitlines())
 ATTEMPT_STATUSES = ["completed", "timeout", "crash", "infrastructure-failure", "environment-violation", "invalid"]
 VALUE_STATUSES = {"completed", "timeout", "crash"}
 CASE_CLASSES = ["AGREE-PASS", "AGREE-FAIL", "DISAGREE", "INCOMPLETE"]
@@ -321,8 +339,13 @@ def validate(root: Path, protocol=None, cases=None, contract=None, texts=None, b
                                                                    for y in (test_yml, publish)):
         add("D014", "a registered gate site no longer runs the registered oracle command or project")
     step = test_yml.split("- name: Run verifier-runtime differential gate", 1)[-1].split("- name:", 1)[0]
-    if "if:" in step or "continue-on-error" in step or TRUSTED_STEP not in test_yml:
-        add("D014", "the oracle step is conditional or masked, or the trusted baseline validation step is gone")
+    trusted = test_yml.split(TRUSTED_STEP_NAME, 1)[-1].split("- name:", 1)[0]
+    if "if:" in step or "continue-on-error" in step or "||" in step or TRUSTED_STEP not in trusted \
+            or "if:" in trusted or "continue-on-error" in trusted:
+        add("D014", "the oracle step or the trusted baseline validation step is missing, altered, conditional, or masked")
+    gate_jobs = [b for y in (test_yml, publish) for b in job_blocks(y) if any(f"project: {p['project']}" in b for p in profiles.values())]
+    if len(gate_jobs) < 2 or any(masked(b) for b in gate_jobs) or masked(step):
+        add("D014", "a registered gate job is skipped, allowed to fail, or swallows an exit status")
     if any(any((root / p["project"]).parent.glob(g)) for p in profiles.values() for g in ("xunit.runner.json", "*.runsettings")):
         add("D014", "a registered project gained a runner configuration file")
     if any(site not in text(rel) for rel, sites in CALL_SITES.items() for site in sites):
@@ -342,9 +365,12 @@ def validate(root: Path, protocol=None, cases=None, contract=None, texts=None, b
             if not new or vkey(version) <= vkey(old_p["protocolVersion"]) or log[:len(old_p["amendments"]["amendmentLog"])] != old_p["amendments"]["amendmentLog"]:
                 add("D016", "the packet changed without a new protocol version and amendment entry (earlier entries are immutable)")
         old_m, new_m = contribution_matrix(old_p, old_c), contribution_matrix(protocol, cases)
+        new_cells, new_arts = cases.get("cells", {}).get("ids", []), cases.get("artifacts", [])
         old_rows = {r["id"]: r for r in old_p["determinismRows"]}
         weaker = [name for name, bad in (
             ("cases or contributions removed", any(new_m.get(k, 0) < n for k, n in old_m.items())),
+            ("a registered cell or artifact was repurposed", new_cells[:len(old_c["cells"]["ids"])] != old_c["cells"]["ids"]
+             or any(a not in new_arts for a in old_c["artifacts"])),
             ("determinism row mapping narrowed", any(not (set(r["cases"]) <= set(rows.get(i, {}).get("cases", []))
                                                          and set(r["environments"]) <= set(rows.get(i, {}).get("environments", [])))
                                                      for i, r in old_rows.items())),
@@ -457,8 +483,8 @@ def _record_problem(r, protocol, cases, mode, envs, shape, expected_commit, run_
             return f"profile {p['id']} reported unregistered {res['unregistered'][:3]}"
         fills = any(part in FILL_VALUES for val in res["tests"].values() for part in val.split(","))
         timed = str(res["invocation"]).startswith("timeout|")
-        if res["status"] not in ATTEMPT_STATUSES or timed != (res["status"] == "timeout") \
-                or (not timed and not str(res["invocation"]).startswith(f"{res['exitCode']}|")) \
+        if res["status"] not in VALUE_STATUSES | {"invalid"} or (not timed and not str(res["invocation"]).startswith(f"{res['exitCode']}|")) \
+                or (res["status"] in VALUE_STATUSES and timed != (res["status"] == "timeout")) \
                 or (res["status"] == "completed" and fills) or (res["status"] == "crash" and not fills):
             return f"profile {p['id']} status, exit code, invocation, and values are inconsistent"
     statuses = [x["status"] for x in r["profiles"]]
@@ -480,8 +506,8 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
     expected_artifacts = {a["name"]: sha256_file(root / a["committedPath"]) if "committedPath" in a else sha256_bytes(a["expected"].encode())
                           for a in cases["artifacts"]}
     invalid, seen = [], {}
-    if not re.match(r"^[0-9a-f]{40}$", expected_commit or "") or (mode == "execution" and len(run_ids) != 1):
-        invalid.append("the expected commit is not a full SHA, or more than one execution was pooled")
+    if not re.match(r"^[0-9a-f]{40}$", expected_commit or "") or mode not in MODES or (mode == "execution" and len(run_ids) != 1):
+        invalid.append("unknown mode, an expected commit that is not a full SHA, or more than one execution pooled")
     for r in records:
         key = tuple(r.get(k) for k in ("executionId", "environment", "job", "attempt"))
         problem = "duplicated" if key in seen else _record_problem(r, protocol, cases, mode, envs, shape, expected_commit, run_ids, hashes)
@@ -502,7 +528,7 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
                     status_counts[r["status"] if r else "missing"] += 1
                     results = {x["profile"]: x for x in (r["profiles"] if r and r["status"] not in ("environment-violation", "infrastructure-failure") else [])}
                     for p in (p for p in profiles if mode == "control" or p["id"] in env["profiles"]):
-                        res = results.get(p["id"]) if results.get(p["id"], {}).get("status") in VALUE_STATUSES else None
+                        res = results.get(p["id"]) if results.get(p["id"], {}).get("status") in VALUE_STATUSES | {"invalid"} else None
                         names = list(res["tests"]) if p["select"] == "observed" and res else []
                         for k in profile_keys(p, cases) + [f"test:control:{n}" for n in names]:
                             expected[k] = expected.get(k, 0) + (0 if k.startswith("test:control:") else 1)
@@ -511,7 +537,7 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
                                 source = {"invocation": {rest: res["invocation"]}, "test": res["tests"], "cell": res["cells"],
                                           "artifact": res["artifacts"]}[kind]
                                 values.setdefault(k, []).append((env_id, source[rest.split(":", 1)[1] if kind == "test" else rest]))
-                                establishing[k] = establishing.get(k, 0) + (r["status"] != "invalid")
+                                establishing[k] = establishing.get(k, 0) + (r["status"] != "invalid" and res["status"] != "invalid")
     if mode == "control":  # an observed control name is expected from every attempt
         per = len(envs) * jobs * attempts * len(run_ids)
         expected.update({k: per for k in values if k.startswith("test:control:")})
@@ -576,7 +602,8 @@ def main(argv=None) -> int:
     d.add_argument("--records", action="append", required=True)
     d.add_argument("--execution-id", required=True)
     d.add_argument("--run-id", required=True)
-    for name in ("--commit", "--mode", "--out"):
+    d.add_argument("--mode", required=True, choices=sorted(MODES))
+    for name in ("--commit", "--out"):
         d.add_argument(name, required=True)
     args = parser.parse_args(argv)
     if args.command == "validate":
