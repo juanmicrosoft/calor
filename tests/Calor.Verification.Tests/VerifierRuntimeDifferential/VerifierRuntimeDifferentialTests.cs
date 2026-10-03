@@ -24,6 +24,10 @@ public sealed class VerifierRuntimeDifferentialTests
 
         var repositoryRoot = FindRepositoryRoot();
         var report = DifferentialGate.Run(repositoryRoot);
+        // #1421: opt-in determinism record (no-op unless CALOR_DETERMINISM_RECORD_DIR is set),
+        // written before any assertion so a failing attempt still records what it generated.
+        DeterminismRecord.WriteGenerated("verifier-runtime-differential.json", Encoding.UTF8.GetBytes(ReportWriter.ToJson(report)));
+        DeterminismRecord.WriteGenerated("verifier-runtime-differential.md", Encoding.UTF8.GetBytes(ReportWriter.ToMarkdown(report)));
 
         Assert.True(report.Passed, ReportWriter.ToJson(report));
         Assert.Equal(65, report.Coverage.FormsWhitelisted);
@@ -88,6 +92,38 @@ public sealed class VerifierRuntimeDifferentialTests
             Assert.True(
                 committedBytes.AsSpan().SequenceEqual(generatedBytes),
                 $"Committed report is stale: {path}. Set {UpdateReportsVariable}=1 and rerun this test.");
+        }
+    }
+
+    [Fact]
+    public void DeterminismRecordWritesCompactCellsAndExactGeneratedBytes()
+    {
+        // #1421: the protocol compares these files byte for byte, so the writer must not add a
+        // platform newline, a BOM, or any normalization, and must write nothing when unset.
+        var directory = Path.Combine(Path.GetTempPath(), "calor-1421-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var cell = new CaseResult("case-000001", "scalar-type:i8", "scalar-type", "precondition", 1,
+                "provable", "proven", "completed", true, false, true, false, null);
+            DeterminismRecord.WriteCells([cell], null);
+            DeterminismRecord.WriteGenerated("x.md", [0x61], "");
+            Assert.False(Directory.Exists(directory));
+
+            DeterminismRecord.WriteCells([cell], directory);
+            DeterminismRecord.WriteGenerated("x.md", [0x61, 0x0D, 0x0A], directory);
+            var cells = File.ReadAllBytes(Path.Combine(directory, "cells.json"));
+            Assert.Equal(
+                "[{\"id\":\"case-000001\",\"formId\":\"scalar-type:i8\",\"category\":\"scalar-type\",\"position\":\"precondition\"," +
+                "\"nestingDepth\":1,\"polarity\":\"provable\",\"solverStatus\":\"proven\",\"runtimeVerdict\":\"completed\"," +
+                "\"guardForced\":true,\"elidedWhenEnabled\":false,\"solverHandled\":true,\"mismatch\":false,\"detail\":null}]",
+                Encoding.UTF8.GetString(cells));
+            Assert.DoesNotContain((byte)'\n', cells);
+            Assert.Equal(new byte[] { 0x61, 0x0D, 0x0A }, File.ReadAllBytes(Path.Combine(directory, "generated", "x.md")));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
         }
     }
 

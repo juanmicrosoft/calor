@@ -55,6 +55,10 @@ public class ContractTranslatorSemanticsVersionGuardTests
     {
         var actualHash = ComputeFixtureHash();
         var actualVersion = ContractTranslator.SemanticsVersion;
+        // #1421: opt-in determinism record (no-op unless CALOR_DETERMINISM_RECORD_DIR is set), so a
+        // platform difference in translator output is compared as bytes, not only as Failed.
+        VerifierRuntimeDifferential.DeterminismRecord.WriteGenerated(
+            "translator-fixture", Encoding.UTF8.GetBytes($"{actualHash}|{actualVersion}"));
 
         // The version constant and the translator output must move together.
         // We assert both in one shot so the failure message is unambiguous.
