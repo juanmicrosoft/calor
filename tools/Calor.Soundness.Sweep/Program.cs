@@ -259,7 +259,7 @@ internal static partial class Program
         var (_, templates, cases, rows) = Load(Path.GetFullPath(opts["repo"]));
         var (caseById, ledger, scratch) = (ById(cases), new Ledger(Path.Combine(outRoot, "ledger.jsonl")), Scratch("cross"));
         var hosts = Pair.ToDictionary(id => id, id => new BaselineHost(id, opts[id.ToLowerInvariant()]));
-        if (hosts.Values.Any(h => Pins(h, "")["calorDllSha256"]!.ToJsonString() != JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, h.Id, "pins.json")))!["calorDllSha256"]!.ToJsonString())) return Fail("INVALID: binary differs from pins", 4);
+        if (hosts.Values.Any(h => Pins(h, "") is var now && JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, h.Id, "pins.json"))) is var then && new[] { "calorDllSha256", "calorRuntimeDllSha256", "microsoftZ3DllSha256", "dotnetVersion", "os" }.Any(k => now[k]?.ToJsonString() != then![k]?.ToJsonString()))) return Fail("INVALID: binary or SDK differs from pins", 4);
         string[] priority = ["false-unconditional-proof", "stale-cache-proof", "required-demotion-absent", "spurious-refutation"];
         var work = Pair.SelectMany(source => JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, source, "findings-index.json")))!.AsArray()
             .GroupBy(f => S(f!["caseId"])).Select(g => (Rank: g.Min(f => Array.IndexOf(priority, S(f!["class"])) is var i and >= 0 ? i : priority.Length), Target: source == "B1" ? "N1" : "B1", CaseId: g.Key)));

@@ -95,8 +95,8 @@ internal static class Report
     private static JsonObject Finding(string id, string b, string other, string cls, JsonObject r, JsonNode pins, JsonNode registration, string outRoot, JsonObject? otherResult, string rowId, SweepCaseGenerator.Case c)
     {
         var (reproSource, reproOutput) = Reproduction(c.OracleSource);
-        var attempt = JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, b, S((r["attempts"]!.AsArray().LastOrDefault(a => a!["class"]?.GetValue<string>() == cls) ?? r["attempts"]!.AsArray()[^1])!["path"]))))!;
-        var (claim, o1, guards) = (attempt["claim"], attempt["o1"], attempt["guards"]);
+        var attempt = JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, b, S((r["attempts"]!.AsArray().LastOrDefault(a => a!["class"]?.GetValue<string>() == cls) ?? r["attempts"]!.AsArray()[^1])!["path"]))))! is var raw && raw["lateObservation"] is JsonObject late ? late : raw;
+        var (claim, o1, guards) = (cls == "false-unconditional-proof" && attempt["claim"]?["token"]?.GetValue<string>() is not ("Proven" or "Discharged") ? attempt["forcedClaim"] : attempt["claim"], attempt["o1"], attempt["guards"]);
         // The in-run pin did not capture the native image; the post-run native-check (same process layout) records what each baseline maps.
         var nativePath = Path.Combine(outRoot, "native-z3-check.json");
         var native = (File.Exists(nativePath) ? JsonNode.Parse(File.ReadAllText(nativePath)) : null)?[b]?["processLoadedZ3"]?.AsArray().FirstOrDefault(x => S(x!["path"]).StartsWith(S(pins["binaryDirectory"]), StringComparison.Ordinal));
