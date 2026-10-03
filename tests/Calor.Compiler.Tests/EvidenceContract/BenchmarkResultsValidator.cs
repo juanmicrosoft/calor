@@ -21,9 +21,13 @@ internal static partial class EvidenceContractValidator
     public static readonly IReadOnlyList<string> ResultsJsonFiles =
         ["oracle-run-1.json", "oracle-run-2.json", "metrics-run-1.json", "metrics-run-2.json", "pair-manifest.json", "results.json"];
 
-    /// <summary><paramref name="results"/> maps every file in the results directory to its text.</summary>
+    /// <summary>
+    /// <paramref name="results"/> maps every file in the results directory to its text;
+    /// <paramref name="recompute"/> re-runs the pinned metric calculator on a registered pair's committed files.
+    /// </summary>
     public static IReadOnlyList<ContractViolation> ValidateBenchmarkResults(
-        JsonNode contract, IReadOnlyDictionary<string, string> registrationPacket, IReadOnlyDictionary<string, string> results)
+        JsonNode contract, IReadOnlyDictionary<string, string> registrationPacket, IReadOnlyDictionary<string, string> results,
+        Func<JsonNode, (string Metric, double CalorSize, double CSharpSize, double R)> recompute)
     {
         var v = new List<ContractViolation>();
         if (ResultsJsonFiles.Append("sha256.json").FirstOrDefault(f => !results.ContainsKey(f)) is { } missing)
@@ -74,6 +78,23 @@ internal static partial class EvidenceContractValidator
             if (run1[field]?.ToJsonString() != run2[field]?.ToJsonString())
                 v.Add(new("R003", "oracle-run-1.json", $"the two oracle runs differ in {field}"));
         }
+        var oracle = registration["oracle"];
+        if (Str(run2["oracleId"]) != Str(oracle?["id"]) || Str(run2["oracleVersion"]) != Str(oracle?["version"])
+            || Str(run2["inputGeneratorVersion"]) != Str(oracle?["inputs"]?["generator"]))
+            v.Add(new("R003", "oracle-identity", "the oracle runs do not name the registered oracle and input generator"));
+        // Re-derive the reconciliation from both raw verdict arrays: unchanged verdicts carry over, changed ones are UNCLASSIFIED.
+        var raw1 = Array(run1["runResults"]).OfType<JsonNode>().ToDictionary(r => Str(r["PairId"]) ?? "", r => r.ToJsonString(), StringComparer.Ordinal);
+        var raw2 = Array(run2["runResults"]).OfType<JsonNode>().ToList();
+        var reconciled = Array(run2["results"]).OfType<JsonNode>().ToList();
+        if (!raw1.Keys.Order(StringComparer.Ordinal).SequenceEqual(raw2.Select(r => Str(r["PairId"]) ?? "").Order(StringComparer.Ordinal))
+            || !raw2.Select(r => Str(r["PairId"])).SequenceEqual(reconciled.Select(r => Str(r["PairId"]))))
+            v.Add(new("R003", "reconciliation", "the two runs and the reconciled result do not cover the same pairs"));
+        foreach (var (raw, result) in raw2.Zip(reconciled))
+        {
+            var changed = !raw1.TryGetValue(Str(raw["PairId"]) ?? "", out var before) || before != raw.ToJsonString();
+            if (changed ? Str(result["Reason"]) != "NONDETERMINISTIC_ACROSS_RUNS" || Str(result["Disposition"]) != "UNCLASSIFIED" : result.ToJsonString() != raw.ToJsonString())
+                v.Add(new("R003", "reconciliation", $"{Str(raw["PairId"])}: the reconciled verdict does not follow from the two raw runs"));
+        }
         if (Str(manifest["oracleResultSha256"]) != RawSha256(results["oracle-run-2.json"]) || Str(manifest["firstOracleResultSha256"]) != RawSha256(results["oracle-run-1.json"]))
             v.Add(new("R003", "pair-manifest", "the manifest does not name the committed oracle runs"));
         var verdicts = Array(run2["results"]).OfType<JsonNode>().ToDictionary(r => Str(r["PairId"]) ?? "", StringComparer.Ordinal);
@@ -89,7 +110,7 @@ internal static partial class EvidenceContractValidator
                 v.Add(new("R003", id, "only pre-registered exclusions may be EXCLUDED-PRE-REGISTERED"));
         }
         if (Str(verdicts.GetValueOrDefault("DomainProblems/CsvParser")?["Disposition"]) != "NOT-EQUIVALENT")
-            v.Add(new("R003", "DomainProblems/CsvParser", "the known witness is not NOT-EQUIVALENT; the oracle result is invalid"));
+            v.Add(new("R003", "known-witness", "DomainProblems/CsvParser is not NOT-EQUIVALENT; the oracle result is invalid"));
 
         // R004 and the shared E008-E010 pair rules: only EQUIVALENT manifest.benchmarks pairs are included.
         foreach (var row in rows)
@@ -127,10 +148,30 @@ internal static partial class EvidenceContractValidator
         var metricRuns = new[] { Load("metrics-run-1.json"), Load("metrics-run-2.json") };
         if (metricRuns[0]["pairs"]?.ToJsonString() != metricRuns[1]["pairs"]?.ToJsonString())
             v.Add(new("R005", "metrics", "the two metric runs are not bit-identical; no result may be produced"));
+        foreach (var run in metricRuns)
+        {
+            if (Str(run["generatorVersion"]) != Str(registration["comparability"]?["generatorVersion"])
+                || Str(run["metricImplementationVersion"]) != Str(registration["comparability"]?["metricImplementationVersion"])
+                || Str(run["oracleResultSha256"]) != RawSha256(results["oracle-run-2.json"]))
+                v.Add(new("R005", "metric-provenance", "a metric run does not name the registered generator, metric implementation, and committed oracle result"));
+        }
         var values = Array(metricRuns[0]["pairs"]).OfType<JsonNode>().ToList();
         var includedIds = rows.Where(r => Bool(r["included"]) == true).Select(r => Str(r["pairId"])).Order(StringComparer.Ordinal).ToList();
         if (!values.Select(x => Str(x["pairId"])).SequenceEqual(includedIds))
-            v.Add(new("R005", "metrics", "the metric runs do not cover exactly the included (EQUIVALENT) pairs"));
+            v.Add(new("R005", "included-set", "the metric runs do not cover exactly the included (EQUIVALENT) pairs"));
+        // Every per-pair value is the pinned calculator's output on the registered files, in the registered category.
+        var registeredById = registered.ToDictionary(p => Str(p["pairId"]) ?? "", StringComparer.Ordinal);
+        foreach (var value in values)
+        {
+            var id = Str(value["pairId"]) ?? "";
+            if (!registeredById.TryGetValue(id, out var pair))
+                continue;
+            var category = (Str(pair["taskStatement"]) ?? "").Split('\n').FirstOrDefault(l => l.StartsWith("category: ", StringComparison.Ordinal))?["category: ".Length..];
+            var (name, calorSize, csharpSize, r) = recompute(pair);
+            if (Str(value["category"]) != category || Str(value["metric"]) != name || Str(value["r"]) != F(r) || Str(value["calorSize"]) != F(calorSize)
+                || Str(value["csharpSize"]) != F(csharpSize) || Str(value["rBits"]) != BitConverter.DoubleToInt64Bits(r).ToString("x16", CultureInfo.InvariantCulture))
+                v.Add(new("R005", "metric-values", $"{id}: the committed value is not the pinned calculator's output on the registered files"));
+        }
         if (summary["byDisposition"]?.ToJsonString() != Tally(rows.Select(r => Str(r["disposition"]) ?? "")).ToJsonString()
             || Int(summary["denominator"]) != registered.Count)
             v.Add(new("R005", "results.json", "disposition counts do not match the manifest"));
@@ -152,7 +193,6 @@ internal static partial class EvidenceContractValidator
     {
         var r = group.OrderBy(x => Str(x["pairId"]), StringComparer.Ordinal).Select(x => double.Parse(Str(x["r"])!, CultureInfo.InvariantCulture)).ToList();
         static double Gm(IEnumerable<double> xs) { var (s, n) = (0.0, 0); foreach (var x in xs) (s, n) = (s + Math.Log(x), n + 1); return Math.Exp(s / n); }
-        static string F(double d) => d.ToString("R", CultureInfo.InvariantCulture);
         JsonArray? interval = null;
         if (r.Count >= 2)
         {
@@ -182,6 +222,8 @@ internal static partial class EvidenceContractValidator
             counts[g.Key] = g.Count();
         return counts;
     }
+
+    private static string F(double d) => d.ToString("R", CultureInfo.InvariantCulture);
 
     private static string RawSha256(string text) => Convert.ToHexStringLower(SHA256.HashData(new UTF8Encoding(false).GetBytes(text)));
 }

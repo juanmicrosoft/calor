@@ -117,7 +117,11 @@ public static class PairResultsCommand
             return "the reconciled oracle result is invalid: " + oracleResult["problems"]?.ToJsonString();
         if (metricPaths.Length != 2)
             return "exactly two metric runs are registered";
-        var runs = metricPaths.Select(p => JsonNode.Parse(File.ReadAllText(p))!["pairs"]!.AsArray()).ToList();
+        var oracleSha = Sha256Hex(File.ReadAllBytes(oraclePath));
+        var metricRuns = metricPaths.Select(p => JsonNode.Parse(File.ReadAllText(p))!).ToList();
+        if (metricRuns.Any(m => Str(m, "oracleResultSha256") != oracleSha || Str(m, "generatorVersion") != GeneratorVersion))
+            return "a metric run was not produced by this generator from this oracle result";
+        var runs = metricRuns.Select(m => m["pairs"]!.AsArray()).ToList();
         if (runs[0].ToJsonString() != runs[1].ToJsonString())
             return "the two metric runs are not bit-identical; no result is produced";
 
@@ -131,7 +135,6 @@ public static class PairResultsCommand
         if (!values.Select(v => Str(v, "pairId")).SequenceEqual(included.Order(StringComparer.Ordinal)))
             return "the metric runs do not cover exactly the included pairs";
 
-        var oracleSha = Sha256Hex(File.ReadAllBytes(oraclePath));
         var manifestPairs = new JsonArray();
         foreach (var pair in registered.OfType<JsonNode>())
         {
