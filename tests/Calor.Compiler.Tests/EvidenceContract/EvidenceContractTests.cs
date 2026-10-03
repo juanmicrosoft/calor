@@ -960,7 +960,7 @@ public class EvidenceContractTests
     {
         // The whole write-back packet: contract and inventory move to 1.0.1 together.
         var contract = FrozenContract();
-        var inventory = Inventory();
+        var inventory = ProposedInventory();
         inventory["contractVersion"] = "1.0.1";
         var violations = EvidenceContractValidator.ValidateContract(contract)
             .Concat(EvidenceContractValidator.ValidateInventory(contract, inventory)).ToList();
@@ -982,6 +982,10 @@ public class EvidenceContractTests
         var violations = EvidenceContractValidator.ValidateContract(contract)
             .Concat(EvidenceContractValidator.ValidateInventory(contract, ProposedInventory())).ToList();
         Assert.True(violations.Count == 0, Describe(violations));
+        // The proposed fixture carries nothing a later amendment added.
+        var text = contract.ToJsonString();
+        foreach (var added in new[] { "1.1.0", "taskStatementRule", "determinismRows", "platformDeterminism", "evidenceDataRule" })
+            Assert.DoesNotContain(added, text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1033,6 +1037,106 @@ public class EvidenceContractTests
         var contract = Contract();
         contract["status"] = "ACCEPTED-ISH";
         AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C012");
+    }
+
+    // ------------------------------------------------------------------
+    // Amendment 1.1.0: per-PR ceiling exception (C011)
+    // ------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("other-value")]
+    [InlineData("other-pr")]
+    [InlineData("other-ceiling")]
+    [InlineData("unlogged-amendment")]
+    [InlineData("no-justification")]
+    [InlineData("added-exception")]
+    public void CeilingExceptionOtherThanTheRegisteredOneFails(string mutation)
+    {
+        // Decision 6 raises one ceiling for one PR to one value; nothing else passes without a new
+        // amendment and a validator change.
+        var contract = Contract();
+        var exceptions = contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray();
+        var exception = exceptions.First(e => e!["pr"]!.GetValue<int>() == 1473)!;
+        switch (mutation)
+        {
+            case "other-value": exception["value"] = 2000.0; break;
+            case "other-pr": exception["pr"] = 1474; break;
+            case "other-ceiling": exception["ceiling"] = "s2-repair-size"; break;
+            case "unlogged-amendment": exception["amendment"] = "1.0.9"; break;
+            case "no-justification": exception["justification"] = " "; break;
+            case "added-exception":
+                var added = exception.DeepClone();
+                added["pr"] = 9004;
+                exceptions.Add(added);
+                break;
+        }
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C011");
+    }
+
+    // ------------------------------------------------------------------
+    // Amendment 1.1.0: pending inventory updates (I013)
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void PendingUpdateChangesNoArtifact()
+    {
+        // A pending update is recorded, not applied: the artifacts the validator reads are the ones
+        // committed, and evidence rows are judged against them. The fixture would reclassify a stale
+        // artifact and resolve its defect; neither may take effect.
+        var inventory = Inventory();
+        var update = PendingUpdate();
+        update["artifact"] = "benchmark-provenance";
+        update["classificationAfter"] = "authoritative";
+        update["changes"] = new JsonObject { ["reason"] = "fixture: repaired" };
+        update["defectResolutions"]![0]!["defect"] = Artifact(inventory, "benchmark-provenance")["openDefects"]![0]!.DeepClone();
+        inventory["pendingUpdates"] = new JsonArray(update);
+        var before = Artifact(Inventory(), "benchmark-provenance").ToJsonString();
+
+        var violations = EvidenceContractValidator.ValidateInventory(Contract(), inventory);
+        Assert.True(violations.Count == 0, Describe(violations));
+        Assert.Equal(before, Artifact(inventory, "benchmark-provenance").ToJsonString());
+
+        var row = Row();
+        row["artifact"] = "benchmark-provenance";
+        row["openDefectsResolvedBy"] = new JsonArray(9003);
+        var rows = EvidenceContractValidator.ValidateEvidenceRows(
+            Contract(), inventory, new JsonArray(row), Candidate, SemanticsVersion);
+        AssertViolation(rows, "E005"); // still stale: the pending classification is not read
+    }
+
+    [Theory]
+    [InlineData("unknown-artifact")]
+    [InlineData("no-pr")]
+    [InlineData("unknown-amendment")]
+    [InlineData("applied-status")]
+    [InlineData("unknown-classification")]
+    [InlineData("no-changes")]
+    [InlineData("paraphrased-defect")]
+    [InlineData("resolution-without-pr")]
+    [InlineData("duplicate-id")]
+    [InlineData("resolutions-not-array")]
+    [InlineData("updates-not-array")]
+    public void MalformedPendingUpdateFails(string mutation)
+    {
+        var update = PendingUpdate();
+        var inventory = Inventory();
+        var updates = new JsonArray(update);
+        inventory["pendingUpdates"] = updates;
+        switch (mutation)
+        {
+            case "unknown-artifact": update["artifact"] = "ledger-index"; break;
+            case "no-pr": update.Remove("repairingPr"); break;
+            case "unknown-amendment": update["recordedInAmendment"] = "1.0.9"; break;
+            case "applied-status": update["status"] = "applied"; break;
+            case "unknown-classification": update["classificationAfter"] = "repaired"; break;
+            case "no-changes": update.Remove("changes"); break;
+            case "paraphrased-defect": update["defectResolutions"]![0]!["defect"] = "HEAD reachability."; break;
+            case "resolution-without-pr": update["defectResolutions"]![0]!.AsObject().Remove("resolvedByPr"); break;
+            case "duplicate-id": updates.Add(PendingUpdate()); break;
+            case "resolutions-not-array": update["defectResolutions"] = "resolved by #9003"; break;
+            case "updates-not-array": inventory["pendingUpdates"] = new JsonObject { ["fixture"] = "x" }; break;
+        }
+        AssertViolation(EvidenceContractValidator.ValidateInventory(Contract(), inventory), "I013");
     }
 
     // ------------------------------------------------------------------
@@ -1089,15 +1193,22 @@ public class EvidenceContractTests
         ["included"] = included,
     };
 
+    /// <summary>A well-formed amendment one MINOR version above the committed contract.</summary>
     private static JsonObject Amendment() => new()
     {
-        ["version"] = "1.1.0",
+        ["version"] = NextMinorVersion(),
         ["timestampUtc"] = "2026-10-20T00:00:00Z",
         ["reviewedInPr"] = 9999,
         ["afterDecisionBearingInspection"] = false,
         ["justification"] = "Control fixture for the amendment rule.",
         ["removedRows"] = new JsonArray(),
     };
+
+    private static string NextMinorVersion()
+    {
+        var parts = Contract()["contractVersion"]!.GetValue<string>().Split('.').Select(int.Parse).ToArray();
+        return $"{parts[0]}.{parts[1] + 1}.0";
+    }
 
     private static JsonNode AmendedContract(JsonObject amendment, JsonNode? baseContract = null)
     {
@@ -1110,16 +1221,24 @@ public class EvidenceContractTests
     /// <summary>
     /// The committed contract in the PROPOSED lifecycle state, whatever state is committed. After the
     /// acceptance write-back merges, this undoes it in memory so the proposed-state controls keep
-    /// testing the proposed state instead of silently changing meaning.
+    /// testing the proposed state instead of silently changing meaning. The proposed state precedes
+    /// every amendment, so the log is emptied (later amendments, such as 1.1.0, follow the freeze).
     /// </summary>
     private static JsonNode ProposedContract()
     {
         var contract = Contract();
+        // Sentences that amendment 1.1.0 appended to frozen text are marked "(amendment 1.1.0)" or
+        // "amendment 1.1.0)"; strip them so the fixture is the original text, not a hybrid.
+        RevertAmendedSentences(contract, "amendment 1.1.0");
         contract.AsObject().Remove("acceptance");
-        var log = contract["amendmentLog"]!.AsArray();
-        foreach (var entry in log.Where(e => e!["justification"]?.GetValue<string>() == "acceptance write-back").ToList())
-            log.Remove(entry);
-        contract["contractVersion"] = log.Count == 0 ? "1.0.0" : log[^1]!["version"]!.GetValue<string>();
+        contract["amendmentLog"]!.AsArray().Clear();
+        contract["contractVersion"] = "1.0.0";
+        // Rules added by amendments do not exist in the proposed state.
+        contract["benchmarkEquivalence"]!.AsObject().Remove("taskStatementRule");
+        contract["authorityCapacity"]!["capacity"]!.AsObject().Remove("exceptions");
+        contract["authorityCapacity"]!["capacity"]!.AsObject().Remove("evidenceDataRule");
+        contract["rules"]!.AsObject().Remove("platformDeterminism");
+        contract.AsObject().Remove("determinismRows");
         contract["status"] = "PROPOSED";
         contract["gateStatus"] = "NOT-MET";
         contract["authorityCapacity"]!["capacity"]!["status"] = "PROPOSED";
@@ -1128,10 +1247,38 @@ public class EvidenceContractTests
         return contract;
     }
 
+    private static void RevertAmendedSentences(JsonNode node, string marker)
+    {
+        switch (node)
+        {
+            case JsonObject obj:
+                foreach (var key in obj.Select(p => p.Key).ToList())
+                {
+                    if (obj[key] is JsonValue value && value.TryGetValue<string>(out var text) && text.Contains(marker, StringComparison.Ordinal))
+                        obj[key] = string.Join(" ", System.Text.RegularExpressions.Regex.Split(text, @"(?<=\.)\s+")
+                            .Where(sentence => !sentence.Contains(marker, StringComparison.Ordinal)));
+                    else if (obj[key] is { } child)
+                        RevertAmendedSentences(child, marker);
+                }
+                break;
+            case JsonArray array:
+                for (var i = 0; i < array.Count; i++)
+                {
+                    if (array[i] is JsonValue value && value.TryGetValue<string>(out var text) && text.Contains(marker, StringComparison.Ordinal))
+                        array[i] = string.Join(" ", System.Text.RegularExpressions.Regex.Split(text, @"(?<=\.)\s+")
+                            .Where(sentence => !sentence.Contains(marker, StringComparison.Ordinal)));
+                    else if (array[i] is { } child)
+                        RevertAmendedSentences(child, marker);
+                }
+                break;
+        }
+    }
+
     /// <summary>The inventory matching <see cref="ProposedContract"/>.</summary>
     private static JsonNode ProposedInventory()
     {
         var inventory = Inventory();
+        inventory.AsObject().Remove("pendingUpdates"); // recorded by amendments after the freeze
         inventory["contractVersion"] = ProposedContract()["contractVersion"]!.DeepClone();
         return inventory;
     }
@@ -1156,6 +1303,24 @@ public class EvidenceContractTests
         };
         return contract;
     }
+
+    /// <summary>A well-formed pending inventory update, independent of what is committed.</summary>
+    private static JsonObject PendingUpdate() => new()
+    {
+        ["id"] = "fixture-ledger-provenance-index",
+        ["artifact"] = "ledger-provenance-index",
+        ["repairingPr"] = 9003,
+        ["recordedInAmendment"] = Contract()["contractVersion"]!.DeepClone(),
+        ["status"] = "pending-merge",
+        ["classificationAfter"] = "authoritative",
+        ["changes"] = new JsonObject(),
+        ["defectResolutions"] = new JsonArray(new JsonObject
+        {
+            ["defect"] = Artifact(Inventory(), "ledger-provenance-index")["openDefects"]![0]!.DeepClone(),
+            ["resolvedByPr"] = 9003,
+            ["scope"] = "fixture",
+        }),
+    };
 
     private static JsonObject ComparabilityKey() => new()
     {

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "issue": 1407,
-  "contractVersion": "1.0.1",
+  "contractVersion": "1.1.0",
   "cutoffCommit": "72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1",
   "scope": "Release-critical proof, verification, corpus, benchmark, provenance, environment, and publication artifacts for milestone 0.24, derived from .github/workflows/*, tools/, tests/, scripts/, bench/, eng/, and website/public/data at the cutoff commit.",
   "fieldNotes": {
@@ -9,7 +9,8 @@
     "provenance.identity": "One of contract.json durableIdentityKinds or nonDurableIdentityKinds.",
     "regeneration.command": "Required for authoritative and derived entries. Historical-only and stale entries give regeneration.note instead when no current command is valid.",
     "owningIssues": "The 0.24 issues that own a repair or consumption of the artifact. Implementation owners are Claude Code agents; @juanmicrosoft reviews and merges.",
-    "openDefects": "Known defects at the cutoff. An open defect blocks establishment until closed; it does not change the role classification."
+    "openDefects": "Known defects at the cutoff. An open defect blocks establishment until closed; it does not change the role classification.",
+    "pendingUpdates": "Amendment 1.1.0. Inventory edits a reviewed amendment has recorded but not applied, each naming the open PR whose repair motivates it. reclassificationRule lets an artifact's record change only through an amendment that names the repairing PR, and a repair exists only once that PR is merged, so an entry here changes nothing: validators, gates, and #1408 read artifacts only. After the named PR merges, a write-back amendment (a PATCH version that records the PR's merge commit) applies the entry's changes to the artifact and removes the entry. If the PR closes unmerged or merges with a different repair, the write-back removes the entry without applying it, or a new amendment records the actual repair. openDefects is never edited: the write-back records each resolution beside it in defectResolutions {defect, resolvedByPr, scope}, so evidence rows still name a resolving PR per cutoff defect (E014)."
   },
   "artifacts": [
     {
@@ -660,6 +661,85 @@
       "storage": { "kind": "git", "retention": "permanent" },
       "owningIssues": [1407],
       "openDefects": []
+    }
+  ],
+  "pendingUpdates": [
+    {
+      "id": "1.1.0-g1-z3-release-binaries",
+      "artifact": "z3-release-binaries",
+      "repairingPr": 1471,
+      "issue": 1420,
+      "recordedInAmendment": "1.1.0",
+      "status": "pending-merge",
+      "classificationAfter": "authoritative",
+      "changes": {
+        "reason": "Content-hash pins for the Z3 binaries packed into shipped NuGet packages. After #1471 no build, test, or pack downloads the z3-binaries-4.15.7 release: every job, including publish-nuget.yml publish, acquires Z3 through the single owned bootstrap (.github/actions/bootstrap-z3) from the upstream archives pinned by z3-upstream-pins, and verifies each extracted output against .github/z3-binaries-4.15.7.sha256. The packed bytes are therefore identical, by content hash, to the pinned assets. The release itself is a pinned mirror produced by build-z3.yml and watched by z3-pin-check.yml.",
+        "consumers": [".github/actions/bootstrap-z3 (verifies every extracted output against the asset pins)", "scripts/check-packaged-z3.py (packed bytes of both packages, every supported RID)", ".github/workflows/z3-pin-check.yml (daily drift monitor of the release mirror)", "eng/z3-consumers.json (pins.assets)", "#1420"]
+      },
+      "defectResolutions": [],
+      "note": "Classification unchanged. The asset pin file remains the canonical record of the packed bytes; the release assets are no longer an input to any build."
+    },
+    {
+      "id": "1.1.0-g1-z3-upstream-pins",
+      "artifact": "z3-upstream-pins",
+      "repairingPr": 1471,
+      "issue": 1420,
+      "recordedInAmendment": "1.1.0",
+      "status": "pending-merge",
+      "classificationAfter": "authoritative",
+      "changes": {
+        "consumers": [".github/actions/bootstrap-z3, the single owned bootstrap used by every Z3-consuming workflow job (21 jobs in 7 workflow files at #1471), including the publish-nuget.yml publish job", "Calor.Compiler.csproj ValidateZ3Assets and AddZ3AssetsToOutput targets", "eng/z3-consumers.json (pins.archives)", ".github/workflows/z3-pin-check.yml", "#1420"]
+      },
+      "defectResolutions": [
+        { "defect": "Two asset provenance paths (this one and z3-release-binaries) with separate pins (#1420).", "resolvedByPr": 1471, "scope": "One acquisition path for builds, tests, and packing. Both pin files remain; the bootstrap checks archives against this file and extracted outputs against the asset pins." }
+      ],
+      "note": "Classification unchanged."
+    },
+    {
+      "id": "1.1.0-p1-ledger-provenance-index",
+      "artifact": "ledger-provenance-index",
+      "repairingPr": 1472,
+      "issue": 1417,
+      "recordedInAmendment": "1.1.0",
+      "status": "pending-merge",
+      "classificationAfter": "authoritative",
+      "changes": {
+        "reason": "The durable-identity index beside measuredCommit stamps (schema 2 at #1472). Each entry keeps its historical stamp and records durableIdentity {status, commit, resolvedVia, treeHashes, inputContentHashes}, verified by tests/Calor.Compiler.Tests/Provenance/DurableProvenance.cs: commit on fetched origin/main, whole-tree and named tree hashes, manifest SHA-256, identical-src-tree verified at both commits, fail (not skip) in shallow or unfetched clones, and a two-phase write-back for squash merges.",
+        "consumers": ["tests/Calor.Compiler.Tests/LedgerCommitStampTests.cs", "tests/Calor.Compiler.Tests/Provenance/DurableProvenance.cs", "roadmap provenance citations", "#1417", "#1422"],
+        "provenance": { "identity": "full-sha", "detail": "durableIdentity.commit is a 40-hex SHA on fetched refs/remotes/origin/main, verified with tree and content hashes; measuredCommit stamps are unchanged." }
+      },
+      "defectResolutions": [
+        { "defect": "Reachability tested against HEAD, shallow clones skip, identical-src-tree not verified by the test (#1417).", "resolvedByPr": 1472, "scope": "All three parts: only fetched origin/main counts (P005), shallow fails (P006), identical-src-tree verified at both commits (P009)." }
+      ],
+      "note": "Classification unchanged."
+    },
+    {
+      "id": "1.1.0-p1-benchmark-provenance",
+      "artifact": "benchmark-provenance",
+      "repairingPr": 1472,
+      "issue": 1417,
+      "recordedInAmendment": "1.1.0",
+      "status": "pending-merge",
+      "classificationAfter": "stale",
+      "changes": {},
+      "defectResolutions": [
+        { "defect": "Short SHA identity (#1417).", "resolvedByPr": 1472, "scope": "The #1417 part only: commit-stamp-index.json records the durable identity of each short stamp beside it by unique-prefix expansion (c2a8816d to c2a8816d1bd3864e70966120c9849e8f8d988cb2, 107462e, 580e189). The file itself still carries the short stamps. A prefix expansion identifies a commit; it does not show the numbers came from a clean checkout of it and does not make them valid." }
+      ],
+      "note": "Stays stale: the causes owned by #1276 and #1422 remain, and the file is regenerated only through #1422."
+    },
+    {
+      "id": "1.1.0-p1-test-manifest",
+      "artifact": "test-manifest",
+      "repairingPr": 1472,
+      "issue": 1417,
+      "recordedInAmendment": "1.1.0",
+      "status": "pending-merge",
+      "classificationAfter": "authoritative",
+      "changes": {},
+      "defectResolutions": [
+        { "defect": "The LedgerCommitStampTests _comment says the test job runs at fetch-depth 0 and shards stay shallow; test.yml does the reverse (#1417).", "resolvedByPr": 1472, "scope": "The comment is removed together with the runtime skip site it described." }
+      ],
+      "note": "Classification unchanged."
     }
   ],
   "excludedFromScope": [
