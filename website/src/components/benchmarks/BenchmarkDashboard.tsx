@@ -1,6 +1,7 @@
 'use client';
 
 import { AgentRefactoringCard } from './AgentRefactoringCard';
+import { HistoricalMethodLabel } from './HistoricalMethodLabel';
 import { MetricCard } from './MetricCard';
 import { ProgramTable } from './ProgramTable';
 import { cn } from '@/lib/utils';
@@ -103,6 +104,8 @@ export function BenchmarkDashboard() {
           )}
         </div>
       </div>
+
+      <HistoricalMethodLabel />
 
       <div className="rounded-lg border p-4 text-sm text-muted-foreground" role="note" aria-label="Benchmark provenance">
         <p>Recorded source revision{' '}

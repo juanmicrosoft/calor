@@ -14,10 +14,13 @@
  *
  * This script compares the candidate file against the committed one and exits non-zero when the
  * candidate is WEAKER — fewer statistical runs, or a changed metric set — so the swap has to be
- * deliberate. `--allow-weaker` performs it anyway and prints what is being given up, which is the
- * escape hatch for a deliberate methodology change.
+ * deliberate.
  *
- *   node scripts/check-benchmark-methodology.js <candidate.json> [--baseline <path>] [--allow-weaker]
+ * #1422 (0.24 B2): benchmark.yml no longer publishes this file; scripts/benchmark_publication_gate.py
+ * gates the only published headline. The former `--allow-weaker` override is removed: a method
+ * change needs a merged #1407 amendment, never a flag.
+ *
+ *   node scripts/check-benchmark-methodology.js <candidate.json> [--baseline <path>]
  */
 
 const fs = require('fs');
@@ -42,14 +45,13 @@ function summarise(doc) {
 
 function main() {
   const args = process.argv.slice(2);
-  const allowWeaker = args.includes('--allow-weaker');
   const baselineIndex = args.indexOf('--baseline');
   const baselinePath = baselineIndex >= 0 ? args[baselineIndex + 1] : DEFAULT_BASELINE;
   const candidatePath = args.find((a, i) =>
     !a.startsWith('--') && (baselineIndex < 0 || i !== baselineIndex + 1));
 
   if (!candidatePath) {
-    console.error('usage: check-benchmark-methodology.js <candidate.json> [--baseline <path>] [--allow-weaker]');
+    console.error('usage: check-benchmark-methodology.js <candidate.json> [--baseline <path>]');
     process.exit(2);
   }
 
@@ -94,19 +96,11 @@ function main() {
     process.exit(0);
   }
 
-  const verb = allowWeaker ? 'ALLOWED (--allow-weaker)' : 'REFUSED';
-  console.error(`\n${verb}: ${problems.length} problem(s) — #1157\n`);
+  console.error(`\nREFUSED: ${problems.length} problem(s) — #1157\n`);
   for (const problem of problems) console.error(`  - ${problem}`);
-  if (allowWeaker) {
-    console.error(
-      '\nProceeding because --allow-weaker was passed. State the before/after '
-      + 'statisticalRunCount and metric set in the PR body, or gate 16 will read the website and '
-      + 'the changelog as disagreeing.');
-    process.exit(0);
-  }
   console.error(
-    '\nRe-run with --statistical --runs 30 to produce a comparable result, or pass --allow-weaker '
-    + 'if the methodology change is deliberate and will be stated in the PR body and CHANGELOG.');
+    '\nRe-run with --statistical --runs 30 to produce a comparable result. A deliberate method '
+    + 'change needs a merged #1407 amendment first (#1422); there is no override.');
   process.exit(1);
 }
 

@@ -5,6 +5,7 @@ import { agentTasks as provenance } from '../../../public/data/benchmark-provena
 import { cn } from '@/lib/utils';
 import { Bot, CheckCircle, XCircle, Target, Layers, TrendingUp } from 'lucide-react';
 import { useEffect } from 'react';
+import { HistoricalMethodLabel } from './HistoricalMethodLabel';
 
 // Build-time import of agent benchmark data
 import agentBenchmarkData from '../../../public/data/agent-benchmark-results.json';
@@ -168,6 +169,8 @@ export function AgentBenchmarkDashboard() {
           <div>Commit: <code className="text-xs">{data.commit}</code></div>
         </div>
       </div>
+
+      <HistoricalMethodLabel />
 
       <p className="text-sm text-muted-foreground">
         {provenance.method}. Corpus: <code>{provenance.corpus}</code>.

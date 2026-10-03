@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Benchmark publication refuses incomparable results (#1422).** The benchmark workflow now
+  proposes one headline file, built only from the B1 results packet (the 0.24 pair-equivalence
+  results). The workflow fails and opens no pull request when an included pair is not
+  `EQUIVALENT`, a registered pair changed, the method changed without an evidence-contract
+  amendment merged first, the regenerated packet differs, or the provenance commit is not a full
+  SHA on `main`. A failed run tries to close open benchmark-results pull requests. Across different
+  methods it prints no delta. The `allow_weaker_methodology` override is removed. Adjudication
+  of what is published is a separate gate (#1410).
+- **The agent refactoring job no longer commits to `main`.** It uploads its results and fails
+  when it cannot read a pass rate, instead of recording 0.
+- **Older website benchmark numbers are labeled historical.** They stay published, marked as not
+  comparable under the 0.24 method.
+
 ## [0.22.0] - 2026-09-15
 
 ### Benchmark Results (Statistical: 30 runs)
