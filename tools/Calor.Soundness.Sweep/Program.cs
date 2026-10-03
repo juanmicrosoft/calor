@@ -33,8 +33,66 @@ internal static partial class Program
             "run" => Run(opts),
             "report" => Report.Write(opts["repo"], opts["out"]),
             "selftest" => SelfTest(opts),
+            "reclassify" => Reclassify(opts),
             _ => Usage(),
         };
+    }
+
+    /// <summary>
+    /// Re-applies the (corrected) claim mapping, guard observation, and classification to every
+    /// retained attempt without calling any compiler: observations (diagnostics, outcomes, emitted
+    /// code, O1, O2) are unchanged. The run-time classification is preserved in each attempt under
+    /// "runtimeClassification", and case-results.jsonl is rebuilt from the attempts.
+    /// </summary>
+    private static int Reclassify(Dictionary<string, string> opts)
+    {
+        var repo = Path.GetFullPath(opts["repo"]);
+        var outRoot = Path.GetFullPath(opts["out"]);
+        var (_, templates, cases, rows) = Load(repo);
+        var templateById = templates["templates"]!.AsArray().ToDictionary(t => t!["id"]!.GetValue<string>(), t => t!, StringComparer.Ordinal);
+        var caseById = cases.ToDictionary(c => c.Id, StringComparer.Ordinal);
+        foreach (var b in new[] { "B1", "N1", "P845" })
+        {
+            var path = Path.Combine(outRoot, b, "case-results.jsonl");
+            var rebuilt = new List<string>();
+            foreach (var line in File.ReadLines(path))
+            {
+                var old = JsonNode.Parse(line)!.AsObject();
+                var c = caseById[old["caseId"]!.GetValue<string>()];
+                var attempts = new List<JsonObject>();
+                foreach (var a in old["attempts"]!.AsArray())
+                {
+                    var file = Path.Combine(outRoot, b, a!["path"]!.GetValue<string>());
+                    var record = JsonNode.Parse(File.ReadAllText(file))!.AsObject();
+                    if (record["status"]?.GetValue<string>() == "executed")
+                    {
+                        record["runtimeClassification"] ??= new JsonObject
+                        {
+                            ["harnessCommit"] = opts["runtime-harness"],
+                            ["claim"] = record["claim"]?.DeepClone(), ["forcedClaim"] = record["forcedClaim"]?.DeepClone(),
+                            ["guards"] = record["guards"]?.DeepClone(), ["class"] = record["class"]?.DeepClone(),
+                            ["classReason"] = record["classReason"]?.DeepClone(), ["addedFindings"] = record["addedFindings"]?.DeepClone(),
+                            ["nonVacuityCheck"] = record["nonVacuityCheck"]?.DeepClone(), ["coldToken"] = record["coldToken"]?.DeepClone(),
+                        };
+                        var o1 = JsonSerializer.Deserialize<IndependentOracle.Verdict>(record["o1"]!.ToJsonString())!;
+                        var (elided, forced) = CaseExecutor.Emissions(record);
+                        CaseExecutor.Adjudicate(record, c, rows[c.RowId], templateById[c.TemplateId], o1, elided, forced);
+                        record["reclassifiedBy"] = opts["harness"];
+                        File.WriteAllText(file, record.ToJsonString(Indented));
+                    }
+                    attempts.Add(record);
+                }
+                var final = Combine(c, attempts);
+                final["bucket"] = old["bucket"]!.DeepClone();
+                final["retryNotRun"] = old["retryNotRun"]?.DeepClone();
+                if (old["class"]!.GetValue<string>() != final["class"]!.GetValue<string>()
+                    || old["addedFindings"]!.ToJsonString() != final["addedFindings"]!.ToJsonString())
+                    Console.WriteLine($"{b} {c.Id}: {old["class"]} {old["addedFindings"]!.ToJsonString()} -> {final["class"]} {final["addedFindings"]!.ToJsonString()}");
+                rebuilt.Add(final.ToJsonString());
+            }
+            File.WriteAllText(path, string.Concat(rebuilt.Select(l => l + "\n")));
+        }
+        return 0;
     }
 
     /// <summary>

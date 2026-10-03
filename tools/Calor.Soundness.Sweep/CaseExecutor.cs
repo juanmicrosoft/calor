@@ -60,22 +60,38 @@ internal static partial class CaseExecutor
             return record;
         }
 
-        // Claim.
-        var claim = Claim(elided, claimSite, obligationKind, c.RowId);
-        var forcedClaim = Claim(forced, claimSite, obligationKind, c.RowId);
+        // O2 replay on the forced emission (an observation; claim-independent).
+        record["o2"] = O2(host, c, template, o1, forced, claimSite, obligationKind);
+        Adjudicate(record, c, row, template, o1, elided, forced);
+        return record;
+    }
+
+    /// <summary>
+    /// Claim mapping, guard observation, and classification from retained observations only (no
+    /// compiler call), so a corrected mapping can be re-applied to retained attempts without
+    /// re-executing a case.
+    /// </summary>
+    public static void Adjudicate(JsonObject record, SweepCaseGenerator.Case c, RowInfo row, JsonNode template,
+        IndependentOracle.Verdict o1, JsonObject elided, JsonObject forced)
+    {
+        var claimSite = template["claimSite"]!.GetValue<string>();
+        var obligationKind = template["obligationKind"]?.GetValue<string>();
+        var claim = Claim(elided, claimSite, obligationKind, c.CalorSource);
+        var forcedClaim = Claim(forced, claimSite, obligationKind, c.CalorSource);
         record["claim"] = claim;
         record["forcedClaim"] = forcedClaim;
-        var token = claim["token"]?.GetValue<string>();
-        if (token != null && !ClaimTokens.Contains(token))
-            throw new InvalidOperationException($"unmapped token {token}");
-
-        // Guards (both emissions) and O2 replay on the forced emission.
-        record["guards"] = Guards(elided, forced, claimSite, obligationKind, token);
-        record["o2"] = O2(host, c, template, o1, forced, claimSite, obligationKind);
-
-        // Classification.
+        record["guards"] = Guards(elided, forced, claimSite, obligationKind, claim["token"]?.GetValue<string>());
         Classify(record, c, row, template, o1, claim, forcedClaim);
-        return record;
+    }
+
+    /// <summary>The (elided, forced) compile records of a retained attempt.</summary>
+    public static (JsonObject Elided, JsonObject Forced) Emissions(JsonObject record)
+    {
+        var channels = record["channels"]!.AsObject();
+        if (channels["CH-CACHE"] is JsonObject cache)
+            return ((JsonObject)cache["warm"]!, (JsonObject)cache["warmForced"]!);
+        var ch = (JsonObject)channels.First().Value!;
+        return ((JsonObject)ch["elided"]!, (JsonObject)ch["forced"]!);
     }
 
     private static (JsonObject Elided, JsonObject Forced) RunCache(BaselineHost host, SweepCaseGenerator.Case c, JsonObject channels, string scratch)
@@ -140,7 +156,7 @@ internal static partial class CaseExecutor
     }
 
     /// <summary>Maps the case's one claim to exactly one contract section 4 token (from ProofOutcome, never a legacy enum).</summary>
-    internal static JsonObject Claim(JsonObject compile, string claimSite, string? obligationKind, string rowId)
+    internal static JsonObject Claim(JsonObject compile, string claimSite, string? obligationKind, string calorSource)
     {
         var result = new JsonObject();
         var errors = compile["diagnostics"]!.AsArray().Where(d => d!["severity"]!.GetValue<string>() == "Error")
@@ -198,18 +214,26 @@ internal static partial class CaseExecutor
             }
             case "implication":
             {
-                // CH-IMPLICATION: Calor0815 (Proven), Calor0816 (TimeoutOrUnavailable), an LSP-violation
-                // error (Failed); none of these means the heuristic fallback ran (Unsupported).
+                // CH-IMPLICATION: each template carries contracts in one direction; only that direction's
+                // Calor0815 text (Proven), Calor0816 (TimeoutOrUnavailable), or LSP-violation error
+                // (Failed) is adjudicated; none of these means the heuristic fallback ran (Unsupported).
+                // Any other Calor0815 (e.g. the vacuous other direction) is archived, not adjudicated.
+                var post = calorSource.Contains("§S (", StringComparison.Ordinal);
+                var dir = post ? "Postcondition" : "Precondition";
+                var proven = post ? "Postcondition strengthening proven" : "Precondition weakening proven";
+                var unknown = post ? "postcondition strengthening is valid" : "precondition weakening is valid";
                 var diags = compile["diagnostics"]!.AsArray().Select(d => d!.AsObject()).ToList();
-                var mine = diags.Where(d => d["message"]!.GetValue<string>().Contains("'Impl.Run'", StringComparison.Ordinal)).ToList();
+                bool Has(JsonObject d, string text) => d["message"]!.GetValue<string>().Contains(text, StringComparison.Ordinal);
+                var mine = diags.Where(d => Has(d, "'Impl.Run'")).ToList();
+                result["direction"] = dir;
                 result["implicationDiagnostics"] = new JsonArray(mine.Select(d => d.DeepClone()).ToArray());
-                var reachedChecker = compile["diagnostics"]!.AsArray().All(d => d!["severity"]!.GetValue<string>() != "Error"
-                    || d["message"]!.GetValue<string>().Contains("LSP violation", StringComparison.Ordinal));
+                var reachedChecker = diags.All(d => d["severity"]!.GetValue<string>() != "Error" || Has(d, "LSP violation"));
                 if (!reachedChecker && !mine.Any()) { result["claimFound"] = false; result["claimError"] = "rejected before the inheritance checker"; break; }
                 result["claimFound"] = true;
-                var lsp = mine.FirstOrDefault(d => d["severity"]!.GetValue<string>() == "Error" && d["message"]!.GetValue<string>().StartsWith("LSP violation", StringComparison.Ordinal));
-                result["token"] = mine.Any(d => d["code"]!.GetValue<string>() == "Calor0815") ? "Proven"
-                    : mine.Any(d => d["code"]!.GetValue<string>() == "Calor0816") ? "TimeoutOrUnavailable"
+                var lsp = mine.FirstOrDefault(d => d["severity"]!.GetValue<string>() == "Error"
+                    && (Has(d, $"LSP violation: {dir} in") || Has(d, $"LSP violation: Could not prove that {dir.ToLowerInvariant()} in")));
+                result["token"] = mine.Any(d => d["code"]!.GetValue<string>() == "Calor0815" && Has(d, proven)) ? "Proven"
+                    : mine.Any(d => d["code"]!.GetValue<string>() == "Calor0816" && Has(d, unknown)) ? "TimeoutOrUnavailable"
                     : lsp != null ? "Failed" : "Unsupported";
                 result["rawStatus"] = result["token"]!.GetValue<string>();
                 result["isVacuous"] = false;
@@ -265,9 +289,12 @@ internal static partial class CaseExecutor
             "postcondition" or "guard-emission" => "Calor.Runtime.ContractKind.Ensures",
             "obligation" => obligationKind switch
             {
-                "ProofObligation" => "violated\");",
-                "IndexBounds" => "throw new IndexOutOfRangeException(",
-                _ => "throw new ArgumentOutOfRangeException(",
+                "ProofObligation" => "Proof obligation [",
+                "IndexBounds" => "\"Indexed-type bound violated\"",
+                "RefinementEntry" => "\"Violation of refinement type",
+                "RefinementReturn" => "\"Return value violates refinement type",
+                "Subtype" => "\"Value violates refinement type",
+                _ => null,
             },
             _ => null,
         };
@@ -374,11 +401,11 @@ internal static partial class CaseExecutor
         // Cache rows: the warm token must equal the cold token (stale-cache-proof); variant A must be Proven.
         if (c.RowId.StartsWith("CACHE-", StringComparison.Ordinal) && record["channels"]!["CH-CACHE"] is JsonObject cache)
         {
-            var cold = Claim((JsonObject)cache["cold"]!, claimSite, null, c.RowId)["token"]?.GetValue<string>();
+            var cold = Claim((JsonObject)cache["cold"]!, claimSite, null, c.CalorSource)["token"]?.GetValue<string>();
             record["coldToken"] = cold;
             if (cache["warmA"] is JsonObject warmA)
             {
-                var a = Claim(warmA, claimSite, null, c.RowId)["token"]?.GetValue<string>();
+                var a = Claim(warmA, claimSite, null, c.CalorSource)["token"]?.GetValue<string>();
                 record["variantAToken"] = a;
                 if (a != "Proven")
                     (primary, reason) = ("harness-invalid", $"tamper-reachability control (variant A) produced {a}, Proven required");

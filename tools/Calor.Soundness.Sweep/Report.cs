@@ -183,7 +183,7 @@ internal static class Report
         var retro = new JsonObject();
         var mismatches = new JsonObject();
         var controlCases = cases.Where(c => c.RowId.StartsWith("CTRL-", StringComparison.Ordinal)).ToList();
-        foreach (var b in new[] { "B1", "N1", "P845" })
+        foreach (var b in new[] { "P845", "B1", "N1" })
         {
             var avail = new JsonArray();
             foreach (var c in controlCases.Where(c => c.RowId is "CTRL-POSITIVE" or "CTRL-NEGATIVE"))

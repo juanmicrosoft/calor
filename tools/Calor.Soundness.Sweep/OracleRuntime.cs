@@ -94,6 +94,8 @@ internal sealed class OracleProgram : IDisposable
     {
         value = null;
         raw = raw.Trim();
+        if (type == typeof(string))
+            return TryParseZ3String(raw, out value);
         if (type == typeof(bool))
         {
             if (raw is "true" or "false") { value = raw == "true"; return true; }
@@ -118,6 +120,32 @@ internal sealed class OracleProgram : IDisposable
         if (n < 0 || n >= modulus) return false;
         if (w.Signed && n >= modulus / 2) n -= modulus;
         value = Convert.ChangeType(n.ToString(CultureInfo.InvariantCulture), type, CultureInfo.InvariantCulture);
+        return true;
+    }
+
+    /// <summary>An SMT-LIB 2.6 string literal as Z3 prints it ("" for a quote, \u{hex} for a code point).</summary>
+    private static bool TryParseZ3String(string raw, out object? value)
+    {
+        value = null;
+        if (raw.Length < 2 || raw[0] != '"' || raw[^1] != '"')
+            return false;
+        var body = raw[1..^1];
+        var sb = new StringBuilder();
+        for (var i = 0; i < body.Length; i++)
+        {
+            if (body[i] == '"' && i + 1 < body.Length && body[i + 1] == '"') { sb.Append('"'); i++; continue; }
+            if (body[i] == '\\' && i + 2 < body.Length && body[i + 1] == 'u' && body[i + 2] == '{')
+            {
+                var close = body.IndexOf('}', i);
+                if (close < 0 || !int.TryParse(body.AsSpan(i + 3, close - i - 3), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var cp))
+                    return false;
+                sb.Append(cp is >= 0xD800 and <= 0xDFFF ? ((char)cp).ToString() : char.ConvertFromUtf32(cp));
+                i = close;
+                continue;
+            }
+            sb.Append(body[i]);
+        }
+        value = sb.ToString();
         return true;
     }
 
