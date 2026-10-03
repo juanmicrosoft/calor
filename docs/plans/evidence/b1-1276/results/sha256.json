@@ -1,0 +1,17 @@
+{
+  "algorithm": "sha256",
+  "normalization": "none (raw bytes; .gitattributes -text)",
+  "files": {
+    "docs/plans/evidence/b1-1276/results/environment.json": "de63b5793789c9834af5a9aec283d612b4e383a1f7578032c4113f5e3aeecb62",
+    "docs/plans/evidence/b1-1276/results/metrics-run-1.json": "d4674750802eb9698b0eadbcbfb77d94b8c0724bec26eab8f3a342faef668c85",
+    "docs/plans/evidence/b1-1276/results/metrics-run-1.log": "9fb5b9830497471d57e91281ca9da4d8117baafb5203179139155b900c559fd8",
+    "docs/plans/evidence/b1-1276/results/metrics-run-2.json": "d4674750802eb9698b0eadbcbfb77d94b8c0724bec26eab8f3a342faef668c85",
+    "docs/plans/evidence/b1-1276/results/metrics-run-2.log": "9fb5b9830497471d57e91281ca9da4d8117baafb5203179139155b900c559fd8",
+    "docs/plans/evidence/b1-1276/results/oracle-run-1.json": "cb07d7a1d5acd47bd850cbf4ce99c82ceec8a266794a95453e4fbe14f3ce66d5",
+    "docs/plans/evidence/b1-1276/results/oracle-run-1.log": "d6b24c6b9cfc0ed5719163d969e1327cb8b542e1a20d6149af25aea6736c2c44",
+    "docs/plans/evidence/b1-1276/results/oracle-run-2.json": "3773d284bbd5e8876bd378c0c849d2537adc9917912d5954a32bca0436a4b98c",
+    "docs/plans/evidence/b1-1276/results/oracle-run-2.log": "abec9bd36ebc71158395f35b6cf137c91b37e8e6b728e87456a661ecc5c2d761",
+    "docs/plans/evidence/b1-1276/results/pair-manifest.json": "eec09eab95c60c18b650bd70ee7ad4f807d649cf2f2800665a4f9589a6fe1813",
+    "docs/plans/evidence/b1-1276/results/results.json": "ed10ba1bff736dba936f112d557296f7c8ffb9f49db3c2ee8925e096fab2ed1f"
+  }
+}

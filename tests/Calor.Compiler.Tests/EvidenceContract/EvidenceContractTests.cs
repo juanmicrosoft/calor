@@ -984,7 +984,7 @@ public class EvidenceContractTests
         Assert.True(violations.Count == 0, Describe(violations));
         // The proposed fixture carries nothing a later amendment added.
         var text = contract.ToJsonString();
-        foreach (var added in new[] { "1.1.0", "taskStatementRule", "determinismRows", "platformDeterminism", "evidenceDataRule" })
+        foreach (var added in new[] { "1.1.0", "1.2.0", "taskStatementRule", "determinismRows", "platformDeterminism", "evidenceDataRule", "chargeRules" })
             Assert.DoesNotContain(added, text, StringComparison.Ordinal);
     }
 
@@ -1050,13 +1050,14 @@ public class EvidenceContractTests
     [InlineData("unlogged-amendment")]
     [InlineData("no-justification")]
     [InlineData("added-exception")]
+    [InlineData("duplicate-other-issue")]
     public void CeilingExceptionOtherThanTheRegisteredOneFails(string mutation)
     {
         // Decision 6 raises one ceiling for one PR to one value; nothing else passes without a new
         // amendment and a validator change.
         var contract = Contract();
         var exceptions = contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray();
-        var exception = exceptions.First(e => e!["pr"]!.GetValue<int>() == 1473)!;
+        var exception = exceptions.First(e => e?["pr"]?.GetValue<int>() == 1473)!;
         switch (mutation)
         {
             case "other-value": exception["value"] = 2000.0; break;
@@ -1069,9 +1070,189 @@ public class EvidenceContractTests
                 added["pr"] = 9004;
                 exceptions.Add(added);
                 break;
+            case "duplicate-other-issue":
+                // Per-PR identity is ceiling and PR; a different issue does not make it distinct.
+                var copy = exception.DeepClone();
+                copy["issue"] = 1311;
+                exceptions.Add(copy);
+                break;
         }
         AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C011");
     }
+
+    // ------------------------------------------------------------------
+    // Amendment 1.2.0: per-gate ceiling exception for #1311 and charge rules (C011)
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void CommittedContractRegistersTheS1ReRunAndTheC2Charge()
+    {
+        // Decision A raises one ceiling for one gate to one value; decision B moves one charge.
+        // Neither changes a ceiling's own value.
+        var contract = Contract();
+        var capacity = contract["authorityCapacity"]!["capacity"]!;
+        var s1 = S1Exception(contract);
+        Assert.Equal("s1-generated-cases", s1["ceiling"]!.GetValue<string>());
+        Assert.Equal(3008, s1["value"]!.GetValue<int>());
+        Assert.Equal(1508, s1["addedExecutions"]!.GetValue<int>());
+        Assert.Null(s1["pr"]);
+        var ceilings = capacity["ceilings"]!.AsArray().ToDictionary(c => c!["id"]!.GetValue<string>(), c => c!["value"]!.GetValue<int>());
+        Assert.Equal(1500, ceilings["s1-generated-cases"]);
+        Assert.Equal(2000, ceilings["determinism-compute"]);
+        Assert.Equal(1500, ceilings["regeneration-compute"]);
+        Assert.Equal(2, ceilings["regenerations"]);
+        Assert.Equal(10, ceilings["s1-timebox"]);
+        Assert.Equal(20, ceilings["s1-agent-hours"]);
+        var rule = Assert.Single(capacity["chargeRules"]!.AsArray())!;
+        Assert.Equal("regeneration-compute", rule["chargedTo"]!.GetValue<string>());
+        Assert.Equal("determinism-compute", rule["notChargedTo"]!.GetValue<string>());
+        var amendment = contract["amendmentLog"]!.AsArray().Last()!;
+        Assert.Equal("1.2.0", amendment["version"]!.GetValue<string>());
+        Assert.True(amendment["afterDecisionBearingInspection"]!.GetValue<bool>());
+    }
+
+    [Theory]
+    [InlineData("other-value")]
+    [InlineData("other-issue")]
+    [InlineData("other-ceiling")]
+    [InlineData("adds-pr")]
+    [InlineData("unlogged-amendment")]
+    [InlineData("no-justification")]
+    [InlineData("no-scope")]
+    [InlineData("no-conditions")]
+    [InlineData("blank-condition")]
+    [InlineData("duplicated")]
+    [InlineData("weakened-condition")]
+    [InlineData("dropped-condition")]
+    [InlineData("added-condition")]
+    [InlineData("reordered-conditions")]
+    [InlineData("replaced-scope")]
+    [InlineData("other-justification")]
+    [InlineData("conditions-moved-into-justification")]
+    [InlineData("other-added-executions")]
+    [InlineData("no-added-executions")]
+    public void GateCeilingExceptionOtherThanTheRegisteredOneFails(string mutation)
+    {
+        var contract = Contract();
+        var exceptions = contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray();
+        var exception = S1Exception(contract);
+        switch (mutation)
+        {
+            case "other-value": exception["value"] = 3009; break;
+            case "other-issue": exception["issue"] = 1413; break;
+            case "other-ceiling": exception["ceiling"] = "s1-compute"; break;
+            case "adds-pr": exception["pr"] = 1480; break;
+            case "unlogged-amendment": exception["amendment"] = "1.1.9"; break;
+            case "no-justification": exception["justification"] = " "; break;
+            case "no-scope": exception.AsObject().Remove("scope"); break;
+            case "no-conditions": exception["conditions"] = new JsonArray(); break;
+            case "blank-condition": exception["conditions"]!.AsArray().Add(" "); break;
+            case "duplicated": exceptions.Add(exception.DeepClone()); break;
+            case "weakened-condition": exception["conditions"]![5] = "Choose the better run."; break;
+            case "dropped-condition": exception["conditions"]!.AsArray().RemoveAt(6); break;
+            case "added-condition": exception["conditions"]!.AsArray().Add("Repeated selective sweeps are permitted."); break;
+            case "reordered-conditions":
+                var conditions = exception["conditions"]!.AsArray();
+                var first = conditions[0]!.DeepClone();
+                conditions.RemoveAt(0);
+                conditions.Add(first);
+                break;
+            case "replaced-scope": exception["scope"] = "Repeated selective sweeps until every row is clean."; break;
+            case "other-justification": exception["justification"] = "Fixture justification."; break;
+            case "conditions-moved-into-justification":
+                // The same text, but five conditions are no longer conditions (review round 2).
+                var all = exception["conditions"]!.AsArray().Select(c => c!.GetValue<string>()).ToList();
+                exception["conditions"] = new JsonArray(all.Take(5).Select(c => (JsonNode)JsonValue.Create(c)!).ToArray());
+                exception["justification"] = string.Join("\n", all.Skip(5).Append(exception["justification"]!.GetValue<string>()));
+                break;
+            case "other-added-executions": exception["addedExecutions"] = 3008; break;
+            case "no-added-executions": exception.AsObject().Remove("addedExecutions"); break;
+        }
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C011");
+    }
+
+    [Fact]
+    public void RegisteredTextHashesMatchTheCommittedEntries()
+    {
+        // The committed packet is the registered text: its exception and charge rule pass C011 as committed.
+        var capacity = Contract()["authorityCapacity"]!["capacity"]!;
+        var violations = EvidenceContractValidator.ValidateContract(Contract());
+        Assert.DoesNotContain(violations, v => v.Code == "C011");
+        Assert.Single(capacity["chargeRules"]!.AsArray());
+    }
+
+    [Fact]
+    public void TextHashNormalizesLineEndingsAndFramesParts()
+    {
+        // CRLF and LF inputs hash alike; text cannot move across a part boundary unnoticed.
+        Assert.Equal(EvidenceContractValidator.TextSha256(["a\nb", "c"]), EvidenceContractValidator.TextSha256(["a\r\nb", "c"]));
+        Assert.NotEqual(EvidenceContractValidator.TextSha256(["a\nb", "c"]), EvidenceContractValidator.TextSha256(["a", "b\nc"]));
+        Assert.NotEqual(EvidenceContractValidator.TextSha256(["a", "b"]), EvidenceContractValidator.TextSha256(["a\nb"]));
+        Assert.NotEqual(EvidenceContractValidator.TextSha256(["a", ""]), EvidenceContractValidator.TextSha256(["a"]));
+    }
+
+    [Fact]
+    public void GateCeilingExceptionWithoutItsAmendmentInTheLogFails()
+    {
+        // Removing amendment 1.2.0 from the log leaves its exception and charge rule unregistered.
+        var contract = Contract();
+        var log = contract["amendmentLog"]!.AsArray();
+        log.RemoveAt(log.Count - 1);
+        contract["contractVersion"] = log.Last()!["version"]!.DeepClone();
+        var violations = EvidenceContractValidator.ValidateContract(contract);
+        AssertViolation(violations, "C011");
+        Assert.Contains(violations, v => v.Subject == "exception s1-generated-cases issue #1311");
+        Assert.Contains(violations, v => v.Subject == "charge rule c2-candidate-determinism-protocol");
+    }
+
+    [Theory]
+    [InlineData("other-id")]
+    [InlineData("reversed")]
+    [InlineData("unknown-ceiling")]
+    [InlineData("unlogged-amendment")]
+    [InlineData("no-work")]
+    [InlineData("no-rule")]
+    [InlineData("no-justification")]
+    [InlineData("added-rule")]
+    [InlineData("duplicated")]
+    [InlineData("broadened-work")]
+    [InlineData("dropped-candidate-binding")]
+    [InlineData("other-justification")]
+    public void ChargeRuleOtherThanTheRegisteredOneFails(string mutation)
+    {
+        var contract = Contract();
+        var rules = contract["authorityCapacity"]!["capacity"]!["chargeRules"]!.AsArray();
+        var rule = rules[0]!;
+        switch (mutation)
+        {
+            case "other-id": rule["id"] = "c2-all-determinism-runs"; break;
+            case "reversed":
+                rule["chargedTo"] = "determinism-compute";
+                rule["notChargedTo"] = "regeneration-compute";
+                break;
+            case "unknown-ceiling": rule["chargedTo"] = "free-compute"; break;
+            case "unlogged-amendment": rule["amendment"] = "1.1.9"; break;
+            case "no-work": rule["work"] = ""; break;
+            case "no-rule": rule.AsObject().Remove("rule"); break;
+            case "no-justification": rule["justification"] = " "; break;
+            case "added-rule":
+                var added = rule.DeepClone();
+                added["id"] = "s1-to-ordinary-ci";
+                rules.Add(added);
+                break;
+            case "duplicated": rules.Add(rule.DeepClone()); break;
+            case "broadened-work": rule["work"] = "Every execution of the #1421 determinism protocol."; break;
+            case "dropped-candidate-binding":
+                rule["rule"] = rule["rule"]!.GetValue<string>().Replace("the #1423 manifest names", "any commit names", StringComparison.Ordinal);
+                break;
+            case "other-justification": rule["justification"] = "Fixture justification."; break;
+        }
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C011");
+    }
+
+    private static JsonNode S1Exception(JsonNode contract)
+        => contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray()
+            .First(e => e?["pr"] is null && e?["issue"]?.GetValue<int>() == 1311)!;
 
     // ------------------------------------------------------------------
     // Amendment 1.1.0: pending inventory updates (I013)
@@ -1230,12 +1411,14 @@ public class EvidenceContractTests
         // Sentences that amendment 1.1.0 appended to frozen text are marked "(amendment 1.1.0)" or
         // "amendment 1.1.0)"; strip them so the fixture is the original text, not a hybrid.
         RevertAmendedSentences(contract, "amendment 1.1.0");
+        RevertAmendedSentences(contract, "amendment 1.2.0");
         contract.AsObject().Remove("acceptance");
         contract["amendmentLog"]!.AsArray().Clear();
         contract["contractVersion"] = "1.0.0";
         // Rules added by amendments do not exist in the proposed state.
         contract["benchmarkEquivalence"]!.AsObject().Remove("taskStatementRule");
         contract["authorityCapacity"]!["capacity"]!.AsObject().Remove("exceptions");
+        contract["authorityCapacity"]!["capacity"]!.AsObject().Remove("chargeRules");
         contract["authorityCapacity"]!["capacity"]!.AsObject().Remove("evidenceDataRule");
         contract["rules"]!.AsObject().Remove("platformDeterminism");
         contract.AsObject().Remove("determinismRows");
@@ -1426,7 +1609,7 @@ public class EvidenceContractTests
     /// <paramref name="code"/> and the explicitly <paramref name="alsoAllowed"/> codes, so a control
     /// cannot pass because some unrelated rule fired.
     /// </summary>
-    private static void AssertViolation(IReadOnlyList<ContractViolation> violations, string code, params string[] alsoAllowed)
+    internal static void AssertViolation(IReadOnlyList<ContractViolation> violations, string code, params string[] alsoAllowed)
     {
         Assert.True(violations.Any(v => v.Code == code),
             $"expected a {code} violation; got:{Environment.NewLine}{Describe(violations)}");
@@ -1435,7 +1618,7 @@ public class EvidenceContractTests
             $"expected only {code}; also got:{Environment.NewLine}{Describe(unexpected)}");
     }
 
-    private static string Describe(IReadOnlyList<ContractViolation> violations)
+    internal static string Describe(IReadOnlyList<ContractViolation> violations)
         => violations.Count == 0 ? "(none)" : string.Join(Environment.NewLine, violations);
 
     private static JsonNode Artifact(JsonNode inventory, string id)
@@ -1461,7 +1644,7 @@ public class EvidenceContractTests
         return Convert.ToHexStringLower(SHA256.HashData(new UTF8Encoding(false).GetBytes(text)));
     }
 
-    private static string RepoRoot()
+    internal static string RepoRoot()
     {
         var dir = AppContext.BaseDirectory;
         while (dir != null

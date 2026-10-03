@@ -75,41 +75,58 @@
           Condition="'$(OS)' == 'Windows_NT'" />
   </Target>
 
-  <!-- Copy Microsoft.Z3.dll to output (skip during publish since Reference already includes it) -->
-  <ItemGroup Condition="'$(PublishSingleFile)' != 'true'">
-    <None Include="$(Z3Dir)\Microsoft.Z3.dll" CopyToOutputDirectory="PreserveNewest" Link="Microsoft.Z3.dll" Condition="Exists('$(Z3Dir)\Microsoft.Z3.dll')" />
-  </ItemGroup>
+  <!-- Z3 consumer propagation (#1420). Every Z3 output item is created at
+       EXECUTION time, after ValidateZ3Assets has verified the bootstrapped
+       files, and before AssignTargetPaths. GetCopyToOutputDirectoryItems (what
+       a referencing project calls to harvest this project's copy-local
+       content) and publish/pack both depend on AssignTargetPaths, so test
+       hosts, Calor.Tasks, the CLI tool package, and the SDK package all
+       receive the same verified set from one place.
 
-  <!-- Include Z3 native libraries for supported .NET 10 platforms.
-       osx-x64 has no valid upstream binary; win-x86 has no .NET 10 SDK. -->
-  <!-- For global tools, these go to tools/net10.0/any/runtimes/ via CopyToOutputDirectory -->
-  <ItemGroup>
-    <None Include="runtimes\**\*"
-          Exclude="runtimes\osx-x64\**\*;runtimes\win-x86\**\*"
-          CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
+       This replaces an evaluation-time `runtimes\**\*` glob, an Exists()-guarded
+       Microsoft.Z3.dll item, and an AfterTargets="Build" side copy (#859). An
+       evaluation-time glob is frozen when MSBuild loads the project; if the
+       explicit bootstrap lands after that, the build passes validation yet ships
+       no natives, and every Z3 test in the consumer silently skips.
 
-  <!-- Also copy the current platform's native library to output root for P/Invoke discovery -->
-  <!-- This ensures libz3 is found without needing deps.json native entries -->
-  <Target Name="CopyZ3NativeToOutput" AfterTargets="Build">
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'Arm64'">
-      <Z3NativeLib Include="$(Z3RuntimesDir)/osx-arm64/native/libz3.dylib" />
+       The list is explicit, not a glob: it is the supported RID set in
+       eng/z3-consumers.json (osx-x64 has no valid upstream binary; win-x86 has
+       no .NET 10 SDK), and scripts/test_z3_hermetic.py keeps the two in sync.
+       Microsoft.Z3.dll itself flows through the Private Reference above.
+       CopyToOutputDirectory="Always" (not PreserveNewest): a stale or replaced
+       destination with a newer timestamp is overwritten by the verified source
+       on the next build instead of surviving it. -->
+  <Target Name="AddZ3AssetsToOutput"
+          BeforeTargets="AssignTargetPaths"
+          DependsOnTargets="ValidateZ3Assets">
+    <ItemGroup>
+      <None Include="$(Z3RuntimesDir)\linux-x64\native\libz3.so" Link="runtimes\linux-x64\native\libz3.so" CopyToOutputDirectory="Always" />
+      <None Include="$(Z3RuntimesDir)\linux-arm64\native\libz3.so" Link="runtimes\linux-arm64\native\libz3.so" CopyToOutputDirectory="Always" />
+      <None Include="$(Z3RuntimesDir)\osx-arm64\native\libz3.dylib" Link="runtimes\osx-arm64\native\libz3.dylib" CopyToOutputDirectory="Always" />
+      <None Include="$(Z3RuntimesDir)\win-x64\native\libz3.dll" Link="runtimes\win-x64\native\libz3.dll" CopyToOutputDirectory="Always" />
+      <None Include="$(Z3RuntimesDir)\win-arm64\native\libz3.dll" Link="runtimes\win-arm64\native\libz3.dll" CopyToOutputDirectory="Always" />
     </ItemGroup>
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'X64'">
+    <!-- The build host's native also goes to the output ROOT, the first
+         Z3ContextFactory probe root. MSBuild loads task assemblies without
+         deps.json native probing, so Calor.Tasks relies on this copy (pinned by
+         CompileCalorIntegrationTests.VerifyGate_NativeZ3_DeployedToTasksOutputRoot).
+         It flows to referencing projects like any other item, but never into
+         publish or pack output: packages carry runtimes/<rid>/native only. -->
+    <PropertyGroup>
+      <_CalorZ3HostRid Condition="$([MSBuild]::IsOSPlatform('OSX')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'Arm64'">osx-arm64</_CalorZ3HostRid>
+      <_CalorZ3HostRid Condition="$([MSBuild]::IsOSPlatform('Windows')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'X64'">win-x64</_CalorZ3HostRid>
+      <_CalorZ3HostRid Condition="$([MSBuild]::IsOSPlatform('Windows')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'Arm64'">win-arm64</_CalorZ3HostRid>
+      <_CalorZ3HostRid Condition="$([MSBuild]::IsOSPlatform('Linux')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'X64'">linux-x64</_CalorZ3HostRid>
+      <_CalorZ3HostRid Condition="$([MSBuild]::IsOSPlatform('Linux')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'Arm64'">linux-arm64</_CalorZ3HostRid>
+    </PropertyGroup>
+    <PropertyGroup>
+      <_CalorZ3HostLib Condition="$(_CalorZ3HostRid.StartsWith('osx-'))">libz3.dylib</_CalorZ3HostLib>
+      <_CalorZ3HostLib Condition="$(_CalorZ3HostRid.StartsWith('win-'))">libz3.dll</_CalorZ3HostLib>
+      <_CalorZ3HostLib Condition="$(_CalorZ3HostRid.StartsWith('linux-'))">libz3.so</_CalorZ3HostLib>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(_CalorZ3HostRid)' != ''">
+      <None Include="$(Z3RuntimesDir)\$(_CalorZ3HostRid)\native\$(_CalorZ3HostLib)" Link="$(_CalorZ3HostLib)" CopyToOutputDirectory="Always" CopyToPublishDirectory="Never" />
     </ItemGroup>
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'X64'">
-      <Z3NativeLib Include="$(Z3RuntimesDir)/win-x64/native/libz3.dll" />
-    </ItemGroup>
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'Arm64'">
-      <Z3NativeLib Include="$(Z3RuntimesDir)/win-arm64/native/libz3.dll" />
-    </ItemGroup>
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'X64'">
-      <Z3NativeLib Include="$(Z3RuntimesDir)/linux-x64/native/libz3.so" />
-    </ItemGroup>
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'Arm64'">
-      <Z3NativeLib Include="$(Z3RuntimesDir)/linux-arm64/native/libz3.so" />
-    </ItemGroup>
-    <Copy SourceFiles="@(Z3NativeLib)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="'@(Z3NativeLib)' != ''" />
   </Target>
 
   <ItemGroup>

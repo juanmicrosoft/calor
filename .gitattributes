@@ -2,3 +2,9 @@
 /bench/phase0-agent-native/verifier-runtime-differential.md text eol=lf
 /docs/plans/evidence/evidence-contract-1407/*.json text eol=lf
 /docs/plans/v0.24-evidence-contract.md text eol=lf
+/docs/plans/evidence/b1-1276/registration/*.json text eol=lf
+/docs/plans/b1-1276-benchmark-registration.md text eol=lf
+/tests/TestData/Benchmarks/** -text
+/tests/Calor.Evaluation/Core/*.cs -text
+/tests/Calor.Evaluation/Metrics/*.cs -text
+/docs/plans/evidence/b1-1276/results/* -text
