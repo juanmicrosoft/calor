@@ -305,7 +305,7 @@ internal static partial class CaseExecutor
         record["class"] = primary;
         record["classReason"] = reason;
         record["addedFindings"] = added;
-        record["nonVacuityCheck"] = Proof(token) ? new JsonObject { ["id"] = "R1-O1-reached", ["result"] = o1.Reached > 0 ? "passed" : "failed" } : null;
+        record["nonVacuityCheck"] = Proof(token) || Proof(forcedToken) ? new JsonObject { ["id"] = "R1-O1-reached", ["result"] = o1.Reached > 0 ? "passed" : "failed" } : null;
     }
 
     private static (string, string?) Rejection(RowInfo row, JsonObject claim)

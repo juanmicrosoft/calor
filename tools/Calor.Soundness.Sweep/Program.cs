@@ -8,9 +8,7 @@ using Calor.Compiler.Tests.SoundnessRegistration;
 
 namespace Calor.Soundness.Sweep;
 
-// #1311 sweep driver. run (registered execution), report (row status, findings, controls), reclassify (re-apply the mapping to retained attempts; optional O2
-// re-replay), crossrun (reserve re-runs on the other baseline), native-check. Order, retries, budget, and invalid-run checks follow registration.json
-// "execution" and "budget".
+// #1311 sweep driver: run, report, reclassify (optional O2 re-replay), crossrun, native-check. Follows registration.json "execution" and "budget".
 internal static partial class Program
 {
     private const int CaseWallClockSeconds = 120, Reserve = 74, ExecutionCeiling = 1500;
@@ -30,7 +28,9 @@ internal static partial class Program
         };
     }
 
-    private static int Fail(string message, int code) { Console.Error.WriteLine(message); return code; }
+    private static string? _out; // set by run/crossrun: invalid-run reasons are persisted there and honored by report
+    private static int Fail(string message, int code) { Console.Error.WriteLine(message); if (_out != null && code is 4 or 5 or 6) File.AppendAllText(Path.Combine(_out, "invalid-run.jsonl"), new JsonObject { ["utc"] = DateTime.UtcNow.ToString("O"), ["reason"] = message }.ToJsonString() + "\n"); return code; }
+    internal static string? Native(JsonNode? pins, string dir) => pins?["processLoadedZ3"]?.AsArray().FirstOrDefault(x => S(x!["path"]).StartsWith(dir, StringComparison.Ordinal))?["sha256"]?.GetValue<string>();
 
     internal static string S(JsonNode? n) => n!.GetValue<string>();
 
@@ -53,7 +53,7 @@ internal static partial class Program
     private static int Run(Dictionary<string, string> opts)
     {
         var repo = Path.GetFullPath(opts["repo"]);
-        var outRoot = Path.GetFullPath(opts["out"]);
+        var outRoot = _out = Path.GetFullPath(opts["out"]);
         var (_, templates, cases, rows) = Load(repo);
         Directory.CreateDirectory(outRoot);
         var scratch = Scratch("sweep");
@@ -77,7 +77,7 @@ internal static partial class Program
                 File.WriteAllText(PinsPath(id), pins.ToJsonString(Indented));
             var pinned = JsonNode.Parse(File.ReadAllText(PinsPath(id)))!;
             if (pinKeys.Append("dotnetVersion").Append("os").Any(k => pinned[k]?.ToJsonString() != pins[k]?.ToJsonString() || pinned[k] == null)
-                || pinned["processLoadedZ3"] is not JsonArray { Count: > 0 } || pinned["processLoadedZ3"]!.ToJsonString() != pins["processLoadedZ3"]!.ToJsonString())
+                || Native(pinned, host.Directory) is not { } native || native != Native(pins, host.Directory))
                 return Fail($"INVALID RUN: {id} pin missing or changed before the first case", 4);
         }
         var ledger = new Ledger(Path.Combine(outRoot, "ledger.jsonl"));
@@ -113,7 +113,7 @@ internal static partial class Program
         {
             var after = Pins(host, opts["registration-commit"]);
             var before = JsonNode.Parse(File.ReadAllText(PinsPath(id)))!;
-            if (pinKeys.Append("processLoadedZ3").Append("dotnetVersion").Any(k => before[k]?.ToJsonString() != after[k]?.ToJsonString() || before[k] == null))
+            if (pinKeys.Append("dotnetVersion").Any(k => before[k]?.ToJsonString() != after[k]?.ToJsonString() || before[k] == null) || Native(before, host.Directory) != Native(after, host.Directory))
                 return Fail($"INVALID RUN: {id} pin missing or changed after the run", 4);
         }
         File.AppendAllText(Path.Combine(outRoot, "sessions.jsonl"), new JsonObject
@@ -157,7 +157,7 @@ internal static partial class Program
         {
             // In-process work cannot be killed: wait (bounded) so a retry never overlaps it, and keep what it produced.
             record = new JsonObject { ["baseline"] = host.Id, ["caseId"] = c.Id, ["status"] = "over-time" };
-            record["lateObservation"] = task.Wait(TimeSpan.FromMinutes(10)) ? task.Result : throw new InvalidOperationException($"{c.Id} did not end; stopping (no overlapping retry)");
+            record["lateObservation"] = task.Wait(TimeSpan.FromMinutes(10)) ? task.Result : null;
         }
         if (row.Id.StartsWith("CTRL-", StringComparison.Ordinal) && record["status"]?.GetValue<string>() == "executed")
             record["cliCrosscheck"] = CliCrosscheck.Run(host, c, record, scratch);
@@ -167,6 +167,7 @@ internal static partial class Program
         Directory.CreateDirectory(Path.GetDirectoryName(file)!);
         File.WriteAllText(file, record.ToJsonString(Indented));
         ledger.Add(host.Id, c.Id, n, bucket, started, sw.ElapsedMilliseconds, Path.GetRelativePath(outRoot, file));
+        if (!task.IsCompleted) throw new InvalidOperationException($"{c.Id} did not end; attempt retained, session stopped (no overlapping retry)");
         return record;
     }
 
@@ -255,11 +256,13 @@ internal static partial class Program
     // ceiling. These executions never enter row status.
     private static int CrossRun(Dictionary<string, string> opts)
     {
-        var outRoot = Path.GetFullPath(opts["out"]);
+        var outRoot = _out = Path.GetFullPath(opts["out"]);
         var (_, templates, cases, rows) = Load(Path.GetFullPath(opts["repo"]));
         var (caseById, ledger, scratch) = (ById(cases), new Ledger(Path.Combine(outRoot, "ledger.jsonl")), Scratch("cross"));
         var hosts = Pair.ToDictionary(id => id, id => new BaselineHost(id, opts[id.ToLowerInvariant()]));
-        if (hosts.Values.Any(h => Pins(h, "") is var now && JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, h.Id, "pins.json"))) is var then && new[] { "calorDllSha256", "calorRuntimeDllSha256", "microsoftZ3DllSha256", "dotnetVersion", "os" }.Any(k => now[k]?.ToJsonString() != then![k]?.ToJsonString()))) return Fail("INVALID: binary or SDK differs from pins", 4);
+        bool Drift() => hosts.Values.Any(h => Pins(h, "") is var now && JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, h.Id, "pins.json"))) is var then && (Native(now, h.Directory) != Native(then, h.Directory)
+            || new[] { "calorDllSha256", "calorRuntimeDllSha256", "microsoftZ3DllSha256", "dotnetVersion", "os" }.Any(k => now[k]?.ToJsonString() != then![k]?.ToJsonString())));
+        if (Drift()) return Fail("INVALID: a pin (binary, native image, or SDK) differs before crossrun", 4);
         string[] priority = ["false-unconditional-proof", "stale-cache-proof", "required-demotion-absent", "spurious-refutation"];
         var work = Pair.SelectMany(source => JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, source, "findings-index.json")))!.AsArray()
             .GroupBy(f => S(f!["caseId"])).Select(g => (Rank: g.Min(f => Array.IndexOf(priority, S(f!["class"])) is var i and >= 0 ? i : priority.Length), Target: source == "B1" ? "N1" : "B1", CaseId: g.Key)));
@@ -277,6 +280,7 @@ internal static partial class Program
                 };
             File.AppendAllText(path, line.ToJsonString() + "\n");
         }
+        if (Drift()) return Fail("INVALID: a pin (binary, native image, or SDK) differs after crossrun", 4);
         Console.WriteLine($"ledger {ledger.Total}, reserve used {ledger.ReserveUsed}");
         return 0;
     }

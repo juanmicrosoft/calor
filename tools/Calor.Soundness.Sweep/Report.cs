@@ -5,8 +5,7 @@ using static Calor.Soundness.Sweep.Program;
 
 namespace Calor.Soundness.Sweep;
 
-// Mechanical row status, findings, and controls from the retained case results (registration caseResults.rowStatus, findingRecord, controls). Each baseline is
-// computed only from its own results.
+// Mechanical row status, findings, and controls (registration rowStatus, findingRecord, controls); each baseline uses only its own results.
 internal static class Report
 {
     private static readonly HashSet<string> FindingClasses =
@@ -85,7 +84,7 @@ internal static class Report
             }
             File.WriteAllText(Path.Combine(outRoot, b, "row-status.json"), new JsonObject { ["baseline"] = b, ["counts"] = Counts(counts), ["rows"] = statusRows }.ToJsonString(Indented));
             File.WriteAllText(Path.Combine(outRoot, b, "findings-index.json"), findingIndex.ToJsonString(Indented));
-            summary[b] = new JsonObject { ["rowStatusCounts"] = Counts(counts), ["findings"] = findingIndex.Count, ["runValidity"] = pins["nativeZ3Sha256"] != null || pins["processLoadedZ3"] is JsonArray { Count: > 0 } ? "pinned" : "provenance-unconfirmed: native solver image not pinned in-run" };
+            summary[b] = new JsonObject { ["rowStatusCounts"] = Counts(counts), ["findings"] = findingIndex.Count, ["runValidity"] = File.Exists(Path.Combine(outRoot, "invalid-run.jsonl")) ? "INVALID: see invalid-run.jsonl (statuses are not eligible; candidate false proofs stay findings)" : Native(pins, S(pins["binaryDirectory"])) != null ? "pinned" : "provenance-unconfirmed: native solver image not pinned in-run" };
         }
         File.WriteAllText(Path.Combine(outRoot, "summary.json"), summary.ToJsonString(Indented));
         Console.WriteLine(summary.ToJsonString(Indented));
@@ -95,7 +94,8 @@ internal static class Report
     private static JsonObject Finding(string id, string b, string other, string cls, JsonObject r, JsonNode pins, JsonNode registration, string outRoot, JsonObject? otherResult, string rowId, SweepCaseGenerator.Case c)
     {
         var (reproSource, reproOutput) = Reproduction(c.OracleSource);
-        var attempt = JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, b, S((r["attempts"]!.AsArray().LastOrDefault(a => a!["class"]?.GetValue<string>() == cls) ?? r["attempts"]!.AsArray()[^1])!["path"]))))! is var raw && raw["lateObservation"] is JsonObject late ? late : raw;
+        var observations = r["attempts"]!.AsArray().Select(a => JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, b, S(a!["path"]))))! is var raw && raw["lateObservation"] is JsonObject late ? late : raw).ToList();
+        var attempt = observations.LastOrDefault(x => x["class"]?.GetValue<string>() == cls || (x["addedFindings"]?.AsArray().Any(y => S(y) == cls) ?? false)) ?? observations[^1];
         var (claim, o1, guards) = (cls == "false-unconditional-proof" && attempt["claim"]?["token"]?.GetValue<string>() is not ("Proven" or "Discharged") ? attempt["forcedClaim"] : attempt["claim"], attempt["o1"], attempt["guards"]);
         // The in-run pin did not capture the native image; the post-run native-check (same process layout) records what each baseline maps.
         var nativePath = Path.Combine(outRoot, "native-z3-check.json");

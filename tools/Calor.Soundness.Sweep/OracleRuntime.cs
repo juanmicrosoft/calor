@@ -26,9 +26,8 @@ internal static class Roslyn
     public static bool Checked(string oracleSource) => !oracleSource.Contains("public const bool Checked = false;", StringComparison.Ordinal);
 }
 
-// Executes a case's registered oracle program on specific inputs, for two registered uses that IndependentOracle.Evaluate (the O1 verdict, used unchanged) does
-// not expose: recovering the input tuples behind its rendered witness and replay sample (R1-O2), and replaying a solver counterexample model under O1 semantics
-// (spurious-refutation). Compilation mirrors IndependentOracle (BCL only).
+// Runs a case's registered oracle on specific inputs (IndependentOracle.Evaluate, used unchanged for O1, does not expose this): recovering the
+// inputs behind its witness and replay sample (R1-O2), and replaying a solver model under O1 (spurious-refutation). BCL only, as in O1.
 internal sealed class OracleProgram : IDisposable
 {
     private readonly AssemblyLoadContext _context = new("R1OracleRuntime", isCollectible: true);
@@ -161,9 +160,8 @@ internal static class EmittedReplay
     public static JsonObject Run(string emitted, string runtimeDll, IReadOnlyList<ParameterInfo> parameters, string? replay,
         IReadOnlyList<(string Rendered, object?[] Input, string O1)> inputs, string claimKind, string? obligationKind)
     {
-        // Parameters typed object or declared by the oracle (e.g. its own Box) cannot be passed to the emitted Probe
-        // directly: they are copied by member name into the emitted type and bound dynamically; an input the emitted
-        // signature cannot accept is recorded, never coerced.
+        // object or oracle-declared parameters (e.g. its Box) are copied by member name into the emitted type and bound dynamically;
+        // an input the emitted signature cannot accept is recorded, never coerced.
         static bool Bcl(Type t) => t.IsArray ? Bcl(t.GetElementType()!) : t.IsPrimitive || t == typeof(string);
         var signature = string.Join(", ", parameters.Select(p => $"{(Bcl(p.ParameterType) ? CSharpName(p.ParameterType) : "object?")} {p.Name}"));
         var call = replay ?? $"Probe({string.Join(", ", parameters.Select(p => Bcl(p.ParameterType) ? p.Name : $"(dynamic?)__R1Copy({p.Name})"))})";
