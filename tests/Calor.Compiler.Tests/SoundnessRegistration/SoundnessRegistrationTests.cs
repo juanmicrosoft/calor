@@ -272,6 +272,17 @@ public class SoundnessRegistrationTests
         Assert.True(codes.Count == 0, $"unrelated codes fired: {string.Join(", ", codes)}");
     }
 
+    [Theory]
+    [InlineData("9.9.9")]   // not a recorded contract version
+    [InlineData("1.0.5")]   // unrecorded version between real ones
+    public void RegistrationUnderAnUnrecordedContractVersionFailsClosed(string version)
+    {
+        var registration = Registration();
+        registration["contract"]!["contractVersion"] = version;
+        var codes = Validate(registration, Templates(), Manifests()).Select(v => v.Code).ToHashSet();
+        Assert.Equal(new HashSet<string> { "R006" }, codes);
+    }
+
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------

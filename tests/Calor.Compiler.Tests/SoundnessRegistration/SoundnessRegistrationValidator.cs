@@ -31,8 +31,16 @@ internal static class SoundnessRegistrationValidator
             Add("R015", "status must be FROZEN-AT-MERGE");
         if (registration["freeze"]?["decisionBearingInspectionBeforeFreeze"]?.GetValue<bool>() != false)
             Add("R015", "freeze.decisionBearingInspectionBeforeFreeze must be explicitly false");
-        if (Str(registration["contract"], "contractVersion") != Str(contract, "contractVersion"))
-            Add("R006", "registration names a different contract version than contract.json");
+        // The registration records the contract version it was made under. A later amendment does not
+        // invalidate it; the version must be a real contract version no newer than the current one.
+        var registeredVersion = Str(registration["contract"], "contractVersion");
+        var knownVersions = new HashSet<string> { "1.0.0" };
+        foreach (var amendment in contract["amendmentLog"]?.AsArray() ?? new JsonArray())
+            if (Str(amendment, "version") is { } amendedVersion) knownVersions.Add(amendedVersion);
+        if (registeredVersion is null || !knownVersions.Contains(registeredVersion)
+            || !Version.TryParse(registeredVersion, out var registered) || !Version.TryParse(Str(contract, "contractVersion"), out var current)
+            || registered > current)
+            Add("R006", "registration names a contract version that is not a recorded version no newer than contract.json");
 
         // R006 baselines: B1 and N1 commits equal the contract's; both present; distinct.
         var contractBaselines = contract["baselines"]!.AsArray().ToDictionary(b => Str(b, "id")!, b => Str(b, "commit"));
