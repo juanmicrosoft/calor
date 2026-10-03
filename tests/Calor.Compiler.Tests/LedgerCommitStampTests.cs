@@ -1,5 +1,7 @@
-using System.Diagnostics;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using Calor.Compiler.Tests.Provenance;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
@@ -29,85 +31,61 @@ namespace Calor.Compiler.Tests;
 /// is reachable; every entry's <c>measuredCommit</c> still matches the ledger it describes, so the
 /// index cannot drift away from the files it speaks for; and every ledger carrying a
 /// <c>measuredCommit</c> is covered, so #1159 cannot recur by simply not adding an entry.</para>
+///
+/// <para><b>#1417</b>: the #1199 version checked reachability from <c>HEAD</c> (in PR CI, the
+/// merge ref), skipped in a shallow clone, and never verified the bases it asserted. Identities now
+/// resolve only from fetched <c>refs/remotes/origin/main</c>, claimed trees and manifests are
+/// re-read, shallow or unfetched clones fail (<see cref="DurableProvenance"/>), and the website's
+/// benchmark stamps are covered. <c>DurableProvenanceTests</c> exercises the rules on real git.</para>
 /// </summary>
 public class LedgerCommitStampTests
 {
     private const string IndexFile = "commit-stamp-index.json";
+    private const string WriteBackVariable = "CALOR_PROVENANCE_WRITEBACK";
+    private static readonly string[] PublicationStampNames = { "commit", "sourceCommit" };
 
-    // SkippableFact, not Fact: Skip.If throws, and xUnit reports that as a FAILURE on a
-    // plain [Fact]. Caught by CI rather than locally, because a developer clone is not
-    // shallow and the guard never fired here.
-    [SkippableFact]
-    public void EveryIndexedCommitResolvesAndIsReachableFromThisBranch()
+    [Fact]
+    public void EveryAuthoritativeIdentityResolvesFromProtectedMain()
     {
         var root = RepoRoot();
-        Skip.If(IsShallowClone(root),
-            "shallow clone: history is not present, so reachability cannot be decided here");
+        var entries = AllEntries(root);
+        var result = DurableProvenance.Verify(new GitRepo(root), entries);
 
-        var failures = new List<string>();
-        var checkedCount = 0;
-
-        foreach (var entry in IndexEntries(root))
-        {
-            var ledger = entry.GetProperty("ledger").GetString()!;
-            var sha = entry.GetProperty("resolvableOnMain").GetString()!;
-            checkedCount++;
-
-            if (sha.Length != 40 || !sha.All(Uri.IsHexDigit))
-            {
-                failures.Add($"{ledger}: resolvableOnMain '{sha}' is not a full commit sha");
-                continue;
-            }
-            if (!Git(root, "cat-file", "-e", $"{sha}^{{commit}}"))
-            {
-                failures.Add(
-                    $"{ledger}: {sha} does not resolve in this repository. A stamp written on a "
-                    + "branch names a commit the squash-merge discards (#1159).");
-                continue;
-            }
-            if (!Git(root, "merge-base", "--is-ancestor", sha, "HEAD"))
-            {
-                failures.Add(
-                    $"{ledger}: {sha} resolves but is not reachable from HEAD, so a fresh clone "
-                    + "cannot check it (#1159).");
-            }
-        }
-
-        Assert.True(checkedCount >= 5, $"expected at least five indexed ledgers; found {checkedCount}");
-        Assert.True(failures.Count == 0,
-            $"{failures.Count} of {checkedCount} indexed commits do not resolve on this branch:"
-            + Environment.NewLine + string.Join(Environment.NewLine, failures));
+        Assert.True(result.Findings.Count == 0,
+            $"{result.Findings.Count} provenance findings (§6; fetch full history and origin/main if " + "this is a fresh or shallow clone):" + Environment.NewLine
+            + string.Join(Environment.NewLine, result.Findings));
+        Assert.True(entries.Count >= 11, $"expected at least 11 indexed stamps; found {entries.Count}");
+        Assert.Equal(entries.Count, result.Authoritative.Count + result.Pending.Count);
     }
 
     /// <summary>
     /// The index describes real files, and keeps describing them. Without this it could drift into
-    /// a set of true statements about ledgers that have since been re-measured.
+    /// a set of true statements about artifacts that have since been re-measured.
     /// </summary>
     [Fact]
-    public void EveryIndexEntryStillMatchesItsLedgersOwnStamp()
+    public void EveryIndexEntryStillMatchesItsArtifactsOwnStamp()
     {
         var root = RepoRoot();
-        var bench = Path.Combine(root, "bench", "phase0-agent-native");
         var mismatches = new List<string>();
 
-        foreach (var entry in IndexEntries(root))
+        foreach (var entry in AllEntries(root))
         {
-            var ledger = entry.GetProperty("ledger").GetString()!;
+            var subject = DurableProvenance.Subject(entry);
             var expected = entry.GetProperty("measuredCommit").GetString()!;
-            var path = Path.Combine(bench, ledger);
-
+            var path = Path.Combine(root, DurableProvenance.ArtifactPath(entry));
             if (!File.Exists(path))
             {
-                mismatches.Add($"{ledger}: indexed but the file does not exist");
+                mismatches.Add($"{subject}: indexed but the file does not exist");
                 continue;
             }
 
             using var doc = JsonDocument.Parse(File.ReadAllText(path));
-            var actual = MeasuredCommit(doc.RootElement);
+            var pointer = DurableProvenance.StampPointer(entry);
+            var actual = pointer == null ? MeasuredCommit(doc.RootElement) : AtPointer(doc.RootElement, pointer);
             if (actual == null)
-                mismatches.Add($"{ledger}: indexed but records no measuredCommit");
-            else if (!string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase))
-                mismatches.Add($"{ledger}: index says {expected}, ledger says {actual}");
+                mismatches.Add($"{subject}: indexed but records no stamp there");
+            else if (!string.Equals(actual, expected, StringComparison.Ordinal))
+                mismatches.Add($"{subject}: index says {expected}, artifact says {actual}");
         }
 
         Assert.Empty(mismatches);
@@ -122,7 +100,7 @@ public class LedgerCommitStampTests
     {
         var root = RepoRoot();
         var bench = Path.Combine(root, "bench", "phase0-agent-native");
-        var indexed = IndexEntries(root)
+        var indexed = IndexEntries(root, "ledgers")
             .Select(e => e.GetProperty("ledger").GetString()!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -150,6 +128,125 @@ public class LedgerCommitStampTests
             + string.Join(", ", unindexed));
     }
 
+    /// <summary>
+    /// #1417: the website's benchmark data stamps short SHAs (<c>c2a8816d</c>). Every
+    /// <c>commit</c>/<c>sourceCommit</c> stamp under <c>website/public/data/</c> must be indexed with a
+    /// durable identity, so a stamp added later cannot bypass the check.
+    /// </summary>
+    [Fact]
+    public void EveryPublishedBenchmarkStampIsIndexed()
+    {
+        var root = RepoRoot();
+        var data = Path.Combine(root, "website", "public", "data");
+        var found = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var file in Directory.EnumerateFiles(data, "*.json"))
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(file));
+            var relative = Path.GetRelativePath(root, file).Replace('\\', '/');
+            CollectStamps(doc.RootElement, "", relative, found);
+        }
+
+        var indexed = IndexEntries(root, "publicationStamps")
+            .Select(DurableProvenance.Subject)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.True(found.Count >= 6, $"expected at least six published stamps; found {found.Count}");
+        var missing = found.Where(s => !indexed.Contains(s)).ToList();
+        Assert.True(missing.Count == 0,
+            "published stamps without a durable identity in " + IndexFile + " (#1417): "
+            + string.Join(", ", missing));
+    }
+
+    /// <summary>
+    /// §6(b) phase 2. A pending identity either has not landed on protected main yet, or it landed
+    /// with every phase-1 tree unchanged. A landing that changed a measured tree fails here rather
+    /// than waiting for someone to notice. With <c>CALOR_PROVENANCE_WRITEBACK=1</c> the completed
+    /// identities are written into the index for the write-back PR.
+    /// </summary>
+    [Fact]
+    public void PendingIdentitiesAwaitLandingOrCompleteWithEqualTrees()
+    {
+        var root = RepoRoot();
+        var git = new GitRepo(root);
+        var failures = new List<string>();
+        var completions = new Dictionary<string, JsonObject>(StringComparer.Ordinal);
+
+        foreach (var entry in AllEntries(root))
+        {
+            if (!entry.TryGetProperty("durableIdentity", out var identity)
+                || !identity.TryGetProperty("status", out var status)
+                || status.GetString() != "pending")
+                continue;
+
+            var (completed, failure) = DurableProvenance.CompleteWriteBack(git, entry);
+            if (failure != null) failures.Add(failure.ToString());
+            else if (completed != null) completions[DurableProvenance.Subject(entry)] = completed;
+        }
+
+        Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
+
+        if (completions.Count > 0
+            && Environment.GetEnvironmentVariable(WriteBackVariable) == "1")
+        {
+            WriteBack(root, completions);
+        }
+    }
+
+    private static void WriteBack(string root, Dictionary<string, JsonObject> completions)
+    {
+        var path = IndexPath(root);
+        var index = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        foreach (var array in new[] { "ledgers", "publicationStamps" })
+        {
+            if (index[array] is not JsonArray entries) continue;
+            foreach (var node in entries)
+            {
+                var element = JsonDocument.Parse(node!.ToJsonString()).RootElement;
+                if (completions.TryGetValue(DurableProvenance.Subject(element), out var completed))
+                    node.AsObject()["durableIdentity"] = completed.DeepClone();
+            }
+        }
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        };
+        File.WriteAllText(path, index.ToJsonString(options) + "\n");
+    }
+
+    private static void CollectStamps(JsonElement element, string pointer, string file, ISet<string> found)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                var child = pointer + "/" + property.Name;
+                if (property.Value.ValueKind == JsonValueKind.String
+                    && PublicationStampNames.Contains(property.Name, StringComparer.Ordinal))
+                    found.Add(file + "#" + child);
+                else
+                    CollectStamps(property.Value, child, file, found);
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            var i = 0;
+            foreach (var item in element.EnumerateArray())
+                CollectStamps(item, pointer + "/" + i++, file, found);
+        }
+    }
+
+    private static string? AtPointer(JsonElement root, string pointer)
+    {
+        var current = root;
+        foreach (var part in pointer.Trim('/').Split('/'))
+        {
+            if (current.ValueKind != JsonValueKind.Object || !current.TryGetProperty(part, out current))
+                return null;
+        }
+        return current.ValueKind == JsonValueKind.String ? current.GetString() : null;
+    }
+
     private static string? MeasuredCommit(JsonElement root)
     {
         foreach (var property in root.EnumerateObject())
@@ -163,35 +260,20 @@ public class LedgerCommitStampTests
         return null;
     }
 
-    private static List<JsonElement> IndexEntries(string root)
+    private static string IndexPath(string root)
+        => Path.Combine(root, "bench", "phase0-agent-native", IndexFile);
+
+    private static List<JsonElement> AllEntries(string root)
+        => IndexEntries(root, "ledgers").Concat(IndexEntries(root, "publicationStamps")).ToList();
+
+    private static List<JsonElement> IndexEntries(string root, string array)
     {
-        var path = Path.Combine(root, "bench", "phase0-agent-native", IndexFile);
+        var path = IndexPath(root);
         Assert.True(File.Exists(path), $"{IndexFile} is missing — #1159's provenance record");
         using var doc = JsonDocument.Parse(File.ReadAllText(path));
-        return doc.RootElement.GetProperty("ledgers").EnumerateArray()
-            .Select(e => e.Clone()).ToList();
-    }
-
-    private static bool IsShallowClone(string root)
-        => Run(root, "rev-parse", "--is-shallow-repository").Output
-            .Trim().Equals("true", StringComparison.OrdinalIgnoreCase);
-
-    private static bool Git(string root, params string[] args) => Run(root, args).ExitCode == 0;
-
-    private static (int ExitCode, string Output) Run(string root, params string[] args)
-    {
-        var info = new ProcessStartInfo("git")
-        {
-            WorkingDirectory = root,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        };
-        foreach (var arg in args) info.ArgumentList.Add(arg);
-        using var process = Process.Start(info)!;
-        var output = process.StandardOutput.ReadToEnd();
-        process.StandardError.ReadToEnd();
-        process.WaitForExit();
-        return (process.ExitCode, output);
+        Assert.True(doc.RootElement.TryGetProperty(array, out var entries)
+            && entries.ValueKind == JsonValueKind.Array, $"{IndexFile} has no '{array}' array");
+        return entries.EnumerateArray().Select(e => e.Clone()).ToList();
     }
 
     private static string RepoRoot()
