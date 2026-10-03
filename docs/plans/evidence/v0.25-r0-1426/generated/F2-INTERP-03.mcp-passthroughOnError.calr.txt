@@ -1,18 +1,10 @@
-§M{m001:F2INTERP03:overflow=unchecked}
+§M{m001:ConvertedModule:overflow=unchecked}
   §U{System}
   §U{System.Runtime.CompilerServices}
   §U{System.Text}
 
-  §CL{c001:Probe:pub:stat}
-    §MT{m002:Log:pub:stat} (RecordingHandler:handler) -> str
-      §R §C{handler.Result}
-
-    §MT{m003:Run:pub:stat} () -> str
-      §B{i32:x} 7
-      §R §C{Log} "a${x}b"
-
-
-  §CSHARP{
+  §NS{ns_global:_global:global}
+    §CSHARP{
 [InterpolatedStringHandler]
 public ref struct RecordingHandler
 {
@@ -39,5 +31,20 @@ public ref struct RecordingHandler
         return builder.ToString();
     }
 }
-  }§/CSHARP
+    }§/CSHARP
+
+    §CSHARP{public static class Probe
+{
+    public static string Log(RecordingHandler handler)
+    {
+        return handler.Result();
+    }
+
+    public static string Run()
+    {
+        int x = 7;
+        return Log($"a{x}b");
+    }
+}}§/CSHARP
+
 

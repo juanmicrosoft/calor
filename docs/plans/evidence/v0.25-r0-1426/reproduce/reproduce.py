@@ -38,6 +38,8 @@ CALR = ".calr.txt"
 # rejects new .cs files outside tests/ and bench/. They are copied to a temporary .cs to run.
 CS = ".cs.txt"
 TMP = tempfile.mkdtemp(prefix="r0-1426-")
+MCP_MODES = {"default": {}, "passthroughOnError": {"passthroughOnError": True},
+             "passthroughOnError-moduleName": {"passthroughOnError": True, "moduleName": "Custom"}}
 
 
 def norm(text):
@@ -103,18 +105,20 @@ def compile_with_fallback(calr, gcs):
 
 
 def mcp_convert(cases):
-    """One MCP stdio session: calor_convert with default args, plus passthroughOnError=true."""
+    """One MCP stdio session: calor_convert with default args, with passthroughOnError=true, and
+    (a separate witness) passthroughOnError=true plus a custom moduleName."""
     msgs = [{"jsonrpc": "2.0", "id": 0, "method": "initialize",
              "params": {"protocolVersion": "2024-11-05", "capabilities": {},
                         "clientInfo": {"name": "r0-1426", "version": "1"}}}]
     ids = {}
     for i, (case, src) in enumerate(cases):
-        for j, extra in enumerate(({}, {"passthroughOnError": True})):
-            rid = 1 + i * 2 + j
-            ids[rid] = (case, "default" if not extra else "passthroughOnError")
+        for j, (mode, extra) in enumerate(MCP_MODES.items()):
+            rid = 1 + i * len(MCP_MODES) + j
+            ids[rid] = (case, mode)
             msgs.append({"jsonrpc": "2.0", "id": rid, "method": "tools/call",
                          "params": {"name": "calor_convert",
-                                    "arguments": {"source": src, "moduleName": case.replace("-", "")} | extra}})
+                                    # Only `source`: every other argument keeps the tool default.
+                                    "arguments": {"source": src} | extra}})
     code, out, _ = run(["mcp", "--stdio", "--no-telemetry"], stdin="\n".join(json.dumps(m) for m in msgs) + "\n")
     results = {}
     for line in out.splitlines():
@@ -228,7 +232,7 @@ def main():
 
     mcp = mcp_convert([(c["case"], open(os.path.join(ROOT, c["fixture"]), encoding="utf-8").read()) for c in cases])
     for row in cases:
-        for mode in ("default", "passthroughOnError"):
+        for mode in MCP_MODES:
             is_error, payload = mcp.get((row["case"], mode), (True, {"missing": True}))
             surf = {"isError": is_error}
             calor = payload.get("calorSource")

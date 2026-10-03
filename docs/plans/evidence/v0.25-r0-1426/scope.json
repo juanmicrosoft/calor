@@ -87,7 +87,9 @@
     "role": [
       "control",
       "residual",
-      "decision"
+      "decision",
+      "interaction",
+      "doc-example"
     ],
     "baselineStatus": [
       "reproduces",
@@ -339,6 +341,11 @@
       }
     ]
   },
+  "evidenceSeal": {
+    "baselineResults": "30d2dbd09255df298928c5f5baf0a1549112eca16ee62ea7a8f1f689552669af",
+    "generated": "e15ae8e61ca9cabab0f3bf02cf70cb5a74e40598931705a9cbe9799bdd9b1fbf",
+    "rule": "baselineResults: SHA-256 of baseline-results.json (LF-normalized). generated: SHA-256 of the sorted lines '<repo path> <file SHA-256>' over generated/. Regenerating either is an amendment."
+  },
   "cases": [
     {
       "id": "F1-REFOUT-01",
@@ -400,9 +407,9 @@
         "cli-default": "preserved-match",
         "cli-passthrough": "preserved-match",
         "mcp-default": "compile-error:Calor1002",
-        "mcp-passthroughOnError": "compile-error:Calor1002"
+        "mcp-passthroughOnError": "preserved-match"
       },
-      "note": "Named/reordered `out`, `in`, and out-before-exception emit native modifiers, but the member fails on an unrelated empty-catch defect (X-TRYCATCH-01): CLI rescues it as interop; MCP returns isError with Calor1002 (CS0161)."
+      "note": "Named/reordered `out`, `in`, and out-before-exception emit native modifiers, but the member fails on an unrelated empty-catch defect (X-TRYCATCH-01). Rescue paths (CLI, MCP passthroughOnError) preserve it as interop; MCP default returns isError (Calor1002, CS0161)."
     },
     {
       "id": "F1-REFOUT-05",
@@ -448,9 +455,9 @@
         "cli-default": "preserved-match",
         "cli-passthrough": "preserved-match",
         "mcp-default": "compile-error:Calor0208",
-        "mcp-passthroughOnError": "compile-error:Calor0208"
+        "mcp-passthroughOnError": "preserved-match"
       },
-      "note": "Generic `out T` and an `out` parameter with [NotNullWhen(true)]: the contract says these stay preserved or refused unless #1427 admits them. CLI rescues `Probe` (mislabeled as --passthrough); MCP converts natively and the compiler rejects `TryCast<str>(5, out s)` (Calor0208, isError). The attribute is carried as `[@NotNullWhen(true)]` with no flow meaning."
+      "note": "Generic `out T` and an `out` parameter with [NotNullWhen(true)]: the contract says these stay preserved or refused unless #1427 admits them. Rescue paths preserve `Probe`; MCP default converts natively and the compiler rejects `TryCast<str>(5, out s)` (Calor0208, isError). The attribute is carried as `[@NotNullWhen(true)]` with no flow meaning."
     },
     {
       "id": "F1-REFOUT-08",
@@ -478,6 +485,17 @@
       "fixtureSha256": null,
       "baseline": {},
       "note": "Analysis row: by-reference mutation must invalidate pre-call nullability and contract facts and refuse or demote proofs. Not fixtured at R0; see 0.24 S1 `OBL-MUTATION-KILL` (PR #1480, undispositioned)."
+    },
+    {
+      "id": "F1-REFOUT-A2",
+      "family": "F1",
+      "role": "residual",
+      "expected": "rejected",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "note": "Analysis row: effect charging for mutation through `ref`/`out` and conservative handling of unresolved callees (#1427). Not fixtured at R0."
     },
     {
       "id": "F2-INTERP-01",
@@ -523,9 +541,9 @@
         "cli-default": "preserved-match",
         "cli-passthrough": "preserved-match",
         "mcp-default": "compile-error:Calor0208",
-        "mcp-passthroughOnError": "compile-error:Calor0208"
+        "mcp-passthroughOnError": "preserved-match"
       },
-      "note": "Custom interpolated-string handler: CLI preserves the handler type and rescues `Probe` (mislabeled as --passthrough); MCP converts the call natively, flattens the argument to STRING and fails (isError; Calor0208). Not silent, but not refused at conversion time."
+      "note": "Custom interpolated-string handler: rescue paths preserve the handler type and `Probe`; MCP default converts the call natively, flattens the argument to STRING and fails (isError; Calor0208). Not silent, but not refused at conversion time."
     },
     {
       "id": "F2-INTERP-04",
@@ -586,6 +604,28 @@
       "note": "Culture: de-DE current culture through a string target and FormattableString.ToString(InvariantCulture) match. The default compile fails on an unrelated Calor0410 (the culture setter); the comparison uses --permissive-effects."
     },
     {
+      "id": "F2-INTERP-08",
+      "family": "F2",
+      "role": "residual",
+      "expected": "native-or-preserved",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "note": "Competing overloads where target typing changes the selected method observably (string vs FormattableString vs IFormattable vs a handler), asserting the selected overload. Not fixtured at R0."
+    },
+    {
+      "id": "F2-INTERP-09",
+      "family": "F2",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "note": "F-2 incomplete-binding counts over the corpus before and after the fix (#906 closure). Not measured at R0 (corpus not used)."
+    },
+    {
       "id": "F3-LOCAL-01",
       "family": "F3",
       "role": "residual",
@@ -634,6 +674,33 @@
       "note": "C-2 (shadows an inherited method), C-3 (shadows an overload), a forward call, and a delegate to a local function: all three members preserved as `§CSHARP`; behavior matches under --permissive-effects. Not native."
     },
     {
+      "id": "F3-LOCAL-04",
+      "family": "F3",
+      "role": "control",
+      "expected": "preserved",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-04.cs.txt",
+      "fixtureSha256": "535b0d42cd66296e5711ab8a6f698c9dbf8322ec06cf5766edb4299c65cde837",
+      "baseline": {
+        "cli-default": "preserved-match@permissive-effects",
+        "cli-passthrough": "preserved-match@permissive-effects",
+        "mcp-default": "preserved-match@permissive-effects",
+        "mcp-passthroughOnError": "preserved-match@permissive-effects"
+      },
+      "note": "Outside the frozen slice: capturing, generic and iterator local functions stay preserved as `§CSHARP` on every surface; behavior matches under --permissive-effects. They must never count as native."
+    },
+    {
+      "id": "F3-LOCAL-A1",
+      "family": "F3",
+      "role": "residual",
+      "expected": "native-or-rejected",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "note": "Analysis row: binding, effects and verification visit native local-function bodies and call edges, or refuse; no proof from omitted bodies (#847). Not fixtured at R0."
+    },
+    {
       "id": "F4-ITER-01",
       "family": "F4",
       "role": "residual",
@@ -645,9 +712,9 @@
         "cli-default": "preserved-match",
         "cli-passthrough": "preserved-match",
         "mcp-default": "compile-error:Calor0209",
-        "mcp-passthroughOnError": "compile-error:Calor0209"
+        "mcp-passthroughOnError": "preserved-match"
       },
-      "note": "Legal iterator property and indexer: MCP/library emits `§YIELD`/`§YBRK` in accessors and fails Calor0209 (isError). The CLI hides this by rescuing both classes (mislabeled as --passthrough); the rescued output matches, including laziness."
+      "note": "Legal iterator property and indexer: the converter emits `§YIELD`/`§YBRK` in accessors; MCP default fails Calor0209 (isError). Rescue paths (CLI, MCP passthroughOnError) preserve both classes and match, including laziness."
     },
     {
       "id": "F4-ITER-02",
@@ -661,9 +728,33 @@
         "cli-default": "preserved-match",
         "cli-passthrough": "preserved-match",
         "mcp-default": "compile-error:Calor0209",
-        "mcp-passthroughOnError": "compile-error:Calor0209"
+        "mcp-passthroughOnError": "preserved-match"
       },
-      "note": "Disposal and exceptions: an abandoned iterator property runs its finally; an iterator indexer throws on the second MoveNext. MCP fails Calor0209; the CLI rescue preserves both, and behavior matches."
+      "note": "Disposal and exceptions: an abandoned iterator property runs its finally; an iterator indexer throws on the second MoveNext. MCP default fails Calor0209; rescue paths preserve both, and behavior matches."
+    },
+    {
+      "id": "F4-ITER-03",
+      "family": "F4",
+      "role": "control",
+      "expected": "rejected",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-03.calr.txt",
+      "fixtureSha256": "dd1de7e8703042dfb740ce1a58cc364c4b3f3af7b2c9571291397423613187e6",
+      "baseline": {
+        "compile": "compile-error:Calor0209@line12"
+      },
+      "note": "Native Calor with `§YIELD` in a property accessor (the MCP output of F4-ITER-01) keeps Calor0209."
+    },
+    {
+      "id": "F4-ITER-04",
+      "family": "F4",
+      "role": "residual",
+      "expected": "preserved",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "note": "The three historical FluentValidation modules (EmptyTester, NotEmptyTester, ITestValidationContinuation) through the pinned CLI with project references. Not re-run at R0."
     },
     {
       "id": "F5-ARRAY-01",
@@ -677,9 +768,9 @@
         "cli-default": "preserved-match",
         "cli-passthrough": "preserved-match",
         "mcp-default": "compile-error:Calor0410;permissive-effects:Calor1002",
-        "mcp-passthroughOnError": "compile-error:Calor0410;permissive-effects:Calor1002"
+        "mcp-passthroughOnError": "preserved-match"
       },
-      "note": "Historical repro unchanged on the native path: `§ARR2D{arr2d004:arr2d005:Cell}` then `§R arr2d005` gives CS0201 and CS0103 `arr2d005` (plus CS1061 on `§IDX2D ... .V`). MCP fails (isError); the CLI rescues both classes. The epic's 'id/name repair already exists' does not hold for this shape."
+      "note": "Historical repro unchanged on the native path: `§ARR2D{arr2d004:arr2d005:Cell}` then `§R arr2d005` gives CS0201 and CS0103 `arr2d005` (plus CS1061 on `§IDX2D ... .V`). MCP default fails (isError); rescue paths preserve both classes. The epic's 'id/name repair already exists' does not hold for this shape."
     },
     {
       "id": "F5-ARRAY-02",
@@ -692,26 +783,10 @@
       "baseline": {
         "cli-default": "preserved-match",
         "cli-passthrough": "preserved-match",
-        "mcp-default": "compile-error:Calor0106",
-        "mcp-passthroughOnError": "compile-error:Calor0106"
+        "mcp-default": "preserved-match",
+        "mcp-passthroughOnError": "preserved-match"
       },
-      "note": "Arrays as an argument and in conditional branches: the native path emits Calor that does not parse (Calor0106 unknown operator `?`); MCP fails, the CLI rescues `Probe`. Rescued output matches, including no evaluation of the unselected branch."
-    },
-    {
-      "id": "F5-ARRAY-04",
-      "family": "F5",
-      "role": "residual",
-      "expected": "native",
-      "baselineStatus": "reproduces",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-04.cs.txt",
-      "fixtureSha256": "1df08bb7a06b2fe17d12a629ff4966d5c5a0f4b79d7ef0248033bd804e7b73b8",
-      "baseline": {
-        "cli-default": "preserved-match",
-        "cli-passthrough": "preserved-match",
-        "mcp-default": "compile-error:Calor1002",
-        "mcp-passthroughOnError": "compile-error:Calor1002"
-      },
-      "note": "User parameters named `_hoist000` and `arr2d005` beside a returned 2-D array, and an element initializer that throws after earlier elements ran. MCP fails (CS0201 from the expression-position `§ARR2D`), so name collision and exception order cannot be observed natively; the CLI rescue matches."
+      "note": "Arrays as an argument and in conditional branches: the native output does not parse (Calor0106 unknown operator `?`), so even MCP default rescues `Probe` through the parse-failure path. Rescued output matches, including no evaluation of the unselected branch."
     },
     {
       "id": "F5-ARRAY-03",
@@ -728,6 +803,38 @@
         "mcp-passthroughOnError": "native-match"
       },
       "note": "Statement-position 1-D and 2-D arrays bound to declared locals convert natively and match."
+    },
+    {
+      "id": "F5-ARRAY-04",
+      "family": "F5",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-04.cs.txt",
+      "fixtureSha256": "2e7526e66a9977db37cb33f112e4c56da82517c424ba1520085c46d0023cbe51",
+      "baseline": {
+        "cli-default": "preserved-match",
+        "cli-passthrough": "preserved-match",
+        "mcp-default": "compile-error:Calor0260",
+        "mcp-passthroughOnError": "preserved-match"
+      },
+      "note": "Name collision: in `Run` the converter hoists array elements into `_hoist000`, the name of a user local in the same scope; the native output is rejected (Calor0260, immutable binding rebound). Grid's parameters match the generated `§ARR2D` id and name. Exception order is observable only on rescue paths, where it matches."
+    },
+    {
+      "id": "F5-ARRAY-05",
+      "family": "F5",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-05.cs.txt",
+      "fixtureSha256": "c7ed707f207831d97c47b0be757348365753a43978b233c226954d67dda3f806",
+      "baseline": {
+        "cli-default": "preserved-match",
+        "cli-passthrough": "preserved-match",
+        "mcp-default": "compile-error:Calor0410;permissive-effects:Calor1002",
+        "mcp-passthroughOnError": "preserved-match"
+      },
+      "note": "Rank and initializer matrix in expression position (jagged, rank 3, sized with initializer, implicitly typed, array nested in an initializer): MCP default fails; rescue paths preserve `Probe` and match."
     },
     {
       "id": "F6-REPORT-01",
@@ -809,10 +916,18 @@
           "case": "F4-ITER-01",
           "surface": "mcp-passthroughOnError",
           "path": "isError",
-          "equals": true
+          "equals": false
+        },
+        {
+          "case": "F4-ITER-01",
+          "surface": "mcp-passthroughOnError",
+          "path": "lossFeatures",
+          "equals": [
+            "post-validation-fallback"
+          ]
         }
       ],
-      "note": "Same input, different outcome by surface: CLI default rescues (success, 2 interop); MCP `calor_convert` default and with passthroughOnError returns isError with no rescue. A legitimate default difference that no output explains."
+      "note": "Default difference: CLI `calor convert` rescues by default (RescueUnusableMembers = true); MCP `calor_convert` with default arguments does not and returns isError; MCP with passthroughOnError rescues like the CLI. No output names the path that fired or the default that applied."
     },
     {
       "id": "F6-REPORT-04",
@@ -824,7 +939,7 @@
       "fixtureSha256": null,
       "baseline": {},
       "observations": [],
-      "note": "Project-level `calor migrate`: defaults, rescue/passthrough precedence, aggregation, partial failure and exit code. Not exercised at R0."
+      "note": "Project-level `calor migrate`: defaults, rescue/passthrough precedence, member/file/project aggregation, partial failure, exit code. Not exercised at R0."
     },
     {
       "id": "F6-REPORT-05",
@@ -836,7 +951,7 @@
       "fixtureSha256": null,
       "baseline": {},
       "observations": [],
-      "note": "MCP `calor_migrate` (MigrateTool sets PassthroughOnError = false): outcome and provenance reporting. Not exercised at R0."
+      "note": "MCP `calor_migrate` (MigrateTool sets PassthroughOnError = false): outcome, provenance and partial failure. Not exercised at R0."
     },
     {
       "id": "F6-REPORT-06",
@@ -848,7 +963,7 @@
       "fixtureSha256": null,
       "baseline": {},
       "observations": [],
-      "note": "MCP `calor_batch`: per-file and aggregate reporting, partial batch failure. Not exercised at R0."
+      "note": "MCP `calor_batch`: per-file and aggregate reporting, partial batch failure, protocol error behavior. Not exercised at R0."
     },
     {
       "id": "F6-REPORT-07",
@@ -925,6 +1040,55 @@
       "baseline": {},
       "observations": [],
       "note": "Exit status per documented mode, `--lossy`, and rejected outcomes across CLI and MCP. Not exercised at R0."
+    },
+    {
+      "id": "F6-REPORT-11",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [
+        {
+          "case": "F4-ITER-01",
+          "surface": "mcp-passthroughOnError-moduleName",
+          "path": "isError",
+          "equals": true
+        },
+        {
+          "case": "F4-ITER-01",
+          "surface": "mcp-passthroughOnError",
+          "path": "isError",
+          "equals": false
+        }
+      ],
+      "note": "An unrelated option changes whether rescue fires: MCP `calor_convert` with passthroughOnError and a custom moduleName does not rescue F4-ITER-01 (isError), while the same call without moduleName does. The module name becomes the namespace identity that the rescue requires to match."
+    },
+    {
+      "id": "F6-REPORT-12",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [],
+      "note": "Both rescue and passthrough enabled versus rescue disabled, on every surface that exposes them; precedence when both fire. Not exercised beyond F6-REPORT-02/03."
+    },
+    {
+      "id": "F6-REPORT-13",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [],
+      "note": "Structured DTO and envelope schema: actual-trigger provenance field or a versioned compatible extension, and wire compatibility. Not exercised at R0."
     }
   ],
   "discovered": [
@@ -1024,6 +1188,15 @@
       "fixtureSha256": null
     },
     {
+      "id": "F1-REFOUT-A2",
+      "family": "F1",
+      "role": "residual",
+      "expected": "rejected",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null
+    },
+    {
       "id": "F2-INTERP-01",
       "family": "F2",
       "role": "control",
@@ -1087,6 +1260,24 @@
       "fixtureSha256": "84fca44ef923afbc1623710353095d49bce1dc5ad533969ccc8ec0928cb7c33e"
     },
     {
+      "id": "F2-INTERP-08",
+      "family": "F2",
+      "role": "residual",
+      "expected": "native-or-preserved",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null
+    },
+    {
+      "id": "F2-INTERP-09",
+      "family": "F2",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null
+    },
+    {
       "id": "F3-LOCAL-01",
       "family": "F3",
       "role": "residual",
@@ -1114,6 +1305,24 @@
       "fixtureSha256": "677a392baa87e118ce915adf7fcec4c6983f3a4ba874c525674bbacfecfb8326"
     },
     {
+      "id": "F3-LOCAL-04",
+      "family": "F3",
+      "role": "control",
+      "expected": "preserved",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-04.cs.txt",
+      "fixtureSha256": "535b0d42cd66296e5711ab8a6f698c9dbf8322ec06cf5766edb4299c65cde837"
+    },
+    {
+      "id": "F3-LOCAL-A1",
+      "family": "F3",
+      "role": "residual",
+      "expected": "native-or-rejected",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null
+    },
+    {
       "id": "F4-ITER-01",
       "family": "F4",
       "role": "residual",
@@ -1130,6 +1339,24 @@
       "baselineStatus": "reproduces",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-02.cs.txt",
       "fixtureSha256": "3a7a1da86ae98ee3ab5c935f8849701e38e2bfdaa7adc10b95b1a394e38a3820"
+    },
+    {
+      "id": "F4-ITER-03",
+      "family": "F4",
+      "role": "control",
+      "expected": "rejected",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-03.calr.txt",
+      "fixtureSha256": "dd1de7e8703042dfb740ce1a58cc364c4b3f3af7b2c9571291397423613187e6"
+    },
+    {
+      "id": "F4-ITER-04",
+      "family": "F4",
+      "role": "residual",
+      "expected": "preserved",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null
     },
     {
       "id": "F5-ARRAY-01",
@@ -1150,15 +1377,6 @@
       "fixtureSha256": "e235ce21ba8e2abca01e9c93d89f4beff240e384410307ee2fe0b9e5247bc674"
     },
     {
-      "id": "F5-ARRAY-04",
-      "family": "F5",
-      "role": "residual",
-      "expected": "native",
-      "baselineStatus": "reproduces",
-      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-04.cs.txt",
-      "fixtureSha256": "1df08bb7a06b2fe17d12a629ff4966d5c5a0f4b79d7ef0248033bd804e7b73b8"
-    },
-    {
       "id": "F5-ARRAY-03",
       "family": "F5",
       "role": "control",
@@ -1166,6 +1384,24 @@
       "baselineStatus": "control-passes",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-03.cs.txt",
       "fixtureSha256": "e90768eca604330a7e503944136d3a3309bc87730bf4a424527935b5da5d36f0"
+    },
+    {
+      "id": "F5-ARRAY-04",
+      "family": "F5",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-04.cs.txt",
+      "fixtureSha256": "2e7526e66a9977db37cb33f112e4c56da82517c424ba1520085c46d0023cbe51"
+    },
+    {
+      "id": "F5-ARRAY-05",
+      "family": "F5",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-05.cs.txt",
+      "fixtureSha256": "c7ed707f207831d97c47b0be757348365753a43978b233c226954d67dda3f806"
     },
     {
       "id": "F6-REPORT-01",
@@ -1250,6 +1486,33 @@
     },
     {
       "id": "F6-REPORT-10",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null
+    },
+    {
+      "id": "F6-REPORT-11",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": null,
+      "fixtureSha256": null
+    },
+    {
+      "id": "F6-REPORT-12",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null
+    },
+    {
+      "id": "F6-REPORT-13",
       "family": "F6",
       "role": "residual",
       "expected": "native",

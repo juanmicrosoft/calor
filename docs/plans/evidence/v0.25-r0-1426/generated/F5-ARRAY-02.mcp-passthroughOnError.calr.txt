@@ -1,39 +1,44 @@
-§M{m001:F5ARRAY02:overflow=unchecked}
+§M{m001:ConvertedModule:overflow=unchecked}
   §U{System}
 
-  §CL{c001:Probe:pub:stat}
-    §FLD{str:log:priv:stat} = ""
+  §NS{ns_global:_global:global}
+    §CSHARP{public static class Probe
+{
+    private static string log = "";
 
-    §MT{m002:Side:pub:stat} (i32:v) -> i32
-      §ASSIGN log (+ log v)
-      §R v
+    public static int Side(int v)
+    {
+        log = log + v;
+        return v;
+    }
 
-    §MT{m003:Sum:pub:stat} (i32[]:xs) -> i32
-      §B{~s:i32} 0
-      §EACH{each004:x:var} xs
-        §ASSIGN s (+ s x)
-      §R s
+    public static int Sum(int[] xs)
+    {
+        int s = 0;
+        foreach (var x in xs)
+        {
+            s = s + x;
+        }
+        return s;
+    }
 
-    §MT{m005:Pick:pub:stat} (bool:flag) -> i32[]
-      §R §IF{tern000} flag → §ARR{arrI32006:i32} §C{Side} §A 1 §/C §C{Side} §A 2 §/C §/ARR{arrI32006} §EL → §ARR{arrI32007:i32} §C{Side} §A 3 §/C §/ARR{arrI32007}
+    public static int[] Pick(bool flag)
+    {
+        return flag ? new int[] { Side(1), Side(2) } : new int[] { Side(3) };
+    }
 
-    §MT{m008:Pick2D:pub:stat} (bool:flag) -> i32[,]
-      §ARR2D{arr2d009:arr2d010:i32}
-        §ROW §C{Side} §A 4 §/C
-      §ARR2D{arr2d011:arr2d012:i32}
-        §ROW §C{Side} §A 5 §/C
-      §R (? flag  )
+    public static int[,] Pick2D(bool flag)
+    {
+        return flag ? new int[,] { { Side(4) } } : new int[,] { { Side(5) } };
+    }
 
-    §MT{m013:Run:pub:stat} () -> str
-      §B{~_hoist000} §C{Side} 6
-      §B{~_hoist001} §C{Side} 7
-      §ARR{_arrI32015:i32}
-        _hoist000
-        _hoist001
-      §B{i32:a} §C{Sum} _arrI32015
-      §B{~_hoist002} §C{Pick} §A true §/C
-      §B{i32:b} (len _hoist002)
-      §B{i32:c} §IDX2D §C{Pick2D} §A false §/C 0 0
-      §R (+ (+ (+ (+ (+ (+ a "|") b) "|") c) "|") log)
+    public static string Run()
+    {
+        int a = Sum(new int[] { Side(6), Side(7) });
+        int b = Pick(true).Length;
+        int c = Pick2D(false)[0, 0];
+        return a + "|" + b + "|" + c + "|" + log;
+    }
+}}§/CSHARP
 
 

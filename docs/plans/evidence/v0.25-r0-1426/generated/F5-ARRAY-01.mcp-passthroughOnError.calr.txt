@@ -1,36 +1,30 @@
-§M{m001:F5ARRAY01:overflow=unchecked}
+§M{m001:ConvertedModule:overflow=unchecked}
   §U{System}
 
-  §CL{c001:Cell:pub}
-    §FLD{i32:V:pub}
+  §NS{ns_global:_global:global}
+    §CL{c001:Cell:pub}
+      §FLD{i32:V:pub}
 
 
-  §CL{c002:Grid:pub}
-    §MT{m003:Build:pub} () -> Cell[,]
-      §E{alloc,mut}
-      §B{~_hoist000} §NEW{Cell}
-        V = 1
-      §/NEW
-      §B{~_hoist001} §NEW{Cell}
-        V = 2
-      §/NEW
-      §B{~_hoist002} §NEW{Cell}
-        V = 3
-      §/NEW
-      §B{~_hoist003} §NEW{Cell}
-        V = 4
-      §/NEW
-      §ARR2D{arr2d004:arr2d005:Cell}
-        §ROW _hoist000 _hoist001
-        §ROW _hoist002 _hoist003
-      §R arr2d005
+    §CSHARP{public class Grid
+{
+    public Cell[,] Build()
+    {
+        return new Cell[,]
+        {
+            { new Cell { V = 1 }, new Cell { V = 2 } },
+            { new Cell { V = 3 }, new Cell { V = 4 } }
+        };
+    }
+}}§/CSHARP
 
-
-  §CL{c006:Probe:pub:stat}
-    §MT{m007:Run:pub:stat} () -> str
-      §E{alloc,mut}
-      §B{_newGrid008} §NEW{Grid} §/NEW
-      §B{cells} §C{_newGrid008.Build}
-      §R (+ (+ (+ (+ (+ (+ §C{cells.GetLength} §A 0 §/C "x") §C{cells.GetLength} §A 1 §/C) "|") §IDX2D cells 0 1.V) "|") §IDX2D cells 1 0.V)
+    §CSHARP{public static class Probe
+{
+    public static string Run()
+    {
+        var cells = new Grid().Build();
+        return cells.GetLength(0) + "x" + cells.GetLength(1) + "|" + cells[0, 1].V + "|" + cells[1, 0].V;
+    }
+}}§/CSHARP
 
 

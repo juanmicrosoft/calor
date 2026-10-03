@@ -17,14 +17,15 @@
         throw new InvalidOperationException("boom");
     }
 
-    public static int[,] Grid(int _hoist000, int arr2d005)
+    public static int[,] Grid(int arr2d005, int arr2d006)
     {
-        return new int[,] { { Note(_hoist000), Note(arr2d005) } };
+        return new int[,] { { Note(arr2d005), Note(arr2d006) } };
     }
 
     public static string Run()
     {
         var g = Grid(1, 2);
+        int _hoist000 = 50;
         string thrown = "";
         try
         {
@@ -35,7 +36,7 @@
         {
             thrown = e.Message;
         }
-        return g[0, 0] + "|" + g[0, 1] + "|" + thrown + "|" + log;
+        return g[0, 0] + "|" + g[0, 1] + "|" + _hoist000 + "|" + thrown + "|" + log;
     }
 }}§/CSHARP
 
