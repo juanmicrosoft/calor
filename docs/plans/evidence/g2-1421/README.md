@@ -146,8 +146,9 @@ across 150 attempts. The protocol bounds non-determinism; it does not prove its 
   line for line. Its first command must be `set -euo pipefail`, and each gate command must be a
   top-level command: not inside `if`/`for`/`while`/`case`, braces, a subshell, or a heredoc, with
   no `exit`, `set +e`, or `ERR` trap before it. The two matrix shard steps (`tests (…)`,
-  `publish-nuget` `test (…)`) must start with `set -euo pipefail`, run `dotnet test`, and swallow
-  no status. A later step that runs after a failure must only upload artifacts or be registered.
+  `publish-nuget` `test (…)`) must start with `set -euo pipefail`, run `dotnet test`, swallow no
+  status, and match the SHA-256 of their frozen script. A workflow line the parser cannot read as a
+  plain key (quoted key, flow mapping, anchor) fails the gate. A later step that runs after a failure must only upload artifacts or be registered.
   The instrumentation call sites must stay. Residual: a change that rewrites the workflow and
   every copy of the validator it runs at once is visible only to review.
 - **Home directory.** Every invocation gets its own `HOME`/`USERPROFILE` under the job's output

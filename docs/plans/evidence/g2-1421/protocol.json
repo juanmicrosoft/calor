@@ -530,7 +530,7 @@
     "rule": "The recorder and the CaseResult schema are frozen by sha256.json (D015); the three call sites (DifferentialGate.Run, CommittedReportsMatchGeneratedOracle, TranslatorOutputMatchesCommittedBaseline) must stay (D014). Changing either is a protocol amendment."
   },
   "gates": {
-    "rule": "D014 parses each workflow (a minimal parser for the job/step subset; no YAML library is available) and requires every gate step below to exist exactly once as its own run step with no if:, no continue-on-error, and no shell override, in a job with no if: or continue-on-error, after its registered earlier steps. A gate with a frozen script must match it line for line, its first command must be 'set -euo pipefail', and each gate command must be a top-level command (not inside if/for/while/case, braces, a subshell, or a heredoc; no ||, &&, ;, &) with no exit, return, set +e, or ERR trap before it. A shard step (a matrix job whose dotnet test runs in a per-shard branch) must start with 'set -euo pipefail', run dotnet test, and contain no '|| true', '|| :', '|| exit 0', or set +e. A later step in the same job that runs after a failure (always(), failure(), cancelled()) must upload artifacts or be registered in alwaysAllowed. Removing or changing a gate is an amendment checked by D016.",
+    "rule": "D014 parses each workflow (a minimal parser for the job/step subset; no YAML library is available) and requires every gate step below to exist exactly once as its own run step with no if:, no continue-on-error, and no shell override, in a job with no if: or continue-on-error, after its registered earlier steps. A gate with a frozen script must match it line for line, its first command must be 'set -euo pipefail', and each gate command must be a top-level command (not inside if/for/while/case, braces, a subshell, or a heredoc; no ||, &&, ;, &) with no exit, return, set +e, or ERR trap before it. A shard step (a matrix job whose dotnet test runs in a per-shard branch) must start with 'set -euo pipefail', run dotnet test, and contain no '|| true', '|| :', '|| exit 0', or set +e. A later step in the same job that runs after a failure (always(), failure(), cancelled()) must upload artifacts or be registered in alwaysAllowed. Removing or changing a gate is an amendment checked by D016. A shard step's script is frozen by the SHA-256 of its non-blank lines (scriptSha256). Any workflow line at a job or step key position that the parser does not read as a plain key (a quoted key, flow mapping, anchor, or merge key) makes the gate fail.",
     "steps": [
       {
         "workflow": ".github/workflows/test.yml",
@@ -607,7 +607,8 @@
         "step": "Run project tests",
         "after": [
           "Bootstrap verified Z3 assets"
-        ]
+        ],
+        "scriptSha256": "b2e788239d12b5dcd672635e4d08ed21ad657e56ffcf57be16ca8536fcd5d92c"
       },
       {
         "workflow": ".github/workflows/publish-nuget.yml",
@@ -615,7 +616,8 @@
         "step": "Run project tests",
         "after": [
           "Build"
-        ]
+        ],
+        "scriptSha256": "43af29422549f0b21c15e9ca0b7372795c2e7208bc868e4732249052a5be301e"
       }
     ],
     "alwaysAllowed": [

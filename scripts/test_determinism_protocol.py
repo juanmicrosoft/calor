@@ -174,6 +174,14 @@ class NegativeRegistrationControls(unittest.TestCase):
                 "      # #881 pinned reproduction", main_block + "      # #881 pinned reproduction", 1)),
             (".github/workflows/publish-nuget.yml", publish.replace(
                 "          set -euo pipefail\n          mkdir -p artifacts/test\n", "          set -euo pipefail\n          mkdir -p artifacts/test\n          set +e\n", 1)),
+            (".github/workflows/test.yml", test_yml.replace(main_step, main_step + "        'if': ${{ 1 == 2 }}\n")),
+            (".github/workflows/test.yml", test_yml.replace(main_step, main_step + "        \"continue-on-error\": true\n")),
+            (".github/workflows/publish-nuget.yml", publish.replace(
+                "          set -euo pipefail\n          mkdir -p artifacts/test\n", "          set -euo pipefail\n          exit 0\n          mkdir -p artifacts/test\n", 1)),
+            (".github/workflows/publish-nuget.yml", publish.replace(
+                "          set -euo pipefail\n          mkdir -p artifacts/test\n", "          set -euo pipefail\n          if false; then\n          mkdir -p artifacts/test\n", 1)
+             .replace("              --verbosity normal 2>&1 | tee test-output.log\n          fi\n",
+                      "              --verbosity normal 2>&1 | tee test-output.log\n          fi\n          fi\n", 1)),
         ):
             self.assertIn(path, (".github/workflows/test.yml", ".github/workflows/publish-nuget.yml"))
             self.assertNotEqual(mutated, (ROOT / path).read_text(encoding="utf-8"))

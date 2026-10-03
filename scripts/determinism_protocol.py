@@ -70,8 +70,11 @@ def parse_workflow(text: str) -> dict:
             job["steps"].append(step)
             body, indent = body[2:], 8
         target = step if indent == 8 and step is not None else job["keys"] if indent == 4 else None
-        match = re.match(r"^([A-Za-z0-9_-]+):(?: (.*))?$", body) if target is not None else None
-        if match is None:
+        if target is None:
+            continue
+        match = re.match(r"^([A-Za-z0-9_-]+):(?: (.*))?$", body)
+        if match is None:  # quoted keys, flow mappings, anchors, merge keys: never silently ignored
+            target.setdefault("__unparsed__", []).append(body)
             continue
         key, value = match.group(1), (match.group(2) or "").strip()
         if key == "steps" and target is job["keys"]:
@@ -144,7 +147,7 @@ def check_gates(protocol, text) -> list[str]:
         wf = parsed.setdefault(gate["workflow"], parse_workflow(text(gate["workflow"])))
         job = wf.get(gate["job"])
         where = f"{gate['workflow']} {gate['job']} '{gate['step']}'"
-        if job is None or "if" in job["keys"] or "continue-on-error" in job["keys"]:
+        if job is None or {"if", "continue-on-error", "__unparsed__"} & set(job["keys"]):
             problems.append(f"{where}: job missing, conditional, or allowed to fail")
             continue
         names = [s.get("name") for s in job["steps"]]
@@ -167,6 +170,8 @@ def check_gates(protocol, text) -> list[str]:
                 problems.append(f"{where}: script differs from the frozen script or a gate command is not top-level")
         else:
             cmds = shell_commands(script)
+            if gate.get("scriptSha256") != sha256_bytes("\n".join(ln for ln in script.splitlines() if ln.strip()).encode("utf-8")):
+                problems.append(f"{where}: shard script differs from its frozen hash")
             masked = any(re.search(r"\|\|\s*(true|:|exit 0)\b|^set \+[a-z]*e", c) and not c.startswith("trap ") for _, c in cmds)
             if not cmds or cmds[0] != (0, "set -euo pipefail") or masked or not any("dotnet test" in c for _, c in cmds):
                 problems.append(f"{where}: shard script lacks set -euo pipefail, runs no dotnet test, or masks a status")
