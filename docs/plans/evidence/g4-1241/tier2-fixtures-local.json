@@ -1,0 +1,5601 @@
+{
+  "schemaVersion": 1,
+  "check": "fixture-compile-check",
+  "astRoundTrip": false,
+  "roots": [
+    "samples",
+    "tests"
+  ],
+  "manifestSha256": "6f41158d9847f9e6321fe3f123f882e37d470a10f37d53920c493d373ad7314f",
+  "trackedFixtures": 509,
+  "counts": {
+    "passed": 428,
+    "expected-negative": 51,
+    "known-failure": 30,
+    "failed": 0,
+    "unexpected-pass": 0,
+    "unclassified": 0,
+    "invalid": 0,
+    "crashed": 0,
+    "TimeoutOrUnavailable": 0
+  },
+  "verdict": "FAIL",
+  "failReasons": [
+    "non-success rows: known-failure=30"
+  ],
+  "rows": [
+    {
+      "group": "conversion-snapshots:08-03.approved",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/08-03.approved.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0029"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0029"
+      ]
+    },
+    {
+      "group": "conversion-snapshots:09-03.approved",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/09-03.approved.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS8510"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS8510"
+      ]
+    },
+    {
+      "group": "conversion-snapshots:11-03.approved",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/11-03.approved.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0050"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0050"
+      ]
+    },
+    {
+      "group": "conversion-snapshots:11-05.approved",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/11-05.approved.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0246"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0246"
+      ]
+    },
+    {
+      "group": "conversion-snapshots:13-02.approved",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/13-02.approved.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS1001",
+        "Calor1002:CS1002",
+        "Calor1002:CS1003",
+        "Calor1002:CS1519",
+        "Calor1002:CS1525"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS1001",
+        "Calor1002:CS1002",
+        "Calor1002:CS1003",
+        "Calor1002:CS1519",
+        "Calor1002:CS1525"
+      ]
+    },
+    {
+      "group": "conversion-snapshots:13-05.approved",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/13-05.approved.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS8510"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS8510"
+      ]
+    },
+    {
+      "group": "conversion-snapshots:13-10.approved",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/13-10.approved.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1006"
+      ],
+      "expectedSignature": [
+        "Calor1006"
+      ]
+    },
+    {
+      "group": "benchmarks:HashMap",
+      "files": [
+        "tests/TestData/Benchmarks/DataStructures/HashMap.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0266"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0266"
+      ]
+    },
+    {
+      "group": "benchmarks:Adapter",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/Adapter.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0266"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0266"
+      ]
+    },
+    {
+      "group": "benchmarks:Factory",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/Factory.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0266"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0266"
+      ]
+    },
+    {
+      "group": "benchmarks:TemplateMethod",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/TemplateMethod.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0060",
+        "Calor1002:CS0115",
+        "Calor1002:CS0122",
+        "Calor1002:CS0534",
+        "Calor1002:CS0621"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0060",
+        "Calor1002:CS0115",
+        "Calor1002:CS0122",
+        "Calor1002:CS0534",
+        "Calor1002:CS0621"
+      ]
+    },
+    {
+      "group": "benchmarks:Visitor",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/Visitor.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0051",
+        "Calor1002:CS0052",
+        "Calor1002:CS0060",
+        "Calor1002:CS0115",
+        "Calor1002:CS0122",
+        "Calor1002:CS0126",
+        "Calor1002:CS0266"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0051",
+        "Calor1002:CS0052",
+        "Calor1002:CS0060",
+        "Calor1002:CS0115",
+        "Calor1002:CS0122",
+        "Calor1002:CS0126",
+        "Calor1002:CS0266"
+      ]
+    },
+    {
+      "group": "benchmarks:CurrencyConverter",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/CurrencyConverter.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0266"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0266"
+      ]
+    },
+    {
+      "group": "benchmarks:ScoreBoard",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/ScoreBoard.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0266"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0266"
+      ]
+    },
+    {
+      "group": "benchmarks:TaxCalculator",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/TaxCalculator.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0664"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0664"
+      ]
+    },
+    {
+      "group": "benchmarks:UnitConverter",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/UnitConverter.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0266"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0266"
+      ]
+    },
+    {
+      "group": "benchmarks:VotingSystem",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/VotingSystem.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0266"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0266"
+      ]
+    },
+    {
+      "group": "benchmarks:NetworkEffect",
+      "files": [
+        "tests/TestData/Benchmarks/EffectSoundness/NetworkEffect.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS1001",
+        "Calor1002:CS1003",
+        "Calor1002:CS1511"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS1001",
+        "Calor1002:CS1003",
+        "Calor1002:CS1511"
+      ]
+    },
+    {
+      "group": "benchmarks:unregistered:NullDeref_buggy",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorDetection/NullDeref_buggy.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS1061"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS1061"
+      ]
+    },
+    {
+      "group": "benchmarks:PureFunctions",
+      "files": [
+        "tests/TestData/Benchmarks/InteropEffectCoverage/PureFunctions.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS1001",
+        "Calor1002:CS1003",
+        "Calor1002:CS1511"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS1001",
+        "Calor1002:CS1003",
+        "Calor1002:CS1511"
+      ]
+    },
+    {
+      "group": "benchmarks:Composition",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/Composition.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0266"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0266"
+      ]
+    },
+    {
+      "group": "benchmarks:InterfaceImpl",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/InterfaceImpl.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0266",
+        "Calor1002:CS1001",
+        "Calor1002:CS1003",
+        "Calor1002:CS1511"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0266",
+        "Calor1002:CS1001",
+        "Calor1002:CS1003",
+        "Calor1002:CS1511"
+      ]
+    },
+    {
+      "group": "benchmarks:Polymorphism",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/Polymorphism.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0266"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0266"
+      ]
+    },
+    {
+      "group": "benchmarks:AreaOfCircle",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/AreaOfCircle.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0266"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0266"
+      ]
+    },
+    {
+      "group": "benchmarks:Average",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/Average.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0266"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0266"
+      ]
+    },
+    {
+      "group": "benchmarks:CelsiusToKelvin",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/CelsiusToKelvin.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0266"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0266"
+      ]
+    },
+    {
+      "group": "benchmarks:CompoundInterest",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/CompoundInterest.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0266"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0266"
+      ]
+    },
+    {
+      "group": "benchmarks:Power",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/Power.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS1001",
+        "Calor1002:CS1003",
+        "Calor1002:CS1511"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS1001",
+        "Calor1002:CS1003",
+        "Calor1002:CS1511"
+      ]
+    },
+    {
+      "group": "benchmarks:TemperatureConverter",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/TemperatureConverter.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0266"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0266"
+      ]
+    },
+    {
+      "group": "benchmarks:TemperatureRange",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/TemperatureRange.calr"
+      ],
+      "expect": "known-failure",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "known-failure",
+      "signature": [
+        "Calor1002:CS0266"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0266"
+      ]
+    },
+    {
+      "group": "samples",
+      "files": [
+        "samples/Collections/collections.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "samples",
+      "files": [
+        "samples/Contracts/contracts.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "samples",
+      "files": [
+        "samples/FizzBuzz/fizzbuzz.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "samples",
+      "files": [
+        "samples/Generics/generics.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "samples",
+      "files": [
+        "samples/HelloWorld/hello.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "samples",
+      "files": [
+        "samples/PatternMatching/matching.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "samples",
+      "files": [
+        "samples/SdkSample/program.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "samples",
+      "files": [
+        "samples/TypeSystem/typesystem.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "samples",
+      "files": [
+        "samples/Verification/mixed-contracts.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "samples",
+      "files": [
+        "samples/Verification/proven-contracts.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "samples",
+      "files": [
+        "samples/Verification/violation-detected.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/01-01.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/01-02.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/01-03.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/01-04.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/02-01.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/02-02.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/02-03.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/02-04.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/03-01.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/03-02.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/03-03.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/03-04.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/04-01.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/04-02.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/04-03.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/04-04.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/05-01.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/05-02.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/05-03.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/06-01.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/06-03.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/06-04.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/07-01.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/07-02.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/07-03.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/07-04.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/08-01.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/08-02.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/08-04.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/09-01.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/09-02.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/10-01.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/10-02.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/10-03.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/11-01.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/11-02.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/11-04.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/12-01.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/12-02.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/12-03.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/12-04.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/12-05.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/13-01.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/13-03.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/13-04.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/13-06.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/13-07.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/13-08.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/13-09.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "conversion-snapshots",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/13-11.approved.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--permissive-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "enforcement:effects:N1_unknown_external_pure",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Bypass/N1_unknown_external_pure.calr"
+      ],
+      "expect": "reject",
+      "options": [
+        "--transpile-only"
+      ],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "enforcement:contracts",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Contracts/C1_requires_throws.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "enforcement:contracts",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Contracts/C2_ensures_throws.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "enforcement:contracts",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Contracts/C3_mode_off.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "enforcement:contracts",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Contracts/C4_multiple_returns.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "enforcement:contracts",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Contracts/C5_function_id.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "enforcement:effects:E1_missing_effect",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Effects/E1_missing_effect.calr"
+      ],
+      "expect": "reject",
+      "options": [
+        "--transpile-only"
+      ],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "enforcement:effects",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Effects/E2_declared_effect.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--transpile-only"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "enforcement:effects:E3_call_chain",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Effects/E3_call_chain.calr"
+      ],
+      "expect": "reject",
+      "options": [
+        "--transpile-only"
+      ],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "enforcement:effects:E4_unknown_external",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Effects/E4_unknown_external.calr"
+      ],
+      "expect": "reject",
+      "options": [
+        "--transpile-only"
+      ],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "enforcement:effects:E5_recursion",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Effects/E5_recursion.calr"
+      ],
+      "expect": "reject",
+      "options": [
+        "--transpile-only"
+      ],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "enforcement:effects:E6_span_accuracy",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Effects/E6_span_accuracy.calr"
+      ],
+      "expect": "reject",
+      "options": [
+        "--transpile-only"
+      ],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "enforcement:effects:Issue1104_BatchingSink_LoopAsync",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Effects/Issue1104_BatchingSink_LoopAsync.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "incidental"
+    },
+    {
+      "group": "e2e:agent-task-fixtures",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/advanced-calor-project/MathUtils.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:agent-task-fixtures",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/async-project/AsyncOps.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:agent-task-fixtures",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/basic-calor-project/Calculator.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:agent-task-fixtures",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/buggy-contracts/BuggyContracts.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:agent-task-fixtures",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/collections-project/Collections.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:agent-task-fixtures",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/contracts-project/Contracts.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:agent-task-fixtures",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/effects-project/Effects.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:agent-task-fixtures",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/enums-project/Enums.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:agent-task-fixtures",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/generics-project/Generic.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:agent-task-fixtures",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/oop-project/Domain.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:agent-task-fixtures",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/refactor-contract-calor/Contract.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:agent-task-fixtures",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/refactor-extract-calor/Extract.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:agent-task-fixtures",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/refactor-inline-calor/Inline.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "E2E:agent-tasks:fixtures:refactor-move-calor:src",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/refactor-move-calor/src/Math.calr",
+        "tests/E2E/agent-tasks/fixtures/refactor-move-calor/src/Utils.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:agent-task-fixtures",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/refactor-rename-calor/Rename.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:agent-task-fixtures",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/refactor-signature-calor/Signature.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:agent-task-fixtures",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/refactor-target/LegacyCode.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:agent-task-fixtures",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/refactoring-impure/Impure.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "E2E:agent-tasks:templates:path-2-gate:task-01-multi-function-refactor:expected",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-01-multi-function-refactor/expected/Math.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "E2E:agent-tasks:templates:path-2-gate:task-01-multi-function-refactor:setup",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-01-multi-function-refactor/setup/Math.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "E2E:agent-tasks:templates:path-2-gate:task-02-add-db-effect:expected",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-02-add-db-effect/expected/Db.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-02-add-db-effect/expected/Service.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-02-add-db-effect/expected/Web.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "E2E:agent-tasks:templates:path-2-gate:task-02-add-db-effect:setup",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-02-add-db-effect/setup/Db.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-02-add-db-effect/setup/Service.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-02-add-db-effect/setup/Web.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "E2E:agent-tasks:templates:path-2-gate:task-03-privacy-change:expected",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-03-privacy-change/expected/Invoice.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-03-privacy-change/expected/Order.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-03-privacy-change/expected/Receipt.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-03-privacy-change/expected/TaxCalc.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "E2E:agent-tasks:templates:path-2-gate:task-03-privacy-change:setup",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-03-privacy-change/setup/Invoice.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-03-privacy-change/setup/Order.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-03-privacy-change/setup/Receipt.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-03-privacy-change/setup/TaxCalc.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "E2E:agent-tasks:templates:path-2-gate:task-04-add-postcondition:expected",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-04-add-postcondition/expected/Bounds.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-04-add-postcondition/expected/Score.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "E2E:agent-tasks:templates:path-2-gate:task-04-add-postcondition:setup",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-04-add-postcondition/setup/Bounds.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-04-add-postcondition/setup/Score.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "E2E:agent-tasks:templates:path-2-gate:task-05-loop-restructure:expected",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-05-loop-restructure/expected/Grid.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "E2E:agent-tasks:templates:path-2-gate:task-05-loop-restructure:setup",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-05-loop-restructure/setup/Grid.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "E2E:agent-tasks:templates:path-2-gate:task-06-error-handling:expected",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-06-error-handling/expected/Pipeline.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-06-error-handling/expected/Remote.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410",
+        "Calor1002:CS0246"
+      ],
+      "expectedSignature": [
+        "Calor0410",
+        "Calor1002:CS0246"
+      ],
+      "negativeKind": "incidental"
+    },
+    {
+      "group": "E2E:agent-tasks:templates:path-2-gate:task-06-error-handling:setup",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-06-error-handling/setup/Pipeline.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-06-error-handling/setup/Remote.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "incidental"
+    },
+    {
+      "group": "e2e:scenarios",
+      "files": [
+        "tests/E2E/scenarios/01_hello_world/input.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:scenarios",
+      "files": [
+        "tests/E2E/scenarios/02_fizzbuzz/input.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:scenarios",
+      "files": [
+        "tests/E2E/scenarios/03_contracts/input.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:scenarios",
+      "files": [
+        "tests/E2E/scenarios/04_option_result/input.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:scenarios",
+      "files": [
+        "tests/E2E/scenarios/05_skill_syntax/input.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:scenarios",
+      "files": [
+        "tests/E2E/scenarios/06_pattern_matching/input.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:scenarios",
+      "files": [
+        "tests/E2E/scenarios/07_collections/input.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:scenarios:output.g",
+      "files": [
+        "tests/E2E/scenarios/07_collections/output.g.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "incidental"
+    },
+    {
+      "group": "e2e:scenarios",
+      "files": [
+        "tests/E2E/scenarios/07_quantifiers/input.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:scenarios",
+      "files": [
+        "tests/E2E/scenarios/08_contract_inheritance_z3/input.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:scenarios",
+      "files": [
+        "tests/E2E/scenarios/08_multi_project_solution/solution/DataAccess/repository.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:scenarios",
+      "files": [
+        "tests/E2E/scenarios/08_multi_project_solution/solution/Shared/utils.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:scenarios",
+      "files": [
+        "tests/E2E/scenarios/08_multi_project_solution/solution/WebApi/api_handler.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "e2e:scenarios",
+      "files": [
+        "tests/E2E/scenarios/09_codegen_bugfixes/input.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "sdk-consumer",
+      "files": [
+        "tests/SdkConsumer/CalorLib/quotes.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/AsyncConcurrency/AsyncChain.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/AsyncConcurrency/AsyncEffect.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/AsyncConcurrency/AsyncErrorHandling.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/AsyncConcurrency/AsyncLoop.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/AsyncConcurrency/AsyncPure.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/AsyncConcurrency/AsyncReturn.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/AsyncConcurrency/CancellableTask.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/AsyncConcurrency/DelayedResult.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/AsyncConcurrency/ParallelTasks.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/AsyncConcurrency/SimpleAsync.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/CollectionsLINQ/ArraySlice.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/CollectionsLINQ/DictOps.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/CollectionsLINQ/Filter.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/CollectionsLINQ/GroupBy.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/CollectionsLINQ/LinqPipeline.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/CollectionsLINQ/ListOps.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/CollectionsLINQ/Map.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/CollectionsLINQ/Reduce.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/CollectionsLINQ/SetOps.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/CollectionsLINQ/Sort.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/CollectionsLINQ/Zip.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/CompactSyntax/AutoProps.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/CompactSyntax/CompactClass.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/CompactSyntax/InlineSigs.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/CompactSyntax/MixedSyntax.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/CompactSyntax/OptionalIds.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ComplexAlgorithms/BreadthFirstSearch.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ComplexAlgorithms/BubbleSort.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ComplexAlgorithms/DepthFirstSearch.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ComplexAlgorithms/Dijkstra.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ComplexAlgorithms/EditDistance.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ComplexAlgorithms/InsertionSort.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ComplexAlgorithms/InterpolationSearch.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ComplexAlgorithms/Knapsack.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ComplexAlgorithms/LCS.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ComplexAlgorithms/LinearSearch.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ComplexAlgorithms/MatrixMultiply.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ComplexAlgorithms/MergeSort.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ComplexAlgorithms/QuickSort.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ComplexAlgorithms/SelectionSort.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ComplexAlgorithms/TowerOfHanoi.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ContractVerification/AbsoluteContracts.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ContractVerification/ArrayContracts.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ContractVerification/BitContracts.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ContractVerification/BuggyContracts.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ContractVerification/DivisionContracts.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ContractVerification/ListInvariant.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ContractVerification/MixedContracts.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ContractVerification/ModuloContracts.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ContractVerification/OverflowSafe.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ContractVerification/OverflowUnsafe.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ContractVerification/ProvableContracts.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ContractVerification/RangeContracts.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ContractVerification/SearchContracts.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ContractVerification/SortingContracts.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ContractVerification/StringContracts.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DataStructures/BinaryTree.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DataStructures/BitSet.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DataStructures/CircularBuffer.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DataStructures/Deque.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DataStructures/DisjointSet.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DataStructures/Graph.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DataStructures/LinkedList.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DataStructures/MaxHeap.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DataStructures/MinStack.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DataStructures/PriorityQueue.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DataStructures/Queue.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DataStructures/SortedList.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DataStructures/Stack.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DataStructures/Trie.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/Builder.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/ChainOfResponsibility.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/Command.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/Composite.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/Decorator.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/Flyweight.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/Iterator.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/Mediator.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/Observer.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/Proxy.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/Singleton.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/State.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/Strategy.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/BMICalculator.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/BankAccount.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/Calendar.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/CsvParser.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/DateDiff.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/DistanceCalculator.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/EmailValidator.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/GradeCalculator.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/Inventory.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/PasswordValidator.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/PhoneBook.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/ShoppingCart.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/Timer.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/TodoList.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/UrlParser.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks:unregistered",
+      "files": [
+        "tests/TestData/Benchmarks/EditPrecision/Calculator_validated.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/EffectSoundness/ComposedEffects.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/EffectSoundness/CorrectEffects.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/EffectSoundness/DatabaseEffect.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/EffectSoundness/FileEffects.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/EffectSoundness/HiddenNetworkEffect.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/EffectSoundness/MissingEffects.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/EffectSoundness/PureComputation.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/EffectSoundness/StateEffect.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/EffectSoundness/TimerEffect.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks:unregistered",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorDetection/ArraySum_buggy.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks:unregistered",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorDetection/DeadCode_buggy.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks:unregistered",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorDetection/DeadStore_buggy.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks:unregistered",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorDetection/Divide_buggy.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks:unregistered",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorDetection/MissingContract_buggy.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks:unregistered",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorDetection/Overflow_buggy.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks:unregistered",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorDetection/Uninitialized_buggy.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorHandling/BasicTryCatch.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorHandling/CustomException.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorHandling/ErrorPropagation.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorHandling/ExceptionChain.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorHandling/GuardClause.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorHandling/MultipleCatch.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorHandling/NullCheck.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorHandling/OptionType.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorHandling/ResultType.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorHandling/TryFinally.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/InteropEffectCoverage/BclCoverage.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/InteropEffectCoverage/CollectionLib.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/InteropEffectCoverage/MathLib.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/InteropEffectCoverage/StringLib.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/AbstractClass.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/ConstructorInit.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/Encapsulation.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/EnumType.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/EnumWithMethods.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/GenericClass.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/GenericConstraints.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/GenericFunction.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/Inheritance.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/MethodOverloading.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/MethodOverriding.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/Properties.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/PropertyAccess.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/RecordType.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/SealedClass.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/SimpleClass.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/StaticMembers.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/TypeAlias.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/PatternMatching/EnumMatch.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/PatternMatching/ExhaustiveMatch.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/PatternMatching/GuardMatch.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/PatternMatching/NestedMatch.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/PatternMatching/PropertyMatch.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/PatternMatching/RangeMatch.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/PatternMatching/SimpleMatch.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/PatternMatching/SwitchExpression.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/PatternMatching/TupleMatch.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/PatternMatching/TypeMatch.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/PatternMatching/WildcardMatch.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/Abs.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/AggregateStats.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/ArraySum.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/BinarySearch.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/Calculator.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/Capitalize.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/Clamp.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/Contains.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/ContractedDivide.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/CountOccurrences.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/CountVowels.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/DigitCount.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/ExpressionBodied.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/Factorial.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/Fibonacci.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/FizzBuzz.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/FormatHeader.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/GCD.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/HelloWorld.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/Hypotenuse.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/IsAlpha.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/IsEven.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/IsOdd.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/IsPrime.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/LeapYear.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/LogPipeline.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/MathOperations.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/MaxTwo.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/MaxValue.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/MinTwo.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/NamedConfig.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/PairLogger.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/Palindrome.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/ParseAndDouble.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/ReturnMapped.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/ReverseArray.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/ReverseString.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/Sign.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/StringUtils.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/SumDigits.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/SumRange.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/TernaryChain.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/ThreeWayMerge.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/TruncateString.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "benchmarks",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/VoidSequence.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:EditScripts:ES-01-local-edit:step-00-baseline",
+      "files": [
+        "tests/TestData/EditScripts/ES-01-local-edit/step-00-baseline/alpha.calr",
+        "tests/TestData/EditScripts/ES-01-local-edit/step-00-baseline/beta.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:EditScripts:ES-01-local-edit:step-01-edit-body",
+      "files": [
+        "tests/TestData/EditScripts/ES-01-local-edit/step-01-edit-body/alpha.calr",
+        "tests/TestData/EditScripts/ES-01-local-edit/step-01-edit-body/beta.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:EditScripts:ES-01-local-edit:step-02-introduce-violation",
+      "files": [
+        "tests/TestData/EditScripts/ES-01-local-edit/step-02-introduce-violation/alpha.calr",
+        "tests/TestData/EditScripts/ES-01-local-edit/step-02-introduce-violation/beta.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "TestData:EditScripts:ES-02-add-file:step-00-baseline",
+      "files": [
+        "tests/TestData/EditScripts/ES-02-add-file/step-00-baseline/alpha.calr",
+        "tests/TestData/EditScripts/ES-02-add-file/step-00-baseline/beta.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:EditScripts:ES-02-add-file:step-01-add-clean",
+      "files": [
+        "tests/TestData/EditScripts/ES-02-add-file/step-01-add-clean/alpha.calr",
+        "tests/TestData/EditScripts/ES-02-add-file/step-01-add-clean/beta.calr",
+        "tests/TestData/EditScripts/ES-02-add-file/step-01-add-clean/gamma.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:EditScripts:ES-02-add-file:step-02-add-violating",
+      "files": [
+        "tests/TestData/EditScripts/ES-02-add-file/step-02-add-violating/alpha.calr",
+        "tests/TestData/EditScripts/ES-02-add-file/step-02-add-violating/beta.calr",
+        "tests/TestData/EditScripts/ES-02-add-file/step-02-add-violating/delta.calr",
+        "tests/TestData/EditScripts/ES-02-add-file/step-02-add-violating/gamma.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "TestData:EditScripts:ES-03-delete-file:step-00-baseline",
+      "files": [
+        "tests/TestData/EditScripts/ES-03-delete-file/step-00-baseline/alpha.calr",
+        "tests/TestData/EditScripts/ES-03-delete-file/step-00-baseline/beta.calr",
+        "tests/TestData/EditScripts/ES-03-delete-file/step-00-baseline/noisy.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "TestData:EditScripts:ES-03-delete-file:step-01-delete-violating",
+      "files": [
+        "tests/TestData/EditScripts/ES-03-delete-file/step-01-delete-violating/alpha.calr",
+        "tests/TestData/EditScripts/ES-03-delete-file/step-01-delete-violating/beta.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:EditScripts:ES-03-delete-file:step-02-delete-clean",
+      "files": [
+        "tests/TestData/EditScripts/ES-03-delete-file/step-02-delete-clean/alpha.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:EditScripts:ES-04-cross-module-effect:step-00-clean",
+      "files": [
+        "tests/TestData/EditScripts/ES-04-cross-module-effect/step-00-clean/callee.calr",
+        "tests/TestData/EditScripts/ES-04-cross-module-effect/step-00-clean/caller.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:EditScripts:ES-04-cross-module-effect:step-01-callee-gains-effect",
+      "files": [
+        "tests/TestData/EditScripts/ES-04-cross-module-effect/step-01-callee-gains-effect/callee.calr",
+        "tests/TestData/EditScripts/ES-04-cross-module-effect/step-01-callee-gains-effect/caller.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "TestData:EditScripts:ES-04-cross-module-effect:step-02-callee-loses-effect",
+      "files": [
+        "tests/TestData/EditScripts/ES-04-cross-module-effect/step-02-callee-loses-effect/callee.calr",
+        "tests/TestData/EditScripts/ES-04-cross-module-effect/step-02-callee-loses-effect/caller.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:EditScripts:ES-05-options-flip:step-00-effects-on",
+      "files": [
+        "tests/TestData/EditScripts/ES-05-options-flip/step-00-effects-on/beta.calr",
+        "tests/TestData/EditScripts/ES-05-options-flip/step-00-effects-on/service.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "TestData:EditScripts:ES-05-options-flip:step-01-effects-off",
+      "files": [
+        "tests/TestData/EditScripts/ES-05-options-flip/step-01-effects-off/beta.calr",
+        "tests/TestData/EditScripts/ES-05-options-flip/step-01-effects-off/service.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:EditScripts:ES-05-options-flip:step-02-effects-on-again",
+      "files": [
+        "tests/TestData/EditScripts/ES-05-options-flip/step-02-effects-on-again/beta.calr",
+        "tests/TestData/EditScripts/ES-05-options-flip/step-02-effects-on-again/service.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "TestData:EditScripts:ES-06-touch-noop:step-00-baseline",
+      "files": [
+        "tests/TestData/EditScripts/ES-06-touch-noop/step-00-baseline/alpha.calr",
+        "tests/TestData/EditScripts/ES-06-touch-noop/step-00-baseline/beta.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:EditScripts:ES-06-touch-noop:step-01-touch-identical",
+      "files": [
+        "tests/TestData/EditScripts/ES-06-touch-noop/step-01-touch-identical/alpha.calr",
+        "tests/TestData/EditScripts/ES-06-touch-noop/step-01-touch-identical/beta.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:EditScripts:ES-06-touch-noop:step-02-touch-identical-again",
+      "files": [
+        "tests/TestData/EditScripts/ES-06-touch-noop/step-02-touch-identical-again/alpha.calr",
+        "tests/TestData/EditScripts/ES-06-touch-noop/step-02-touch-identical-again/beta.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:EditScripts:ES-07-persistent-finding:step-00-finding-present",
+      "files": [
+        "tests/TestData/EditScripts/ES-07-persistent-finding/step-00-finding-present/churn.calr",
+        "tests/TestData/EditScripts/ES-07-persistent-finding/step-00-finding-present/stable.calr",
+        "tests/TestData/EditScripts/ES-07-persistent-finding/step-00-finding-present/violating.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--require-docs"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:EditScripts:ES-07-persistent-finding:step-01-edit-neighbour",
+      "files": [
+        "tests/TestData/EditScripts/ES-07-persistent-finding/step-01-edit-neighbour/churn.calr",
+        "tests/TestData/EditScripts/ES-07-persistent-finding/step-01-edit-neighbour/stable.calr",
+        "tests/TestData/EditScripts/ES-07-persistent-finding/step-01-edit-neighbour/violating.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--require-docs"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:EditScripts:ES-07-persistent-finding:step-02-edit-neighbour-again",
+      "files": [
+        "tests/TestData/EditScripts/ES-07-persistent-finding/step-02-edit-neighbour-again/churn.calr",
+        "tests/TestData/EditScripts/ES-07-persistent-finding/step-02-edit-neighbour-again/stable.calr",
+        "tests/TestData/EditScripts/ES-07-persistent-finding/step-02-edit-neighbour-again/violating.calr"
+      ],
+      "expect": "compile",
+      "options": [
+        "--require-docs"
+      ],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:EditScripts:ES-08-effect-row-edit:step-00-clean",
+      "files": [
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-00-clean/app.calr",
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-00-clean/bystander.calr",
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-00-clean/combinators.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:EditScripts:ES-08-effect-row-edit:step-01-callee-row-widens",
+      "files": [
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-01-callee-row-widens/app.calr",
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-01-callee-row-widens/bystander.calr",
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-01-callee-row-widens/combinators.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "TestData:EditScripts:ES-08-effect-row-edit:step-02-callee-row-erased",
+      "files": [
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-02-callee-row-erased/app.calr",
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-02-callee-row-erased/bystander.calr",
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-02-callee-row-erased/combinators.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/01_id_abbreviation/already_abbreviated.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/01_id_abbreviation/if_id_conversion.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/01_id_abbreviation/loop_id_conversion.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/01_id_abbreviation/mixed_ids.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/01_id_abbreviation/padded_function_id.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/01_id_abbreviation/padded_module_id.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/01_id_abbreviation/while_id_conversion.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/02_whitespace/blank_lines.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/02_whitespace/clean_file.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios:leading_spaces",
+      "files": [
+        "tests/TestData/LintScenarios/02_whitespace/leading_spaces.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "incidental"
+    },
+    {
+      "group": "lint-scenarios:leading_tabs",
+      "files": [
+        "tests/TestData/LintScenarios/02_whitespace/leading_tabs.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "incidental"
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/02_whitespace/mixed_indentation.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/02_whitespace/multiple_blank_lines.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios:trailing_spaces",
+      "files": [
+        "tests/TestData/LintScenarios/02_whitespace/trailing_spaces.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "incidental"
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/03_tag_formats/call_statement.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/03_tag_formats/for_loop.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/03_tag_formats/if_statement.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/03_tag_formats/match_statement.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/03_tag_formats/return_statement.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/03_tag_formats/visibility_format.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/03_tag_formats/while_loop.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/04_expressions/binary_infix.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/04_expressions/comparison_ops.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/04_expressions/logical_ops.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/04_expressions/mixed_expressions.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/04_expressions/nested_binary.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/04_expressions/reference_format.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/05_type_and_effects/effect_codes.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/05_type_and_effects/multiple_effects.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/05_type_and_effects/parameter_types.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/05_type_and_effects/uppercase_types.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/06_statements/bind_statement.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/06_statements/print_statement.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/06_statements/return_void.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/06_statements/return_with_value.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios:throw_statement",
+      "files": [
+        "tests/TestData/LintScenarios/06_statements/throw_statement.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "incidental"
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/06_statements/try_catch.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/06_statements/try_catch_nested.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios:try_catch_when",
+      "files": [
+        "tests/TestData/LintScenarios/06_statements/try_catch_when.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "incidental"
+    },
+    {
+      "group": "lint-scenarios:try_finally_return",
+      "files": [
+        "tests/TestData/LintScenarios/06_statements/try_finally_return.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "incidental"
+    },
+    {
+      "group": "lint-scenarios:try_multi_catch_finally",
+      "files": [
+        "tests/TestData/LintScenarios/06_statements/try_multi_catch_finally.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "incidental"
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/07_round_trip/all_features.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/07_round_trip/complex_nesting.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/07_round_trip/contracts.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/07_round_trip/fizzbuzz.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/07_round_trip/hello_world.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/08_idempotency/already_formatted.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/08_idempotency/needs_formatting.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/08_idempotency/partial_format.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/09_edge_cases/empty_function.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/09_edge_cases/empty_module.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/09_edge_cases/escaped_strings.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/09_edge_cases/long_identifiers.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/09_edge_cases/max_nesting.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/09_edge_cases/single_statement.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios",
+      "files": [
+        "tests/TestData/LintScenarios/09_edge_cases/unicode_strings.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "lint-scenarios:mismatched_ids",
+      "files": [
+        "tests/TestData/LintScenarios/10_error_cases/mismatched_ids.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0830"
+      ],
+      "expectedSignature": [
+        "Calor0830"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "lint-scenarios:syntax_error",
+      "files": [
+        "tests/TestData/LintScenarios/10_error_cases/syntax_error.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0006"
+      ],
+      "expectedSignature": [
+        "Calor0006"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "lint-scenarios:unterminated_string",
+      "files": [
+        "tests/TestData/LintScenarios/10_error_cases/unterminated_string.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0002"
+      ],
+      "expectedSignature": [
+        "Calor0002"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "TestData:QueryCorpus:project",
+      "files": [
+        "tests/TestData/QueryCorpus/project/ambiguous.calr",
+        "tests/TestData/QueryCorpus/project/ambiguous2.calr",
+        "tests/TestData/QueryCorpus/project/app.calr",
+        "tests/TestData/QueryCorpus/project/asks-across.calr",
+        "tests/TestData/QueryCorpus/project/contracts.calr",
+        "tests/TestData/QueryCorpus/project/math.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor0410"
+      ],
+      "expectedSignature": [
+        "Calor0410"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "TestData:RenameScripts:RN-01-function-across-files",
+      "files": [
+        "tests/TestData/RenameScripts/RN-01-function-across-files/app.calr",
+        "tests/TestData/RenameScripts/RN-01-function-across-files/lib.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:RenameScripts:RN-02-shadowed-local",
+      "files": [
+        "tests/TestData/RenameScripts/RN-02-shadowed-local/shadow.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:RenameScripts:RN-03-parameter-vs-field",
+      "files": [
+        "tests/TestData/RenameScripts/RN-03-parameter-vs-field/holder.calr",
+        "tests/TestData/RenameScripts/RN-03-parameter-vs-field/reader.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:RenameScripts:RN-04-capture-refused",
+      "files": [
+        "tests/TestData/RenameScripts/RN-04-capture-refused/capture.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:RenameScripts:RN-05-overload-exact",
+      "files": [
+        "tests/TestData/RenameScripts/RN-05-overload-exact/overload.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "TestData:RenameScripts:RN-06-module-split-refused",
+      "files": [
+        "tests/TestData/RenameScripts/RN-06-module-split-refused/part-a.calr",
+        "tests/TestData/RenameScripts/RN-06-module-split-refused/part-b.calr"
+      ],
+      "expect": "reject",
+      "options": [],
+      "status": "expected-negative",
+      "signature": [
+        "Calor1002:CS0101"
+      ],
+      "expectedSignature": [
+        "Calor1002:CS0101"
+      ],
+      "negativeKind": "designed"
+    },
+    {
+      "group": "verification-testdata",
+      "files": [
+        "tests/TestData/Verification/Outcomes/assumed-division.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "verification-testdata",
+      "files": [
+        "tests/TestData/Verification/Outcomes/proven-with-binding.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "verification-testdata",
+      "files": [
+        "tests/TestData/Verification/Outcomes/proven-with-result.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "verification-testdata",
+      "files": [
+        "tests/TestData/Verification/Outcomes/proven.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "verification-testdata",
+      "files": [
+        "tests/TestData/Verification/Outcomes/refuted-overflow.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "verification-testdata",
+      "files": [
+        "tests/TestData/Verification/Outcomes/refuted-with-binding.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "verification-testdata",
+      "files": [
+        "tests/TestData/Verification/Outcomes/refuted-with-model.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "verification-testdata",
+      "files": [
+        "tests/TestData/Verification/Outcomes/timeout.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "verification-testdata",
+      "files": [
+        "tests/TestData/Verification/Outcomes/unsupported-body.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "verification-testdata",
+      "files": [
+        "tests/TestData/Verification/Outcomes/unsupported.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    },
+    {
+      "group": "verification-testdata",
+      "files": [
+        "tests/TestData/Verification/Outcomes/vacuous-precondition.calr"
+      ],
+      "expect": "compile",
+      "options": [],
+      "status": "passed",
+      "signature": []
+    }
+  ],
+  "provenance": {
+    "compiler": "checkout-built calor.dll (installed tools are never used)",
+    "dll": "src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+    "dllSha256": "1b996a6c9fcfa3abc14dbad2808805e814aa792f81b48fbb201e7e27abdff84a",
+    "head": "695059811242a8cc45f78d6154095f7e3844eaf5",
+    "worktreeDirty": false
+  },
+  "ignoredUntrackedCalr": {
+    "buildOutput": 0,
+    "otherUntracked": 0
+  }
+}
