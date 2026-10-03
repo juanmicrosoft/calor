@@ -291,7 +291,7 @@ internal static partial class CaseExecutor
             {
                 "ProofObligation" => "Proof obligation [",
                 "IndexBounds" => "\"Indexed-type bound violated\"",
-                "RefinementEntry" => "\"Violation of refinement type",
+                "RefinementEntry" => "\"Violation of refinement type|\"Violation of inline refinement",
                 "RefinementReturn" => "\"Return value violates refinement type",
                 "Subtype" => "\"Value violates refinement type",
                 _ => null,
@@ -304,8 +304,8 @@ internal static partial class CaseExecutor
         var f = forced["emitted"]!.GetValue<string>();
         g["applicable"] = true;
         if (e.Length == 0 || f.Length == 0) { g["observed"] = false; g["reason"] = "no-emission (compile rejected)"; return g; }
-        var ec = Count(e, marker);
-        var fc = Count(f, marker);
+        var ec = marker.Split('|').Sum(m => Count(e, m));
+        var fc = marker.Split('|').Sum(m => Count(f, m));
         g["observed"] = true;
         g["elidedCount"] = ec;
         g["forcedCount"] = fc;
