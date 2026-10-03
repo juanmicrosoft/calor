@@ -1,6 +1,6 @@
 {
   "algorithm": "SHA-256 over LF-normalized bytes",
-  "count": 1807,
+  "count": 1808,
   "files": {
     "bench/correctness/false-established/v024/B1/attempts/R1-ARR-COMPUTED-BASE-001/sweep-attempt-1.json": "958dc38e191996d517727fc9c93c94d8570acf3dae18b87f324f70357e0564df",
     "bench/correctness/false-established/v024/B1/attempts/R1-ARR-COMPUTED-BASE-002/sweep-attempt-1.json": "9c4fbab6fec1261a521d6f337c4b9b4a252b39f643f08ff4dcf468026f83e93b",
@@ -1791,23 +1791,24 @@
     "bench/correctness/false-established/v024/oracle-controls.json": "53e68bac25a1ad99e25274dc246a2be1f7c95f2a0ceaf9d3da0b18cd9b39a0a3",
     "bench/correctness/false-established/v024/sessions.jsonl": "41d932f738cae430f06b36b9286e4447fc0b92cdadd769f77c5882665dd9bc4c",
     "bench/correctness/false-established/v024/summary.json": "5f42d3e627fc3772f89f2f3147ae9dec19c89167f2c77f831ddbc59510fb5df6",
-    "docs/plans/evidence/s1-1311/capacity.json": "1c3a7798373bd46763a249137edded237e0fd6f3dad6b96bc598d82c62eaaa48",
+    "docs/plans/evidence/s1-1311/capacity.json": "b5fa50e3bfcc1db499b5f219d9cd1d5ab14bb04aa2eb8dde71b57a3e42f8358e",
     "docs/plans/evidence/s1-1311/controls.json": "36da02dceb4b540537d8967426964b4be04c248a533166284f56a23b65632f07",
     "docs/plans/evidence/s1-1311/findings.json": "57c04eb3a0d1a2789b0a7b48dd5bf90ae41566c0ce925e032039bd46f3fad31b",
     "docs/plans/evidence/s1-1311/gate-status.json": "7f8063d733b7e1de687cb3918c3acef5f4108ff2cc002f4794caacca1f6a8605",
     "docs/plans/evidence/s1-1311/harness-corrections.json": "5d0a77d904d53d874a97ac13ebbb72513aa91c7b87b81b9cc6e49c5f6d284570",
-    "docs/plans/evidence/s1-1311/pins.json": "0296e048a1b2fa5787aa125b87488989b1dc887ca1043dfa5dc2a9eda7e41a10",
+    "docs/plans/evidence/s1-1311/pins.json": "e11e7adb7159e7d9c47f6636454cdc11c28cd0a389f5834dd0567b722668b95c",
     "docs/plans/evidence/s1-1311/preflight.json": "f4206b6e3825099955f34ffdab4af8addf84bb2e8864932d3bf113742571ff1b",
     "docs/plans/evidence/s1-1311/results-summary.json": "d278a3c38f5b73af655c0ac28e4cb07f35c71ab134d88b364d1ae35a7dea0e72",
     "docs/plans/evidence/s1-1311/reviews/round-1.json": "a829352335ae364f5a83e0473af353a0ad0baa050572cea7c5bd6ec324815fc3",
     "docs/plans/evidence/s1-1311/reviews/round-2.json": "e5e8c691cf6301c3583a04aa8e34d8f4e4b22d9b2dc5f2d9003140818ab1acec",
     "docs/plans/evidence/s1-1311/reviews/round-3.json": "2defb116f9099f7f6996da031f29f1fc1c949e1ac2220f0ccfccb52a323fe647",
-    "docs/plans/v0.24-s1-soundness-results.md": "ca9c6360d01a6e3bc8c8d63dd5bab006a59b29e89ad31eb01cd804798bdfdef9",
+    "docs/plans/evidence/s1-1311/reviews/round-verification.json": "c0d3a3a225d330c665b7307e85ac631efc78ce3b5384f6bc86664f4234ac02af",
+    "docs/plans/v0.24-s1-soundness-results.md": "ce12dbe805b5b5ee1a3d60e84d4cfe4362dfbc1faf43969a6d1f2cdcaa12cc84",
     "tools/Calor.Soundness.Sweep/BaselineHost.cs": "111b8d597189f985c4865ca18fecf7dd33cf2cbd19aafb063a670e4a706853eb",
     "tools/Calor.Soundness.Sweep/Calor.Soundness.Sweep.csproj": "b7bd026cd61089c57f63037588aaf9e792dcd8157b41533dfd8dbdb0fed8f879",
     "tools/Calor.Soundness.Sweep/CaseExecutor.cs": "afa2ce43f83d6a706ee9ff1cb543ecdf68a7d37d13c8ff32052d0c7a8512cacf",
     "tools/Calor.Soundness.Sweep/OracleRuntime.cs": "86cc1d392ed4cd84149b8227c58f802d554a8f86cdd84596002c77dda10ae40e",
-    "tools/Calor.Soundness.Sweep/Program.cs": "d8f62f3a1668cb2aa5c698212e43e69cf4e750d31e74cc86a3cb8efef852103f",
-    "tools/Calor.Soundness.Sweep/Report.cs": "3a351f2aca9afcbdc200439e859a470205a2ea599cd1c3c694ccfe3163e70f05"
+    "tools/Calor.Soundness.Sweep/Program.cs": "c78949b501a58b08fe824d180a3c761200aa5281bbc0c2005dc79aa1dae8c631",
+    "tools/Calor.Soundness.Sweep/Report.cs": "19a7488ea76c8658ebc02bd306e50b34ab9b5abb84440885aa73889f9d5b3b33"
   }
 }

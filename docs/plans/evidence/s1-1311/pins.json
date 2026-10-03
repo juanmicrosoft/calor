@@ -5,7 +5,8 @@
     "run": "8e33f08019303cf805e5098775032face6017a27",
     "crossRun": "dcd6f34a59e9276ef28e45e543a64865ed819a05",
     "o2Rereplay": "449b4ec5d7b07b2c36209e4fd1e0fec4edbd5712",
-    "reclassifyAndReport": "fa2ff938098e6e64aadaa888c746b6249995762c"
+    "reclassify": "fa2ff938098e6e64aadaa888c746b6249995762c",
+    "finalHarnessAndReport": "e7cbce77c5eefbfa7b6c7338f17b57bb4b06127e"
   },
   "baselines": {
     "B1": {

@@ -23,7 +23,7 @@
     "sweepWallClockSeconds": 185.4,
     "localMachineHours": "under 1 (sweep 185 s, cross-baseline re-runs under 1 min; builds, self-tests, reclassification, reports, and the native check each took minutes)",
     "ciRunnerMinutes": 0,
-    "agentHours": "about 1.5 (2026-10-03T16:33Z to packet time); review rounds add to it, see the results document",
+    "agentHours": "about 3 (2026-10-03T16:33Z to the final packet, including three review rounds and a verification pass)",
     "paidSpendUsd": 0,
     "timebox": "sweep finished 2026-10-03T16:53:50Z, inside the timebox"
   },

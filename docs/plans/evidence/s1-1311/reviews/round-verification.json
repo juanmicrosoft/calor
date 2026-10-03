@@ -1,0 +1,29 @@
+{
+  "round": "verification",
+  "reviewer": "codex exec -s read-only --ephemeral -c model_reasoning_effort=high",
+  "reviewedCommit": "998d2f58",
+  "verdict": "REQUEST-CHANGES",
+  "output": "1. **NOT RESOLVED \u2014 pin enforcement.** Baseline-specific comparison and persisted invalidity are implemented. However, [`CrossRun.Drift`](/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a15b19a09073e2529/tools/Calor.Soundness.Sweep/Program.cs:263) accepts missing stored and live native identities because `null != null` is false. The response\u2019s claim of completed enforcement remains too strong. The original provenance gap is honestly recorded.\n\n2. **NOT RESOLVED \u2014 finding evidence selection.** Raw/late observation selection and forced-proof non-vacuity checks are repaired. But [`Finding.classReason`](/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a15b19a09073e2529/tools/Calor.Soundness.Sweep/Report.cs:127) still comes from `r`, whose reason comes from the last attempt, rather than the selected finding-bearing observation. An earlier false proof followed by a non-finding retry can therefore export the wrong reason. This remaining gap is not recorded as unresolved.\n\n3. **RESOLVED \u2014 unfinished-attempt retention.** [`Attempt`](/Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a15b19a09073e2529/tools/Calor.Soundness.Sweep/Program.cs:168) writes the over-time record and ledger entry before throwing to stop the session. The retained data does not exercise this branch, as disclosed.\n\n4. **RESOLVED \u2014 O2 totals and historical response.** Each baseline has **671 full, 2 partial, 9 compiler-rejected, and 28 not-applicable distinct cases**. The results document and corrections record match. Round-1 response 2 preserves its original text and adds the superseding correction.\n\n**Regression checks:** No retained-data regression found. Case-results files are byte-identical to `29d66385`; all **1,807 hashes** match; all **1,500 ledger entries** reference existing, unique attempts, with none unledgered. Full counted PR size is **1,497 lines**: 1,397 under `tools/` plus 100 in the results document. The maintainer-only open decisions and gate `BLOCKED` remain acceptable disclosures.\n\nVERDICT: REQUEST-CHANGES",
+  "responses": [
+    {
+      "item": 1,
+      "severity": "NOT RESOLVED (verification)",
+      "response": "Fixed after the verification pass in e7cbce77 (one-line change): crossrun's Drift check now fails when the live native identity is missing (null), so missing stored and live identities no longer compare equal. Not re-reviewed: the review budget (3 rounds plus one verification pass) is used. The original provenance gap stays open for the maintainer."
+    },
+    {
+      "item": 2,
+      "severity": "NOT RESOLVED (verification)",
+      "response": "Fixed after the verification pass in e7cbce77 (one-line change): a finding's classReason comes from the selected finding-bearing observation. Not re-reviewed. No retained finding involves a retry, and the regenerated finding records are unchanged."
+    },
+    {
+      "item": 3,
+      "severity": "RESOLVED",
+      "response": "No change."
+    },
+    {
+      "item": 4,
+      "severity": "RESOLVED",
+      "response": "No change."
+    }
+  ]
+}
