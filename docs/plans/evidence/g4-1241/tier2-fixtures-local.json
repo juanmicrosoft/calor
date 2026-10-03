@@ -6,7 +6,7 @@
     "samples",
     "tests"
   ],
-  "manifestSha256": "ac1a75a879d9c18d1fd0d23cc2e7a407d1edb92bd66c8bfd6caae8d73fbbcfaf",
+  "manifestSha256": "f12b860d62739cc4277003e7d4fa870edd854382696013c73e5c15c8476cfe88",
   "trackedFixtures": 509,
   "counts": {
     "passed": 428,
@@ -42,7 +42,7 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-6m2pdkwx/in/08-03.approved.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-8v_qmnzp/in/08-03.approved.g.cs",
           "line": 15,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0029): Cannot implicitly convert type 'string[]' to 'System.Collections.Generic.List<string>'"
@@ -67,7 +67,7 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-nrazwrvy/in/09-03.approved.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-o9finh6_/in/09-03.approved.calr",
           "line": 4,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS8510): The pattern is unreachable. It has already been handled by a previous arm of the switch expression or it is impossible to match."
@@ -92,7 +92,7 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-ey_hg3gh/in/11-03.approved.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-f8sy7shq/in/11-03.approved.g.cs",
           "line": 14,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0050): Inconsistent accessibility: return type 'Container.Status' is less accessible than method 'Container.GetStatus()'"
@@ -119,13 +119,13 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lbzqcn61/in/11-05.approved.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-t8qrww5c/in/11-05.approved.calr",
           "line": 15,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0246): The type or namespace name 'str' could not be found (are you missing a using directive or an assembly reference?)"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lbzqcn61/in/11-05.approved.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-t8qrww5c/in/11-05.approved.calr",
           "line": 15,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0246): The type or namespace name 'i32' could not be found (are you missing a using directive or an assembly reference?)"
@@ -168,61 +168,61 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-0k97ueiz/in/13-02.approved.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-b6a6d1zr/in/13-02.approved.g.cs",
           "line": 14,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1519): Invalid token 'object' in a member declaration"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-0k97ueiz/in/13-02.approved.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-b6a6d1zr/in/13-02.approved.g.cs",
           "line": 14,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1519): Invalid token ';' in a member declaration"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-0k97ueiz/in/13-02.approved.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-b6a6d1zr/in/13-02.approved.g.cs",
           "line": 14,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1519): Invalid token ';' in a member declaration"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-0k97ueiz/in/13-02.approved.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-b6a6d1zr/in/13-02.approved.g.cs",
           "line": 16,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1001): Identifier expected"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-0k97ueiz/in/13-02.approved.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-b6a6d1zr/in/13-02.approved.g.cs",
           "line": 16,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1003): Syntax error, ',' expected"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-0k97ueiz/in/13-02.approved.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-b6a6d1zr/in/13-02.approved.g.cs",
           "line": 16,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1001): Identifier expected"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-0k97ueiz/in/13-02.approved.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-b6a6d1zr/in/13-02.approved.calr",
           "line": 7,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1001): Identifier expected"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-0k97ueiz/in/13-02.approved.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-b6a6d1zr/in/13-02.approved.calr",
           "line": 7,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1002): ; expected"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-0k97ueiz/in/13-02.approved.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-b6a6d1zr/in/13-02.approved.calr",
           "line": 7,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1001): Identifier expected"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-0k97ueiz/in/13-02.approved.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-b6a6d1zr/in/13-02.approved.calr",
           "line": 7,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1525): Invalid expression term 'object'"
@@ -251,19 +251,19 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-fsrq_dyj/in/13-05.approved.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-y3p234yg/in/13-05.approved.calr",
           "line": 4,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS8510): The pattern is unreachable. It has already been handled by a previous arm of the switch expression or it is impossible to match."
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-fsrq_dyj/in/13-05.approved.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-y3p234yg/in/13-05.approved.calr",
           "line": 4,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS8510): The pattern is unreachable. It has already been handled by a previous arm of the switch expression or it is impossible to match."
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-fsrq_dyj/in/13-05.approved.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-y3p234yg/in/13-05.approved.calr",
           "line": 4,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS8510): The pattern is unreachable. It has already been handled by a previous arm of the switch expression or it is impossible to match."
@@ -290,13 +290,13 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-uo_hxr32/in/13-10.approved.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-621hqxzl/in/13-10.approved.calr",
           "line": 8,
           "code": "Calor1006",
           "message": "Expression-match arms must contain exactly one value-return expression. Multi-statement, empty, and valueless arms are not supported; use a statement match instead."
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-uo_hxr32/in/13-10.approved.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-621hqxzl/in/13-10.approved.calr",
           "line": 14,
           "code": "Calor1006",
           "message": "Expression-match arms must contain exactly one value-return expression. Multi-statement, empty, and valueless arms are not supported; use a statement match instead."
@@ -321,7 +321,7 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-h79et_sk/in/HashMap.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-ljal37lq/in/HashMap.calr",
           "line": 13,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
@@ -348,13 +348,13 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-vhk9oe_t/in/Adapter.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-u8xtn02y/in/Adapter.calr",
           "line": 4,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-vhk9oe_t/in/Adapter.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-u8xtn02y/in/Adapter.calr",
           "line": 8,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
@@ -381,13 +381,13 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-1r58djpd/in/Factory.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-iy8vij6h/in/Factory.calr",
           "line": 5,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-1r58djpd/in/Factory.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-iy8vij6h/in/Factory.calr",
           "line": 21,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
@@ -464,163 +464,163 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
           "line": 101,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0060): Inconsistent accessibility: base class 'DataProcessor' is less accessible than class 'JsonProcessor'"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
           "line": 51,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0060): Inconsistent accessibility: base class 'DataProcessor' is less accessible than class 'CsvProcessor'"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
-          "line": 65,
-          "code": "Calor1002",
-          "message": "Generated C# failed compilation (CS0621): 'CsvProcessor.ReadData()': virtual or abstract members cannot be private"
-        },
-        {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
           "line": 115,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0621): 'JsonProcessor.ReadData()': virtual or abstract members cannot be private"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
+          "line": 65,
+          "code": "Calor1002",
+          "message": "Generated C# failed compilation (CS0621): 'CsvProcessor.ReadData()': virtual or abstract members cannot be private"
+        },
+        {
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
           "line": 36,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0621): 'DataProcessor.ReadData()': virtual or abstract members cannot be private"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
           "line": 38,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0621): 'DataProcessor.ProcessData(string)': virtual or abstract members cannot be private"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
           "line": 40,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0621): 'DataProcessor.SaveResults(string)': virtual or abstract members cannot be private"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
           "line": 42,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0621): 'DataProcessor.ValidateData(string)': virtual or abstract members cannot be private"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
-          "line": 72,
-          "code": "Calor1002",
-          "message": "Generated C# failed compilation (CS0621): 'CsvProcessor.ProcessData(string)': virtual or abstract members cannot be private"
-        },
-        {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
           "line": 122,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0621): 'JsonProcessor.ProcessData(string)': virtual or abstract members cannot be private"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
+          "line": 72,
+          "code": "Calor1002",
+          "message": "Generated C# failed compilation (CS0621): 'CsvProcessor.ProcessData(string)': virtual or abstract members cannot be private"
+        },
+        {
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
           "line": 129,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0621): 'JsonProcessor.SaveResults(string)': virtual or abstract members cannot be private"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
           "line": 79,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0621): 'CsvProcessor.SaveResults(string)': virtual or abstract members cannot be private"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
           "line": 86,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0621): 'CsvProcessor.ValidateData(string)': virtual or abstract members cannot be private"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
           "line": 65,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0115): 'CsvProcessor.ReadData()': no suitable method found to override"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
-          "line": 115,
-          "code": "Calor1002",
-          "message": "Generated C# failed compilation (CS0115): 'JsonProcessor.ReadData()': no suitable method found to override"
-        },
-        {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
           "line": 72,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0115): 'CsvProcessor.ProcessData(string)': no suitable method found to override"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
-          "line": 122,
-          "code": "Calor1002",
-          "message": "Generated C# failed compilation (CS0115): 'JsonProcessor.ProcessData(string)': no suitable method found to override"
-        },
-        {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
           "line": 79,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0115): 'CsvProcessor.SaveResults(string)': no suitable method found to override"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
-          "line": 129,
-          "code": "Calor1002",
-          "message": "Generated C# failed compilation (CS0115): 'JsonProcessor.SaveResults(string)': no suitable method found to override"
-        },
-        {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
           "line": 86,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0115): 'CsvProcessor.ValidateData(string)': no suitable method found to override"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
-          "line": 101,
-          "code": "Calor1002",
-          "message": "Generated C# failed compilation (CS0534): 'JsonProcessor' does not implement inherited abstract member 'DataProcessor.ProcessData(string)'"
-        },
-        {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
-          "line": 51,
-          "code": "Calor1002",
-          "message": "Generated C# failed compilation (CS0534): 'CsvProcessor' does not implement inherited abstract member 'DataProcessor.ProcessData(string)'"
-        },
-        {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
-          "line": 101,
-          "code": "Calor1002",
-          "message": "Generated C# failed compilation (CS0534): 'JsonProcessor' does not implement inherited abstract member 'DataProcessor.ReadData()'"
-        },
-        {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
-          "line": 51,
-          "code": "Calor1002",
-          "message": "Generated C# failed compilation (CS0534): 'CsvProcessor' does not implement inherited abstract member 'DataProcessor.ReadData()'"
-        },
-        {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
-          "line": 101,
-          "code": "Calor1002",
-          "message": "Generated C# failed compilation (CS0534): 'JsonProcessor' does not implement inherited abstract member 'DataProcessor.SaveResults(string)'"
-        },
-        {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
           "line": 51,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0534): 'CsvProcessor' does not implement inherited abstract member 'DataProcessor.SaveResults(string)'"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-tnti0y4z/in/TemplateMethod.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
+          "line": 51,
+          "code": "Calor1002",
+          "message": "Generated C# failed compilation (CS0534): 'CsvProcessor' does not implement inherited abstract member 'DataProcessor.ReadData()'"
+        },
+        {
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
+          "line": 51,
+          "code": "Calor1002",
+          "message": "Generated C# failed compilation (CS0534): 'CsvProcessor' does not implement inherited abstract member 'DataProcessor.ProcessData(string)'"
+        },
+        {
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
+          "line": 115,
+          "code": "Calor1002",
+          "message": "Generated C# failed compilation (CS0115): 'JsonProcessor.ReadData()': no suitable method found to override"
+        },
+        {
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
+          "line": 122,
+          "code": "Calor1002",
+          "message": "Generated C# failed compilation (CS0115): 'JsonProcessor.ProcessData(string)': no suitable method found to override"
+        },
+        {
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
+          "line": 129,
+          "code": "Calor1002",
+          "message": "Generated C# failed compilation (CS0115): 'JsonProcessor.SaveResults(string)': no suitable method found to override"
+        },
+        {
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
+          "line": 101,
+          "code": "Calor1002",
+          "message": "Generated C# failed compilation (CS0534): 'JsonProcessor' does not implement inherited abstract member 'DataProcessor.SaveResults(string)'"
+        },
+        {
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
+          "line": 101,
+          "code": "Calor1002",
+          "message": "Generated C# failed compilation (CS0534): 'JsonProcessor' does not implement inherited abstract member 'DataProcessor.ReadData()'"
+        },
+        {
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.g.cs",
+          "line": 101,
+          "code": "Calor1002",
+          "message": "Generated C# failed compilation (CS0534): 'JsonProcessor' does not implement inherited abstract member 'DataProcessor.ProcessData(string)'"
+        },
+        {
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-in3dsjw3/in/TemplateMethod.calr",
           "line": 40,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0122): 'DataProcessor.ValidateData(string)' is inaccessible due to its protection level"
@@ -685,127 +685,127 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.g.cs",
-          "line": 30,
-          "code": "Calor1002",
-          "message": "Generated C# failed compilation (CS0060): Inconsistent accessibility: base class 'Expression' is less accessible than class 'NumberExpression'"
-        },
-        {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.g.cs",
           "line": 49,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0060): Inconsistent accessibility: base class 'Expression' is less accessible than class 'AddExpression'"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.g.cs",
-          "line": 63,
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.g.cs",
+          "line": 30,
           "code": "Calor1002",
-          "message": "Generated C# failed compilation (CS0115): 'AddExpression.Accept(IExpressionVisitor)': no suitable method found to override"
+          "message": "Generated C# failed compilation (CS0060): Inconsistent accessibility: base class 'Expression' is less accessible than class 'NumberExpression'"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.g.cs",
-          "line": 40,
-          "code": "Calor1002",
-          "message": "Generated C# failed compilation (CS0115): 'NumberExpression.Accept(IExpressionVisitor)': no suitable method found to override"
-        },
-        {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.g.cs",
           "line": 72,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0060): Inconsistent accessibility: base class 'Expression' is less accessible than class 'MultiplyExpression'"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.g.cs",
           "line": 86,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0115): 'MultiplyExpression.Accept(IExpressionVisitor)': no suitable method found to override"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.g.cs",
-          "line": 51,
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.g.cs",
+          "line": 40,
           "code": "Calor1002",
-          "message": "Generated C# failed compilation (CS0052): Inconsistent accessibility: field type 'Expression' is less accessible than field 'AddExpression.Left'"
+          "message": "Generated C# failed compilation (CS0115): 'NumberExpression.Accept(IExpressionVisitor)': no suitable method found to override"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.g.cs",
+          "line": 63,
+          "code": "Calor1002",
+          "message": "Generated C# failed compilation (CS0115): 'AddExpression.Accept(IExpressionVisitor)': no suitable method found to override"
+        },
+        {
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.g.cs",
           "line": 74,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0052): Inconsistent accessibility: field type 'Expression' is less accessible than field 'MultiplyExpression.Left'"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.g.cs",
+          "line": 51,
+          "code": "Calor1002",
+          "message": "Generated C# failed compilation (CS0052): Inconsistent accessibility: field type 'Expression' is less accessible than field 'AddExpression.Left'"
+        },
+        {
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.g.cs",
           "line": 75,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0052): Inconsistent accessibility: field type 'Expression' is less accessible than field 'MultiplyExpression.Right'"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.g.cs",
           "line": 52,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0052): Inconsistent accessibility: field type 'Expression' is less accessible than field 'AddExpression.Right'"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.g.cs",
           "line": 76,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0051): Inconsistent accessibility: parameter type 'Expression' is less accessible than method 'MultiplyExpression.MultiplyExpression(Expression, Expression)'"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.g.cs",
           "line": 76,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0051): Inconsistent accessibility: parameter type 'Expression' is less accessible than method 'MultiplyExpression.MultiplyExpression(Expression, Expression)'"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.g.cs",
           "line": 53,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0051): Inconsistent accessibility: parameter type 'Expression' is less accessible than method 'AddExpression.AddExpression(Expression, Expression)'"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.g.cs",
           "line": 53,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0051): Inconsistent accessibility: parameter type 'Expression' is less accessible than method 'AddExpression.AddExpression(Expression, Expression)'"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.calr",
           "line": 9,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0126): An object of a type convertible to 'float' is required"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.calr",
           "line": 56,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.calr",
           "line": 72,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0122): 'Expression.Accept(IExpressionVisitor)' is inaccessible due to its protection level"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.calr",
           "line": 59,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0122): 'Expression.Accept(IExpressionVisitor)' is inaccessible due to its protection level"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.calr",
           "line": 60,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0122): 'Expression.Accept(IExpressionVisitor)' is inaccessible due to its protection level"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.calr",
           "line": 64,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0122): 'Expression.Accept(IExpressionVisitor)' is inaccessible due to its protection level"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2pjc5hjy/in/Visitor.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-lu29g2z6/in/Visitor.calr",
           "line": 65,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0122): 'Expression.Accept(IExpressionVisitor)' is inaccessible due to its protection level"
@@ -830,7 +830,7 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-5blwi5gp/in/CurrencyConverter.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-xbkt4qrp/in/CurrencyConverter.calr",
           "line": 10,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
@@ -855,7 +855,7 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-htpta59j/in/ScoreBoard.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2b5kvmbv/in/ScoreBoard.calr",
           "line": 14,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
@@ -886,25 +886,25 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-j0tjnr9i/in/TaxCalculator.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-uplz683m/in/TaxCalculator.calr",
           "line": 5,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0664): Literal of type double cannot be implicitly converted to type 'float'; use an 'F' suffix to create a literal of this type"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-j0tjnr9i/in/TaxCalculator.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-uplz683m/in/TaxCalculator.calr",
           "line": 7,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0664): Literal of type double cannot be implicitly converted to type 'float'; use an 'F' suffix to create a literal of this type"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-j0tjnr9i/in/TaxCalculator.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-uplz683m/in/TaxCalculator.calr",
           "line": 9,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0664): Literal of type double cannot be implicitly converted to type 'float'; use an 'F' suffix to create a literal of this type"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-j0tjnr9i/in/TaxCalculator.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-uplz683m/in/TaxCalculator.calr",
           "line": 11,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0664): Literal of type double cannot be implicitly converted to type 'float'; use an 'F' suffix to create a literal of this type"
@@ -937,31 +937,31 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-w795v_yl/in/UnitConverter.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-_m_hfck_/in/UnitConverter.calr",
           "line": 4,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-w795v_yl/in/UnitConverter.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-_m_hfck_/in/UnitConverter.calr",
           "line": 8,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-w795v_yl/in/UnitConverter.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-_m_hfck_/in/UnitConverter.calr",
           "line": 12,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-w795v_yl/in/UnitConverter.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-_m_hfck_/in/UnitConverter.calr",
           "line": 16,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-w795v_yl/in/UnitConverter.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-_m_hfck_/in/UnitConverter.calr",
           "line": 20,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
@@ -986,7 +986,7 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-5zmza2q7/in/VotingSystem.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-5cdjyji8/in/VotingSystem.calr",
           "line": 11,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
@@ -1015,19 +1015,19 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-cocx3x0h/in/NetworkEffect.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-ji1v4jv9/in/NetworkEffect.g.cs",
           "line": 28,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1001): Identifier expected"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-cocx3x0h/in/NetworkEffect.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-ji1v4jv9/in/NetworkEffect.g.cs",
           "line": 28,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1003): Syntax error, ',' expected"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-cocx3x0h/in/NetworkEffect.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-ji1v4jv9/in/NetworkEffect.calr",
           "line": 11,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1511): Keyword 'base' is not available in a static method"
@@ -1052,7 +1052,7 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-j_4qaa3_/in/NullDeref_buggy.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-hvaicy0f/in/NullDeref_buggy.calr",
           "line": 3,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1061): 'Option<int>' does not contain a definition for 'unwrap' and no accessible extension method 'unwrap' accepting a first argument of type 'Option<int>' could be found (are you missing a using directive or an assembly reference?)"
@@ -1081,19 +1081,19 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-hqivlnc4/in/PureFunctions.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-wxkf71x0/in/PureFunctions.g.cs",
           "line": 67,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1001): Identifier expected"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-hqivlnc4/in/PureFunctions.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-wxkf71x0/in/PureFunctions.g.cs",
           "line": 67,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1003): Syntax error, ',' expected"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-hqivlnc4/in/PureFunctions.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-wxkf71x0/in/PureFunctions.calr",
           "line": 25,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1511): Keyword 'base' is not available in a static method"
@@ -1118,7 +1118,7 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-dfpp2v8n/in/Composition.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-ekczrt_w/in/Composition.calr",
           "line": 9,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
@@ -1151,31 +1151,31 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-3lfgvm0r/in/InterfaceImpl.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-b_ho83i4/in/InterfaceImpl.g.cs",
           "line": 31,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1001): Identifier expected"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-3lfgvm0r/in/InterfaceImpl.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-b_ho83i4/in/InterfaceImpl.g.cs",
           "line": 31,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1003): Syntax error, ',' expected"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-3lfgvm0r/in/InterfaceImpl.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-b_ho83i4/in/InterfaceImpl.calr",
           "line": 4,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-3lfgvm0r/in/InterfaceImpl.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-b_ho83i4/in/InterfaceImpl.g.cs",
           "line": 33,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1511): Keyword 'base' is not available in a static method"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-3lfgvm0r/in/InterfaceImpl.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-b_ho83i4/in/InterfaceImpl.calr",
           "line": 13,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1511): Keyword 'base' is not available in a static method"
@@ -1200,7 +1200,7 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-mkw_mly8/in/Polymorphism.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-_i5rwxoz/in/Polymorphism.calr",
           "line": 4,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
@@ -1225,7 +1225,7 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-wli50bw5/in/AreaOfCircle.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-q8lx3hjd/in/AreaOfCircle.calr",
           "line": 5,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
@@ -1250,7 +1250,7 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-fv5fvxa6/in/Average.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-v2iupm6i/in/Average.calr",
           "line": 4,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
@@ -1275,7 +1275,7 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-rm23ad6i/in/CelsiusToKelvin.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-ngtwaqh5/in/CelsiusToKelvin.calr",
           "line": 5,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
@@ -1300,7 +1300,7 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-rcu5kxmy/in/CompoundInterest.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-bg1camlv/in/CompoundInterest.calr",
           "line": 7,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
@@ -1329,19 +1329,19 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-84dds5fw/in/Power.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2qtyab2e/in/Power.g.cs",
           "line": 15,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1001): Identifier expected"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-84dds5fw/in/Power.g.cs",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2qtyab2e/in/Power.g.cs",
           "line": 15,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1003): Syntax error, ',' expected"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-84dds5fw/in/Power.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-2qtyab2e/in/Power.calr",
           "line": 7,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS1511): Keyword 'base' is not available in a static method"
@@ -1370,19 +1370,19 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-7izz6e1f/in/TemperatureConverter.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-_w0im_h7/in/TemperatureConverter.calr",
           "line": 3,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-7izz6e1f/in/TemperatureConverter.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-_w0im_h7/in/TemperatureConverter.calr",
           "line": 6,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
         },
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-7izz6e1f/in/TemperatureConverter.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-_w0im_h7/in/TemperatureConverter.calr",
           "line": 9,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
@@ -1407,7 +1407,7 @@
       ],
       "errorDiagnostics": [
         {
-          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-183adx1d/in/TemperatureRange.calr",
+          "file": "/var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/fixture-check-o7il9sn_/in/TemperatureRange.calr",
           "line": 5,
           "code": "Calor1002",
           "message": "Generated C# failed compilation (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)"
@@ -6449,7 +6449,7 @@
     "compiler": "checkout-built calor.dll, never an installed tool",
     "dll": "src/Calor.Compiler/bin/Release/net10.0/calor.dll",
     "dllSha256": "1b996a6c9fcfa3abc14dbad2808805e814aa792f81b48fbb201e7e27abdff84a",
-    "head": "0d6fe0075544b6db44e9d0a7e4ee26bb4eb5b062",
+    "head": "f167a910ce2cf4805f4c46132846958f2c6bbfa8",
     "worktreeDirty": false
   },
   "ignoredUntrackedCalr": {
