@@ -55,6 +55,12 @@ public class BenchmarkResultsTests
         ["narrowed interval"] = (f => f("results.json")["metric"]!["overall"]!["interval95"]![0] = f("results.json")["metric"]!["overall"]!["geometricMeanR"]!.GetValue<string>(), "R005", "overall", []),
         ["interval for one pair"] = (f => f("results.json")["metric"]!["perCategory"]!["ErrorHandling"]!["interval95"] = new JsonArray("1", "2"), "R005", "ErrorHandling", []),
         ["changed method key"] = (f => f("results.json")["comparability"]!["aggregationMethod"] = "mean of category means", "R005", "aggregationMethod", []),
+        ["stripped pair evidence"] = (f => Row(f("pair-manifest.json"), "TokenEconomics/HelloWorld")["equivalenceEvidence"] = new JsonObject { ["reason"] = "AGREE" },
+            "R003", "TokenEconomics/HelloWorld evidence", []),
+        ["falsified input count"] = (f => Row(f("pair-manifest.json"), Witness)["equivalenceEvidence"]!["inputCount"] = 5000, "R003", Witness + " evidence", []),
+        ["generalized population"] = (f => f("results.json")["metric"]!["population"] = "all C# and Calor programs", "R005", "labels", []),
+        ["interval relabeled as a confidence interval"] = (f => f("results.json")["metric"]!["intervalLabel"] = "95% confidence interval for a language advantage", "R005", "labels", []),
+        ["metric runs not recorded"] = (f => f("environment.json")["metricRuns"]!["bitIdentical"] = false, "R003", "environment", []),
     };
 
     [Fact]
@@ -93,6 +99,11 @@ public class BenchmarkResultsTests
     [InlineData("narrowed interval")]
     [InlineData("interval for one pair")]
     [InlineData("changed method key")]
+    [InlineData("stripped pair evidence")]
+    [InlineData("falsified input count")]
+    [InlineData("generalized population")]
+    [InlineData("interval relabeled as a confidence interval")]
+    [InlineData("metric runs not recorded")]
     public void MutationIsRejected(string name)
     {
         var (change, code, subject, also) = Mutations[name];
@@ -105,6 +116,14 @@ public class BenchmarkResultsTests
         EvidenceContractTests.AssertViolation(violations, code, also);
         Assert.True(violations.Any(v => v.Code == code && v.Subject == subject),
             $"expected {code} on '{subject}'; got:{Environment.NewLine}{EvidenceContractTests.Describe(violations)}");
+    }
+
+    [Fact]
+    public void MissingEnvironmentRecordIsRejected()
+    {
+        var results = Results();
+        results.Remove("environment.json");
+        EvidenceContractTests.AssertViolation(Validate(Reseal(results)), "R001");
     }
 
     [Fact]

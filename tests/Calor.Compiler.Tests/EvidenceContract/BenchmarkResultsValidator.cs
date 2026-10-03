@@ -19,7 +19,11 @@ internal static partial class EvidenceContractValidator
     public const string RegistrationMergeCommit = "f0e0eb682a8658364170ad49aff2d2c433d570f8";
 
     public static readonly IReadOnlyList<string> ResultsJsonFiles =
-        ["oracle-run-1.json", "oracle-run-2.json", "metrics-run-1.json", "metrics-run-2.json", "pair-manifest.json", "results.json"];
+        ["oracle-run-1.json", "oracle-run-2.json", "metrics-run-1.json", "metrics-run-2.json", "pair-manifest.json", "results.json", "environment.json"];
+
+    private const string ResultsLabel =
+        "Describes this fixed, author-built corpus only. r is a static source-size ratio of two committed files, not a coding-agent outcome or a language advantage. " +
+        "EQUIVALENT means no observed disagreement on the registered finite inputs; it is not a proof and not a correctness claim about either arm.";
 
     /// <summary>
     /// <paramref name="results"/> maps every file in the results directory to its text;
@@ -108,7 +112,30 @@ internal static partial class EvidenceContractValidator
                 v.Add(new("R003", id, "disposition is not the reconciled oracle verdict under the registered reason map"));
             if ((Str(row["registeredDisposition"]) == "EXCLUDED-PRE-REGISTERED") != (Str(row["disposition"]) == "EXCLUDED-PRE-REGISTERED"))
                 v.Add(new("R003", id, "only pre-registered exclusions may be EXCLUDED-PRE-REGISTERED"));
+            // The pair's evidence is exactly the reconciled verdict's, with the oracle and result it came from.
+            var evidence = verdict is null ? null : new JsonObject
+            {
+                ["status"] = Str(row["disposition"]) == "EXCLUDED-PRE-REGISTERED" ? "not-run" : "oracle-executed",
+                ["oracle"] = $"{Str(oracle?["id"])}@{Str(oracle?["version"])}",
+                ["oracleResultSha256"] = RawSha256(results["oracle-run-2.json"]),
+                ["reason"] = verdict["Reason"]?.DeepClone(),
+                ["inputCount"] = verdict["InputCount"]?.DeepClone(),
+                ["observationsSha256"] = verdict["ObservationsSha256"]?.DeepClone(),
+                ["surface"] = verdict["Surface"]?.DeepClone(),
+                ["witnesses"] = verdict["Witnesses"]?.DeepClone(),
+                ["detail"] = verdict["Detail"]?.DeepClone(),
+            };
+            if (evidence is null || row["equivalenceEvidence"]?.ToJsonString() != evidence.ToJsonString())
+                v.Add(new("R003", id + " evidence", "equivalenceEvidence is not the reconciled oracle verdict with its oracle and result hash"));
         }
+        // The execution record: both oracle runs at the merge commit with their registered exit codes, and two
+        // bit-identical metric runs at one recorded commit.
+        var environment = Load("environment.json");
+        if (Str(environment["oracleRuns"]?["checkout"])?.Contains(RegistrationMergeCommit, StringComparison.Ordinal) != true
+            || Int(environment["oracleRuns"]?["run1"]?["exitCode"]) != 4 || Int(environment["oracleRuns"]?["run2"]?["exitCode"]) != 0
+            || Str(environment["metricRuns"]?["commit"]) is not { Length: 40 } || Bool(environment["metricRuns"]?["bitIdentical"]) != true
+            || Array(environment["metricRuns"]?["exitCodes"]).Any(c => Int(c) != 0) || Array(environment["metricRuns"]?["exitCodes"]).Count != 2)
+            v.Add(new("R003", "environment", "the environment record does not show the registered oracle and metric executions"));
         if (Str(verdicts.GetValueOrDefault("DomainProblems/CsvParser")?["Disposition"]) != "NOT-EQUIVALENT")
             v.Add(new("R003", "known-witness", "DomainProblems/CsvParser is not NOT-EQUIVALENT; the oracle result is invalid"));
 
@@ -176,6 +203,18 @@ internal static partial class EvidenceContractValidator
             || Int(summary["denominator"]) != registered.Count)
             v.Add(new("R005", "results.json", "disposition counts do not match the manifest"));
         var metric = summary["metric"];
+        // The declared population, sampling unit, and interval interpretation are the registered ones, word for word.
+        var labels = new (JsonNode? Node, string Expected)[]
+        {
+            (metric?["metric"], "TokenEconomics/CompositeTokenEconomics"),
+            (metric?["perPairValue"], "r = csharpSize / calorSize (r > 1: the C# file is larger; r < 1: the Calor file is larger)"),
+            (metric?["population"], "registered manifest.benchmarks pairs dispositioned EQUIVALENT by the reconciled oracle result"),
+            (metric?["samplingUnit"], Str(registration["statistics"]?["samplingUnit"]) ?? "?"),
+            (metric?["intervalLabel"], Str(registration["statistics"]?["interval"]?["label"]) ?? "?"),
+            (summary["label"], ResultsLabel),
+        };
+        if (labels.Any(l => Str(l.Node) != l.Expected))
+            v.Add(new("R005", "labels", "the metric's population, sampling unit, or interval or claim label is not the registered wording"));
         if (metric?["overall"]?.ToJsonString() != Expected(values).ToJsonString())
             v.Add(new("R005", "overall", "the overall estimate or interval is not the registered computation over the included pairs"));
         foreach (var group in values.GroupBy(x => Str(x["category"]) ?? ""))
