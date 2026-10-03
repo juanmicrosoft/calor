@@ -7,30 +7,38 @@ using Xunit;
 namespace Calor.Compiler.Tests.InteropScope;
 
 /// <summary>
-/// #1426 (0.25 R0) — the committed scope and baseline packet is valid, and the validator fails
-/// closed. Each negative control changes one fact of the committed packet and asserts that only
-/// the expected violation code fires, so a validator that rejected everything would fail the
-/// positive controls and one that accepted everything would fail the negative ones.
+/// #1426 (0.25 R0): positive controls pass; each negative control changes one fact of the committed
+/// packet and asserts that only its expected violation code fires.
 /// </summary>
 public class InteropScopeTests
 {
     /// <summary>
-    /// SHA-256 over the frozen 1.0.0 denominator and the evidence seal. Both are frozen at 1.0.0;
-    /// later changes are amendments, never edits to them. A packet that drops a case from both the
-    /// cases and the frozen list, or regenerates and reseals the evidence, passes the validator but
-    /// fails this pin.
+    /// SHA-256 over the frozen 1.0.0 denominator and evidence seal. Later changes are amendments, so a
+    /// packet that drops a case from both lists, or reseals regenerated evidence, fails only this pin.
     /// </summary>
-    private const string FrozenSeal = "dfd029745a39da716e4b750677ca4f6601496e4e803f0a6b44e9e0572faffc70";
+    private const string FrozenSeal = "65307b91a3c57b54c6484219f67fc6bdb285b23858cbe15a7d7293b422ed7ff8";
 
     private const string Dir = InteropScopeValidator.PacketDir;
     private const string Results = Dir + "/baseline-results.json";
 
-    [Fact]
-    public void CommittedPacketIsValid()
+    public static IEnumerable<object[]> Positives => PositiveSetups.Keys.Select(k => new object[] { k });
+
+    [Theory]
+    [MemberData(nameof(Positives))]
+    public void PositiveControlPasses(string name)
     {
-        var violations = Run(Scope());
+        var scope = Scope();
+        var violations = Run(scope, PositiveSetups[name](scope));
         Assert.True(violations.Count == 0, EvidenceContractTests.Describe(violations));
     }
+
+    private static readonly Dictionary<string, Func<JsonNode, Func<string, byte[]?>?>> PositiveSetups = new()
+    {
+        ["committed packet"] = _ => null,
+        ["frozen, not met"] = s => { Freeze(s); s["gateStatus"] = "NOT-MET"; return null; },
+        ["fully evidenced MET"] = s => { MetWithAmendment(s); return GateReader("CLOSED"); },
+        ["well-formed READY record"] = s => { Ready(s); return null; },
+    };
 
     [Fact]
     public void FrozenDenominatorAndEvidenceMatchThePinnedSeal() => Assert.Equal(FrozenSeal, Seal(Scope()));
@@ -46,42 +54,12 @@ public class InteropScopeTests
     }
 
     [Fact]
-    public void CommittedPacketIsNotMetWhileAnyGateConditionIsOpen()
+    public void CommittedPacketHasSixFamiliesAndIsNotMetWhileAConditionIsOpen()
     {
-        // Lifecycle-aware: PROPOSED until the acceptance write-back, then FROZEN; MET only once every
-        // gate condition is SATISFIED (S009 checks the records behind that).
         var scope = Scope();
-        var open = scope["gateConditions"]!.AsArray().Any(g => g!["state"]!.GetValue<string>() != "SATISFIED");
-        Assert.True(!open || scope["gateStatus"]!.GetValue<string>() == "NOT-MET");
         Assert.Equal(6, scope["families"]!.AsArray().Count);
-    }
-
-    [Fact]
-    public void FrozenNotMetPacketPasses()
-    {
-        var scope = Scope();
-        Freeze(scope);
-        scope["gateStatus"] = "NOT-MET";
-        var violations = Run(scope);
-        Assert.True(violations.Count == 0, EvidenceContractTests.Describe(violations));
-    }
-
-    [Fact]
-    public void FullyEvidencedMetPacketPasses()
-    {
-        var scope = Scope();
-        MetWithAmendment(scope);
-        var violations = Run(scope, GateReader("CLOSED"));
-        Assert.True(violations.Count == 0, EvidenceContractTests.Describe(violations));
-    }
-
-    [Fact]
-    public void WellFormedReadyRecordPasses()
-    {
-        var scope = Scope();
-        Ready(scope);
-        var violations = Run(scope);
-        Assert.True(violations.Count == 0, EvidenceContractTests.Describe(violations));
+        Assert.True(scope["gateConditions"]!.AsArray().All(g => g!["state"]!.GetValue<string>() == "SATISFIED")
+            || scope["gateStatus"]!.GetValue<string>() == "NOT-MET");
     }
 
     [Fact]
@@ -92,11 +70,13 @@ public class InteropScopeTests
         var added = Case(scope, "F6-REPORT-10").DeepClone();
         added["id"] = "F6-REPORT-99";
         scope["cases"]!.AsArray().Add(added.DeepClone());
-        Case(scope, "F4-ITER-01")["expected"] = "rejected";
+        var from = Case(scope, "F4-ITER-01")["expected"]!.GetValue<string>();
+        var to = from == "rejected" ? "native" : "rejected";
+        Case(scope, "F4-ITER-01")["expected"] = to;
         var a = Amendment(scope, removed: "F5-ARRAY-02");
         added["requirementSha256"] = Requirement(added);
         a["addedCases"] = new JsonArray(added);
-        a["changes"] = new JsonArray(Change("F4-ITER-01", "expected", "preserved", "rejected"));
+        a["changes"] = new JsonArray(Change("F4-ITER-01", "expected", from, to));
         scope["amendments"]!.AsArray().Add(a);
         scope["scopeVersion"] = Last(scope);
         var violations = Run(scope);
@@ -207,6 +187,13 @@ public class InteropScopeTests
         ["READY with README as review"] = ("S007", scope => { Ready(scope)["reviews"]![0]!["record"] = "README.md"; return null; }),
         ["READY with a bare approval URL"] = ("S007", scope => { Ready(scope)["approver"]!["approvalUrl"] = "https://github.com/"; return null; }),
         ["READY case without retained result"] = ("S007", scope => { Ready(scope)["cases"]![0]!.AsObject().Remove("evidence"); return null; }),
+        ["READY result from another candidate"] = ("S007", scope => { Ready(scope)["cases"]![0]!["evidence"] = $"{Dir}/ready/F4-ITER-01.{new string('2', 40)}.json"; return null; }),
+        ["READY result from historical evidence"] = ("S007", scope => { Ready(scope)["cases"]![0]!["evidence"] = Results; return null; }),
+        ["READY example by path traversal"] = ("S007", scope => { Ready(scope)["websiteExamples"] = new JsonArray("website/content/../../README.md"); return null; }),
+        ["READY review by path traversal"] = ("S007", scope => { Ready(scope)["reviews"]![0]!["record"] = $"{Dir}/reviews/../../../../../README.md"; return null; }),
+        ["READY result by path traversal"] = ("S007", scope => { Ready(scope)["cases"]![0]!["evidence"] = "docs/plans/evidence/../../../README.md"; return null; }),
+        ["MET with a relabeled interaction row"] = ("S009", scope => { MetWithAmendment(scope); var x = Case(scope, "X-interaction"); x.AsObject().Remove("families");
+            scope["denominatorV1"]!.AsArray().Single(d => d!["id"]!.GetValue<string>() == "X-interaction")!["requirementSha256"] = Requirement(x); return GateReader("CLOSED"); }),
         ["MET with the planning doc as evidence"] = ("S009", scope => { MetWithAmendment(scope); scope["gateConditions"]![0]!["evidence"] = "docs/plans/v0.25-interop-scope-and-baseline.md"; return GateReader("CLOSED"); }),
         ["MET while the 1413 record is open"] = ("S009", scope => { MetWithAmendment(scope); return GateReader("OPEN"); }),
     };
@@ -216,7 +203,7 @@ public class InteropScopeTests
     private static IReadOnlyList<ContractViolation> Run(JsonNode scope, Func<string, byte[]?>? read = null,
         string? extraFixture = null, string? withoutFixture = null)
     {
-        read ??= ReadRepo;
+        read = ReadyRecords(scope, read ?? ReadRepo);
         var fixtures = Files("fixtures").Where(f => Path.GetFileName(f) != withoutFixture)
             .Concat(extraFixture is null ? [] : [extraFixture]).ToList();
         var results = JsonNode.Parse(Encoding.UTF8.GetString(read(Results)!))!;
@@ -227,6 +214,18 @@ public class InteropScopeTests
         Directory.EnumerateFiles(Path.Combine(EvidenceContractTests.RepoRoot(), Dir, sub))
             .Where(f => Path.GetFileName(f) != ".DS_Store")
             .Select(f => Path.GetRelativePath(EvidenceContractTests.RepoRoot(), f).Replace('\\', '/')).ToList();
+
+    /// <summary>Serves READY result records at ready/&lt;case&gt;.&lt;candidate&gt;.json for the packet's current requirements.</summary>
+    private static Func<string, byte[]?> ReadyRecords(JsonNode scope, Func<string, byte[]?> inner) => p =>
+    {
+        if (!p.StartsWith(Dir + "/ready/", StringComparison.Ordinal)) return inner(p);
+        var parts = Path.GetFileNameWithoutExtension(p).Split('.');
+        var c = scope["cases"]!.AsArray().FirstOrDefault(x => x!["id"]!.GetValue<string>() == parts[0]);
+        return c is null ? null : Encoding.UTF8.GetBytes(new JsonObject
+        {
+            ["candidate"] = parts[1], ["caseId"] = parts[0], ["requirementSha256"] = Requirement(c), ["result"] = "passed",
+        }.ToJsonString());
+    };
 
     private static byte[]? ReadRepo(string path)
     {
@@ -340,6 +339,8 @@ public class InteropScopeTests
             var row = Case(scope, "F6-REPORT-01").DeepClone();
             row["id"] = "X-" + role;
             row["role"] = role;
+            if (role == "interaction") row["families"] = new JsonArray("F1", "F2");
+            else row["websiteExample"] = "website/content/cli/convert.mdx";
             scope["cases"]!.AsArray().Add(row.DeepClone());
             row["requirementSha256"] = Requirement(row);
             scope["denominatorV1"]!.AsArray().Add(row);
@@ -351,10 +352,11 @@ public class InteropScopeTests
         var record = new JsonObject
         {
             ["status"] = "READY",
-            ["scopeVersion"] = "1.0.0",
+            ["scopeVersion"] = scope["scopeVersion"]!.GetValue<string>(),
             ["candidate"] = new JsonObject { ["commit"] = new string('1', 40) },
             ["cases"] = new JsonArray(scope["cases"]!.AsArray().Where(c => c!["family"]!.GetValue<string>() == "F4")
-                .Select(c => (JsonNode)new JsonObject { ["id"] = c!["id"]!.GetValue<string>(), ["result"] = "passed", ["evidence"] = Results }).ToArray()),
+                .Select(c => (JsonNode)new JsonObject { ["id"] = c!["id"]!.GetValue<string>(), ["result"] = "passed",
+                    ["evidence"] = $"{Dir}/ready/{c!["id"]!.GetValue<string>()}.{new string('1', 40)}.json" }).ToArray()),
             ["tests"] = new JsonArray(new JsonObject { ["project"] = "tests/Calor.Conversion.Tests", ["total"] = 12, ["failed"] = 0 }),
             ["websiteExamples"] = new JsonArray("website/content/cli/convert.mdx#what-changed-in-0-16"),
             ["reviews"] = new JsonArray(new JsonObject { ["reviewer"] = "codex", ["record"] = Dir + "/reviews/round-1.md" }),

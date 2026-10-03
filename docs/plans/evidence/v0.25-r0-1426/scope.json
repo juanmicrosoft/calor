@@ -1046,10 +1046,14 @@
       "observations": [],
       "note": "Library and SDK wrappers (`ConversionOptions.RescueUnusableMembers` defaults to false): documented defaults and reported provenance. Not exercised at R0.",
       "cells": [
-        "defaults",
-        "rescue-passthrough-precedence",
-        "provenance",
-        "schema-version"
+        "library-defaults",
+        "library-precedence",
+        "library-provenance",
+        "library-schema-version",
+        "sdk-defaults",
+        "sdk-precedence",
+        "sdk-provenance",
+        "sdk-schema-version"
       ]
     },
     {
@@ -1163,10 +1167,14 @@
         "cli-rescue-only",
         "mcp-both-enabled",
         "mcp-disabled",
-        "migrate-both-enabled",
-        "migrate-disabled",
+        "cli-migrate-both-enabled",
+        "cli-migrate-disabled-or-unavailable",
+        "mcp-migrate-both-enabled",
+        "mcp-migrate-disabled",
         "batch-both-enabled",
         "batch-disabled",
+        "library-both-enabled",
+        "library-disabled",
         "sdk-both-enabled",
         "sdk-disabled"
       ]
@@ -1185,8 +1193,10 @@
       "cells": [
         "cli-json-provenance",
         "mcp-dto-provenance",
-        "migrate-dto-provenance",
+        "cli-migrate-provenance",
+        "mcp-migrate-dto-provenance",
         "batch-dto-provenance",
+        "library-sdk-provenance",
         "wire-compatibility"
       ]
     }
@@ -1214,7 +1224,7 @@
       "baselineStatus": "control-passes",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-01.cs.txt",
       "fixtureSha256": "46268d5042b214df9d23772bb1e1e61f89a7cfbff3f565ac24a988808f7ed7b0",
-      "requirementSha256": "274a65b0c6c8e8bc4fd2ddbe534bc48247a20995279bc607a461d9fe8ef85d85"
+      "requirementSha256": "9fc7f78bcca5fb81ff0de95f531974820ecd68c3cb4ae72fae61a817df80726b"
     },
     {
       "id": "F1-REFOUT-02",
@@ -1224,7 +1234,7 @@
       "baselineStatus": "partially-reproduces",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-02.cs.txt",
       "fixtureSha256": "0936b4c0e172e18f621d5efba290ed3150a57669f7494ab402521cd8b774d8a2",
-      "requirementSha256": "66066537f6dc77ce1f9eef9d25d45602752f00af0a9f768cc681cb7582ecb98e"
+      "requirementSha256": "7a4093a62f7a9af470031c4cf874b7271e51789447ca9da859ac3234a2fee2d3"
     },
     {
       "id": "F1-REFOUT-03",
@@ -1234,7 +1244,7 @@
       "baselineStatus": "control-passes",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-03.cs.txt",
       "fixtureSha256": "9a02ee5807cfa332de2672660f2ab6696ceeff8bfc890ce69d71d6768517fbe5",
-      "requirementSha256": "6467cab5881c104f83b55ed083c6fa9e7d022c1d1582ee8197dbacc0825b9dad"
+      "requirementSha256": "ecc974b39f15e73345a83677d2e6fc27190c91a8ab50fb27770e4ba17a417e6c"
     },
     {
       "id": "F1-REFOUT-04",
@@ -1244,7 +1254,7 @@
       "baselineStatus": "partially-reproduces",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-04.cs.txt",
       "fixtureSha256": "27ce08c1219b26c85fd12c552d8a9d23b8afddaf993eef350e876aaf2ceca389",
-      "requirementSha256": "4c6eb4b2ca614139b1d9d0294530cfe5e40de7bab61ea15e39c3681c9b76219a"
+      "requirementSha256": "643fc1843dfcc1d83a8d9f9db3af17c8b507c4bfc8a9984568d52548ac0a5c4d"
     },
     {
       "id": "F1-REFOUT-05",
@@ -1254,7 +1264,7 @@
       "baselineStatus": "control-passes",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-05.cs.txt",
       "fixtureSha256": "14fd512e352fc64ac431427b4259f4cc2a523c16f046debad6b5cf9ad2328a9b",
-      "requirementSha256": "f4db5cb31a4f9c7061425390084c2381a9265007bc8830590c7caba2b4dd7774"
+      "requirementSha256": "5fb2767f0ddab9ae85cd764fd012c28e425200693c10330366820263bf42744f"
     },
     {
       "id": "F1-REFOUT-06",
@@ -1264,7 +1274,7 @@
       "baselineStatus": "control-passes",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-06.cs.txt",
       "fixtureSha256": "72723f89d0c1493a1e5953ffbafaedd8d331acde01664bc7d92d62d830947931",
-      "requirementSha256": "7cd69fdca1374c3bf87e39cc41e1c4273e218af52876920c9200e483a06788c1"
+      "requirementSha256": "772bbe9b14449453682394019c15f0f3cada0c693555fbba3ae1d186cd6c041f"
     },
     {
       "id": "F1-REFOUT-07",
@@ -1274,7 +1284,7 @@
       "baselineStatus": "partially-reproduces",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-07.cs.txt",
       "fixtureSha256": "a9ecef3fde04a3eb6566fce5b7289311ef29522331e4ecb1d3779acf0ba30b64",
-      "requirementSha256": "0bd1ae47c05cb7cc91df77b211f70ad00644a440de6dac95bc84adb35f91173b"
+      "requirementSha256": "d2a1b0f4a126311fbfd5a1abc1e3bb175ca21840de6d5b419bd0df293a43620f"
     },
     {
       "id": "F1-REFOUT-08",
@@ -1284,7 +1294,7 @@
       "baselineStatus": "reproduces",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-08.cs.txt",
       "fixtureSha256": "cc2fcdb6713cab9b05948f37f9cf004da19fe29dede4869ebb2bcc63ad091650",
-      "requirementSha256": "286a0463bd46251c1f38ca9866564d5cf0ac9265a21c0e4630de29ccf1ed13cd"
+      "requirementSha256": "0ead542aa8b0008b430f733dbbfe1c3c96ff55c1e4956eba4650972fd88eeba9"
     },
     {
       "id": "F1-REFOUT-A1",
@@ -1294,7 +1304,7 @@
       "baselineStatus": "not-measured",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "87a6dcc6d1c28e96270f0034944cdc7e4d064190bb2cf9118eb7e2dc76f1e9f5"
+      "requirementSha256": "4ef4b58b3f224bb295f7bdd2c7747b0677b74a393d29115d25bd474e5466ddc5"
     },
     {
       "id": "F1-REFOUT-A2",
@@ -1304,7 +1314,7 @@
       "baselineStatus": "not-measured",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "f41dd91a0947559cf3399474fe110991b4e8db665f2029de30720025fe947d68"
+      "requirementSha256": "4782ce9843275b887d7147353f4812d3a2608833528bbbcbb41e5d2beac599b1"
     },
     {
       "id": "F2-INTERP-01",
@@ -1314,7 +1324,7 @@
       "baselineStatus": "control-passes",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-01.cs.txt",
       "fixtureSha256": "a60dbcf6ba85d93ab20e47fbea05cf495e6c8fd7a027e7d22215cfb580c3856f",
-      "requirementSha256": "457b710dfc6e77033cd1df1320eecf3ccd6da7438c397e37f4ddcce601b6a3ef"
+      "requirementSha256": "0cc8ab8a6955d9112703989dc816dc2dba5485d571924d4e87643dc6b1fe2f02"
     },
     {
       "id": "F2-INTERP-02",
@@ -1324,7 +1334,7 @@
       "baselineStatus": "partially-reproduces",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-02.cs.txt",
       "fixtureSha256": "9d988a99732e3e3c046e1b6d871a0ea423e068fb3cf81ad58f9fc6881278f7f1",
-      "requirementSha256": "53af15f39b22aa1eea74cb894b2d5ebc45fc62506271c3d0b598ca78ad880b77"
+      "requirementSha256": "e2d9fea5df6a906e3877909fe961d15a18204daa15426642f7a25801ccad75c2"
     },
     {
       "id": "F2-INTERP-03",
@@ -1334,7 +1344,7 @@
       "baselineStatus": "partially-reproduces",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-03.cs.txt",
       "fixtureSha256": "632bd63c1ee8d2310a67ec1b7b3872ea785267ff6a37aa72d01cf48093efe641",
-      "requirementSha256": "4eb85ece2ab01fa53a802f3bbae92160406a676da3e61bdbac08c2c41b1f58bf"
+      "requirementSha256": "0b3e762e77f3491ae6335ebd74f262edd2e34d544ef647ac3a2cd8d52c56c5e2"
     },
     {
       "id": "F2-INTERP-04",
@@ -1344,7 +1354,7 @@
       "baselineStatus": "control-passes",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-04.cs.txt",
       "fixtureSha256": "ff11d343cb9171f61354ba165db287d749d5a2be3f329b315d19cf678b02c79d",
-      "requirementSha256": "7d39ba6a49b38655871eb625265665316543315689a3de713c43289ac3655b04"
+      "requirementSha256": "69df91ebb15e15d8d8ba7162f9295dace6d493b1f571b89103a08247d9841e2e"
     },
     {
       "id": "F2-INTERP-05",
@@ -1354,7 +1364,7 @@
       "baselineStatus": "partially-reproduces",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-05.calr.txt",
       "fixtureSha256": "419003b22f7036b3fd20e56752be6727db8750d8833495a79497e32c932fd9a7",
-      "requirementSha256": "4a80e6adcd7e58a1c24d8a689e63f32d34417d856d6bc8137f807dbb5b02c5b1"
+      "requirementSha256": "2deb475e3901f6f3c6959761823901c18228fce49d16f45ee140d382f617f2cb"
     },
     {
       "id": "F2-INTERP-06",
@@ -1364,7 +1374,7 @@
       "baselineStatus": "reproduces",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-06.calr.txt",
       "fixtureSha256": "f4554251c0e9a27ce3ea1bc392d6351500c84ecdf82aa69cef5b257023c6d35c",
-      "requirementSha256": "29c7dd3b79b9555342d72c68b07b7c572e5a6cfe4c2d6f6c8e0df646795f06f6"
+      "requirementSha256": "55477dac53e290e6ac635f0d5ee2bac53eb02393120eaf10890d790355bde977"
     },
     {
       "id": "F2-INTERP-07",
@@ -1374,7 +1384,7 @@
       "baselineStatus": "control-passes",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-07.cs.txt",
       "fixtureSha256": "84fca44ef923afbc1623710353095d49bce1dc5ad533969ccc8ec0928cb7c33e",
-      "requirementSha256": "8e6babb7d470bd16c8e5cf4af2a1190732a57290c903224763d8278e454b5727"
+      "requirementSha256": "40b09dd7f10e42d7ba6adaf9c8521a134016135e39bbfabae8b415ecb73205a2"
     },
     {
       "id": "F2-INTERP-08",
@@ -1384,7 +1394,7 @@
       "baselineStatus": "not-measured",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "eec31debd6e1de98d48799fb9fcf776d872137934a67b4126678217282dda5ab"
+      "requirementSha256": "f9e1e662fb7770a0284b6aa5f947ad20bc949911c642f482737b4733fc64d327"
     },
     {
       "id": "F2-INTERP-09",
@@ -1394,7 +1404,7 @@
       "baselineStatus": "not-measured",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "ebdd0bacf68f6a0eb05f2fbc660facbd2c2f107c59bedac962a410cd141bbbda"
+      "requirementSha256": "4047ac60402e91acc1e1374732f2705b1e76d8b1841c4d33c009eb4cb22e07d6"
     },
     {
       "id": "F2-INTERP-10",
@@ -1404,7 +1414,7 @@
       "baselineStatus": "not-measured",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "0a7ac99817a49c0faf80f6823fd7faaa22fb8374ef8f22ebe72d5195868467ee"
+      "requirementSha256": "49e5ce2386c200b4801b74275645e20c2b80ba2315baf9c6ccbc20705c340532"
     },
     {
       "id": "F3-LOCAL-01",
@@ -1414,7 +1424,7 @@
       "baselineStatus": "reproduces",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-01.cs.txt",
       "fixtureSha256": "f323c3f90e8936fe5fec785a5083e5033ed2d0e0e50f83ca81020665379f1f4e",
-      "requirementSha256": "b8d8150ad9dc2f42059030573c84e723412128aab831ba81da2ca9b6a2c77c0a"
+      "requirementSha256": "df7fb00615f6879a913260e3df9675a6cd211180dabeef0a29a750f56a31d35a"
     },
     {
       "id": "F3-LOCAL-02",
@@ -1424,7 +1434,7 @@
       "baselineStatus": "reproduces",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-02.cs.txt",
       "fixtureSha256": "1b7d5a367c5f8e3e30045d11b9bfdb55e28ed3bbf19cda346131b633adbbbddd",
-      "requirementSha256": "d0a205733b3573b8d763151c17734fec27365f4cc18ccda67c30a0961591d87b"
+      "requirementSha256": "44b506989fef4de5c400fcd5ea858e2e124dc40aab2c893f80208e90ca8434b5"
     },
     {
       "id": "F3-LOCAL-03",
@@ -1434,7 +1444,7 @@
       "baselineStatus": "reproduces",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-03.cs.txt",
       "fixtureSha256": "677a392baa87e118ce915adf7fcec4c6983f3a4ba874c525674bbacfecfb8326",
-      "requirementSha256": "1f3115e7281f8840db8795177d870d76584710782b6fbce56c32a3ab07a72f4f"
+      "requirementSha256": "e00626a621b35d1e462c6e43a4b7b53ed1512c669328f230b328065d5baf1c45"
     },
     {
       "id": "F3-LOCAL-04",
@@ -1444,7 +1454,7 @@
       "baselineStatus": "control-passes",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-04.cs.txt",
       "fixtureSha256": "535b0d42cd66296e5711ab8a6f698c9dbf8322ec06cf5766edb4299c65cde837",
-      "requirementSha256": "5139de815693119b04acb1d6a432ea99f087cc1620b3bf9ddbb8bb7d471a4070"
+      "requirementSha256": "ba3b310384cae59d23a1e9cc509059c74675079d08275f455c6717157db58004"
     },
     {
       "id": "F3-LOCAL-A1",
@@ -1454,7 +1464,7 @@
       "baselineStatus": "not-measured",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "f084316660e46f9a972f9273f8c44074b50df316a7a068ef21bacb92ff20d93f"
+      "requirementSha256": "87b6c8dcb73cfdf36b4630b8838d0fff52b27b8c45d29a7bf5e3e1cd96bfaa60"
     },
     {
       "id": "F3-LOCAL-05",
@@ -1464,7 +1474,7 @@
       "baselineStatus": "not-measured",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "e45ea2868412523efa1beefc69c228b947a63f333bc7e2bb6d343d3eed49a2be"
+      "requirementSha256": "ad59b04b92aad001b40be89434e45578ad3f61e82c54c0d7551ca37604e51cbc"
     },
     {
       "id": "F4-ITER-01",
@@ -1474,7 +1484,7 @@
       "baselineStatus": "reproduces",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-01.cs.txt",
       "fixtureSha256": "0a1a21be9eac4d82bcf51a02705607d6b9de6fe98c50e649a532ae8f63f5db9e",
-      "requirementSha256": "cad675ed51a634e7d4639672a18980395e4b0afdab80042443b627ee0d78bcb3"
+      "requirementSha256": "55b406d5e633ad89550848021b353a7766326416d88517581cdd7d1ebb4ae331"
     },
     {
       "id": "F4-ITER-02",
@@ -1484,7 +1494,7 @@
       "baselineStatus": "reproduces",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-02.cs.txt",
       "fixtureSha256": "3a7a1da86ae98ee3ab5c935f8849701e38e2bfdaa7adc10b95b1a394e38a3820",
-      "requirementSha256": "4a86ed9ca390ea794e90725188f3eec26c714c10c33e2a1e1a62a2c6e8349bf5"
+      "requirementSha256": "744dd5acdbd86bd94dd086c5e6cc8cec8fb6953f7c518a7e91cd8396d6d9c858"
     },
     {
       "id": "F4-ITER-03",
@@ -1494,7 +1504,7 @@
       "baselineStatus": "control-passes",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-03.calr.txt",
       "fixtureSha256": "dd1de7e8703042dfb740ce1a58cc364c4b3f3af7b2c9571291397423613187e6",
-      "requirementSha256": "5d05efab7119e9bbb58a337147b4614c3ad45618c4accd5ae52200aff3a06efd"
+      "requirementSha256": "fbb2c71c1a397b11544f9116ed71409353d13f88361a60bf6ab1d741a9f783a3"
     },
     {
       "id": "F4-ITER-04",
@@ -1504,7 +1514,7 @@
       "baselineStatus": "not-measured",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "9582654d4b3a7bfb782cd54e4b812218f502771e2db19950af8588e64979a071"
+      "requirementSha256": "e3e3afe563b66f53afe1e6b9d7a075df6588ed6916ff9e81abea0e9669e7256a"
     },
     {
       "id": "F5-ARRAY-01",
@@ -1514,7 +1524,7 @@
       "baselineStatus": "reproduces",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-01.cs.txt",
       "fixtureSha256": "984f6a6bf85c56b9120f7053d207e98c254fd486d65b9f27a938ca3ed4dac5ae",
-      "requirementSha256": "625a71a59dc30ea5bfaad87f2d66832e62700cbb9acf7582e70f6e1160a018fc"
+      "requirementSha256": "8c3575c39db5aab9c1584edfc91de0214ffb02954122400e762df17a3b45d9ee"
     },
     {
       "id": "F5-ARRAY-02",
@@ -1524,7 +1534,7 @@
       "baselineStatus": "reproduces",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-02.cs.txt",
       "fixtureSha256": "e235ce21ba8e2abca01e9c93d89f4beff240e384410307ee2fe0b9e5247bc674",
-      "requirementSha256": "7f7916f11156915773c29fb7c165ed2329f3d778ffa80829741fbba84f4fe3e6"
+      "requirementSha256": "92abd3dc59562413b792ab1b03ee6f89a4dcc2dfea2b20855df0eb2a7dbcec7f"
     },
     {
       "id": "F5-ARRAY-03",
@@ -1534,7 +1544,7 @@
       "baselineStatus": "control-passes",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-03.cs.txt",
       "fixtureSha256": "e90768eca604330a7e503944136d3a3309bc87730bf4a424527935b5da5d36f0",
-      "requirementSha256": "1da7a08d0ed27ab435bce5e33527c57d67daffa0508662039ac293a33d20d933"
+      "requirementSha256": "4b3fe4d1d214577ee9b21a6e9db4e64a0382fa29bfd7c300761296f35bbaf9e9"
     },
     {
       "id": "F5-ARRAY-04",
@@ -1544,7 +1554,7 @@
       "baselineStatus": "reproduces",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-04.cs.txt",
       "fixtureSha256": "2e7526e66a9977db37cb33f112e4c56da82517c424ba1520085c46d0023cbe51",
-      "requirementSha256": "db3b31688e07b83dcc7fb855a5de974e5fa8565df78d1bed0a7f9bffdbec1417"
+      "requirementSha256": "743e88286039589695087ca45cbb5dc2e47955e9d19f38e694b9f7404a3399b3"
     },
     {
       "id": "F5-ARRAY-05",
@@ -1554,7 +1564,7 @@
       "baselineStatus": "reproduces",
       "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-05.cs.txt",
       "fixtureSha256": "c7ed707f207831d97c47b0be757348365753a43978b233c226954d67dda3f806",
-      "requirementSha256": "0cbe67a47060f5a7f8677c063cc767e214c4c4d34953e475a0c350407b9c3a0f"
+      "requirementSha256": "1ce0b19177a66b99f6a2a19f3c330a0f795cd44e63fc35e0aef26485f3cc1b92"
     },
     {
       "id": "F5-ARRAY-06",
@@ -1564,7 +1574,7 @@
       "baselineStatus": "not-measured",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "b36721f25d22385504084f0f84068de068919e9c95b444c5cc360387229054af"
+      "requirementSha256": "b05e3fd0cb1d628cc86ea0fb4c4528bbaf815665e0d2f2b8831a49eec5ddb318"
     },
     {
       "id": "F6-REPORT-01",
@@ -1574,7 +1584,7 @@
       "baselineStatus": "reproduces",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "94fe7a044d3e51fb9670a9e61da4f28a61ca9649a0aa4e272b06da721e8ba035"
+      "requirementSha256": "360bced6a1bda5c6d46c8b44a6eb7a00305394b8b4f2066ddab0b0dd6ed98b0f"
     },
     {
       "id": "F6-REPORT-02",
@@ -1584,7 +1594,7 @@
       "baselineStatus": "reproduces",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "8b00fdf4a09e88c92a3a0d00376b42fdb33e881f30d22e4c4762e6e259b6d232"
+      "requirementSha256": "458c40980529e79728ef56e48c5db81db78a57f6f95a60b93475266f08781f05"
     },
     {
       "id": "F6-REPORT-03",
@@ -1594,7 +1604,7 @@
       "baselineStatus": "reproduces",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "37dcd14fd7ef719284804bd9a0d27c09c472b2efc22817f97a093e364ddf1b28"
+      "requirementSha256": "c4b2de060b7342c715c1f0d86d2baa995620c0389a0cd5f00e676f5750458eab"
     },
     {
       "id": "F6-REPORT-04",
@@ -1604,7 +1614,7 @@
       "baselineStatus": "not-measured",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "8756f1251acc9fedd8c688743cdfe5e4e15f9e57f0b55e36341976548e34b82d"
+      "requirementSha256": "488dd1995f18b2299f678b5f45a677ad3724f771be5d43ad1cddb0647e38aaa5"
     },
     {
       "id": "F6-REPORT-05",
@@ -1614,7 +1624,7 @@
       "baselineStatus": "not-measured",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "19c38883d67e6c90a59a75a2b102b909239f5fdd49d2a6ff69cc95e4e6ed37f4"
+      "requirementSha256": "77c5dd83c7b7ca60671b131320bdc4c0aff33897c436a22280ea981ec979d0d6"
     },
     {
       "id": "F6-REPORT-06",
@@ -1624,7 +1634,7 @@
       "baselineStatus": "not-measured",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "2a070fff849aabb8fa0b5d16a3db695fc5de306d37180e721a0b0fcd315d3643"
+      "requirementSha256": "7d0860f5d3ea13a109c890e8073d405d832162c3328684c9b7a10ef32201d553"
     },
     {
       "id": "F6-REPORT-07",
@@ -1634,7 +1644,7 @@
       "baselineStatus": "not-measured",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "a03915879fbe805d9601bf308e24ff806553ecbb12ca794c2d7dd30d22508fcc"
+      "requirementSha256": "0eec7a023abc25b1eb703342b1ccfd67a0a52bfda381f741b57529d1833a8516"
     },
     {
       "id": "F6-REPORT-08",
@@ -1644,7 +1654,7 @@
       "baselineStatus": "control-passes",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "cd7461e269c1bd24ea68a7fcd3f1b75d9685aca01abc179fde5789034d44cb03"
+      "requirementSha256": "1f38825274e5c74e74a4da923ad8b33adbcd64ac813285193c44791d6b1e5dfb"
     },
     {
       "id": "F6-REPORT-09",
@@ -1654,7 +1664,7 @@
       "baselineStatus": "control-passes",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "c69334eb80fe79f1891e4a0c583e4e2fd9bad1d72699acdaecf6aad973c0493a"
+      "requirementSha256": "ad351227bb6ac36045191088f8b755dc0f492af325846bbdcbe71d153f12168d"
     },
     {
       "id": "F6-REPORT-10",
@@ -1664,7 +1674,7 @@
       "baselineStatus": "not-measured",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "df4329e84881481a4f6de0f60495fdc045fd0524355ba927c94b265cfce161a0"
+      "requirementSha256": "d04b267712d0901cd328bdcbcf4f97d98c43d0a6c2eee6226eccc60740cffebf"
     },
     {
       "id": "F6-REPORT-11",
@@ -1674,7 +1684,7 @@
       "baselineStatus": "reproduces",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "23cc636a0ef22863d3e94034ab609ffe5ab80ae724635042b4e3f96007c97e31"
+      "requirementSha256": "06000c32ec50fe3c1e64510db178274fda1d3729f3750606e965365584e3cb85"
     },
     {
       "id": "F6-REPORT-12",
@@ -1684,7 +1694,7 @@
       "baselineStatus": "not-measured",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "7293e7ff3d4adab891195bfc8e84cc04df62eb83725150ce33cd4d1fa0b9c284"
+      "requirementSha256": "001add9f08e83140f6c5dbfb1874f16d7a0a046b446e999f61435140b65f46cc"
     },
     {
       "id": "F6-REPORT-13",
@@ -1694,7 +1704,7 @@
       "baselineStatus": "not-measured",
       "fixture": null,
       "fixtureSha256": null,
-      "requirementSha256": "31319df0f59540b6e0238252375335c57b4310f4c740cebc3e100e11c36599fb"
+      "requirementSha256": "961bdde5ba9a2763be36a6907ef93392ddc17db733a6d5c53354f2ea46baca22"
     }
   ],
   "amendments": []

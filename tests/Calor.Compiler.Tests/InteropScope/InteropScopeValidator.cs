@@ -53,7 +53,8 @@ internal static class InteropScopeValidator
         var cases = Arr(scope["cases"]).ToList();
         var amendments = Arr(scope["amendments"]).ToList();
         var removedFamilies = amendments.SelectMany(a => Arr(a["removedFamilies"])).ToList();
-        bool Exists(string? path) => path is { Length: > 0 } && readRepoFile(path.Split('#')[0]) is not null;
+        bool Exists(string? path) => path is { Length: > 0 } && !path.StartsWith('/') && !path.Contains('\\')
+            && !path.Split('#')[0].Split('/').Contains("..") && readRepoFile(path.Split('#')[0]) is not null;
 
         // S001: the six-family denominator.
         foreach (var (id, issue) in RequiredFamilies)
@@ -204,7 +205,7 @@ internal static class InteropScopeValidator
             if (status == "READY")
             {
                 var familyCases = cases.Where(c => Str(c["family"]) == fid).ToList();
-                ValidateReady(v, fid, r!, f, familyCases, Exists, recordValue, deviation);
+                ValidateReady(v, fid, r!, f, familyCases, Exists, readRepoFile, recordValue, deviation);
                 var assessed = Version(Str(r!["scopeVersion"]));
                 var stale = familyTouched.Where(x => x.Family == fid && assessed is not null && Version(x.Version)!.Value.CompareTo(assessed.Value) > 0)
                     .Select(x => x.Version).Distinct();
@@ -255,9 +256,12 @@ internal static class InteropScopeValidator
                 if (!ok)
                     v.Add(new("S009", gid, $"MET needs a SATISFIED record at {PacketDir}/gate/{gid}.json naming this condition"));
             }
-            foreach (var role in new[] { "interaction", "doc-example" }.Where(role => !cases.Any(c => Str(c["role"]) == role
-                && Str(c["baselineStatus"]) != "not-measured" && (Str(c["fixture"]) is not null || Arr(c["observations"]).Any()))))
-                v.Add(new("S009", role, $"MET needs measured {role} rows with a fixture or observations"));
+            // An interaction row names at least two registered families; a doc-example row names a website page.
+            bool Concrete(JsonNode c) => Str(c["baselineStatus"]) != "not-measured" && (Str(c["role"]) == "interaction"
+                ? Arr(c["families"]).Select(Str).Distinct().Count(x => families.Any(f => Str(f["id"]) == x)) >= 2
+                : Str(c["websiteExample"])?.StartsWith("website/content/", StringComparison.Ordinal) == true && Exists(Str(c["websiteExample"])));
+            foreach (var role in new[] { "interaction", "doc-example" }.Where(role => !cases.Any(c => Str(c["role"]) == role && Concrete(c))))
+                v.Add(new("S009", role, $"MET needs a measured {role} row naming its families or website example"));
         }
         var ceilingIds = new HashSet<string>();
         foreach (var c in ceilings)
@@ -312,7 +316,7 @@ internal static class InteropScopeValidator
     }
 
     private static void ValidateReady(List<ContractViolation> v, string fid, JsonNode r, JsonNode family,
-        List<JsonNode> familyCases, Func<string?, bool> exists, string? recordValue, bool deviation)
+        List<JsonNode> familyCases, Func<string?, bool> exists, Func<string, byte[]?> read, string? recordValue, bool deviation)
     {
         void Fail(string what) => v.Add(new("S007", fid, $"READY record: {what}"));
         if (!IsFullSha(Str(r["candidate"]?["commit"])))
@@ -325,10 +329,18 @@ internal static class InteropScopeValidator
                 Fail($"case {Str(c["id"])} has no recorded result");
             else if (Str(row["result"]) != "passed")
                 Fail($"case {Str(c["id"])} is {Str(row["result"])}, not passed");
-            else if (Str(row["evidence"]) is not { } ev || !ev.StartsWith("docs/plans/evidence/", StringComparison.Ordinal) || !exists(ev))
-                Fail($"case {Str(c["id"])} needs a retained candidate result under docs/plans/evidence/");
-            else if (Arr(c["cells"]).Any(cell => Str(row["cells"]?[Str(cell)!]) != "passed"))
-                Fail($"case {Str(c["id"])} needs a passed result for every registered cell");
+            else
+            {
+                // The retained result record must be for this candidate, this case and its current requirement.
+                var ev = Str(row["evidence"]);
+                JsonNode? rec = null;
+                try { rec = ev is not null && ev.StartsWith("docs/plans/evidence/", StringComparison.Ordinal) && exists(ev) ? JsonNode.Parse(read(ev)!) : null; }
+                catch (JsonException) { }
+                if (rec is null || Str(rec["candidate"]) != Str(r["candidate"]?["commit"]) || Str(rec["caseId"]) != Str(c["id"])
+                    || Str(rec["requirementSha256"]) != RequirementDigest(c) || Str(rec["result"]) != "passed"
+                    || Arr(c["cells"]).Any(cell => Str(rec["cells"]?[Str(cell)!]) != "passed"))
+                    Fail($"case {Str(c["id"])} needs a retained passed result record for this candidate, case, requirement and cells");
+            }
         }
         var tests = Arr(r["tests"]).ToList();
         if (tests.Count == 0 || tests.Any(t => !NonBlank(t["project"]) || !IsInt(t["total"]) || Int(t["total"]) <= 0
@@ -384,7 +396,8 @@ internal static class InteropScopeValidator
     /// <summary>A tracked field of a case; requirementSha256 is recomputed from the case itself.</summary>
     private static string? Value(JsonNode c, string field) => field != "requirementSha256" ? Str(c[field])
         : Sha256(Encoding.UTF8.GetBytes(Str(c["fixture"]) + "\n" + Str(c["note"]) + "\n" + string.Join("\n", Arr(c["cells"]).Select(Str))
-            + "\n" + (c["observations"] ?? new JsonArray()).ToJsonString(Relaxed)));
+            + "\n" + (c["observations"] ?? new JsonArray()).ToJsonString(Relaxed)
+            + "\n" + string.Join("\n", Arr(c["families"]).Select(Str)) + "\n" + Str(c["websiteExample"])));
 
     public static string RequirementDigest(JsonNode c) => Value(c, "requirementSha256")!;
 
