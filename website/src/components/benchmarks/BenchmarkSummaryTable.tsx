@@ -2,11 +2,13 @@
 
 import benchmarkData from '../../../public/data/benchmark-results.json';
 import { staticMetricLabels, staticMetricOrder } from '@/lib/benchmark-labels';
+import { HistoricalMethodLabel } from './HistoricalMethodLabel';
 
 export function BenchmarkSummaryTable() {
   const metrics: Record<string, { ratio: number }> = benchmarkData.metrics;
   return (
     <div className="overflow-x-auto">
+      <HistoricalMethodLabel className="mb-3" />
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b">
