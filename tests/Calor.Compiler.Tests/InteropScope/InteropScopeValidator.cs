@@ -27,6 +27,11 @@ internal static class InteropScopeValidator
 
     private const int CandidateFreezeIssue = 1423;
     private const int RefOutDesignIssue = 1427;
+    private const int ScopeGateIssue = 1426;
+
+    /// <summary>Gate conditions registered at 1.0.0; none may be dropped to reach MET.</summary>
+    public static readonly IReadOnlyList<string> RequiredGateConditions =
+        ["blocker-1413", "capacity-accepted", "independence-deviation-accepted", "blockers-mapped-after-1413"];
     private static readonly Regex FullSha = new("^[0-9a-f]{40}$", RegexOptions.Compiled);
     private static readonly Regex SemVer = new(@"^(\d+)\.(\d+)\.(\d+)$", RegexOptions.Compiled);
 
@@ -66,6 +71,8 @@ internal static class InteropScopeValidator
                 v.Add(new("S012", Str(f["id"]) ?? "?", $"family blockers must include #{CandidateFreezeIssue}"));
             if (Str(f["id"]) == "F1" && !blockers.Contains(RefOutDesignIssue))
                 v.Add(new("S012", "F1", $"F1 blockers must include #{RefOutDesignIssue}"));
+            if (Str(f["id"]) != "F1" && !blockers.Contains(ScopeGateIssue))
+                v.Add(new("S012", Str(f["id"]) ?? "?", $"family blockers must include #{ScopeGateIssue}"));
         }
 
         // S002: case shape and vocabularies.
@@ -112,8 +119,9 @@ internal static class InteropScopeValidator
             }
             if (Str(current["family"]) != Str(d["family"]))
                 v.Add(new("S004", id, "case moved to another family"));
-            if (Str(current["expected"]) != Str(d["expected"]) && !Amended("reclassifiedCases", id))
-                v.Add(new("S004", id, "expected outcome changed without an amendment"));
+            foreach (var field in new[] { "expected", "role", "baselineStatus" })
+                if (Str(current[field]) != Str(d[field]) && !Amended("reclassifiedCases", id))
+                    v.Add(new("S004", id, $"{field} changed without an amendment"));
             if (Str(current["fixtureSha256"]) != Str(d["fixtureSha256"]) && !Amended("rehashedCases", id))
                 v.Add(new("S004", id, "fixture hash changed without an amendment"));
         }
@@ -141,6 +149,10 @@ internal static class InteropScopeValidator
         var recordValue = Str(scope["independence"]?["recordValue"]);
         if (deviation && (recordValue != "reduced" || Str(scope["independence"]?["statement"]) is not { Length: > 0 }))
             v.Add(new("S011", "independence", "the reduced-independence deviation must be recorded as 'reduced' with its statement"));
+        // Lifting the deviation is itself a decision: it names the reviewer and the amendment that did it.
+        if (!deviation && (Str(scope["independence"]?["reviewer"]) is not { Length: > 0 }
+            || !amendments.Any(a => Str(a["version"]) == Str(scope["independence"]?["liftedBy"]))))
+            v.Add(new("S011", "independence", "lifting the deviation needs a named reviewer and the amendment that lifted it"));
         foreach (var f in families)
         {
             var fid = Str(f["id"]) ?? "?";
@@ -173,8 +185,10 @@ internal static class InteropScopeValidator
         if (gate == "MET" && (lifecycle != "FROZEN"
             || Arr(scope["gateConditions"]).Any(g => Str(g["state"]) != "SATISFIED" || Str(g["evidence"]) is not { Length: > 0 })))
             v.Add(new("S009", "gateStatus", "R0 is MET only when FROZEN and every gate condition is SATISFIED with evidence"));
-        if (!Arr(scope["gateConditions"]).Any(g => Int(g["issue"]) == 1413))
-            v.Add(new("S009", "gateConditions", "the #1413 closure condition must stay registered"));
+        foreach (var id in RequiredGateConditions.Where(id => !Arr(scope["gateConditions"]).Any(g => Str(g["id"]) == id)))
+            v.Add(new("S009", id, "a registered gate condition was removed"));
+        if (!Arr(scope["gateConditions"]).Any(g => Str(g["id"]) == "blocker-1413" && Int(g["issue"]) == 1413))
+            v.Add(new("S009", "blocker-1413", "the #1413 closure condition must name #1413"));
         var ceilingIds = new HashSet<string>();
         foreach (var c in ceilings)
             if (!ceilingIds.Add(Str(c["id"]) ?? "") || c["value"]?.GetValueKind() != JsonValueKind.Number

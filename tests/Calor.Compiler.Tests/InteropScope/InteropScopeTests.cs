@@ -19,7 +19,7 @@ public class InteropScopeTests
     /// 1.0.0; later scope changes are amendments, never edits to this list. A packet that drops a
     /// case from both the cases and the frozen list passes the validator but fails this pin.
     /// </summary>
-    private const string DenominatorV1Seal = "8daa21950578b7e26ea68fce5bed13623fd10d609b3215d73ac200a2266fd0ef";
+    private const string DenominatorV1Seal = "83e0aa391d4c24e50b93a8f6718608a885b7f1278b9f441838f4f88e9ed80522";
 
     [Fact]
     public void CommittedPacketIsValid()
@@ -82,6 +82,10 @@ public class InteropScopeTests
     [InlineData("fixture hash drift", "S003")]
     [InlineData("case removed silently", "S004")]
     [InlineData("case reclassified silently", "S004")]
+    [InlineData("baseline status relabeled silently", "S004")]
+    [InlineData("deviation lifted without amendment", "S011")]
+    [InlineData("family without 1426 blocker", "S012")]
+    [InlineData("capacity condition removed", "S009")]
     [InlineData("amendment without PR", "S005")]
     [InlineData("scope version ahead of amendments", "S005")]
     [InlineData("unknown readiness status", "S006")]
@@ -118,11 +122,16 @@ public class InteropScopeTests
             case "family tracks another issue": Family(scope, "F2")["issue"] = 9999; break;
             case "unknown family": var extra = Family(scope, "F6").DeepClone(); extra["id"] = "F7"; scope["families"]!.AsArray().Add(extra); var c7 = Case(scope, "F6-REPORT-04").DeepClone(); c7["id"] = "F7-X"; c7["family"] = "F7"; scope["cases"]!.AsArray().Add(c7); break;
             case "duplicate case id": scope["cases"]!.AsArray().Add(Case(scope, "F5-ARRAY-03").DeepClone()); break;
-            case "role outside vocabulary": Case(scope, "F5-ARRAY-03")["role"] = "nice-to-have"; break;
-            case "measured status without baseline": Case(scope, "F6-REPORT-04")["baselineStatus"] = "reproduces"; break;
+            // These two also edit the frozen entry, so the control isolates S002 from S004.
+            case "role outside vocabulary": SetBoth(scope, "F5-ARRAY-03", "role", "nice-to-have"); break;
+            case "measured status without baseline": SetBoth(scope, "F6-REPORT-04", "baselineStatus", "reproduces"); break;
             case "fixture hash drift": read = p => p.EndsWith("F5-ARRAY-03.cs") ? Encoding.UTF8.GetBytes("// edited") : ReadRepo(p); break;
             case "case removed silently": Remove(scope["cases"]!, "F2-INTERP-03"); break;
             case "case reclassified silently": Case(scope, "F4-ITER-01")["expected"] = "rejected"; break;
+            case "baseline status relabeled silently": Case(scope, "F1-REFOUT-08")["baselineStatus"] = "control-passes"; break;
+            case "deviation lifted without amendment": scope["independence"]!["deviation"] = false; break;
+            case "family without 1426 blocker": Family(scope, "F3")["blockers"] = new JsonArray(1423); break;
+            case "capacity condition removed": scope["gateConditions"]!.AsArray().RemoveAt(1); break;
             case "amendment without PR": var a = Amendment("1.0.1", removed: null); a["pr"] = 0; scope["amendments"]!.AsArray().Add(a); scope["scopeVersion"] = "1.0.1"; break;
             case "scope version ahead of amendments": scope["scopeVersion"] = "1.1.0"; break;
             case "unknown readiness status": Family(scope, "F2")["readiness"]!["status"] = "DONE"; break;
@@ -192,6 +201,12 @@ public class InteropScopeTests
     private static JsonNode Family(JsonNode scope, string id) => scope["families"]!.AsArray().Single(f => f!["id"]!.GetValue<string>() == id)!;
     private static JsonNode Case(JsonNode scope, string id) => scope["cases"]!.AsArray().First(c => c!["id"]!.GetValue<string>() == id)!;
     private static JsonNode Ceiling(JsonNode scope, string id) => scope["capacity"]!["ceilings"]!.AsArray().Single(c => c!["id"]!.GetValue<string>() == id)!;
+
+    private static void SetBoth(JsonNode scope, string id, string field, string value)
+    {
+        Case(scope, id)[field] = value;
+        scope["denominatorV1"]!.AsArray().Single(d => d!["id"]!.GetValue<string>() == id)![field] = value;
+    }
 
     private static void Remove(JsonNode list, params string[] ids)
     {
