@@ -47,6 +47,7 @@
     "commit": "935345a9e8aa349b718f242953e63642e2bf6383",
     "command": "dotnet run --project tests/Calor.Evaluation -c Release -- pair-results --registration docs/plans/evidence/b1-1276/registration --first-oracle-result oracle-run-1.json --oracle-result oracle-run-2.json --metrics metrics-run-1.json metrics-run-2.json --output docs/plans/evidence/b1-1276/results",
     "exitCode": 0,
-    "outputs": ["pair-manifest.json", "results.json"]
+    "outputs": ["pair-manifest.json", "results.json"],
+    "rerun": "After review round 1 added a metric-run provenance check to pair-results, the same command was re-run at 84069fb0cc31ec6d82f8522d3f458049fca51048 into a scratch directory: exit 0, and both outputs byte-identical to the committed files."
   }
 }
