@@ -71,7 +71,7 @@ internal static class Report
                     {
                         findingClasses.Add(fc);
                         var id = $"F-{b}-{++n:D3}";
-                        var record = Finding(id, b, other, fc, r, pins, registration, outRoot, Final(other, caseId), rowId);
+                        var record = Finding(id, b, other, fc, r, pins, registration, outRoot, Final(other, caseId), rowId, cases.First(x => x.Id == caseId));
                         File.WriteAllText(Path.Combine(findingsDir, id + ".json"), record.ToJsonString(Indented));
                         findingIndex.Add(new JsonObject { ["findingId"] = id, ["rowId"] = rowId, ["caseId"] = caseId, ["class"] = fc, ["token"] = r["token"]?.DeepClone(), ["o1"] = r["o1"]?.DeepClone() });
                     }
@@ -119,8 +119,9 @@ internal static class Report
     }
 
     private static JsonObject Finding(string id, string b, string other, string cls, JsonObject r, JsonNode pins, JsonNode registration,
-        string outRoot, JsonObject? otherResult, string rowId)
+        string outRoot, JsonObject? otherResult, string rowId, Calor.Compiler.Tests.SoundnessRegistration.SweepCaseGenerator.Case c)
     {
+        var repro = Reproduction(c.OracleSource);
         var lastAttempt = r["attempts"]!.AsArray()[^1]!["path"]!.GetValue<string>();
         var attempt = JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, b, lastAttempt)))!;
         var claim = attempt["claim"];
@@ -157,7 +158,15 @@ internal static class Report
             },
             ["nonVacuityCheck"] = attempt["nonVacuityCheck"]?.DeepClone(),
             ["classReason"] = r["classReason"]?.DeepClone(),
-            ["minimized"] = new JsonObject { ["calorSource"] = null, ["csharpReproduction"] = null, ["sha256"] = null, ["status"] = "pending" },
+            ["minimized"] = new JsonObject
+            {
+                ["status"] = "registered-case: a single-function probe generated from one template; not reduced further",
+                ["calorSource"] = c.CalorSource,
+                ["calorPrimeSource"] = c.CalorPrimeSource,
+                ["csharpReproduction"] = repro.Source,
+                ["reproductionOutput"] = repro.Output,
+                ["sha256"] = Hashing.Sha256Text(c.CalorSource),
+            },
             ["environment"] = new JsonObject
             {
                 ["calorDllSha256"] = pins["calorDllSha256"]!.DeepClone(),
@@ -172,6 +181,71 @@ internal static class Report
             ["filedIssue"] = null,
             ["disposition"] = null,
         };
+    }
+
+    /// <summary>
+    /// Standalone C# reproduction (no Calor): the case's registered oracle program plus a Main that
+    /// enumerates its domain and prints the first input where the property is false or throws (or,
+    /// for an exists claim, the first witness). Compiled against BCL only and executed here.
+    /// </summary>
+    internal static (string Source, string Output) Reproduction(string oracleSource)
+    {
+        const string Main = """
+
+public static class Repro
+{
+    public static int Main()
+    {
+        int reached = 0;
+        foreach (var a in R1Oracle.Inputs())
+        {
+            bool hyp;
+            try { hyp = R1Oracle.HypO(a); } catch { continue; }
+            if (!hyp) continue;
+            object? r = null;
+            if (R1Oracle.HasBody) { try { r = R1Oracle.BodyO(a); } catch { continue; } }
+            reached++;
+            string why;
+            bool ok;
+            try { ok = R1Oracle.PropO(a, r); why = "false"; } catch (Exception e) { ok = false; why = "throws " + e.GetType().Name; }
+            var shown = "(" + string.Join(", ", a.Select(v => v is null ? "null" : v is Array arr ? "[" + string.Join(", ", arr.Cast<object>()) + "]" : v is string s ? "\"" + s + "\"" : Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture))) + ")";
+            if (R1Oracle.Claim == "exists") { if (ok) { Console.WriteLine("witness " + shown); return 0; } continue; }
+            if (!ok) { Console.WriteLine("property " + why + " at " + shown + (R1Oracle.HasBody ? " result=" + Convert.ToString(r, System.Globalization.CultureInfo.InvariantCulture) : "")); return 1; }
+        }
+        Console.WriteLine((R1Oracle.Claim == "exists" ? "no witness" : "no violation") + " in the registered domain; reached inputs: " + reached);
+        return 0;
+    }
+}
+""";
+        var source = oracleSource + Main;
+        var checkedMode = !oracleSource.Contains("public const bool Checked = false;", StringComparison.Ordinal);
+        var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create("Repro_" + Guid.NewGuid().ToString("N"),
+            [Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(source, new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(Microsoft.CodeAnalysis.CSharp.LanguageVersion.CSharp14))],
+            [.. Calor.Compiler.Tests.SoundnessRegistration.IndependentOracle.BclReferences, Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(typeof(Console).Assembly.Location)],
+            new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary, checkOverflow: checkedMode,
+                nullableContextOptions: Microsoft.CodeAnalysis.NullableContextOptions.Enable));
+        using var stream = new MemoryStream();
+        var emit = compilation.Emit(stream);
+        if (!emit.Success)
+            return (source, "compile error: " + string.Join("; ", emit.Diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).Take(3)));
+        var context = new System.Runtime.Loader.AssemblyLoadContext("Repro", isCollectible: true);
+        var previousOut = Console.Out;
+        var previousCulture = System.Globalization.CultureInfo.CurrentCulture;
+        var writer = new StringWriter();
+        try
+        {
+            stream.Position = 0;
+            Console.SetOut(writer);
+            System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.GetCultureInfo("en-US");
+            var exit = context.LoadFromStream(stream).GetType("Repro")!.GetMethod("Main")!.Invoke(null, null);
+            return (source, writer.ToString().Trim() + $" (exit {exit})");
+        }
+        finally
+        {
+            Console.SetOut(previousOut);
+            System.Globalization.CultureInfo.CurrentCulture = previousCulture;
+            context.Unload();
+        }
     }
 
     private static JsonObject Controls(IReadOnlyList<Calor.Compiler.Tests.SoundnessRegistration.SweepCaseGenerator.Case> cases,

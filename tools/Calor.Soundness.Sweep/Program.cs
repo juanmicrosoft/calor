@@ -34,8 +34,27 @@ internal static partial class Program
             "report" => Report.Write(opts["repo"], opts["out"]),
             "selftest" => SelfTest(opts),
             "reclassify" => Reclassify(opts),
+            "native-check" => NativeCheck(opts),
             _ => Usage(),
         };
+    }
+
+    /// <summary>
+    /// Loads the three baselines in the same order and process layout as "run", forces the solver to
+    /// load, and records every libz3 image the process actually mapped (no case is executed).
+    /// </summary>
+    private static int NativeCheck(Dictionary<string, string> opts)
+    {
+        var result = new JsonObject { ["recordedUtc"] = DateTime.UtcNow.ToString("O") };
+        foreach (var id in new[] { "B1", "N1", "P845" })
+        {
+            var host = new BaselineHost(id, opts[id.ToLowerInvariant()]);
+            host.Compile("§M{m1:R1Native}\n  §F{f1:Probe:pub} (i32:x) -> i32\n    §E{}\n    §S (== x x)\n    §R INT:0\n", false, true, null);
+            result[id] = Pins(host, opts["registration-commit"]);
+        }
+        File.WriteAllText(opts["out-file"], result.ToJsonString(Indented));
+        Console.WriteLine(result.ToJsonString(Indented));
+        return 0;
     }
 
     /// <summary>
@@ -443,6 +462,8 @@ internal static partial class Program
             ["z3Available"] = available,
             ["nativeZ3Path"] = host.NativeZ3Path,
             ["nativeZ3Sha256"] = host.NativeZ3Path == null ? null : Hashing.Sha256File(host.NativeZ3Path),
+            ["processLoadedZ3"] = new JsonArray(MappedFiles().Where(f => f.Contains("libz3", StringComparison.OrdinalIgnoreCase))
+                .Select(f => (JsonNode)new JsonObject { ["path"] = f, ["sha256"] = Hashing.Sha256File(f) }).ToArray()),
             ["translatorSemanticsVersion"] = host.TranslatorSemanticsVersion,
             ["dotnetVersion"] = DotnetVersion(),
             ["runtime"] = RuntimeInformation.FrameworkDescription,
@@ -453,6 +474,16 @@ internal static partial class Program
             ["culture"] = "en-US for O1/O2",
             ["recordedUtc"] = DateTime.UtcNow.ToString("O"),
         };
+    }
+
+    /// <summary>Files mapped into this process (lsof), used to pin the native solver image actually loaded.</summary>
+    private static IEnumerable<string> MappedFiles()
+    {
+        var psi = new ProcessStartInfo("lsof", $"-p {Environment.ProcessId} -Fn") { RedirectStandardOutput = true };
+        using var p = Process.Start(psi)!;
+        var lines = p.StandardOutput.ReadToEnd().Split('\n');
+        p.WaitForExit();
+        return lines.Where(l => l.StartsWith('n')).Select(l => l[1..]).Where(File.Exists).Distinct().ToList();
     }
 
     private static string DotnetVersion()
