@@ -4,8 +4,8 @@
   "harnessCommits": {
     "run": "8e33f08019303cf805e5098775032face6017a27",
     "crossRun": "dcd6f34a59e9276ef28e45e543a64865ed819a05",
-    "reclassifyAndRereplay": "449b4ec5d7b07b2c36209e4fd1e0fec4edbd5712",
-    "report": "fd0c3287147bf234cb1362d58627dedc8cbea37b"
+    "o2Rereplay": "449b4ec5d7b07b2c36209e4fd1e0fec4edbd5712",
+    "reclassifyAndReport": "fa2ff938098e6e64aadaa888c746b6249995762c"
   },
   "baselines": {
     "B1": {

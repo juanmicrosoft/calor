@@ -13,7 +13,8 @@
     {
       "item": 2,
       "severity": "BLOCKING",
-      "response": "Fixed (HC5): the driver adapts oracle-defined and object parameters. O2 now runs on 675 of 684 applicable cases per baseline; the remaining 9 were rejected by the compiler itself (Calor1002), so no runnable emission exists. The registered rowStatus does not list O2 not-run as blocking; it is disclosed, not used to change status."
+      "response": "Fixed (HC5): the driver adapts oracle-defined and object parameters. O2 now runs on 675 of 684 applicable cases per baseline; the remaining 9 were rejected by the compiler itself (Calor1002), so no runnable emission exists. The registered rowStatus does not list O2 not-run as blocking; it is disclosed, not used to change status.",
+      "supersededBy": "Round 2 item 2 and round 3 item 4: item 2 is only partially resolved. O2 runs fully on 671 distinct cases per baseline, partially on 2 (GEN-REFUSAL-002, -004; one frozen input each cannot be passed to the emitted signature), and not on 9 compiler-rejected cases. The 675 figure above counted 2 retry attempts as cases."
     },
     {
       "item": 3,

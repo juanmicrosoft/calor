@@ -1,7 +1,7 @@
 {
   "note": "Chronology: the sweep ran 16:50:44Z-16:53:50Z with harness 8e33f080. The executor then inspected the first generated report (decision-bearing results) and audited it; HC1-HC3 were committed at 17:05:52Z and 17:06:34Z (6f3a6e83, e33d4339). Codex review round 1 found HC4-HC5; they were committed at 17:26:51Z (dcd6f34a). Every correction follows inspection of results and implements registered text; no registered rule changed. No verifier channel was re-executed: HC1-HC3 re-apply the mapping to retained observations, and HC4/HC5 re-run R1-O2 from the retained forced emission with the pinned Calor.Runtime.dll. Run-time values are retained in every attempt (runtimeClassification, runtimeO2) and in <baseline>/case-results.runtime-8e33f080.jsonl.",
   "runtimeHarnessCommit": "8e33f08019303cf805e5098775032face6017a27",
-  "reclassifyHarnessCommit": "449b4ec5d7b07b2c36209e4fd1e0fec4edbd5712 (final; O2 re-replayed again to mark partial replays; case results byte-identical to dcd6f34a and 15aa06ca)",
+  "reclassifyHarnessCommit": "fa2ff938098e6e64aadaa888c746b6249995762c (final mapping; the last O2 re-replay ran at 449b4ec5; case results byte-identical to dcd6f34a, 15aa06ca, and 449b4ec5)",
   "corrections": [
     {
       "id": "HC1",
@@ -31,7 +31,7 @@
       "id": "HC5",
       "registeredText": "oracle.corroboration (R1-O2): the emitted function is called with the tuple (or the template replay expression)",
       "defect": "The replay driver declared oracle-defined (Box) and object parameters with the oracle CLR type, so 7 cases per baseline (OBL-UNGATED-REFERENCE 001-005, GEN-REFUSAL 002, 004) did not compile and O2 did not run.",
-      "fix": "Such parameters are copied by member name into the emitted type and bound dynamically; an input the emitted signature cannot accept (new object() for a double[] parameter) is recorded as not-run-input-not-representable. After HC5, per baseline: O2 ran on every replay input of 673 of 684 applicable cases; on 2 cases (GEN-REFUSAL-002, -004) it ran on all inputs but one, the input new object(), which the emitted double[] parameter cannot accept (status partial; 2 inputs per baseline unexecuted; this frozen-input incompatibility needs a maintainer decision or amendment); it did not run on 9 cases the compiler itself rejected (Calor1002), which have no runnable emission."
+      "fix": "Such parameters are copied by member name into the emitted type and bound dynamically; an input the emitted signature cannot accept (new object() for a double[] parameter) is recorded as not-run-input-not-representable. After HC5, per baseline (distinct cases; the 2 retries are not counted again): O2 ran on every replay input of 671 cases; on 2 cases (GEN-REFUSAL-002, -004) it ran on all inputs but one, new object(), which the emitted double[] parameter cannot accept (status partial; 1 input per case unexecuted; a maintainer decision or amendment); it did not run on 9 cases the compiler itself rejected (Calor1002), which have no runnable emission; 28 cases are precondition or implication claims where O2 is not applicable."
     }
   ],
   "changedCases": [
