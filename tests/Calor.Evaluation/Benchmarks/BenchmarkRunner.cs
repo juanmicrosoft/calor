@@ -275,7 +275,11 @@ public class BenchmarkRunner
     }
 
     /// <summary>
-    /// Gets the current git commit hash, if available.
+    /// Gets the full commit SHA of the checkout the benchmarks ran on, if available.
+    /// #1417: a short SHA is not a durable identity. Prefixes collide (one ledger stamp shares
+    /// eight hex characters with an unrelated release commit), so a short stamp such as the
+    /// published c2a8816d resolves only by expansion. A full SHA of a pre-merge branch commit is
+    /// still only a phase-1 identity; see bench/phase0-agent-native/commit-stamp-index.json.
     /// </summary>
     private static string? GetGitCommitHash()
     {
@@ -284,7 +288,7 @@ public class BenchmarkRunner
             var psi = new System.Diagnostics.ProcessStartInfo
             {
                 FileName = "git",
-                Arguments = "rev-parse --short HEAD",
+                Arguments = "rev-parse --verify HEAD^{commit}",
                 RedirectStandardOutput = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
