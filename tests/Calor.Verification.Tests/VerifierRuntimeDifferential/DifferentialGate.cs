@@ -82,6 +82,7 @@ internal static class DifferentialGate
                 .ToList();
         }
 
+        DeterminismRecord.WriteCells(results);
         var failSafeControls = RunFailSafeControls();
         return BuildReport(forms, results, failSafeControls);
     }
