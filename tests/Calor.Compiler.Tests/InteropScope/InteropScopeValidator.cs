@@ -31,7 +31,8 @@ internal static class InteropScopeValidator
 
     /// <summary>Gate conditions registered at 1.0.0; none may be dropped to reach MET.</summary>
     public static readonly IReadOnlyList<string> RequiredGateConditions =
-        ["blocker-1413", "capacity-accepted", "independence-deviation-accepted", "blockers-mapped-after-1413"];
+        ["blocker-1413", "capacity-accepted", "independence-deviation-accepted", "blockers-mapped-after-1413",
+         "interaction-and-doc-rows-registered"];
     private static readonly Regex FullSha = new("^[0-9a-f]{40}$", RegexOptions.Compiled);
     private static readonly Regex SemVer = new(@"^(\d+)\.(\d+)\.(\d+)$", RegexOptions.Compiled);
 

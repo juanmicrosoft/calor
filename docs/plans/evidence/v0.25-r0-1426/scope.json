@@ -28,6 +28,11 @@
       "id": "blockers-mapped-after-1413",
       "state": "OPEN",
       "reason": "#1426 deliverable 3: after #1413 dispositions exist, map each applicable 0.24 repair or demotion as a native blocker of the affected family issues."
+    },
+    {
+      "id": "interaction-and-doc-rows-registered",
+      "state": "OPEN",
+      "reason": "#1426 deliverable 2 also asks for cross-feature interaction rows and documentation-example rows. 1.0.0 registers single-family rows only; an amendment adds the #1428 shared controls and the #1429 example rows before MET."
     }
   ],
   "acceptance": null,
