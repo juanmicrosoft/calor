@@ -80,6 +80,8 @@ internal static partial class Program
                 || Native(pinned, host.Directory) is not { } native || native != Native(pins, host.Directory))
                 return Fail($"INVALID RUN: {id} pin missing or changed before the first case", 4);
         }
+        if (LoadedImageCapture.Capture(outRoot, "before-case-1", hosts.Values) is { Count: > 0 } beforeCapture)
+            return Fail("INVALID RUN: loaded libz3 capture before the first case: " + string.Join("; ", beforeCapture), 4);
         var ledger = new Ledger(Path.Combine(outRoot, "ledger.jsonl"));
         var byRow = cases.GroupBy(c => c.RowId).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
         var sw = Stopwatch.StartNew();
@@ -109,6 +111,8 @@ internal static partial class Program
                     Exec(b, byRow[r.Id][k], "sweep");
                 }
         done:
+        if (LoadedImageCapture.Capture(outRoot, "after-last-case", hosts.Values) is { Count: > 0 } afterCapture)
+            return Fail("INVALID RUN: loaded libz3 capture after the last case: " + string.Join("; ", afterCapture), 4);
         foreach (var (id, host) in hosts)
         {
             var after = Pins(host, opts["registration-commit"]);
@@ -263,6 +267,8 @@ internal static partial class Program
         bool Drift() => hosts.Values.Any(h => Pins(h, "") is var now && JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, h.Id, "pins.json"))) is var then && (Native(now, h.Directory) is null || Native(now, h.Directory) != Native(then, h.Directory)
             || new[] { "calorDllSha256", "calorRuntimeDllSha256", "microsoftZ3DllSha256", "dotnetVersion", "os" }.Any(k => now[k]?.ToJsonString() != then![k]?.ToJsonString())));
         if (Drift()) return Fail("INVALID: a pin (binary, native image, or SDK) differs before crossrun", 4);
+        if (LoadedImageCapture.Capture(outRoot, "crossrun-before-case-1", hosts.Values) is { Count: > 0 } beforeCapture)
+            return Fail("INVALID: loaded libz3 capture before crossrun: " + string.Join("; ", beforeCapture), 4);
         string[] priority = ["false-unconditional-proof", "stale-cache-proof", "required-demotion-absent", "spurious-refutation"];
         var work = Pair.SelectMany(source => JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, source, "findings-index.json")))!.AsArray()
             .GroupBy(f => S(f!["caseId"])).Select(g => (Rank: g.Min(f => Array.IndexOf(priority, S(f!["class"])) is var i and >= 0 ? i : priority.Length), Target: source == "B1" ? "N1" : "B1", CaseId: g.Key)));
@@ -280,6 +286,8 @@ internal static partial class Program
                 };
             File.AppendAllText(path, line.ToJsonString() + "\n");
         }
+        if (LoadedImageCapture.Capture(outRoot, "crossrun-after-last-case", hosts.Values) is { Count: > 0 } afterCapture)
+            return Fail("INVALID: loaded libz3 capture after crossrun: " + string.Join("; ", afterCapture), 4);
         if (Drift()) return Fail("INVALID: a pin (binary, native image, or SDK) differs after crossrun", 4);
         Console.WriteLine($"ledger {ledger.Total}, reserve used {ledger.ReserveUsed}");
         return 0;
