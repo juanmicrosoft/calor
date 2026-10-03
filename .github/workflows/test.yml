@@ -85,6 +85,7 @@ jobs:
           python3 scripts/generate_ast_infrastructure.py --check
           python3 scripts/sync-self-test-resources.py --check
           python3 scripts/test_supply_chain.py
+          python3 scripts/test_z3_hermetic.py
 
       # #881 pinned reproduction: the epoch cost metric must count subagent
       # and compaction-segment output tokens. Pure Python, no build needed.
@@ -112,15 +113,8 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # src/Calor.Compiler/{z3,runtimes}/ are gitignored, so on a fresh checkout the
-      # csproj's `<None Include="runtimes\**\*" CopyToOutputDirectory>` glob — resolved at
-      # MSBuild EVALUATION time — matches nothing, and the natives never propagate to test
-      # projects. The DownloadZ3 target populates those directories later, at EXECUTION
-      # time, which is too late for the glob. The managed Microsoft.Z3.dll still flows via
-      # <Reference Private="true">, so the wrapper loads and dies at P/Invoke, and every
-      # Z3-backed test silently skips. Seeding before restore fixes the ordering.
-      - name: Seed Z3 native libraries (before MSBuild evaluation)
-        run: bash src/Calor.Compiler/scripts/download-z3.sh
+      - name: Bootstrap verified Z3 assets
+        uses: ./.github/actions/bootstrap-z3
 
       - name: Restore dependencies
         run: dotnet restore
@@ -257,6 +251,39 @@ jobs:
           test ! -e src/Calor.Compiler/z3
           test ! -e src/Calor.Compiler/runtimes
 
+      # #1420 negative controls. A wrong asset for ANY supported RID (here
+      # linux-arm64, which this x64 host never loads) fails before compilation.
+      - name: Wrong Z3 asset fails before compilation
+        run: |
+          set -euo pipefail
+          native=src/Calor.Compiler/runtimes/linux-arm64/native/libz3.so
+          cp "$native" /tmp/calor-libz3-arm64.so
+          trap 'cp /tmp/calor-libz3-arm64.so "$native"' EXIT
+          python3 -c 'import sys; p=sys.argv[1]; b=bytearray(open(p,"rb").read()); b[4096]^=0xFF; open(p,"wb").write(b)' "$native"
+          if dotnet build src/Calor.Compiler/Calor.Compiler.csproj \
+              -c Release --no-restore > /tmp/wrong-z3.log 2>&1; then
+            echo "::error::build unexpectedly succeeded with a corrupted Z3 native"
+            exit 1
+          fi
+          grep -F "checksum mismatch for src/Calor.Compiler/runtimes/linux-arm64/native/libz3.so" /tmp/wrong-z3.log
+
+      # #859's race, reproduced: MSBuild evaluates Calor.Compiler before the
+      # bootstrap lands, then builds a referencing test host in the same build.
+      # The host must still receive the verified natives; its guard fails, not
+      # skips, if it does not.
+      - name: Late Z3 bootstrap still reaches a referencing test host
+        run: |
+          set -euo pipefail
+          stash="$(mktemp -d)"
+          trap 'test -e src/Calor.Compiler/z3 || mv "$stash/z3" src/Calor.Compiler/z3; test -e src/Calor.Compiler/runtimes || mv "$stash/runtimes" src/Calor.Compiler/runtimes' EXIT
+          rm -rf tests/Calor.Semantics.Tests/bin/Release
+          mv src/Calor.Compiler/z3 src/Calor.Compiler/runtimes "$stash/"
+          dotnet msbuild scripts/z3-late-bootstrap-probe.proj -t:Probe \
+            -p:Configuration=Release -p:Z3Stash="$stash" -nologo
+          dotnet test tests/Calor.Semantics.Tests/Calor.Semantics.Tests.csproj \
+            -c Release --no-build --filter "FullyQualifiedName~Z3ConsumerGuardTests" \
+            --verbosity normal
+
       - name: Dependency lock mismatch fails closed
         run: |
           set -euo pipefail
@@ -312,8 +339,8 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Seed Z3 native libraries
-        run: bash src/Calor.Compiler/scripts/download-z3.sh
+      - name: Bootstrap verified Z3 assets
+        uses: ./.github/actions/bootstrap-z3
 
       - name: Restore and build
         run: |
@@ -489,10 +516,8 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # Seed before MSBuild evaluation so any Z3-backed project receives its
-      # native runtime asset instead of silently skipping verification tests.
-      - name: Seed Z3 native libraries
-        run: bash src/Calor.Compiler/scripts/download-z3.sh
+      - name: Bootstrap verified Z3 assets
+        uses: ./.github/actions/bootstrap-z3
 
       - name: Run project tests
         run: |
@@ -647,7 +672,7 @@ jobs:
 
       - name: Bootstrap verified Z3 assets
         if: steps.fixtures.outputs.present == 'true'
-        run: bash src/Calor.Compiler/scripts/download-z3.sh
+        uses: ./.github/actions/bootstrap-z3
 
       - name: Validate registered fixtures (indeterminate = failing)
         if: steps.fixtures.outputs.present == 'true'
@@ -674,7 +699,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Bootstrap verified Z3 assets
-        run: bash src/Calor.Compiler/scripts/download-z3.sh
+        uses: ./.github/actions/bootstrap-z3
 
       - name: Restore dependencies
         run: dotnet restore
@@ -979,14 +1004,8 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      # PRECAUTIONARY, not currently load-bearing — stated honestly because an earlier
-      # version of this comment was wrong. This job runs `harness run --all`, which routes
-      # to RoundTripPipeline and touches no Z3; the Z3-backed addressability probe
-      # (VerificationAddressability) is reachable only from the `gen-tasks` command, and its
-      # tests run in the `test` job. Verified: with and without this step the job's output is
-      # byte-identical. Kept so that adding `gen-tasks` here cannot silently degrade.
-      - name: Seed Z3 native libraries (before MSBuild evaluation)
-        run: bash src/Calor.Compiler/scripts/download-z3.sh
+      - name: Bootstrap verified Z3 assets
+        uses: ./.github/actions/bootstrap-z3
 
       - name: Restore and build Calor
         run: |
@@ -1157,7 +1176,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Bootstrap verified Z3 assets
-        run: bash src/Calor.Compiler/scripts/download-z3.sh
+        uses: ./.github/actions/bootstrap-z3
 
       - name: Restore dependencies
         run: dotnet restore
@@ -1216,13 +1235,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Bootstrap verified Z3 assets
-        if: runner.os != 'Windows'
-        run: bash src/Calor.Compiler/scripts/download-z3.sh
-
-      - name: Bootstrap verified Z3 assets (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: pwsh -NoProfile -File src/Calor.Compiler/scripts/download-z3.ps1
+        uses: ./.github/actions/bootstrap-z3
 
       - name: Run M-A1 consumer check (pack -> local feed -> restore/build/test)
         env:
@@ -1237,8 +1250,10 @@ jobs:
     # is sdk-package-consumer above; this is the `calor` global tool, which was
     # previously only ever checked by hand after a publish.
     #
-    # The matrix is gate 7's frozen RID set (win-x64, linux-x64, osx-arm64). The
-    # dropped osx-x64 RID (#916) is not a runner here — its amended oracle, the
+    # The matrix started as gate 7's frozen RID set (win-x64, linux-x64,
+    # osx-arm64); #1420 adds linux-arm64 and win-arm64 so every RID the tool
+    # package ships a native for has a clean-install consumer. The dropped
+    # osx-x64 RID (#916) is not a runner here — its amended oracle, the
     # documented degradation, is reproduced inside the script on every leg.
     name: cli-tool-consumer (${{ matrix.rid }})
     strategy:
@@ -1247,10 +1262,14 @@ jobs:
         include:
           - runner: ubuntu-latest
             rid: linux-x64
+          - runner: ubuntu-24.04-arm
+            rid: linux-arm64
           - runner: macos-14
             rid: osx-arm64
           - runner: windows-latest
             rid: win-x64
+          - runner: windows-11-arm
+            rid: win-arm64
     runs-on: ${{ matrix.runner }}
     # Windows packs, restores from a cold NuGet cache and installs a global tool
     # noticeably slower than the POSIX legs; 20 minutes was tight enough that a
@@ -1267,18 +1286,104 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Bootstrap verified Z3 assets
-        if: runner.os != 'Windows'
-        run: bash src/Calor.Compiler/scripts/download-z3.sh
-
-      - name: Bootstrap verified Z3 assets (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: pwsh -NoProfile -File src/Calor.Compiler/scripts/download-z3.ps1
+        uses: ./.github/actions/bootstrap-z3
 
       - name: Run gate 7 CLI consumer check (pack -> tool install -> solver verdict)
         env:
           CALOR_EXPECTED_RID: ${{ matrix.rid }}
         run: bash .github/scripts/test-cli-tool-consumer.sh
+
+  z3-consumer-matrix:
+    # 0.24 G1 (#1420): a bootstrapped checkout must load the pinned Z3 in test
+    # hosts on every supported RID, not only on the linux-x64 runners above.
+    # Calor.Verification.Tests runs in full (zero skips, exact count) except the
+    # registered Windows platform divergences; every registered test host runs
+    # its four guard facts; Calor.Tasks.Tests also runs the task-root native
+    # check, which covers the MSBuild-task consumer. Z3ConsumerGuardTests fails, never
+    # skips, when Z3 is missing, wrong, or on an unsupported RID.
+    name: z3-consumer-matrix (${{ matrix.rid }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04-arm
+            rid: linux-arm64
+          - runner: macos-14
+            rid: osx-arm64
+          - runner: windows-latest
+            rid: win-x64
+          - runner: windows-11-arm
+            rid: win-arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      # Windows runners default to core.autocrlf=true. Calor.Verification.Tests
+      # pins SHA-256 hashes of committed text fixtures and embeds multi-line
+      # Calor sources in C# verbatim strings, so a CRLF checkout fails those
+      # tests for reasons unrelated to Z3. Check out the bytes as committed.
+      - name: Check out committed line endings
+        run: git config --global core.autocrlf false
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Bootstrap verified Z3 assets
+        uses: ./.github/actions/bootstrap-z3
+
+      - name: Build every registered test host
+        run: |
+          set -euo pipefail
+          py="$(command -v python3 || command -v python)"
+          for project in $("$py" scripts/test_z3_hermetic.py --list-test-projects | tr -d '\r'); do
+            dotnet build "$project" -c Release
+          done
+
+      - name: Run Z3 test hosts
+        env:
+          CALOR_Z3_EXPECTED_RID: ${{ matrix.rid }}
+        run: |
+          set -euo pipefail
+          py="$(command -v python3 || command -v python)"
+          # Every registered test host on this RID: the four guard facts.
+          for project in $("$py" scripts/test_z3_hermetic.py --list-test-projects | tr -d '\r'); do
+            name="$(basename "$project" .csproj)"
+            dotnet test "$project" -c Release --no-build \
+              --filter "FullyQualifiedName~Z3ConsumerGuardTests" \
+              --logger "trx;LogFileName=guard-$name.trx" --results-directory artifacts/z3
+          done
+          project=tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj
+          # Registered Windows-only verdict/fixture divergences (eng/z3-consumers.json
+          # testHosts.platformDivergences) are deselected by exact name; nothing else is.
+          filter="$("$py" scripts/test_z3_hermetic.py --divergence-filter --rid "${{ matrix.rid }}" --project "$project" | tr -d '\r')"
+          args=()
+          if [ -n "$filter" ]; then args=(--filter "$filter"); fi
+          dotnet test "$project" -c Release --no-build ${args[@]+"${args[@]}"} \
+            --logger "trx;LogFileName=verification.trx" --results-directory artifacts/z3
+          dotnet test tests/Calor.Tasks.Tests/Calor.Tasks.Tests.csproj \
+            -c Release --no-build \
+            --filter "FullyQualifiedName~VerifyGate_NativeZ3_DeployedToTasksOutputRoot" \
+            --logger "trx;LogFileName=tasks-root.trx" --results-directory artifacts/z3
+
+      - name: Enforce zero skips and the guard on every host
+        run: |
+          set -euo pipefail
+          py="$(command -v python3 || command -v python)"
+          for project in $("$py" scripts/test_z3_hermetic.py --list-test-projects | tr -d '\r'); do
+            "$py" scripts/test_z3_hermetic.py --check-trx "artifacts/z3/guard-$(basename "$project" .csproj).trx" --exact 4
+          done
+          "$py" scripts/test_z3_hermetic.py --check-trx artifacts/z3/verification.trx --project tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj \
+            --rid "${{ matrix.rid }}"
+          "$py" scripts/test_z3_hermetic.py --check-trx artifacts/z3/tasks-root.trx --exact 1 --no-guard \
+            --require Calor.Tasks.Tests.CompileCalorIntegrationTests.VerifyGate_NativeZ3_DeployedToTasksOutputRoot
 
   verify-phase1:
     # Tier 1 self-verification harness — v6 §3.1.
@@ -1301,7 +1406,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Bootstrap verified Z3 assets
-        run: bash src/Calor.Compiler/scripts/download-z3.sh
+        uses: ./.github/actions/bootstrap-z3
 
       - name: Restore and build (needed for ast_roundtrip)
         run: |

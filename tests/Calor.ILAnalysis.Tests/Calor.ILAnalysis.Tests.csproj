@@ -52,5 +52,6 @@
 
   <ItemGroup>
     <Compile Include="..\Shared\Z3TestSeeding.cs" Link="Shared\Z3TestSeeding.cs" />
+    <Compile Include="..\Shared\Z3ConsumerGuardTests.cs" Link="Shared\Z3ConsumerGuardTests.cs" />
   </ItemGroup>
 </Project>

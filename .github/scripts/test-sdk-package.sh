@@ -78,6 +78,14 @@ if [ -n "${CALOR_SDK_EXPECTED_RID:-}" ]; then
   echo "OK: package contains and loads Z3 for runner RID $ACTUAL_RID"
 fi
 
+# #1420: every Z3 asset the package carries must match the committed pins.
+if [ "${CALOR_SDK_REQUIRE_ALL_RIDS:-0}" = "1" ]; then
+  python3 "$REPO_ROOT/scripts/check-packaged-z3.py" "$NUPKG" --prefix tasks/net10.0 --all-rids
+elif [ -n "${CALOR_SDK_EXPECTED_RID:-}" ]; then
+  python3 "$REPO_ROOT/scripts/check-packaged-z3.py" "$NUPKG" --prefix tasks/net10.0 \
+    --rid "$CALOR_SDK_EXPECTED_RID"
+fi
+
 export NUGET_PACKAGES="$WORK/packages"   # fresh consumer cache: restore must come from the feed
 
 echo "== 3. materialize consumer from template =="

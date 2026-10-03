@@ -2,7 +2,8 @@
   "schemaVersion": 1,
   "warmupRuns": 1,
   "measuredRuns": 3,
-  "expectedTestCount": 21,
+  "expectedTestCount": 25,
+  "expectedTestCountNote": "#1420: 21 -> 25, the four Z3ConsumerGuardTests facts linked into every registered test host. They hash two small files and load Z3 once (milliseconds), so the timed-suite ceiling below is unchanged.",
   "metrics": {
     "performance-suite-seconds": {
       "maximumMedian": 24.0,
