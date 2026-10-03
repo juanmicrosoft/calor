@@ -4,8 +4,9 @@
 The protocol is docs/plans/evidence/g2-1421/protocol.json; its case registry is cases.json.
 This module holds what the registration freezes: the validator (codes D001-D016), the value
 rules that turn one test invocation into registered case values, and the agreement decider.
-The execution machinery (workflow, environment check, attempt runner, budget and ledger
-guards) is the second G2 PR; #1135 executes after both merge.
+The execution machinery (workflow, environment check, attempt runner, budget and history
+guards) is scripts/determinism_runner.py and .github/workflows/determinism-protocol.yml,
+registered by amendment 1.1.0; #1135 executes it.
 
   validate [--baseline-ref REF]   fail closed on registration defects; with a baseline,
                                   also on unrecorded or weakening changes to the packet
@@ -447,6 +448,10 @@ def validate(root: Path, protocol=None, cases=None, contract=None, texts=None, b
             add("D013", "execution machinery exists while the protocol records it as pending")
     elif wf.get("status") != "registered" or wf.get("amendment") not in amended or not all((root / wf.get(k, "missing")).exists() for k in ("path", "runner")):
         add("D013", "execution machinery must be registered by a recorded amendment")
+    else:
+        import determinism_runner  # the registered machinery checks its own workflow's structure
+        for problem in determinism_runner.workflow_problems(text(wf["path"]), protocol):
+            add("D013", f"{wf['path']}: {problem}")
 
     if any(not home_safe(text(rel)) for rel in [HARNESS] + [f for f in wf.get("frozenFiles", []) if f.endswith(".py")]):
         add("D013", "a harness file references the real home directory")

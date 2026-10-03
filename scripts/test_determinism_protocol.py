@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -16,6 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import determinism_protocol as dp  # noqa: E402
+import determinism_runner as dr  # noqa: E402
 
 ROOT = dp.ROOT
 PROTOCOL, CASES, CONTRACT = dp.load(ROOT, dp.PROTOCOL), dp.load(ROOT, dp.CASES), dp.load(ROOT, dp.CONTRACT)
@@ -143,7 +145,8 @@ class NegativeRegistrationControls(unittest.TestCase):
         self.only("D012", protocol=mutate(lambda p: p["attemptStatuses"].pop("timeout")))
 
     def test_d013_unregistered_machinery(self) -> None:
-        self.only("D013", protocol=mutate(lambda p: p["workflow"].update(status="registered")))
+        self.only("D013", protocol=mutate(lambda p: p["workflow"].update(amendment="9.9.9")))
+        self.only("D013", protocol=mutate(lambda p: p["workflow"].update(status="pending-second-g2-pr")))
 
     def test_d014_gate_site_drift(self) -> None:
         test_yml = (ROOT / ".github/workflows/test.yml").read_text(encoding="utf-8")
@@ -360,6 +363,249 @@ class ValueControls(unittest.TestCase):
                        '<UnitTestResult testName="A(x: 1)" outcome="Failed" duration="00:00:09" />'
                        '</Results><ResultSummary outcome="Failed" /></TestRun>', encoding="utf-8")
         self.assertEqual(({"A(x: 1)": ["Passed", "Failed"]}, "Failed"), dp.parse_trx(trx))
+
+
+# ---------------------------------------------------------------- execution machinery (amendment 1.1.0)
+
+WORKFLOW_TEXT = (ROOT / dr.WORKFLOW).read_text(encoding="utf-8")
+OLD, NEW = "a" * 40, "b" * 40
+
+
+def dispatch(**extra) -> dict:
+    env = {"GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_RUN_ATTEMPT": "1", "GITHUB_SHA": NEW, "GITHUB_RUN_ID": "900"}
+    env.update(extra)
+    return env
+
+
+def past(i, title, sha=OLD, status="completed", conclusion="success", minutes=100, started=True, event="workflow_dispatch") -> dict:
+    return {"id": i, "runNumber": i, "title": title, "event": event, "status": status, "conclusion": conclusion, "headSha": sha,
+            "minutes": minutes, "attemptsStarted": started}
+
+
+class PlanGuards(unittest.TestCase):
+    """Each guard the plan job applies before any attempt runs, from a synthetic API inventory."""
+
+    def plan(self, inventory=(), mode="execution", execution_id="E9", env=None, paths=("src/Calor.Compiler/X.cs",)) -> list[str]:
+        return dr.plan_problems(PROTOCOL, mode=mode, execution_id=execution_id, env=env or dispatch(), inventory=list(inventory),
+                                changed_paths=lambda old, new: None if paths is None else list(paths))
+
+    def refused(self, needle: str, **kwargs) -> None:
+        problems = self.plan(**kwargs)
+        self.assertTrue(any(needle in p for p in problems), problems)
+
+    def test_first_execution_is_planned_from_the_protocol(self) -> None:
+        self.assertEqual([], self.plan())
+        self.assertEqual([], self.plan(mode="control", execution_id="C1"))
+        include = dr.matrix(PROTOCOL, "execution")["include"]
+        envs = dp.env_by_id(PROTOCOL)
+        self.assertEqual(10, len(include))
+        for cell in include:
+            env = envs[cell["env"]]
+            self.assertEqual((env["runner"], env["jobTimeoutMinutes"], PROTOCOL["toolchain"]["sdk"]), (cell["runner"], cell["timeout"], cell["sdk"]))
+        self.assertEqual({20}, {c["timeout"] for c in dr.matrix(PROTOCOL, "control")["include"]})
+
+    def test_second_execution_of_a_commit_is_refused(self) -> None:
+        self.refused("already executed", inventory=[past(1, "determinism execution E1", sha=NEW)])
+        self.refused("already executed", inventory=[past(1, "determinism execution E1", sha=NEW, conclusion="failure")])
+        self.refused("already executed", inventory=[past(1, "unreadable title", sha=NEW)])  # fail closed: charged as an execution
+        self.refused("unfinished", inventory=[past(1, "determinism execution E1", status="in_progress", started=False)])
+        self.assertEqual([], self.plan(inventory=[past(1, "determinism control C1", sha=NEW)]))  # a control run is not an execution
+
+    def test_docs_only_repair_is_refused(self) -> None:
+        failed = [past(1, "determinism execution E1", conclusion="failure")]
+        self.refused("outside docs/", inventory=failed, paths=["docs/plans/evidence/g3-1135/ledger.json"])
+        self.refused("outside docs/", inventory=failed, paths=None)  # git cannot tell: fail closed
+        self.assertEqual([], self.plan(inventory=failed, paths=["docs/x.md", "tests/Calor.Verification.Tests/X.cs"]))
+        self.assertEqual([], self.plan(inventory=[past(1, "determinism execution E1")], paths=["docs/x.md"]))
+
+    def test_budget_exceeded_is_refused(self) -> None:
+        spent = [past(i, f"determinism control C{i}", minutes=720, started=False) for i in (1, 2)]  # 13 + 1,440 + 555 > 2,000
+        self.refused("exceeds the 2000", inventory=spent)
+        self.assertEqual([], self.plan(inventory=spent, mode="control", execution_id="C3"))  # 1,453 + 115 fits
+        self.refused("exceeds the 2000", inventory=[past(i, "unreadable", status="in_progress", minutes=0) for i in (1, 2, 3)])
+        executions = [past(i, f"determinism execution E{i}", sha=str(i) * 40, minutes=1) for i in (1, 2, 3)]
+        self.refused("limit of 3 execution", inventory=executions)
+        controls = [past(i, f"determinism control C{i}", minutes=1) for i in (1, 2)]
+        self.refused("limit of 2 control", inventory=controls, mode="control", execution_id="C3")
+        queued = [past(i, f"determinism control C{i}", status="queued", minutes=0, started=False) for i in (1, 2)]
+        self.refused("limit of 2 control", inventory=queued, mode="control", execution_id="C3")  # unfinished runs count
+        refusals = [past(i, f"determinism execution E{i}", minutes=1, started=False, conclusion="failure") for i in (1, 2, 3)]
+        self.assertEqual([], self.plan(inventory=refusals))  # refused runs are charged but never counted as executions
+        self.assertEqual([], self.plan(inventory=[past(1, "determinism execution E1", minutes=1900, event="pull_request")]))
+
+    def test_retry_rerun_or_reused_id_is_refused(self) -> None:
+        self.refused("GITHUB_RUN_ATTEMPT=2", env=dispatch(GITHUB_RUN_ATTEMPT="2"))
+        self.refused("already dispatched", inventory=[past(1, "determinism control E9")])
+        for env in ({"GITHUB_RUN_ATTEMPT": "2"}, {}):
+            with self.assertRaises(dr.Refusal):
+                dr.refuse_rerun(env)
+        out = Path(tempfile.mkdtemp())
+        kwargs = dict(env_id="linux-x64", job=1, mode="control", execution_id="C1", out=out, base={"GITHUB_RUN_ATTEMPT": "2"})
+        with self.assertRaises(dr.Refusal):
+            dr.run_job(PROTOCOL, CASES, **kwargs)
+        with self.assertRaises(dr.Refusal):
+            dr.fill_missing(PROTOCOL, **kwargs)
+        self.assertEqual([], list(out.iterdir()))
+
+    def test_automatic_trigger_is_rejected(self) -> None:
+        self.assertEqual([], dr.workflow_problems(WORKFLOW_TEXT, PROTOCOL))
+        self.refused("only a workflow_dispatch", env=dispatch(GITHUB_EVENT_NAME="push"))
+        self.refused("only a workflow_dispatch", env=dispatch(GITHUB_EVENT_NAME="pull_request"))
+        for trigger in ("  push:\n", "  pull_request:\n", "  schedule:\n    - cron: '0 0 * * *'\n", "  workflow_run:\n"):
+            mutated = WORKFLOW_TEXT.replace("on:\n", "on:\n" + trigger, 1)
+            self.assertTrue(any("triggers" in p for p in dr.workflow_problems(mutated, PROTOCOL)), trigger)
+            self.assertEqual({"D013"}, codes(texts={dr.WORKFLOW: mutated}))
+        self.assertTrue(dr.workflow_problems(WORKFLOW_TEXT.replace("on:\n", "on: [push]\n", 1), PROTOCOL))
+
+    def test_normalization_flag_or_masked_status_is_rejected(self) -> None:
+        flag = WORKFLOW_TEXT.replace("      execution_id:\n", "      normalize_line_endings:\n        type: boolean\n      execution_id:\n", 1)
+        self.assertTrue(any("inputs" in p for p in dr.workflow_problems(flag, PROTOCOL)))
+        with self.assertRaises(SystemExit):
+            dr.main(["run-job", "--env", "linux-x64", "--out", "x", "--job", "1", "--mode", "execution", "--execution-id", "E1",
+                     "--normalize-line-endings"])
+        self.assertIn("D009", codes(protocol=mutate(lambda p: p["agreement"]["normalizationRules"].append("CRLF to LF"))))
+        for old, new in (("fail-fast: false", "fail-fast: true"), ("    timeout-minutes: 5\n", "    timeout-minutes: 6\n"),
+                         ("cancel-in-progress: false", "cancel-in-progress: true"),
+                         ("--github-output \"$GITHUB_OUTPUT\"\n", "--github-output \"$GITHUB_OUTPUT\" || true\n"),
+                         ("      - name: Build the registered test hosts\n", "      - name: Build the registered test hosts\n        continue-on-error: true\n"),
+                         ("      - name: Run every attempt of this job\n", "      - name: Run every attempt of this job\n        if: always()\n"),
+                         ("  actions: read\n", "  actions: write\n")):
+            self.assertIn(old, WORKFLOW_TEXT)
+            self.assertTrue(dr.workflow_problems(WORKFLOW_TEXT.replace(old, new, 1), PROTOCOL), new)
+
+    def test_missing_isolated_home_is_refused(self) -> None:
+        tmp = Path(tempfile.mkdtemp()).resolve()
+        inv = tmp / "inv"
+        base = {"PATH": "/usr/bin", "HOME": "/real-home-never-used", "CALOR_UPDATE_BASELINES": "1", "calor_update_x": "1"}
+        child = dr.invocation_env(base, inv, "linux-x64", str(tmp / "nuget"))
+        (inv / "home").mkdir(parents=True)
+        dr.check_isolation(child, inv)
+        self.assertEqual({str(inv / "home")}, {child[k] for k in dr.ISOLATED})
+        self.assertFalse([k for k in child if k.upper().startswith("CALOR_UPDATE_")])
+        self.assertEqual(str(inv / "record"), child["CALOR_DETERMINISM_RECORD_DIR"])
+        broken = [{k: v for k, v in child.items() if k != "USERPROFILE"}, dict(child, HOME="/real-home-never-used"),
+                  dict(child, DOTNET_CLI_HOME="home"), dict(child, CALOR_UPDATE_BASELINES="1"), dict(child, NUGET_PACKAGES="pkgs"),
+                  dict(child, USERPROFILE=str(tmp / "elsewhere" / "home"))]
+        for env in broken:
+            with self.assertRaises(dr.Refusal):
+                dr.check_isolation(env, inv)
+        (inv / "home" / ".calor").mkdir()
+        with self.assertRaises(dr.Refusal):
+            dr.check_isolation(child, inv)  # a home that is not empty is not fresh
+        runner = (ROOT / dr.RUNNER).read_text(encoding="utf-8")
+        self.assertTrue(dp.home_safe(runner))
+        self.assertEqual({"D013"}, codes(texts={dr.RUNNER: runner + "\nshutil.rmtree(Path.home() / '.calor')\n"}))
+
+    def test_environment_check_rejects_any_other_toolchain_or_runner(self) -> None:
+        env = dp.env_by_id(PROTOCOL)["linux-x64"]
+        root = "/t/dotnet-1421"
+        good = {"sdks": [f"10.0.401 [{root}/sdk]"], "runtimes": [f"Microsoft.AspNetCore.App 10.0.12 [{root}/x]",
+                                                                 f"Microsoft.NETCore.App 10.0.12 [{root}/shared]"],
+                "dotnetVersion": "10.0.401", "dotnetPath": f"{root}/dotnet", "dotnetRoots": [root], "runnerOs": "Linux",
+                "runnerArch": "X64", "logicalProcessors": 4, "memoryBytes": 16 * 2 ** 30, "z3": {"a": {"sha256": "1", "pin": "1"}},
+                "commit": NEW, "autocrlf": "false", "dirty": "", "userProfileFollowsIsolatedHome": True}
+        self.assertEqual([], dr.judge(PROTOCOL, env, good, NEW))
+        for change in ({"sdks": good["sdks"] + ["10.0.100 [/usr/share/dotnet/sdk]"]},
+                       {"runtimes": good["runtimes"] + [f"Microsoft.NETCore.App 10.0.0 [{root}/shared]"]},
+                       {"dotnetPath": "/usr/bin/dotnet"}, {"runnerArch": "ARM64"}, {"logicalProcessors": 2},
+                       {"memoryBytes": 14 * 2 ** 30}, {"z3": {"a": {"sha256": "2", "pin": "1"}}}, {"commit": OLD},
+                       {"autocrlf": "true"}, {"dirty": " M src/x.cs"}, {"userProfileFollowsIsolatedHome": False}):
+            self.assertTrue(dr.judge(PROTOCOL, env, dict(good, **change), NEW), change)
+        windows = dp.env_by_id(PROTOCOL)["win-x64"]
+        self.assertTrue(any("UserProfile" in v for v in dr.judge(PROTOCOL, windows, dict(good, userProfileFollowsIsolatedHome=None), NEW)))
+
+    def test_minutes_and_ledger_come_from_the_api_inventory(self) -> None:
+        jobs = [{"started_at": "2026-10-03T10:00:00Z", "completed_at": "2026-10-03T10:00:01Z"},
+                {"started_at": "2026-10-03T10:00:00Z", "completed_at": "2026-10-03T10:02:00Z"},
+                {"started_at": "2026-10-03T10:05:00Z", "completed_at": "2026-10-03T10:04:00Z"}, {"started_at": None}]
+        self.assertEqual(3, dr.job_minutes(jobs))
+        inventory = [past(1, "determinism control C1", minutes=13), past(2, "determinism execution E1", minutes=300)]
+        self.assertEqual([], dr.ledger_problems({"entries": [{"runId": 1, "runnerMinutes": 13}, {"runId": "2", "runnerMinutes": 300}]}, inventory))
+        self.assertEqual(2, len(dr.ledger_problems({"entries": [{"runId": 1, "runnerMinutes": 12}]}, inventory)))
+
+
+FAKE_DOTNET = """#!/bin/sh
+# Fake dotnet for the attempt-runner controls: logs its environment, then writes a TRX unless FAKE_FAIL is set.
+echo "$HOME|$USERPROFILE|$DOTNET_CLI_HOME|$CALOR_DETERMINISM_RECORD_DIR|${CALOR_UPDATE_X:-unset}|$NUGET_PACKAGES" >> "$FAKE_LOG"
+prev=""; dir=""
+for a in "$@"; do [ "$prev" = "--results-directory" ] && dir="$a"; prev="$a"; done
+[ -n "$FAKE_FAIL" ] && exit 3
+printf '<TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010"><Results><UnitTestResult testName="T.A" outcome="Passed" /></Results><ResultSummary outcome="Completed" /></TestRun>' > "$dir/control.trx"
+"""
+
+
+@unittest.skipIf(os.name == "nt", "the fake dotnet is a POSIX shell script")
+class AttemptRunnerControls(unittest.TestCase):
+    """run-job end to end in control mode with a fake dotnet: one invocation per profile per attempt, never retried."""
+
+    def setUp(self) -> None:
+        self.tmp = Path(tempfile.mkdtemp()).resolve()
+        (self.tmp / "bin").mkdir()
+        fake = self.tmp / "bin" / "dotnet"
+        fake.write_text(FAKE_DOTNET, encoding="utf-8")
+        fake.chmod(0o755)
+        self.log, self.out = self.tmp / "log.txt", self.tmp / "out"
+        self.out.mkdir()
+        self.base = {"PATH": f"{self.tmp / 'bin'}{os.pathsep}{os.environ.get('PATH', '')}", "GITHUB_RUN_ATTEMPT": "1",
+                     "GITHUB_RUN_ID": "77", "NUGET_PACKAGES": str(self.tmp / "nuget"), "FAKE_LOG": str(self.log), "CALOR_UPDATE_X": "1"}
+
+    def run_job(self, violations=(), dirty=lambda: "", **extra) -> int:
+        (self.out / "env.json").write_text(json.dumps({"violations": list(violations), "observed": {}}), encoding="utf-8")
+        return dr.run_job(PROTOCOL, CASES, env_id="linux-x64", job=1, mode="control", execution_id="C1", out=self.out,
+                          base=dict(self.base, **extra), dirty=dirty)
+
+    def records(self) -> list[dict]:
+        return [json.loads(p.read_text(encoding="utf-8")) for p in sorted(self.out.glob("attempt-*.json"))]
+
+    def lines(self) -> list[str]:
+        return self.log.read_text(encoding="utf-8").splitlines() if self.log.exists() else []
+
+    def problem(self, record):
+        shape = ([PROTOCOL["control"]["profile"]], PROTOCOL["control"]["jobsPerEnvironment"], PROTOCOL["control"]["attemptsPerJob"])
+        hashes = (dp.sha256_file(ROOT / dp.PROTOCOL), dp.sha256_file(ROOT / dp.HARNESS))
+        return dp._record_problem(record, PROTOCOL, CASES, "control", dp.env_by_id(PROTOCOL), shape, record["commit"], {"C1": "77"}, hashes)
+
+    def test_every_attempt_runs_once_in_its_own_isolated_home(self) -> None:
+        self.assertEqual(0, self.run_job())
+        records = self.records()
+        self.assertEqual([1, 2], [r["attempt"] for r in records])
+        self.assertEqual(["completed", "completed"], [r["status"] for r in records])
+        self.assertEqual([None, None], [self.problem(r) for r in records])
+        homes = [line.split("|") for line in self.lines()]
+        self.assertEqual(2, len(homes))
+        self.assertEqual(2, len({h[0] for h in homes}))
+        for home, profile, cli, record, update, nuget in homes:
+            self.assertTrue(home == profile == cli and str(self.out) in home, home)
+            self.assertTrue(Path(record).is_absolute() and update == "unset" and nuget == self.base["NUGET_PACKAGES"])
+        with self.assertRaises(dr.Refusal):
+            self.run_job()  # an attempt is never run twice
+        self.assertEqual(2, len(self.lines()))
+
+    def test_a_failing_invocation_is_recorded_and_never_retried(self) -> None:
+        self.assertEqual(0, self.run_job(FAKE_FAIL="1"))
+        records = self.records()
+        self.assertEqual(["crash", "crash"], [r["status"] for r in records])
+        self.assertEqual(["3|Missing", "3|Missing"], [r["profiles"][0]["invocation"] for r in records])
+        self.assertEqual(2, len(self.lines()))
+
+    def test_a_modified_tree_invalidates_this_and_every_later_attempt(self) -> None:
+        self.assertEqual(1, self.run_job(dirty=lambda: " M src/x.cs"))
+        records = self.records()
+        self.assertEqual(["invalid", "invalid"], [r["status"] for r in records])
+        self.assertEqual((1, 0), (len(records[0]["profiles"]), len(records[1]["profiles"])))
+        self.assertEqual([None, None], [self.problem(r) for r in records])
+        self.assertEqual(1, len(self.lines()))
+
+    def test_an_environment_violation_runs_nothing(self) -> None:
+        self.assertEqual(1, self.run_job(violations=["2 logical processors"]))
+        self.assertEqual(["environment-violation"] * 2, [r["status"] for r in self.records()])
+        self.assertEqual([], self.lines())
+
+    def test_fill_missing_records_unrun_attempts_without_running_them(self) -> None:
+        dr.fill_missing(PROTOCOL, env_id="linux-x64", job=1, mode="control", execution_id="C1", out=self.out, base=self.base)
+        self.assertEqual(["infrastructure-failure"] * 2, [r["status"] for r in self.records()])
+        self.assertEqual([None, None], [self.problem(r) for r in self.records()])
+        self.assertEqual([], self.lines())
 
 
 if __name__ == "__main__":
