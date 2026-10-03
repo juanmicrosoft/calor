@@ -2,14 +2,15 @@
 """
 migrator_corpus_dryrun.py — Tier 2 migrator dry-run over the corpus.
 
-Walks every `.calr` file under a directory tree and invokes the
-migrator in `--dry-run` mode. Asserts the migrator does not modify
-the file on disk and that the byte-preservation invariant holds for
-the proposed migration.
+Invokes the migrator in `--dry-run` mode over a directory tree and
+asserts it does not modify any tracked `.calr` file on disk. It does
+not check byte preservation (byte_preservation_check.py does).
 
-In Phase 0 (no migrator yet), this script reports the count of `.calr`
-files that WOULD be migrated and exits 0 — the actual migrator hooks
-in at PR-1c.
+Repaired by #1241: it runs the checkout-built compiler (never an
+installed `calor`), selects tracked files only (never bin/ or obj/
+copies), fails on an empty selection, exits 3 (TimeoutOrUnavailable,
+not a pass) when the migrator is missing, and fails when the dry run
+of a synthetic control file reports no change (a vacuous run).
 
 Usage:
     python3 scripts/migrator_corpus_dryrun.py <root-dir> \\
@@ -23,22 +24,42 @@ import hashlib
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-CALOR_PROJECT = REPO_ROOT / "src" / "Calor.Compiler"
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+import checkout_compiler  # noqa: E402
 
-ID_BLOCK_RE = re.compile(r"§[A-Z]+\{[^}]*\}")
+UNAVAILABLE = 3
+# A file the forward rewrite of each mode must change, so that neither
+# migrator check can pass without exercising the migrator.
+CONTROLS = {
+    "drop-structural-ids": "§M{m_01J5X7K9M2NP:Ctl}\n"
+    "  §F{f_01J5X7K9M2NQ:One:pub} () -> i32\n    §R INT:1\n"
+    "  §/F{f_01J5X7K9M2NQ}\n§/M{m_01J5X7K9M2NP}\n",
+    "compact-ids": "§M{m_01J5X7K9M2NPQRSTABWXYZ1234:Ctl}\n"
+    "  §F{f_01J5X7K9M2NPQRSTABWXYZ1235:One:pub} () -> i32\n    §R INT:1\n",
+}
 
 
 def calor_command() -> list[str]:
-    from shutil import which
-    if which("calor"):
-        return ["calor"]
-    return [
-        "dotnet", "run", "--project", str(CALOR_PROJECT), "-c", "Release",
-        "--no-build", "--",
-    ]
+    """The checkout-built compiler; raises instead of falling back."""
+    return checkout_compiler.resolve(REPO_ROOT).command
+
+
+def tracked_files(root: Path) -> list[Path]:
+    rel = root.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+    return [REPO_ROOT / f
+            for f in checkout_compiler.tracked_calr(REPO_ROOT, [rel])]
+
+
+def migrator_available(calor_cmd: list[str], flags: list[str]) -> bool:
+    probe = subprocess.run(
+        calor_cmd + ["fix", "--help"], capture_output=True, text=True
+    )
+    text = probe.stdout + probe.stderr
+    return probe.returncode == 0 and all(f in text for f in flags)
 
 
 def file_sha1(p: Path) -> str:
@@ -58,27 +79,23 @@ def main(argv: list[str] | None = None) -> int:
               file=sys.stderr)
         return 2
 
-    calor_cmd = calor_command()
-    files = sorted(root.rglob("*.calr"))
-    print(f"migrator_corpus_dryrun: {len(files)} file(s) in scope "
+    try:
+        calor_cmd = calor_command()
+        files = tracked_files(root)
+    except checkout_compiler.CompilerResolutionError as e:
+        print(f"migrator_corpus_dryrun: {e}", file=sys.stderr)
+        return 2
+    print(f"migrator_corpus_dryrun: {len(files)} tracked file(s) in scope "
           f"(mode={args.mode})")
+    if not files:
+        print("migrator_corpus_dryrun: FAIL: empty selection",
+              file=sys.stderr)
+        return 1
 
-    # Probe whether the migrator subcommand exists.
-    probe = subprocess.run(
-        calor_cmd + ["fix", "--help"], capture_output=True, text=True
-    )
-    migrator_present = (
-        probe.returncode == 0 and args.mode in (probe.stdout + probe.stderr)
-    )
-    if not migrator_present:
-        print("migrator_corpus_dryrun: migrator subcommand not yet "
-              "available; reporting candidate count (Phase 0).")
-        n_candidates = sum(
-            1 for f in files
-            if ID_BLOCK_RE.search(f.read_text(encoding="utf-8", errors="ignore"))
-        )
-        print(f"  files_with_id_blocks: {n_candidates}")
-        return 0
+    if not migrator_available(calor_cmd, [f"--{args.mode}", "--dry-run"]):
+        print("migrator_corpus_dryrun: TimeoutOrUnavailable: the migrator "
+              "subcommand or flag is missing (not a pass)", file=sys.stderr)
+        return UNAVAILABLE
 
     failures = 0
     # `calor fix` takes a positional <root> directory and walks it
@@ -86,14 +103,27 @@ def main(argv: list[str] | None = None) -> int:
     # Tier 2 corpus coverage we invoke fix once over the whole root
     # and rely on `--dry-run` to ensure no file changes.
     hashes_before = {f: file_sha1(f) for f in files}
-    cmd = calor_cmd + [
-        "fix", str(root), f"--{args.mode}", "--dry-run",
-    ]
-    cp = subprocess.run(cmd, capture_output=True, text=True, cwd=REPO_ROOT)
-    if cp.returncode != 0:
-        print(f"  FAIL: migrator exit {cp.returncode}", file=sys.stderr)
-        print(f"    {cp.stderr.strip()[-1000:]}", file=sys.stderr)
-        return 1
+    with tempfile.TemporaryDirectory() as td:
+        control = Path(td) / "control.calr"
+        control.write_text(CONTROLS[args.mode], encoding="utf-8")
+        before = file_sha1(control)
+        for target in (root, Path(td)):
+            cmd = calor_cmd + [
+                "fix", str(target), f"--{args.mode}", "--dry-run",
+            ]
+            cp = subprocess.run(cmd, capture_output=True, text=True,
+                                cwd=REPO_ROOT)
+            if cp.returncode != 0:
+                print(f"  FAIL: migrator exit {cp.returncode}",
+                      file=sys.stderr)
+                print(f"    {cp.stderr.strip()[-1000:]}", file=sys.stderr)
+                return 1
+        m = re.search(r"files_changed=(\d+)", cp.stdout)
+        if not m or int(m.group(1)) < 1 or file_sha1(control) != before:
+            print("  FAIL: the dry run of the control file reported no "
+                  "change or wrote it; the check exercised nothing",
+                  file=sys.stderr)
+            return 1
     # Verify no file was actually modified by dry-run.
     for f in files:
         h_after = file_sha1(f)

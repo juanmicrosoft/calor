@@ -1,0 +1,1743 @@
+{
+  "schemaVersion": 1,
+  "issue": 1241,
+  "description": "Explicit compile expectation for every tracked .calr fixture under samples/ and tests/, read by scripts/fixture_compile_check.py (Tier 1: samples/; Tier 2: samples/ and tests/). Every fixture is listed by path exactly once; there is no pattern or catch-all. compile = must compile. reject = must fail with exactly the listed error signature; negativeKind designed means the fixture exists to fail, incidental means nothing compiles it and it is invalid Calor that the compiler rejects correctly. known-failure = a real compiler failure, kept as a failure and never counted as a pass. Error signature = sorted unique error-severity codes, with Calor1002 suffixed by its Roslyn code. Options mirror the fixture's consumer and are limited to the checker's allowlist. The checker compiles each fixture once; it performs no AST round trip.",
+  "roots": [
+    "samples",
+    "tests"
+  ],
+  "groups": [
+    {
+      "id": "samples",
+      "expect": "compile",
+      "mode": "each",
+      "evidence": "samples/ are the public example programs; Tier 1 compiles them with default options.",
+      "files": [
+        "samples/Collections/collections.calr",
+        "samples/Contracts/contracts.calr",
+        "samples/FizzBuzz/fizzbuzz.calr",
+        "samples/Generics/generics.calr",
+        "samples/HelloWorld/hello.calr",
+        "samples/PatternMatching/matching.calr",
+        "samples/SdkSample/program.calr",
+        "samples/TypeSystem/typesystem.calr",
+        "samples/Verification/mixed-contracts.calr",
+        "samples/Verification/proven-contracts.calr",
+        "samples/Verification/violation-detected.calr"
+      ]
+    },
+    {
+      "id": "conversion-snapshots",
+      "expect": "compile",
+      "mode": "each",
+      "options": [
+        "--permissive-effects"
+      ],
+      "evidence": "Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code.",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/01-01.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/01-02.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/01-03.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/01-04.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/02-01.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/02-02.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/02-03.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/02-04.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/03-01.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/03-02.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/03-03.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/03-04.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/04-01.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/04-02.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/04-03.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/04-04.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/05-01.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/05-02.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/05-03.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/06-01.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/06-03.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/06-04.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/07-01.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/07-02.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/07-03.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/07-04.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/08-01.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/08-02.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/08-04.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/09-01.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/09-02.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/10-01.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/10-02.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/10-03.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/11-01.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/11-02.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/11-04.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/12-01.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/12-02.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/12-03.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/12-04.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/12-05.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/13-01.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/13-03.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/13-04.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/13-06.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/13-07.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/13-08.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/13-09.approved.calr",
+        "tests/Calor.Conversion.Tests/Snapshots/13-11.approved.calr"
+      ]
+    },
+    {
+      "id": "conversion-snapshots:08-03.approved",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--permissive-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0029"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0029): Cannot implicitly convert type 'string[]' to 'System.Collections.Generic.List<string>'",
+      "evidence": "Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/08-03.approved.calr"
+      ]
+    },
+    {
+      "id": "conversion-snapshots:09-03.approved",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--permissive-effects"
+      ],
+      "errors": [
+        "Calor1002:CS8510"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS8510): The pattern is unreachable. It has already been handled by a previous arm of the switch expression or it is impossible to match.",
+      "evidence": "Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/09-03.approved.calr"
+      ]
+    },
+    {
+      "id": "conversion-snapshots:11-03.approved",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--permissive-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0050"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0050): Inconsistent accessibility: return type 'Container.Status' is less accessible than method 'Container.GetStatus()'",
+      "evidence": "Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/11-03.approved.calr"
+      ]
+    },
+    {
+      "id": "conversion-snapshots:11-05.approved",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--permissive-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0246"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0246): The type or namespace name 'str' could not be found (are you missing a using directive or an assembly reference?); generated C# (CS0246): The type or namespace name 'i32' could not be found (are you missing a using directive or an assembly reference?)",
+      "evidence": "Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/11-05.approved.calr"
+      ]
+    },
+    {
+      "id": "conversion-snapshots:13-02.approved",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--permissive-effects"
+      ],
+      "errors": [
+        "Calor1002:CS1001",
+        "Calor1002:CS1002",
+        "Calor1002:CS1003",
+        "Calor1002:CS1519",
+        "Calor1002:CS1525"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS1519): Invalid token 'object' in a member declaration; generated C# (CS1519): Invalid token ';' in a member declaration; generated C# (CS1001): Identifier expected; and 3 more",
+      "evidence": "Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/13-02.approved.calr"
+      ]
+    },
+    {
+      "id": "conversion-snapshots:13-05.approved",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--permissive-effects"
+      ],
+      "errors": [
+        "Calor1002:CS8510"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS8510): The pattern is unreachable. It has already been handled by a previous arm of the switch expression or it is impossible to match.",
+      "evidence": "Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/13-05.approved.calr"
+      ]
+    },
+    {
+      "id": "conversion-snapshots:13-10.approved",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--permissive-effects"
+      ],
+      "errors": [
+        "Calor1006"
+      ],
+      "defect": "Front end accepts the source; Expression-match arms must contain exactly one value-return expression. Multi-statement, empty, and valueless arms are not supported; use a statement match instead.",
+      "evidence": "Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
+      "files": [
+        "tests/Calor.Conversion.Tests/Snapshots/13-10.approved.calr"
+      ]
+    },
+    {
+      "id": "enforcement:effects:N1_unknown_external_pure",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "each",
+      "options": [
+        "--transpile-only"
+      ],
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "tests/Calor.Enforcement.Tests (EffectEnforcementTests, BypassTests) compile these with TestHarness.Compile: effects enforced, UnsafeTranspileOnly = true; expected codes in the sibling *.expected.json. BypassTests.N1_UnknownExternalInPureFunction_Fails asserts HasErrors and N1_unknown_external_pure.expected.json (Calor0411 is reported as a warning; the error is the fail-closed Calor0410 for the unknown effect).",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Bypass/N1_unknown_external_pure.calr"
+      ]
+    },
+    {
+      "id": "enforcement:contracts",
+      "expect": "compile",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "evidence": "tests/Calor.Enforcement.Tests/ContractEnforcementTests.cs compiles these with TestHarness.CompileWithContractMode (EnforceEffects = false).",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Contracts/C1_requires_throws.calr",
+        "tests/Calor.Enforcement.Tests/Scenarios/Contracts/C2_ensures_throws.calr",
+        "tests/Calor.Enforcement.Tests/Scenarios/Contracts/C3_mode_off.calr",
+        "tests/Calor.Enforcement.Tests/Scenarios/Contracts/C4_multiple_returns.calr",
+        "tests/Calor.Enforcement.Tests/Scenarios/Contracts/C5_function_id.calr"
+      ]
+    },
+    {
+      "id": "enforcement:effects:E1_missing_effect",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "each",
+      "options": [
+        "--transpile-only"
+      ],
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "tests/Calor.Enforcement.Tests (EffectEnforcementTests, BypassTests) compile these with TestHarness.Compile: effects enforced, UnsafeTranspileOnly = true; expected codes in the sibling *.expected.json. EffectEnforcementTests.E1_MissingEffect_FailsWithForbiddenEffect asserts HasErrors and E1_missing_effect.expected.json (Calor0410).",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Effects/E1_missing_effect.calr"
+      ]
+    },
+    {
+      "id": "enforcement:effects",
+      "expect": "compile",
+      "mode": "each",
+      "options": [
+        "--transpile-only"
+      ],
+      "evidence": "tests/Calor.Enforcement.Tests (EffectEnforcementTests, BypassTests) compile these with TestHarness.Compile: effects enforced, UnsafeTranspileOnly = true; expected codes in the sibling *.expected.json.",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Effects/E2_declared_effect.calr"
+      ]
+    },
+    {
+      "id": "enforcement:effects:E3_call_chain",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "each",
+      "options": [
+        "--transpile-only"
+      ],
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "tests/Calor.Enforcement.Tests (EffectEnforcementTests, BypassTests) compile these with TestHarness.Compile: effects enforced, UnsafeTranspileOnly = true; expected codes in the sibling *.expected.json. EffectEnforcementTests.E3_CallChain_ReportsCallerFunction asserts HasErrors and E3_call_chain.expected.json (Calor0410).",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Effects/E3_call_chain.calr"
+      ]
+    },
+    {
+      "id": "enforcement:effects:E4_unknown_external",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "each",
+      "options": [
+        "--transpile-only"
+      ],
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "tests/Calor.Enforcement.Tests (EffectEnforcementTests, BypassTests) compile these with TestHarness.Compile: effects enforced, UnsafeTranspileOnly = true; expected codes in the sibling *.expected.json. EffectEnforcementTests.E4_UnknownExternal_FailsInStrictMode asserts HasErrors and E4_unknown_external.expected.json (Calor0411 is reported as a warning; the error is the fail-closed Calor0410).",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Effects/E4_unknown_external.calr"
+      ]
+    },
+    {
+      "id": "enforcement:effects:E5_recursion",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "each",
+      "options": [
+        "--transpile-only"
+      ],
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "tests/Calor.Enforcement.Tests (EffectEnforcementTests, BypassTests) compile these with TestHarness.Compile: effects enforced, UnsafeTranspileOnly = true; expected codes in the sibling *.expected.json. EffectEnforcementTests.E5_Recursion_ComputesEffectsViaFixpoint asserts HasErrors and E5_recursion.expected.json (Calor0410).",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Effects/E5_recursion.calr"
+      ]
+    },
+    {
+      "id": "enforcement:effects:E6_span_accuracy",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "each",
+      "options": [
+        "--transpile-only"
+      ],
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "tests/Calor.Enforcement.Tests (EffectEnforcementTests, BypassTests) compile these with TestHarness.Compile: effects enforced, UnsafeTranspileOnly = true; expected codes in the sibling *.expected.json. EffectEnforcementTests.E6_SpanAccuracy_PointsAtCorrectLocation asserts the Calor0410 span (E6_span_accuracy.expected.json).",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Effects/E6_span_accuracy.calr"
+      ]
+    },
+    {
+      "id": "enforcement:effects:Issue1104_BatchingSink_LoopAsync",
+      "expect": "reject",
+      "negativeKind": "incidental",
+      "mode": "each",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "Not an intended negative. EffectInferrerRecursionTests only parses this Serilog-derived fixture and runs effect inference with the permissive policy; nothing compiles it. Under the strict default its unresolved external calls (Calor0411 warnings) make LoopAsync use the undeclared effect unknown, which Calor0410 reports correctly.",
+      "files": [
+        "tests/Calor.Enforcement.Tests/Scenarios/Effects/Issue1104_BatchingSink_LoopAsync.calr"
+      ]
+    },
+    {
+      "id": "e2e:agent-task-fixtures",
+      "expect": "compile",
+      "mode": "each",
+      "evidence": "Projects that agent E2E tasks start from (each directory carries a .csproj); compiled one file at a time with default options.",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/advanced-calor-project/MathUtils.calr",
+        "tests/E2E/agent-tasks/fixtures/async-project/AsyncOps.calr",
+        "tests/E2E/agent-tasks/fixtures/basic-calor-project/Calculator.calr",
+        "tests/E2E/agent-tasks/fixtures/buggy-contracts/BuggyContracts.calr",
+        "tests/E2E/agent-tasks/fixtures/collections-project/Collections.calr",
+        "tests/E2E/agent-tasks/fixtures/contracts-project/Contracts.calr",
+        "tests/E2E/agent-tasks/fixtures/effects-project/Effects.calr",
+        "tests/E2E/agent-tasks/fixtures/enums-project/Enums.calr",
+        "tests/E2E/agent-tasks/fixtures/generics-project/Generic.calr",
+        "tests/E2E/agent-tasks/fixtures/oop-project/Domain.calr",
+        "tests/E2E/agent-tasks/fixtures/refactor-contract-calor/Contract.calr",
+        "tests/E2E/agent-tasks/fixtures/refactor-extract-calor/Extract.calr",
+        "tests/E2E/agent-tasks/fixtures/refactor-inline-calor/Inline.calr",
+        "tests/E2E/agent-tasks/fixtures/refactor-rename-calor/Rename.calr",
+        "tests/E2E/agent-tasks/fixtures/refactor-signature-calor/Signature.calr",
+        "tests/E2E/agent-tasks/fixtures/refactor-target/LegacyCode.calr",
+        "tests/E2E/agent-tasks/fixtures/refactoring-impure/Impure.calr"
+      ]
+    },
+    {
+      "id": "E2E:agent-tasks:fixtures:refactor-move-calor:src",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "refactor-move-calor/src is one two-module project (Move.csproj); compiled together.",
+      "files": [
+        "tests/E2E/agent-tasks/fixtures/refactor-move-calor/src/Math.calr",
+        "tests/E2E/agent-tasks/fixtures/refactor-move-calor/src/Utils.calr"
+      ]
+    },
+    {
+      "id": "E2E:agent-tasks:templates:path-2-gate:task-01-multi-function-refactor:expected",
+      "expect": "compile",
+      "mode": "each",
+      "evidence": "Each path-2-gate task setup/ and expected/ directory is one multi-module workspace an agent edits (task.md, acceptance.sh); compiled together.",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-01-multi-function-refactor/expected/Math.calr"
+      ]
+    },
+    {
+      "id": "E2E:agent-tasks:templates:path-2-gate:task-01-multi-function-refactor:setup",
+      "expect": "compile",
+      "mode": "each",
+      "evidence": "Each path-2-gate task setup/ and expected/ directory is one multi-module workspace an agent edits (task.md, acceptance.sh); compiled together.",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-01-multi-function-refactor/setup/Math.calr"
+      ]
+    },
+    {
+      "id": "E2E:agent-tasks:templates:path-2-gate:task-02-add-db-effect:expected",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "Each path-2-gate task setup/ and expected/ directory is one multi-module workspace an agent edits (task.md, acceptance.sh); compiled together.",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-02-add-db-effect/expected/Db.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-02-add-db-effect/expected/Service.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-02-add-db-effect/expected/Web.calr"
+      ]
+    },
+    {
+      "id": "E2E:agent-tasks:templates:path-2-gate:task-02-add-db-effect:setup",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "Each path-2-gate task setup/ and expected/ directory is one multi-module workspace an agent edits (task.md, acceptance.sh); compiled together.",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-02-add-db-effect/setup/Db.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-02-add-db-effect/setup/Service.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-02-add-db-effect/setup/Web.calr"
+      ]
+    },
+    {
+      "id": "E2E:agent-tasks:templates:path-2-gate:task-03-privacy-change:expected",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "Each path-2-gate task setup/ and expected/ directory is one multi-module workspace an agent edits (task.md, acceptance.sh); compiled together.",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-03-privacy-change/expected/Invoice.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-03-privacy-change/expected/Order.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-03-privacy-change/expected/Receipt.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-03-privacy-change/expected/TaxCalc.calr"
+      ]
+    },
+    {
+      "id": "E2E:agent-tasks:templates:path-2-gate:task-03-privacy-change:setup",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "Each path-2-gate task setup/ and expected/ directory is one multi-module workspace an agent edits (task.md, acceptance.sh); compiled together.",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-03-privacy-change/setup/Invoice.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-03-privacy-change/setup/Order.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-03-privacy-change/setup/Receipt.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-03-privacy-change/setup/TaxCalc.calr"
+      ]
+    },
+    {
+      "id": "E2E:agent-tasks:templates:path-2-gate:task-04-add-postcondition:expected",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "Each path-2-gate task setup/ and expected/ directory is one multi-module workspace an agent edits (task.md, acceptance.sh); compiled together.",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-04-add-postcondition/expected/Bounds.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-04-add-postcondition/expected/Score.calr"
+      ]
+    },
+    {
+      "id": "E2E:agent-tasks:templates:path-2-gate:task-04-add-postcondition:setup",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "Each path-2-gate task setup/ and expected/ directory is one multi-module workspace an agent edits (task.md, acceptance.sh); compiled together.",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-04-add-postcondition/setup/Bounds.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-04-add-postcondition/setup/Score.calr"
+      ]
+    },
+    {
+      "id": "E2E:agent-tasks:templates:path-2-gate:task-05-loop-restructure:expected",
+      "expect": "compile",
+      "mode": "each",
+      "evidence": "Each path-2-gate task setup/ and expected/ directory is one multi-module workspace an agent edits (task.md, acceptance.sh); compiled together.",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-05-loop-restructure/expected/Grid.calr"
+      ]
+    },
+    {
+      "id": "E2E:agent-tasks:templates:path-2-gate:task-05-loop-restructure:setup",
+      "expect": "compile",
+      "mode": "each",
+      "evidence": "Each path-2-gate task setup/ and expected/ directory is one multi-module workspace an agent edits (task.md, acceptance.sh); compiled together.",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-05-loop-restructure/setup/Grid.calr"
+      ]
+    },
+    {
+      "id": "E2E:agent-tasks:templates:path-2-gate:task-06-error-handling:expected",
+      "expect": "reject",
+      "negativeKind": "incidental",
+      "mode": "together",
+      "errors": [
+        "Calor0410",
+        "Calor1002:CS0246"
+      ],
+      "evidence": "Not an intended negative. acceptance.sh greps text and never compiles. Besides the setup's undeclared net/db effects (Calor0410), the reference solution catches NetworkError and IoError, which no module defines; Calor defers unknown type names to Roslyn (Calor0200 warning), which rejects them (CS0246). A defect in the task template, not in the compiler.",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-06-error-handling/expected/Pipeline.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-06-error-handling/expected/Remote.calr"
+      ]
+    },
+    {
+      "id": "E2E:agent-tasks:templates:path-2-gate:task-06-error-handling:setup",
+      "expect": "reject",
+      "negativeKind": "incidental",
+      "mode": "together",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "Not an intended negative. acceptance.sh greps text and never compiles. FetchAndStore calls Remote.FetchRemote (net) and Remote.WriteRecord (db) without declaring them; Calor0410 reports this correctly. A defect in the task template, not in the compiler.",
+      "files": [
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-06-error-handling/setup/Pipeline.calr",
+        "tests/E2E/agent-tasks/templates/path-2-gate/task-06-error-handling/setup/Remote.calr"
+      ]
+    },
+    {
+      "id": "e2e:scenarios",
+      "expect": "compile",
+      "mode": "each",
+      "evidence": "tests/E2E/run-tests.sh compiles each scenario input.calr (and run.sh compiles each 08_multi_project_solution file) one file at a time with default options.",
+      "files": [
+        "tests/E2E/scenarios/01_hello_world/input.calr",
+        "tests/E2E/scenarios/02_fizzbuzz/input.calr",
+        "tests/E2E/scenarios/03_contracts/input.calr",
+        "tests/E2E/scenarios/04_option_result/input.calr",
+        "tests/E2E/scenarios/05_skill_syntax/input.calr",
+        "tests/E2E/scenarios/06_pattern_matching/input.calr",
+        "tests/E2E/scenarios/07_collections/input.calr",
+        "tests/E2E/scenarios/07_quantifiers/input.calr",
+        "tests/E2E/scenarios/08_contract_inheritance_z3/input.calr",
+        "tests/E2E/scenarios/08_multi_project_solution/solution/DataAccess/repository.calr",
+        "tests/E2E/scenarios/08_multi_project_solution/solution/Shared/utils.calr",
+        "tests/E2E/scenarios/08_multi_project_solution/solution/WebApi/api_handler.calr",
+        "tests/E2E/scenarios/09_codegen_bugfixes/input.calr"
+      ]
+    },
+    {
+      "id": "e2e:scenarios:output.g",
+      "expect": "reject",
+      "negativeKind": "incidental",
+      "mode": "each",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "Not an intended negative. Nothing reads this file (run-tests.sh compiles input.calr and verify.sh reads output.g.cs). Main uses alloc, cw and mut without declaring them; Calor0410 reports this correctly.",
+      "files": [
+        "tests/E2E/scenarios/07_collections/output.g.calr"
+      ]
+    },
+    {
+      "id": "sdk-consumer",
+      "expect": "compile",
+      "mode": "each",
+      "evidence": "tests/SdkConsumer/CalorLib is the Calor library used by .github/scripts/test-sdk-package.sh; compiled with default options.",
+      "files": [
+        "tests/SdkConsumer/CalorLib/quotes.calr"
+      ]
+    },
+    {
+      "id": "benchmarks",
+      "expect": "compile",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug.",
+      "files": [
+        "tests/TestData/Benchmarks/AsyncConcurrency/AsyncChain.calr",
+        "tests/TestData/Benchmarks/AsyncConcurrency/AsyncEffect.calr",
+        "tests/TestData/Benchmarks/AsyncConcurrency/AsyncErrorHandling.calr",
+        "tests/TestData/Benchmarks/AsyncConcurrency/AsyncLoop.calr",
+        "tests/TestData/Benchmarks/AsyncConcurrency/AsyncPure.calr",
+        "tests/TestData/Benchmarks/AsyncConcurrency/AsyncReturn.calr",
+        "tests/TestData/Benchmarks/AsyncConcurrency/CancellableTask.calr",
+        "tests/TestData/Benchmarks/AsyncConcurrency/DelayedResult.calr",
+        "tests/TestData/Benchmarks/AsyncConcurrency/ParallelTasks.calr",
+        "tests/TestData/Benchmarks/AsyncConcurrency/SimpleAsync.calr",
+        "tests/TestData/Benchmarks/CollectionsLINQ/ArraySlice.calr",
+        "tests/TestData/Benchmarks/CollectionsLINQ/DictOps.calr",
+        "tests/TestData/Benchmarks/CollectionsLINQ/Filter.calr",
+        "tests/TestData/Benchmarks/CollectionsLINQ/GroupBy.calr",
+        "tests/TestData/Benchmarks/CollectionsLINQ/LinqPipeline.calr",
+        "tests/TestData/Benchmarks/CollectionsLINQ/ListOps.calr",
+        "tests/TestData/Benchmarks/CollectionsLINQ/Map.calr",
+        "tests/TestData/Benchmarks/CollectionsLINQ/Reduce.calr",
+        "tests/TestData/Benchmarks/CollectionsLINQ/SetOps.calr",
+        "tests/TestData/Benchmarks/CollectionsLINQ/Sort.calr",
+        "tests/TestData/Benchmarks/CollectionsLINQ/Zip.calr",
+        "tests/TestData/Benchmarks/CompactSyntax/AutoProps.calr",
+        "tests/TestData/Benchmarks/CompactSyntax/CompactClass.calr",
+        "tests/TestData/Benchmarks/CompactSyntax/InlineSigs.calr",
+        "tests/TestData/Benchmarks/CompactSyntax/MixedSyntax.calr",
+        "tests/TestData/Benchmarks/CompactSyntax/OptionalIds.calr",
+        "tests/TestData/Benchmarks/ComplexAlgorithms/BreadthFirstSearch.calr",
+        "tests/TestData/Benchmarks/ComplexAlgorithms/BubbleSort.calr",
+        "tests/TestData/Benchmarks/ComplexAlgorithms/DepthFirstSearch.calr",
+        "tests/TestData/Benchmarks/ComplexAlgorithms/Dijkstra.calr",
+        "tests/TestData/Benchmarks/ComplexAlgorithms/EditDistance.calr",
+        "tests/TestData/Benchmarks/ComplexAlgorithms/InsertionSort.calr",
+        "tests/TestData/Benchmarks/ComplexAlgorithms/InterpolationSearch.calr",
+        "tests/TestData/Benchmarks/ComplexAlgorithms/Knapsack.calr",
+        "tests/TestData/Benchmarks/ComplexAlgorithms/LCS.calr",
+        "tests/TestData/Benchmarks/ComplexAlgorithms/LinearSearch.calr",
+        "tests/TestData/Benchmarks/ComplexAlgorithms/MatrixMultiply.calr",
+        "tests/TestData/Benchmarks/ComplexAlgorithms/MergeSort.calr",
+        "tests/TestData/Benchmarks/ComplexAlgorithms/QuickSort.calr",
+        "tests/TestData/Benchmarks/ComplexAlgorithms/SelectionSort.calr",
+        "tests/TestData/Benchmarks/ComplexAlgorithms/TowerOfHanoi.calr",
+        "tests/TestData/Benchmarks/ContractVerification/AbsoluteContracts.calr",
+        "tests/TestData/Benchmarks/ContractVerification/ArrayContracts.calr",
+        "tests/TestData/Benchmarks/ContractVerification/BitContracts.calr",
+        "tests/TestData/Benchmarks/ContractVerification/BuggyContracts.calr",
+        "tests/TestData/Benchmarks/ContractVerification/DivisionContracts.calr",
+        "tests/TestData/Benchmarks/ContractVerification/ListInvariant.calr",
+        "tests/TestData/Benchmarks/ContractVerification/MixedContracts.calr",
+        "tests/TestData/Benchmarks/ContractVerification/ModuloContracts.calr",
+        "tests/TestData/Benchmarks/ContractVerification/OverflowSafe.calr",
+        "tests/TestData/Benchmarks/ContractVerification/OverflowUnsafe.calr",
+        "tests/TestData/Benchmarks/ContractVerification/ProvableContracts.calr",
+        "tests/TestData/Benchmarks/ContractVerification/RangeContracts.calr",
+        "tests/TestData/Benchmarks/ContractVerification/SearchContracts.calr",
+        "tests/TestData/Benchmarks/ContractVerification/SortingContracts.calr",
+        "tests/TestData/Benchmarks/ContractVerification/StringContracts.calr",
+        "tests/TestData/Benchmarks/DataStructures/BinaryTree.calr",
+        "tests/TestData/Benchmarks/DataStructures/BitSet.calr",
+        "tests/TestData/Benchmarks/DataStructures/CircularBuffer.calr",
+        "tests/TestData/Benchmarks/DataStructures/Deque.calr",
+        "tests/TestData/Benchmarks/DataStructures/DisjointSet.calr",
+        "tests/TestData/Benchmarks/DataStructures/Graph.calr",
+        "tests/TestData/Benchmarks/DataStructures/LinkedList.calr",
+        "tests/TestData/Benchmarks/DataStructures/MaxHeap.calr",
+        "tests/TestData/Benchmarks/DataStructures/MinStack.calr",
+        "tests/TestData/Benchmarks/DataStructures/PriorityQueue.calr",
+        "tests/TestData/Benchmarks/DataStructures/Queue.calr",
+        "tests/TestData/Benchmarks/DataStructures/SortedList.calr",
+        "tests/TestData/Benchmarks/DataStructures/Stack.calr",
+        "tests/TestData/Benchmarks/DataStructures/Trie.calr",
+        "tests/TestData/Benchmarks/DesignPatterns/Builder.calr",
+        "tests/TestData/Benchmarks/DesignPatterns/ChainOfResponsibility.calr",
+        "tests/TestData/Benchmarks/DesignPatterns/Command.calr",
+        "tests/TestData/Benchmarks/DesignPatterns/Composite.calr",
+        "tests/TestData/Benchmarks/DesignPatterns/Decorator.calr",
+        "tests/TestData/Benchmarks/DesignPatterns/Flyweight.calr",
+        "tests/TestData/Benchmarks/DesignPatterns/Iterator.calr",
+        "tests/TestData/Benchmarks/DesignPatterns/Mediator.calr",
+        "tests/TestData/Benchmarks/DesignPatterns/Observer.calr",
+        "tests/TestData/Benchmarks/DesignPatterns/Proxy.calr",
+        "tests/TestData/Benchmarks/DesignPatterns/Singleton.calr",
+        "tests/TestData/Benchmarks/DesignPatterns/State.calr",
+        "tests/TestData/Benchmarks/DesignPatterns/Strategy.calr",
+        "tests/TestData/Benchmarks/DomainProblems/BMICalculator.calr",
+        "tests/TestData/Benchmarks/DomainProblems/BankAccount.calr",
+        "tests/TestData/Benchmarks/DomainProblems/Calendar.calr",
+        "tests/TestData/Benchmarks/DomainProblems/CsvParser.calr",
+        "tests/TestData/Benchmarks/DomainProblems/DateDiff.calr",
+        "tests/TestData/Benchmarks/DomainProblems/DistanceCalculator.calr",
+        "tests/TestData/Benchmarks/DomainProblems/EmailValidator.calr",
+        "tests/TestData/Benchmarks/DomainProblems/GradeCalculator.calr",
+        "tests/TestData/Benchmarks/DomainProblems/Inventory.calr",
+        "tests/TestData/Benchmarks/DomainProblems/PasswordValidator.calr",
+        "tests/TestData/Benchmarks/DomainProblems/PhoneBook.calr",
+        "tests/TestData/Benchmarks/DomainProblems/ShoppingCart.calr",
+        "tests/TestData/Benchmarks/DomainProblems/Timer.calr",
+        "tests/TestData/Benchmarks/DomainProblems/TodoList.calr",
+        "tests/TestData/Benchmarks/DomainProblems/UrlParser.calr",
+        "tests/TestData/Benchmarks/EffectSoundness/ComposedEffects.calr",
+        "tests/TestData/Benchmarks/EffectSoundness/CorrectEffects.calr",
+        "tests/TestData/Benchmarks/EffectSoundness/DatabaseEffect.calr",
+        "tests/TestData/Benchmarks/EffectSoundness/FileEffects.calr",
+        "tests/TestData/Benchmarks/EffectSoundness/HiddenNetworkEffect.calr",
+        "tests/TestData/Benchmarks/EffectSoundness/MissingEffects.calr",
+        "tests/TestData/Benchmarks/EffectSoundness/PureComputation.calr",
+        "tests/TestData/Benchmarks/EffectSoundness/StateEffect.calr",
+        "tests/TestData/Benchmarks/EffectSoundness/TimerEffect.calr",
+        "tests/TestData/Benchmarks/ErrorHandling/BasicTryCatch.calr",
+        "tests/TestData/Benchmarks/ErrorHandling/CustomException.calr",
+        "tests/TestData/Benchmarks/ErrorHandling/ErrorPropagation.calr",
+        "tests/TestData/Benchmarks/ErrorHandling/ExceptionChain.calr",
+        "tests/TestData/Benchmarks/ErrorHandling/GuardClause.calr",
+        "tests/TestData/Benchmarks/ErrorHandling/MultipleCatch.calr",
+        "tests/TestData/Benchmarks/ErrorHandling/NullCheck.calr",
+        "tests/TestData/Benchmarks/ErrorHandling/OptionType.calr",
+        "tests/TestData/Benchmarks/ErrorHandling/ResultType.calr",
+        "tests/TestData/Benchmarks/ErrorHandling/TryFinally.calr",
+        "tests/TestData/Benchmarks/InteropEffectCoverage/BclCoverage.calr",
+        "tests/TestData/Benchmarks/InteropEffectCoverage/CollectionLib.calr",
+        "tests/TestData/Benchmarks/InteropEffectCoverage/MathLib.calr",
+        "tests/TestData/Benchmarks/InteropEffectCoverage/StringLib.calr",
+        "tests/TestData/Benchmarks/OOPGenerics/AbstractClass.calr",
+        "tests/TestData/Benchmarks/OOPGenerics/ConstructorInit.calr",
+        "tests/TestData/Benchmarks/OOPGenerics/Encapsulation.calr",
+        "tests/TestData/Benchmarks/OOPGenerics/EnumType.calr",
+        "tests/TestData/Benchmarks/OOPGenerics/EnumWithMethods.calr",
+        "tests/TestData/Benchmarks/OOPGenerics/GenericClass.calr",
+        "tests/TestData/Benchmarks/OOPGenerics/GenericConstraints.calr",
+        "tests/TestData/Benchmarks/OOPGenerics/GenericFunction.calr",
+        "tests/TestData/Benchmarks/OOPGenerics/Inheritance.calr",
+        "tests/TestData/Benchmarks/OOPGenerics/MethodOverloading.calr",
+        "tests/TestData/Benchmarks/OOPGenerics/MethodOverriding.calr",
+        "tests/TestData/Benchmarks/OOPGenerics/Properties.calr",
+        "tests/TestData/Benchmarks/OOPGenerics/PropertyAccess.calr",
+        "tests/TestData/Benchmarks/OOPGenerics/RecordType.calr",
+        "tests/TestData/Benchmarks/OOPGenerics/SealedClass.calr",
+        "tests/TestData/Benchmarks/OOPGenerics/SimpleClass.calr",
+        "tests/TestData/Benchmarks/OOPGenerics/StaticMembers.calr",
+        "tests/TestData/Benchmarks/OOPGenerics/TypeAlias.calr",
+        "tests/TestData/Benchmarks/PatternMatching/EnumMatch.calr",
+        "tests/TestData/Benchmarks/PatternMatching/ExhaustiveMatch.calr",
+        "tests/TestData/Benchmarks/PatternMatching/GuardMatch.calr",
+        "tests/TestData/Benchmarks/PatternMatching/NestedMatch.calr",
+        "tests/TestData/Benchmarks/PatternMatching/PropertyMatch.calr",
+        "tests/TestData/Benchmarks/PatternMatching/RangeMatch.calr",
+        "tests/TestData/Benchmarks/PatternMatching/SimpleMatch.calr",
+        "tests/TestData/Benchmarks/PatternMatching/SwitchExpression.calr",
+        "tests/TestData/Benchmarks/PatternMatching/TupleMatch.calr",
+        "tests/TestData/Benchmarks/PatternMatching/TypeMatch.calr",
+        "tests/TestData/Benchmarks/PatternMatching/WildcardMatch.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/Abs.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/AggregateStats.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/ArraySum.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/BinarySearch.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/Calculator.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/Capitalize.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/Clamp.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/Contains.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/ContractedDivide.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/CountOccurrences.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/CountVowels.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/DigitCount.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/ExpressionBodied.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/Factorial.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/Fibonacci.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/FizzBuzz.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/FormatHeader.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/GCD.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/HelloWorld.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/Hypotenuse.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/IsAlpha.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/IsEven.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/IsOdd.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/IsPrime.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/LeapYear.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/LogPipeline.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/MathOperations.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/MaxTwo.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/MaxValue.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/MinTwo.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/NamedConfig.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/PairLogger.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/Palindrome.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/ParseAndDouble.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/ReturnMapped.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/ReverseArray.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/ReverseString.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/Sign.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/StringUtils.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/SumDigits.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/SumRange.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/TernaryChain.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/ThreeWayMerge.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/TruncateString.calr",
+        "tests/TestData/Benchmarks/TokenEconomics/VoidSequence.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:HashMap",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0266"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/DataStructures/HashMap.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:Adapter",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0266"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/Adapter.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:Factory",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0266"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/Factory.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:TemplateMethod",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0060",
+        "Calor1002:CS0115",
+        "Calor1002:CS0122",
+        "Calor1002:CS0534",
+        "Calor1002:CS0621"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0060): Inconsistent accessibility: base class 'DataProcessor' is less accessible than class 'CsvProcessor'; generated C# (CS0060): Inconsistent accessibility: base class 'DataProcessor' is less accessible than class 'JsonProcessor'; generated C# (CS0621): 'CsvProcessor.ReadData()': virtual or abstract members cannot be private; and 24 more",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/TemplateMethod.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:Visitor",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0051",
+        "Calor1002:CS0052",
+        "Calor1002:CS0060",
+        "Calor1002:CS0115",
+        "Calor1002:CS0122",
+        "Calor1002:CS0126",
+        "Calor1002:CS0266"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0060): Inconsistent accessibility: base class 'Expression' is less accessible than class 'NumberExpression'; generated C# (CS0060): Inconsistent accessibility: base class 'Expression' is less accessible than class 'MultiplyExpression'; generated C# (CS0060): Inconsistent accessibility: base class 'Expression' is less accessible than class 'AddExpression'; and 12 more",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/DesignPatterns/Visitor.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:CurrencyConverter",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0266"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/CurrencyConverter.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:ScoreBoard",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0266"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/ScoreBoard.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:TaxCalculator",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0664"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0664): Literal of type double cannot be implicitly converted to type 'float'; use an 'F' suffix to create a literal of this type",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/TaxCalculator.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:UnitConverter",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0266"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/UnitConverter.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:VotingSystem",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0266"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/DomainProblems/VotingSystem.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:unregistered",
+      "expect": "compile",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "evidence": "Benchmark-directory files not listed in tests/TestData/Benchmarks/manifest.json; no test compiles them. Compiled with the same options as the registered benchmarks.",
+      "files": [
+        "tests/TestData/Benchmarks/EditPrecision/Calculator_validated.calr",
+        "tests/TestData/Benchmarks/ErrorDetection/ArraySum_buggy.calr",
+        "tests/TestData/Benchmarks/ErrorDetection/DeadCode_buggy.calr",
+        "tests/TestData/Benchmarks/ErrorDetection/DeadStore_buggy.calr",
+        "tests/TestData/Benchmarks/ErrorDetection/Divide_buggy.calr",
+        "tests/TestData/Benchmarks/ErrorDetection/MissingContract_buggy.calr",
+        "tests/TestData/Benchmarks/ErrorDetection/Overflow_buggy.calr",
+        "tests/TestData/Benchmarks/ErrorDetection/Uninitialized_buggy.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:NetworkEffect",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS1001",
+        "Calor1002:CS1003",
+        "Calor1002:CS1511"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS1001): Identifier expected; generated C# (CS1003): Syntax error, ',' expected; generated C# (CS1511): Keyword 'base' is not available in a static method",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/EffectSoundness/NetworkEffect.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:unregistered:NullDeref_buggy",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS1061"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS1061): 'Option<int>' does not contain a definition for 'unwrap' and no accessible extension method 'unwrap' accepting a first argument of type 'Option<int>' could be found (are you missing a using directive or an assembly reference?)",
+      "evidence": "Benchmark-directory files not listed in tests/TestData/Benchmarks/manifest.json; no test compiles them. Compiled with the same options as the registered benchmarks. Not in Benchmarks/manifest.json, so no test compiles it.",
+      "files": [
+        "tests/TestData/Benchmarks/ErrorDetection/NullDeref_buggy.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:PureFunctions",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS1001",
+        "Calor1002:CS1003",
+        "Calor1002:CS1511"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS1001): Identifier expected; generated C# (CS1003): Syntax error, ',' expected; generated C# (CS1511): Keyword 'base' is not available in a static method",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/InteropEffectCoverage/PureFunctions.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:Composition",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0266"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/Composition.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:InterfaceImpl",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0266",
+        "Calor1002:CS1001",
+        "Calor1002:CS1003",
+        "Calor1002:CS1511"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS1001): Identifier expected; generated C# (CS1003): Syntax error, ',' expected; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?); and 1 more",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/InterfaceImpl.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:Polymorphism",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0266"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/OOPGenerics/Polymorphism.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:AreaOfCircle",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0266"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/AreaOfCircle.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:Average",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0266"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/Average.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:CelsiusToKelvin",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0266"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/CelsiusToKelvin.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:CompoundInterest",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0266"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/CompoundInterest.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:Power",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS1001",
+        "Calor1002:CS1003",
+        "Calor1002:CS1511"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS1001): Identifier expected; generated C# (CS1003): Syntax error, ',' expected; generated C# (CS1511): Keyword 'base' is not available in a static method",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/Power.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:TemperatureConverter",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0266"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/TemperatureConverter.calr"
+      ]
+    },
+    {
+      "id": "benchmarks:TemperatureRange",
+      "expect": "known-failure",
+      "mode": "each",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "errors": [
+        "Calor1002:CS0266"
+      ],
+      "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
+      "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
+      "files": [
+        "tests/TestData/Benchmarks/TokenEconomics/TemperatureRange.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-01-local-edit:step-00-baseline",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/EditScripts/ES-01-local-edit/step-00-baseline/alpha.calr",
+        "tests/TestData/EditScripts/ES-01-local-edit/step-00-baseline/beta.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-01-local-edit:step-01-edit-body",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/EditScripts/ES-01-local-edit/step-01-edit-body/alpha.calr",
+        "tests/TestData/EditScripts/ES-01-local-edit/step-01-edit-body/beta.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-01-local-edit:step-02-introduce-violation",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "together",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: ES-01 step 2 introduces a violation (Calor0410).",
+      "files": [
+        "tests/TestData/EditScripts/ES-01-local-edit/step-02-introduce-violation/alpha.calr",
+        "tests/TestData/EditScripts/ES-01-local-edit/step-02-introduce-violation/beta.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-02-add-file:step-00-baseline",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/EditScripts/ES-02-add-file/step-00-baseline/alpha.calr",
+        "tests/TestData/EditScripts/ES-02-add-file/step-00-baseline/beta.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-02-add-file:step-01-add-clean",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/EditScripts/ES-02-add-file/step-01-add-clean/alpha.calr",
+        "tests/TestData/EditScripts/ES-02-add-file/step-01-add-clean/beta.calr",
+        "tests/TestData/EditScripts/ES-02-add-file/step-01-add-clean/gamma.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-02-add-file:step-02-add-violating",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "together",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: ES-02 step 2 adds a violating file (Calor0410).",
+      "files": [
+        "tests/TestData/EditScripts/ES-02-add-file/step-02-add-violating/alpha.calr",
+        "tests/TestData/EditScripts/ES-02-add-file/step-02-add-violating/beta.calr",
+        "tests/TestData/EditScripts/ES-02-add-file/step-02-add-violating/delta.calr",
+        "tests/TestData/EditScripts/ES-02-add-file/step-02-add-violating/gamma.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-03-delete-file:step-00-baseline",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "together",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: ES-03 starts with a violating file (noisy.calr, Calor0410) that step 1 deletes.",
+      "files": [
+        "tests/TestData/EditScripts/ES-03-delete-file/step-00-baseline/alpha.calr",
+        "tests/TestData/EditScripts/ES-03-delete-file/step-00-baseline/beta.calr",
+        "tests/TestData/EditScripts/ES-03-delete-file/step-00-baseline/noisy.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-03-delete-file:step-01-delete-violating",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/EditScripts/ES-03-delete-file/step-01-delete-violating/alpha.calr",
+        "tests/TestData/EditScripts/ES-03-delete-file/step-01-delete-violating/beta.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-03-delete-file:step-02-delete-clean",
+      "expect": "compile",
+      "mode": "each",
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/EditScripts/ES-03-delete-file/step-02-delete-clean/alpha.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-04-cross-module-effect:step-00-clean",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/EditScripts/ES-04-cross-module-effect/step-00-clean/callee.calr",
+        "tests/TestData/EditScripts/ES-04-cross-module-effect/step-00-clean/caller.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-04-cross-module-effect:step-01-callee-gains-effect",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "together",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: in ES-04 step 1 the callee gains an effect, so the unedited caller draws a cross-module Calor0410.",
+      "files": [
+        "tests/TestData/EditScripts/ES-04-cross-module-effect/step-01-callee-gains-effect/callee.calr",
+        "tests/TestData/EditScripts/ES-04-cross-module-effect/step-01-callee-gains-effect/caller.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-04-cross-module-effect:step-02-callee-loses-effect",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/EditScripts/ES-04-cross-module-effect/step-02-callee-loses-effect/callee.calr",
+        "tests/TestData/EditScripts/ES-04-cross-module-effect/step-02-callee-loses-effect/caller.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-05-options-flip:step-00-effects-on",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "together",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: ES-05 compiles identical files under effects-on (violation reported, Calor0410), effects-off (clean), effects-on again.",
+      "files": [
+        "tests/TestData/EditScripts/ES-05-options-flip/step-00-effects-on/beta.calr",
+        "tests/TestData/EditScripts/ES-05-options-flip/step-00-effects-on/service.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-05-options-flip:step-01-effects-off",
+      "expect": "compile",
+      "mode": "together",
+      "options": [
+        "--no-enforce-effects"
+      ],
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/EditScripts/ES-05-options-flip/step-01-effects-off/beta.calr",
+        "tests/TestData/EditScripts/ES-05-options-flip/step-01-effects-off/service.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-05-options-flip:step-02-effects-on-again",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "together",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: ES-05 compiles identical files under effects-on (violation reported, Calor0410), effects-off (clean), effects-on again.",
+      "files": [
+        "tests/TestData/EditScripts/ES-05-options-flip/step-02-effects-on-again/beta.calr",
+        "tests/TestData/EditScripts/ES-05-options-flip/step-02-effects-on-again/service.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-06-touch-noop:step-00-baseline",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/EditScripts/ES-06-touch-noop/step-00-baseline/alpha.calr",
+        "tests/TestData/EditScripts/ES-06-touch-noop/step-00-baseline/beta.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-06-touch-noop:step-01-touch-identical",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/EditScripts/ES-06-touch-noop/step-01-touch-identical/alpha.calr",
+        "tests/TestData/EditScripts/ES-06-touch-noop/step-01-touch-identical/beta.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-06-touch-noop:step-02-touch-identical-again",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/EditScripts/ES-06-touch-noop/step-02-touch-identical-again/alpha.calr",
+        "tests/TestData/EditScripts/ES-06-touch-noop/step-02-touch-identical-again/beta.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-07-persistent-finding:step-00-finding-present",
+      "expect": "compile",
+      "mode": "together",
+      "options": [
+        "--require-docs"
+      ],
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/EditScripts/ES-07-persistent-finding/step-00-finding-present/churn.calr",
+        "tests/TestData/EditScripts/ES-07-persistent-finding/step-00-finding-present/stable.calr",
+        "tests/TestData/EditScripts/ES-07-persistent-finding/step-00-finding-present/violating.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-07-persistent-finding:step-01-edit-neighbour",
+      "expect": "compile",
+      "mode": "together",
+      "options": [
+        "--require-docs"
+      ],
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/EditScripts/ES-07-persistent-finding/step-01-edit-neighbour/churn.calr",
+        "tests/TestData/EditScripts/ES-07-persistent-finding/step-01-edit-neighbour/stable.calr",
+        "tests/TestData/EditScripts/ES-07-persistent-finding/step-01-edit-neighbour/violating.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-07-persistent-finding:step-02-edit-neighbour-again",
+      "expect": "compile",
+      "mode": "together",
+      "options": [
+        "--require-docs"
+      ],
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/EditScripts/ES-07-persistent-finding/step-02-edit-neighbour-again/churn.calr",
+        "tests/TestData/EditScripts/ES-07-persistent-finding/step-02-edit-neighbour-again/stable.calr",
+        "tests/TestData/EditScripts/ES-07-persistent-finding/step-02-edit-neighbour-again/violating.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-08-effect-row-edit:step-00-clean",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests).",
+      "files": [
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-00-clean/app.calr",
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-00-clean/bystander.calr",
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-00-clean/combinators.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-08-effect-row-edit:step-01-callee-row-widens",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "together",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: in ES-08 step 1 the widened row makes the unedited UsePure draw Calor0410.",
+      "files": [
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-01-callee-row-widens/app.calr",
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-01-callee-row-widens/bystander.calr",
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-01-callee-row-widens/combinators.calr"
+      ]
+    },
+    {
+      "id": "TestData:EditScripts:ES-08-effect-row-edit:step-02-callee-row-erased",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "together",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: in ES-08 step 2 the erased row draws Calor0425 (warning) plus the fail-closed Calor0410.",
+      "files": [
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-02-callee-row-erased/app.calr",
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-02-callee-row-erased/bystander.calr",
+        "tests/TestData/EditScripts/ES-08-effect-row-edit/step-02-callee-row-erased/combinators.calr"
+      ]
+    },
+    {
+      "id": "lint-scenarios",
+      "expect": "compile",
+      "mode": "each",
+      "evidence": "Inputs for the lint tests (LintTestDataLoader); no test compiles them. Compiled with default options.",
+      "files": [
+        "tests/TestData/LintScenarios/01_id_abbreviation/already_abbreviated.calr",
+        "tests/TestData/LintScenarios/01_id_abbreviation/if_id_conversion.calr",
+        "tests/TestData/LintScenarios/01_id_abbreviation/loop_id_conversion.calr",
+        "tests/TestData/LintScenarios/01_id_abbreviation/mixed_ids.calr",
+        "tests/TestData/LintScenarios/01_id_abbreviation/padded_function_id.calr",
+        "tests/TestData/LintScenarios/01_id_abbreviation/padded_module_id.calr",
+        "tests/TestData/LintScenarios/01_id_abbreviation/while_id_conversion.calr",
+        "tests/TestData/LintScenarios/02_whitespace/blank_lines.calr",
+        "tests/TestData/LintScenarios/02_whitespace/clean_file.calr",
+        "tests/TestData/LintScenarios/02_whitespace/mixed_indentation.calr",
+        "tests/TestData/LintScenarios/02_whitespace/multiple_blank_lines.calr",
+        "tests/TestData/LintScenarios/03_tag_formats/call_statement.calr",
+        "tests/TestData/LintScenarios/03_tag_formats/for_loop.calr",
+        "tests/TestData/LintScenarios/03_tag_formats/if_statement.calr",
+        "tests/TestData/LintScenarios/03_tag_formats/match_statement.calr",
+        "tests/TestData/LintScenarios/03_tag_formats/return_statement.calr",
+        "tests/TestData/LintScenarios/03_tag_formats/visibility_format.calr",
+        "tests/TestData/LintScenarios/03_tag_formats/while_loop.calr",
+        "tests/TestData/LintScenarios/04_expressions/binary_infix.calr",
+        "tests/TestData/LintScenarios/04_expressions/comparison_ops.calr",
+        "tests/TestData/LintScenarios/04_expressions/logical_ops.calr",
+        "tests/TestData/LintScenarios/04_expressions/mixed_expressions.calr",
+        "tests/TestData/LintScenarios/04_expressions/nested_binary.calr",
+        "tests/TestData/LintScenarios/04_expressions/reference_format.calr",
+        "tests/TestData/LintScenarios/05_type_and_effects/effect_codes.calr",
+        "tests/TestData/LintScenarios/05_type_and_effects/multiple_effects.calr",
+        "tests/TestData/LintScenarios/05_type_and_effects/parameter_types.calr",
+        "tests/TestData/LintScenarios/05_type_and_effects/uppercase_types.calr",
+        "tests/TestData/LintScenarios/06_statements/bind_statement.calr",
+        "tests/TestData/LintScenarios/06_statements/print_statement.calr",
+        "tests/TestData/LintScenarios/06_statements/return_void.calr",
+        "tests/TestData/LintScenarios/06_statements/return_with_value.calr",
+        "tests/TestData/LintScenarios/06_statements/try_catch.calr",
+        "tests/TestData/LintScenarios/06_statements/try_catch_nested.calr",
+        "tests/TestData/LintScenarios/07_round_trip/all_features.calr",
+        "tests/TestData/LintScenarios/07_round_trip/complex_nesting.calr",
+        "tests/TestData/LintScenarios/07_round_trip/contracts.calr",
+        "tests/TestData/LintScenarios/07_round_trip/fizzbuzz.calr",
+        "tests/TestData/LintScenarios/07_round_trip/hello_world.calr",
+        "tests/TestData/LintScenarios/08_idempotency/already_formatted.calr",
+        "tests/TestData/LintScenarios/08_idempotency/needs_formatting.calr",
+        "tests/TestData/LintScenarios/08_idempotency/partial_format.calr",
+        "tests/TestData/LintScenarios/09_edge_cases/empty_function.calr",
+        "tests/TestData/LintScenarios/09_edge_cases/empty_module.calr",
+        "tests/TestData/LintScenarios/09_edge_cases/escaped_strings.calr",
+        "tests/TestData/LintScenarios/09_edge_cases/long_identifiers.calr",
+        "tests/TestData/LintScenarios/09_edge_cases/max_nesting.calr",
+        "tests/TestData/LintScenarios/09_edge_cases/single_statement.calr",
+        "tests/TestData/LintScenarios/09_edge_cases/unicode_strings.calr"
+      ]
+    },
+    {
+      "id": "lint-scenarios:leading_spaces",
+      "expect": "reject",
+      "negativeKind": "incidental",
+      "mode": "each",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "Not an intended negative. Lint-only input (LintTestDataLoader never compiles it). Main prints without declaring cw; Calor0410 reports this correctly.",
+      "files": [
+        "tests/TestData/LintScenarios/02_whitespace/leading_spaces.calr"
+      ]
+    },
+    {
+      "id": "lint-scenarios:leading_tabs",
+      "expect": "reject",
+      "negativeKind": "incidental",
+      "mode": "each",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "Not an intended negative. Lint-only input (LintTestDataLoader never compiles it). Main prints without declaring cw; Calor0410 reports this correctly.",
+      "files": [
+        "tests/TestData/LintScenarios/02_whitespace/leading_tabs.calr"
+      ]
+    },
+    {
+      "id": "lint-scenarios:trailing_spaces",
+      "expect": "reject",
+      "negativeKind": "incidental",
+      "mode": "each",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "Not an intended negative. Lint-only input (LintTestDataLoader never compiles it). Main prints without declaring cw; Calor0410 reports this correctly.",
+      "files": [
+        "tests/TestData/LintScenarios/02_whitespace/trailing_spaces.calr"
+      ]
+    },
+    {
+      "id": "lint-scenarios:throw_statement",
+      "expect": "reject",
+      "negativeKind": "incidental",
+      "mode": "each",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "Not an intended negative. Lint-only input (LintTestDataLoader never compiles it). Its functions throw or print without declaring throw/cw; Calor0410 reports this correctly.",
+      "files": [
+        "tests/TestData/LintScenarios/06_statements/throw_statement.calr"
+      ]
+    },
+    {
+      "id": "lint-scenarios:try_catch_when",
+      "expect": "reject",
+      "negativeKind": "incidental",
+      "mode": "each",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "Not an intended negative. Lint-only input (LintTestDataLoader never compiles it). Its functions throw or print without declaring throw/cw; Calor0410 reports this correctly.",
+      "files": [
+        "tests/TestData/LintScenarios/06_statements/try_catch_when.calr"
+      ]
+    },
+    {
+      "id": "lint-scenarios:try_finally_return",
+      "expect": "reject",
+      "negativeKind": "incidental",
+      "mode": "each",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "Not an intended negative. Lint-only input (LintTestDataLoader never compiles it). Its functions throw or print without declaring throw/cw; Calor0410 reports this correctly.",
+      "files": [
+        "tests/TestData/LintScenarios/06_statements/try_finally_return.calr"
+      ]
+    },
+    {
+      "id": "lint-scenarios:try_multi_catch_finally",
+      "expect": "reject",
+      "negativeKind": "incidental",
+      "mode": "each",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "Not an intended negative. Lint-only input (LintTestDataLoader never compiles it). Its functions throw or print without declaring throw/cw; Calor0410 reports this correctly.",
+      "files": [
+        "tests/TestData/LintScenarios/06_statements/try_multi_catch_finally.calr"
+      ]
+    },
+    {
+      "id": "lint-scenarios:mismatched_ids",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "each",
+      "errors": [
+        "Calor0830"
+      ],
+      "evidence": "Inputs for the lint tests (LintTestDataLoader); no test compiles them. Compiled with default options. LintScenarios/10_error_cases holds deliberately malformed inputs for the lint error path; the parse/lex error is the fixture's purpose.",
+      "files": [
+        "tests/TestData/LintScenarios/10_error_cases/mismatched_ids.calr"
+      ]
+    },
+    {
+      "id": "lint-scenarios:syntax_error",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "each",
+      "errors": [
+        "Calor0006"
+      ],
+      "evidence": "Inputs for the lint tests (LintTestDataLoader); no test compiles them. Compiled with default options. LintScenarios/10_error_cases holds deliberately malformed inputs for the lint error path; the parse/lex error is the fixture's purpose.",
+      "files": [
+        "tests/TestData/LintScenarios/10_error_cases/syntax_error.calr"
+      ]
+    },
+    {
+      "id": "lint-scenarios:unterminated_string",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "each",
+      "errors": [
+        "Calor0002"
+      ],
+      "evidence": "Inputs for the lint tests (LintTestDataLoader); no test compiles them. Compiled with default options. LintScenarios/10_error_cases holds deliberately malformed inputs for the lint error path; the parse/lex error is the fixture's purpose.",
+      "files": [
+        "tests/TestData/LintScenarios/10_error_cases/unterminated_string.calr"
+      ]
+    },
+    {
+      "id": "TestData:QueryCorpus:project",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "together",
+      "errors": [
+        "Calor0410"
+      ],
+      "evidence": "tests/TestData/QueryCorpus/project is one workspace indexed as a unit (QueryGoldenTests); compiled together. tests/TestData/QueryCorpus/expected.json: Leaky (app.calr) is the registered Calor0410 case of the effects facet, and AsksAmbiguous/AsksMissing (asks-across.calr) call unresolved targets on purpose; the Calor0410 errors are those cases.",
+      "files": [
+        "tests/TestData/QueryCorpus/project/ambiguous.calr",
+        "tests/TestData/QueryCorpus/project/ambiguous2.calr",
+        "tests/TestData/QueryCorpus/project/app.calr",
+        "tests/TestData/QueryCorpus/project/asks-across.calr",
+        "tests/TestData/QueryCorpus/project/contracts.calr",
+        "tests/TestData/QueryCorpus/project/math.calr"
+      ]
+    },
+    {
+      "id": "TestData:RenameScripts:RN-01-function-across-files",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "Each RenameScripts/RN-* directory is one workspace the rename harness edits as a unit (RenameHarnessTests); compiled together.",
+      "files": [
+        "tests/TestData/RenameScripts/RN-01-function-across-files/app.calr",
+        "tests/TestData/RenameScripts/RN-01-function-across-files/lib.calr"
+      ]
+    },
+    {
+      "id": "TestData:RenameScripts:RN-02-shadowed-local",
+      "expect": "compile",
+      "mode": "each",
+      "evidence": "Each RenameScripts/RN-* directory is one workspace the rename harness edits as a unit (RenameHarnessTests); compiled together.",
+      "files": [
+        "tests/TestData/RenameScripts/RN-02-shadowed-local/shadow.calr"
+      ]
+    },
+    {
+      "id": "TestData:RenameScripts:RN-03-parameter-vs-field",
+      "expect": "compile",
+      "mode": "together",
+      "evidence": "Each RenameScripts/RN-* directory is one workspace the rename harness edits as a unit (RenameHarnessTests); compiled together.",
+      "files": [
+        "tests/TestData/RenameScripts/RN-03-parameter-vs-field/holder.calr",
+        "tests/TestData/RenameScripts/RN-03-parameter-vs-field/reader.calr"
+      ]
+    },
+    {
+      "id": "TestData:RenameScripts:RN-04-capture-refused",
+      "expect": "compile",
+      "mode": "each",
+      "evidence": "Each RenameScripts/RN-* directory is one workspace the rename harness edits as a unit (RenameHarnessTests); compiled together.",
+      "files": [
+        "tests/TestData/RenameScripts/RN-04-capture-refused/capture.calr"
+      ]
+    },
+    {
+      "id": "TestData:RenameScripts:RN-05-overload-exact",
+      "expect": "compile",
+      "mode": "each",
+      "evidence": "Each RenameScripts/RN-* directory is one workspace the rename harness edits as a unit (RenameHarnessTests); compiled together.",
+      "files": [
+        "tests/TestData/RenameScripts/RN-05-overload-exact/overload.calr"
+      ]
+    },
+    {
+      "id": "TestData:RenameScripts:RN-06-module-split-refused",
+      "expect": "reject",
+      "negativeKind": "designed",
+      "mode": "together",
+      "errors": [
+        "Calor1002:CS0101"
+      ],
+      "evidence": "Each RenameScripts/RN-* directory is one workspace the rename harness edits as a unit (RenameHarnessTests); compiled together. RN-06 script.json: \"One module, two declarations ... Calor reports nothing for the split (each file still binds); the break appears only in generated C#.\" The rename engine must refuse. Lifting the refusal is #922.",
+      "files": [
+        "tests/TestData/RenameScripts/RN-06-module-split-refused/part-a.calr",
+        "tests/TestData/RenameScripts/RN-06-module-split-refused/part-b.calr"
+      ]
+    },
+    {
+      "id": "verification-testdata",
+      "expect": "compile",
+      "mode": "each",
+      "evidence": "Verification outcome-corpus inputs (tests/Calor.Verification.Tests); compiled with default options.",
+      "files": [
+        "tests/TestData/Verification/Outcomes/assumed-division.calr",
+        "tests/TestData/Verification/Outcomes/proven-with-binding.calr",
+        "tests/TestData/Verification/Outcomes/proven-with-result.calr",
+        "tests/TestData/Verification/Outcomes/proven.calr",
+        "tests/TestData/Verification/Outcomes/refuted-overflow.calr",
+        "tests/TestData/Verification/Outcomes/refuted-with-binding.calr",
+        "tests/TestData/Verification/Outcomes/refuted-with-model.calr",
+        "tests/TestData/Verification/Outcomes/timeout.calr",
+        "tests/TestData/Verification/Outcomes/unsupported-body.calr",
+        "tests/TestData/Verification/Outcomes/unsupported.calr",
+        "tests/TestData/Verification/Outcomes/vacuous-precondition.calr"
+      ]
+    }
+  ]
+}

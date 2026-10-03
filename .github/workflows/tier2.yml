@@ -1,8 +1,11 @@
 name: Tier 2 verification
 
-# Tier 2 — corpus-wide verification (v6 §3.2).
+# Tier 2 — corpus-wide verification (v6 §3.2, repaired by #1241).
 # Only runs for PRs that target phase-1/phase-2/release/0.x+1 branches,
 # or on manual dispatch. Tier 1 runs on every PR (test.yml).
+# Checks run the compiler built below over tracked fixtures, once each,
+# against eng/tier2-fixture-expectations.json; no AST round trip. Registered
+# known compiler failures keep this job red until they are fixed.
 
 on:
   pull_request:
@@ -46,7 +49,8 @@ jobs:
         run: |
           set -o pipefail
           /usr/bin/time -f '%e' -o tier2.time \
-            python3 scripts/verify_corpus.py 2>&1 | tee tier2.log
+            python3 scripts/verify_corpus.py --report tier2-fixtures.json \
+              2>&1 | tee tier2.log
           echo "elapsed_seconds=$(cat tier2.time)" >> "$GITHUB_OUTPUT"
 
       - name: Upload Tier 2 artifacts
@@ -57,4 +61,5 @@ jobs:
           path: |
             tier2.log
             tier2.time
+            tier2-fixtures.json
           retention-days: 30
