@@ -41,6 +41,13 @@ dotnet build --no-restore
 dotnet test --no-restore
 ```
 
+The bootstrap is the only way Z3 enters the tree; the build verifies every asset
+against `.github/z3-binaries-4.15.7.sha256` and fails if one is missing or wrong.
+Every test project also runs `Z3ConsumerGuardTests`, which fail (never skip) when
+Z3 did not reach that test host or the host RID is unsupported (for example
+Intel macOS, `osx-x64`). The supported RIDs and every registered consumer are in
+`eng/z3-consumers.json`.
+
 The documented `--no-restore` build/test/pack path never downloads dependencies
 or rewrites tracked source resources. Restores are always locked; update a lock
 file intentionally with

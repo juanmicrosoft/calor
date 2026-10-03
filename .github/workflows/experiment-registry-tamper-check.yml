@@ -72,7 +72,7 @@ jobs:
 
       - name: Bootstrap verified Z3 assets
         if: steps.registry.outputs.changed == 'true'
-        run: bash src/Calor.Compiler/scripts/download-z3.sh
+        uses: ./.github/actions/bootstrap-z3
 
       - name: Extract base-branch version of registry.json
         if: steps.registry.outputs.changed == 'true'

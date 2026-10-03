@@ -19,4 +19,8 @@
     <ProjectReference Include="..\..\src\Calor.Compiler\Calor.Compiler.csproj" />
   </ItemGroup>
 
+  <!-- 0.24 G1 (#1420): fail-closed Z3 consumer guard; see eng/z3-consumers.json. -->
+  <ItemGroup>
+    <Compile Include="..\Shared\Z3ConsumerGuardTests.cs" Link="Shared\Z3ConsumerGuardTests.cs" />
+  </ItemGroup>
 </Project>
