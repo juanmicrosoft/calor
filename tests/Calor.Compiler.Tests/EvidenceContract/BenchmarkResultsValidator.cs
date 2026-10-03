@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 namespace Calor.Compiler.Tests.EvidenceContract;
 
@@ -99,6 +100,18 @@ internal static partial class EvidenceContractValidator
             if (changed ? Str(result["Reason"]) != "NONDETERMINISTIC_ACROSS_RUNS" || Str(result["Disposition"]) != "UNCLASSIFIED" : result.ToJsonString() != raw.ToJsonString())
                 v.Add(new("R003", "reconciliation", $"{Str(raw["PairId"])}: the reconciled verdict does not follow from the two raw runs"));
         }
+        // What the registered oracle can emit per reason: only an executed comparison has a surface, inputs, and a
+        // transcript hash; AGREE has no witnesses and OBSERVATION_MISMATCH has 1 to 5.
+        foreach (var verdict in reconciled.Concat(raw2).Concat(Array(run1["runResults"]).OfType<JsonNode>()))
+        {
+            var reason = Str(verdict["Reason"]);
+            var executed = reason is "AGREE" or "OBSERVATION_MISMATCH";
+            var witnesses = Array(verdict["Witnesses"]).Count;
+            if (executed != IsSha256(Str(verdict["ObservationsSha256"])) || (executed && (Array(verdict["Surface"]).Count == 0 || Int(verdict["InputCount"]) is not > 0))
+                || (reason == "AGREE" && (witnesses != 0 || Str(verdict["Detail"]) != "")) || (reason == "OBSERVATION_MISMATCH" && witnesses is < 1 or > 5)
+                || (reason == "PRE_REGISTERED_EXCLUSION" && (Array(verdict["Surface"]).Count != 0 || Int(verdict["InputCount"]) != 0)))
+                v.Add(new("R003", "verdict-invariants", $"{Str(verdict["PairId"])}: a {reason} verdict the registered oracle cannot produce"));
+        }
         if (Str(manifest["oracleResultSha256"]) != RawSha256(results["oracle-run-2.json"]) || Str(manifest["firstOracleResultSha256"]) != RawSha256(results["oracle-run-1.json"]))
             v.Add(new("R003", "pair-manifest", "the manifest does not name the committed oracle runs"));
         var verdicts = Array(run2["results"]).OfType<JsonNode>().ToDictionary(r => Str(r["PairId"]) ?? "", StringComparer.Ordinal);
@@ -133,8 +146,14 @@ internal static partial class EvidenceContractValidator
         var environment = Load("environment.json");
         if (Str(environment["oracleRuns"]?["checkout"])?.Contains(RegistrationMergeCommit, StringComparison.Ordinal) != true
             || Int(environment["oracleRuns"]?["run1"]?["exitCode"]) != 4 || Int(environment["oracleRuns"]?["run2"]?["exitCode"]) != 0
-            || Str(environment["metricRuns"]?["commit"]) is not { Length: 40 } || Bool(environment["metricRuns"]?["bitIdentical"]) != true
-            || Array(environment["metricRuns"]?["exitCodes"]).Any(c => Int(c) != 0) || Array(environment["metricRuns"]?["exitCodes"]).Count != 2)
+            || !Regex.IsMatch(Str(environment["metricRuns"]?["commit"]) ?? "", "^[0-9a-f]{40}$") || Bool(environment["metricRuns"]?["bitIdentical"]) != true
+            || Array(environment["metricRuns"]?["exitCodes"]).Any(c => Int(c) != 0) || Array(environment["metricRuns"]?["exitCodes"]).Count != 2
+            || Str(environment["machine"]?["oracleEnvironmentString"]) != Str(run2["environment"])
+            || new[] { "run1", "run2" }.Any(r => Str(environment["oracleRuns"]?[r]?["command"])?.Contains($"pair-oracle --registration {RegistrationDir} --registration-commit {RegistrationMergeCommit}", StringComparison.Ordinal) != true)
+            || Str(environment["oracleRuns"]?["run2"]?["command"])?.Contains("--compare-with", StringComparison.Ordinal) != true
+            || Array(environment["metricRuns"]?["commands"]).Select(Str).FirstOrDefault()?.Contains("pair-metrics", StringComparison.Ordinal) != true
+            || Str(environment["oracleRuns"]?["run1"]?["output"]) != "oracle-run-1.json" || Str(environment["oracleRuns"]?["run2"]?["output"]) != "oracle-run-2.json"
+            || !Array(environment["metricRuns"]?["outputs"]).Select(Str).SequenceEqual(["metrics-run-1.json", "metrics-run-2.json"]))
             v.Add(new("R003", "environment", "the environment record does not show the registered oracle and metric executions"));
         if (Str(verdicts.GetValueOrDefault("DomainProblems/CsvParser")?["Disposition"]) != "NOT-EQUIVALENT")
             v.Add(new("R003", "known-witness", "DomainProblems/CsvParser is not NOT-EQUIVALENT; the oracle result is invalid"));
@@ -202,6 +221,34 @@ internal static partial class EvidenceContractValidator
         if (summary["byDisposition"]?.ToJsonString() != Tally(rows.Select(r => Str(r["disposition"]) ?? "")).ToJsonString()
             || Int(summary["denominator"]) != registered.Count)
             v.Add(new("R005", "results.json", "disposition counts do not match the manifest"));
+        // Every other published summary fact is derived from the manifest, the runs, and the registration.
+        var witnessRow = rows.FirstOrDefault(r => Str(r["pairId"]) == "DomainProblems/CsvParser");
+        var expectedSummary = new JsonObject
+        {
+            ["generatorVersion"] = registration["comparability"]?["generatorVersion"]?.DeepClone(),
+            ["registrationPairManifestSha256"] = registrationSha,
+            ["byDispositionAndReason"] = Tally(rows.Select(r => $"{Str(r["disposition"])} {Str(r["equivalenceEvidence"]?["reason"])}")),
+            ["knownWitness"] = new JsonObject
+            {
+                ["pairId"] = "DomainProblems/CsvParser",
+                ["disposition"] = Str(witnessRow?["disposition"]),
+                ["reason"] = Str(witnessRow?["equivalenceEvidence"]?["reason"]),
+            },
+            ["determinism"] = new JsonObject
+            {
+                ["oracleRuns"] = 2,
+                ["oracleResultValid"] = Bool(run2["valid"]),
+                ["pairsChangedAcrossOracleRuns"] = rows.Count(r => Str(r["equivalenceEvidence"]?["reason"]) == "NONDETERMINISTIC_ACROSS_RUNS"),
+                ["metricRuns"] = 2,
+                ["metricRunsBitIdentical"] = metricRuns[0]["pairs"]?.ToJsonString() == metricRuns[1]["pairs"]?.ToJsonString(),
+            },
+            ["includedPerCategory"] = Tally(values.Select(x => Str(x["category"]) ?? "")),
+        };
+        foreach (var (field, expected) in expectedSummary)
+        {
+            if (summary[field]?.ToJsonString() != expected?.ToJsonString())
+                v.Add(new("R005", "summary", $"results.json {field} is not derived from the manifest and runs"));
+        }
         var metric = summary["metric"];
         // The declared population, sampling unit, and interval interpretation are the registered ones, word for word.
         var labels = new (JsonNode? Node, string Expected)[]

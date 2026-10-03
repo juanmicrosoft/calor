@@ -26,7 +26,7 @@ public class BenchmarkResultsTests
         ["changed registered hash"] = (f => Row(f("pair-manifest.json"), "TokenEconomics/HelloWorld")["csharpSha256"] = new string('0', 64), "R002", "TokenEconomics/HelloWorld", []),
         ["disposition not from the oracle"] = (f => Row(f("pair-manifest.json"), Witness)["disposition"] = "UNCLASSIFIED", "R003", Witness, ["R005"]),
         ["late exclusion"] = (f => Row(f("pair-manifest.json"), Witness)["disposition"] = "EXCLUDED-PRE-REGISTERED", "R003", Witness, ["R005"]),
-        ["invalid oracle run"] = (f => f("oracle-run-2.json")["valid"] = false, "R003", "oracle-run-2.json", []),
+        ["invalid oracle run"] = (f => f("oracle-run-2.json")["valid"] = false, "R003", "oracle-run-2.json", ["R005"]),
         ["witness not NOT-EQUIVALENT"] = (f => Verdict(f("oracle-run-2.json"), "results", Witness)["Disposition"] = "EQUIVALENT", "R003", "known-witness", []),
         ["raw verdict changed between runs"] = (f => Verdict(f("oracle-run-1.json"), "runResults", "TokenEconomics/HelloWorld")["Disposition"] = "NOT-EQUIVALENT", "R003", "reconciliation", []),
         ["unregistered oracle version"] = (f =>
@@ -61,6 +61,18 @@ public class BenchmarkResultsTests
         ["generalized population"] = (f => f("results.json")["metric"]!["population"] = "all C# and Calor programs", "R005", "labels", []),
         ["interval relabeled as a confidence interval"] = (f => f("results.json")["metric"]!["intervalLabel"] = "95% confidence interval for a language advantage", "R005", "labels", []),
         ["metric runs not recorded"] = (f => f("environment.json")["metricRuns"]!["bitIdentical"] = false, "R003", "environment", []),
+        ["impossible AGREE verdict copied consistently"] = (f =>
+        {
+            foreach (var (file, array) in new[] { ("oracle-run-1.json", "runResults"), ("oracle-run-2.json", "runResults"), ("oracle-run-2.json", "results") })
+            {
+                var verdict = Verdict(f(file), array, "TokenEconomics/HelloWorld");
+                (verdict["Surface"], verdict["InputCount"], verdict["ObservationsSha256"]) = (new JsonArray(), 0, null);
+            }
+            var evidence = Row(f("pair-manifest.json"), "TokenEconomics/HelloWorld")["equivalenceEvidence"]!;
+            (evidence["surface"], evidence["inputCount"], evidence["observationsSha256"]) = (new JsonArray(), 0, null);
+        }, "R003", "verdict-invariants", []),
+        ["non-hex metric commit"] = (f => f("environment.json")["metricRuns"]!["commit"] = new string('z', 40), "R003", "environment", []),
+        ["falsified summary counts"] = (f => f("results.json")["byDispositionAndReason"] = new JsonObject { ["EQUIVALENT AGREE"] = 226 }, "R005", "summary", []),
     };
 
     [Fact]
@@ -104,6 +116,9 @@ public class BenchmarkResultsTests
     [InlineData("generalized population")]
     [InlineData("interval relabeled as a confidence interval")]
     [InlineData("metric runs not recorded")]
+    [InlineData("impossible AGREE verdict copied consistently")]
+    [InlineData("non-hex metric commit")]
+    [InlineData("falsified summary counts")]
     public void MutationIsRejected(string name)
     {
         var (change, code, subject, also) = Mutations[name];
