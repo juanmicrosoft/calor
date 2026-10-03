@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "issue": 1407,
-  "contractVersion": "1.1.1",
+  "contractVersion": "1.2.0",
   "cutoffCommit": "72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1",
   "scope": "Release-critical proof, verification, corpus, benchmark, provenance, environment, and publication artifacts for milestone 0.24, derived from .github/workflows/*, tools/, tests/, scripts/, bench/, eng/, and website/public/data at the cutoff commit.",
   "fieldNotes": {
