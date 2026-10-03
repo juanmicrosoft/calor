@@ -77,7 +77,7 @@ internal static partial class Program
                 File.WriteAllText(PinsPath(id), pins.ToJsonString(Indented));
             var pinned = JsonNode.Parse(File.ReadAllText(PinsPath(id)))!;
             if (pinKeys.Append("dotnetVersion").Append("os").Any(k => pinned[k]?.ToJsonString() != pins[k]?.ToJsonString() || pinned[k] == null)
-                || pinned["processLoadedZ3"] is not JsonArray { Count: > 0 })
+                || pinned["processLoadedZ3"] is not JsonArray { Count: > 0 } || pinned["processLoadedZ3"]!.ToJsonString() != pins["processLoadedZ3"]!.ToJsonString())
                 return Fail($"INVALID RUN: {id} pin missing or changed before the first case", 4);
         }
         var ledger = new Ledger(Path.Combine(outRoot, "ledger.jsonl"));
@@ -113,7 +113,7 @@ internal static partial class Program
         {
             var after = Pins(host, opts["registration-commit"]);
             var before = JsonNode.Parse(File.ReadAllText(PinsPath(id)))!;
-            if (pinKeys.Any(k => before[k]?.ToJsonString() != after[k]?.ToJsonString() || before[k] == null))
+            if (pinKeys.Append("processLoadedZ3").Append("dotnetVersion").Any(k => before[k]?.ToJsonString() != after[k]?.ToJsonString() || before[k] == null))
                 return Fail($"INVALID RUN: {id} pin missing or changed after the run", 4);
         }
         File.AppendAllText(Path.Combine(outRoot, "sessions.jsonl"), new JsonObject
@@ -157,7 +157,7 @@ internal static partial class Program
         {
             // In-process work cannot be killed: wait (bounded) so a retry never overlaps it, and keep what it produced.
             record = new JsonObject { ["baseline"] = host.Id, ["caseId"] = c.Id, ["status"] = "over-time" };
-            if (task.Wait(TimeSpan.FromMinutes(10))) record["lateObservation"] = task.Result;
+            record["lateObservation"] = task.Wait(TimeSpan.FromMinutes(10)) ? task.Result : throw new InvalidOperationException($"{c.Id} did not end; stopping (no overlapping retry)");
         }
         if (row.Id.StartsWith("CTRL-", StringComparison.Ordinal) && record["status"]?.GetValue<string>() == "executed")
             record["cliCrosscheck"] = CliCrosscheck.Run(host, c, record, scratch);
@@ -176,7 +176,7 @@ internal static partial class Program
         static string? Token(JsonObject a) => a["claim"]?["token"]?.GetValue<string>();
         static string Class(JsonObject a) => S(a["status"]) switch { "executed" => S(a["class"]), "crashed" or "over-time" => "crashed", _ => "harness-invalid" };
         var last = attempts[^1];
-        var cls = attempts.Any(a => a["status"]?.GetValue<string>() == "executed" && Class(a) == "false-unconditional-proof") ? "false-unconditional-proof"
+        var cls = attempts.Select(a => a["lateObservation"] as JsonObject ?? a).Any(a => a["status"]?.GetValue<string>() == "executed" && Class(a) == "false-unconditional-proof") ? "false-unconditional-proof"
             : attempts.Count == 2 && (Token(attempts[0]) != Token(attempts[1]) || S(attempts[0]["status"]) != S(attempts[1]["status"])) ? "flaky"
             : attempts.All(a => Token(a) == "TimeoutOrUnavailable") ? "timed-out"
             : Class(last);
@@ -259,6 +259,7 @@ internal static partial class Program
         var (_, templates, cases, rows) = Load(Path.GetFullPath(opts["repo"]));
         var (caseById, ledger, scratch) = (ById(cases), new Ledger(Path.Combine(outRoot, "ledger.jsonl")), Scratch("cross"));
         var hosts = Pair.ToDictionary(id => id, id => new BaselineHost(id, opts[id.ToLowerInvariant()]));
+        if (hosts.Values.Any(h => Pins(h, "")["calorDllSha256"]!.ToJsonString() != JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, h.Id, "pins.json")))!["calorDllSha256"]!.ToJsonString())) return Fail("INVALID: binary differs from pins", 4);
         string[] priority = ["false-unconditional-proof", "stale-cache-proof", "required-demotion-absent", "spurious-refutation"];
         var work = Pair.SelectMany(source => JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, source, "findings-index.json")))!.AsArray()
             .GroupBy(f => S(f!["caseId"])).Select(g => (Rank: g.Min(f => Array.IndexOf(priority, S(f!["class"])) is var i and >= 0 ? i : priority.Length), Target: source == "B1" ? "N1" : "B1", CaseId: g.Key)));
@@ -318,6 +319,7 @@ internal static partial class Program
                     var (elided, forced) = CaseExecutor.Emissions(record);
                     if (opts.ContainsKey("rereplay"))
                     {
+                        if (Hashing.Sha256File(Path.Combine(opts[b.ToLowerInvariant()], "Calor.Runtime.dll")) != S(JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, b, "pins.json")))!["calorRuntimeDllSha256"])) return Fail("INVALID: runtime differs from pins", 4);
                         record["runtimeO2"] ??= record["o2"]?.DeepClone();
                         record["o2"] = CaseExecutor.Replay(c, t, o1, S(forced["emitted"]), Path.Combine(opts[b.ToLowerInvariant()], "Calor.Runtime.dll"), S(t["claimSite"]), t["obligationKind"]?.GetValue<string>());
                         record["o2ReplayedBy"] = opts["harness"];

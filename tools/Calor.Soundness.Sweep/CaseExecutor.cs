@@ -258,10 +258,10 @@ internal static partial class CaseExecutor
         string primary;
         if (o1.Kind == "oracle-invalid") (primary, reason) = ("harness-invalid", "oracle-invalid: " + o1.Error);
         else if (token?.StartsWith("UNMAPPED", StringComparison.Ordinal) == true) (primary, reason) = ("harness-invalid", "unmappable status " + token);
-        else if (claim["claimFound"]?.GetValue<bool>() != true) (primary, reason) = Rejection(row, claim);
+        else if (claim["claimFound"]?.GetValue<bool>() != true && !Proof(forcedToken)) (primary, reason) = Rejection(row, claim);
         else if (claimSite == "guard-emission") (primary, reason) = ("no-claim", "guard-emission claim: no proof token; judged on the inherited guard only");
         else if (token != forcedToken)
-            (primary, reason) = c.Claim != "exists" && o1.Kind == "violated" && (Proof(token) || Proof(forcedToken))
+            (primary, reason) = o1.Kind == (c.Claim == "exists" ? "no-witness-exhaustive" : "violated") && (Proof(token) || Proof(forcedToken))
                 ? ("false-unconditional-proof", $"elided and forced compiles disagree ({token} vs {forcedToken}); a proof with an O1 violation is a finding regardless")
                 : ("flaky", $"elided and forced compiles disagree ({token} vs {forcedToken})");
         else if (token == "TimeoutOrUnavailable") (primary, reason) = ("timed-out", "TimeoutOrUnavailable");

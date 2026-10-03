@@ -196,7 +196,7 @@ internal static class EmittedReplay
                 }
                 runs.Add(new JsonObject { ["input"] = rendered, ["o1"] = o1, ["o2"] = o2, ["exception"] = exception, ["divergence"] = (o1 == "violated" && o2 == "returned") || (o1 == "holds" && o2 == "guard-threw") });
             }
-            (record["status"], record["runs"]) = ("run", runs);
+            (record["status"], record["runs"]) = (runs.Any(r => r!["o2"]!.GetValue<string>() == "not-run-input-not-representable") ? "partial" : "run", runs);
         }
         finally { context.Unload(); }
         return record;
