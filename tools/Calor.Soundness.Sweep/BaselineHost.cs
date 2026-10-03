@@ -56,13 +56,9 @@ internal sealed class BaselineHost : AssemblyLoadContext
     public JsonObject Compile(string source, bool verifyRefinements, bool elide, string? cacheDirectory)
     {
         var options = Activator.CreateInstance(_options)!;
-        Set(options, "VerifyContracts", true);
-        Set(options, "VerifyRefinements", verifyRefinements);
-        Set(options, "EnableTypeChecking", true);
-        Set(options, "ContractMode", Enum.Parse(Compiler.GetType("Calor.Compiler.ContractMode", true)!, "Debug"));
-        Set(options, "VerificationTimeoutMs", 5000u);
-        Set(options, "ElideProvenGuards", elide);
-        Set(options, "StatusWriter", TextWriter.Null);
+        foreach (var (name, value) in new (string, object)[] { ("VerifyContracts", true), ("VerifyRefinements", verifyRefinements), ("EnableTypeChecking", true),
+            ("ContractMode", Enum.Parse(Compiler.GetType("Calor.Compiler.ContractMode", true)!, "Debug")), ("VerificationTimeoutMs", 5000u), ("ElideProvenGuards", elide), ("StatusWriter", TextWriter.Null) })
+            Set(options, name, value);
         var cache = Activator.CreateInstance(Compiler.GetType("Calor.Compiler.Verification.Z3.Cache.VerificationCacheOptions", true)!)!;
         Set(cache, "Enabled", cacheDirectory != null);
         if (cacheDirectory != null) Set(cache, "ProjectDirectory", cacheDirectory);

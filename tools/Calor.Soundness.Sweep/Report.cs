@@ -179,14 +179,11 @@ public static class Repro
         int reached = 0;
         foreach (var a in R1Oracle.Inputs())
         {
-            bool hyp;
+            bool hyp; object? r = null; bool ok; string why;
             try { hyp = R1Oracle.HypO(a); } catch { continue; }
             if (!hyp) continue;
-            object? r = null;
             if (R1Oracle.HasBody) { try { r = R1Oracle.BodyO(a); } catch { continue; } }
             reached++;
-            string why;
-            bool ok;
             try { ok = R1Oracle.PropO(a, r); why = "false"; } catch (Exception e) { ok = false; why = "throws " + e.GetType().Name; }
             var shown = "(" + string.Join(", ", a.Select(v => v is null ? "null" : v is Array arr ? "[" + string.Join(", ", arr.Cast<object>()) + "]" : v is string s ? "\"" + s + "\"" : Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture))) + ")";
             if (R1Oracle.Claim == "exists") { if (ok) { Console.WriteLine("witness " + shown); return 0; } continue; }
