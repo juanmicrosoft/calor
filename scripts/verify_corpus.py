@@ -41,11 +41,11 @@ TESTS = REPO_ROOT / "tests"
 def run_step(name: str, cmd: list[str]) -> int:
     start = time.monotonic()
     print(f"\n=== {name} ===")
-    print(f"$ {' '.join(cmd)}")
+    print(f"$ {' '.join(cmd)}", flush=True)
     cp = subprocess.run(cmd, cwd=REPO_ROOT)
     elapsed = time.monotonic() - start
     print(f"--- {name}: {status_of(cp.returncode)} "
-          f"({elapsed:.1f}s)")
+          f"({elapsed:.1f}s)", flush=True)
     return cp.returncode
 
 
