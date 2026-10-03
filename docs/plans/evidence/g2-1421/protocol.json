@@ -501,8 +501,8 @@
     "amendmentLog": [
       {
         "version": "1.1.0",
-        "timestampUtc": "2026-10-03T23:00:00Z",
-        "pr": 0,
+        "timestampUtc": "2026-10-03T23:02:46Z",
+        "pr": 1486,
         "afterDecisionBearingExecution": false,
         "justification": "Registers the execution machinery required by workflow.requirements (the second G2 PR): .github/workflows/determinism-protocol.yml and scripts/determinism_runner.py, frozen by sha256.json; records how each requirement is implemented, three stricter-than-registered choices, the residual, and one limitation. No case, environment, attempt, determinism row, gate, rule, or budget value changes. No registered case was run."
       }
