@@ -6,7 +6,8 @@
       "FINDING": 10,
       "NOT-INVESTIGATED": 7
     },
-    "findings": 34
+    "findings": 34,
+    "runValidity": "provenance-unconfirmed: native solver image not pinned in-run"
   },
   "N1": {
     "rowStatusCounts": {
@@ -15,6 +16,7 @@
       "FINDING": 10,
       "NOT-INVESTIGATED": 7
     },
-    "findings": 34
+    "findings": 34,
+    "runValidity": "provenance-unconfirmed: native solver image not pinned in-run"
   }
 }

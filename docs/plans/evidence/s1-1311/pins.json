@@ -3,9 +3,8 @@
   "registrationMergedUtc": "2026-10-03T00:36:51Z",
   "harnessCommits": {
     "run": "8e33f08019303cf805e5098775032face6017a27",
-    "o2ReReplayAndCrossRun": "dcd6f34a59e9276ef28e45e543a64865ed819a05",
-    "reclassify": "15aa06ca4c017e86a91954fc812220f7f521b6bc",
-    "report": "838c6fce90ec046ed55748f0d21662464c357454"
+    "crossRun": "dcd6f34a59e9276ef28e45e543a64865ed819a05",
+    "reclassifyRereplayAndReport": "449b4ec5d7b07b2c36209e4fd1e0fec4edbd5712"
   },
   "baselines": {
     "B1": {
