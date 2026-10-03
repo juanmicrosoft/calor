@@ -87,7 +87,12 @@ jobs:
           python3 scripts/test_supply_chain.py
           python3 scripts/test_z3_hermetic.py
           python3 scripts/test_determinism_protocol.py
-          python3 scripts/determinism_protocol.py validate --baseline-ref origin/main
+          # #1421 D016: main's validator (not this tree's) judges this tree against main's packet.
+          if git cat-file -e origin/main:scripts/determinism_protocol.py 2>/dev/null; then
+            git show origin/main:scripts/determinism_protocol.py > "$RUNNER_TEMP/determinism_protocol_main.py"
+            python3 "$RUNNER_TEMP/determinism_protocol_main.py" validate --root . --baseline-ref origin/main
+          fi
+          python3 scripts/determinism_protocol.py validate --root . --baseline-ref origin/main
 
       # #881 pinned reproduction: the epoch cost metric must count subagent
       # and compaction-segment output tokens. Pure Python, no build needed.

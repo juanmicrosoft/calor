@@ -59,7 +59,7 @@ def passing_records(protocol, execution="E1") -> list[dict]:
             records.append({"schemaVersion": 1, "protocolVersion": protocol["protocolVersion"], "protocolSha256": dp.sha256_file(ROOT / dp.PROTOCOL),
                             "harnessSha256": dp.sha256_file(ROOT / dp.HARNESS), "mode": "execution", "executionId": execution,
                             "environment": env["id"], "job": 1, "attempt": attempt, "runId": RUN, "runAttempt": "1", "commit": COMMIT,
-                            "status": "completed", "environmentCheck": {"violations": []}, "profiles": results})
+                            "status": "completed", "environmentCheck": {"violations": [], "observed": {}}, "profiles": results})
     return records
 
 
@@ -132,10 +132,12 @@ class NegativeRegistrationControls(unittest.TestCase):
     def test_d010_registry_drift(self) -> None:
         self.only("D010", cases=mutate(lambda c: c["cells"]["ids"].pop(), CASES))
         self.only("D010", cases=mutate(lambda c: c["groups"]["verification"]["tests"][0].update(multiplicity=5), CASES))
-        self.only("D010", texts={"tests/Calor.Verification.Tests/ContractTranslatorSemanticsVersionGuardTests.cs": "x"})
+        # Named co-fire: emptying the guard test also removes its DeterminismRecord call site (D014).
+        self.assertEqual({"D010", "D014"}, codes(texts={"tests/Calor.Verification.Tests/ContractTranslatorSemanticsVersionGuardTests.cs": "x"}))
 
-    def test_d011_timing_sensitive_without_amendment(self) -> None:
-        self.only("D011", protocol=mutate(lambda p: p["cases"]["timingSensitiveSet"].append({"case": f"test:verification:{ORACLE}", "reason": "flaky"})))
+    def test_d011_timing_sensitive_set_must_stay_empty(self) -> None:
+        entry = {"case": f"test:verification:{ORACLE}", "reason": "flaky", "amendment": "1.0.0", "contractAmendment": "1.1.1"}
+        self.only("D011", protocol=mutate(lambda p: p["cases"]["timingSensitiveSet"].append(entry)))
 
     def test_d012_vocabulary_changed(self) -> None:
         self.only("D012", protocol=mutate(lambda p: p["attemptStatuses"].pop("timeout")))
@@ -148,12 +150,25 @@ class NegativeRegistrationControls(unittest.TestCase):
         self.only("D014", texts={".github/workflows/test.yml": test_yml.replace(
             "VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle\"", "VerifierRuntimeDifferentialTests\"")})
         self.only("D014", texts={".github/workflows/publish-nuget.yml": ""})
+        step = "- name: Run verifier-runtime differential gate\n"
+        self.only("D014", texts={".github/workflows/test.yml": test_yml.replace(step, step + "        if: false\n")})
+        self.only("D014", texts={".github/workflows/test.yml": test_yml.replace(dp.TRUSTED_STEP, "true")})
+        gate = "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DifferentialGate.cs"
+        self.only("D014", texts={gate: (ROOT / gate).read_text(encoding="utf-8").replace("DeterminismRecord.WriteCells(results);", "")})
 
     def test_d016_unrecorded_or_weakening_change_against_main(self) -> None:
         changed = dict(HASHES, **{dp.PROTOCOL: "0" * 64})
         self.only("D016", baseline=(PROTOCOL, CASES, changed))
         bigger = mutate(lambda p: p["runPlan"].update(attemptsPerJob=20))
         self.assertIn("D016", codes(baseline=(bigger, CASES, HASHES)))
+        more = mutate(lambda c: c["groups"]["verification"]["tests"][0].update(multiplicity=9), CASES)
+        self.assertIn("D016", codes(baseline=(PROTOCOL, more, HASHES)))
+        no_cells = mutate(lambda p: p["profiles"][1].update(oracle=False))
+        self.assertIn("D016", codes(protocol=no_cells, baseline=(PROTOCOL, CASES, HASHES)))
+
+    def test_baseline_that_cannot_be_read_fails_closed(self) -> None:
+        with self.assertRaises(SystemExit):
+            dp.load_baseline(ROOT, "no-such-ref-1421")
 
 
 class DecisionControls(unittest.TestCase):
@@ -200,7 +215,7 @@ class DecisionControls(unittest.TestCase):
         p = prof(find(records, "osx-arm64"), "oracle-isolated")
         p["status"], p["tests"][ORACLE], p["invocation"] = "timeout", "Timeout", "timeout|Missing"
         find(records, "osx-arm64")["status"] = "timeout"
-        prof(find(records, "linux-arm64"), "verification-full")["invocation"] = "1|Completed"
+        prof(find(records, "linux-arm64"), "verification-full").update(invocation="1|Completed", exitCode=1)
         result = self.decide(records)
         self.assertEqual("DISAGREE", self.klass(result, f"test:verification:{ORACLE}")["class"])
         self.assertEqual("DISAGREE", self.klass(result, "invocation:verification-full")["class"])
@@ -214,18 +229,23 @@ class DecisionControls(unittest.TestCase):
         find(records, "win-arm64").update(status="infrastructure-failure", profiles=[])
         self.assertEqual("INCOMPLETE", self.decide(records)["verdict"])
         records = passing_records(self.protocol)
-        find(records, "win-x64").update(status="environment-violation", environmentCheck={"violations": ["SDK"]})
+        find(records, "win-x64").update(status="environment-violation", environmentCheck={"violations": ["SDK"], "observed": {}})
         self.assertEqual("INCOMPLETE", self.decide(records)["verdict"])
         records = passing_records(self.protocol)
         records.remove(find(records, "linux-arm64", 2))
         self.assertEqual(("INCOMPLETE", 1), (lambda r: (r["verdict"], r["attempts"]["missing"]))(self.decide(records)))
 
-    def test_observations_of_an_invalid_attempt_are_kept(self) -> None:
+    def test_invalid_attempt_reveals_disagreement_but_never_establishes(self) -> None:
         records = passing_records(self.protocol)
         r = find(records, "linux-x64")
         r["status"], r["profiles"] = "invalid", r["profiles"][:1]
         r["profiles"][0]["tests"][ORACLE] = "Failed"
         self.assertEqual("NON-DETERMINISTIC", self.decide(records)["verdict"])
+        records = passing_records(self.protocol)
+        find(records, "linux-x64")["status"] = "invalid"
+        result = self.decide(records)
+        self.assertEqual(("INCOMPLETE", False), (result["verdict"], result["complete"]))
+        self.assertEqual({"OPEN"}, {r["status"] for r in result["determinismRows"] if r["id"] == "identical-tree-CommittedReportsMatchGeneratedOracle"})
 
     def test_malformed_foreign_or_rerun_records_are_invalid(self) -> None:
         def theory_short(rs):
@@ -238,6 +258,10 @@ class DecisionControls(unittest.TestCase):
             lambda rs: find(rs, "linux-x64").update(runId="1"),
             lambda rs: find(rs, "linux-x64").update(schemaVersion=999),
             lambda rs: find(rs, "linux-x64").update(environmentCheck={"violations": ["SDK"]}),
+            lambda rs: find(rs, "linux-x64").update(environmentCheck=None),
+            lambda rs: prof(find(rs, "linux-x64"), "verification-full").update(exitCode=19),
+            lambda rs: prof(find(rs, "linux-x64"), "verification-full").update(status="timeout"),
+            lambda rs: prof(find(rs, "linux-x64"), "verification-full")["tests"].update({ORACLE: "Missing"}),
             lambda rs: find(rs, "linux-x64")["profiles"].append(copy.deepcopy(find(rs, "linux-x64")["profiles"][0])),
             lambda rs: prof(find(rs, "linux-x64"), "verification-full")["tests"].update({"Extra.Test": "Failed"}),
             lambda rs: prof(find(rs, "linux-x64"), "verification-full")["cells"].update({"case-999999": "0" * 32 + "|1"}),
@@ -248,6 +272,8 @@ class DecisionControls(unittest.TestCase):
             records = passing_records(self.protocol)
             edit(records)
             self.assertEqual("INVALID", self.decide(records)["verdict"])
+        records = passing_records(self.protocol) + passing_records(self.protocol, "E2")
+        self.assertEqual("INVALID", self.decide(records, {"E1": RUN, "E2": RUN})["verdict"])
 
 
 class ValueControls(unittest.TestCase):
@@ -266,6 +292,10 @@ class ValueControls(unittest.TestCase):
         self.assertEqual(("Missing", "Malformed", "Missing"), (values["artifacts"]["verifier-runtime-differential.json"],
                                                               values["cells"]["case-000001"], values["cells"]["case-000002"]))
         self.assertEqual(3, len(values["unregistered"]))
+        bare = {k: cell[k] for k in ("id", "formId", "position", "nestingDepth", "polarity", "mismatch")}
+        (tmp / "cells.json").write_text(json.dumps([bare]), encoding="utf-8")
+        values = dp.profile_values(oracle, CASES, {ORACLE: ["Passed"]}, "Completed", 0, False, tmp)
+        self.assertEqual("Malformed", values["cells"]["case-000001"])
 
     def test_timeout_keeps_observed_values_and_fills_only_the_rest(self) -> None:
         full = dp.profile_by_id(PROTOCOL)["verification-full"]

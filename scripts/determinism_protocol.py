@@ -32,7 +32,18 @@ INVENTORY = "docs/plans/evidence/evidence-contract-1407/artifact-inventory.json"
 Z3_CONSUMERS = "eng/z3-consumers.json"
 ORACLE_REPORT = "bench/phase0-agent-native/verifier-runtime-differential.json"
 HARNESS = "scripts/determinism_protocol.py"
-FROZEN_FILES = [PROTOCOL, CASES, README, HARNESS, "scripts/test_determinism_protocol.py"]
+RECORDER = "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DeterminismRecord.cs"
+FROZEN_FILES = [PROTOCOL, CASES, README, HARNESS, "scripts/test_determinism_protocol.py", RECORDER,
+                "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DifferentialModels.cs"]
+# Instrumentation call sites that must stay in the oracle's test code (D014).
+CALL_SITES = {"tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DifferentialGate.cs": ["DeterminismRecord.WriteCells(results);"],
+              "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/VerifierRuntimeDifferentialTests.cs":
+                  ['DeterminismRecord.WriteGenerated("verifier-runtime-differential.json"', 'DeterminismRecord.WriteGenerated("verifier-runtime-differential.md"'],
+              "tests/Calor.Verification.Tests/ContractTranslatorSemanticsVersionGuardTests.cs": ['DeterminismRecord.WriteGenerated(\n            "translator-fixture"']}
+CELL_FIELDS = {"id": str, "formId": str, "category": str, "position": str, "nestingDepth": int, "polarity": str, "solverStatus": str,
+               "runtimeVerdict": str, "guardForced": bool, "elidedWhenEnabled": bool, "solverHandled": bool, "mismatch": bool,
+               "detail": (str, type(None))}
+TRUSTED_STEP = 'python3 "$RUNNER_TEMP/determinism_protocol_main.py" validate --root . --baseline-ref origin/main'
 ATTEMPT_STATUSES = ["completed", "timeout", "crash", "infrastructure-failure", "environment-violation", "invalid"]
 VALUE_STATUSES = {"completed", "timeout", "crash"}
 CASE_CLASSES = ["AGREE-PASS", "AGREE-FAIL", "DISAGREE", "INCOMPLETE"]
@@ -113,6 +124,18 @@ def case_universe(protocol, cases) -> set[str]:
     profiles = profile_by_id(protocol)
     return {k for e in protocol["environments"] for pid in e["profiles"] if pid in profiles
             for k in profile_keys(profiles[pid], cases)}
+
+
+def contribution_matrix(protocol, cases) -> dict[str, int]:
+    """Expected contributions per case per execution, with test multiplicity folded in."""
+    profiles, per = profile_by_id(protocol), protocol["runPlan"]["jobsPerEnvironment"] * protocol["runPlan"]["attemptsPerJob"]
+    matrix: dict[str, int] = {}
+    for env in protocol["environments"]:
+        for p in (profiles[pid] for pid in env["profiles"] if pid in profiles):
+            for k in profile_keys(p, cases):
+                mult = selection(p, cases).get(k.split(":", 2)[2], 1) if k.startswith("test:") else 1
+                matrix[f"{env['id']}|{k}"] = matrix.get(f"{env['id']}|{k}", 0) + per * mult
+    return matrix
 
 
 def worst_case(protocol) -> tuple[int, int, int]:
@@ -275,9 +298,8 @@ def validate(root: Path, protocol=None, cases=None, contract=None, texts=None, b
 
     # D011 timing-sensitive set: only by a recorded amendment and a #1407 amendment.
     ts, amended = protocol.get("cases", {}).get("timingSensitiveSet"), {a.get("version") for a in log}
-    if not isinstance(ts, list) or any(e.get("case") not in universe or not e.get("reason") or e.get("amendment") not in amended
-                                       or not e.get("contractAmendment") for e in ts):
-        add("D011", "a timing-sensitive entry lacks a registered case, a reason, or its amendments")
+    if ts != []:
+        add("D011", "timingSensitiveSet must stay empty: the decider gives it no semantics until an amendment (with a #1407 amendment) adds them")
 
     # D012 frozen vocabularies.
     if sorted(protocol.get("attemptStatuses", {})) != sorted(ATTEMPT_STATUSES) or sorted(protocol.get("caseClasses", {})) != sorted(CASE_CLASSES) \
@@ -298,8 +320,13 @@ def validate(root: Path, protocol=None, cases=None, contract=None, texts=None, b
     if f"--filter \"{iso.get('filter')}\"" not in test_yml or any(f"project: {p['project']}" not in y for p in profiles.values()
                                                                    for y in (test_yml, publish)):
         add("D014", "a registered gate site no longer runs the registered oracle command or project")
+    step = test_yml.split("- name: Run verifier-runtime differential gate", 1)[-1].split("- name:", 1)[0]
+    if "if:" in step or "continue-on-error" in step or TRUSTED_STEP not in test_yml:
+        add("D014", "the oracle step is conditional or masked, or the trusted baseline validation step is gone")
     if any(any((root / p["project"]).parent.glob(g)) for p in profiles.values() for g in ("xunit.runner.json", "*.runsettings")):
         add("D014", "a registered project gained a runner configuration file")
+    if any(site not in text(rel) for rel, sites in CALL_SITES.items() for site in sites):
+        add("D014", "a DeterminismRecord call site was removed from the oracle's test code")
 
     # D015 the packet and harness are frozen by hash.
     hashes = json.loads(text(HASHES)).get("files", {}) if (root / HASHES).exists() else {}
@@ -314,12 +341,16 @@ def validate(root: Path, protocol=None, cases=None, contract=None, texts=None, b
             new = [a for a in log if a.get("version") not in {x.get("version") for x in old_p["amendments"]["amendmentLog"]}]
             if not new or vkey(version) <= vkey(old_p["protocolVersion"]) or log[:len(old_p["amendments"]["amendmentLog"])] != old_p["amendments"]["amendmentLog"]:
                 add("D016", "the packet changed without a new protocol version and amendment entry (earlier entries are immutable)")
+        old_m, new_m = contribution_matrix(old_p, old_c), contribution_matrix(protocol, cases)
+        old_rows = {r["id"]: r for r in old_p["determinismRows"]}
         weaker = [name for name, bad in (
-            ("cases removed", not case_universe(old_p, old_c) <= universe),
+            ("cases or contributions removed", any(new_m.get(k, 0) < n for k, n in old_m.items())),
+            ("determinism row mapping narrowed", any(not (set(r["cases"]) <= set(rows.get(i, {}).get("cases", []))
+                                                         and set(r["environments"]) <= set(rows.get(i, {}).get("environments", [])))
+                                                     for i, r in old_rows.items())),
             ("environments removed", not set(env_by_id(old_p)) <= set(env_ids)),
             ("fewer attempts", jobs * attempts < old_p["runPlan"]["jobsPerEnvironment"] * old_p["runPlan"]["attemptsPerJob"]),
             ("determinism rows removed", not set(r["id"] for r in old_p["determinismRows"]) <= set(rows)),
-            ("timing-sensitive set grew", len(ts or []) > len(old_p["cases"]["timingSensitiveSet"]) and not all(e.get("contractAmendment") for e in ts)),
         ) if bad]
         if weaker:
             add("D016", f"the amendment weakens the registration: {', '.join(weaker)}")
@@ -356,7 +387,9 @@ def profile_values(profile, cases, outcomes, summary: str, exit_code, timed_out:
         for cell in json.loads(cell_file.read_text(encoding="utf-8")) if cell_file and cell_file.exists() else []:
             cid = cell.get("id") if isinstance(cell, dict) else None
             identity = {k: cell.get(k) for k in ("id", "formId", "position", "nestingDepth", "polarity")} if cid else None
-            if cid not in registered or identity != registered[cid] or cid in seen or not isinstance(cell.get("mismatch"), bool):
+            typed = isinstance(cell, dict) and set(cell) == set(CELL_FIELDS) and all(
+                isinstance(cell[f], t) and not (t is int and isinstance(cell[f], bool)) for f, t in CELL_FIELDS.items())
+            if cid not in registered or identity != registered[cid] or cid in seen or not typed:
                 result["unregistered"].append(f"cell:{cid} (unregistered, duplicate, or malformed)")
                 if cid in cells:
                     cells[cid] = "Malformed"
@@ -395,8 +428,11 @@ def _record_problem(r, protocol, cases, mode, envs, shape, expected_commit, run_
         return "from an unregistered environment, job, or attempt"
     if str(r["runAttempt"]) != "1":
         return "from a re-run job"
-    if r["status"] not in ATTEMPT_STATUSES or (r["status"] == "environment-violation") != bool((r["environmentCheck"] or {}).get("violations")):
-        return "status inconsistent with its environment check"
+    check = r["environmentCheck"]
+    if r["status"] not in ATTEMPT_STATUSES or (r["status"] != "infrastructure-failure" and not (
+            isinstance(check, dict) and isinstance(check.get("violations"), list) and isinstance(check.get("observed"), dict))) \
+            or (r["status"] == "environment-violation") != bool((check or {}).get("violations")):
+        return "status inconsistent with its environment check, or no environment attestation"
     expected = [p["id"] for p in profiles_all if mode == "control" or p["id"] in envs[r["environment"]]["profiles"]]
     got = [p.get("profile") for p in r["profiles"]]
     if len(got) != len(set(got)) or got != expected[:len(got)] or (r["status"] in VALUE_STATUSES and got != expected):
@@ -419,6 +455,15 @@ def _record_problem(r, protocol, cases, mode, envs, shape, expected_commit, run_
             return f"profile {p['id']} cells or artifacts differ from the registry"
         if res["unregistered"]:
             return f"profile {p['id']} reported unregistered {res['unregistered'][:3]}"
+        fills = any(part in FILL_VALUES for val in res["tests"].values() for part in val.split(","))
+        timed = str(res["invocation"]).startswith("timeout|")
+        if res["status"] not in ATTEMPT_STATUSES or timed != (res["status"] == "timeout") \
+                or (not timed and not str(res["invocation"]).startswith(f"{res['exitCode']}|")) \
+                or (res["status"] == "completed" and fills) or (res["status"] == "crash" and not fills):
+            return f"profile {p['id']} status, exit code, invocation, and values are inconsistent"
+    statuses = [x["status"] for x in r["profiles"]]
+    if r["status"] in VALUE_STATUSES and r["status"] != next(s for s in ("invalid", "timeout", "crash", "completed") if s in statuses + ["completed"]):
+        return "attempt status inconsistent with its profiles"
     return None
 
 
@@ -435,8 +480,8 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
     expected_artifacts = {a["name"]: sha256_file(root / a["committedPath"]) if "committedPath" in a else sha256_bytes(a["expected"].encode())
                           for a in cases["artifacts"]}
     invalid, seen = [], {}
-    if not re.match(r"^[0-9a-f]{40}$", expected_commit or ""):
-        invalid.append("the expected commit is not a full SHA")
+    if not re.match(r"^[0-9a-f]{40}$", expected_commit or "") or (mode == "execution" and len(run_ids) != 1):
+        invalid.append("the expected commit is not a full SHA, or more than one execution was pooled")
     for r in records:
         key = tuple(r.get(k) for k in ("executionId", "environment", "job", "attempt"))
         problem = "duplicated" if key in seen else _record_problem(r, protocol, cases, mode, envs, shape, expected_commit, run_ids, hashes)
@@ -447,6 +492,7 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
 
     expected: dict[str, int] = {}
     values: dict[str, list[tuple[str, str]]] = {}
+    establishing: dict[str, int] = {}
     status_counts = {s: 0 for s in ATTEMPT_STATUSES + ["missing"]}
     for eid in run_ids:
         for env_id, env in envs.items():
@@ -465,7 +511,8 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
                                 source = {"invocation": {rest: res["invocation"]}, "test": res["tests"], "cell": res["cells"],
                                           "artifact": res["artifacts"]}[kind]
                                 values.setdefault(k, []).append((env_id, source[rest.split(":", 1)[1] if kind == "test" else rest]))
-    if mode == "control":
+                                establishing[k] = establishing.get(k, 0) + (r["status"] != "invalid")
+    if mode == "control":  # an observed control name is expected from every attempt
         per = len(envs) * jobs * attempts * len(run_ids)
         expected.update({k: per for k in values if k.startswith("test:control:")})
 
@@ -473,10 +520,11 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
     for key in sorted(expected):
         present = values.get(key, [])
         distinct = sorted({x for _, x in present})
-        klass = "DISAGREE" if len(distinct) > 1 else "INCOMPLETE" if len(present) < expected[key] or not present else \
+        # Values from invalid attempts can reveal a disagreement but never count toward agreement.
+        klass = "DISAGREE" if len(distinct) > 1 else "INCOMPLETE" if establishing.get(key, 0) < expected[key] or not present else \
             "AGREE-PASS" if _is_pass(key, distinct[0], expected_artifacts) else "AGREE-FAIL"
         counts[klass] += 1
-        row = {"case": key, "class": klass, "contributions": len(present), "expected": expected[key]}
+        row = {"case": key, "class": klass, "contributions": establishing.get(key, 0), "expected": expected[key]}
         if klass != "AGREE-PASS":
             by_env: dict[str, dict[str, int]] = {}
             for env_id, x in present:
@@ -496,42 +544,53 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
     return {"schemaVersion": 1, "protocolVersion": protocol["protocolVersion"], "protocolSha256": hashes[0], "harnessSha256": hashes[1],
             "mode": mode, "executionIds": sorted(run_ids), "runIds": run_ids, "commit": expected_commit,
             "verdict": ("CONTROL-" + verdict) if mode == "control" else verdict,
-            "complete": not invalid and status_counts["missing"] == 0 and not counts["INCOMPLETE"],
+            "complete": not invalid and not counts["INCOMPLETE"] and all(status_counts[s] == 0 for s in
+                                                                          ("missing", "invalid", "infrastructure-failure", "environment-violation")),
             "attempts": status_counts, "invalidReasons": invalid, "classCounts": counts, "cases": rows_out,
             "determinismRows": det_rows, "environments": sorted(envs), "notCovered": protocol["scope"]["notCovered"],
             "limitations": protocol["limitations"] + (["CONTROL RUN: no registered case; never decision-bearing."] if mode == "control" else [])}
 
 
-def git_show(ref: str, rel: str):
-    out = subprocess.run(["git", "show", f"{ref}:{rel}"], cwd=ROOT, capture_output=True, check=False)
-    return json.loads(out.stdout) if out.returncode == 0 else None
+def load_baseline(root: Path, ref: str):
+    """(protocol, cases, hashes) registered at ref; None only when ref verifiably has no packet."""
+    def git(*args):
+        return subprocess.run(["git", *args], cwd=root, capture_output=True, check=False)
+    if git("rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}").returncode != 0:
+        raise SystemExit(f"baseline ref {ref} does not resolve to a commit")
+    present = [git("cat-file", "-e", f"{ref}:{rel}").returncode == 0 for rel in (PROTOCOL, CASES, HASHES)]
+    if not any(present) and git("ls-tree", "-d", ref, PACKET).stdout == b"":
+        return None
+    if not all(present):
+        raise SystemExit(f"baseline {ref} has a partial packet")
+    old = [json.loads(git("show", f"{ref}:{rel}").stdout) for rel in (PROTOCOL, CASES, HASHES)]
+    return old[0], old[1], old[2]["files"]
 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("validate").add_argument("--baseline-ref")
+    v = sub.add_parser("validate")
+    v.add_argument("--baseline-ref")
+    v.add_argument("--root", default=str(ROOT), help="tree to validate (the trusted entry point runs main's validator on a PR tree)")
     d = sub.add_parser("decide")
-    for name in ("--records", "--execution-id", "--run-id"):
-        d.add_argument(name, action="append", required=True)
+    d.add_argument("--records", action="append", required=True)
+    d.add_argument("--execution-id", required=True)
+    d.add_argument("--run-id", required=True)
     for name in ("--commit", "--mode", "--out"):
         d.add_argument(name, required=True)
     args = parser.parse_args(argv)
     if args.command == "validate":
-        baseline = None
+        root = Path(args.root).resolve()
+        baseline = load_baseline(root, args.baseline_ref) if args.baseline_ref else None
         if args.baseline_ref:
-            old = [git_show(args.baseline_ref, rel) for rel in (PROTOCOL, CASES, HASHES)]
-            baseline = (old[0], old[1], old[2]["files"]) if all(old) else None
             print(f"baseline {args.baseline_ref}: {'registered packet found' if baseline else 'no registered packet yet'}")
-        violations = validate(ROOT, baseline=baseline)
+        violations = validate(root, baseline=baseline)
         for code, message in violations:
             print(f"{code}: {message}")
         print("protocol valid" if not violations else f"{len(violations)} violation(s)")
         return 1 if violations else 0
-    if len(args.execution_id) != len(args.run_id):
-        parser.error("give one --run-id per --execution-id")
     records = [json.loads(p.read_text(encoding="utf-8")) for d in args.records for p in sorted(Path(d).rglob("attempt-*.json"))]
-    result = decide(ROOT, records, dict(zip(args.execution_id, args.run_id)), args.commit, args.mode)
+    result = decide(ROOT, records, {args.execution_id: args.run_id}, args.commit, args.mode)
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_bytes((json.dumps(result, indent=1, sort_keys=True) + "\n").encode("utf-8"))
     print(json.dumps({k: result[k] for k in ("verdict", "complete", "attempts", "classCounts", "determinismRows", "invalidReasons")}, indent=1))

@@ -30,9 +30,9 @@ difference is a defect to fix by amendment.
 |---|---|
 | `protocol.json` | The protocol |
 | `cases.json` | Frozen case registry: 411 + 554 test names with multiplicities, 1,170 oracle cells, 3 artifacts |
-| `sha256.json` | SHA-256 (LF-normalized) of the packet, the harness, and its tests (`D015`) |
+| `sha256.json` | SHA-256 (LF-normalized) of the packet, the harness, its tests, the C# recorder, and the `CaseResult` schema (`D015`) |
 | `scripts/determinism_protocol.py` | `validate` (D001–D016) and `decide` (the frozen agreement rule) |
-| `scripts/test_determinism_protocol.py` | Positive and negative controls; run in the required `calor-first-guard` job together with `validate --baseline-ref origin/main` |
+| `scripts/test_determinism_protocol.py` | Positive and negative controls; run in the required `calor-first-guard` job, which also runs main's copy of the validator against this tree (`D016`) |
 
 `cases.json` was built from `dotnet test <project> -c Release --no-build --list-tests` on the
 registration base plus this change: every line indented by four spaces is a name, repeats are
@@ -65,9 +65,10 @@ fails if any of these stops running the registered command or project (`D014`).
 `TaskGenAddressabilityTests`, and the packaged-SDK verifier canary. Nothing may cite this
 protocol for them.
 
-**Timing-sensitive set: empty.** No registered case asserts on elapsed time. A Z3 timeout that
-changes a verdict is instability, not an allowance. Moving a case into the set needs a reviewed
-#1407 amendment, a protocol amendment, and a complete new execution.
+**Timing-sensitive set: empty, and kept empty** (`D011`). No registered case asserts on elapsed
+time, and the decider gives such a set no semantics. A Z3 timeout that changes a verdict is
+instability, not an allowance. Adding the semantics needs a protocol amendment, a reviewed #1407
+amendment, and a complete new execution.
 
 **Determinism rows.** The three contract rows from G1 (win-x64 and win-arm64:
 `StringInBodyOnly_StillNeverElides`, `TranslatorOutputMatchesCommittedBaseline` with its
@@ -119,19 +120,24 @@ across 150 attempts. The protocol bounds non-determinism; it does not prove its 
   `DETERMINISTIC`. Only `DETERMINISTIC` establishes anything.
 - **Statuses.** Timeout, crash, `Skipped`, and Z3-unavailable failures are values that never
   equal a pass. Every observed value is kept; only an unobserved value is filled. Values from an
-  `invalid` attempt are still compared. `infrastructure-failure` and `environment-violation`
-  attempts contribute nothing, so the execution cannot be `DETERMINISTIC`.
-- **Strict records.** The decider binds each record to the dispatched commit and the run id,
-  rejects re-run jobs, other protocol or harness bytes, duplicate or reordered profiles, and any
-  test, cell, or artifact set or multiplicity that differs from the registry (`INVALID`).
+  `invalid` attempt are compared, so they can reveal a disagreement, but never count toward
+  agreement. `infrastructure-failure` and `environment-violation` attempts contribute nothing.
+  Any of these makes the execution at best `INCOMPLETE`.
+- **Strict records.** The decider takes exactly one execution, binds each record to the
+  dispatched commit and run id, and rejects re-run jobs, other protocol or harness bytes, a
+  missing environment attestation, inconsistent status, exit code, and invocation, duplicate or
+  reordered profiles, cells without exactly the `CaseResult` fields, and any test, cell, or
+  artifact set or multiplicity that differs from the registry (`INVALID`).
 - **No run-until-green.** No retries, no job re-runs, and a commit is executed at most once.
   After `NON-DETERMINISTIC` or `FAILING`, the next execution needs a commit that changes a path
   outside `docs/` and a ledger entry naming the repair. Every execution stays reported.
 - **Release-blocking.** Any `DISAGREE` is release-blocking for the affected form, test, or
   artifact until resolved under §8.
-- **Amendments.** After merge, the required `calor-first-guard` job validates every change
-  against the packet on `main` (`D016`): an unrecorded change, or one that removes a case,
-  environment, determinism row, or attempt, fails.
+- **Amendments.** After merge, the required `calor-first-guard` job runs main's copy of the
+  validator and this tree's copy against the packet on `main` (`D016`): an unrecorded change, or
+  one that lowers any case's contributions per environment (including test multiplicity) or
+  narrows a determinism row, fails. An unreadable baseline fails closed. The oracle's gate step
+  may not be conditional or masked, and the instrumentation call sites must stay (`D014`).
 
 ## Compute plan
 
@@ -162,7 +168,8 @@ reserved. Pull-request control runs are ordinary CI.
 ## Changes to the oracle's test code
 
 `DifferentialGate.Run`, `CommittedReportsMatchGeneratedOracle`, and
-`TranslatorOutputMatchesCommittedBaseline` gained an opt-in `DeterminismRecord` call that writes
+`TranslatorOutputMatchesCommittedBaseline` gained an opt-in call to the new, frozen
+`DeterminismRecord.cs` that writes
 the per-cell results, the generated report bytes, and the translator fixture value when
 `CALOR_DETERMINISM_RECORD_DIR` is set. It writes before any assertion, writes nothing when the
 variable is unset, and changes no verdict, report byte, or assertion. The verifier is unchanged.
