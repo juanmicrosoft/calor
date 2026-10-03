@@ -1,9 +1,9 @@
 {
   "algorithm": "SHA-256 over LF-normalized UTF-8 bytes",
   "files": {
-    "docs/plans/evidence/g2-1421/protocol.json": "4445a91ead5fd331b195e70600b0821931a57946d22851e7ff5446d2c4c333db",
+    "docs/plans/evidence/g2-1421/protocol.json": "ebf3deeee97ff5d44fc5d44abf6a5a0ae5ba465d8f8aad0bac90c15388d6157a",
     "docs/plans/evidence/g2-1421/cases.json": "253f591fed185ddfd66865f6e0f81502dc62085555a2cb2dff32ee22be023317",
-    "docs/plans/evidence/g2-1421/README.md": "51bf3d808565bb8c22e8c8d43912e4eaf61d6a1c1dc4f80e564a52fdcd077460",
+    "docs/plans/evidence/g2-1421/README.md": "6c82b376cb52c00b60529cd2df2520afa35df5be04e2be26b8945d220241f2ca",
     "scripts/determinism_protocol.py": "cc4be9b942e79274cfc4948b45613bfbab43a4f29b0f2bb7080b1e29cf7fd55d",
     "scripts/test_determinism_protocol.py": "cb3d4b9b15a49dafbd4cd2fed44ee27f54f73016bf0e2e2b8f26df17886a2f8d"
   }

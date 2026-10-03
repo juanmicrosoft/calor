@@ -1,7 +1,7 @@
 # 0.24 G2 (#1421): verifier determinism protocol — registration
 
 Gate G2 of the frozen 0.24 contract (`docs/plans/v0.24-evidence-contract.md`, contract
-1.1.0). This packet registers how #1135 (G3) decides whether the release-critical verifier
+1.1.1). This packet registers how #1135 (G3) decides whether the release-critical verifier
 oracle and its test host give the same verdicts on the same tree, on every supported
 platform. **Registration only.** No registered case was run under this protocol; the first
 decision-bearing execution happens in #1135.
