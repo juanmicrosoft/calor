@@ -437,7 +437,7 @@
     {
       "version": "1.1.1",
       "justification": "Inventory write-back for amendment 1.1.0 decision 3. G1 PR #1471 (#1420) merged as 24a9b0bad4749d723814d7b320a5f7c8d2f38f77 at 2026-10-03T17:16:38Z, and P1 PR #1472 (#1417) merged as 39b5edecc505bdefcd8811c8a8c073fbf1241361 at 2026-10-03T00:01:21Z. As the pendingUpdates rule requires, this amendment copies each pending entry's changes into its artifact, records its defectResolutions beside openDefects, and removes the entry: 1.1.0-g1-z3-release-binaries and 1.1.0-g1-z3-upstream-pins (repairing PR #1471), and 1.1.0-p1-ledger-provenance-index, 1.1.0-p1-benchmark-provenance, and 1.1.0-p1-test-manifest (repairing PR #1472). These five were every pending entry. openDefects are unchanged, and no classification changes: every entry's classificationAfter equals the artifact's classification (benchmark-provenance stays stale). Nothing else changes.",
-      "reviewedInPr": 9999999,
+      "reviewedInPr": 1478,
       "timestampUtc": "2026-10-03T17:19:34Z",
       "afterDecisionBearingInspection": false,
       "inspectionStatement": "This write-back follows no decision-bearing inspection. Its author has inspected no decision-bearing result. S1 #1311 is executing on a branch but has no merged result. B1 PR #1473 is unmerged and its oracle has not run. No #1421 or #1135 protocol run exists. The amendment applies edits fixed in 1.1.0 and checks only that the repairing PRs merged.",
