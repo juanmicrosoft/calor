@@ -95,7 +95,7 @@
         "--permissive-effects"
       ],
       "errors": [
-        "Calor1002:CS0029"
+        "08-03.approved.g.cs|Calor1002:CS0029"
       ],
       "defect": "Front end accepts the source; generated C# (CS0029): Cannot implicitly convert type 'string[]' to 'System.Collections.Generic.List<string>'",
       "evidence": "Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
@@ -111,7 +111,7 @@
         "--permissive-effects"
       ],
       "errors": [
-        "Calor1002:CS8510"
+        "09-03.approved.calr|Calor1002:CS8510"
       ],
       "defect": "Front end accepts the source; generated C# (CS8510): The pattern is unreachable. It has already been handled by a previous arm of the switch expression or it is impossible to match.",
       "evidence": "Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
@@ -127,7 +127,7 @@
         "--permissive-effects"
       ],
       "errors": [
-        "Calor1002:CS0050"
+        "11-03.approved.g.cs|Calor1002:CS0050"
       ],
       "defect": "Front end accepts the source; generated C# (CS0050): Inconsistent accessibility: return type 'Container.Status' is less accessible than method 'Container.GetStatus()'",
       "evidence": "Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
@@ -143,7 +143,8 @@
         "--permissive-effects"
       ],
       "errors": [
-        "Calor1002:CS0246"
+        "11-05.approved.calr|Calor1002:CS0246",
+        "11-05.approved.calr|Calor1002:CS0246"
       ],
       "defect": "Front end accepts the source; generated C# (CS0246): The type or namespace name 'str' could not be found (are you missing a using directive or an assembly reference?); generated C# (CS0246): The type or namespace name 'i32' could not be found (are you missing a using directive or an assembly reference?)",
       "evidence": "Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
@@ -159,11 +160,16 @@
         "--permissive-effects"
       ],
       "errors": [
-        "Calor1002:CS1001",
-        "Calor1002:CS1002",
-        "Calor1002:CS1003",
-        "Calor1002:CS1519",
-        "Calor1002:CS1525"
+        "13-02.approved.calr|Calor1002:CS1001",
+        "13-02.approved.calr|Calor1002:CS1001",
+        "13-02.approved.calr|Calor1002:CS1002",
+        "13-02.approved.calr|Calor1002:CS1525",
+        "13-02.approved.g.cs|Calor1002:CS1001",
+        "13-02.approved.g.cs|Calor1002:CS1001",
+        "13-02.approved.g.cs|Calor1002:CS1003",
+        "13-02.approved.g.cs|Calor1002:CS1519",
+        "13-02.approved.g.cs|Calor1002:CS1519",
+        "13-02.approved.g.cs|Calor1002:CS1519"
       ],
       "defect": "Front end accepts the source; generated C# (CS1519): Invalid token 'object' in a member declaration; generated C# (CS1519): Invalid token ';' in a member declaration; generated C# (CS1001): Identifier expected; and 3 more",
       "evidence": "Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
@@ -179,7 +185,9 @@
         "--permissive-effects"
       ],
       "errors": [
-        "Calor1002:CS8510"
+        "13-05.approved.calr|Calor1002:CS8510",
+        "13-05.approved.calr|Calor1002:CS8510",
+        "13-05.approved.calr|Calor1002:CS8510"
       ],
       "defect": "Front end accepts the source; generated C# (CS8510): The pattern is unreachable. It has already been handled by a previous arm of the switch expression or it is impossible to match.",
       "evidence": "Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
@@ -195,7 +203,8 @@
         "--permissive-effects"
       ],
       "errors": [
-        "Calor1006"
+        "13-10.approved.calr|Calor1006",
+        "13-10.approved.calr|Calor1006"
       ],
       "defect": "Front end accepts the source; Expression-match arms must contain exactly one value-return expression. Multi-statement, empty, and valueless arms are not supported; use a statement match instead.",
       "evidence": "Approved C#-to-Calor converter outputs (SnapshotConversionTests compares text only; no test compiles them). Compiled with --permissive-effects, the CLI mode documented for converted code. Approved converter output that the compiler rejects; whether the converter or the emitter is at fault was not investigated in G4.",
@@ -212,7 +221,7 @@
         "--transpile-only"
       ],
       "errors": [
-        "Calor0410"
+        "N1_unknown_external_pure.calr|Calor0410"
       ],
       "evidence": "tests/Calor.Enforcement.Tests (EffectEnforcementTests, BypassTests) compile these with TestHarness.Compile: effects enforced, UnsafeTranspileOnly = true; expected codes in the sibling *.expected.json. BypassTests.N1_UnknownExternalInPureFunction_Fails asserts HasErrors and N1_unknown_external_pure.expected.json (Calor0411 is reported as a warning; the error is the fail-closed Calor0410 for the unknown effect).",
       "files": [
@@ -244,7 +253,7 @@
         "--transpile-only"
       ],
       "errors": [
-        "Calor0410"
+        "E1_missing_effect.calr|Calor0410"
       ],
       "evidence": "tests/Calor.Enforcement.Tests (EffectEnforcementTests, BypassTests) compile these with TestHarness.Compile: effects enforced, UnsafeTranspileOnly = true; expected codes in the sibling *.expected.json. EffectEnforcementTests.E1_MissingEffect_FailsWithForbiddenEffect asserts HasErrors and E1_missing_effect.expected.json (Calor0410).",
       "files": [
@@ -272,7 +281,7 @@
         "--transpile-only"
       ],
       "errors": [
-        "Calor0410"
+        "E3_call_chain.calr|Calor0410"
       ],
       "evidence": "tests/Calor.Enforcement.Tests (EffectEnforcementTests, BypassTests) compile these with TestHarness.Compile: effects enforced, UnsafeTranspileOnly = true; expected codes in the sibling *.expected.json. EffectEnforcementTests.E3_CallChain_ReportsCallerFunction asserts HasErrors and E3_call_chain.expected.json (Calor0410).",
       "files": [
@@ -288,7 +297,7 @@
         "--transpile-only"
       ],
       "errors": [
-        "Calor0410"
+        "E4_unknown_external.calr|Calor0410"
       ],
       "evidence": "tests/Calor.Enforcement.Tests (EffectEnforcementTests, BypassTests) compile these with TestHarness.Compile: effects enforced, UnsafeTranspileOnly = true; expected codes in the sibling *.expected.json. EffectEnforcementTests.E4_UnknownExternal_FailsInStrictMode asserts HasErrors and E4_unknown_external.expected.json (Calor0411 is reported as a warning; the error is the fail-closed Calor0410).",
       "files": [
@@ -304,7 +313,7 @@
         "--transpile-only"
       ],
       "errors": [
-        "Calor0410"
+        "E5_recursion.calr|Calor0410"
       ],
       "evidence": "tests/Calor.Enforcement.Tests (EffectEnforcementTests, BypassTests) compile these with TestHarness.Compile: effects enforced, UnsafeTranspileOnly = true; expected codes in the sibling *.expected.json. EffectEnforcementTests.E5_Recursion_ComputesEffectsViaFixpoint asserts HasErrors and E5_recursion.expected.json (Calor0410).",
       "files": [
@@ -320,7 +329,7 @@
         "--transpile-only"
       ],
       "errors": [
-        "Calor0410"
+        "E6_span_accuracy.calr|Calor0410"
       ],
       "evidence": "tests/Calor.Enforcement.Tests (EffectEnforcementTests, BypassTests) compile these with TestHarness.Compile: effects enforced, UnsafeTranspileOnly = true; expected codes in the sibling *.expected.json. EffectEnforcementTests.E6_SpanAccuracy_PointsAtCorrectLocation asserts the Calor0410 span (E6_span_accuracy.expected.json).",
       "files": [
@@ -333,7 +342,7 @@
       "negativeKind": "incidental",
       "mode": "each",
       "errors": [
-        "Calor0410"
+        "Issue1104_BatchingSink_LoopAsync.calr|Calor0410"
       ],
       "evidence": "Not an intended negative. EffectInferrerRecursionTests only parses this Serilog-derived fixture and runs effect inference with the permissive policy; nothing compiles it. Under the strict default its unresolved external calls (Calor0411 warnings) make LoopAsync use the undeclared effect unknown, which Calor0410 reports correctly.",
       "files": [
@@ -483,8 +492,10 @@
       "negativeKind": "incidental",
       "mode": "together",
       "errors": [
-        "Calor0410",
-        "Calor1002:CS0246"
+        "Pipeline.calr|Calor0410",
+        "Pipeline.calr|Calor0410",
+        "Pipeline.g.cs|Calor1002:CS0246",
+        "Pipeline.g.cs|Calor1002:CS0246"
       ],
       "evidence": "Not an intended negative. acceptance.sh greps text and never compiles. Besides the setup's undeclared net/db effects (Calor0410), the reference solution catches NetworkError and IoError, which no module defines; Calor defers unknown type names to Roslyn (Calor0200 warning), which rejects them (CS0246). A defect in the task template, not in the compiler.",
       "files": [
@@ -498,7 +509,8 @@
       "negativeKind": "incidental",
       "mode": "together",
       "errors": [
-        "Calor0410"
+        "Pipeline.calr|Calor0410",
+        "Pipeline.calr|Calor0410"
       ],
       "evidence": "Not an intended negative. acceptance.sh greps text and never compiles. FetchAndStore calls Remote.FetchRemote (net) and Remote.WriteRecord (db) without declaring them; Calor0410 reports this correctly. A defect in the task template, not in the compiler.",
       "files": [
@@ -533,7 +545,9 @@
       "negativeKind": "incidental",
       "mode": "each",
       "errors": [
-        "Calor0410"
+        "output.g.calr|Calor0410",
+        "output.g.calr|Calor0410",
+        "output.g.calr|Calor0410"
       ],
       "evidence": "Not an intended negative. Nothing reads this file (run-tests.sh compiles input.calr and verify.sh reads output.g.cs). Main uses alloc, cw and mut without declaring them; Calor0410 reports this correctly.",
       "files": [
@@ -763,7 +777,7 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0266"
+        "HashMap.calr|Calor1002:CS0266"
       ],
       "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -779,7 +793,8 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0266"
+        "Adapter.calr|Calor1002:CS0266",
+        "Adapter.calr|Calor1002:CS0266"
       ],
       "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -795,7 +810,8 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0266"
+        "Factory.calr|Calor1002:CS0266",
+        "Factory.calr|Calor1002:CS0266"
       ],
       "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -811,11 +827,33 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0060",
-        "Calor1002:CS0115",
-        "Calor1002:CS0122",
-        "Calor1002:CS0534",
-        "Calor1002:CS0621"
+        "TemplateMethod.calr|Calor1002:CS0122",
+        "TemplateMethod.g.cs|Calor1002:CS0060",
+        "TemplateMethod.g.cs|Calor1002:CS0060",
+        "TemplateMethod.g.cs|Calor1002:CS0115",
+        "TemplateMethod.g.cs|Calor1002:CS0115",
+        "TemplateMethod.g.cs|Calor1002:CS0115",
+        "TemplateMethod.g.cs|Calor1002:CS0115",
+        "TemplateMethod.g.cs|Calor1002:CS0115",
+        "TemplateMethod.g.cs|Calor1002:CS0115",
+        "TemplateMethod.g.cs|Calor1002:CS0115",
+        "TemplateMethod.g.cs|Calor1002:CS0534",
+        "TemplateMethod.g.cs|Calor1002:CS0534",
+        "TemplateMethod.g.cs|Calor1002:CS0534",
+        "TemplateMethod.g.cs|Calor1002:CS0534",
+        "TemplateMethod.g.cs|Calor1002:CS0534",
+        "TemplateMethod.g.cs|Calor1002:CS0534",
+        "TemplateMethod.g.cs|Calor1002:CS0621",
+        "TemplateMethod.g.cs|Calor1002:CS0621",
+        "TemplateMethod.g.cs|Calor1002:CS0621",
+        "TemplateMethod.g.cs|Calor1002:CS0621",
+        "TemplateMethod.g.cs|Calor1002:CS0621",
+        "TemplateMethod.g.cs|Calor1002:CS0621",
+        "TemplateMethod.g.cs|Calor1002:CS0621",
+        "TemplateMethod.g.cs|Calor1002:CS0621",
+        "TemplateMethod.g.cs|Calor1002:CS0621",
+        "TemplateMethod.g.cs|Calor1002:CS0621",
+        "TemplateMethod.g.cs|Calor1002:CS0621"
       ],
       "defect": "Front end accepts the source; generated C# (CS0060): Inconsistent accessibility: base class 'DataProcessor' is less accessible than class 'CsvProcessor'; generated C# (CS0060): Inconsistent accessibility: base class 'DataProcessor' is less accessible than class 'JsonProcessor'; generated C# (CS0621): 'CsvProcessor.ReadData()': virtual or abstract members cannot be private; and 24 more",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -831,13 +869,27 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0051",
-        "Calor1002:CS0052",
-        "Calor1002:CS0060",
-        "Calor1002:CS0115",
-        "Calor1002:CS0122",
-        "Calor1002:CS0126",
-        "Calor1002:CS0266"
+        "Visitor.calr|Calor1002:CS0122",
+        "Visitor.calr|Calor1002:CS0122",
+        "Visitor.calr|Calor1002:CS0122",
+        "Visitor.calr|Calor1002:CS0122",
+        "Visitor.calr|Calor1002:CS0122",
+        "Visitor.calr|Calor1002:CS0126",
+        "Visitor.calr|Calor1002:CS0266",
+        "Visitor.g.cs|Calor1002:CS0051",
+        "Visitor.g.cs|Calor1002:CS0051",
+        "Visitor.g.cs|Calor1002:CS0051",
+        "Visitor.g.cs|Calor1002:CS0051",
+        "Visitor.g.cs|Calor1002:CS0052",
+        "Visitor.g.cs|Calor1002:CS0052",
+        "Visitor.g.cs|Calor1002:CS0052",
+        "Visitor.g.cs|Calor1002:CS0052",
+        "Visitor.g.cs|Calor1002:CS0060",
+        "Visitor.g.cs|Calor1002:CS0060",
+        "Visitor.g.cs|Calor1002:CS0060",
+        "Visitor.g.cs|Calor1002:CS0115",
+        "Visitor.g.cs|Calor1002:CS0115",
+        "Visitor.g.cs|Calor1002:CS0115"
       ],
       "defect": "Front end accepts the source; generated C# (CS0060): Inconsistent accessibility: base class 'Expression' is less accessible than class 'NumberExpression'; generated C# (CS0060): Inconsistent accessibility: base class 'Expression' is less accessible than class 'MultiplyExpression'; generated C# (CS0060): Inconsistent accessibility: base class 'Expression' is less accessible than class 'AddExpression'; and 12 more",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -853,7 +905,7 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0266"
+        "CurrencyConverter.calr|Calor1002:CS0266"
       ],
       "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -869,7 +921,7 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0266"
+        "ScoreBoard.calr|Calor1002:CS0266"
       ],
       "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -885,7 +937,10 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0664"
+        "TaxCalculator.calr|Calor1002:CS0664",
+        "TaxCalculator.calr|Calor1002:CS0664",
+        "TaxCalculator.calr|Calor1002:CS0664",
+        "TaxCalculator.calr|Calor1002:CS0664"
       ],
       "defect": "Front end accepts the source; generated C# (CS0664): Literal of type double cannot be implicitly converted to type 'float'; use an 'F' suffix to create a literal of this type",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -901,7 +956,11 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0266"
+        "UnitConverter.calr|Calor1002:CS0266",
+        "UnitConverter.calr|Calor1002:CS0266",
+        "UnitConverter.calr|Calor1002:CS0266",
+        "UnitConverter.calr|Calor1002:CS0266",
+        "UnitConverter.calr|Calor1002:CS0266"
       ],
       "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -917,7 +976,7 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0266"
+        "VotingSystem.calr|Calor1002:CS0266"
       ],
       "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -952,9 +1011,9 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS1001",
-        "Calor1002:CS1003",
-        "Calor1002:CS1511"
+        "NetworkEffect.calr|Calor1002:CS1511",
+        "NetworkEffect.g.cs|Calor1002:CS1001",
+        "NetworkEffect.g.cs|Calor1002:CS1003"
       ],
       "defect": "Front end accepts the source; generated C# (CS1001): Identifier expected; generated C# (CS1003): Syntax error, ',' expected; generated C# (CS1511): Keyword 'base' is not available in a static method",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -970,7 +1029,7 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS1061"
+        "NullDeref_buggy.calr|Calor1002:CS1061"
       ],
       "defect": "Front end accepts the source; generated C# (CS1061): 'Option<int>' does not contain a definition for 'unwrap' and no accessible extension method 'unwrap' accepting a first argument of type 'Option<int>' could be found (are you missing a using directive or an assembly reference?)",
       "evidence": "Benchmark-directory files not listed in tests/TestData/Benchmarks/manifest.json; no test compiles them. Compiled with the same options as the registered benchmarks. Not in Benchmarks/manifest.json, so no test compiles it.",
@@ -986,9 +1045,9 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS1001",
-        "Calor1002:CS1003",
-        "Calor1002:CS1511"
+        "PureFunctions.calr|Calor1002:CS1511",
+        "PureFunctions.g.cs|Calor1002:CS1001",
+        "PureFunctions.g.cs|Calor1002:CS1003"
       ],
       "defect": "Front end accepts the source; generated C# (CS1001): Identifier expected; generated C# (CS1003): Syntax error, ',' expected; generated C# (CS1511): Keyword 'base' is not available in a static method",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -1004,7 +1063,7 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0266"
+        "Composition.calr|Calor1002:CS0266"
       ],
       "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -1020,10 +1079,11 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0266",
-        "Calor1002:CS1001",
-        "Calor1002:CS1003",
-        "Calor1002:CS1511"
+        "InterfaceImpl.calr|Calor1002:CS0266",
+        "InterfaceImpl.calr|Calor1002:CS1511",
+        "InterfaceImpl.g.cs|Calor1002:CS1001",
+        "InterfaceImpl.g.cs|Calor1002:CS1003",
+        "InterfaceImpl.g.cs|Calor1002:CS1511"
       ],
       "defect": "Front end accepts the source; generated C# (CS1001): Identifier expected; generated C# (CS1003): Syntax error, ',' expected; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?); and 1 more",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -1039,7 +1099,7 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0266"
+        "Polymorphism.calr|Calor1002:CS0266"
       ],
       "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -1055,7 +1115,7 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0266"
+        "AreaOfCircle.calr|Calor1002:CS0266"
       ],
       "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -1071,7 +1131,7 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0266"
+        "Average.calr|Calor1002:CS0266"
       ],
       "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -1087,7 +1147,7 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0266"
+        "CelsiusToKelvin.calr|Calor1002:CS0266"
       ],
       "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -1103,7 +1163,7 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0266"
+        "CompoundInterest.calr|Calor1002:CS0266"
       ],
       "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -1119,9 +1179,9 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS1001",
-        "Calor1002:CS1003",
-        "Calor1002:CS1511"
+        "Power.calr|Calor1002:CS1511",
+        "Power.g.cs|Calor1002:CS1001",
+        "Power.g.cs|Calor1002:CS1003"
       ],
       "defect": "Front end accepts the source; generated C# (CS1001): Identifier expected; generated C# (CS1003): Syntax error, ',' expected; generated C# (CS1511): Keyword 'base' is not available in a static method",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -1137,7 +1197,9 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0266"
+        "TemperatureConverter.calr|Calor1002:CS0266",
+        "TemperatureConverter.calr|Calor1002:CS0266",
+        "TemperatureConverter.calr|Calor1002:CS0266"
       ],
       "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -1153,7 +1215,7 @@
         "--no-enforce-effects"
       ],
       "errors": [
-        "Calor1002:CS0266"
+        "TemperatureRange.calr|Calor1002:CS0266"
       ],
       "defect": "Front end accepts the source; generated C# (CS0266): Cannot implicitly convert type 'double' to 'float'. An explicit conversion exists (are you missing a cast?)",
       "evidence": "tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs compiles every manifest.json benchmark with EnforceEffects = false and ContractMode.Debug. tests/Calor.Compiler.Tests/BulkBenchmarkCompilationTests.cs lists this file in KnownGeneratedCSharpFailures and asserts it fails with Calor1002 only.",
@@ -1187,7 +1249,7 @@
       "negativeKind": "designed",
       "mode": "together",
       "errors": [
-        "Calor0410"
+        "alpha.calr|Calor0410"
       ],
       "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: ES-01 step 2 introduces a violation (Calor0410).",
       "files": [
@@ -1222,7 +1284,7 @@
       "negativeKind": "designed",
       "mode": "together",
       "errors": [
-        "Calor0410"
+        "delta.calr|Calor0410"
       ],
       "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: ES-02 step 2 adds a violating file (Calor0410).",
       "files": [
@@ -1238,7 +1300,7 @@
       "negativeKind": "designed",
       "mode": "together",
       "errors": [
-        "Calor0410"
+        "noisy.calr|Calor0410"
       ],
       "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: ES-03 starts with a violating file (noisy.calr, Calor0410) that step 1 deletes.",
       "files": [
@@ -1282,7 +1344,7 @@
       "negativeKind": "designed",
       "mode": "together",
       "errors": [
-        "Calor0410"
+        "caller.calr|Calor0410"
       ],
       "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: in ES-04 step 1 the callee gains an effect, so the unedited caller draws a cross-module Calor0410.",
       "files": [
@@ -1306,7 +1368,7 @@
       "negativeKind": "designed",
       "mode": "together",
       "errors": [
-        "Calor0410"
+        "service.calr|Calor0410"
       ],
       "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: ES-05 compiles identical files under effects-on (violation reported, Calor0410), effects-off (clean), effects-on again.",
       "files": [
@@ -1333,7 +1395,7 @@
       "negativeKind": "designed",
       "mode": "together",
       "errors": [
-        "Calor0410"
+        "service.calr|Calor0410"
       ],
       "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: ES-05 compiles identical files under effects-on (violation reported, Calor0410), effects-off (clean), effects-on again.",
       "files": [
@@ -1430,7 +1492,7 @@
       "negativeKind": "designed",
       "mode": "together",
       "errors": [
-        "Calor0410"
+        "app.calr|Calor0410"
       ],
       "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: in ES-08 step 1 the widened row makes the unedited UsePure draw Calor0410.",
       "files": [
@@ -1445,7 +1507,7 @@
       "negativeKind": "designed",
       "mode": "together",
       "errors": [
-        "Calor0410"
+        "combinators.calr|Calor0410"
       ],
       "evidence": "tests/TestData/EditScripts/README.md and each script.json: every step directory is the complete workspace, compiled together under the step's options profile (EditScriptIdentityTests). README.md: in ES-08 step 2 the erased row draws Calor0425 (warning) plus the fail-closed Calor0410.",
       "files": [
@@ -1517,7 +1579,7 @@
       "negativeKind": "incidental",
       "mode": "each",
       "errors": [
-        "Calor0410"
+        "leading_spaces.calr|Calor0410"
       ],
       "evidence": "Not an intended negative. Lint-only input (LintTestDataLoader never compiles it). Main prints without declaring cw; Calor0410 reports this correctly.",
       "files": [
@@ -1530,7 +1592,7 @@
       "negativeKind": "incidental",
       "mode": "each",
       "errors": [
-        "Calor0410"
+        "leading_tabs.calr|Calor0410"
       ],
       "evidence": "Not an intended negative. Lint-only input (LintTestDataLoader never compiles it). Main prints without declaring cw; Calor0410 reports this correctly.",
       "files": [
@@ -1543,7 +1605,7 @@
       "negativeKind": "incidental",
       "mode": "each",
       "errors": [
-        "Calor0410"
+        "trailing_spaces.calr|Calor0410"
       ],
       "evidence": "Not an intended negative. Lint-only input (LintTestDataLoader never compiles it). Main prints without declaring cw; Calor0410 reports this correctly.",
       "files": [
@@ -1556,7 +1618,8 @@
       "negativeKind": "incidental",
       "mode": "each",
       "errors": [
-        "Calor0410"
+        "throw_statement.calr|Calor0410",
+        "throw_statement.calr|Calor0410"
       ],
       "evidence": "Not an intended negative. Lint-only input (LintTestDataLoader never compiles it). Its functions throw or print without declaring throw/cw; Calor0410 reports this correctly.",
       "files": [
@@ -1569,7 +1632,9 @@
       "negativeKind": "incidental",
       "mode": "each",
       "errors": [
-        "Calor0410"
+        "try_catch_when.calr|Calor0410",
+        "try_catch_when.calr|Calor0410",
+        "try_catch_when.calr|Calor0410"
       ],
       "evidence": "Not an intended negative. Lint-only input (LintTestDataLoader never compiles it). Its functions throw or print without declaring throw/cw; Calor0410 reports this correctly.",
       "files": [
@@ -1582,7 +1647,8 @@
       "negativeKind": "incidental",
       "mode": "each",
       "errors": [
-        "Calor0410"
+        "try_finally_return.calr|Calor0410",
+        "try_finally_return.calr|Calor0410"
       ],
       "evidence": "Not an intended negative. Lint-only input (LintTestDataLoader never compiles it). Its functions throw or print without declaring throw/cw; Calor0410 reports this correctly.",
       "files": [
@@ -1595,7 +1661,7 @@
       "negativeKind": "incidental",
       "mode": "each",
       "errors": [
-        "Calor0410"
+        "try_multi_catch_finally.calr|Calor0410"
       ],
       "evidence": "Not an intended negative. Lint-only input (LintTestDataLoader never compiles it). Its functions throw or print without declaring throw/cw; Calor0410 reports this correctly.",
       "files": [
@@ -1608,7 +1674,8 @@
       "negativeKind": "designed",
       "mode": "each",
       "errors": [
-        "Calor0830"
+        "mismatched_ids.calr|Calor0830",
+        "mismatched_ids.calr|Calor0830"
       ],
       "evidence": "Inputs for the lint tests (LintTestDataLoader); no test compiles them. Compiled with default options. LintScenarios/10_error_cases holds deliberately malformed inputs for the lint error path; the parse/lex error is the fixture's purpose.",
       "files": [
@@ -1621,7 +1688,7 @@
       "negativeKind": "designed",
       "mode": "each",
       "errors": [
-        "Calor0006"
+        "syntax_error.calr|Calor0006"
       ],
       "evidence": "Inputs for the lint tests (LintTestDataLoader); no test compiles them. Compiled with default options. LintScenarios/10_error_cases holds deliberately malformed inputs for the lint error path; the parse/lex error is the fixture's purpose.",
       "files": [
@@ -1634,7 +1701,7 @@
       "negativeKind": "designed",
       "mode": "each",
       "errors": [
-        "Calor0002"
+        "unterminated_string.calr|Calor0002"
       ],
       "evidence": "Inputs for the lint tests (LintTestDataLoader); no test compiles them. Compiled with default options. LintScenarios/10_error_cases holds deliberately malformed inputs for the lint error path; the parse/lex error is the fixture's purpose.",
       "files": [
@@ -1647,7 +1714,9 @@
       "negativeKind": "designed",
       "mode": "together",
       "errors": [
-        "Calor0410"
+        "app.calr|Calor0410",
+        "asks-across.calr|Calor0410",
+        "asks-across.calr|Calor0410"
       ],
       "evidence": "tests/TestData/QueryCorpus/project is one workspace indexed as a unit (QueryGoldenTests); compiled together. tests/TestData/QueryCorpus/expected.json: Leaky (app.calr) is the registered Calor0410 case of the effects facet, and AsksAmbiguous/AsksMissing (asks-across.calr) call unresolved targets on purpose; the Calor0410 errors are those cases.",
       "files": [
@@ -1712,7 +1781,7 @@
       "negativeKind": "designed",
       "mode": "together",
       "errors": [
-        "Calor1002:CS0101"
+        "part-b.g.cs|Calor1002:CS0101"
       ],
       "evidence": "Each RenameScripts/RN-* directory is one workspace the rename harness edits as a unit (RenameHarnessTests); compiled together. RN-06 script.json: \"One module, two declarations ... Calor reports nothing for the split (each file still binds); the break appears only in generated C#.\" The rename engine must refuse. Lifting the refusal is #922.",
       "files": [

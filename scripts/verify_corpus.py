@@ -2,19 +2,13 @@
 """
 verify_corpus.py — Tier 2 corpus-wide verification driver (v6 §3.2).
 
-Repaired by #1241. Every check runs the checkout-built compiler over
-tracked fixtures only (never bin/ or obj/ copies):
-
-    1. Tier 1 in extended mode: every tracked samples/ + tests/ fixture is
-       compiled once against its explicit expectation (compile / reject /
-       known-failure) in eng/tier2-fixture-expectations.json. Registered
-       known compiler failures keep Tier 2 red. Not an AST round trip.
-    2. Migrator corpus dry-run (fails closed; exit 3 = unavailable).
-    3. Aggregate token-delta counterfactual (informational; not a check).
-    4. Migrator revert round trip: source bytes, not an AST round trip.
-
-Removed by #1241: a `dotnet test` run filtered on the `DiagnosticSnapshot`
-category trait, which selected zero tests.
+Repaired by #1241; all checks use the checkout-built compiler and tracked
+fixtures only. 1. Tier 1 extended: samples/ + tests/ against
+eng/tier2-fixture-expectations.json (known failures keep Tier 2 red;
+not an AST round trip). 2. Migrator dry run. 3. Token-delta counterfactual
+(informational). 4. Migrator revert round trip (source bytes, not AST).
+Removed: a `dotnet test` run on the `DiagnosticSnapshot` category trait,
+which selected zero tests.
 
 Runtime target: < 30 minutes on a developer machine.
 

@@ -20,19 +20,11 @@ fixture under the selected roots must appear there exactly once, with:
   expect = known-failure  a real compiler failure, retained as a failure:
                           must fail with exactly the registered signature.
 
-Row statuses. Only `passed` and `expected-negative` are successes:
-
-  passed, expected-negative           success
-  known-failure                       a registered real failure; not a pass
-  failed                              wrong outcome or wrong error signature
-  unexpected-pass                     a reject/known-failure row compiled
-  unclassified                        tracked fixture with no expectation
-  invalid                             malformed or stale expectation entry
-  crashed                             no parseable compiler result
-  TimeoutOrUnavailable                the compile hit the time limit
-
-There is no skip path. The verdict is PASS only when there is at least one
-row and every row is a success.
+Only `passed` and `expected-negative` are successes. `known-failure`,
+`failed` (wrong outcome or signature), `unexpected-pass`, `unclassified`
+(no expectation), `invalid` (malformed or stale entry), `crashed` (no
+parseable result), and `TimeoutOrUnavailable` all fail. There is no skip
+path; an empty selection fails.
 
 Exit codes:
     0  PASS
@@ -88,17 +80,26 @@ STATUSES = SUCCESS + ("known-failure", "failed", "unexpected-pass",
 CS_CODE = re.compile(r"\((CS\d{4})\)")
 
 
+def errors_of(diagnostics: list[dict]) -> list[dict]:
+    return [d for d in diagnostics
+            if str(d.get("severity", "")).lower() == "error"]
+
+
 def signature(diagnostics: list[dict]) -> list[str]:
-    """Sorted unique error codes; Calor1002 carries its Roslyn code."""
-    sig = set()
-    for d in diagnostics:
-        if str(d.get("severity", "")).lower() != "error":
-            continue
+    """One `file|code` entry per error, sorted, duplicates kept.
+
+    `file` is the base name of the reported location, so an error on the
+    wrong module of a workspace, or one more error of the same code, changes
+    the signature. Calor1002 carries its Roslyn code.
+    """
+    sig = []
+    for d in errors_of(diagnostics):
         code = str(d.get("code", ""))
         if code == "Calor1002":
             m = CS_CODE.search(str(d.get("message", "")))
             code = f"Calor1002:{m.group(1)}" if m else "Calor1002"
-        sig.add(code)
+        where = Path(str((d.get("location") or {}).get("file") or "-")).name
+        sig.append(f"{where}|{code}")
     return sorted(sig)
 
 
@@ -112,79 +113,65 @@ def validate_manifest(manifest: dict) -> list[str]:
     groups = manifest.get("groups")
     if not isinstance(groups, list) or not groups:
         return errors + ["groups must be a non-empty list"]
-    seen_ids: set[str] = set()
+    ids = [g.get("id") if isinstance(g, dict) else None for g in groups]
     for i, g in enumerate(groups):
-        gid = g.get("id") if isinstance(g, dict) else None
-        where = f"group {gid or i}"
-        if not isinstance(g, dict) or not isinstance(gid, str) or not gid:
-            errors.append(f"{where}: missing id")
+        def bad(why):
+            errors.append(f"group {ids[i] or i}: {why}")
+        if not isinstance(ids[i], str) or not ids[i] or ids.count(ids[i]) > 1:
+            bad("missing or duplicate id")
             continue
-        if gid in seen_ids:
-            errors.append(f"{where}: duplicate id")
-        seen_ids.add(gid)
-        files = g.get("files")
-        if (not isinstance(files, list) or not files
-                or not all(isinstance(f, str) and f for f in files)):
-            errors.append(f"{where}: files must be a non-empty list of paths")
-        elif len(set(files)) != len(files):
-            errors.append(f"{where}: a file is listed twice")
-        if g.get("mode") not in MODES:
-            errors.append(f"{where}: mode must be one of {MODES}")
-        elif g["mode"] == "together" and isinstance(files, list) \
-                and len(files) < 2:
-            errors.append(f"{where}: a together group needs 2+ files")
-        expect = g.get("expect")
+        files, expect, errs = g.get("files"), g.get("expect"), g.get("errors")
+        if (not isinstance(files, list) or not files or len(set(files))
+                != len(files) or not all(isinstance(f, str) and f
+                                         for f in files)):
+            bad("files must be a non-empty list of distinct paths")
+        if g.get("mode") not in MODES or (
+                g["mode"] == "together" and len(files or []) < 2):
+            bad(f"mode must be one of {MODES}; together needs 2+ files")
         if expect not in EXPECTATIONS:
-            errors.append(f"{where}: expect must be one of {EXPECTATIONS}")
+            bad(f"expect must be one of {EXPECTATIONS}")
         opts = g.get("options", [])
-        if not isinstance(opts, list) or any(o not in ALLOWED_OPTIONS
-                                             for o in opts):
-            errors.append(f"{where}: options must be a subset of "
-                          f"{sorted(ALLOWED_OPTIONS)}")
-        errs = g.get("errors")
-        if expect == "compile":
-            if errs not in (None, []):
-                errors.append(f"{where}: a compile group lists no errors")
-        elif (not isinstance(errs, list) or not errs
-              or not all(isinstance(e, str) and e for e in errs)
-              or errs != sorted(set(errs))):
-            errors.append(f"{where}: {expect} needs a sorted, unique, "
-                          "non-empty error signature")
-        kind = g.get("negativeKind")
-        if expect == "reject" and kind not in NEGATIVE_KINDS:
-            errors.append(f"{where}: reject needs negativeKind in "
-                          f"{NEGATIVE_KINDS}")
-        elif expect != "reject" and kind is not None:
-            errors.append(f"{where}: only a reject group has a negativeKind")
-        if not isinstance(g.get("evidence"), str) or not g["evidence"].strip():
-            errors.append(f"{where}: evidence is required")
-        if expect == "known-failure" and (
-                not isinstance(g.get("defect"), str) or not g["defect"].strip()):
-            errors.append(f"{where}: known-failure needs a defect description")
+        if not isinstance(opts, list) or not set(opts) <= ALLOWED_OPTIONS:
+            bad(f"options must be a subset of {sorted(ALLOWED_OPTIONS)}")
+        if expect == "compile" and errs not in (None, []):
+            bad("a compile group lists no errors")
+        if expect != "compile" and (
+                not isinstance(errs, list) or not errs or errs != sorted(errs)
+                or not all(isinstance(e, str) and e for e in errs)):
+            bad(f"{expect} needs a sorted, non-empty error signature")
+        if (expect == "reject") != (g.get("negativeKind") in NEGATIVE_KINDS) \
+                or (expect != "reject" and "negativeKind" in g):
+            bad(f"negativeKind in {NEGATIVE_KINDS} is required for reject "
+                "and only there")
+        if not (isinstance(g.get("evidence"), str) and g["evidence"].strip()):
+            bad("evidence is required")
+        if expect == "known-failure" and not (
+                isinstance(g.get("defect"), str) and g["defect"].strip()):
+            bad("known-failure needs a defect description")
     return errors
 
 
 # ------------------------------------------------------------- execution
 
-def _parse_result(rc: int, stdout: str) -> tuple[str | None, list[str], str]:
-    """Return (outcome, signature, detail); outcome None means crashed."""
+def _parse_result(rc: int, stdout: str) -> tuple:
+    """Return (outcome, signature, detail, errors); None outcome = crashed."""
     start = stdout.find("{")
     try:
         doc = json.loads(stdout[start:]) if start >= 0 else None
     except json.JSONDecodeError:
         doc = None
     if not isinstance(doc, dict) or not isinstance(doc.get("diagnostics"), list):
-        return None, [], f"exit {rc}; no JSON diagnostics document"
-    sig = signature(doc["diagnostics"])
+        return None, [], f"exit {rc}; no JSON diagnostics document", []
+    sig, errs = signature(doc["diagnostics"]), errors_of(doc["diagnostics"])
     if rc == 0 and not sig:
-        return "ok", [], ""
+        return "ok", [], "", []
     if rc == 1 and sig:
-        return "errors", sig, ""
-    return None, sig, f"exit {rc} with error signature {sig}"
+        return "errors", sig, "", errs
+    return None, sig, f"exit {rc} with error signature {sig}", errs
 
 
 def run_unit(compiler_cmd: list[str], repo_root: Path, files: list[str],
-             options: list[str], timeout: float) -> tuple[str | None, list[str], str]:
+             options: list[str], timeout: float) -> tuple:
     """Compile one unit: one file, or one multi-file group, in a scratch dir.
 
     Inputs are copied so that nothing is written into the checkout (the CLI
@@ -209,18 +196,18 @@ def run_unit(compiler_cmd: list[str], repo_root: Path, files: list[str],
             cp = subprocess.run(cmd, cwd=work, capture_output=True, text=True,
                                 timeout=timeout)
         except subprocess.TimeoutExpired:
-            return "timeout", [], f"exceeded {timeout:.0f}s"
-        outcome, sig, detail = _parse_result(cp.returncode, cp.stdout)
+            return "timeout", [], f"exceeded {timeout:.0f}s", []
+        outcome, sig, detail, errs = _parse_result(cp.returncode, cp.stdout)
         if outcome == "ok":
             outputs = ([work / "out.g.cs"] if len(inputs) == 1
                        else [p.with_suffix(".g.cs") for p in inputs])
             missing = [o.name for o in outputs
                        if not o.is_file() or o.stat().st_size == 0]
             if missing:
-                return None, [], f"exit 0 but no generated C#: {missing}"
-        if outcome is None and not detail:
-            detail = (cp.stderr or cp.stdout)[-400:]
-        return outcome, sig, detail
+                return None, [], f"exit 0 but no generated C#: {missing}", []
+        if outcome is None:
+            detail = f"{detail} {(cp.stderr or cp.stdout)[-400:]}".strip()
+        return outcome, sig, detail, errs
 
 
 def classify(expect: str, expected_sig: list[str], outcome: str | None,
@@ -288,8 +275,8 @@ def check(repo_root: Path, manifest: dict, roots: list[str], discovered: list[st
 
     def work(unit):
         g, batch = unit
-        outcome, sig, detail = run_unit(compiler_cmd, repo_root, batch,
-                                        g.get("options", []), timeout)
+        outcome, sig, detail, errs = run_unit(compiler_cmd, repo_root, batch,
+                                              g.get("options", []), timeout)
         expected_sig = g.get("errors") or []
         status = classify(g["expect"], expected_sig, outcome, sig)
         row = {"group": g["id"], "files": batch, "expect": g["expect"],
@@ -301,6 +288,12 @@ def check(repo_root: Path, manifest: dict, roots: list[str], discovered: list[st
             row["negativeKind"] = g["negativeKind"]
         if detail:
             row["detail"] = detail
+        if status not in SUCCESS:  # keep what is needed to investigate
+            row["errorDiagnostics"] = [{"file": e.get("location", {}).get("file"),
+                              "line": e.get("location", {}).get("line"),
+                              "code": e.get("code"),
+                              "message": str(e.get("message"))[:300]}
+                             for e in errs]
         return row
 
     with concurrent.futures.ThreadPoolExecutor(max(1, jobs)) as ex:
@@ -390,7 +383,8 @@ def self_test() -> int:
             (root / f"fx/c{i}.calr").write_text(src, encoding="utf-8")
             g = {"id": f"c{i}", "files": [f"fx/c{i}.calr"], "mode": "each",
                  "expect": expect, "evidence": "self-test"}
-            g.update({"errors": errs} if errs else {})
+            g.update({"errors": [f"c{i}.calr|{e}" for e in errs]} if errs
+                     else {})
             g.update({"defect": "self-test"} if expect == "known-failure"
                      else {"negativeKind": "designed"} if expect == "reject"
                      else {})

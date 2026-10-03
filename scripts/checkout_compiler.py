@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
 """Checkout-pinned compiler and fixture discovery for Tier 1 and Tier 2 (#1241).
 
-Every Tier 1 and Tier 2 script runs the compiler that `dotnet build -c Release`
-produced from this checkout: `src/Calor.Compiler/bin/Release/<tfm>/calor.dll`,
-started with `dotnet`. An installed `calor` tool on PATH is never used, and
-there is no fallback. A missing or stale build is an error.
-
-Fixtures are discovered with `git ls-files`, so build-output copies under
-`bin/` and `obj/` (which are untracked) can never be selected.
+Tier scripts run `dotnet src/Calor.Compiler/bin/Release/<tfm>/calor.dll` built
+from this checkout; a missing or stale build is an error, never a fallback to
+an installed `calor`. Fixtures come from `git ls-files`, so untracked bin/ and
+obj/ copies are never selected.
 """
 
 from __future__ import annotations
 
 import hashlib
-import os
 import re
 import shutil
 import subprocess
@@ -22,9 +18,13 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 COMPILER_PROJECT = Path("src/Calor.Compiler")
-# Sources whose change must be followed by a rebuild before a check may run.
+# Build inputs: every non-ignored file (any type, tracked or not) under the
+# compiler and runtime projects, plus the root build files. A build older
+# than any of them, or a deleted tracked input, is stale. Freshness is
+# judged by modification time, not by a content fingerprint.
 SOURCE_DIRS = ("src/Calor.Compiler", "src/Calor.Runtime")
-SOURCE_SUFFIXES = (".cs", ".csproj", ".props", ".targets")
+ROOT_BUILD_FILES = ("Directory.Build.props", "Directory.Build.targets",
+                    "Directory.Packages.props", "global.json", "NuGet.config")
 BUILD_OUTPUT_PARTS = frozenset({"bin", "obj"})
 
 
@@ -82,20 +82,19 @@ def resolve(repo_root: Path = REPO_ROOT) -> PinnedCompiler:
             "`dotnet build src/Calor.Compiler -c Release` first. An installed "
             "`calor` tool is never used instead.")
     built = dll.stat().st_mtime
-    stale = []
-    tracked = _git(repo_root, "ls-files", "-z", "--", *SOURCE_DIRS,
-                   "Directory.Build.props").split("\0")
-    for rel in tracked:
-        if not rel or not rel.endswith(SOURCE_SUFFIXES):
-            continue
-        p = repo_root / rel
-        if p.is_file() and p.stat().st_mtime > built:
-            stale.append(rel)
+    inputs = (*SOURCE_DIRS, *ROOT_BUILD_FILES)
+    deleted = [f for f in _git(repo_root, "ls-files", "-z", "--deleted", "--",
+                               *inputs).split("\0") if f]
+    files = _git(repo_root, "ls-files", "-z", "-co", "--exclude-standard",
+                 "--", *inputs).split("\0")
+    stale = deleted + [f for f in files if f
+                       and (repo_root / f).is_file()
+                       and (repo_root / f).stat().st_mtime > built]
     if stale:
         raise CompilerResolutionError(
-            f"checkout-built compiler {dll} is older than {len(stale)} source "
-            f"file(s), for example {stale[0]}. Rebuild with "
-            "`dotnet build src/Calor.Compiler -c Release`.")
+            f"checkout-built compiler {dll} is older than {len(stale)} build "
+            f"input(s) (changed, added, or deleted), e.g. {stale[0]}. Rebuild "
+            "with `dotnet build src/Calor.Compiler -c Release`.")
     head = _git(repo_root, "rev-parse", "HEAD").strip()
     dirty = bool(_git(repo_root, "status", "--porcelain", "--untracked-files=no")
                  .strip())
@@ -132,20 +131,9 @@ def copy_tracked(repo_root: Path, files: list[str], dest: Path) -> None:
 
 
 def untracked_calr_count(repo_root: Path, roots: list[str]) -> dict:
-    """Count `.calr` files on disk that discovery deliberately ignores."""
-    tracked = set(tracked_calr(repo_root, roots))
-    counts = {"buildOutput": 0, "otherUntracked": 0}
-    for root in roots:
-        base = repo_root / root
-        if not base.is_dir():
-            continue
-        for dirpath, _dirs, names in os.walk(base):
-            for name in names:
-                if not name.endswith(".calr"):
-                    continue
-                rel = Path(dirpath, name).relative_to(repo_root).as_posix()
-                if rel in tracked:
-                    continue
-                key = "buildOutput" if is_build_output(rel) else "otherUntracked"
-                counts[key] += 1
-    return counts
+    """Count untracked `.calr` files on disk that discovery ignores."""
+    out = _git(repo_root, "ls-files", "-z", "-o", "--",
+               *[f"{r.rstrip('/')}/*.calr" for r in roots]).split("\0")
+    build = sum(1 for f in out if f and is_build_output(f))
+    return {"buildOutput": build,
+            "otherUntracked": sum(1 for f in out if f) - build}

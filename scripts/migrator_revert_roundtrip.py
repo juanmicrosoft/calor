@@ -5,15 +5,10 @@ migrator_revert_roundtrip.py — Tier 2 round-trip migrate/revert check.
 For each `.calr` file under a directory tree, perform:
     original → migrate → revert → byte-equal to original
 
-This is a source byte round trip through the migrator, not an AST
-round trip. It delegates to `calor fix`.
-
-Repaired by #1241: it runs the checkout-built compiler (never an
-installed `calor`) on a scratch copy of the tracked files (never bin/
-or obj/ copies) plus a synthetic control file the forward rewrite must
-change. It fails on an empty selection or when the control is not
-rewritten (a vacuous run), and exits 3 (TimeoutOrUnavailable, not a
-pass) when the migrator flags are missing.
+A source byte round trip through `calor fix`, not an AST round trip.
+Repaired by #1241: checkout-built compiler, scratch copy of tracked files
+plus a control file the rewrite must change (else: vacuous, FAIL); empty
+selection fails; missing flags exit 3 (TimeoutOrUnavailable).
 
 Usage:
     python3 scripts/migrator_revert_roundtrip.py <root-dir> \\

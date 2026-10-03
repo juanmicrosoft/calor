@@ -7,16 +7,13 @@ on a developer machine (per v6 §3.1.a). On budget overrun, the
 remediation order is §3.6.
 
 Components (repaired by #1241):
-    1. fixture compile check on samples/ (default) or samples/ + tests/
-       (extended): the checkout-built compiler compiles every tracked
-       fixture once against eng/tier2-fixture-expectations.json. This is
-       not an AST round trip; no Tier 1 or Tier 2 check performs one.
+    1. fixture_compile_check.py on samples/ (or samples/ + tests/ with
+       --corpus all); compiles once, no AST round trip.
     2. token-delta spot check on a single fixture (informational)
 
-Removed by #1241 because they established nothing: a `dotnet test` run
-filtered on the `Unit` category trait (no test carries it, so it selected
-zero tests) and a byte-preservation "identity check" comparing a file
-with itself. A checker exit of 3 is TimeoutOrUnavailable, never OK.
+Removed by #1241: a `dotnet test` run on the `Unit` category trait (it
+selected zero tests) and a byte-preservation "identity check" comparing a
+file with itself. Exit 3 from a checker is TimeoutOrUnavailable, not OK.
 
 Exit codes:
     0  all checks PASS

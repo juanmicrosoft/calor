@@ -32,12 +32,12 @@ surface emitter findings outside G4. No equivalence is claimed.
 
 | Contract clause | Change | Kept closed by |
 |---|---|---|
-| Checkout-pinned Tier 2 run | `scripts/checkout_compiler.py`: every tier script runs `dotnet src/Calor.Compiler/bin/Release/<tfm>/calor.dll` built from the checkout. A missing build, or a build older than any tracked `.cs`/`.csproj`/`.props`/`.targets` under `src/Calor.Compiler` or `src/Calor.Runtime`, is an error; an installed `calor` on `PATH` is never used. Reports record the DLL path, its SHA-256, `HEAD`, and whether the worktree is dirty. | `PinnedCompilerControls` (installed tool on `PATH` + no build → error; stale build → error; fresh build → pinned command); `RepositoryGuards.test_tier_scripts_never_resolve_an_installed_tool` |
-| Explicit positive / negative / multifile expectations | `eng/tier2-fixture-expectations.json` (G4's machine-readable closure inventory) lists all 509 tracked `.calr` files under `samples/` and `tests/` by path, each exactly once, with `compile`, `reject` (`negativeKind` `designed` or `incidental`, exact error signature), or `known-failure` (real compiler failure, exact signature, defect text). Options mirror the consumer and come from a 4-flag allowlist. 36 multi-file workspaces compile `together`. | `RepositoryGuards.test_every_tracked_fixture_is_registered_exactly_once`; `test_benchmark_known_failures_match_the_bulk_test`; `FixtureCheckControls.test_single_fixture_outcomes`, `test_malformed_entries_are_invalid`, `test_multifile_group_is_compiled_together_outside_the_checkout` |
+| Checkout-pinned Tier 2 run | `scripts/checkout_compiler.py`: every tier script runs `dotnet src/Calor.Compiler/bin/Release/<tfm>/calor.dll` built from the checkout. The build is refused when it is missing, older than any non-ignored file (any type, tracked or untracked, so embedded resources and new sources count) under `src/Calor.Compiler` or `src/Calor.Runtime` or a root build file (`Directory.Build.props`, `Directory.Build.targets`, `Directory.Packages.props`, `global.json`, `NuGet.config`), or when a tracked input is deleted. An installed `calor` on `PATH` is never used. Reports record the DLL path, its SHA-256, `HEAD`, and whether the worktree is dirty. Limitation: freshness is judged by modification time, not by a content fingerprint of the build inputs. | `PinnedCompilerControls` (installed tool on `PATH` + no build → error; stale build, added resource, deleted source → error; fresh build → pinned command); `RepositoryGuards.test_tier_scripts_never_resolve_an_installed_tool` |
+| Explicit positive / negative / multifile expectations | `eng/tier2-fixture-expectations.json` (G4's machine-readable closure inventory) lists all 509 tracked `.calr` files under `samples/` and `tests/` by path, each exactly once, with `compile`, `reject` (`negativeKind` `designed` or `incidental`, exact error signature), or `known-failure` (real compiler failure, exact signature, defect text). A signature is one `file|code` entry per error, sorted, duplicates kept (`Calor1002` carries its Roslyn code), so an error in the wrong module of a workspace or one extra error of the same code fails the row. Non-success rows keep each error's file, line, code, and message in the report. Options mirror the consumer and come from a 4-flag allowlist. 36 multi-file workspaces compile `together`. | `RepositoryGuards.test_every_tracked_fixture_is_registered_exactly_once`; `test_benchmark_known_failures_match_the_bulk_test`; `FixtureCheckControls.test_single_fixture_outcomes` (including an extra same-code error), `test_negative_error_must_come_from_the_registered_file`, `test_malformed_entries_are_invalid`, `test_multifile_group_is_compiled_together_outside_the_checkout` |
 | No build-output duplicates | Discovery is `git ls-files`, so untracked `bin/` and `obj/` copies are never selected; a tracked `.calr` under `bin/` or `obj/` is an error; the report counts the ignored copies (`ignoredUntrackedCalr`). | `FixtureCheckControls.test_build_output_is_never_discovered`; `test_single_fixture_outcomes` (a registered `obj/` copy is `invalid`) |
 | No empty advertised selections | Removed `dotnet test --filter` on the `Unit` (Tier 1) and `DiagnosticSnapshot` (Tier 2) category traits: no test carries either trait, so both selected zero tests. An empty fixture selection fails the fixture check and both migrator checks. | `RepositoryGuards.test_no_live_claims_or_empty_selections`; `test_empty_selection_fails`; `MigratorAndDriverControls.test_migrators_fail_closed` |
 | AST-roundtrip claims match the work performed | See the decision above. | `test_no_live_claims_or_empty_selections` (also asserts `ast_roundtrip_check.py` is gone) |
-| Negative self-tests | `fixture_compile_check.py --self-test` (real compiler, synthetic fixtures; run by `verify_phase1.py --self-test` in the `verify-phase1` job): a broken positive is `failed`, a compiling negative is `unexpected-pass`, a negative with another signature is `failed`, a known failure is never a pass, and the empty selection fails. `scripts/test_tier2_verification.py` (18 tests, guard job, no build) adds fake-compiler controls for crashes, missing output, timeouts, unclassified and stale entries, double registration, malformed entries, multi-file grouping, and the migrator and driver exits. | Mutation check below |
+| Negative self-tests | `fixture_compile_check.py --self-test` (real compiler, synthetic fixtures; run by `verify_phase1.py --self-test` in the `verify-phase1` job): a broken positive is `failed`, a compiling negative is `unexpected-pass`, a negative with another signature is `failed`, a known failure is never a pass, and the empty selection fails. `scripts/test_tier2_verification.py` (19 tests, guard job, no build) adds fake-compiler controls for crashes, missing output, timeouts, unclassified and stale entries, double registration, malformed entries, wrong-file and extra errors, multi-file grouping, the migrator checks (unavailable, empty, vacuous, passing, a dry run that writes, a revert that corrupts; the checkout is never modified), and both drivers (a failed or unavailable step never passes). | Mutation check below |
 
 ### Outcome vocabulary (§4)
 
@@ -49,8 +49,8 @@ missing (exit 3) are reported as `TimeoutOrUnavailable`, never as a pass. The to
 steps are labelled informational and never count as checks.
 
 The migrator dry run and revert round trip previously exited 0 ("Phase 0 stub") when the
-migrator was missing. They now exit 3. Both also add a synthetic control file that the
-rewrite must change, because the tracked corpus has no structural IDs left to drop: the
+migrator was missing. They now exit 3. Both run on a scratch copy holding exactly the tracked
+selection, and both add a synthetic control file that the rewrite must change, because the tracked corpus has no structural IDs left to drop: the
 forward rewrite changes 0 of 498 tracked `tests/` files, so without the control both checks
 would pass while exercising nothing.
 
@@ -117,10 +117,13 @@ workspace. Twenty further files are expected negatives only as members of a fail
   `passed` 428, `expected-negative` 51, `known-failure` 30, every other status 0.
   Migrator dry run and revert round trip `OK` (forward rewrite changed 0 corpus files plus the
   control). Tier 2 exits 1 because of the 30 known failures.
-- **CI**: `tier2.yml` `workflow_dispatch` run on this branch — see the PR description for the
-  run ID and result. Its artifact `tier2-verification` holds `tier2.log` and
-  `tier2-fixtures.json`. The CI checkout also builds every test project, so
-  `ignoredUntrackedCalr.buildOutput` shows the `bin/` copies that discovery skips.
+- **CI** (ubuntu-latest): `tier2.yml` `workflow_dispatch` run
+  [37142068674](https://github.com/juanmicrosoft/calor/actions/runs/37142068674) on
+  `5fa2adc2`, before review round 1: same counts as local (428 / 51 / 30, everything else 0),
+  migrator checks `OK`, job `failure` because of the 30 known failures. The CI build also
+  builds every test project, and the report's `ignoredUntrackedCalr.buildOutput` is **594**:
+  the `bin/` copies the old discovery counted (509 + 594 = 1,103 files, close to the inherited
+  1,092). Later runs are listed in the PR description.
 
 Tier 2 stays red until the 30 known failures are fixed. That is the intended result: the gate
 reports real compiler failures instead of hiding them, and G4 does not fix emitter or
@@ -128,13 +131,16 @@ converter defects.
 
 ## Mutation check
 
-Nineteen single-line mutations of the checkers (accept a known failure as a pass, drop the
-unexpected-pass branch, ignore the signature, drop the unclassified rows, accept an empty
-selection, treat a timeout or crash as a pass, skip the missing-output check, compile a
-together group file by file, accept exit 0 with errors, skip the stale-build and tracked
-build-output checks, make the missing migrator a pass, skip each control-file check and the
-migrator empty-selection check, and map exit 3 to OK) each make
-`scripts/test_tier2_verification.py` fail. 19 of 19 killed.
+Twenty-six single-line mutations of the checkers each make
+`scripts/test_tier2_verification.py` fail (26 of 26 killed): accept a known failure as a pass;
+drop the unexpected-pass branch; ignore the signature; drop the file from the signature;
+collapse duplicate errors; drop the failure diagnostics; drop the unclassified rows; accept an
+empty selection; treat a timeout or crash as a pass; skip the missing-output check; compile a
+together group file by file; accept a nonzero exit with errors; skip the stale-build check, the
+deleted-input check, the untracked-input check, and the tracked build-output check; make a
+missing migrator a pass (both scripts); skip each control-file check, the migrator
+empty-selection check, the dry-run write check, and the post-revert byte comparison; and map
+exit 3 to OK.
 
 ## Verifier findings
 
