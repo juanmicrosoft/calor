@@ -124,20 +124,63 @@ internal static partial class EvidenceContractValidator
         var amendmentVersions = Array(contract["amendmentLog"]).Select(a => Str(a?["version"])).OfType<string>().ToHashSet(StringComparer.Ordinal);
         foreach (var exception in Array(capacity?["exceptions"]))
         {
-            // A per-PR raise (stopping rule 1) is valid only exactly as an amendment registered it,
-            // in an amendment that is in the log: a different PR, value, or ceiling needs a new
-            // amendment and a validator change, which review sees.
+            // A raise (stopping rule 1) is valid only exactly as an amendment registered it, in an
+            // amendment that is in the log: a different PR, gate, value, or ceiling needs a new
+            // amendment and a validator change, which review sees. A per-PR exception is keyed by
+            // its PR; a per-gate exception (1.2.0) is keyed by its issue and names no PR.
             var ceilingId = Str(exception?["ceiling"]);
             var pr = Int(exception?["pr"]);
-            var subject = $"exception {ceilingId ?? "?"} #{pr?.ToString(CultureInfo.InvariantCulture) ?? "?"}";
+            var issue = Int(exception?["issue"]);
+            var hasPr = exception?["pr"] is not null;
+            var subject = hasPr
+                ? $"exception {ceilingId ?? "?"} #{pr?.ToString(CultureInfo.InvariantCulture) ?? "?"}"
+                : $"exception {ceilingId ?? "?"} issue #{issue?.ToString(CultureInfo.InvariantCulture) ?? "?"}";
             double? raised = exception?["value"] is JsonValue rv && rv.TryGetValue<double>(out var r) ? r : null;
             var recordedIn = Str(exception?["amendment"]);
-            var registered = RegisteredCeilingExceptions.Any(e =>
-                e.Ceiling == ceilingId && e.Pr == pr && e.Value == raised && e.Amendment == recordedIn);
-            if (!registered || recordedIn is null || !amendmentVersions.Contains(recordedIn))
-                v.Add(new("C011", subject, "ceiling exception is not one registered by a logged amendment (1.1.0: pr-size, #1473, 1520)"));
+            var match = RegisteredCeilingExceptions.FirstOrDefault(e =>
+                e.Ceiling == ceilingId && e.Value == raised && e.Amendment == recordedIn
+                && (e.Pr is { } registeredPr ? hasPr && pr == registeredPr : !hasPr && issue == e.Issue));
+            if (match.Ceiling is null || recordedIn is null || !amendmentVersions.Contains(recordedIn))
+                v.Add(new("C011", subject, "ceiling exception is not one registered by a logged amendment (1.1.0: pr-size, #1473, 1520; 1.2.0: s1-generated-cases, issue #1311, 3008)"));
             if (string.IsNullOrWhiteSpace(Str(exception?["justification"])))
                 v.Add(new("C011", subject, "exception needs a justification"));
+            // A per-gate exception authorizes work, not just a number: it must state its scope and
+            // the conditions that bound that work.
+            if (match.Ceiling is not null && match.Pr is null
+                && (string.IsNullOrWhiteSpace(Str(exception?["scope"]))
+                    || Array(exception?["conditions"]).Count == 0
+                    || Array(exception?["conditions"]).Any(c => string.IsNullOrWhiteSpace(Str(c)))))
+                v.Add(new("C011", subject, "a per-gate exception needs a scope and non-empty conditions"));
+        }
+        var seenExceptions = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var exception in Array(capacity?["exceptions"]))
+        {
+            var key = $"{Str(exception?["ceiling"])}|{Int(exception?["pr"])}|{Int(exception?["issue"])}|{exception?["pr"] is not null}";
+            if (!seenExceptions.Add(key))
+                v.Add(new("C011", $"exception {Str(exception?["ceiling"]) ?? "?"}", "duplicate ceiling exception"));
+        }
+
+        // Charge rules (1.2.0) move named work from one ceiling to another without changing any
+        // value. Each is valid only exactly as an amendment registered it.
+        var ceilingIds = ceilings.Select(c => Str(c?["id"])).OfType<string>().ToHashSet(StringComparer.Ordinal);
+        foreach (var rule in Array(capacity?["chargeRules"]))
+        {
+            var id = Str(rule?["id"]);
+            var subject = $"charge rule {id ?? "?"}";
+            var chargedTo = Str(rule?["chargedTo"]);
+            var notChargedTo = Str(rule?["notChargedTo"]);
+            var recordedIn = Str(rule?["amendment"]);
+            var registered = RegisteredChargeRules.Any(c =>
+                c.Id == id && c.ChargedTo == chargedTo && c.NotChargedTo == notChargedTo && c.Amendment == recordedIn);
+            if (!registered || recordedIn is null || !amendmentVersions.Contains(recordedIn))
+                v.Add(new("C011", subject, "charge rule is not one registered by a logged amendment (1.2.0: c2-candidate-determinism-protocol, determinism-compute -> regeneration-compute)"));
+            if (chargedTo is null || !ceilingIds.Contains(chargedTo) || notChargedTo is null || !ceilingIds.Contains(notChargedTo))
+                v.Add(new("C011", subject, "charge rule must name two existing ceilings"));
+            foreach (var field in new[] { "work", "rule", "justification" })
+            {
+                if (string.IsNullOrWhiteSpace(Str(rule?[field])))
+                    v.Add(new("C011", subject, $"charge rule needs {field}"));
+            }
         }
         var anyProposed = Str(capacity?["status"]) == "PROPOSED"
             || ceilings.Any(c => Str(c?["status"]) == "PROPOSED");
@@ -171,10 +214,20 @@ internal static partial class EvidenceContractValidator
         return v;
     }
 
-    /// <summary>Per-PR ceiling raises registered by amendments (stopping rule 1).</summary>
-    private static readonly (string Ceiling, int Pr, double Value, string Amendment)[] RegisteredCeilingExceptions =
+    /// <summary>
+    /// Ceiling raises registered by amendments (stopping rule 1). A per-PR raise names its PR; a
+    /// per-gate raise (amendment 1.2.0) has no PR and is keyed by the gate's issue.
+    /// </summary>
+    private static readonly (string Ceiling, int? Pr, int? Issue, double Value, string Amendment)[] RegisteredCeilingExceptions =
     [
-        ("pr-size", 1473, 1520, "1.1.0"),
+        ("pr-size", 1473, 1276, 1520, "1.1.0"),
+        ("s1-generated-cases", null, 1311, 3008, "1.2.0"),
+    ];
+
+    /// <summary>Charge reallocations registered by amendments; they change no ceiling value.</summary>
+    private static readonly (string Id, string ChargedTo, string NotChargedTo, string Amendment)[] RegisteredChargeRules =
+    [
+        ("c2-candidate-determinism-protocol", "regeneration-compute", "determinism-compute", "1.2.0"),
     ];
 
     private static IEnumerable<ContractViolation> ValidateGraph(List<JsonNode?> children, HashSet<int> childIssues)

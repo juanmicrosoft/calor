@@ -984,7 +984,7 @@ public class EvidenceContractTests
         Assert.True(violations.Count == 0, Describe(violations));
         // The proposed fixture carries nothing a later amendment added.
         var text = contract.ToJsonString();
-        foreach (var added in new[] { "1.1.0", "taskStatementRule", "determinismRows", "platformDeterminism", "evidenceDataRule" })
+        foreach (var added in new[] { "1.1.0", "1.2.0", "taskStatementRule", "determinismRows", "platformDeterminism", "evidenceDataRule", "chargeRules" })
             Assert.DoesNotContain(added, text, StringComparison.Ordinal);
     }
 
@@ -1056,7 +1056,7 @@ public class EvidenceContractTests
         // amendment and a validator change.
         var contract = Contract();
         var exceptions = contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray();
-        var exception = exceptions.First(e => e!["pr"]!.GetValue<int>() == 1473)!;
+        var exception = exceptions.First(e => e?["pr"]?.GetValue<int>() == 1473)!;
         switch (mutation)
         {
             case "other-value": exception["value"] = 2000.0; break;
@@ -1072,6 +1072,122 @@ public class EvidenceContractTests
         }
         AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C011");
     }
+
+    // ------------------------------------------------------------------
+    // Amendment 1.2.0: per-gate ceiling exception for #1311 and charge rules (C011)
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void CommittedContractRegistersTheS1ReRunAndTheC2Charge()
+    {
+        // Decision A raises one ceiling for one gate to one value; decision B moves one charge.
+        // Neither changes a ceiling's own value.
+        var contract = Contract();
+        var capacity = contract["authorityCapacity"]!["capacity"]!;
+        var s1 = S1Exception(contract);
+        Assert.Equal("s1-generated-cases", s1["ceiling"]!.GetValue<string>());
+        Assert.Equal(3008, s1["value"]!.GetValue<int>());
+        Assert.Equal(1508, s1["addedExecutions"]!.GetValue<int>());
+        Assert.Null(s1["pr"]);
+        var ceilings = capacity["ceilings"]!.AsArray().ToDictionary(c => c!["id"]!.GetValue<string>(), c => c!["value"]!.GetValue<int>());
+        Assert.Equal(1500, ceilings["s1-generated-cases"]);
+        Assert.Equal(2000, ceilings["determinism-compute"]);
+        Assert.Equal(1500, ceilings["regeneration-compute"]);
+        Assert.Equal(2, ceilings["regenerations"]);
+        Assert.Equal(10, ceilings["s1-timebox"]);
+        Assert.Equal(20, ceilings["s1-agent-hours"]);
+        var rule = Assert.Single(capacity["chargeRules"]!.AsArray())!;
+        Assert.Equal("regeneration-compute", rule["chargedTo"]!.GetValue<string>());
+        Assert.Equal("determinism-compute", rule["notChargedTo"]!.GetValue<string>());
+        var amendment = contract["amendmentLog"]!.AsArray().Last()!;
+        Assert.Equal("1.2.0", amendment["version"]!.GetValue<string>());
+        Assert.True(amendment["afterDecisionBearingInspection"]!.GetValue<bool>());
+    }
+
+    [Theory]
+    [InlineData("other-value")]
+    [InlineData("other-issue")]
+    [InlineData("other-ceiling")]
+    [InlineData("adds-pr")]
+    [InlineData("unlogged-amendment")]
+    [InlineData("no-justification")]
+    [InlineData("no-scope")]
+    [InlineData("no-conditions")]
+    [InlineData("blank-condition")]
+    [InlineData("duplicated")]
+    public void GateCeilingExceptionOtherThanTheRegisteredOneFails(string mutation)
+    {
+        var contract = Contract();
+        var exceptions = contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray();
+        var exception = S1Exception(contract);
+        switch (mutation)
+        {
+            case "other-value": exception["value"] = 3009; break;
+            case "other-issue": exception["issue"] = 1413; break;
+            case "other-ceiling": exception["ceiling"] = "s1-compute"; break;
+            case "adds-pr": exception["pr"] = 1480; break;
+            case "unlogged-amendment": exception["amendment"] = "1.1.9"; break;
+            case "no-justification": exception["justification"] = " "; break;
+            case "no-scope": exception.AsObject().Remove("scope"); break;
+            case "no-conditions": exception["conditions"] = new JsonArray(); break;
+            case "blank-condition": exception["conditions"]!.AsArray().Add(" "); break;
+            case "duplicated": exceptions.Add(exception.DeepClone()); break;
+        }
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C011");
+    }
+
+    [Fact]
+    public void GateCeilingExceptionWithoutItsAmendmentInTheLogFails()
+    {
+        // Removing amendment 1.2.0 from the log leaves its exception and charge rule unregistered.
+        var contract = Contract();
+        var log = contract["amendmentLog"]!.AsArray();
+        log.RemoveAt(log.Count - 1);
+        contract["contractVersion"] = log.Last()!["version"]!.DeepClone();
+        var violations = EvidenceContractValidator.ValidateContract(contract);
+        AssertViolation(violations, "C011");
+        Assert.Contains(violations, v => v.Subject == "exception s1-generated-cases issue #1311");
+        Assert.Contains(violations, v => v.Subject == "charge rule c2-candidate-determinism-protocol");
+    }
+
+    [Theory]
+    [InlineData("other-id")]
+    [InlineData("reversed")]
+    [InlineData("unknown-ceiling")]
+    [InlineData("unlogged-amendment")]
+    [InlineData("no-work")]
+    [InlineData("no-rule")]
+    [InlineData("no-justification")]
+    [InlineData("added-rule")]
+    public void ChargeRuleOtherThanTheRegisteredOneFails(string mutation)
+    {
+        var contract = Contract();
+        var rules = contract["authorityCapacity"]!["capacity"]!["chargeRules"]!.AsArray();
+        var rule = rules[0]!;
+        switch (mutation)
+        {
+            case "other-id": rule["id"] = "c2-all-determinism-runs"; break;
+            case "reversed":
+                rule["chargedTo"] = "determinism-compute";
+                rule["notChargedTo"] = "regeneration-compute";
+                break;
+            case "unknown-ceiling": rule["chargedTo"] = "free-compute"; break;
+            case "unlogged-amendment": rule["amendment"] = "1.1.9"; break;
+            case "no-work": rule["work"] = ""; break;
+            case "no-rule": rule.AsObject().Remove("rule"); break;
+            case "no-justification": rule["justification"] = " "; break;
+            case "added-rule":
+                var added = rule.DeepClone();
+                added["id"] = "s1-to-ordinary-ci";
+                rules.Add(added);
+                break;
+        }
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C011");
+    }
+
+    private static JsonNode S1Exception(JsonNode contract)
+        => contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray()
+            .First(e => e?["pr"] is null && e?["issue"]?.GetValue<int>() == 1311)!;
 
     // ------------------------------------------------------------------
     // Amendment 1.1.0: pending inventory updates (I013)
@@ -1230,12 +1346,14 @@ public class EvidenceContractTests
         // Sentences that amendment 1.1.0 appended to frozen text are marked "(amendment 1.1.0)" or
         // "amendment 1.1.0)"; strip them so the fixture is the original text, not a hybrid.
         RevertAmendedSentences(contract, "amendment 1.1.0");
+        RevertAmendedSentences(contract, "amendment 1.2.0");
         contract.AsObject().Remove("acceptance");
         contract["amendmentLog"]!.AsArray().Clear();
         contract["contractVersion"] = "1.0.0";
         // Rules added by amendments do not exist in the proposed state.
         contract["benchmarkEquivalence"]!.AsObject().Remove("taskStatementRule");
         contract["authorityCapacity"]!["capacity"]!.AsObject().Remove("exceptions");
+        contract["authorityCapacity"]!["capacity"]!.AsObject().Remove("chargeRules");
         contract["authorityCapacity"]!["capacity"]!.AsObject().Remove("evidenceDataRule");
         contract["rules"]!.AsObject().Remove("platformDeterminism");
         contract.AsObject().Remove("determinismRows");
