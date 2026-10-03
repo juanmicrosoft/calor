@@ -535,6 +535,12 @@ public static class Program
 
         rootCommand.AddCommand(scorecardCommand);
 
+        // #1276 registered pair differential oracle (run only after the registration merges)
+        rootCommand.AddCommand(Equivalence.PairOracleCommand.Create());
+        // #1276 results generator: metric runs over EQUIVALENT pairs and the dispositioned pair manifest
+        foreach (var command in Equivalence.PairResultsCommand.Create())
+            rootCommand.AddCommand(command);
+
         // Default: run benchmarks if no command specified
         rootCommand.SetHandler(async () =>
         {
