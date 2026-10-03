@@ -10,13 +10,25 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace Calor.Soundness.Sweep;
 
-/// <summary>
-/// Executes a case's registered oracle program on specific inputs, for two registered uses that
-/// IndependentOracle.Evaluate (the O1 verdict, used unchanged) does not expose: recovering the input
-/// tuples behind its rendered witness and replay sample (R1-O2), and replaying a solver counterexample
-/// model under O1 semantics (spurious-refutation). Compilation mirrors IndependentOracle exactly
-/// (BCL references only, the case's overflow mode, nullable enabled).
-/// </summary>
+internal static class Roslyn
+{
+    // Compiles one C# source (C# 14, nullable on) to an in-memory library; returns null and the errors on failure.
+    public static (MemoryStream? Image, string Errors) Emit(string source, IEnumerable<MetadataReference> references, bool checkOverflow)
+    {
+        var compilation = CSharpCompilation.Create("R1_" + Guid.NewGuid().ToString("N"), [CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp14))],
+            references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, checkOverflow: checkOverflow, nullableContextOptions: NullableContextOptions.Enable));
+        var stream = new MemoryStream();
+        var emit = compilation.Emit(stream);
+        stream.Position = 0;
+        return emit.Success ? (stream, "") : (null, string.Join("; ", emit.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Take(5)));
+    }
+
+    public static bool Checked(string oracleSource) => !oracleSource.Contains("public const bool Checked = false;", StringComparison.Ordinal);
+}
+
+// Executes a case's registered oracle program on specific inputs, for two registered uses that IndependentOracle.Evaluate (the O1 verdict, used unchanged) does
+// not expose: recovering the input tuples behind its rendered witness and replay sample (R1-O2), and replaying a solver counterexample model under O1 semantics
+// (spurious-refutation). Compilation mirrors IndependentOracle (BCL only).
 internal sealed class OracleProgram : IDisposable
 {
     private readonly AssemblyLoadContext _context = new("R1OracleRuntime", isCollectible: true);
@@ -24,121 +36,86 @@ internal sealed class OracleProgram : IDisposable
 
     public OracleProgram(string oracleSource)
     {
-        var tree = CSharpSyntaxTree.ParseText(oracleSource, new CSharpParseOptions(LanguageVersion.CSharp14));
-        var checkedMode = !oracleSource.Contains("public const bool Checked = false;", StringComparison.Ordinal);
-        var compilation = CSharpCompilation.Create("R1OracleRuntime_" + Guid.NewGuid().ToString("N"), [tree],
-            IndependentOracle.BclReferences,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, checkOverflow: checkedMode,
-                nullableContextOptions: NullableContextOptions.Enable));
-        using var stream = new MemoryStream();
-        var emit = compilation.Emit(stream);
-        if (!emit.Success)
-            throw new InvalidOperationException("oracle does not compile: " + string.Join("; ", emit.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error)));
-        stream.Position = 0;
-        _type = _context.LoadFromStream(stream).GetType("R1Oracle")!;
+        var (image, errors) = Roslyn.Emit(oracleSource, IndependentOracle.BclReferences, Roslyn.Checked(oracleSource));
+        _type = _context.LoadFromStream(image ?? throw new InvalidOperationException("oracle does not compile: " + errors)).GetType("R1Oracle")!;
     }
 
-    /// <summary>Oracle domain parameters (names and CLR types), from the registered Hyp signature.</summary>
+    // Oracle domain parameters (names and CLR types), from the registered Hyp signature.
     public IReadOnlyList<ParameterInfo> Parameters => _type.GetMethod("Hyp")!.GetParameters();
 
-    public IEnumerable<object?[]> Inputs() => (IEnumerable<object?[]>)_type.GetMethod("Inputs")!.Invoke(null, null)!;
-
-    /// <summary>O1 semantics on one input: excluded (Hyp false/throws or Body throws), holds, or violated.</summary>
-    public string PointVerdict(object?[] input)
+    // O1 semantics on one input: excluded (Hyp false/throws or Body throws), holds, or violated.
+    public string PointVerdict(object?[] input) => WithCulture(() =>
     {
-        return WithCulture(() =>
-        {
-            if (!TryInvoke("HypO", [input], out var hyp))
-                return "excluded-hyp-threw";
-            if (!(bool)hyp!)
-                return "excluded-hyp-false";
-            object? result = null;
-            if ((bool)_type.GetProperty("HasBody")!.GetValue(null)! && !TryInvoke("BodyO", [input], out result))
-                return "excluded-body-threw";
-            var ok = TryInvoke("PropO", [input, result], out var prop);
-            return ok && (bool)prop! ? "holds" : "violated";
-        });
-    }
+        if (!TryInvoke("HypO", [input], out var hyp)) return "excluded-hyp-threw";
+        if (!(bool)hyp!) return "excluded-hyp-false";
+        object? result = null;
+        if ((bool)_type.GetProperty("HasBody")!.GetValue(null)! && !TryInvoke("BodyO", [input], out result)) return "excluded-body-threw";
+        return TryInvoke("PropO", [input, result], out var prop) && (bool)prop! ? "holds" : "violated";
+    });
 
-    /// <summary>Recovers the input tuples whose rendering (IndependentOracle's format) is in <paramref name="rendered"/>.</summary>
+    // Fresh input tuples (from the registered Inputs()) whose rendering is in rendered.
     public Dictionary<string, object?[]> Recover(IReadOnlyCollection<string> rendered)
     {
         var found = new Dictionary<string, object?[]>(StringComparer.Ordinal);
-        if (rendered.Count == 0)
-            return found;
-        foreach (var input in Inputs())
+        if (rendered.Count == 0) return found;
+        foreach (var input in (IEnumerable<object?[]>)_type.GetMethod("Inputs")!.Invoke(null, null)!)
         {
             var text = Render(input);
-            if (rendered.Contains(text) && !found.ContainsKey(text))
-                found[text] = input;
-            if (found.Count == rendered.Count)
-                break;
+            if (rendered.Contains(text)) found.TryAdd(text, input);
+            if (found.Count == rendered.Count) break;
         }
         return found;
     }
 
-    /// <summary>Builds an oracle input tuple from a solver model, or null when the model is not replayable.</summary>
+    // An oracle input tuple from a solver model (integers, bool, string), or null when the model is not replayable.
     public object?[]? FromModel(IReadOnlyDictionary<string, string> bindings)
     {
         var values = new List<object?>();
         foreach (var p in Parameters)
         {
-            if (!bindings.TryGetValue(p.Name!, out var raw) || !TryConvert(raw, p.ParameterType, out var value))
-                return null;
+            if (!bindings.TryGetValue(p.Name!, out var raw) || !TryConvert(raw.Trim(), p.ParameterType, out var value)) return null;
             values.Add(value);
         }
         return [.. values];
     }
 
+    private static readonly Dictionary<Type, (int Bits, bool Signed)> Widths = new()
+    {
+        [typeof(sbyte)] = (8, true), [typeof(short)] = (16, true), [typeof(int)] = (32, true), [typeof(long)] = (64, true),
+        [typeof(byte)] = (8, false), [typeof(ushort)] = (16, false), [typeof(uint)] = (32, false), [typeof(ulong)] = (64, false),
+    };
+
     private static bool TryConvert(string raw, Type type, out object? value)
     {
         value = null;
-        raw = raw.Trim();
-        if (type == typeof(string))
-            return TryParseZ3String(raw, out value);
-        if (type == typeof(bool))
-        {
-            if (raw is "true" or "false") { value = raw == "true"; return true; }
-            return false;
-        }
-        var widths = new Dictionary<Type, (int Bits, bool Signed)>
-        {
-            [typeof(sbyte)] = (8, true), [typeof(short)] = (16, true), [typeof(int)] = (32, true), [typeof(long)] = (64, true),
-            [typeof(byte)] = (8, false), [typeof(ushort)] = (16, false), [typeof(uint)] = (32, false), [typeof(ulong)] = (64, false),
-        };
-        if (!widths.TryGetValue(type, out var w))
-            return false;
+        if (type == typeof(string)) return TryParseZ3String(raw, out value);
+        if (type == typeof(bool)) { value = raw == "true"; return raw is "true" or "false"; }
+        if (!Widths.TryGetValue(type, out var w)) return false;
         BigInteger n;
-        if (raw.StartsWith("#x", StringComparison.Ordinal))
-            n = BigInteger.Parse("0" + raw[2..], NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-        else if (raw.StartsWith("#b", StringComparison.Ordinal))
-            n = raw[2..].Aggregate(BigInteger.Zero, (acc, c) => acc * 2 + (c - '0'));
-        else if (!BigInteger.TryParse(raw, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out n))
-            return false;
+        if (raw.StartsWith("#x", StringComparison.Ordinal)) n = BigInteger.Parse("0" + raw[2..], NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+        else if (raw.StartsWith("#b", StringComparison.Ordinal)) n = raw[2..].Aggregate(BigInteger.Zero, (acc, c) => acc * 2 + (c - '0'));
+        else if (!BigInteger.TryParse(raw, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out n)) return false;
         var modulus = BigInteger.One << w.Bits;
         if (n < 0) n += modulus;
         if (n < 0 || n >= modulus) return false;
-        if (w.Signed && n >= modulus / 2) n -= modulus;
+        if (w.Signed && n >= modulus / 2) n -= modulus; // bit-vector models print unsigned
         value = Convert.ChangeType(n.ToString(CultureInfo.InvariantCulture), type, CultureInfo.InvariantCulture);
         return true;
     }
 
-    /// <summary>An SMT-LIB 2.6 string literal as Z3 prints it ("" for a quote, \u{hex} for a code point).</summary>
+    // An SMT-LIB 2.6 string literal as Z3 prints it ("" for a quote, \u{hex} for a code point).
     private static bool TryParseZ3String(string raw, out object? value)
     {
         value = null;
-        if (raw.Length < 2 || raw[0] != '"' || raw[^1] != '"')
-            return false;
-        var body = raw[1..^1];
-        var sb = new StringBuilder();
+        if (raw.Length < 2 || raw[0] != '"' || raw[^1] != '"') return false;
+        var (body, sb) = (raw[1..^1], new StringBuilder());
         for (var i = 0; i < body.Length; i++)
         {
             if (body[i] == '"' && i + 1 < body.Length && body[i + 1] == '"') { sb.Append('"'); i++; continue; }
             if (body[i] == '\\' && i + 2 < body.Length && body[i + 1] == 'u' && body[i + 2] == '{')
             {
                 var close = body.IndexOf('}', i);
-                if (close < 0 || !int.TryParse(body.AsSpan(i + 3, close - i - 3), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var cp))
-                    return false;
+                if (close < 0 || !int.TryParse(body.AsSpan(i + 3, close - i - 3), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var cp)) return false;
                 sb.Append(cp is >= 0xD800 and <= 0xDFFF ? ((char)cp).ToString() : char.ConvertFromUtf32(cp));
                 i = close;
                 continue;
@@ -149,7 +126,7 @@ internal sealed class OracleProgram : IDisposable
         return true;
     }
 
-    /// <summary>Byte-for-byte the rendering IndependentOracle uses for witnesses and replay samples.</summary>
+    // Byte-for-byte the rendering IndependentOracle uses for witnesses and replay samples.
     public static string Render(object?[] values) => "(" + string.Join(", ", values.Select(v => v switch
     {
         null => "null",
@@ -174,26 +151,19 @@ internal sealed class OracleProgram : IDisposable
     public void Dispose() => _context.Unload();
 }
 
-/// <summary>
-/// R1-O2: the baseline's forced-guard emission, compiled against the baseline's own Calor.Runtime.dll
-/// and run on replay inputs. A replay driver is added next to the emitted code (inside the emitted
-/// module class when it exists, so private Probe functions stay callable); the emitted code itself
-/// is not edited.
-/// </summary>
+// R1-O2: the baseline's forced-guard emission, compiled against the baseline's own Calor.Runtime.dll and run on replay inputs. A replay driver is added next to
+// the emitted code (inside the emitted module class when it exists, so private Probe functions stay callable); the emitted code is not edited.
 internal static class EmittedReplay
 {
-    private static readonly IReadOnlyList<MetadataReference> Framework =
-        ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
-            .Where(p => !Path.GetFileName(p).StartsWith("Microsoft.CodeAnalysis", StringComparison.Ordinal))
-            .Select(p => (MetadataReference)MetadataReference.CreateFromFile(p)).ToList();
+    private static readonly IReadOnlyList<MetadataReference> Framework = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
+        .Where(p => !Path.GetFileName(p).StartsWith("Microsoft.CodeAnalysis", StringComparison.Ordinal)).Select(p => (MetadataReference)MetadataReference.CreateFromFile(p)).ToList();
 
     public static JsonObject Run(string emitted, string runtimeDll, IReadOnlyList<ParameterInfo> parameters, string? replay,
         IReadOnlyList<(string Rendered, object?[] Input, string O1)> inputs, string claimKind, string? obligationKind)
     {
-        var record = new JsonObject();
-        // Parameters typed object or declared by the oracle (e.g. its own Box) cannot be passed to the
-        // emitted Probe directly: they are copied by member name into the emitted type and bound
-        // dynamically; an input the emitted signature cannot accept is recorded, never coerced.
+        // Parameters typed object or declared by the oracle (e.g. its own Box) cannot be passed to the emitted Probe
+        // directly: they are copied by member name into the emitted type and bound dynamically; an input the emitted
+        // signature cannot accept is recorded, never coerced.
         static bool Bcl(Type t) => t.IsArray ? Bcl(t.GetElementType()!) : t.IsPrimitive || t == typeof(string);
         var signature = string.Join(", ", parameters.Select(p => $"{(Bcl(p.ParameterType) ? CSharpName(p.ParameterType) : "object?")} {p.Name}"));
         var call = replay ?? $"Probe({string.Join(", ", parameters.Select(p => Bcl(p.ParameterType) ? p.Name : $"(dynamic?)__R1Copy({p.Name})"))})";
@@ -201,47 +171,22 @@ internal static class EmittedReplay
             + "var t = System.Linq.Enumerable.First(System.Reflection.Assembly.GetExecutingAssembly().GetTypes(), x => x.Name == v.GetType().Name); var o = System.Activator.CreateInstance(t)!; "
             + "foreach (var f in v.GetType().GetFields()) { var m = t.GetField(f.Name); if (m != null) m.SetValue(o, f.GetValue(v)); else t.GetProperty(f.Name)!.SetValue(o, f.GetValue(v)); } return o; }";
         var driver = $"public static object? __R1Run({signature}) {{ return (object?)({call}); }} {Copy}";
-        string source;
-        const string ModuleClass = "public static class R1CaseModule";
-        var at = emitted.IndexOf(ModuleClass, StringComparison.Ordinal);
-        if (at >= 0)
-        {
-            var brace = emitted.IndexOf('{', at);
-            source = emitted[..(brace + 1)] + "\n" + driver + "\n" + emitted[(brace + 1)..];
-        }
-        else
-            source = emitted + "\nnamespace R1Case { public static class R1CaseReplay { " + driver + " } }\n";
-        record["driver"] = driver;
-
-        var compilation = CSharpCompilation.Create("R1O2_" + Guid.NewGuid().ToString("N"),
-            [CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp14))],
-            [.. Framework, MetadataReference.CreateFromFile(runtimeDll)],
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
-        using var stream = new MemoryStream();
-        var emit = compilation.Emit(stream);
-        if (!emit.Success)
-        {
-            record["status"] = "not-run-compile-error";
-            record["errors"] = string.Join("; ", emit.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Take(5));
-            return record;
-        }
-        stream.Position = 0;
+        var at = emitted.IndexOf("public static class R1CaseModule", StringComparison.Ordinal);
+        var source = at >= 0 ? emitted.Insert(emitted.IndexOf('{', at) + 1, "\n" + driver + "\n")
+            : emitted + "\nnamespace R1Case { public static class R1CaseReplay { " + driver + " } }\n";
+        var record = new JsonObject { ["driver"] = driver };
+        var (image, errors) = Roslyn.Emit(source, [.. Framework, MetadataReference.CreateFromFile(runtimeDll)], checkOverflow: false);
+        if (image == null) { record["status"] = "not-run-compile-error"; record["errors"] = errors; return record; }
         var context = new ReplayContext(runtimeDll);
         try
         {
-            var assembly = context.LoadFromStream(stream);
-            var method = assembly.GetTypes().Select(t => t.GetMethod("__R1Run", BindingFlags.Public | BindingFlags.Static)).First(m => m != null)!;
+            var method = context.LoadFromStream(image).GetTypes().Select(t => t.GetMethod("__R1Run", BindingFlags.Public | BindingFlags.Static)).First(m => m != null)!;
             var runs = new JsonArray();
             foreach (var (rendered, input, o1) in inputs)
             {
-                var copy = input.Select(v => v is Array a ? a.Clone() : v).ToArray();
                 string o2;
                 string? exception = null;
-                try
-                {
-                    OracleProgram.WithCulture(() => method.Invoke(null, copy));
-                    o2 = "returned";
-                }
+                try { OracleProgram.WithCulture(() => method.Invoke(null, input.Select(v => v is Array a ? a.Clone() : v).ToArray())); o2 = "returned"; }
                 catch (TargetInvocationException ex)
                 {
                     var inner = ex.InnerException!;
@@ -249,57 +194,40 @@ internal static class EmittedReplay
                     o2 = inner.GetType().FullName == "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException" ? "not-run-input-not-representable"
                         : GuardFired(inner, claimKind, obligationKind) ? "guard-threw" : "o2-other-exception";
                 }
-                var divergence = (o1 == "violated" && o2 == "returned") || (o1 == "holds" && o2 == "guard-threw");
-                runs.Add(new JsonObject { ["input"] = rendered, ["o1"] = o1, ["o2"] = o2, ["exception"] = exception, ["divergence"] = divergence });
+                runs.Add(new JsonObject { ["input"] = rendered, ["o1"] = o1, ["o2"] = o2, ["exception"] = exception, ["divergence"] = (o1 == "violated" && o2 == "returned") || (o1 == "holds" && o2 == "guard-threw") });
             }
-            record["status"] = "run";
-            record["runs"] = runs;
+            (record["status"], record["runs"]) = ("run", runs);
         }
-        finally
-        {
-            context.Unload();
-        }
+        finally { context.Unload(); }
         return record;
     }
 
-    private static bool GuardFired(Exception e, string claimKind, string? obligationKind)
-    {
-        if (claimKind is "postcondition" or "guard-emission")
-            return e.GetType().FullName == "Calor.Runtime.ContractViolationException"
-                && e.GetType().GetProperty("Kind")?.GetValue(e)?.ToString() == "Ensures";
-        return obligationKind switch
+    // The registered O2 exception per claim site.
+    private static bool GuardFired(Exception e, string claimKind, string? obligationKind) => claimKind is "postcondition" or "guard-emission"
+        ? e.GetType().FullName == "Calor.Runtime.ContractViolationException" && e.GetType().GetProperty("Kind")?.GetValue(e)?.ToString() == "Ensures"
+        : obligationKind switch
         {
             "ProofObligation" => e is InvalidOperationException && e.Message.Contains("Proof obligation", StringComparison.Ordinal),
             "IndexBounds" => e is IndexOutOfRangeException,
             "RefinementEntry" or "RefinementReturn" or "Subtype" => e is ArgumentOutOfRangeException,
             _ => false,
         };
-    }
 
-    internal static string CSharpName(Type t)
+    private static string CSharpName(Type t) => t.IsArray ? CSharpName(t.GetElementType()!) + "[]" : Type.GetTypeCode(t) switch
     {
-        if (t.IsArray) return CSharpName(t.GetElementType()!) + "[]";
-        return Type.GetTypeCode(t) switch
-        {
-            TypeCode.Boolean => "bool", TypeCode.SByte => "sbyte", TypeCode.Byte => "byte", TypeCode.Int16 => "short",
-            TypeCode.UInt16 => "ushort", TypeCode.Int32 => "int", TypeCode.UInt32 => "uint", TypeCode.Int64 => "long",
-            TypeCode.UInt64 => "ulong", TypeCode.String => "string", TypeCode.Double => "double", TypeCode.Single => "float",
-            _ => t.FullName!,
-        };
-    }
+        TypeCode.Boolean => "bool", TypeCode.SByte => "sbyte", TypeCode.Byte => "byte", TypeCode.Int16 => "short", TypeCode.UInt16 => "ushort", TypeCode.Int32 => "int",
+        TypeCode.UInt32 => "uint", TypeCode.Int64 => "long", TypeCode.UInt64 => "ulong", TypeCode.String => "string", _ => t.FullName!,
+    };
 
     private sealed class ReplayContext(string runtimeDll) : AssemblyLoadContext("R1O2", isCollectible: true)
     {
-        protected override Assembly? Load(AssemblyName name) =>
-            name.Name == "Calor.Runtime" ? LoadFromAssemblyPath(runtimeDll) : null;
+        protected override Assembly? Load(AssemblyName name) => name.Name == "Calor.Runtime" ? LoadFromAssemblyPath(runtimeDll) : null;
     }
 }
 
 internal static class Hashing
 {
-    public static string Sha256File(string path) =>
-        Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
+    public static string Sha256File(string path) => Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
 
-    public static string Sha256Text(string text) =>
-        Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(new UTF8Encoding(false).GetBytes(text)));
+    public static string Sha256Text(string text) => Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(new UTF8Encoding(false).GetBytes(text)));
 }

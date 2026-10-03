@@ -5,15 +5,11 @@ using System.Text.Json.Nodes;
 
 namespace Calor.Soundness.Sweep;
 
-/// <summary>
-/// One released compiler loaded in-process (registration channels.invocation): the baseline's own
-/// calor.dll, Microsoft.Z3.dll, native libz3, and Calor.Runtime.dll in a collectible load context.
-/// Program.Compile and CompilationOptions are bound by name; nothing from the current tree is used.
-/// </summary>
+// One released compiler loaded in-process (registration channels.invocation): the baseline's own calor.dll, Microsoft.Z3.dll, native libz3, and
+// Calor.Runtime.dll in a collectible load context. Program.Compile and CompilationOptions are bound by name; nothing from the current tree is used.
 internal sealed class BaselineHost : AssemblyLoadContext
 {
     private readonly AssemblyDependencyResolver _resolver;
-    private readonly Type _program;
     private readonly Type _options;
     private readonly MethodInfo _compile;
 
@@ -26,53 +22,37 @@ internal sealed class BaselineHost : AssemblyLoadContext
     {
         Id = id;
         Directory = Path.GetFullPath(directory);
-        var calor = Path.Combine(Directory, "calor.dll");
-        _resolver = new AssemblyDependencyResolver(calor);
-        Compiler = LoadFromAssemblyPath(calor);
-        _program = Compiler.GetType("Calor.Compiler.Program", throwOnError: true)!;
+        _resolver = new AssemblyDependencyResolver(Path.Combine(Directory, "calor.dll"));
+        Compiler = LoadFromAssemblyPath(Path.Combine(Directory, "calor.dll"));
         _options = Compiler.GetType("Calor.Compiler.CompilationOptions", throwOnError: true)!;
-        _compile = _program.GetMethod("Compile", [typeof(string), typeof(string), _options])
+        _compile = Compiler.GetType("Calor.Compiler.Program", throwOnError: true)!.GetMethod("Compile", [typeof(string), typeof(string), _options])
             ?? throw new InvalidOperationException($"{id}: Program.Compile(string, string, CompilationOptions) not found");
     }
 
     protected override Assembly? Load(AssemblyName name)
     {
-        var path = _resolver.ResolveAssemblyToPath(name);
-        if (path == null)
-        {
-            var local = Path.Combine(Directory, name.Name + ".dll");
-            if (File.Exists(local))
-                path = local;
-        }
-        return path == null ? null : LoadFromAssemblyPath(path);
+        var path = _resolver.ResolveAssemblyToPath(name) ?? Path.Combine(Directory, name.Name + ".dll");
+        return File.Exists(path) ? LoadFromAssemblyPath(path) : null;
     }
 
     protected override IntPtr LoadUnmanagedDll(string unmanagedDllName)
     {
-        var path = _resolver.ResolveUnmanagedDllToPath(unmanagedDllName);
-        if (path == null)
-        {
-            var file = unmanagedDllName.EndsWith(".dylib", StringComparison.Ordinal) ? unmanagedDllName : unmanagedDllName + ".dylib";
-            foreach (var candidate in new[] { Path.Combine(Directory, "runtimes", "osx-arm64", "native", file), Path.Combine(Directory, file) })
-                if (File.Exists(candidate)) { path = candidate; break; }
-        }
-        if (path == null)
-            return IntPtr.Zero;
-        if (unmanagedDllName.Contains("z3", StringComparison.OrdinalIgnoreCase))
-            NativeZ3Path = path;
+        var file = unmanagedDllName.EndsWith(".dylib", StringComparison.Ordinal) ? unmanagedDllName : unmanagedDllName + ".dylib";
+        var path = _resolver.ResolveUnmanagedDllToPath(unmanagedDllName)
+            ?? new[] { Path.Combine(Directory, "runtimes", "osx-arm64", "native", file), Path.Combine(Directory, file) }.FirstOrDefault(File.Exists);
+        if (path == null) return IntPtr.Zero;
+        if (unmanagedDllName.Contains("z3", StringComparison.OrdinalIgnoreCase)) NativeZ3Path = path;
         return LoadUnmanagedDllFromPath(path);
     }
 
-    /// <summary>The loaded ContractTranslator.SemanticsVersion, or null when the baseline has none (P845).</summary>
-    public string? TranslatorSemanticsVersion =>
-        Compiler.GetType("Calor.Compiler.Verification.Z3.ContractTranslator")
-            ?.GetField("SemanticsVersion", BindingFlags.Public | BindingFlags.Static)?.GetValue(null) as string;
+    // The loaded ContractTranslator.SemanticsVersion, or null when the baseline has none (P845).
+    public string? TranslatorSemanticsVersion => Compiler.GetType("Calor.Compiler.Verification.Z3.ContractTranslator")
+        ?.GetField("SemanticsVersion", BindingFlags.Public | BindingFlags.Static)?.GetValue(null) as string;
 
-    public bool? Z3Available =>
-        Compiler.GetType("Calor.Compiler.Verification.Z3.Z3ContextFactory")
-            ?.GetProperty("IsAvailable", BindingFlags.Public | BindingFlags.Static)?.GetValue(null) as bool?;
+    public bool? Z3Available => Compiler.GetType("Calor.Compiler.Verification.Z3.Z3ContextFactory")
+        ?.GetProperty("IsAvailable", BindingFlags.Public | BindingFlags.Static)?.GetValue(null) as bool?;
 
-    /// <summary>Compiles one source text with the registered channel options and returns every observation.</summary>
+    // Compiles one source text with the registered channel options and returns every observation.
     public JsonObject Compile(string source, bool verifyRefinements, bool elide, string? cacheDirectory)
     {
         var options = Activator.CreateInstance(_options)!;
@@ -83,114 +63,54 @@ internal sealed class BaselineHost : AssemblyLoadContext
         Set(options, "VerificationTimeoutMs", 5000u);
         Set(options, "ElideProvenGuards", elide);
         Set(options, "StatusWriter", TextWriter.Null);
-        var cacheType = Compiler.GetType("Calor.Compiler.Verification.Z3.Cache.VerificationCacheOptions", true)!;
-        var cache = Activator.CreateInstance(cacheType)!;
+        var cache = Activator.CreateInstance(Compiler.GetType("Calor.Compiler.Verification.Z3.Cache.VerificationCacheOptions", true)!)!;
         Set(cache, "Enabled", cacheDirectory != null);
-        if (cacheDirectory != null)
-            Set(cache, "ProjectDirectory", cacheDirectory);
+        if (cacheDirectory != null) Set(cache, "ProjectDirectory", cacheDirectory);
         Set(options, "VerificationCacheOptions", cache);
-
         var result = _compile.Invoke(null, [source, "case.calr", options])!;
-        var diagnostics = new JsonArray();
-        foreach (var d in (IEnumerable)Get(result, "Diagnostics")!)
+        var diagnostics = Each(Get(result, "Diagnostics"), d => new JsonObject
         {
-            var span = Get(d, "Span")!;
-            diagnostics.Add(new JsonObject
-            {
-                ["code"] = (string)Get(d, "Code")!,
-                ["severity"] = Get(d, "Severity")!.ToString(),
-                ["line"] = (int)Get(span, "Line")!,
-                ["message"] = (string)Get(d, "Message")!,
-            });
-        }
+            ["code"] = Str(d, "Code"), ["severity"] = Get(d, "Severity")!.ToString(), ["line"] = (int)Get(Get(d, "Span")!, "Line")!, ["message"] = Str(d, "Message"),
+        });
         return new JsonObject
         {
             ["hasErrors"] = (bool)Get(result, "HasErrors")!,
             ["diagnostics"] = diagnostics,
-            ["contracts"] = Contracts(Get(options, "VerificationResults")),
-            ["obligations"] = Obligations(Get(options, "ObligationResults")),
+            ["contracts"] = Get(options, "VerificationResults") is { } module ? Each(Get(module, "Functions"), f => new JsonObject
+            {
+                ["functionId"] = Str(f, "FunctionId"), ["functionName"] = Str(f, "FunctionName"),
+                ["preconditions"] = Results(Get(f, "PreconditionResults")), ["postconditions"] = Results(Get(f, "PostconditionResults")),
+            }) : null,
+            ["obligations"] = Get(options, "ObligationResults") is { } tracker ? Each(Get(tracker, "Obligations"), o => new JsonObject
+            {
+                ["id"] = Str(o, "Id"), ["kind"] = Get(o, "Kind")!.ToString(), ["functionId"] = Str(o, "FunctionId"), ["status"] = Get(o, "Status")!.ToString(),
+                ["description"] = (string?)Get(o, "Description"), ["counterexampleDescription"] = (string?)Get(o, "CounterexampleDescription"),
+                ["parameterName"] = TryGet(o, "ParameterName") as string, ["sourceProofId"] = TryGet(o, "SourceProofId") as string,
+                ["outcome"] = Outcome(TryGet(o, "Outcome")),
+            }) : null,
             ["emitted"] = (string?)Get(result, "GeneratedCode") ?? "",
         };
     }
 
-    private static JsonArray? Contracts(object? module)
+    private static JsonArray Results(object? list) => Each(list, r => new JsonObject
     {
-        if (module == null)
-            return null;
-        var functions = new JsonArray();
-        foreach (var f in (IEnumerable)Get(module, "Functions")!)
-        {
-            functions.Add(new JsonObject
-            {
-                ["functionId"] = (string)Get(f, "FunctionId")!,
-                ["functionName"] = (string)Get(f, "FunctionName")!,
-                ["preconditions"] = Results(Get(f, "PreconditionResults")!),
-                ["postconditions"] = Results(Get(f, "PostconditionResults")!),
-            });
-        }
-        return functions;
-    }
+        ["legacyStatus"] = Get(r, "Status")!.ToString(), ["translatorSemanticsVersion"] = TryGet(r, "TranslatorSemanticsVersion") as string,
+        ["outcome"] = Outcome(Get(r, "EffectiveOutcome")),
+    });
 
-    private static JsonArray Results(object list)
+    private static JsonObject? Outcome(object? outcome) => outcome == null ? null : new JsonObject
     {
-        var array = new JsonArray();
-        foreach (var r in (IEnumerable)list)
-        {
-            var outcome = Get(r, "EffectiveOutcome")!;
-            array.Add(new JsonObject
-            {
-                ["legacyStatus"] = Get(r, "Status")!.ToString(),
-                ["translatorSemanticsVersion"] = TryGet(r, "TranslatorSemanticsVersion") as string,
-                ["outcome"] = Outcome(outcome),
-            });
-        }
-        return array;
-    }
+        ["status"] = Get(outcome, "Status")!.ToString(),
+        ["isVacuous"] = (bool)Get(outcome, "IsVacuous")!,
+        ["assumptions"] = new JsonArray(((IEnumerable<string>)Get(outcome, "Assumptions")!).Select(a => (JsonNode)a).ToArray()),
+        ["reason"] = (string?)Get(outcome, "Reason"),
+        ["counterexample"] = Get(outcome, "Counterexample") is { } cex
+            ? Each(Get(cex, "Bindings"), b => new JsonObject { ["name"] = Str(b, "Name"), ["value"] = Str(b, "Value") }) : null,
+    };
 
-    private static JsonObject? Outcome(object? outcome)
-    {
-        if (outcome == null)
-            return null;
-        var cex = Get(outcome, "Counterexample");
-        JsonArray? bindings = null;
-        if (cex != null)
-        {
-            bindings = [];
-            foreach (var b in (IEnumerable)Get(cex, "Bindings")!)
-                bindings.Add(new JsonObject { ["name"] = (string)Get(b, "Name")!, ["value"] = (string)Get(b, "Value")! });
-        }
-        return new JsonObject
-        {
-            ["status"] = Get(outcome, "Status")!.ToString(),
-            ["isVacuous"] = (bool)Get(outcome, "IsVacuous")!,
-            ["assumptions"] = new JsonArray(((IEnumerable<string>)Get(outcome, "Assumptions")!).Select(a => (JsonNode)a).ToArray()),
-            ["reason"] = (string?)Get(outcome, "Reason"),
-            ["counterexample"] = bindings,
-        };
-    }
+    private static JsonArray Each(object? list, Func<object, JsonNode> map) => new(((IEnumerable)list!).Cast<object>().Select(map).ToArray());
 
-    private static JsonArray? Obligations(object? tracker)
-    {
-        if (tracker == null)
-            return null;
-        var array = new JsonArray();
-        foreach (var o in (IEnumerable)Get(tracker, "Obligations")!)
-        {
-            array.Add(new JsonObject
-            {
-                ["id"] = (string)Get(o, "Id")!,
-                ["kind"] = Get(o, "Kind")!.ToString(),
-                ["functionId"] = (string)Get(o, "FunctionId")!,
-                ["status"] = Get(o, "Status")!.ToString(),
-                ["description"] = (string?)Get(o, "Description"),
-                ["counterexampleDescription"] = (string?)Get(o, "CounterexampleDescription"),
-                ["parameterName"] = TryGet(o, "ParameterName") as string,
-                ["sourceProofId"] = TryGet(o, "SourceProofId") as string,
-                ["outcome"] = Outcome(TryGet(o, "Outcome")),
-            });
-        }
-        return array;
-    }
+    private static string Str(object target, string name) => (string)Get(target, name)!;
 
     private static void Set(object target, string name, object? value) =>
         (target.GetType().GetProperty(name) ?? throw new MissingMemberException(target.GetType().FullName, name)).SetValue(target, value);

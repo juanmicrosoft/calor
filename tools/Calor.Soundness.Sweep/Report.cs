@@ -1,204 +1,153 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Calor.Compiler.Tests.SoundnessRegistration;
+using static Calor.Soundness.Sweep.Program;
 
 namespace Calor.Soundness.Sweep;
 
-/// <summary>
-/// Mechanical row status, findings, and controls from the retained case results (registration
-/// caseResults.rowStatus, findingRecord, controls). Each baseline is computed only from its own
-/// results; nothing is pooled.
-/// </summary>
+// Mechanical row status, findings, and controls from the retained case results (registration caseResults.rowStatus, findingRecord, controls). Each baseline is
+// computed only from its own results.
 internal static class Report
 {
-    internal static readonly HashSet<string> FindingClasses =
+    private static readonly HashSet<string> FindingClasses =
     [
-        "false-unconditional-proof", "false-proof-unconfirmed-vacuity", "required-demotion-absent", "guard-elided-without-proof",
-        "vacuity-mislabel", "spurious-refutation", "spurious-model", "stale-cache-proof", "semantic-divergence",
-        "control-mismatch", "candidate-unconfirmed",
+        "false-unconditional-proof", "false-proof-unconfirmed-vacuity", "required-demotion-absent", "guard-elided-without-proof", "vacuity-mislabel",
+        "spurious-refutation", "spurious-model", "stale-cache-proof", "semantic-divergence", "control-mismatch", "candidate-unconfirmed",
     ];
 
     private static readonly HashSet<string> Blocking = ["harness-invalid", "flaky", "crashed", "unconfirmed-claim", "timed-out"];
-    private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
+
+    private static List<JsonObject> Lines(string path) => File.Exists(path) ? File.ReadLines(path).Select(l => JsonNode.Parse(l)!.AsObject()).ToList() : [];
+
+    private static JsonNode Counts(Dictionary<string, int> d) => JsonSerializer.SerializeToNode(d.OrderBy(k => k.Key, StringComparer.Ordinal).ToDictionary())!;
 
     public static int Write(string repo, string outRoot)
     {
-        var (registration, templates, cases, rows) = Program.Load(Path.GetFullPath(repo));
-        var templateById = templates["templates"]!.AsArray().ToDictionary(t => t!["id"]!.GetValue<string>(), t => t!, StringComparer.Ordinal);
-        var results = new Dictionary<string, List<JsonObject>>(StringComparer.Ordinal);
-        foreach (var b in new[] { "B1", "N1", "P845" })
-        {
-            var path = Path.Combine(outRoot, b, "case-results.jsonl");
-            results[b] = File.Exists(path) ? File.ReadLines(path).Select(l => JsonNode.Parse(l)!.AsObject()).ToList() : [];
-        }
-        JsonObject? Final(string b, string caseId) => results[b].LastOrDefault(r => r["caseId"]!.GetValue<string>() == caseId);
-
-        var controls = Controls(cases, templateById, Final);
+        var (registration, templates, cases, rows) = Load(Path.GetFullPath(repo));
+        var results = new[] { "B1", "N1", "P845" }.ToDictionary(b => b, b => Lines(Path.Combine(outRoot, b, "case-results.jsonl")));
+        JsonObject? Final(string b, string caseId) => results[b].LastOrDefault(r => S(r["caseId"]) == caseId);
+        var controls = Controls(cases, templates, Final);
         File.WriteAllText(Path.Combine(outRoot, "controls.json"), controls.ToJsonString(Indented));
-
         var summary = new JsonObject();
         foreach (var b in new[] { "B1", "N1" })
         {
             var other = b == "B1" ? "N1" : "B1";
             var manifest = JsonNode.Parse(File.ReadAllText(Path.Combine(repo, $"docs/plans/evidence/r1-1419/manifest-{b}.json")))!;
             var pins = JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, b, "pins.json")))!;
-            var rowsDir = Path.Combine(outRoot, b, "rows");
-            var findingsDir = Path.Combine(outRoot, b, "findings");
+            var (rowsDir, findingsDir) = (Path.Combine(outRoot, b, "rows"), Path.Combine(outRoot, b, "findings"));
             Directory.CreateDirectory(rowsDir);
             if (Directory.Exists(findingsDir)) Directory.Delete(findingsDir, true);
             Directory.CreateDirectory(findingsDir);
-            var statusRows = new JsonArray();
-            var counts = new Dictionary<string, int>(StringComparer.Ordinal);
-            var findingIndex = new JsonArray();
-            var n = 0;
-            var nonDiscriminating = controls["retro845"]![b]!["discriminates"]!.GetValue<bool>() == false;
+            var (statusRows, findingIndex, counts, n) = (new JsonArray(), new JsonArray(), new Dictionary<string, int>(StringComparer.Ordinal), 0);
+            var nonDiscriminating = !controls["retro845"]![b]!["discriminates"]!.GetValue<bool>();
             foreach (var mrow in manifest["rows"]!.AsArray())
             {
-                var rowId = mrow!["row"]!.GetValue<string>();
+                var rowId = S(mrow!["row"]);
                 var row = rows[rowId];
-                var lines = new List<string>();
-                var classes = new Dictionary<string, int>(StringComparer.Ordinal);
-                var unexecuted = 0;
-                var findingClasses = new List<string>();
-                foreach (var caseId in mrow["caseIds"]!.AsArray().Select(x => x!.GetValue<string>()))
+                var (lines, classes, findingClasses, unexecuted) = (new List<JsonObject>(), new Dictionary<string, int>(StringComparer.Ordinal), new List<string>(), 0);
+                foreach (var caseId in mrow["caseIds"]!.AsArray().Select(S))
                 {
-                    var r = Final(b, caseId);
-                    if (r == null) { unexecuted++; lines.Add(new JsonObject { ["caseId"] = caseId, ["baseline"] = b, ["class"] = "not-investigated", ["reason"] = "unexecuted" }.ToJsonString()); continue; }
-                    lines.Add(r.ToJsonString());
-                    var cls = r["class"]!.GetValue<string>();
+                    if (Final(b, caseId) is not { } r) { unexecuted++; lines.Add(new JsonObject { ["caseId"] = caseId, ["baseline"] = b, ["class"] = "not-investigated", ["reason"] = "unexecuted" }); continue; }
+                    lines.Add(r);
+                    var cls = S(r["class"]);
                     classes[cls] = classes.GetValueOrDefault(cls) + 1;
-                    var all = new[] { cls }.Concat(r["addedFindings"]!.AsArray().Select(x => x!.GetValue<string>())).Where(FindingClasses.Contains).Distinct().ToList();
-                    foreach (var fc in all)
+                    foreach (var fc in r["addedFindings"]!.AsArray().Select(S).Prepend(cls).Where(FindingClasses.Contains).Distinct())
                     {
                         findingClasses.Add(fc);
                         var id = $"F-{b}-{++n:D3}";
-                        var record = Finding(id, b, other, fc, r, pins, registration, outRoot, Final(other, caseId), rowId, cases.First(x => x.Id == caseId));
-                        File.WriteAllText(Path.Combine(findingsDir, id + ".json"), record.ToJsonString(Indented));
+                        File.WriteAllText(Path.Combine(findingsDir, id + ".json"), Finding(id, b, other, fc, r, pins, registration, outRoot, Final(other, caseId), rowId, cases.First(x => x.Id == caseId)).ToJsonString(Indented));
                         findingIndex.Add(new JsonObject { ["findingId"] = id, ["rowId"] = rowId, ["caseId"] = caseId, ["class"] = fc, ["token"] = r["token"]?.DeepClone(), ["o1"] = r["o1"]?.DeepClone() });
                     }
                 }
-                foreach (var mutation in controls["mutationPairs"]![b]!.AsArray().Where(p => p!["row"]!.GetValue<string>() == rowId && !p["oracleEqual"]!.GetValue<bool>()))
-                    findingClasses.Add("control-mismatch");
-                File.WriteAllText(Path.Combine(rowsDir, rowId + ".jsonl"), string.Concat(lines.Select(l => l + "\n")));
-                string status;
+                if (controls["mutationPairs"]![b]!.AsArray().Any(p => S(p!["row"]) == rowId && !p["oracleEqual"]!.GetValue<bool>())) findingClasses.Add("control-mismatch");
+                File.WriteAllText(Path.Combine(rowsDir, rowId + ".jsonl"), string.Concat(lines.Select(l => l.ToJsonString() + "\n")));
                 var reasons = new JsonArray();
-                if (findingClasses.Contains("false-unconditional-proof")) status = "FALSE-PROOF";
-                else if (findingClasses.Count > 0) status = "FINDING";
-                else if (unexecuted > 0 || classes.Keys.Any(Blocking.Contains)) status = "INCOMPLETE";
-                else status = "CLEAN-WITHIN-BUDGET";
                 if (unexecuted > 0) reasons.Add($"{unexecuted} unexecuted");
                 foreach (var k in classes.Keys.Where(Blocking.Contains)) reasons.Add($"{classes[k]} {k}");
+                var status = findingClasses.Contains("false-unconditional-proof") ? "FALSE-PROOF" : findingClasses.Count > 0 ? "FINDING"
+                    : unexecuted > 0 || classes.Keys.Any(Blocking.Contains) ? "INCOMPLETE" : "CLEAN-WITHIN-BUDGET";
                 if (nonDiscriminating && rowId is "NUM-LITERAL-TYPED" or "NUM-ARITH-ADD")
                 {
                     reasons.Add("#845 discriminating control did not discriminate on this baseline (registration controls.retrospective845.nonDiscriminatingConsequence)");
                     if (status == "CLEAN-WITHIN-BUDGET") status = "INCOMPLETE";
                 }
-                var guardedBy = controls["controlMismatches"]![b]!.AsArray().Where(m => m!["guards"]!.AsArray().Any(g => g!.GetValue<string>() == rowId)).Select(m => m!["caseId"]!.DeepClone()).ToArray();
                 if (row.Classification == "not-investigated") status = "NOT-INVESTIGATED";
                 counts[status] = counts.GetValueOrDefault(status) + 1;
-                var exhaustive = lines.Count(l => JsonNode.Parse(l)!["exhaustive"]?.GetValue<bool>() == true);
                 statusRows.Add(new JsonObject
                 {
-                    ["id"] = $"{b}:{rowId}", ["row"] = rowId, ["classification"] = row.Classification, ["releaseCritical"] = row.ReleaseCritical,
-                    ["status"] = status, ["blockedAtTimebox"] = status == "INCOMPLETE" && row.ReleaseCritical,
-                    ["allocated"] = mrow["caseIds"]!.AsArray().Count, ["unexecuted"] = unexecuted,
-                    ["classCounts"] = JsonSerializer.SerializeToNode(classes.OrderBy(k => k.Key, StringComparer.Ordinal).ToDictionary()),
-                    ["findingClasses"] = new JsonArray(findingClasses.Distinct().Select(x => (JsonNode)x).ToArray()),
-                    ["exhaustiveDomains"] = exhaustive, ["reasons"] = reasons,
-                    ["controlMismatchesGuardingThisRow"] = new JsonArray(guardedBy),
+                    ["id"] = $"{b}:{rowId}", ["row"] = rowId, ["classification"] = row.Classification, ["releaseCritical"] = row.ReleaseCritical, ["status"] = status,
+                    ["blockedAtTimebox"] = status == "INCOMPLETE" && row.ReleaseCritical, ["allocated"] = mrow["caseIds"]!.AsArray().Count, ["unexecuted"] = unexecuted,
+                    ["classCounts"] = Counts(classes), ["findingClasses"] = new JsonArray(findingClasses.Distinct().Select(x => (JsonNode)x).ToArray()),
+                    ["exhaustiveDomains"] = lines.Count(l => l["exhaustive"]?.GetValue<bool>() == true), ["reasons"] = reasons,
+                    ["controlMismatchesGuardingThisRow"] = new JsonArray(controls["controlMismatches"]![b]!.AsArray().Where(m => m!["guards"]!.AsArray().Any(g => S(g) == rowId)).Select(m => m!["caseId"]!.DeepClone()).ToArray()),
                     ["resultPath"] = mrow["resultPath"]!.DeepClone(),
                 });
             }
-            var rowStatus = new JsonObject { ["baseline"] = b, ["counts"] = JsonSerializer.SerializeToNode(counts.OrderBy(k => k.Key, StringComparer.Ordinal).ToDictionary()), ["rows"] = statusRows };
-            File.WriteAllText(Path.Combine(outRoot, b, "row-status.json"), rowStatus.ToJsonString(Indented));
+            File.WriteAllText(Path.Combine(outRoot, b, "row-status.json"), new JsonObject { ["baseline"] = b, ["counts"] = Counts(counts), ["rows"] = statusRows }.ToJsonString(Indented));
             File.WriteAllText(Path.Combine(outRoot, b, "findings-index.json"), findingIndex.ToJsonString(Indented));
-            summary[b] = new JsonObject { ["rowStatusCounts"] = rowStatus["counts"]!.DeepClone(), ["findings"] = findingIndex.Count };
+            summary[b] = new JsonObject { ["rowStatusCounts"] = Counts(counts), ["findings"] = findingIndex.Count };
         }
         File.WriteAllText(Path.Combine(outRoot, "summary.json"), summary.ToJsonString(Indented));
         Console.WriteLine(summary.ToJsonString(Indented));
         return 0;
     }
 
-    private static JsonObject Finding(string id, string b, string other, string cls, JsonObject r, JsonNode pins, JsonNode registration,
-        string outRoot, JsonObject? otherResult, string rowId, Calor.Compiler.Tests.SoundnessRegistration.SweepCaseGenerator.Case c)
+    private static JsonObject Finding(string id, string b, string other, string cls, JsonObject r, JsonNode pins, JsonNode registration, string outRoot, JsonObject? otherResult, string rowId, SweepCaseGenerator.Case c)
     {
-        var repro = Reproduction(c.OracleSource);
-        var lastAttempt = r["attempts"]!.AsArray()[^1]!["path"]!.GetValue<string>();
-        var attempt = JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, b, lastAttempt)))!;
-        var claim = attempt["claim"];
-        var o1 = attempt["o1"];
-        var witness = o1?["Witness"]?.GetValue<string>();
-        static string Repro(JsonObject? x, string cls) => x == null || x["status"]?.GetValue<string>() != "executed" ? "not-run"
-            : x["class"]?.GetValue<string>() == cls || (x["addedFindings"]?.AsArray().Any(y => y!.GetValue<string>() == cls) ?? false) ? "reproduces" : "does-not-reproduce";
-        var crossPath = Path.Combine(outRoot, other, "cross-baseline.jsonl");
-        var cross = File.Exists(crossPath) ? File.ReadLines(crossPath).Select(l => JsonNode.Parse(l)!.AsObject()).LastOrDefault(x => x["caseId"]!.GetValue<string>() == r["caseId"]!.GetValue<string>()) : null;
-        var otherResultText = Repro(cross, cls);
+        var (reproSource, reproOutput) = Reproduction(c.OracleSource);
+        var attempt = JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, b, S(r["attempts"]!.AsArray()[^1]!["path"]))))!;
+        var (claim, o1, guards) = (attempt["claim"], attempt["o1"], attempt["guards"]);
+        // The in-run pin did not capture the native image; the post-run native-check (same process layout) records what each baseline maps.
+        var nativePath = Path.Combine(outRoot, "native-z3-check.json");
+        var native = (File.Exists(nativePath) ? JsonNode.Parse(File.ReadAllText(nativePath)) : null)?[b]?["processLoadedZ3"]?.AsArray().FirstOrDefault(x => S(x!["path"]).StartsWith(S(pins["binaryDirectory"]), StringComparison.Ordinal));
+        static string Repro(JsonObject? x, string cls) => x == null || (x["status"] is JsonNode st && S(st) != "executed") ? "not-run"
+            : x["class"]?.GetValue<string>() == cls || (x["addedFindings"]?.AsArray().Any(y => S(y) == cls) ?? false) ? "reproduces" : "does-not-reproduce";
+        var cross = Lines(Path.Combine(outRoot, other, "cross-baseline.jsonl")).LastOrDefault(x => S(x["caseId"]) == S(r["caseId"]));
         var replay = claim?["modelReplay"];
-        var useModel = cls == "spurious-refutation" && replay?["input"] is JsonValue;
-        var witnessInput = useModel ? replay!["input"]!.GetValue<string>() : witness ?? replay?["input"]?.ToString();
-        var o2For = attempt["o2"]?["runs"]?.AsArray().FirstOrDefault(x => witnessInput != null && witnessInput.StartsWith(x!["input"]!.GetValue<string>(), StringComparison.Ordinal));
+        var useModel = cls == "spurious-refutation" && replay?["input"] is JsonValue; // the defect witness of a spurious refutation is the solver model
+        var witnessInput = useModel ? S(replay!["input"]) : o1?["Witness"]?.GetValue<string>() ?? replay?["input"]?.ToString();
+        var o2For = attempt["o2"]?["runs"]?.AsArray().FirstOrDefault(x => witnessInput?.StartsWith(S(x!["input"]), StringComparison.Ordinal) == true);
         return new JsonObject
         {
-            ["findingId"] = id,
-            ["baseline"] = b,
-            ["registrationCommit"] = pins["registrationCommit"]!.DeepClone(),
-            ["rowId"] = rowId,
-            ["caseId"] = r["caseId"]!.DeepClone(),
-            ["templateId"] = r["templateId"]!.DeepClone(),
-            ["caseSha256"] = attempt["caseSha256"]?.DeepClone(),
-            ["class"] = cls,
+            ["findingId"] = id, ["baseline"] = b, ["registrationCommit"] = pins["registrationCommit"]!.DeepClone(), ["rowId"] = rowId, ["caseId"] = r["caseId"]!.DeepClone(),
+            ["templateId"] = r["templateId"]!.DeepClone(), ["caseSha256"] = attempt["caseSha256"]?.DeepClone(), ["class"] = cls,
             ["claim"] = new JsonObject
             {
-                ["site"] = attempt["claimSite"]?.DeepClone(),
-                ["token"] = claim?["token"]?.DeepClone(),
-                ["rawStatus"] = claim?["rawStatus"]?.DeepClone(),
-                ["isVacuous"] = claim?["isVacuous"]?.DeepClone(),
-                ["assumptions"] = claim?["assumptions"]?.DeepClone(),
-                ["guardInElidedEmission"] = attempt["guards"]?["guardInElidedEmission"]?.DeepClone(),
-                ["guardInForcedEmission"] = attempt["guards"]?["guardInForcedEmission"]?.DeepClone(),
+                ["site"] = attempt["claimSite"]?.DeepClone(), ["token"] = claim?["token"]?.DeepClone(), ["rawStatus"] = claim?["rawStatus"]?.DeepClone(),
+                ["isVacuous"] = claim?["isVacuous"]?.DeepClone(), ["assumptions"] = claim?["assumptions"]?.DeepClone(),
+                ["guardInElidedEmission"] = guards?["guardInElidedEmission"]?.DeepClone(), ["guardInForcedEmission"] = guards?["guardInForcedEmission"]?.DeepClone(),
             },
             ["witness"] = new JsonObject
             {
-                ["inputs"] = witnessInput,
-                ["source"] = useModel ? "the solver counterexample model, replayed under O1" : "the O1 witness",
+                ["inputs"] = witnessInput, ["source"] = useModel ? "the solver counterexample model, replayed under O1" : "the O1 witness",
                 ["o1"] = useModel ? $"model input: {replay!["o1"]}; case verdict: {o1?["Kind"]}" : $"{o1?["Kind"]} {o1?["ViolationKind"]}".Trim(),
-                ["o2"] = o2For == null ? "not-run" : o2For["o2"]!.GetValue<string>() switch { "guard-threw" => "guard threw", "returned" or "o2-other-exception" => "did not throw", _ => "not-run" },
+                ["o2"] = o2For == null ? "not-run" : S(o2For["o2"]) switch { "guard-threw" => "guard threw", "returned" or "o2-other-exception" => "did not throw", _ => "not-run" },
                 ["o2Detail"] = o2For?.DeepClone(),
             },
-            ["nonVacuityCheck"] = attempt["nonVacuityCheck"]?.DeepClone(),
-            ["classReason"] = r["classReason"]?.DeepClone(),
+            ["nonVacuityCheck"] = attempt["nonVacuityCheck"]?.DeepClone(), ["classReason"] = r["classReason"]?.DeepClone(),
             ["minimized"] = new JsonObject
             {
-                ["status"] = "registered-case: a single-function probe generated from one template; not reduced further",
-                ["calorSource"] = c.CalorSource,
-                ["calorPrimeSource"] = c.CalorPrimeSource,
-                ["csharpReproduction"] = repro.Source,
-                ["reproductionOutput"] = repro.Output,
-                ["sha256"] = Hashing.Sha256Text(c.CalorSource),
+                ["status"] = "registered-case: a single-function probe generated from one template; not reduced further", ["calorSource"] = c.CalorSource,
+                ["calorPrimeSource"] = c.CalorPrimeSource, ["csharpReproduction"] = reproSource, ["reproductionOutput"] = reproOutput, ["sha256"] = Hashing.Sha256Text(c.CalorSource),
             },
             ["environment"] = new JsonObject
             {
-                ["calorDllSha256"] = pins["calorDllSha256"]!.DeepClone(),
-                ["z3NativeSha256"] = pins["nativeZ3Sha256"]?.DeepClone(),
-                ["dotnetVersion"] = pins["dotnetVersion"]!.DeepClone(),
-                ["os"] = pins["os"]!.DeepClone(),
-                ["translatorSemanticsVersion"] = pins["translatorSemanticsVersion"]?.DeepClone(),
+                ["calorDllSha256"] = pins["calorDllSha256"]!.DeepClone(), ["z3NativeSha256"] = native?["sha256"]?.DeepClone(), ["z3NativeSource"] = native == null ? "not captured" : "post-run native-check.json (same process layout)", ["dotnetVersion"] = pins["dotnetVersion"]!.DeepClone(),
+                ["os"] = pins["os"]!.DeepClone(), ["translatorSemanticsVersion"] = pins["translatorSemanticsVersion"]?.DeepClone(),
             },
             ["attempts"] = r["attempts"]!.DeepClone(),
             ["otherBaseline"] = new JsonObject
             {
-                ["id"] = other, ["result"] = otherResultText,
-                ["rerun"] = cross?.DeepClone(),
+                ["id"] = other, ["result"] = Repro(cross, cls), ["rerun"] = cross?.DeepClone(),
                 ["otherSweepResult"] = new JsonObject { ["token"] = otherResult?["token"]?.DeepClone(), ["class"] = otherResult?["class"]?.DeepClone(), ["result"] = Repro(otherResult, cls) },
             },
-            ["affectedGuarantee"] = Affected(rowId, attempt["claimSite"]?.GetValue<string>(), registration),
-            ["filedIssue"] = null,
-            ["disposition"] = null,
+            ["affectedGuarantee"] = Affected(rowId, attempt["claimSite"]?.GetValue<string>(), registration), ["filedIssue"] = null, ["disposition"] = null,
         };
     }
 
     private static string Affected(string rowId, string? site, JsonNode registration)
     {
-        var title = registration["denominator"]!["rows"]!.AsArray().First(x => x!["id"]!.GetValue<string>() == rowId)!["title"]!.GetValue<string>();
+        var title = S(registration["denominator"]!["rows"]!.AsArray().First(x => S(x!["id"]) == rowId)!["title"]);
         var path = site switch
         {
             "obligation" => "a Discharged obligation drops its emitted runtime guard under the default ObligationPolicy (Discharged = Ignore) with ElideProvenGuards on (CSharpEmitter obligation sites)",
@@ -217,12 +166,9 @@ internal static class Report
             + "No experiment relying on this form was identified by S1; S2 (#1413) confirms.";
     }
 
-    /// <summary>
-    /// Standalone C# reproduction (no Calor): the case's registered oracle program plus a Main that
-    /// enumerates its domain and prints the first input where the property is false or throws (or,
-    /// for an exists claim, the first witness). Compiled against BCL only and executed here.
-    /// </summary>
-    internal static (string Source, string Output) Reproduction(string oracleSource)
+    // Standalone C# reproduction (no Calor): the registered oracle program plus a Main that enumerates its domain and prints the first input where the property
+    // is false or throws (or, for an exists claim, the first witness). BCL only; executed here.
+    private static (string Source, string Output) Reproduction(string oracleSource)
     {
         const string Main = """
 
@@ -252,106 +198,63 @@ public static class Repro
 }
 """;
         var source = oracleSource + Main;
-        var checkedMode = !oracleSource.Contains("public const bool Checked = false;", StringComparison.Ordinal);
-        var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create("Repro_" + Guid.NewGuid().ToString("N"),
-            [Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(source, new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(Microsoft.CodeAnalysis.CSharp.LanguageVersion.CSharp14))],
-            [.. Calor.Compiler.Tests.SoundnessRegistration.IndependentOracle.BclReferences, Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(typeof(Console).Assembly.Location)],
-            new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary, checkOverflow: checkedMode,
-                nullableContextOptions: Microsoft.CodeAnalysis.NullableContextOptions.Enable));
-        using var stream = new MemoryStream();
-        var emit = compilation.Emit(stream);
-        if (!emit.Success)
-            return (source, "compile error: " + string.Join("; ", emit.Diagnostics.Where(d => d.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).Take(3)));
+        var (image, errors) = Roslyn.Emit(source, [.. IndependentOracle.BclReferences, Microsoft.CodeAnalysis.MetadataReference.CreateFromFile(typeof(Console).Assembly.Location)], Roslyn.Checked(oracleSource));
+        if (image == null) return (source, "compile error: " + errors);
         var context = new System.Runtime.Loader.AssemblyLoadContext("Repro", isCollectible: true);
         var previousOut = Console.Out;
-        var previousCulture = System.Globalization.CultureInfo.CurrentCulture;
         var writer = new StringWriter();
         try
         {
-            stream.Position = 0;
             Console.SetOut(writer);
-            System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.GetCultureInfo("en-US");
-            var exit = context.LoadFromStream(stream).GetType("Repro")!.GetMethod("Main")!.Invoke(null, null);
+            var exit = OracleProgram.WithCulture(() => context.LoadFromStream(image).GetType("Repro")!.GetMethod("Main")!.Invoke(null, null));
             return (source, writer.ToString().Trim() + $" (exit {exit})");
         }
-        finally
-        {
-            Console.SetOut(previousOut);
-            System.Globalization.CultureInfo.CurrentCulture = previousCulture;
-            context.Unload();
-        }
+        finally { Console.SetOut(previousOut); context.Unload(); }
     }
 
-    private static JsonObject Controls(IReadOnlyList<Calor.Compiler.Tests.SoundnessRegistration.SweepCaseGenerator.Case> cases,
-        Dictionary<string, JsonNode> templateById, Func<string, string, JsonObject?> final)
+    private static JsonObject Controls(IReadOnlyList<SweepCaseGenerator.Case> cases, Dictionary<string, JsonNode> templates, Func<string, string, JsonObject?> final)
     {
-        var result = new JsonObject();
-        var availability = new JsonObject();
-        var mutation = new JsonObject();
-        var retro = new JsonObject();
-        var mismatches = new JsonObject();
-        var controlCases = cases.Where(c => c.RowId.StartsWith("CTRL-", StringComparison.Ordinal)).ToList();
+        var (availability, mutation, retro, mismatches) = (new JsonObject(), new JsonObject(), new JsonObject(), new JsonObject());
+        var ctrl = cases.Where(c => c.RowId.StartsWith("CTRL-", StringComparison.Ordinal)).ToList();
+        string? Token(string b, string caseId) => final(b, caseId)?["token"]?.GetValue<string>();
         foreach (var b in new[] { "P845", "B1", "N1" })
         {
-            var avail = new JsonArray();
-            foreach (var c in controlCases.Where(c => c.RowId is "CTRL-POSITIVE" or "CTRL-NEGATIVE"))
+            var avail = new JsonArray(ctrl.Where(c => c.RowId is "CTRL-POSITIVE" or "CTRL-NEGATIVE").Select(c => (JsonNode)new JsonObject
             {
-                var r = final(b, c.Id);
-                var expected = templateById[c.TemplateId]["expectedOutcome"]!.GetValue<string>();
-                avail.Add(new JsonObject { ["caseId"] = c.Id, ["expected"] = expected, ["token"] = r?["token"]?.DeepClone(), ["ok"] = r?["token"]?.GetValue<string>() == expected });
-            }
+                ["caseId"] = c.Id, ["expected"] = S(templates[c.TemplateId]["expectedOutcome"]), ["token"] = Token(b, c.Id), ["ok"] = Token(b, c.Id) == S(templates[c.TemplateId]["expectedOutcome"]),
+            }).ToArray());
             availability[b] = new JsonObject { ["pass"] = avail.All(x => x!["ok"]!.GetValue<bool>()), ["cases"] = avail };
             if (b == "P845") continue;
-            var pairs = new JsonArray();
-            foreach (var g in controlCases.Where(c => c.RowId == "CTRL-MUTATION").GroupBy(c => templateById[c.TemplateId]["mutationPair"]!.GetValue<string>()))
+            mutation[b] = new JsonArray(ctrl.Where(c => c.RowId == "CTRL-MUTATION").GroupBy(c => S(templates[c.TemplateId]["mutationPair"])).Select(g =>
             {
                 var members = g.Select(c => final(b, c.Id)).ToList();
-                pairs.Add(new JsonObject
+                return (JsonNode)new JsonObject
                 {
-                    ["pair"] = g.Key, ["row"] = "CTRL-MUTATION",
-                    ["cases"] = new JsonArray(g.Select(c => (JsonNode)c.Id).ToArray()),
-                    ["o1"] = new JsonArray(members.Select(m => m?["o1"]?.DeepClone()).ToArray()),
-                    ["tokens"] = new JsonArray(members.Select(m => m?["token"]?.DeepClone()).ToArray()),
+                    ["pair"] = g.Key, ["row"] = "CTRL-MUTATION", ["cases"] = new JsonArray(g.Select(c => (JsonNode)c.Id).ToArray()),
+                    ["o1"] = new JsonArray(members.Select(m => m?["o1"]?.DeepClone()).ToArray()), ["tokens"] = new JsonArray(members.Select(m => m?["token"]?.DeepClone()).ToArray()),
                     ["oracleEqual"] = members.All(m => m != null) && members.Select(m => m!["o1"]?.ToJsonString()).Distinct().Count() == 1,
-                });
-            }
-            mutation[b] = pairs;
-            var mm = new JsonArray();
-            foreach (var c in controlCases.Where(c => c.RowId is "CTRL-RETRO-845" or "CTRL-RETRO-FIXED"))
+                };
+            }).ToArray());
+            mismatches[b] = new JsonArray(ctrl.Where(c => c.RowId is "CTRL-RETRO-845" or "CTRL-RETRO-FIXED" && Token(b, c.Id) != S(templates[c.TemplateId]["expectedOutcome"])).Select(c => (JsonNode)new JsonObject
             {
-                var r = final(b, c.Id);
-                var t = templateById[c.TemplateId];
-                if (r == null || r["token"]?.GetValue<string>() != t["expectedOutcome"]!.GetValue<string>())
-                    mm.Add(new JsonObject { ["caseId"] = c.Id, ["expected"] = t["expectedOutcome"]!.DeepClone(), ["token"] = r?["token"]?.DeepClone(), ["class"] = r?["class"]?.DeepClone(), ["guards"] = t["guards"]!.DeepClone() });
-            }
-            mismatches[b] = mm;
-            var width = new JsonArray();
-            foreach (var c in controlCases.Where(c => c.RowId == "CTRL-RETRO-845"))
+                ["caseId"] = c.Id, ["expected"] = templates[c.TemplateId]["expectedOutcome"]!.DeepClone(), ["token"] = Token(b, c.Id), ["class"] = final(b, c.Id)?["class"]?.DeepClone(),
+                ["guards"] = templates[c.TemplateId]["guards"]!.DeepClone(),
+            }).ToArray());
+            var width = new JsonArray(ctrl.Where(c => c.RowId == "CTRL-RETRO-845").Select(c =>
             {
-                var t = templateById[c.TemplateId];
-                var p = final("P845", c.Id);
-                var r = final(b, c.Id);
-                var p845Expected = t["retrospective"]!["p845ExpectedOutcome"]!.GetValue<string>();
+                var t = templates[c.TemplateId];
+                var p845Expected = S(t["retrospective"]!["p845ExpectedOutcome"]);
                 var isWidth = c.TemplateId.Contains("LONG", StringComparison.Ordinal) || c.TemplateId.Contains("UINT", StringComparison.Ordinal);
-                width.Add(new JsonObject
+                return (JsonNode)new JsonObject
                 {
-                    ["caseId"] = c.Id, ["template"] = c.TemplateId, ["widthCase"] = isWidth,
-                    ["p845Expected"] = p845Expected, ["p845Token"] = p?["token"]?.DeepClone(),
-                    ["expected"] = t["expectedOutcome"]!.DeepClone(), ["token"] = r?["token"]?.DeepClone(),
-                    ["discriminates"] = isWidth && p?["token"]?.GetValue<string>() == p845Expected && r?["token"]?.GetValue<string>() == t["expectedOutcome"]!.GetValue<string>(),
-                });
-            }
-            retro[b] = new JsonObject
-            {
-                ["p845AvailabilityPass"] = availability["P845"]!["pass"]!.DeepClone(),
-                ["discriminates"] = availability["P845"]!["pass"]!.GetValue<bool>() && width.Any(w => w!["discriminates"]!.GetValue<bool>()),
-                ["cases"] = width,
-            };
+                    ["caseId"] = c.Id, ["template"] = c.TemplateId, ["widthCase"] = isWidth, ["p845Expected"] = p845Expected, ["p845Token"] = Token("P845", c.Id),
+                    ["expected"] = t["expectedOutcome"]!.DeepClone(), ["token"] = Token(b, c.Id),
+                    ["discriminates"] = isWidth && Token("P845", c.Id) == p845Expected && Token(b, c.Id) == S(t["expectedOutcome"]),
+                };
+            }).ToArray());
+            var p845Pass = availability["P845"]!["pass"]!.GetValue<bool>();
+            retro[b] = new JsonObject { ["p845AvailabilityPass"] = p845Pass, ["discriminates"] = p845Pass && width.Any(w => w!["discriminates"]!.GetValue<bool>()), ["cases"] = width };
         }
-        result["solverAvailability"] = availability;
-        result["mutationPairs"] = mutation;
-        result["controlMismatches"] = mismatches;
-        result["retro845"] = retro;
-        return result;
+        return new JsonObject { ["solverAvailability"] = availability, ["mutationPairs"] = mutation, ["controlMismatches"] = mismatches, ["retro845"] = retro };
     }
 }
