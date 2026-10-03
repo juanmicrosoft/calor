@@ -452,16 +452,13 @@ class PlanGuards(unittest.TestCase):
         self.refused("not listed exactly once", current=False)  # a copied workflow's run is not in this workflow's inventory
         self.refused("only .github/workflows/determinism-protocol.yml", env=dispatch(GITHUB_WORKFLOW_REF=f"{REPO}/.github/workflows/copy.yml@x"))
         copy_text = "on:\n  workflow_dispatch:\njobs:\n  x:\n    steps:\n      - run: python3 scripts/determinism_runner.py plan\n"
-        with tempfile.TemporaryDirectory() as tmp:
-            texts = {".github/workflows/copy.yml": copy_text}
-            original = dp.Path.glob
-            try:
-                dp.Path.glob = lambda self, pattern: list(original(self, pattern)) + (
-                    [ROOT / ".github/workflows/copy.yml"] if self == ROOT / ".github/workflows" else [])
-                self.assertIn("D013", codes(texts=texts))
-            finally:
-                dp.Path.glob = original
-            del tmp
+        original = dp.Path.glob  # list a copied workflow without writing one into the tree
+        try:
+            dp.Path.glob = lambda self, pattern: list(original(self, pattern)) + (
+                [ROOT / ".github/workflows/copy.yml"] if self == ROOT / ".github/workflows" else [])
+            self.assertEqual({"D013"}, codes(texts={".github/workflows/copy.yml": copy_text}))
+        finally:
+            dp.Path.glob = original
 
     def test_docs_only_repair_is_refused(self) -> None:
         failed = [past(1, "determinism execution E1", conclusion="failure")]
