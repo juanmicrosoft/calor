@@ -121,6 +121,24 @@ internal static class EvidenceContractValidator
             if (status is not ("PROPOSED" or "ACCEPTED"))
                 v.Add(new("C011", id, $"ceiling status '{status}' is not PROPOSED or ACCEPTED"));
         }
+        var amendmentVersions = Array(contract["amendmentLog"]).Select(a => Str(a?["version"])).OfType<string>().ToHashSet(StringComparer.Ordinal);
+        foreach (var exception in Array(capacity?["exceptions"]))
+        {
+            // A per-PR raise (stopping rule 1) is valid only exactly as an amendment registered it,
+            // in an amendment that is in the log: a different PR, value, or ceiling needs a new
+            // amendment and a validator change, which review sees.
+            var ceilingId = Str(exception?["ceiling"]);
+            var pr = Int(exception?["pr"]);
+            var subject = $"exception {ceilingId ?? "?"} #{pr?.ToString(CultureInfo.InvariantCulture) ?? "?"}";
+            double? raised = exception?["value"] is JsonValue rv && rv.TryGetValue<double>(out var r) ? r : null;
+            var recordedIn = Str(exception?["amendment"]);
+            var registered = RegisteredCeilingExceptions.Any(e =>
+                e.Ceiling == ceilingId && e.Pr == pr && e.Value == raised && e.Amendment == recordedIn);
+            if (!registered || recordedIn is null || !amendmentVersions.Contains(recordedIn))
+                v.Add(new("C011", subject, "ceiling exception is not one registered by a logged amendment (1.1.0: pr-size, #1473, 1520)"));
+            if (string.IsNullOrWhiteSpace(Str(exception?["justification"])))
+                v.Add(new("C011", subject, "exception needs a justification"));
+        }
         var anyProposed = Str(capacity?["status"]) == "PROPOSED"
             || ceilings.Any(c => Str(c?["status"]) == "PROPOSED");
         if (Str(contract["gateStatus"]) == "MET" && (anyProposed || Str(contract["status"]) == "PROPOSED"))
@@ -152,6 +170,12 @@ internal static class EvidenceContractValidator
         v.AddRange(ValidateAmendments(contract));
         return v;
     }
+
+    /// <summary>Per-PR ceiling raises registered by amendments (stopping rule 1).</summary>
+    private static readonly (string Ceiling, int Pr, double Value, string Amendment)[] RegisteredCeilingExceptions =
+    [
+        ("pr-size", 1473, 1520, "1.1.0"),
+    ];
 
     private static IEnumerable<ContractViolation> ValidateGraph(List<JsonNode?> children, HashSet<int> childIssues)
     {
@@ -249,7 +273,7 @@ internal static class EvidenceContractValidator
                 previous = parsed;
             if (string.IsNullOrWhiteSpace(Str(entry?["justification"])))
                 yield return new("C010", subject, "amendment has no justification");
-            if (Int(entry?["reviewedInPr"]) is null)
+            if (Int(entry?["reviewedInPr"]) is not > 0)
                 yield return new("C010", subject, "amendment names no reviewed PR");
             if (!IsUtcTimestamp(Str(entry?["timestampUtc"])))
                 yield return new("C010", subject, "amendment has no UTC timestamp");
@@ -352,7 +376,57 @@ internal static class EvidenceContractValidator
                 v.Add(new("I011", id, $"owning issue {owner} is not a 0.24 child"));
         }
 
+        v.AddRange(ValidatePendingUpdates(contract, inventory, byId, classifications));
         return v;
+    }
+
+    /// <summary>
+    /// I013 (amendment 1.1.0): a pending inventory update names a known artifact, the open PR whose
+    /// repair motivates it, the amendment that recorded it, a known target classification, and a
+    /// resolving PR for each defect it would resolve. It is never applied by the validator: rows are
+    /// checked against the artifacts as committed.
+    /// </summary>
+    private static IEnumerable<ContractViolation> ValidatePendingUpdates(
+        JsonNode contract, JsonNode inventory, Dictionary<string, JsonNode> byId, HashSet<string> classifications)
+    {
+        var amendments = Array(contract["amendmentLog"]).Select(a => Str(a?["version"])).OfType<string>().ToHashSet(StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        if (inventory["pendingUpdates"] is { } present && present is not JsonArray)
+            yield return new("I013", "pendingUpdates", "pendingUpdates must be an array");
+        foreach (var update in Array(inventory["pendingUpdates"]))
+        {
+            var id = Str(update?["id"]) ?? "?";
+            if (!seen.Add(id))
+                yield return new("I013", id, "duplicate pending update id");
+            var artifact = Str(update?["artifact"]);
+            if (artifact is null || !byId.ContainsKey(artifact))
+                yield return new("I013", id, $"pending update names unknown artifact '{artifact}'");
+            if (Int(update?["repairingPr"]) is not > 0)
+                yield return new("I013", id, "pending update must name the repairing PR");
+            var amendment = Str(update?["recordedInAmendment"]);
+            if (amendment is null || !amendments.Contains(amendment))
+                yield return new("I013", id, $"pending update names no recorded amendment ('{amendment}')");
+            if (Str(update?["status"]) != "pending-merge")
+                yield return new("I013", id, "a pending update has status 'pending-merge'; an applied update is removed by its write-back");
+            var after = Str(update?["classificationAfter"]);
+            if (after is null || !classifications.Contains(after))
+                yield return new("I013", id, $"unknown classificationAfter '{after}'");
+            if (update?["changes"] is not JsonObject)
+                yield return new("I013", id, "pending update needs a changes object (empty when only defects resolve)");
+            var cutoffDefects = artifact is not null && byId.TryGetValue(artifact, out var record)
+                ? Array(record["openDefects"]).Select(Str).OfType<string>().ToHashSet(StringComparer.Ordinal)
+                : [];
+            if (update?["defectResolutions"] is not JsonArray)
+                yield return new("I013", id, "defectResolutions must be an array (empty when no defect resolves)");
+            foreach (var resolution in Array(update?["defectResolutions"]))
+            {
+                if (string.IsNullOrWhiteSpace(Str(resolution?["defect"])) || Int(resolution?["resolvedByPr"]) is not > 0
+                    || string.IsNullOrWhiteSpace(Str(resolution?["scope"])))
+                    yield return new("I013", id, "a defect resolution needs the defect text, a resolving PR, and its scope");
+                else if (!cutoffDefects.Contains(Str(resolution?["defect"])!))
+                    yield return new("I013", id, "a defect resolution must quote one of the artifact's cutoff openDefects verbatim");
+            }
+        }
     }
 
     // ------------------------------------------------------------------
