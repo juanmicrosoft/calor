@@ -8,13 +8,9 @@ using Calor.Compiler.Tests.EvidenceContract;
 namespace Calor.Compiler.Tests.InteropScope;
 
 /// <summary>
-/// #1426 (0.25 R0): validates the interoperability scope and baseline packet
-/// (<c>docs/plans/evidence/v0.25-r0-1426/scope.json</c>) against the sealed baseline evidence.
-/// It fails closed on a family missing from the denominator, a case added, removed, reclassified
-/// or rehashed without a matching amendment, fixture or evidence drift, a READY record without
-/// typed, resolvable commit/tests/examples/reviews/approver/blocker evidence or made stale by a
-/// later amendment, and a gate marked MET without its amendment and retained evidence.
-/// It checks that evidence is present and consistent; it does not re-run the converter.
+/// #1426 (0.25 R0): validates <c>scope.json</c> against the sealed baseline evidence and fails closed
+/// (codes S001-S013, documented in docs/plans/v0.25-interop-scope-and-baseline.md §11). It checks that
+/// evidence is present and consistent; it does not re-run the converter.
 /// </summary>
 internal static class InteropScopeValidator
 {
@@ -44,8 +40,9 @@ internal static class InteropScopeValidator
         ["blocker-1413", "capacity-accepted", "independence-deviation-accepted", "blockers-mapped-after-1413",
          "interaction-and-doc-rows-registered"];
 
-    private static readonly string[] TrackedFields = ["family", "role", "expected", "baselineStatus", "fixtureSha256"];
+    private static readonly string[] TrackedFields = ["family", "role", "expected", "baselineStatus", "fixtureSha256", "requirementSha256"];
     private static readonly Regex FullSha = new("^[0-9a-f]{40}$", RegexOptions.Compiled);
+    private static readonly Regex ApprovalUrl = new(@"^https://github\.com/juanmicrosoft/calor/pull/\d+#pullrequestreview-\d+$", RegexOptions.Compiled);
     private static readonly Regex SemVer = new(@"^(\d+)\.(\d+)\.(\d+)$", RegexOptions.Compiled);
 
     public static IReadOnlyList<ContractViolation> Validate(JsonNode scope, JsonNode results,
@@ -133,49 +130,61 @@ internal static class InteropScopeValidator
         if (Str(scope["scopeVersion"]) != latest)
             v.Add(new("S005", "scopeVersion", "scopeVersion must equal the latest amendment version"));
 
-        // S004: every registered case (1.0.0 or added by amendment) stays, or is removed with its last
-        // status; every tracked field equals its registered value after the amendments' exact
-        // from -> to changes, applied in order. A case nobody registered fails.
+        // S004: amendments are ordered state transitions over every registered case. An added case is
+        // registered (or restored after removal); a removal retains its last status; a change names the
+        // exact from -> to value of a tracked field, including the requirement digest (fixture, note,
+        // observations). Each step records the families it affects, for READY staleness (S007).
         var registry = Arr(scope["denominatorV1"]).ToDictionary(d => Str(d["id"])!, d => (JsonNode)d.DeepClone());
-        var touched = new Dictionary<string, string>(); // case id -> latest amendment version that touched it
+        var active = registry.Keys.ToHashSet();
+        var familyTouched = new List<(string Family, string Version)>();
         foreach (var a in amendments)
         {
             var version = Str(a["version"]) ?? "?";
+            void Touch(JsonNode? e) => familyTouched.Add((Str(e?["family"]) ?? "?", version));
             foreach (var added in Arr(a["addedCases"]))
-                if (Str(added["id"]) is { } aid && registry.TryAdd(aid, added.DeepClone()))
-                    touched[aid] = version;
+            {
+                var aid = Str(added["id"]) ?? "";
+                if (active.Contains(aid))
+                    v.Add(new("S004", aid, $"amendment {version} registers a case that is already registered"));
+                registry[aid] = added.DeepClone();
+                active.Add(aid);
+                Touch(added);
+            }
             foreach (var ch in Arr(a["changes"]))
             {
                 var cid = Str(ch["id"]) ?? "";
                 var field = Str(ch["field"]) ?? "";
-                if (!registry.TryGetValue(cid, out var entry) || !TrackedFields.Contains(field) || Str(entry[field]) != Str(ch["from"]))
+                if (!active.Contains(cid) || !TrackedFields.Contains(field) || Str(registry[cid][field]) != Str(ch["from"]))
                     v.Add(new("S004", cid, $"amendment {version} changes {field} from a value that is not the registered one"));
                 else
                 {
-                    entry[field] = Str(ch["to"]);
-                    touched[cid] = version;
+                    Touch(registry[cid]);
+                    registry[cid][field] = Str(ch["to"]);
+                    Touch(registry[cid]);
                 }
             }
             foreach (var r in Arr(a["removedCases"]))
-                if (Str(r["id"]) is { } rid)
-                    touched[rid] = version;
+            {
+                var rid = Str(r["id"]) ?? "";
+                if (!active.Remove(rid) || !NonBlank(r["lastStatus"]))
+                    v.Add(new("S004", rid, $"amendment {version} removes a case that is not registered, or without its last status"));
+                else
+                    Touch(registry[rid]);
+            }
         }
-        var removed = amendments.SelectMany(a => Arr(a["removedCases"]))
-            .Where(r => NonBlank(r["lastStatus"])).Select(r => Str(r["id"])).ToHashSet();
-        foreach (var (id, entry) in registry)
+        foreach (var id in active)
         {
             var current = cases.FirstOrDefault(c => Str(c["id"]) == id);
             if (current is null)
             {
-                if (!removed.Contains(id))
-                    v.Add(new("S004", id, "registered case removed without an amendment that retains it with its last status"));
+                v.Add(new("S004", id, "registered case removed without an amendment that retains it with its last status"));
                 continue;
             }
-            foreach (var field in TrackedFields.Where(fl => Str(current[fl]) != Str(entry[fl])))
+            foreach (var field in TrackedFields.Where(fl => Value(current, fl) != Str(registry[id][fl])))
                 v.Add(new("S004", id, $"{field} differs from its registered value without a matching amendment change"));
         }
-        foreach (var c in cases.Where(c => !registry.ContainsKey(Str(c["id"]) ?? "")))
-            v.Add(new("S004", Str(c["id"]) ?? "?", "case added without an amendment that registers it"));
+        foreach (var c in cases.Where(c => !active.Contains(Str(c["id"]) ?? "")))
+            v.Add(new("S004", Str(c["id"]) ?? "?", "case is not registered (or was removed) by the 1.0.0 denominator or an amendment"));
 
         // S006-S008, S011: readiness records.
         var deviation = scope["independence"]?["deviation"]?.GetValue<bool>() ?? true;
@@ -197,12 +206,12 @@ internal static class InteropScopeValidator
                 var familyCases = cases.Where(c => Str(c["family"]) == fid).ToList();
                 ValidateReady(v, fid, r!, f, familyCases, Exists, recordValue, deviation);
                 var assessed = Version(Str(r!["scopeVersion"]));
-                var stale = familyCases.Select(c => Str(c["id"])!).Concat(removed.Where(x => registry.TryGetValue(x!, out var e) && Str(e["family"]) == fid)!)
-                    .Where(id => touched.TryGetValue(id!, out var ver) && assessed is not null && Version(ver)!.Value.CompareTo(assessed.Value) > 0);
+                var stale = familyTouched.Where(x => x.Family == fid && assessed is not null && Version(x.Version)!.Value.CompareTo(assessed.Value) > 0)
+                    .Select(x => x.Version).Distinct();
                 if (assessed is null || (Str(r["scopeVersion"]) != "1.0.0" && !amendments.Any(a => Str(a["version"]) == Str(r["scopeVersion"]))))
                     v.Add(new("S007", fid, "READY record: scopeVersion must name the registered scope version it was assessed under"));
-                foreach (var id in stale)
-                    v.Add(new("S007", fid, $"READY record is stale: case {id} changed in a later amendment"));
+                foreach (var ver in stale)
+                    v.Add(new("S007", fid, $"READY record is stale: amendment {ver} changed this family's cases"));
             }
             if (status == "BLOCKED" && (!NonBlank(r?["reason"]) || !Arr(r?["blockedBy"]).Any()))
                 v.Add(new("S008", fid, "a BLOCKED record needs a reason and blockedBy"));
@@ -233,12 +242,22 @@ internal static class InteropScopeValidator
         {
             if (lifecycle != "FROZEN" || !amendments.Any(a => Str(a["gateDecision"]) == "R0-MET"))
                 v.Add(new("S009", "gateStatus", "R0 is MET only in a FROZEN packet, by an amendment recording gateDecision R0-MET"));
-            foreach (var g in conditions.Where(g => Str(g["state"]) != "SATISFIED" || !Exists(Str(g["evidence"]))))
-                v.Add(new("S009", Str(g["id"]) ?? "?", "MET needs every gate condition SATISFIED with a retained evidence file"));
-            if (!conditions.Any(g => Str(g["id"]) == "blocker-1413" && Str(g["closedAtUtc"]) is { } cl && cl.EndsWith('Z')))
-                v.Add(new("S009", "blocker-1413", "MET needs the #1413 closure time"));
-            foreach (var role in new[] { "interaction", "doc-example" }.Where(role => !cases.Any(c => Str(c["role"]) == role)))
-                v.Add(new("S009", role, $"MET needs registered {role} rows"));
+            // Each condition cites its own retained record, gate/<id>.json, which names the condition;
+            // the #1413 record also states CLOSED with a parseable UTC closure time.
+            foreach (var g in conditions)
+            {
+                var gid = Str(g["id"]) ?? "?";
+                var record = Str(g["evidence"]) == $"{PacketDir}/gate/{gid}.json" && readRepoFile(Str(g["evidence"])!) is { } b
+                    ? JsonNode.Parse(Encoding.UTF8.GetString(b)) : null;
+                var ok = Str(g["state"]) == "SATISFIED" && Str(record?["condition"]) == gid && Str(record?["state"]) == "SATISFIED"
+                    && (gid != "blocker-1413" || (Str(record?["issueState"]) == "CLOSED"
+                        && Str(record?["closedAtUtc"]) is { } cl && cl.EndsWith('Z') && DateTime.TryParse(cl, out _)));
+                if (!ok)
+                    v.Add(new("S009", gid, $"MET needs a SATISFIED record at {PacketDir}/gate/{gid}.json naming this condition"));
+            }
+            foreach (var role in new[] { "interaction", "doc-example" }.Where(role => !cases.Any(c => Str(c["role"]) == role
+                && Str(c["baselineStatus"]) != "not-measured" && (Str(c["fixture"]) is not null || Arr(c["observations"]).Any()))))
+                v.Add(new("S009", role, $"MET needs measured {role} rows with a fixture or observations"));
         }
         var ceilingIds = new HashSet<string>();
         foreach (var c in ceilings)
@@ -252,6 +271,11 @@ internal static class InteropScopeValidator
         var seal = scope["evidenceSeal"];
         if (Str(seal?["baselineResults"]) != Sha256(readRepoFile(PacketDir + "/baseline-results.json") ?? []))
             v.Add(new("S013", "baselineResults", "baseline-results.json differs from its sealed hash"));
+        foreach (var (producer, hash) in (seal?["producers"] as JsonObject) ?? new JsonObject())
+            if (Str(hash) != Sha256(readRepoFile(producer) ?? []))
+                v.Add(new("S013", producer, "a reproduction producer differs from its sealed hash"));
+        if ((seal?["producers"] as JsonObject)?.Count != 2)
+            v.Add(new("S013", "producers", "the evidence seal must cover reproduce.py and ProbeRunner.cs.txt"));
         if (Str(seal?["generated"]) != SealFiles(generatedFiles, readRepoFile))
             v.Add(new("S013", "generated", "the retained converter outputs differ from their sealed hash"));
         if (Str(results["srcTree"]) != Str(scope["identities"]?["srcTree"]) || !IsFullSha(Str(results["srcTree"]))
@@ -301,19 +325,24 @@ internal static class InteropScopeValidator
                 Fail($"case {Str(c["id"])} has no recorded result");
             else if (Str(row["result"]) != "passed")
                 Fail($"case {Str(c["id"])} is {Str(row["result"])}, not passed");
+            else if (Str(row["evidence"]) is not { } ev || !ev.StartsWith("docs/plans/evidence/", StringComparison.Ordinal) || !exists(ev))
+                Fail($"case {Str(c["id"])} needs a retained candidate result under docs/plans/evidence/");
+            else if (Arr(c["cells"]).Any(cell => Str(row["cells"]?[Str(cell)!]) != "passed"))
+                Fail($"case {Str(c["id"])} needs a passed result for every registered cell");
         }
         var tests = Arr(r["tests"]).ToList();
         if (tests.Count == 0 || tests.Any(t => !NonBlank(t["project"]) || !IsInt(t["total"]) || Int(t["total"]) <= 0
             || !IsInt(t["failed"]) || Int(t["failed"]) != 0))
             Fail("tests must name each project with a numeric positive total and a numeric zero failed");
         var examples = Arr(r["websiteExamples"]).ToList();
-        if (examples.Count == 0 || examples.Any(e => !exists(Str(e))))
+        if (examples.Count == 0 || examples.Any(e => Str(e)?.StartsWith("website/content/", StringComparison.Ordinal) != true || !exists(Str(e))))
             Fail("websiteExamples must list checked website pages that exist in the repository");
         var reviews = Arr(r["reviews"]).ToList();
-        if (reviews.Count == 0 || reviews.Any(x => !NonBlank(x["reviewer"]) || !exists(Str(x["record"]))))
+        if (reviews.Count == 0 || reviews.Any(x => !NonBlank(x["reviewer"]) || Str(x["record"]) is not { } rec
+            || !rec.StartsWith("docs/plans/evidence/", StringComparison.Ordinal) || !rec.Contains("/reviews/") || !exists(rec)))
             Fail("reviews must name each reviewer and a retained record that exists in the repository");
         if (!NonBlank(r["approver"]?["login"]) || Str(r["approver"]?["approvalUrl"]) is not { } url
-            || !url.StartsWith("https://github.com/", StringComparison.Ordinal))
+            || !ApprovalUrl.IsMatch(url))
             Fail("approver needs a login and a GitHub approval URL");
         if (deviation && Str(r["independence"]) != recordValue)
             Fail($"independence must be '{recordValue}' while the deviation stands");
@@ -351,6 +380,15 @@ internal static class InteropScopeValidator
 
     public static string Sha256(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(
         Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(bytes).Replace("\r\n", "\n"))));
+
+    /// <summary>A tracked field of a case; requirementSha256 is recomputed from the case itself.</summary>
+    private static string? Value(JsonNode c, string field) => field != "requirementSha256" ? Str(c[field])
+        : Sha256(Encoding.UTF8.GetBytes(Str(c["fixture"]) + "\n" + Str(c["note"]) + "\n" + string.Join("\n", Arr(c["cells"]).Select(Str))
+            + "\n" + (c["observations"] ?? new JsonArray()).ToJsonString(Relaxed)));
+
+    public static string RequirementDigest(JsonNode c) => Value(c, "requirementSha256")!;
+
+    private static readonly JsonSerializerOptions Relaxed = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     private static (int, int, int)? Version(string? s) => s is not null && SemVer.Match(s) is { Success: true } m
         ? (int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value), int.Parse(m.Groups[3].Value)) : null;

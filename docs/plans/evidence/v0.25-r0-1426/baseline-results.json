@@ -1,6 +1,6 @@
 {
   "schema": "v0.25-r0-1426-baseline/1",
-  "measuredCommit": "49128556b06560dfed603ab4081ccf489d23be9d",
+  "measuredCommit": "03f6f1c254af85e52398f7994bb072fb436a7d22",
   "srcTree": "ee3c9db987d844a9348b8d0bab75e603cc01797c",
   "environment": {
     "dotnetSdk": "10.0.401",

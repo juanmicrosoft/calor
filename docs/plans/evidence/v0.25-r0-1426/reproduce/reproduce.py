@@ -1,21 +1,9 @@
 #!/usr/bin/env python3
-"""0.25 R0 (#1426) baseline reproduction.
-
-Run from the repository root after `src/Calor.Compiler/scripts/download-z3.sh` and
-`dotnet build src/Calor.Compiler/Calor.Compiler.csproj -c Release`:
-
-    python3 docs/plans/evidence/v0.25-r0-1426/reproduce/reproduce.py
-
-For every fixture under fixtures/ it runs the real converter through three public surfaces
-(CLI `calor convert` with no flags, CLI with `--passthrough`, and the MCP `calor_convert` tool
-with default arguments), compiles each produced .calr with the real `calor` compiler, and
-executes `Probe.Run()` on the original and every generated C# file with ProbeRunner.cs.txt.
-It also scans website/content/**/*.mdx for complete ```calor programs (first non-blank line
-starts with §M) and records which ones the current compiler rejects (W0 / #1143 baseline).
-
-Writes baseline-results.json and generated/ next to this folder. Absolute paths are
-normalized to <repo> so the output is comparable across machines.
-"""
+"""0.25 R0 (#1426) baseline reproduction. From the repository root, after download-z3.sh and a
+Release build of src/Calor.Compiler: python3 docs/plans/evidence/v0.25-r0-1426/reproduce/reproduce.py
+Converts every fixture through the CLI and MCP surfaces, compiles each output with `calor`, runs
+Probe.Run() on the original and generated C# (ProbeRunner.cs.txt), scans website ```calor programs,
+and writes baseline-results.json and generated/ with repository-relative paths."""
 import concurrent.futures
 import glob
 import hashlib
@@ -31,12 +19,9 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..",
 EVID = os.path.relpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."), ROOT)
 CALOR = os.path.join("src", "Calor.Compiler", "bin", "Release", "net10.0", "calor.dll")
 GEN = os.path.join(EVID, "generated")
-# Calor files here use .calr.txt: every tracked *.calr is part of the repository's Calor corpus,
-# which ledger tests count. The compiler accepts the extension unchanged.
-CALR = ".calr.txt"
-# C# fixtures and the runner use .cs.txt: the Calor-first guard (scripts/check-calor-first-diff.sh)
-# rejects new .cs files outside tests/ and bench/. They are copied to a temporary .cs to run.
-CS = ".cs.txt"
+# .calr.txt: ledger tests count every tracked *.calr as corpus. .cs.txt: the Calor-first guard
+# rejects new .cs outside tests/ and bench/; fixtures are copied to a temporary .cs to run.
+CALR, CS = ".calr.txt", ".cs.txt"
 TMP = tempfile.mkdtemp(prefix="r0-1426-")
 MCP_MODES = {"default": {}, "passthroughOnError": {"passthroughOnError": True},
              "passthroughOnError-moduleName": {"passthroughOnError": True, "moduleName": "Custom"}}
