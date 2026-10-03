@@ -1,0 +1,12 @@
+{
+  "algorithm": "SHA-256 over LF-normalized UTF-8 bytes",
+  "files": {
+    "docs/plans/evidence/g2-1421/protocol.json": "2159eea6d82e000747c5d47cb1c20e098e939946f13a208d6ac55cbec44bbacb",
+    "docs/plans/evidence/g2-1421/cases.json": "2dd187b9271063ceb013560c47507796789745f53a9d51d65ac158577657708b",
+    "docs/plans/evidence/g2-1421/freeze_cases.py": "c1decb61fea608acc82aa19d79e8a14de05916b31672f31482989ee25c245563",
+    "docs/plans/evidence/g2-1421/README.md": "cbdaebfdf293fd4ed0d050e93e8dd860cda3e4ea7a8d5e30e51d0b5536039062",
+    "scripts/determinism_protocol.py": "bdb9adbc267033dc6e4d4a4ec725ce274f992afb5da6fb3e79824b28c3815f64",
+    "scripts/test_determinism_protocol.py": "69c12bab5e471cc68eb5e5fb830bbe94aff1351c132a8dc265d3777fc18c1e73",
+    ".github/workflows/determinism-protocol.yml": "009791bf47b49fa0cc6639a7fb51e4d2a1e1c11a6891d9dc377f70a49220df2a"
+  }
+}

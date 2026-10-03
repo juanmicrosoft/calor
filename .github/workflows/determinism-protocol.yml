@@ -1,0 +1,164 @@
+name: determinism-protocol
+
+# 0.24 G2 (#1421): the registered verifier determinism protocol
+# (docs/plans/evidence/g2-1421/protocol.json), executed by #1135. Every pinned value comes
+# from the protocol through the plan job. Pull-request runs are always control mode (an
+# unregistered project, never decision-bearing).
+
+run-name: determinism ${{ inputs.mode || 'control' }} ${{ inputs.execution_id || format('pr-{0}', github.event.pull_request.number) }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [control, execution]
+        default: control
+      execution_id:
+        type: string
+        required: true
+      charge:
+        type: choice
+        options: [determinism-compute, regeneration-compute]
+        default: determinism-compute
+  pull_request:
+    paths:
+      - .github/workflows/determinism-protocol.yml
+      - scripts/determinism_protocol.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: determinism-protocol-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      mode: ${{ steps.plan.outputs.mode }}
+      execution: ${{ steps.plan.outputs.execution }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate the protocol and plan the run
+        id: plan
+        env:
+          MODE: ${{ inputs.mode || 'control' }}
+          EXECUTION: ${{ inputs.execution_id || format('pr-{0}', github.event.pull_request.number) }}
+          CHARGE: ${{ inputs.charge || 'determinism-compute' }}
+        run: |
+          set -euo pipefail
+          python3 "scripts/determinism_protocol.py" plan --mode "$MODE" --execution-id "$EXECUTION" \
+            --event "${{ github.event_name }}" --charge "$CHARGE" --github-output "$GITHUB_OUTPUT"
+
+  attempts:
+    needs: plan
+    name: attempts (${{ matrix.env }} job ${{ matrix.job }})
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      OUT: artifacts/determinism
+    steps:
+      - name: Check out committed line endings
+        run: git config --global core.autocrlf false
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET (pinned, private root)
+        uses: actions/setup-dotnet@v4
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet-1421
+        with:
+          dotnet-version: ${{ matrix.sdk }}
+
+      - name: Bootstrap verified Z3 assets
+        uses: ./.github/actions/bootstrap-z3
+
+      - name: Check and record the environment
+        run: |
+          set -euo pipefail
+          py="$(command -v python3 || command -v python)"
+          "$py" "scripts/determinism_protocol.py" env-check --env "${{ matrix.env }}" --commit "${{ github.sha }}" --out "$OUT"
+
+      - name: Build the registered test hosts
+        run: |
+          set -euo pipefail
+          for project in ${{ matrix.projects }}; do
+            dotnet build "$project" -c Release
+          done
+
+      - name: Run every attempt of this job
+        run: |
+          set -euo pipefail
+          py="$(command -v python3 || command -v python)"
+          "$py" "scripts/determinism_protocol.py" run-job --env "${{ matrix.env }}" --job "${{ matrix.job }}" \
+            --mode "${{ needs.plan.outputs.mode }}" --execution-id "${{ needs.plan.outputs.execution }}" --out "$OUT"
+
+      - name: Record attempts that did not run
+        if: always()
+        run: |
+          set -euo pipefail
+          py="$(command -v python3 || command -v python)"
+          "$py" "scripts/determinism_protocol.py" fill-missing --env "${{ matrix.env }}" --job "${{ matrix.job }}" \
+            --mode "${{ needs.plan.outputs.mode }}" --execution-id "${{ needs.plan.outputs.execution }}" --out "$OUT"
+
+      - name: Upload attempt records
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: determinism-${{ needs.plan.outputs.execution }}-${{ matrix.env }}-j${{ matrix.job }}-r${{ github.run_attempt }}
+          path: artifacts/determinism/
+          if-no-files-found: error
+          retention-days: 90
+
+  decide:
+    needs: [plan, attempts]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Download every attempt record
+        uses: actions/download-artifact@v4
+        with:
+          pattern: determinism-${{ needs.plan.outputs.execution }}-*
+          path: records
+
+      # Exits non-zero unless DETERMINISTIC (CONTROL-DETERMINISTIC in control mode).
+      - name: Decide agreement under the frozen rule
+        run: |
+          set -euo pipefail
+          python3 "scripts/determinism_protocol.py" decide --records records \
+            --execution-id "${{ needs.plan.outputs.execution }}" --mode "${{ needs.plan.outputs.mode }}" \
+            --out result/result.json
+
+      - name: Upload the result record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: determinism-result-${{ needs.plan.outputs.execution }}-r${{ github.run_attempt }}
+          path: result/
+          if-no-files-found: error
+          retention-days: 90
