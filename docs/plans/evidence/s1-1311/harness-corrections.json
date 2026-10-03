@@ -1,0 +1,579 @@
+{
+  "note": "Mapping defects found by the executor audit after the run and before any report. Each correction implements registered text; no observation (diagnostic, outcome, emitted code, O1, O2) changed and no case was re-executed. The run-time classification is retained in every attempt (runtimeClassification) and in <baseline>/case-results.runtime-8e33f080.jsonl.",
+  "runtimeHarnessCommit": "8e33f08019303cf805e5098775032face6017a27",
+  "reclassifyHarnessCommit": "e33d4339d1e815be2ad63a6049c879038fde5971",
+  "corrections": [
+    {
+      "id": "HC1",
+      "registeredText": "channels.CH-IMPLICATION: \"Each IMPL template carries contracts in exactly one direction ... its outcome is read from the Calor0815 info diagnostic text ('Precondition weakening proven' or the postcondition counterpart: Proven) ... Any other Calor0815 on the case is archived, not adjudicated.\"",
+      "defect": "The run-time harness read any Calor0815 as Proven. B1 and N1 also emit the other direction's Calor0815 when that direction has no contracts, so a Failed (LSP-violation error) template direction was mapped to Proven.",
+      "fix": "Only the template's own direction (the Calor0815 / Calor0816 / LSP-violation text naming that direction) is adjudicated."
+    },
+    {
+      "id": "HC2",
+      "registeredText": "observation.perCase guard observation: \"in the forced emission it must be present.\"",
+      "defect": "The run-time harness searched the forced emission for one exception type per obligation kind. B1 emits RefinementReturn guards as InvalidOperationException(\"Return value violates refinement type ...\") and inline parameter refinements as \"Violation of inline refinement ...\", so present guards were reported absent (guard-elided-without-proof).",
+      "fix": "Guard markers are the emitted guard texts per obligation kind: \"Proof obligation [\", \"Indexed-type bound violated\", \"Violation of refinement type\" or \"Violation of inline refinement\" (RefinementEntry), \"Return value violates refinement type\", \"Value violates refinement type\" (Subtype)."
+    },
+    {
+      "id": "HC3",
+      "registeredText": "caseResults.classes.spurious-refutation: \"Failed whose replayed counterexample model does not violate the property under O1\"",
+      "defect": "The run-time harness treated models with string-typed parameters as not replayable, which made such Failed results no-claim without replay.",
+      "fix": "String parameters are replayed from the SMT-LIB string literal Z3 prints. Arrays and user-type objects remain not replayable (the model has no length or field values)."
+    }
+  ],
+  "changedCases": [
+    {
+      "baseline": "B1",
+      "caseId": "R1-OBL-REFINEMENT-RETURN-001",
+      "runtime": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": [
+          "guard-elided-without-proof"
+        ]
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "B1",
+      "caseId": "R1-OBL-REFINEMENT-RETURN-002",
+      "runtime": {
+        "token": "Failed",
+        "class": "spurious-refutation",
+        "addedFindings": [
+          "guard-elided-without-proof"
+        ]
+      },
+      "final": {
+        "token": "Failed",
+        "class": "spurious-refutation",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "B1",
+      "caseId": "R1-IMPL-PRECONDITION-WEAKENING-002",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "B1",
+      "caseId": "R1-IMPL-POSTCONDITION-STRENGTHENING-002",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "B1",
+      "caseId": "R1-IMPL-ASSUMPTION-FORMS-002",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "B1",
+      "caseId": "R1-IMPL-DIVISION-TOTALIZED-002",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "B1",
+      "caseId": "R1-STR-OPS-COUNT-INDEX-003",
+      "runtime": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "spurious-refutation",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "B1",
+      "caseId": "R1-OBL-REFINEMENT-RETURN-003",
+      "runtime": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": [
+          "guard-elided-without-proof"
+        ]
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "B1",
+      "caseId": "R1-IMPL-PRECONDITION-WEAKENING-003",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "B1",
+      "caseId": "R1-IMPL-DIVISION-TOTALIZED-003",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "B1",
+      "caseId": "R1-OBL-REFINEMENT-RETURN-004",
+      "runtime": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": [
+          "guard-elided-without-proof"
+        ]
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "B1",
+      "caseId": "R1-IMPL-PRECONDITION-WEAKENING-004",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "B1",
+      "caseId": "R1-IMPL-POSTCONDITION-STRENGTHENING-004",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "B1",
+      "caseId": "R1-IMPL-ASSUMPTION-FORMS-004",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "B1",
+      "caseId": "R1-IMPL-DIVISION-TOTALIZED-004",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "B1",
+      "caseId": "R1-OBL-REFINEMENT-RETURN-005",
+      "runtime": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": [
+          "guard-elided-without-proof"
+        ]
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "B1",
+      "caseId": "R1-IMPL-PRECONDITION-WEAKENING-005",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "B1",
+      "caseId": "R1-IMPL-PRECONDITION-WEAKENING-006",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "B1",
+      "caseId": "R1-IMPL-PRECONDITION-WEAKENING-007",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-OBL-REFINEMENT-RETURN-001",
+      "runtime": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": [
+          "guard-elided-without-proof"
+        ]
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-OBL-REFINEMENT-RETURN-002",
+      "runtime": {
+        "token": "Failed",
+        "class": "spurious-refutation",
+        "addedFindings": [
+          "guard-elided-without-proof"
+        ]
+      },
+      "final": {
+        "token": "Failed",
+        "class": "spurious-refutation",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-IMPL-PRECONDITION-WEAKENING-002",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-IMPL-POSTCONDITION-STRENGTHENING-002",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-IMPL-ASSUMPTION-FORMS-002",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-IMPL-DIVISION-TOTALIZED-002",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-STR-OPS-COUNT-INDEX-003",
+      "runtime": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "spurious-refutation",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-OBL-REFINEMENT-RETURN-003",
+      "runtime": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": [
+          "guard-elided-without-proof"
+        ]
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-IMPL-PRECONDITION-WEAKENING-003",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-IMPL-DIVISION-TOTALIZED-003",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-OBL-REFINEMENT-RETURN-004",
+      "runtime": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": [
+          "guard-elided-without-proof"
+        ]
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-IMPL-PRECONDITION-WEAKENING-004",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-IMPL-POSTCONDITION-STRENGTHENING-004",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-IMPL-ASSUMPTION-FORMS-004",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-IMPL-DIVISION-TOTALIZED-004",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-OBL-REFINEMENT-RETURN-005",
+      "runtime": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": [
+          "guard-elided-without-proof"
+        ]
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-IMPL-PRECONDITION-WEAKENING-005",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-IMPL-PRECONDITION-WEAKENING-006",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    },
+    {
+      "baseline": "N1",
+      "caseId": "R1-IMPL-PRECONDITION-WEAKENING-007",
+      "runtime": {
+        "token": "Proven",
+        "class": "false-unconditional-proof",
+        "addedFindings": []
+      },
+      "final": {
+        "token": "Failed",
+        "class": "no-claim",
+        "addedFindings": []
+      }
+    }
+  ]
+}

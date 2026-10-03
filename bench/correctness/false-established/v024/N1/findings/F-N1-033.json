@@ -1,0 +1,67 @@
+{
+  "findingId": "F-N1-033",
+  "baseline": "N1",
+  "registrationCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67",
+  "rowId": "CACHE-LITERAL-WIDTH",
+  "caseId": "R1-CACHE-LITERAL-WIDTH-002",
+  "templateId": "T-CACHE-LITWIDTH",
+  "caseSha256": {
+    "calor": "2a9fb2edf916ee2df77a241e51efde478d13768d253ffc4c97cf840d89c69a08",
+    "oracle": "29653286320a29ede2130abff40a7c84992b50c25535de78dd22977ed7eac984",
+    "prime": "ec1e9444f132781d4ee328e972c854b4cf82b5b4f1ba88e1fe4745e5863f67f4"
+  },
+  "class": "spurious-refutation",
+  "claim": {
+    "site": "postcondition",
+    "token": "Failed",
+    "rawStatus": "Refuted",
+    "isVacuous": false,
+    "assumptions": [],
+    "guardInElidedEmission": true,
+    "guardInForcedEmission": true
+  },
+  "witness": {
+    "inputs": "(2147483647)",
+    "o1": "holds-sampled",
+    "o2": "run"
+  },
+  "nonVacuityCheck": null,
+  "classReason": "model (2147483647) does not violate the property under O1 (holds)",
+  "minimized": {
+    "status": "registered-case: a single-function probe generated from one template; not reduced further",
+    "calorSource": "\u00A7M{m1:R1Case:overflow=unchecked}\n  \u00A7F{f1:Probe:pub} (i32:x) -\u003E i32\n    \u00A7E{}\n    \u00A7Q (== x INT:2147483647)\n    \u00A7S (\u003E (\u002B x LONG:1) INT:0)\n    \u00A7R INT:0\n",
+    "calorPrimeSource": "\u00A7M{m1:R1Case:overflow=unchecked}\n  \u00A7F{f1:Probe:pub} (i32:x) -\u003E i32\n    \u00A7E{}\n    \u00A7Q (== x INT:2147483647)\n    \u00A7S (\u003E (\u002B x INT:1) INT:0)\n    \u00A7R INT:0\n",
+    "csharpReproduction": "// R1 #1419 independent oracle for R1-CACHE-LITERAL-WIDTH-002\nusing System;\nusing System.Collections.Generic;\nusing System.Linq;\nusing System.Numerics;\npublic static class R1Oracle\n{\n    public const string Claim = \u0022forall\u0022;\n    public const bool Exhaustive = false;\n    public const bool Checked = false;\n    public static bool Hyp(int x) =\u003E x == 2147483647;\n    public static bool Prop(int x) =\u003E x \u002B 1L \u003E 0;\n    public static bool HypO(object?[] a) =\u003E Hyp((int)a[0]!);\n    public static bool HasBody =\u003E false;\n    public static object? BodyO(object?[] a) =\u003E null;\n    public static bool PropO(object?[] a, object? r) =\u003E Prop((int)a[0]!);\n    public static IEnumerable\u003Cobject?[]\u003E Inputs()\n    {\n        yield return new object?[] { (int)((-2147483648)) };\n        yield return new object?[] { (int)((-2147483647)) };\n        yield return new object?[] { (int)((-1796102019)) };\n        yield return new object?[] { (int)((-1742873908)) };\n        yield return new object?[] { (int)((-1083563622)) };\n        yield return new object?[] { (int)((-974726527)) };\n        yield return new object?[] { (int)((-613975811)) };\n        yield return new object?[] { (int)((-2)) };\n        yield return new object?[] { (int)((-1)) };\n        yield return new object?[] { (int)(0) };\n        yield return new object?[] { (int)(1) };\n        yield return new object?[] { (int)(2) };\n        yield return new object?[] { (int)(437457776) };\n        yield return new object?[] { (int)(2147483646) };\n        yield return new object?[] { (int)(2147483647) };\n    }\n}\n\npublic static class Repro\n{\n    public static int Main()\n    {\n        int reached = 0;\n        foreach (var a in R1Oracle.Inputs())\n        {\n            bool hyp;\n            try { hyp = R1Oracle.HypO(a); } catch { continue; }\n            if (!hyp) continue;\n            object? r = null;\n            if (R1Oracle.HasBody) { try { r = R1Oracle.BodyO(a); } catch { continue; } }\n            reached\u002B\u002B;\n            string why;\n            bool ok;\n            try { ok = R1Oracle.PropO(a, r); why = \u0022false\u0022; } catch (Exception e) { ok = false; why = \u0022throws \u0022 \u002B e.GetType().Name; }\n            var shown = \u0022(\u0022 \u002B string.Join(\u0022, \u0022, a.Select(v =\u003E v is null ? \u0022null\u0022 : v is Array arr ? \u0022[\u0022 \u002B string.Join(\u0022, \u0022, arr.Cast\u003Cobject\u003E()) \u002B \u0022]\u0022 : v is string s ? \u0022\\\u0022\u0022 \u002B s \u002B \u0022\\\u0022\u0022 : Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture))) \u002B \u0022)\u0022;\n            if (R1Oracle.Claim == \u0022exists\u0022) { if (ok) { Console.WriteLine(\u0022witness \u0022 \u002B shown); return 0; } continue; }\n            if (!ok) { Console.WriteLine(\u0022property \u0022 \u002B why \u002B \u0022 at \u0022 \u002B shown \u002B (R1Oracle.HasBody ? \u0022 result=\u0022 \u002B Convert.ToString(r, System.Globalization.CultureInfo.InvariantCulture) : \u0022\u0022)); return 1; }\n        }\n        Console.WriteLine((R1Oracle.Claim == \u0022exists\u0022 ? \u0022no witness\u0022 : \u0022no violation\u0022) \u002B \u0022 in the registered domain; reached inputs: \u0022 \u002B reached);\n        return 0;\n    }\n}",
+    "reproductionOutput": "no violation in the registered domain; reached inputs: 1 (exit 0)",
+    "sha256": "2a9fb2edf916ee2df77a241e51efde478d13768d253ffc4c97cf840d89c69a08"
+  },
+  "environment": {
+    "calorDllSha256": "794b28d4956f786fe41e0e5ab2199cad1ab1271a2893ee42d9f9d303289b515b",
+    "z3NativeSha256": null,
+    "dotnetVersion": "10.0.401",
+    "os": "macOS 27.0.1",
+    "translatorSemanticsVersion": "z3-executable-semantics-v2"
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "bucket": "sweep",
+      "status": "executed",
+      "token": "Failed",
+      "class": "spurious-refutation",
+      "startedUtc": "2026-10-03T16:52:30.5626250Z",
+      "durationMs": 23,
+      "path": "attempts/R1-CACHE-LITERAL-WIDTH-002/sweep-attempt-1.json"
+    }
+  ],
+  "otherBaseline": {
+    "id": "B1",
+    "result": "reproduces",
+    "source": "the other baseline\u0027s own execution of the same frozen case",
+    "otherClass": "spurious-refutation",
+    "otherToken": "Failed"
+  },
+  "affectedGuarantee": null,
+  "filedIssue": null,
+  "disposition": null
+}

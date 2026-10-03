@@ -1,0 +1,34 @@
+{
+  "ceilings": {
+    "s1-generated-cases": 1500,
+    "s1-timebox": "2026-10-13T00:36:51Z (10 days after the #1419 merge 2026-10-03T00:36:51Z)",
+    "s1-agent-hours": 20,
+    "s1-ci-minutes": 600,
+    "s1-local-machine-hours": 10,
+    "paid-spend-usd": 0
+  },
+  "used": {
+    "caseExecutions": 1444,
+    "byBucket": {
+      "controls": 64,
+      "p845": 6,
+      "reserve-p845-availability": 14,
+      "reserve-retry": 4,
+      "sweep": 1356
+    },
+    "reserveUsed": 18,
+    "reserveAllocated": 74,
+    "sweepWallClockSeconds": 185.4,
+    "localMachineHours": "under 0.5 (the registered run took 185 s; self-tests, builds, reclassification, reports, and the native-image check each took minutes)",
+    "ciRunnerMinutes": 0,
+    "agentHours": "about 3 at packet time (started 2026-10-03T16:33Z); final figure in the results document",
+    "paidSpendUsd": 0,
+    "timebox": "sweep finished 2026-10-03T16:53:50Z, inside the timebox"
+  },
+  "stoppedBy": null,
+  "notes": [
+    "The ceiling counts case executions across B1, N1, and P845. 1,444 of 1,500 were used: 710 B1, 710 N1, 20 P845 (6 #845 cases + 14 availability checks charged to the reserve), and 4 retries charged to the reserve.",
+    "No case was executed outside the ledger. Harness self-tests ran on executor-written synthetic inputs (tools/Calor.Soundness.Sweep/selftest-templates.json); they are not registered cases and are not counted.",
+    "PR CI for this branch is ordinary PR CI (contract section 9), not sweep compute."
+  ]
+}

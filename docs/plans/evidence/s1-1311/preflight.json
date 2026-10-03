@@ -1,0 +1,35 @@
+{
+  "executedUtc": "2026-10-03T16:33Z..16:50Z",
+  "deriveManifestsCheck": {
+    "command": "python3 docs/plans/evidence/r1-1419/derive-manifests.py --check",
+    "output": [
+      "ok manifest-B1.json",
+      "ok manifest-N1.json"
+    ],
+    "exit": 0
+  },
+  "packetHashes": {
+    "file": "docs/plans/evidence/r1-1419/sha256.json",
+    "result": "all 7 entries match (LF-normalized SHA-256)"
+  },
+  "registrationAncestry": "6a1a78db71b04bee3f2d42268e92800d94333f67 is an ancestor of the sweep branch base (origin/main 91fa7780); since the merge, only SoundnessRegistrationValidator.cs/Tests.cs changed (402834bd, contract-version check); SweepCaseGenerator.cs, IndependentOracle.cs, and the r1-1419 packet are unchanged",
+  "registrationTests": {
+    "command": "dotnet test tests/Calor.Compiler.Tests/ --filter FullyQualifiedName~SoundnessRegistration",
+    "result": "Passed 26, Failed 0"
+  },
+  "caseIndex": "the harness regenerated all 710 cases with the linked, unmodified SweepCaseGenerator and matched every id, Calor hash, and oracle hash in cases-index.json before the first case",
+  "oracleControls": {
+    "file": "bench/correctness/false-established/v024/oracle-controls.json",
+    "result": "13 of 13 produced their registered verdicts on the executing machine"
+  },
+  "environment": {
+    "dotnet": "10.0.401",
+    "runtime": ".NET 10.0.12",
+    "os": "macOS 27.0.1",
+    "rid": "osx-arm64",
+    "CALOR_NO_TYPE_CHECK": "unset",
+    "culture": "en-US for O1/O2",
+    "parallelism": "sequential, one process"
+  },
+  "harnessSelfTest": "tools/Calor.Soundness.Sweep/selftest-templates.json (11 executor-written synthetic inputs, never registered cases) on B1, N1, and P845 before the first case. It found one harness defect (cache tamper used PascalCase keys; the baseline cache is camelCase), fixed before the run."
+}

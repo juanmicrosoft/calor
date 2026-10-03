@@ -1,0 +1,70 @@
+{
+  "findingId": "F-B1-006",
+  "baseline": "B1",
+  "registrationCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67",
+  "rowId": "QNT-NESTED",
+  "caseId": "R1-QNT-NESTED-001",
+  "templateId": "T-QNT-NESTED",
+  "caseSha256": {
+    "calor": "cb607c54859b2339e5c25cdbecfb8eca835c1c64ebca93f841d8a89c774d4779",
+    "oracle": "d55c74ff26282c8a5cb5bcfc1e0d31c66a6bb1b35e5fe1cac5f26a1647551b72",
+    "prime": null
+  },
+  "class": "required-demotion-absent",
+  "claim": {
+    "site": "postcondition",
+    "token": "Proven",
+    "rawStatus": "Proven",
+    "isVacuous": false,
+    "assumptions": [],
+    "guardInElidedEmission": false,
+    "guardInForcedEmission": true
+  },
+  "witness": {
+    "inputs": null,
+    "o1": "holds-exhaustive",
+    "o2": "run"
+  },
+  "nonVacuityCheck": {
+    "id": "R1-O1-reached",
+    "result": "passed"
+  },
+  "classReason": null,
+  "minimized": {
+    "status": "registered-case: a single-function probe generated from one template; not reduced further",
+    "calorSource": "\u00A7M{m1:R1Case}\n  \u00A7F{f1:Probe:pub} (i8:n) -\u003E i32\n    \u00A7E{}\n    \u00A7Q (\u0026\u0026 (\u003E n INT:0) (\u003C n INT:12))\n    \u00A7S (forall ((i i32)) (-\u003E (\u0026\u0026 (\u003E= i INT:0) (\u003C i n)) (forall ((j i32)) (-\u003E (\u0026\u0026 (\u003E= j INT:0) (\u003C j n)) (\u003C (- i j) INT:29)))))\n    \u00A7R INT:0\n",
+    "calorPrimeSource": null,
+    "csharpReproduction": "// R1 #1419 independent oracle for R1-QNT-NESTED-001\nusing System;\nusing System.Collections.Generic;\nusing System.Linq;\nusing System.Numerics;\npublic static class R1Oracle\n{\n    public const string Claim = \u0022forall\u0022;\n    public const bool Exhaustive = true;\n    public const bool Checked = true;\n    static bool All(int lo, int hi, Func\u003Cint, bool\u003E p) { for (int i = lo; i \u003C hi; i\u002B\u002B) if (!p(i)) return false; return true; }\n    public static bool Hyp(sbyte n) =\u003E n \u003E 0 \u0026\u0026 n \u003C 12;\n    public static bool Prop(sbyte n) =\u003E All(0, n, i =\u003E All(0, n, j =\u003E (i - j) \u003C 29));\n    public static bool HypO(object?[] a) =\u003E Hyp((sbyte)a[0]!);\n    public static bool HasBody =\u003E false;\n    public static object? BodyO(object?[] a) =\u003E null;\n    public static bool PropO(object?[] a, object? r) =\u003E Prop((sbyte)a[0]!);\n    public static IEnumerable\u003Cobject?[]\u003E Inputs()\n    {\n        for (long n = -128; n \u003C= 127; n\u002B\u002B)\n            yield return new object?[] { (sbyte)n };\n    }\n}\n\npublic static class Repro\n{\n    public static int Main()\n    {\n        int reached = 0;\n        foreach (var a in R1Oracle.Inputs())\n        {\n            bool hyp;\n            try { hyp = R1Oracle.HypO(a); } catch { continue; }\n            if (!hyp) continue;\n            object? r = null;\n            if (R1Oracle.HasBody) { try { r = R1Oracle.BodyO(a); } catch { continue; } }\n            reached\u002B\u002B;\n            string why;\n            bool ok;\n            try { ok = R1Oracle.PropO(a, r); why = \u0022false\u0022; } catch (Exception e) { ok = false; why = \u0022throws \u0022 \u002B e.GetType().Name; }\n            var shown = \u0022(\u0022 \u002B string.Join(\u0022, \u0022, a.Select(v =\u003E v is null ? \u0022null\u0022 : v is Array arr ? \u0022[\u0022 \u002B string.Join(\u0022, \u0022, arr.Cast\u003Cobject\u003E()) \u002B \u0022]\u0022 : v is string s ? \u0022\\\u0022\u0022 \u002B s \u002B \u0022\\\u0022\u0022 : Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture))) \u002B \u0022)\u0022;\n            if (R1Oracle.Claim == \u0022exists\u0022) { if (ok) { Console.WriteLine(\u0022witness \u0022 \u002B shown); return 0; } continue; }\n            if (!ok) { Console.WriteLine(\u0022property \u0022 \u002B why \u002B \u0022 at \u0022 \u002B shown \u002B (R1Oracle.HasBody ? \u0022 result=\u0022 \u002B Convert.ToString(r, System.Globalization.CultureInfo.InvariantCulture) : \u0022\u0022)); return 1; }\n        }\n        Console.WriteLine((R1Oracle.Claim == \u0022exists\u0022 ? \u0022no witness\u0022 : \u0022no violation\u0022) \u002B \u0022 in the registered domain; reached inputs: \u0022 \u002B reached);\n        return 0;\n    }\n}",
+    "reproductionOutput": "no violation in the registered domain; reached inputs: 11 (exit 0)",
+    "sha256": "cb607c54859b2339e5c25cdbecfb8eca835c1c64ebca93f841d8a89c774d4779"
+  },
+  "environment": {
+    "calorDllSha256": "79839f6c8681bb7132df876c624339385969cc69c5b9914eea09fdfbf48e6651",
+    "z3NativeSha256": null,
+    "dotnetVersion": "10.0.401",
+    "os": "macOS 27.0.1",
+    "translatorSemanticsVersion": "z3-executable-semantics-v2"
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "bucket": "sweep",
+      "status": "executed",
+      "token": "Proven",
+      "class": "required-demotion-absent",
+      "startedUtc": "2026-10-03T16:51:42.2802490Z",
+      "durationMs": 19,
+      "path": "attempts/R1-QNT-NESTED-001/sweep-attempt-1.json"
+    }
+  ],
+  "otherBaseline": {
+    "id": "N1",
+    "result": "reproduces",
+    "source": "the other baseline\u0027s own execution of the same frozen case",
+    "otherClass": "required-demotion-absent",
+    "otherToken": "Proven"
+  },
+  "affectedGuarantee": null,
+  "filedIssue": null,
+  "disposition": null
+}

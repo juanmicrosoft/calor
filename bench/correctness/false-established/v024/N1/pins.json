@@ -1,0 +1,20 @@
+{
+  "baseline": "N1",
+  "registrationCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67",
+  "binaryDirectory": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin",
+  "calorDllSha256": "794b28d4956f786fe41e0e5ab2199cad1ab1271a2893ee42d9f9d303289b515b",
+  "calorRuntimeDllSha256": "b5b6dd8adfa76fff306e6a643f6a896852e45b45b0b613435bcf50df12658753",
+  "microsoftZ3DllSha256": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175",
+  "z3Available": true,
+  "nativeZ3Path": null,
+  "nativeZ3Sha256": null,
+  "translatorSemanticsVersion": "z3-executable-semantics-v2",
+  "dotnetVersion": "10.0.401",
+  "runtime": ".NET 10.0.12",
+  "os": "macOS 27.0.1",
+  "rid": "osx-arm64",
+  "architecture": "Arm64",
+  "CALOR_NO_TYPE_CHECK": null,
+  "culture": "en-US for O1/O2",
+  "recordedUtc": "2026-10-03T16:50:44.4097060Z"
+}
