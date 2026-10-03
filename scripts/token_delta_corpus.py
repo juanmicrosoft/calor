@@ -31,6 +31,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from token_delta_spot import count_id_blocks, count_tokens, TOKENS_PER_ID_MEAN  # noqa: E402
+import checkout_compiler  # noqa: E402
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -53,7 +54,16 @@ def main(argv: list[str] | None = None) -> int:
     total_ids = 0
     n_files = 0
 
-    for f in sorted(root.rglob("*.calr")):
+    # Tracked files only: build-output copies under bin/ and obj/ are never
+    # counted (#1241).
+    rel_root = root.resolve().relative_to(checkout_compiler.REPO_ROOT)
+    tracked = checkout_compiler.tracked_calr(checkout_compiler.REPO_ROOT,
+                                             [rel_root.as_posix()])
+    if not tracked:
+        print(f"token_delta_corpus: empty selection under {root}",
+              file=sys.stderr)
+        return 1
+    for f in (checkout_compiler.REPO_ROOT / t for t in tracked):
         n_files += 1
         pre_text = f.read_text(encoding="utf-8")
         total_pre += count_tokens(pre_text)
@@ -86,6 +96,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"in_band:             {in_band}")
         return 0 if in_band else 1
 
+    print("informational only: no migrated tree was given, so nothing is "
+          "checked")
     print(f"counterfactual_delta: {expected}")
     print(f"counterfactual_post:  {total_pre - expected}")
     return 0

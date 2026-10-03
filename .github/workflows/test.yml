@@ -86,6 +86,7 @@ jobs:
           python3 scripts/sync-self-test-resources.py --check
           python3 scripts/test_supply_chain.py
           python3 scripts/test_z3_hermetic.py
+          python3 scripts/test_tier2_verification.py
 
       # #881 pinned reproduction: the epoch cost metric must count subagent
       # and compaction-segment output tokens. Pure Python, no build needed.
@@ -1386,8 +1387,8 @@ jobs:
             --require Calor.Tasks.Tests.CompileCalorIntegrationTests.VerifyGate_NativeZ3_DeployedToTasksOutputRoot
 
   verify-phase1:
-    # Tier 1 self-verification harness — v6 §3.1.
-    # Goal: every PR finishes Tier 1 in < 60s.
+    # Tier 1 self-verification harness — v6 §3.1, repaired by #1241.
+    # Goal: every PR finishes Tier 1 in < 60s. No AST round trip.
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -1408,7 +1409,7 @@ jobs:
       - name: Bootstrap verified Z3 assets
         uses: ./.github/actions/bootstrap-z3
 
-      - name: Restore and build (needed for ast_roundtrip)
+      - name: Restore and build (the fixture compile check runs this build)
         run: |
           dotnet restore
           dotnet build -c Release --no-restore
@@ -1418,7 +1419,7 @@ jobs:
         run: |
           set -o pipefail
           /usr/bin/time -f '%e' -o tier1-self.time \
-            python3 scripts/verify_phase1.py --self-test --skip-dotnet \
+            python3 scripts/verify_phase1.py --self-test \
               2>&1 | tee tier1-self.log
           echo "elapsed_seconds=$(cat tier1-self.time)" >> "$GITHUB_OUTPUT"
 
@@ -1427,7 +1428,8 @@ jobs:
         run: |
           set -o pipefail
           /usr/bin/time -f '%e' -o tier1-samples.time \
-            python3 scripts/verify_phase1.py --skip-dotnet \
+            python3 scripts/verify_phase1.py \
+              --report tier1-samples-fixtures.json \
               2>&1 | tee tier1-samples.log
           echo "elapsed_seconds=$(cat tier1-samples.time)" >> "$GITHUB_OUTPUT"
 
@@ -1441,6 +1443,7 @@ jobs:
             tier1-self.time
             tier1-samples.log
             tier1-samples.time
+            tier1-samples-fixtures.json
           retention-days: 30
 
   phase1-corpus-clean:
