@@ -535,6 +535,9 @@ public static class Program
 
         rootCommand.AddCommand(scorecardCommand);
 
+        // #1276 registered pair differential oracle (run only after the registration merges)
+        rootCommand.AddCommand(Equivalence.PairOracleCommand.Create());
+
         // Default: run benchmarks if no command specified
         rootCommand.SetHandler(async () =>
         {
