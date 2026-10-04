@@ -82,7 +82,11 @@ public sealed class VerificationCacheEntry
     // 1.19 (#1135): on Windows, non-ASCII string literals reached Z3 in the code page instead of
     // UTF-8, so a Windows entry for one may hold a verdict the byte model does not give. Linux and
     // macOS output is unchanged, so SemanticsVersion stays; the bump evicts every entry instead.
-    public const string CurrentFormatVersion = "1.19";
+    // 1.20 (#1413, S1 CACHE-LITERAL-WIDTH): integer literal keys include width and
+    // signedness. Older keys hashed only the value, so `x + INT:1` and `x + LONG:1`
+    // shared one entry and a warm cache served the LONG proof for the INT text — a
+    // false Proven that elides the guard. The bump evicts every entry written under the old keys.
+    public const string CurrentFormatVersion = "1.20";
 
     /// <summary>#778: the compiler-semantics ledger version that produced this entry.
     /// A verdict computed under different compile semantics must not be served, even

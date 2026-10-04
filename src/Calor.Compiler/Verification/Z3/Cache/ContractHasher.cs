@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Calor.Compiler.Ast;
+using Calor.Compiler.Parsing;
 
 namespace Calor.Compiler.Verification.Z3.Cache;
 
@@ -45,7 +46,9 @@ public sealed class ContractHasher
         sb.Append("POST:");
         AppendParameters(sb, parameters);
         sb.Append(':');
-        sb.Append(outputType ?? "void");
+        // #1413 review: length-prefixed like every other caller-supplied spelling —
+        // a raw output type could forge the ":PRECS:" delimiter (SDK-built ASTs).
+        AppendRaw(sb, outputType ?? "void");
         sb.Append(":PRECS:");
 
         // Include all preconditions in the hash since they affect postcondition verification
@@ -96,7 +99,12 @@ public sealed class ContractHasher
                     sb.Append(bind.IsMutable ? "B~(" : "B(");
                     AppendRaw(sb, bind.Name);
                     sb.Append(':');
-                    AppendRaw(sb, bind.TypeName ?? "?");
+                    // #1413 review: a null (inferred) type and the spelling "?" verify
+                    // differently, so they must not share a key.
+                    if (bind.TypeName is null)
+                        sb.Append("<inferred>");
+                    else
+                        AppendRaw(sb, bind.TypeName);
                     sb.Append('=');
                     if (bind.Initializer != null)
                         AppendExpression(sb, bind.Initializer);
@@ -184,8 +192,22 @@ public sealed class ContractHasher
         switch (expr)
         {
             case IntLiteralNode intLit:
+                // #1413 (S1 CACHE-LITERAL-WIDTH): the translator types a literal by its
+                // width and signedness (INT:1 is i32, LONG:1 is i64, UINT/ULONG unsigned),
+                // so `x + INT:1` and `x + LONG:1` have different overflow behavior and
+                // different verdicts. Hash every typing-relevant field — the bare value
+                // let a warm cache serve the LONG proof for the INT text (a false Proven
+                // that elides the guard). Sign + magnitude also keep ULONG values above
+                // long.MaxValue distinct from their wrapped `Value`.
                 sb.Append("INT:");
-                sb.Append(intLit.Value);
+                sb.Append(intLit.Width);
+                sb.Append(':');
+                sb.Append(intLit.Signedness);
+                sb.Append(':');
+                sb.Append(intLit.Base);
+                sb.Append(':');
+                sb.Append(intLit.Sign == IntegerLiteralSign.Negative ? '-' : '+');
+                sb.Append(intLit.Magnitude);
                 break;
 
             case BoolLiteralNode boolLit:
@@ -194,7 +216,10 @@ public sealed class ContractHasher
                 break;
 
             case FloatLiteralNode floatLit:
+                // Same rule for real literals: float, double, and decimal spellings of
+                // one value are different C# types.
                 sb.Append("FLOAT:");
+                sb.Append(floatLit.IsDecimal ? "m:" : floatLit.IsSingle ? "f:" : "d:");
                 sb.Append(floatLit.Value.ToString("G17"));
                 break;
 
@@ -390,8 +415,13 @@ public sealed class ContractHasher
 
     private static string ComputeSha256Hash(string input)
     {
-        var bytes = Encoding.UTF8.GetBytes(input);
-        var hashBytes = SHA256.HashData(bytes);
+        var hashBytes = SHA256.HashData(LosslessBytes(input));
         return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }
+
+    /// <summary>#1413 review: the raw UTF-16 code units. UTF-8 encoding replaces an
+    /// unpaired surrogate with U+FFFD, so two different SDK-supplied names could share
+    /// a key; the code units cannot collide.</summary>
+    internal static byte[] LosslessBytes(string input)
+        => System.Runtime.InteropServices.MemoryMarshal.AsBytes(input.AsSpan()).ToArray();
 }
