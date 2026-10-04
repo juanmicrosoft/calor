@@ -1,0 +1,34 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §U{System}
+  §U{System.Collections.Generic}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §MT{m002:ParseOrMinus:pub:stat} (str:text) -> i32
+        §B{~n:i32} `default`
+        §B{bool:ok} §C{int.TryParse} §A text §A{out} n §/C
+        §R (? ok n (- 1))
+
+      §MT{m003:Bump:pub:stat} (i32:x:ref)
+        §ASSIGN x (+ x 1)
+
+      §MT{m004:CallBump:pub:stat} () -> i32
+        §B{~v:i32} 41
+        §C{Bump} §A{ref} v §/C
+        §R v
+
+      §MT{m005:Lookup:pub:stat} (Dict<str, str>:d, str:key) -> str
+        §B{~value:str} `default`
+        §B{_preTryGetValue007} §C{d.TryGetValue} §A key §A{out} value §/C
+        §IF{if006} _preTryGetValue007
+          §R value
+        §R "missing"
+
+      §MT{m008:Run:pub:stat} () -> str
+        §E{alloc,mut}
+        §B{d} §NEW{Dictionary<str,str>} §/NEW
+        §PUT{d} "a" "alpha"
+        §R (+ (+ (+ (+ (+ (+ (+ (+ §C{ParseOrMinus} §A "12" §/C "|") §C{ParseOrMinus} §A "x" §/C) "|") §C{CallBump} §/C) "|") §C{Lookup} §A d §A "a" §/C) "|") §C{Lookup} §A d §A "b" §/C)
+
+
+

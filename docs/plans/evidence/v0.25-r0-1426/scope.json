@@ -1,0 +1,1711 @@
+{
+  "schema": "v0.25-interop-scope/1",
+  "scopeVersion": "1.0.0",
+  "status": "PROPOSED",
+  "gateStatus": "NOT-MET",
+  "recordedAtUtc": "2026-10-03T18:30:00Z",
+  "epic": 1425,
+  "gate": 1426,
+  "document": "docs/plans/v0.25-interop-scope-and-baseline.md",
+  "gateConditions": [
+    {
+      "id": "blocker-1413",
+      "issue": 1413,
+      "state": "OPEN",
+      "reason": "#1426 closure is blocked by 0.24 S2. No #1413 disposition exists at recording; the S1 results PR #1480 is open and undispositioned."
+    },
+    {
+      "id": "capacity-accepted",
+      "state": "OPEN",
+      "reason": "Every ceiling below is PROPOSED until the maintainer accepts it (by merge, then an acceptance write-back)."
+    },
+    {
+      "id": "independence-deviation-accepted",
+      "state": "OPEN",
+      "reason": "#1426 deliverable 4 says missing independent review blocks R0. No reviewer independent of the maintainer and the AI reviewers is available, so R0 needs the maintainer's explicit acceptance of the reduced-independence deviation."
+    },
+    {
+      "id": "blockers-mapped-after-1413",
+      "state": "OPEN",
+      "reason": "#1426 deliverable 3: after #1413 dispositions exist, map each applicable 0.24 repair or demotion as a native blocker of the affected family issues."
+    },
+    {
+      "id": "interaction-and-doc-rows-registered",
+      "state": "OPEN",
+      "reason": "#1426 deliverable 2 also asks for cross-feature interaction rows and documentation-example rows. 1.0.0 registers single-family rows only; an amendment adds the #1428 shared controls and the #1429 example rows before MET."
+    }
+  ],
+  "acceptance": null,
+  "identities": {
+    "measuredCommit": "bf584fb71db140ca19e5c956a241a0da7dd02f60",
+    "srcTree": "ee3c9db987d844a9348b8d0bab75e603cc01797c",
+    "srcTreeNote": "git tree of src/ at the measured commit. Results were produced on branch commits that change only docs/, tests/ and eng/; their src/ tree is this one, which reproduce.py records and S013 checks.",
+    "productVersion": "0.22.0",
+    "dotnetSdk": "10.0.401 (global.json 10.0.100, rollForward latestMinor)",
+    "roslyn": "Microsoft.CodeAnalysis.CSharp 5.3.0",
+    "z3": "4.15.7",
+    "platform": "Darwin arm64 (macOS 27.0.1)",
+    "converterReferences": "default (no --reference); oracle compiles against the runner's trusted platform assemblies",
+    "nullableContext": "generated C# carries #nullable enable; the oracle compiles both arms with nullable enabled",
+    "corpusSubmodules": {
+      "FluentValidation": "71b3c60cb5a16e02cb7957e478ec3fb6b983a73c",
+      "MediatR": "fb309026775ef953a64fb5339d074426c1ad2c37",
+      "serilog": "0597ddfbd4ec594d9c42edd745fe728a2198bad9"
+    },
+    "corpusUsedForBaseline": false,
+    "baselineResults": "docs/plans/evidence/v0.25-r0-1426/baseline-results.json",
+    "reproduce": "python3 docs/plans/evidence/v0.25-r0-1426/reproduce/reproduce.py"
+  },
+  "authority": {
+    "decision": "@juanmicrosoft",
+    "amendment": "@juanmicrosoft",
+    "implementation": "Claude Code agents; one branch and one PR per issue",
+    "review": "OpenAI Codex cross-family adversarial review: at most 3 rounds plus one verification-only pass per PR",
+    "merge": "routine merges delegated by @juanmicrosoft to the agent session when CI is green and no BLOCKING finding remains; decision-bearing PRs (this packet, amendments) are accepted by merge as maintainer decisions",
+    "approver": "@juanmicrosoft"
+  },
+  "independence": {
+    "deviation": true,
+    "recordValue": "reduced",
+    "statement": "No reviewer independent of the maintainer and the AI reviewers is available. READY records name the Codex reviews and @juanmicrosoft as approver; no record or public surface may say 'independently reviewed' or 'independently verified'."
+  },
+  "vocabularies": {
+    "readiness": [
+      "NOT_STARTED",
+      "IN_PROGRESS",
+      "READY",
+      "BLOCKED"
+    ],
+    "expected": [
+      "native",
+      "preserved",
+      "rejected",
+      "native-or-rejected",
+      "native-or-preserved",
+      "preserved-or-rejected"
+    ],
+    "role": [
+      "control",
+      "residual",
+      "decision",
+      "interaction",
+      "doc-example"
+    ],
+    "baselineStatus": [
+      "reproduces",
+      "partially-reproduces",
+      "no-longer-reproduces",
+      "control-passes",
+      "not-measured"
+    ],
+    "caseResult": [
+      "passed",
+      "failed",
+      "skipped",
+      "reverted"
+    ]
+  },
+  "families": [
+    {
+      "id": "F1",
+      "issue": 943,
+      "title": "ref/out call semantics",
+      "blockers": [
+        1427,
+        1423
+      ],
+      "provisionalSize": "L",
+      "readiness": {
+        "status": "NOT_STARTED"
+      }
+    },
+    {
+      "id": "F2",
+      "issue": 906,
+      "title": "interpolation target typing",
+      "blockers": [
+        1426,
+        1423
+      ],
+      "provisionalSize": "L",
+      "readiness": {
+        "status": "NOT_STARTED"
+      }
+    },
+    {
+      "id": "F3",
+      "issue": 847,
+      "title": "native non-capturing local functions",
+      "blockers": [
+        1426,
+        1423
+      ],
+      "provisionalSize": "L",
+      "readiness": {
+        "status": "NOT_STARTED"
+      }
+    },
+    {
+      "id": "F4",
+      "issue": 1139,
+      "title": "iterator accessor preservation",
+      "blockers": [
+        1426,
+        1423
+      ],
+      "provisionalSize": "S-M",
+      "readiness": {
+        "status": "NOT_STARTED"
+      }
+    },
+    {
+      "id": "F5",
+      "issue": 1132,
+      "title": "array-expression evaluation",
+      "blockers": [
+        1426,
+        1423
+      ],
+      "provisionalSize": "M",
+      "readiness": {
+        "status": "NOT_STARTED"
+      }
+    },
+    {
+      "id": "F6",
+      "issue": 1144,
+      "title": "converter rescue/passthrough reporting",
+      "blockers": [
+        1426,
+        1423
+      ],
+      "provisionalSize": "M",
+      "readiness": {
+        "status": "NOT_STARTED"
+      }
+    }
+  ],
+  "supportingIssues": [
+    {
+      "issue": 1427,
+      "role": "D1",
+      "blockers": [
+        1426,
+        1379
+      ]
+    },
+    {
+      "issue": 1143,
+      "role": "W0",
+      "blockers": [
+        1426
+      ]
+    },
+    {
+      "issue": 1428,
+      "role": "T1",
+      "blockers": [
+        1426,
+        1423
+      ]
+    },
+    {
+      "issue": 1429,
+      "role": "W1",
+      "blockers": [
+        1143,
+        1428
+      ]
+    },
+    {
+      "issue": 1430,
+      "role": "A1",
+      "blockers": [
+        847,
+        906,
+        943,
+        1132,
+        1139,
+        1143,
+        1144,
+        1408,
+        1428,
+        1429
+      ]
+    }
+  ],
+  "capacity": {
+    "status": "PROPOSED",
+    "ceilings": [
+      {
+        "id": "timebox",
+        "value": 84,
+        "unit": "calendar days from the R0 acceptance write-back",
+        "status": "PROPOSED"
+      },
+      {
+        "id": "agent-prs-per-issue",
+        "value": 2,
+        "unit": "PRs (one primary, one follow-up)",
+        "status": "PROPOSED"
+      },
+      {
+        "id": "pr-size",
+        "value": 1500,
+        "unit": "changed lines excluding committed evidence data and test fixtures",
+        "status": "PROPOSED"
+      },
+      {
+        "id": "family-nontest-lines-F1",
+        "value": 900,
+        "unit": "changed non-test lines across the family's PRs",
+        "status": "PROPOSED"
+      },
+      {
+        "id": "family-nontest-lines-F2",
+        "value": 900,
+        "unit": "changed non-test lines across the family's PRs",
+        "status": "PROPOSED"
+      },
+      {
+        "id": "family-nontest-lines-F3",
+        "value": 900,
+        "unit": "changed non-test lines across the family's PRs",
+        "status": "PROPOSED"
+      },
+      {
+        "id": "family-nontest-lines-F4",
+        "value": 400,
+        "unit": "changed non-test lines across the family's PRs",
+        "status": "PROPOSED"
+      },
+      {
+        "id": "family-nontest-lines-F5",
+        "value": 600,
+        "unit": "changed non-test lines across the family's PRs",
+        "status": "PROPOSED"
+      },
+      {
+        "id": "family-nontest-lines-F6",
+        "value": 700,
+        "unit": "changed non-test lines across the family's PRs",
+        "status": "PROPOSED"
+      },
+      {
+        "id": "review-rounds",
+        "value": 3,
+        "unit": "Codex adversarial rounds per PR, plus one verification-only pass; then close and re-scope",
+        "status": "PROPOSED"
+      },
+      {
+        "id": "maintainer-review-per-pr",
+        "value": 2,
+        "unit": "hours, all rounds",
+        "status": "PROPOSED"
+      },
+      {
+        "id": "maintainer-review-total",
+        "value": 40,
+        "unit": "hours across the milestone",
+        "status": "PROPOSED"
+      },
+      {
+        "id": "agent-execution",
+        "value": 124,
+        "unit": "agent-hours across the milestone (R0 6, D1 6, F1-F3 16 each, F4 6, F5 10, F6 10, W0 10, W1 10, T1 12, A1 6)",
+        "status": "PROPOSED"
+      },
+      {
+        "id": "ci-minutes",
+        "value": 12000,
+        "unit": "CI runner-minutes across the milestone, including round-trip harness runs",
+        "status": "PROPOSED"
+      },
+      {
+        "id": "roundtrip-harness-runs",
+        "value": 10,
+        "unit": "complete runs (about 30 minutes each), inside ci-minutes",
+        "status": "PROPOSED"
+      },
+      {
+        "id": "local-compute",
+        "value": 20,
+        "unit": "local machine-hours",
+        "status": "PROPOSED"
+      },
+      {
+        "id": "paid-spend",
+        "value": 0,
+        "unit": "USD; on usage limits, wait",
+        "status": "PROPOSED"
+      }
+    ]
+  },
+  "evidenceSeal": {
+    "baselineResults": "9892f60b7832b68526143a55a0e39424b4563785c44afbffc5374dd6ffd478bf",
+    "producers": {
+      "docs/plans/evidence/v0.25-r0-1426/reproduce/reproduce.py": "57f4a663acc202f6ffb06121e3a143869b742d179d304a9ab342b11a4d4a6f38",
+      "docs/plans/evidence/v0.25-r0-1426/reproduce/ProbeRunner.cs.txt": "b5aea9857edcc47133efe92813c1c6798fbc50a39a8d408f9aeef95758cb4d51"
+    },
+    "generated": "e15ae8e61ca9cabab0f3bf02cf70cb5a74e40598931705a9cbe9799bdd9b1fbf",
+    "rule": "baselineResults: SHA-256 of baseline-results.json (LF-normalized). generated: SHA-256 of the sorted lines '<repo path> <file SHA-256>' over generated/. producers: SHA-256 of the two reproduction producers. Changing any of them is an amendment."
+  },
+  "cases": [
+    {
+      "id": "F1-REFOUT-01",
+      "family": "F1",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-01.cs.txt",
+      "fixtureSha256": "46268d5042b214df9d23772bb1e1e61f89a7cfbff3f565ac24a988808f7ed7b0",
+      "baseline": {
+        "cli-default": "native-match",
+        "cli-passthrough": "native-match",
+        "mcp-default": "native-match",
+        "mcp-passthroughOnError": "native-match"
+      },
+      "note": "TryParse, Dictionary.TryGetValue and ref on simple locals convert natively to existing `§A{out}`/`§A{ref}` and mutate caller storage on all four surfaces."
+    },
+    {
+      "id": "F1-REFOUT-02",
+      "family": "F1",
+      "role": "decision",
+      "expected": "native-or-rejected",
+      "baselineStatus": "partially-reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-02.cs.txt",
+      "fixtureSha256": "0936b4c0e172e18f621d5efba290ed3150a57669f7494ab402521cd8b774d8a2",
+      "baseline": {
+        "cli-default": "preserved-match",
+        "cli-passthrough": "preserved-match",
+        "mcp-default": "preserved-match",
+        "mcp-passthroughOnError": "preserved-match"
+      },
+      "note": "`out _` converts natively; `out var n` inside a conditional is kept as an inline `§CS{}` C# expression (counted as interop, effects assumed: Calor0419). #1427 decides native versus explicit refusal."
+    },
+    {
+      "id": "F1-REFOUT-03",
+      "family": "F1",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-03.cs.txt",
+      "fixtureSha256": "9a02ee5807cfa332de2672660f2ab6696ceeff8bfc890ce69d71d6768517fbe5",
+      "baseline": {
+        "cli-default": "native-match",
+        "cli-passthrough": "native-match",
+        "mcp-default": "native-match",
+        "mcp-passthroughOnError": "native-match"
+      },
+      "note": "ref to an array element, a static field, and the same local twice (aliasing) convert natively and match. #1427 still owns the writable-lvalue and aliasing matrix."
+    },
+    {
+      "id": "F1-REFOUT-04",
+      "family": "F1",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "partially-reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-04.cs.txt",
+      "fixtureSha256": "27ce08c1219b26c85fd12c552d8a9d23b8afddaf993eef350e876aaf2ceca389",
+      "baseline": {
+        "cli-default": "preserved-match",
+        "cli-passthrough": "preserved-match",
+        "mcp-default": "compile-error:Calor1002",
+        "mcp-passthroughOnError": "preserved-match"
+      },
+      "note": "Named/reordered `out`, `in`, and out-before-exception emit native modifiers, but the member fails on an unrelated empty-catch defect (X-TRYCATCH-01). Rescue paths (CLI, MCP passthroughOnError) preserve it as interop; MCP default returns isError (Calor1002, CS0161)."
+    },
+    {
+      "id": "F1-REFOUT-05",
+      "family": "F1",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-05.cs.txt",
+      "fixtureSha256": "14fd512e352fc64ac431427b4259f4cc2a523c16f046debad6b5cf9ad2328a9b",
+      "baseline": {
+        "cli-default": "native-match",
+        "cli-passthrough": "native-match",
+        "mcp-default": "native-match",
+        "mcp-passthroughOnError": "native-match"
+      },
+      "note": "A by-reference call whose mutation is read later in the same expression keeps C# evaluation order."
+    },
+    {
+      "id": "F1-REFOUT-06",
+      "family": "F1",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-06.cs.txt",
+      "fixtureSha256": "72723f89d0c1493a1e5953ffbafaedd8d331acde01664bc7d92d62d830947931",
+      "baseline": {
+        "cli-default": "native-match",
+        "cli-passthrough": "native-match",
+        "mcp-default": "native-match",
+        "mcp-passthroughOnError": "native-match"
+      },
+      "note": "Dictionary.TryGetValue with an int payload (a miss resets 99 to 0, so a copy would be visible) and a List<string> payload (a miss leaves null) converts natively and matches."
+    },
+    {
+      "id": "F1-REFOUT-07",
+      "family": "F1",
+      "role": "decision",
+      "expected": "preserved-or-rejected",
+      "baselineStatus": "partially-reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-07.cs.txt",
+      "fixtureSha256": "a9ecef3fde04a3eb6566fce5b7289311ef29522331e4ecb1d3779acf0ba30b64",
+      "baseline": {
+        "cli-default": "preserved-match",
+        "cli-passthrough": "preserved-match",
+        "mcp-default": "compile-error:Calor0208",
+        "mcp-passthroughOnError": "preserved-match"
+      },
+      "note": "Generic `out T` and an `out` parameter with [NotNullWhen(true)]: the contract says these stay preserved or refused unless #1427 admits them. Rescue paths preserve `Probe`; MCP default converts natively and the compiler rejects `TryCast<str>(5, out s)` (Calor0208, isError). The attribute is carried as `[@NotNullWhen(true)]` with no flow meaning."
+    },
+    {
+      "id": "F1-REFOUT-08",
+      "family": "F1",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-08.cs.txt",
+      "fixtureSha256": "cc2fcdb6713cab9b05948f37f9cf004da19fe29dede4869ebb2bcc63ad091650",
+      "baseline": {
+        "cli-default": "native-mismatch@permissive-effects",
+        "cli-passthrough": "native-mismatch@permissive-effects",
+        "mcp-default": "native-mismatch@permissive-effects",
+        "mcp-passthroughOnError": "native-mismatch@permissive-effects"
+      },
+      "note": "`Bump(ref pts[0].X)` on a struct array: the converter hoists `pts[0]` into a local copy and passes `ref _hoist001.X`. Reported native with no losses on all four surfaces; the default compile fails only on an unrelated Calor0410, and with --permissive-effects the result is 1 instead of 2. A copy masquerading as a by-reference argument."
+    },
+    {
+      "id": "F1-REFOUT-A1",
+      "family": "F1",
+      "role": "residual",
+      "expected": "rejected",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "note": "Analysis row: by-reference mutation must invalidate pre-call nullability and contract facts and refuse or demote proofs. Not fixtured at R0; see 0.24 S1 `OBL-MUTATION-KILL` (PR #1480, undispositioned)."
+    },
+    {
+      "id": "F1-REFOUT-A2",
+      "family": "F1",
+      "role": "residual",
+      "expected": "rejected",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "note": "Analysis row: effect charging for mutation through `ref`/`out` and conservative handling of unresolved callees (#1427). Not fixtured at R0."
+    },
+    {
+      "id": "F2-INTERP-01",
+      "family": "F2",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-01.cs.txt",
+      "fixtureSha256": "a60dbcf6ba85d93ab20e47fbea05cf495e6c8fd7a027e7d22215cfb580c3856f",
+      "baseline": {
+        "cli-default": "native-match",
+        "cli-passthrough": "native-match",
+        "mcp-default": "native-match",
+        "mcp-passthroughOnError": "native-match"
+      },
+      "note": "String targets: format specifier, alignment, escaped braces, null hole and hole evaluation order all match. Holes that contain calls compile as raw C# expressions with assumed effects (Calor0419)."
+    },
+    {
+      "id": "F2-INTERP-02",
+      "family": "F2",
+      "role": "residual",
+      "expected": "native-or-preserved",
+      "baselineStatus": "partially-reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-02.cs.txt",
+      "fixtureSha256": "9d988a99732e3e3c046e1b6d871a0ea423e068fb3cf81ad58f9fc6881278f7f1",
+      "baseline": {
+        "cli-default": "native-match@permissive-effects",
+        "cli-passthrough": "native-match@permissive-effects",
+        "mcp-default": "native-match@permissive-effects",
+        "mcp-passthroughOnError": "native-match@permissive-effects"
+      },
+      "note": "FormattableString/IFormattable targets and a FormattableString-vs-object overload keep their C# target typing (the emitter re-emits `$\"...\"`). Default compile fails on an unrelated Calor0410 for `Kind(object)`; with --permissive-effects the behavior matches. FeatureSupport still says Full."
+    },
+    {
+      "id": "F2-INTERP-03",
+      "family": "F2",
+      "role": "residual",
+      "expected": "preserved-or-rejected",
+      "baselineStatus": "partially-reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-03.cs.txt",
+      "fixtureSha256": "632bd63c1ee8d2310a67ec1b7b3872ea785267ff6a37aa72d01cf48093efe641",
+      "baseline": {
+        "cli-default": "preserved-match",
+        "cli-passthrough": "preserved-match",
+        "mcp-default": "compile-error:Calor0208",
+        "mcp-passthroughOnError": "preserved-match"
+      },
+      "note": "Custom interpolated-string handler: rescue paths preserve the handler type and `Probe`; MCP default converts the call natively, flattens the argument to STRING and fails (isError; Calor0208). Not silent, but not refused at conversion time."
+    },
+    {
+      "id": "F2-INTERP-04",
+      "family": "F2",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-04.cs.txt",
+      "fixtureSha256": "ff11d343cb9171f61354ba165db287d749d5a2be3f329b315d19cf678b02c79d",
+      "baseline": {
+        "cli-default": "native-match",
+        "cli-passthrough": "native-match",
+        "mcp-default": "native-match",
+        "mcp-passthroughOnError": "native-match"
+      },
+      "note": "Ordinary literals containing `${x}` and `{x}` stay literal (the converter escapes `\\${x}`)."
+    },
+    {
+      "id": "F2-INTERP-05",
+      "family": "F2",
+      "role": "residual",
+      "expected": "rejected",
+      "baselineStatus": "partially-reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-05.calr.txt",
+      "fixtureSha256": "419003b22f7036b3fd20e56752be6727db8750d8833495a79497e32c932fd9a7",
+      "baseline": {
+        "compile": "compile-error:Calor0200@line1"
+      },
+      "note": "Native Calor: an undefined name inside `${...}` is now bound and reported (Calor0200), so the historical 'invisible to the binder' claim no longer holds; the diagnostic points at line 1, column 1, not the hole."
+    },
+    {
+      "id": "F2-INTERP-06",
+      "family": "F2",
+      "role": "residual",
+      "expected": "rejected",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-06.calr.txt",
+      "fixtureSha256": "f4554251c0e9a27ce3ea1bc392d6351500c84ecdf82aa69cef5b257023c6d35c",
+      "baseline": {
+        "compile": "compiled;warnings:Calor0419"
+      },
+      "note": "Native Calor: a call inside `${...}` in a function declared pure (`§E{}`) is a raw C# expression; the compiler accepts the declared effects as an assumption (Calor0419 warning) instead of checking them."
+    },
+    {
+      "id": "F2-INTERP-07",
+      "family": "F2",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-07.cs.txt",
+      "fixtureSha256": "84fca44ef923afbc1623710353095d49bce1dc5ad533969ccc8ec0928cb7c33e",
+      "baseline": {
+        "cli-default": "native-match@permissive-effects",
+        "cli-passthrough": "native-match@permissive-effects",
+        "mcp-default": "native-match@permissive-effects",
+        "mcp-passthroughOnError": "native-match@permissive-effects"
+      },
+      "note": "Culture: de-DE current culture through a string target and FormattableString.ToString(InvariantCulture) match. The default compile fails on an unrelated Calor0410 (the culture setter); the comparison uses --permissive-effects."
+    },
+    {
+      "id": "F2-INTERP-08",
+      "family": "F2",
+      "role": "residual",
+      "expected": "native-or-preserved",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "note": "Competing overloads where target typing changes the selected method observably (string vs FormattableString vs IFormattable vs a handler), asserting the selected overload. Not fixtured at R0.",
+      "cells": [
+        "string",
+        "FormattableString",
+        "IFormattable",
+        "custom-handler",
+        "selected-overload-asserted",
+        "handler-side-effects"
+      ]
+    },
+    {
+      "id": "F2-INTERP-09",
+      "family": "F2",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "note": "F-2 incomplete-binding counts over the corpus before and after the fix (#906 closure). Not measured at R0 (corpus not used)."
+    },
+    {
+      "id": "F2-INTERP-10",
+      "family": "F2",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "note": "String return target: `return $\"...\";` from a string-returning method, with format, alignment and culture, through original and generated execution. Not fixtured as a return at R0 (F2-INTERP-01 covers assignments)."
+    },
+    {
+      "id": "F3-LOCAL-01",
+      "family": "F3",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-01.cs.txt",
+      "fixtureSha256": "f323c3f90e8936fe5fec785a5083e5033ed2d0e0e50f83ca81020665379f1f4e",
+      "baseline": {
+        "cli-default": "preserved-match@permissive-effects",
+        "cli-passthrough": "preserved-match@permissive-effects",
+        "mcp-default": "preserved-match@permissive-effects",
+        "mcp-passthroughOnError": "preserved-match@permissive-effects"
+      },
+      "note": "The epic's `int Add(int x) => x + 1` row and a recursive local function: both members are preserved as `§CSHARP` (feature `method`), as #846 intended. Default compile then fails on Calor0410 in the caller; with --permissive-effects behavior matches. Native support is the 0.25 work."
+    },
+    {
+      "id": "F3-LOCAL-02",
+      "family": "F3",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-02.cs.txt",
+      "fixtureSha256": "1b7d5a367c5f8e3e30045d11b9bfdb55e28ed3bbf19cda346131b633adbbbddd",
+      "baseline": {
+        "cli-default": "preserved-match@permissive-effects",
+        "cli-passthrough": "preserved-match@permissive-effects",
+        "mcp-default": "preserved-match@permissive-effects",
+        "mcp-passthroughOnError": "preserved-match@permissive-effects"
+      },
+      "note": "C-1 shadowing shape: preserved as `§CSHARP`, no silent rebind (3|1002 matches). Still not native."
+    },
+    {
+      "id": "F3-LOCAL-03",
+      "family": "F3",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-03.cs.txt",
+      "fixtureSha256": "677a392baa87e118ce915adf7fcec4c6983f3a4ba874c525674bbacfecfb8326",
+      "baseline": {
+        "cli-default": "preserved-match@permissive-effects",
+        "cli-passthrough": "preserved-match@permissive-effects",
+        "mcp-default": "preserved-match@permissive-effects",
+        "mcp-passthroughOnError": "preserved-match@permissive-effects"
+      },
+      "note": "C-2 (shadows an inherited method), C-3 (shadows an overload), a forward call, and a delegate to a local function: all three members preserved as `§CSHARP`; behavior matches under --permissive-effects. Not native."
+    },
+    {
+      "id": "F3-LOCAL-04",
+      "family": "F3",
+      "role": "control",
+      "expected": "preserved",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-04.cs.txt",
+      "fixtureSha256": "535b0d42cd66296e5711ab8a6f698c9dbf8322ec06cf5766edb4299c65cde837",
+      "baseline": {
+        "cli-default": "preserved-match@permissive-effects",
+        "cli-passthrough": "preserved-match@permissive-effects",
+        "mcp-default": "preserved-match@permissive-effects",
+        "mcp-passthroughOnError": "preserved-match@permissive-effects"
+      },
+      "note": "Outside the frozen slice: capturing, generic and iterator local functions stay preserved as `§CSHARP` on every surface; behavior matches under --permissive-effects. They must never count as native."
+    },
+    {
+      "id": "F3-LOCAL-A1",
+      "family": "F3",
+      "role": "residual",
+      "expected": "native-or-rejected",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "note": "Analysis row: binding, effects and verification visit native local-function bodies and call edges, or refuse; no proof from omitted bodies (#847). Not fixtured at R0."
+    },
+    {
+      "id": "F3-LOCAL-05",
+      "family": "F3",
+      "role": "control",
+      "expected": "preserved",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "note": "Async local functions (outside the frozen slice) stay preserved, never native. Not fixtured at R0."
+    },
+    {
+      "id": "F4-ITER-01",
+      "family": "F4",
+      "role": "residual",
+      "expected": "preserved",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-01.cs.txt",
+      "fixtureSha256": "0a1a21be9eac4d82bcf51a02705607d6b9de6fe98c50e649a532ae8f63f5db9e",
+      "baseline": {
+        "cli-default": "preserved-match",
+        "cli-passthrough": "preserved-match",
+        "mcp-default": "compile-error:Calor0209",
+        "mcp-passthroughOnError": "preserved-match"
+      },
+      "note": "Legal iterator property and indexer: the converter emits `§YIELD`/`§YBRK` in accessors; MCP default fails Calor0209 (isError). Rescue paths (CLI, MCP passthroughOnError) preserve both classes and match, including laziness."
+    },
+    {
+      "id": "F4-ITER-02",
+      "family": "F4",
+      "role": "residual",
+      "expected": "preserved",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-02.cs.txt",
+      "fixtureSha256": "3a7a1da86ae98ee3ab5c935f8849701e38e2bfdaa7adc10b95b1a394e38a3820",
+      "baseline": {
+        "cli-default": "preserved-match",
+        "cli-passthrough": "preserved-match",
+        "mcp-default": "compile-error:Calor0209",
+        "mcp-passthroughOnError": "preserved-match"
+      },
+      "note": "Disposal and exceptions: an abandoned iterator property runs its finally; an iterator indexer throws on the second MoveNext. MCP default fails Calor0209; rescue paths preserve both, and behavior matches."
+    },
+    {
+      "id": "F4-ITER-03",
+      "family": "F4",
+      "role": "control",
+      "expected": "rejected",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-03.calr.txt",
+      "fixtureSha256": "dd1de7e8703042dfb740ce1a58cc364c4b3f3af7b2c9571291397423613187e6",
+      "baseline": {
+        "compile": "compile-error:Calor0209@line12"
+      },
+      "note": "Native Calor with `§YIELD` in a property accessor (the MCP output of F4-ITER-01) keeps Calor0209."
+    },
+    {
+      "id": "F4-ITER-04",
+      "family": "F4",
+      "role": "residual",
+      "expected": "preserved",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "note": "The three historical FluentValidation modules (EmptyTester, NotEmptyTester, ITestValidationContinuation) through the pinned CLI with project references. Not re-run at R0."
+    },
+    {
+      "id": "F5-ARRAY-01",
+      "family": "F5",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-01.cs.txt",
+      "fixtureSha256": "984f6a6bf85c56b9120f7053d207e98c254fd486d65b9f27a938ca3ed4dac5ae",
+      "baseline": {
+        "cli-default": "preserved-match",
+        "cli-passthrough": "preserved-match",
+        "mcp-default": "compile-error:Calor0410;permissive-effects:Calor1002",
+        "mcp-passthroughOnError": "preserved-match"
+      },
+      "note": "Historical repro unchanged on the native path: `§ARR2D{arr2d004:arr2d005:Cell}` then `§R arr2d005` gives CS0201 and CS0103 `arr2d005` (plus CS1061 on `§IDX2D ... .V`). MCP default fails (isError); rescue paths preserve both classes. The epic's 'id/name repair already exists' does not hold for this shape."
+    },
+    {
+      "id": "F5-ARRAY-02",
+      "family": "F5",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-02.cs.txt",
+      "fixtureSha256": "e235ce21ba8e2abca01e9c93d89f4beff240e384410307ee2fe0b9e5247bc674",
+      "baseline": {
+        "cli-default": "preserved-match",
+        "cli-passthrough": "preserved-match",
+        "mcp-default": "preserved-match",
+        "mcp-passthroughOnError": "preserved-match"
+      },
+      "note": "Arrays as an argument and in conditional branches: the native output does not parse (Calor0106 unknown operator `?`), so even MCP default rescues `Probe` through the parse-failure path. Rescued output matches, including no evaluation of the unselected branch."
+    },
+    {
+      "id": "F5-ARRAY-03",
+      "family": "F5",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-03.cs.txt",
+      "fixtureSha256": "e90768eca604330a7e503944136d3a3309bc87730bf4a424527935b5da5d36f0",
+      "baseline": {
+        "cli-default": "native-match",
+        "cli-passthrough": "native-match",
+        "mcp-default": "native-match",
+        "mcp-passthroughOnError": "native-match"
+      },
+      "note": "Statement-position 1-D and 2-D arrays bound to declared locals convert natively and match."
+    },
+    {
+      "id": "F5-ARRAY-04",
+      "family": "F5",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-04.cs.txt",
+      "fixtureSha256": "2e7526e66a9977db37cb33f112e4c56da82517c424ba1520085c46d0023cbe51",
+      "baseline": {
+        "cli-default": "preserved-match",
+        "cli-passthrough": "preserved-match",
+        "mcp-default": "compile-error:Calor0260",
+        "mcp-passthroughOnError": "preserved-match"
+      },
+      "note": "Name collision: in `Run` the converter hoists array elements into `_hoist000`, the name of a user local in the same scope; the native output is rejected (Calor0260, immutable binding rebound). Grid's parameters match the generated `§ARR2D` id and name. Exception order is observable only on rescue paths, where it matches."
+    },
+    {
+      "id": "F5-ARRAY-05",
+      "family": "F5",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-05.cs.txt",
+      "fixtureSha256": "c7ed707f207831d97c47b0be757348365753a43978b233c226954d67dda3f806",
+      "baseline": {
+        "cli-default": "preserved-match",
+        "cli-passthrough": "preserved-match",
+        "mcp-default": "compile-error:Calor0410;permissive-effects:Calor1002",
+        "mcp-passthroughOnError": "preserved-match"
+      },
+      "note": "Rank and initializer matrix in expression position (jagged, rank 3, sized with initializer, implicitly typed, array nested in an initializer): MCP default fails; rescue paths preserve `Probe` and match."
+    },
+    {
+      "id": "F5-ARRAY-06",
+      "family": "F5",
+      "role": "decision",
+      "expected": "native-or-rejected",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "note": "Declared supported/unsupported rank, initializer and element-type boundary (#1132 governing scope). F5-ARRAY-05 samples forms but does not define the boundary; the F5 PR must register it."
+    },
+    {
+      "id": "F6-REPORT-01",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [
+        {
+          "case": "F5-ARRAY-01",
+          "surface": "cli-default",
+          "path": "humanAttribution",
+          "equals": "(2 via --passthrough fallback)"
+        }
+      ],
+      "note": "No-flag `calor convert` rescue is labeled '(2 via --passthrough fallback)' although no flag was passed."
+    },
+    {
+      "id": "F6-REPORT-02",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [
+        {
+          "case": "F5-ARRAY-01",
+          "surface": "cli-passthrough",
+          "path": "humanAttribution",
+          "equals": "(2 via --passthrough fallback)"
+        },
+        {
+          "case": "F5-ARRAY-01",
+          "surface": "cli-default",
+          "path": "lossFeatures",
+          "equals": [
+            "post-validation-fallback"
+          ]
+        },
+        {
+          "case": "F5-ARRAY-01",
+          "surface": "cli-passthrough",
+          "path": "lossFeatures",
+          "equals": [
+            "post-validation-fallback"
+          ]
+        }
+      ],
+      "note": "No-flag and --passthrough runs produce the same JSON loss feature (`post-validation-fallback`) and the same text; no field records which trigger fired."
+    },
+    {
+      "id": "F6-REPORT-03",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [
+        {
+          "case": "F4-ITER-01",
+          "surface": "cli-default",
+          "path": "success",
+          "equals": true
+        },
+        {
+          "case": "F4-ITER-01",
+          "surface": "mcp-default",
+          "path": "isError",
+          "equals": true
+        },
+        {
+          "case": "F4-ITER-01",
+          "surface": "mcp-passthroughOnError",
+          "path": "isError",
+          "equals": false
+        },
+        {
+          "case": "F4-ITER-01",
+          "surface": "mcp-passthroughOnError",
+          "path": "lossFeatures",
+          "equals": [
+            "post-validation-fallback"
+          ]
+        }
+      ],
+      "note": "Default difference: CLI `calor convert` rescues by default (RescueUnusableMembers = true); MCP `calor_convert` with default arguments does not and returns isError; MCP with passthroughOnError rescues like the CLI. No output names the path that fired or the default that applied."
+    },
+    {
+      "id": "F6-REPORT-04",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [],
+      "note": "Project-level `calor migrate`: defaults, rescue/passthrough precedence, member/file/project aggregation, partial failure, exit code. Not exercised at R0.",
+      "cells": [
+        "defaults",
+        "rescue-passthrough-precedence",
+        "member-file-project-aggregation",
+        "partial-failure",
+        "exit-code",
+        "schema-version"
+      ]
+    },
+    {
+      "id": "F6-REPORT-05",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [],
+      "note": "MCP `calor_migrate` (MigrateTool sets PassthroughOnError = false): outcome, provenance and partial failure. Not exercised at R0.",
+      "cells": [
+        "defaults",
+        "rescue-passthrough-precedence",
+        "aggregation",
+        "partial-failure",
+        "protocol-error",
+        "schema-version"
+      ]
+    },
+    {
+      "id": "F6-REPORT-06",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [],
+      "note": "MCP `calor_batch`: per-file and aggregate reporting, partial batch failure, protocol error behavior. Not exercised at R0.",
+      "cells": [
+        "defaults",
+        "rescue-passthrough-precedence",
+        "per-file-and-aggregate",
+        "partial-failure",
+        "protocol-error",
+        "schema-version"
+      ]
+    },
+    {
+      "id": "F6-REPORT-07",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [],
+      "note": "Library and SDK wrappers (`ConversionOptions.RescueUnusableMembers` defaults to false): documented defaults and reported provenance. Not exercised at R0.",
+      "cells": [
+        "library-defaults",
+        "library-precedence",
+        "library-provenance",
+        "library-schema-version",
+        "sdk-defaults",
+        "sdk-precedence",
+        "sdk-provenance",
+        "sdk-schema-version"
+      ]
+    },
+    {
+      "id": "F6-REPORT-08",
+      "family": "F6",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [
+        {
+          "case": "F1-REFOUT-01",
+          "surface": "cli-default",
+          "path": "interopPreservationCount",
+          "equals": 0
+        },
+        {
+          "case": "F1-REFOUT-01",
+          "surface": "cli-default",
+          "path": "humanAttribution",
+          "equals": null
+        }
+      ],
+      "note": "A fully native conversion reports no interop and prints no preservation attribution."
+    },
+    {
+      "id": "F6-REPORT-09",
+      "family": "F6",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [
+        {
+          "case": "F3-LOCAL-01",
+          "surface": "cli-default",
+          "path": "humanAttribution",
+          "equals": ""
+        },
+        {
+          "case": "F3-LOCAL-01",
+          "surface": "cli-default",
+          "path": "lossFeatures",
+          "equals": [
+            "method"
+          ]
+        }
+      ],
+      "note": "Converter-level interop without rescue (local functions, feature `method`) is reported without a rescue or passthrough attribution."
+    },
+    {
+      "id": "F6-REPORT-10",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [],
+      "note": "Exit status per documented mode, `--lossy`, and rejected outcomes across CLI and MCP. Not exercised at R0.",
+      "cells": [
+        "cli-exit-per-mode",
+        "mcp-error-per-mode",
+        "lossy",
+        "rejected"
+      ]
+    },
+    {
+      "id": "F6-REPORT-11",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [
+        {
+          "case": "F4-ITER-01",
+          "surface": "mcp-passthroughOnError-moduleName",
+          "path": "isError",
+          "equals": true
+        },
+        {
+          "case": "F4-ITER-01",
+          "surface": "mcp-passthroughOnError",
+          "path": "isError",
+          "equals": false
+        }
+      ],
+      "note": "An unrelated option changes whether rescue fires: MCP `calor_convert` with passthroughOnError and a custom moduleName does not rescue F4-ITER-01 (isError), while the same call without moduleName does. The module name becomes the namespace identity that the rescue requires to match."
+    },
+    {
+      "id": "F6-REPORT-12",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [],
+      "note": "Both rescue and passthrough enabled versus rescue disabled, on every surface that exposes them; precedence when both fire. Not exercised beyond F6-REPORT-02/03.",
+      "cells": [
+        "cli-both-enabled",
+        "cli-rescue-only",
+        "mcp-both-enabled",
+        "mcp-disabled",
+        "cli-migrate-both-enabled",
+        "cli-migrate-disabled-or-unavailable",
+        "mcp-migrate-both-enabled",
+        "mcp-migrate-disabled",
+        "batch-both-enabled",
+        "batch-disabled",
+        "library-both-enabled",
+        "library-disabled",
+        "sdk-both-enabled",
+        "sdk-disabled"
+      ]
+    },
+    {
+      "id": "F6-REPORT-13",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "baseline": {},
+      "observations": [],
+      "note": "Structured DTO and envelope schema: actual-trigger provenance field or a versioned compatible extension, and wire compatibility. Not exercised at R0.",
+      "cells": [
+        "cli-json-provenance",
+        "mcp-dto-provenance",
+        "cli-migrate-provenance",
+        "mcp-migrate-dto-provenance",
+        "batch-dto-provenance",
+        "library-sdk-provenance",
+        "wire-compatibility"
+      ]
+    }
+  ],
+  "discovered": [
+    {
+      "id": "X-TRYCATCH-01",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/X-TRYCATCH-01.cs.txt",
+      "fixtureSha256": "ecac78a73149c52923c76f12b0b6534910f94b36c628df87be3c583b41b16c62",
+      "baseline": {
+        "cli-default": "native-mismatch",
+        "cli-passthrough": "native-mismatch",
+        "mcp-default": "native-mismatch",
+        "mcp-passthroughOnError": "native-mismatch"
+      },
+      "note": "Outside the six families. An empty catch clause followed by a statement: the converter emits an empty `§CA` clause and the compiler parses the next sibling statement into the catch body. Native, no losses, compiles, wrong result (1 instead of 2) on all four surfaces."
+    }
+  ],
+  "denominatorV1": [
+    {
+      "id": "F1-REFOUT-01",
+      "family": "F1",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-01.cs.txt",
+      "fixtureSha256": "46268d5042b214df9d23772bb1e1e61f89a7cfbff3f565ac24a988808f7ed7b0",
+      "requirementSha256": "9fc7f78bcca5fb81ff0de95f531974820ecd68c3cb4ae72fae61a817df80726b"
+    },
+    {
+      "id": "F1-REFOUT-02",
+      "family": "F1",
+      "role": "decision",
+      "expected": "native-or-rejected",
+      "baselineStatus": "partially-reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-02.cs.txt",
+      "fixtureSha256": "0936b4c0e172e18f621d5efba290ed3150a57669f7494ab402521cd8b774d8a2",
+      "requirementSha256": "7a4093a62f7a9af470031c4cf874b7271e51789447ca9da859ac3234a2fee2d3"
+    },
+    {
+      "id": "F1-REFOUT-03",
+      "family": "F1",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-03.cs.txt",
+      "fixtureSha256": "9a02ee5807cfa332de2672660f2ab6696ceeff8bfc890ce69d71d6768517fbe5",
+      "requirementSha256": "ecc974b39f15e73345a83677d2e6fc27190c91a8ab50fb27770e4ba17a417e6c"
+    },
+    {
+      "id": "F1-REFOUT-04",
+      "family": "F1",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "partially-reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-04.cs.txt",
+      "fixtureSha256": "27ce08c1219b26c85fd12c552d8a9d23b8afddaf993eef350e876aaf2ceca389",
+      "requirementSha256": "643fc1843dfcc1d83a8d9f9db3af17c8b507c4bfc8a9984568d52548ac0a5c4d"
+    },
+    {
+      "id": "F1-REFOUT-05",
+      "family": "F1",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-05.cs.txt",
+      "fixtureSha256": "14fd512e352fc64ac431427b4259f4cc2a523c16f046debad6b5cf9ad2328a9b",
+      "requirementSha256": "5fb2767f0ddab9ae85cd764fd012c28e425200693c10330366820263bf42744f"
+    },
+    {
+      "id": "F1-REFOUT-06",
+      "family": "F1",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-06.cs.txt",
+      "fixtureSha256": "72723f89d0c1493a1e5953ffbafaedd8d331acde01664bc7d92d62d830947931",
+      "requirementSha256": "772bbe9b14449453682394019c15f0f3cada0c693555fbba3ae1d186cd6c041f"
+    },
+    {
+      "id": "F1-REFOUT-07",
+      "family": "F1",
+      "role": "decision",
+      "expected": "preserved-or-rejected",
+      "baselineStatus": "partially-reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-07.cs.txt",
+      "fixtureSha256": "a9ecef3fde04a3eb6566fce5b7289311ef29522331e4ecb1d3779acf0ba30b64",
+      "requirementSha256": "d2a1b0f4a126311fbfd5a1abc1e3bb175ca21840de6d5b419bd0df293a43620f"
+    },
+    {
+      "id": "F1-REFOUT-08",
+      "family": "F1",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F1-REFOUT-08.cs.txt",
+      "fixtureSha256": "cc2fcdb6713cab9b05948f37f9cf004da19fe29dede4869ebb2bcc63ad091650",
+      "requirementSha256": "0ead542aa8b0008b430f733dbbfe1c3c96ff55c1e4956eba4650972fd88eeba9"
+    },
+    {
+      "id": "F1-REFOUT-A1",
+      "family": "F1",
+      "role": "residual",
+      "expected": "rejected",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "4ef4b58b3f224bb295f7bdd2c7747b0677b74a393d29115d25bd474e5466ddc5"
+    },
+    {
+      "id": "F1-REFOUT-A2",
+      "family": "F1",
+      "role": "residual",
+      "expected": "rejected",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "4782ce9843275b887d7147353f4812d3a2608833528bbbcbb41e5d2beac599b1"
+    },
+    {
+      "id": "F2-INTERP-01",
+      "family": "F2",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-01.cs.txt",
+      "fixtureSha256": "a60dbcf6ba85d93ab20e47fbea05cf495e6c8fd7a027e7d22215cfb580c3856f",
+      "requirementSha256": "0cc8ab8a6955d9112703989dc816dc2dba5485d571924d4e87643dc6b1fe2f02"
+    },
+    {
+      "id": "F2-INTERP-02",
+      "family": "F2",
+      "role": "residual",
+      "expected": "native-or-preserved",
+      "baselineStatus": "partially-reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-02.cs.txt",
+      "fixtureSha256": "9d988a99732e3e3c046e1b6d871a0ea423e068fb3cf81ad58f9fc6881278f7f1",
+      "requirementSha256": "e2d9fea5df6a906e3877909fe961d15a18204daa15426642f7a25801ccad75c2"
+    },
+    {
+      "id": "F2-INTERP-03",
+      "family": "F2",
+      "role": "residual",
+      "expected": "preserved-or-rejected",
+      "baselineStatus": "partially-reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-03.cs.txt",
+      "fixtureSha256": "632bd63c1ee8d2310a67ec1b7b3872ea785267ff6a37aa72d01cf48093efe641",
+      "requirementSha256": "0b3e762e77f3491ae6335ebd74f262edd2e34d544ef647ac3a2cd8d52c56c5e2"
+    },
+    {
+      "id": "F2-INTERP-04",
+      "family": "F2",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-04.cs.txt",
+      "fixtureSha256": "ff11d343cb9171f61354ba165db287d749d5a2be3f329b315d19cf678b02c79d",
+      "requirementSha256": "69df91ebb15e15d8d8ba7162f9295dace6d493b1f571b89103a08247d9841e2e"
+    },
+    {
+      "id": "F2-INTERP-05",
+      "family": "F2",
+      "role": "residual",
+      "expected": "rejected",
+      "baselineStatus": "partially-reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-05.calr.txt",
+      "fixtureSha256": "419003b22f7036b3fd20e56752be6727db8750d8833495a79497e32c932fd9a7",
+      "requirementSha256": "2deb475e3901f6f3c6959761823901c18228fce49d16f45ee140d382f617f2cb"
+    },
+    {
+      "id": "F2-INTERP-06",
+      "family": "F2",
+      "role": "residual",
+      "expected": "rejected",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-06.calr.txt",
+      "fixtureSha256": "f4554251c0e9a27ce3ea1bc392d6351500c84ecdf82aa69cef5b257023c6d35c",
+      "requirementSha256": "55477dac53e290e6ac635f0d5ee2bac53eb02393120eaf10890d790355bde977"
+    },
+    {
+      "id": "F2-INTERP-07",
+      "family": "F2",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F2-INTERP-07.cs.txt",
+      "fixtureSha256": "84fca44ef923afbc1623710353095d49bce1dc5ad533969ccc8ec0928cb7c33e",
+      "requirementSha256": "40b09dd7f10e42d7ba6adaf9c8521a134016135e39bbfabae8b415ecb73205a2"
+    },
+    {
+      "id": "F2-INTERP-08",
+      "family": "F2",
+      "role": "residual",
+      "expected": "native-or-preserved",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "f9e1e662fb7770a0284b6aa5f947ad20bc949911c642f482737b4733fc64d327"
+    },
+    {
+      "id": "F2-INTERP-09",
+      "family": "F2",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "4047ac60402e91acc1e1374732f2705b1e76d8b1841c4d33c009eb4cb22e07d6"
+    },
+    {
+      "id": "F2-INTERP-10",
+      "family": "F2",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "49e5ce2386c200b4801b74275645e20c2b80ba2315baf9c6ccbc20705c340532"
+    },
+    {
+      "id": "F3-LOCAL-01",
+      "family": "F3",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-01.cs.txt",
+      "fixtureSha256": "f323c3f90e8936fe5fec785a5083e5033ed2d0e0e50f83ca81020665379f1f4e",
+      "requirementSha256": "df7fb00615f6879a913260e3df9675a6cd211180dabeef0a29a750f56a31d35a"
+    },
+    {
+      "id": "F3-LOCAL-02",
+      "family": "F3",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-02.cs.txt",
+      "fixtureSha256": "1b7d5a367c5f8e3e30045d11b9bfdb55e28ed3bbf19cda346131b633adbbbddd",
+      "requirementSha256": "44b506989fef4de5c400fcd5ea858e2e124dc40aab2c893f80208e90ca8434b5"
+    },
+    {
+      "id": "F3-LOCAL-03",
+      "family": "F3",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-03.cs.txt",
+      "fixtureSha256": "677a392baa87e118ce915adf7fcec4c6983f3a4ba874c525674bbacfecfb8326",
+      "requirementSha256": "e00626a621b35d1e462c6e43a4b7b53ed1512c669328f230b328065d5baf1c45"
+    },
+    {
+      "id": "F3-LOCAL-04",
+      "family": "F3",
+      "role": "control",
+      "expected": "preserved",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-04.cs.txt",
+      "fixtureSha256": "535b0d42cd66296e5711ab8a6f698c9dbf8322ec06cf5766edb4299c65cde837",
+      "requirementSha256": "ba3b310384cae59d23a1e9cc509059c74675079d08275f455c6717157db58004"
+    },
+    {
+      "id": "F3-LOCAL-A1",
+      "family": "F3",
+      "role": "residual",
+      "expected": "native-or-rejected",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "87b6c8dcb73cfdf36b4630b8838d0fff52b27b8c45d29a7bf5e3e1cd96bfaa60"
+    },
+    {
+      "id": "F3-LOCAL-05",
+      "family": "F3",
+      "role": "control",
+      "expected": "preserved",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "ad59b04b92aad001b40be89434e45578ad3f61e82c54c0d7551ca37604e51cbc"
+    },
+    {
+      "id": "F4-ITER-01",
+      "family": "F4",
+      "role": "residual",
+      "expected": "preserved",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-01.cs.txt",
+      "fixtureSha256": "0a1a21be9eac4d82bcf51a02705607d6b9de6fe98c50e649a532ae8f63f5db9e",
+      "requirementSha256": "55b406d5e633ad89550848021b353a7766326416d88517581cdd7d1ebb4ae331"
+    },
+    {
+      "id": "F4-ITER-02",
+      "family": "F4",
+      "role": "residual",
+      "expected": "preserved",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-02.cs.txt",
+      "fixtureSha256": "3a7a1da86ae98ee3ab5c935f8849701e38e2bfdaa7adc10b95b1a394e38a3820",
+      "requirementSha256": "744dd5acdbd86bd94dd086c5e6cc8cec8fb6953f7c518a7e91cd8396d6d9c858"
+    },
+    {
+      "id": "F4-ITER-03",
+      "family": "F4",
+      "role": "control",
+      "expected": "rejected",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-03.calr.txt",
+      "fixtureSha256": "dd1de7e8703042dfb740ce1a58cc364c4b3f3af7b2c9571291397423613187e6",
+      "requirementSha256": "fbb2c71c1a397b11544f9116ed71409353d13f88361a60bf6ab1d741a9f783a3"
+    },
+    {
+      "id": "F4-ITER-04",
+      "family": "F4",
+      "role": "residual",
+      "expected": "preserved",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "e3e3afe563b66f53afe1e6b9d7a075df6588ed6916ff9e81abea0e9669e7256a"
+    },
+    {
+      "id": "F5-ARRAY-01",
+      "family": "F5",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-01.cs.txt",
+      "fixtureSha256": "984f6a6bf85c56b9120f7053d207e98c254fd486d65b9f27a938ca3ed4dac5ae",
+      "requirementSha256": "8c3575c39db5aab9c1584edfc91de0214ffb02954122400e762df17a3b45d9ee"
+    },
+    {
+      "id": "F5-ARRAY-02",
+      "family": "F5",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-02.cs.txt",
+      "fixtureSha256": "e235ce21ba8e2abca01e9c93d89f4beff240e384410307ee2fe0b9e5247bc674",
+      "requirementSha256": "92abd3dc59562413b792ab1b03ee6f89a4dcc2dfea2b20855df0eb2a7dbcec7f"
+    },
+    {
+      "id": "F5-ARRAY-03",
+      "family": "F5",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-03.cs.txt",
+      "fixtureSha256": "e90768eca604330a7e503944136d3a3309bc87730bf4a424527935b5da5d36f0",
+      "requirementSha256": "4b3fe4d1d214577ee9b21a6e9db4e64a0382fa29bfd7c300761296f35bbaf9e9"
+    },
+    {
+      "id": "F5-ARRAY-04",
+      "family": "F5",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-04.cs.txt",
+      "fixtureSha256": "2e7526e66a9977db37cb33f112e4c56da82517c424ba1520085c46d0023cbe51",
+      "requirementSha256": "743e88286039589695087ca45cbb5dc2e47955e9d19f38e694b9f7404a3399b3"
+    },
+    {
+      "id": "F5-ARRAY-05",
+      "family": "F5",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F5-ARRAY-05.cs.txt",
+      "fixtureSha256": "c7ed707f207831d97c47b0be757348365753a43978b233c226954d67dda3f806",
+      "requirementSha256": "1ce0b19177a66b99f6a2a19f3c330a0f795cd44e63fc35e0aef26485f3cc1b92"
+    },
+    {
+      "id": "F5-ARRAY-06",
+      "family": "F5",
+      "role": "decision",
+      "expected": "native-or-rejected",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "b05e3fd0cb1d628cc86ea0fb4c4528bbaf815665e0d2f2b8831a49eec5ddb318"
+    },
+    {
+      "id": "F6-REPORT-01",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "360bced6a1bda5c6d46c8b44a6eb7a00305394b8b4f2066ddab0b0dd6ed98b0f"
+    },
+    {
+      "id": "F6-REPORT-02",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "458c40980529e79728ef56e48c5db81db78a57f6f95a60b93475266f08781f05"
+    },
+    {
+      "id": "F6-REPORT-03",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "c4b2de060b7342c715c1f0d86d2baa995620c0389a0cd5f00e676f5750458eab"
+    },
+    {
+      "id": "F6-REPORT-04",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "488dd1995f18b2299f678b5f45a677ad3724f771be5d43ad1cddb0647e38aaa5"
+    },
+    {
+      "id": "F6-REPORT-05",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "77c5dd83c7b7ca60671b131320bdc4c0aff33897c436a22280ea981ec979d0d6"
+    },
+    {
+      "id": "F6-REPORT-06",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "7d0860f5d3ea13a109c890e8073d405d832162c3328684c9b7a10ef32201d553"
+    },
+    {
+      "id": "F6-REPORT-07",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "0eec7a023abc25b1eb703342b1ccfd67a0a52bfda381f741b57529d1833a8516"
+    },
+    {
+      "id": "F6-REPORT-08",
+      "family": "F6",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "1f38825274e5c74e74a4da923ad8b33adbcd64ac813285193c44791d6b1e5dfb"
+    },
+    {
+      "id": "F6-REPORT-09",
+      "family": "F6",
+      "role": "control",
+      "expected": "native",
+      "baselineStatus": "control-passes",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "ad351227bb6ac36045191088f8b755dc0f492af325846bbdcbe71d153f12168d"
+    },
+    {
+      "id": "F6-REPORT-10",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "d04b267712d0901cd328bdcbcf4f97d98c43d0a6c2eee6226eccc60740cffebf"
+    },
+    {
+      "id": "F6-REPORT-11",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "reproduces",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "06000c32ec50fe3c1e64510db178274fda1d3729f3750606e965365584e3cb85"
+    },
+    {
+      "id": "F6-REPORT-12",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "001add9f08e83140f6c5dbfb1874f16d7a0a046b446e999f61435140b65f46cc"
+    },
+    {
+      "id": "F6-REPORT-13",
+      "family": "F6",
+      "role": "residual",
+      "expected": "native",
+      "baselineStatus": "not-measured",
+      "fixture": null,
+      "fixtureSha256": null,
+      "requirementSha256": "961bdde5ba9a2763be36a6907ef93392ddc17db733a6d5c53354f2ea46baca22"
+    }
+  ],
+  "amendments": []
+}
