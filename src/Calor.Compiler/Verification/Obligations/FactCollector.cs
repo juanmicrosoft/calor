@@ -75,8 +75,8 @@ public sealed class FactCollector
     private static bool MayChangeHeap(IReadOnlyList<StatementNode> body)
         => body.SelectMany(DescendantsAndSelf).Any(node => IsHeapMutation(node) || IsHeapRead(node));
 
-    /// <summary>For a counterexample only: whether a fact may be stale at <paramref name="span"/>
-    /// through code outside that span (the obligation's own reads are its evaluation).</summary>
+    /// <summary>For a §PROOF counterexample only: whether a fact may be stale at <paramref name="span"/>
+    /// through code outside that span (the proof condition's own reads are its evaluation).</summary>
     public bool IsStaleBefore(ExpressionNode fact, TextSpan span)
         => HasOpaqueCode || ReferencedNames(fact).Overlaps(_assignedNames) || ReadsHeap(fact)
             && (_heapWritten || _heapReads.Any(read => read.Start < span.Start || read.End > span.End));

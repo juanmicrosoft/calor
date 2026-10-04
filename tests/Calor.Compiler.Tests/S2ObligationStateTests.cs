@@ -311,6 +311,29 @@ public sealed class S2ObligationStateTests
     }
 
     [Fact]
+    public void GetterReadInASubtypeInitializer_IsNotRefuted()
+    {
+        // Second verification-pass witness: the getter always returns 0, but the solver models
+        // the inherited field accessor as free; the read is not a proof condition.
+        const string source = """
+            §M{m1:M}
+              §RTYPE{r1:Zero:i32} (== # INT:0)
+              §CL{c1:Base:pub}
+                §FLD{i32:Trigger:pub}
+              §CL{c2:Box:pub}
+                §EXT{Base}
+                §PROP{pr1:Trigger:i32:pub}
+                  §GET
+                    §R INT:0
+              §F{f1:Probe:pub} (Box:box) -> void
+                §E{}
+                §B{value:Zero} box.Trigger
+            """;
+        var subtype = Single(Solve(source).Obligations, ObligationKind.Subtype);
+        Assert.NotEqual(ObligationStatus.Failed, subtype.Status);
+    }
+
+    [Fact]
     public void ParameterNamedResult_DoesNotDischargeTheRefinedReturn()
     {
         const string source = """
