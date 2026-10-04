@@ -58,6 +58,23 @@ public sealed class ObligationSolver : IDisposable
     {
         var sw = Stopwatch.StartNew();
 
+        // #1413 review: a parameter named `result` would share the return value's solver
+        // constant, turning the parameter's refinement into a "proof" of the return's.
+        if (obligation.Kind == ObligationKind.RefinementReturn && info.Parameters.Any(p => p.Name == "result"))
+        {
+            obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
+                "a parameter is named 'result', which collides with the return value. Runtime check kept.")));
+            return;
+        }
+
+        // #1413 review: raw C# in an entry predicate runs before the body and may change any state.
+        if (info.Facts.HasOpaqueEntry || info.Preconditions.Any(pre => FactCollector.IsOpaque(pre.Condition)))
+        {
+            obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
+                "an entry predicate contains raw C#, whose effects are not modeled. Runtime check kept.")));
+            return;
+        }
+
         // The condition, and every assumption the query could use, must be free of nesting.
         if (QuantifierNesting.ContainsNestedQuantifier(obligation.Condition)
             || info.Preconditions.Any(pre => QuantifierNesting.ContainsNestedQuantifier(pre.Condition))
@@ -147,15 +164,33 @@ public sealed class ObligationSolver : IDisposable
         {
             solver = new IsolatedSolver(_ctx, _timeoutMs);
 
-            // ASSUME: Assert all translatable preconditions
+            // #1413 (S1 OBL-MUTATION-KILL): a satisfying model is a counterexample only
+            // when the asserted state is exactly the program's state at the obligation.
+            // Every reason it is not is collected here; see the SAT handling below.
+            var inexact = new List<string>();
+            var isEntry = obligation.Kind == ObligationKind.RefinementEntry;
+
+            // ASSUME: Assert all translatable preconditions. A precondition describes the
+            // ENTRY state: it is dropped for any obligation after entry when the body may
+            // rebind a name it reads — asserting `§Q (> x -1)` after `§ASSIGN x -5`
+            // discharged `§PROOF (> x -1)` and deleted its guard (a false proof).
             var preconditionExprs = new List<BoolExpr>();
             foreach (var pre in info.Preconditions)
             {
+                if (!isEntry && info.Facts.IsStaleAfterEntry(pre.Condition))
+                {
+                    inexact.Add("a precondition reads a variable or heap state the body may change");
+                    continue;
+                }
                 var preExpr = translator.TranslateBoolExpr(pre.Condition);
                 if (preExpr != null)
                 {
                     preconditionExprs.Add(preExpr);
                     solver.Assert(preExpr);
+                }
+                else
+                {
+                    inexact.Add("a precondition could not be modeled");
                 }
             }
 
@@ -176,6 +211,10 @@ public sealed class ObligationSolver : IDisposable
                     {
                         solver.Assert(factExpr);
                     }
+                    else
+                    {
+                        inexact.Add("a path fact could not be modeled");
+                    }
                 }
             }
 
@@ -185,6 +224,7 @@ public sealed class ObligationSolver : IDisposable
             // preconditions themselves are inconsistent, refuse to discharge.
             if (solver.Check() == Status.UNSATISFIABLE)
             {
+                inexact.Add("the path facts at this obligation are inconsistent (it may be unreachable)");
                 solver.Dispose();
                 solver = new IsolatedSolver(_ctx, _timeoutMs);
                 foreach (var preExpr in preconditionExprs)
@@ -267,6 +307,34 @@ public sealed class ObligationSolver : IDisposable
                 return;
             }
 
+            if (status == Status.SATISFIABLE && !isEntry)
+            {
+                if (obligation.Kind == ObligationKind.RefinementReturn)
+                    inexact.Add("the returned value is not modeled (the solver's `result` is unconstrained)");
+                if (!info.Facts.IsExact(obligation.Span))
+                    inexact.Add("the path to the obligation is not fully modeled (an enclosing guard, loop, try, or earlier exit is not asserted)");
+                if (obligation.Kind == ObligationKind.ProofObligation
+                        ? info.Facts.IsStaleBefore(obligation.Condition, obligation.Span)
+                        : info.Facts.IsStaleAfterEntry(obligation.Condition))
+                    inexact.Add("the obligation reads a variable or heap state the body may change, whose current value is not modeled");
+                if (info.Preconditions.Select(pre => pre.Condition)
+                        .Concat(info.CollectedFacts.Where(f => f.AppliesTo(obligation.Span)).Select(f => f.Fact))
+                        .Append(obligation.Condition)
+                        .Any(e => FactCollector.ReferencedNames(e).Overlaps(info.Facts.DroppedFactNames)))
+                    inexact.Add("a dropped entry refinement constrains a variable this query reads");
+            }
+            if (status == Status.SATISFIABLE && inexact.Count > 0)
+            {
+                // Not a refutation: the model may describe a state the program never
+                // reaches at this obligation (S1 OBL-MUTATION-KILL/-BRANCH-FACTS/
+                // -REFINEMENT-RETURN spurious refutations). Report Unsupported — visible,
+                // guard kept, no compile error built on a fabricated counterexample.
+                obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
+                    "No counterexample established: " + string.Join("; ", inexact.Distinct())
+                    + ". Runtime check kept.")));
+                return;
+            }
+
             obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.SolverVerdict(
                 status, solver.CheckedSolver, solver.TranslateVariables(translator.Variables), SatPolarity.SatIsRefutation)));
         }
@@ -298,6 +366,13 @@ public sealed class ObligationSolver : IDisposable
             type => type.Name,
             type => type.BaseTypeName,
             StringComparer.Ordinal);
+        var refinementNodes = new Dictionary<string, RefinementTypeNode>(StringComparer.Ordinal);
+        foreach (var type in module.RefinementTypes)
+            refinementNodes[type.Name] = type;
+        var refinementPredicates = refinementNodes.ToDictionary(
+            pair => pair.Key,
+            pair => ObligationGenerator.EffectiveRefinementPredicate(pair.Value, refinementNodes),
+            StringComparer.Ordinal);
 
         foreach (var func in module.Functions)
         {
@@ -307,7 +382,7 @@ public sealed class ObligationSolver : IDisposable
 
             // Collect flow-sensitive facts (loop bounds, etc.)
             var factCollector = new FactCollector();
-            factCollector.CollectFromFunction(func);
+            factCollector.CollectFromFunction(func, refinementPredicates);
 
             // Add size parameter variables for indexed-typed parameters
             var extraVars = new List<(string Name, string TypeName)>();
@@ -324,6 +399,8 @@ public sealed class ObligationSolver : IDisposable
                     extraVars.Add((itype.SizeParam, "i32"));
 
                     // If the indexed type has a constraint, add it as a fact
+                    if (factCollector.AssignedNames.Contains(param.Name))
+                        factCollector.MarkAssigned(itype.SizeParam);
                     if (itype.Constraint != null)
                     {
                         factCollector.AddFunctionWideFact(
@@ -336,7 +413,7 @@ public sealed class ObligationSolver : IDisposable
                 parameters,
                 func.Preconditions,
                 func.Output?.TypeName,
-                factCollector.ScopedFacts,
+                factCollector,
                 extraVars,
                 refinementTypes);
         }
@@ -349,7 +426,7 @@ public sealed class ObligationSolver : IDisposable
                     .Select(p => (p.Name, p.TypeName))
                     .ToList();
                 var factCollector = new FactCollector();
-                factCollector.CollectFromFunction(method);
+                factCollector.CollectFromFunction(method, refinementPredicates);
                 var extraVars = new List<(string Name, string TypeName)>();
                 foreach (var param in method.Parameters)
                 {
@@ -361,6 +438,8 @@ public sealed class ObligationSolver : IDisposable
                     if (indexedTypes.TryGetValue(baseTypeName, out var indexedType))
                     {
                         extraVars.Add((indexedType.SizeParam, "i32"));
+                        if (factCollector.AssignedNames.Contains(param.Name))
+                            factCollector.MarkAssigned(indexedType.SizeParam);
                         if (indexedType.Constraint != null)
                         {
                             factCollector.AddFunctionWideFact(
@@ -375,7 +454,7 @@ public sealed class ObligationSolver : IDisposable
                     parameters,
                     method.Preconditions,
                     method.Output?.TypeName,
-                    factCollector.ScopedFacts,
+                    factCollector,
                     extraVars,
                     refinementTypes);
             }
@@ -389,12 +468,12 @@ public sealed class ObligationSolver : IDisposable
                     .Select(p => (p.Name, p.TypeName))
                     .ToList();
                 var factCollector = new FactCollector();
-                factCollector.CollectFromStatements(constructor.Body);
+                factCollector.CollectFromCallable(constructor.Parameters, constructor.Body, refinementPredicates);
                 result[constructor.Id] = new FunctionInfo(
                     parameters,
                     constructor.Preconditions,
                     null,
-                    factCollector.ScopedFacts,
+                    factCollector,
                     new List<(string, string)>(),
                     refinementTypes);
             }
@@ -405,7 +484,7 @@ public sealed class ObligationSolver : IDisposable
                     .Select(p => (p.Name, p.TypeName))
                     .ToList();
                 var factCollector = new FactCollector();
-                factCollector.CollectFromMethod(method);
+                factCollector.CollectFromMethod(method, refinementPredicates);
                 var extraVars = new List<(string Name, string TypeName)>();
                 foreach (var param in method.Parameters)
                 {
@@ -417,6 +496,8 @@ public sealed class ObligationSolver : IDisposable
                     if (indexedTypes.TryGetValue(baseTypeName, out var indexedType))
                     {
                         extraVars.Add((indexedType.SizeParam, "i32"));
+                        if (factCollector.AssignedNames.Contains(param.Name))
+                            factCollector.MarkAssigned(indexedType.SizeParam);
                         if (indexedType.Constraint != null)
                         {
                             factCollector.AddFunctionWideFact(
@@ -431,7 +512,7 @@ public sealed class ObligationSolver : IDisposable
                     parameters,
                     method.Preconditions,
                     method.Output?.TypeName,
-                    factCollector.ScopedFacts,
+                    factCollector,
                     extraVars,
                     refinementTypes);
             }
@@ -442,7 +523,7 @@ public sealed class ObligationSolver : IDisposable
                     .Select(p => (p.Name, p.TypeName))
                     .ToList();
                 var factCollector = new FactCollector();
-                factCollector.CollectFromStatements(operatorOverload.Body);
+                factCollector.CollectFromCallable(operatorOverload.Parameters, operatorOverload.Body, refinementPredicates);
                 var extraVars = new List<(string Name, string TypeName)>();
                 foreach (var param in operatorOverload.Parameters)
                 {
@@ -454,6 +535,8 @@ public sealed class ObligationSolver : IDisposable
                     if (indexedTypes.TryGetValue(baseTypeName, out var indexedType))
                     {
                         extraVars.Add((indexedType.SizeParam, "i32"));
+                        if (factCollector.AssignedNames.Contains(param.Name))
+                            factCollector.MarkAssigned(indexedType.SizeParam);
                         if (indexedType.Constraint != null)
                         {
                             factCollector.AddFunctionWideFact(
@@ -468,7 +551,7 @@ public sealed class ObligationSolver : IDisposable
                     parameters,
                     operatorOverload.Preconditions,
                     operatorOverload.Output?.TypeName,
-                    factCollector.ScopedFacts,
+                    factCollector,
                     extraVars,
                     refinementTypes);
             }
@@ -481,9 +564,12 @@ public sealed class ObligationSolver : IDisposable
         List<(string Name, string TypeName)> Parameters,
         IReadOnlyList<RequiresNode> Preconditions,
         string? OutputType,
-        List<ScopedFact> CollectedFacts,
+        FactCollector Facts,
         List<(string Name, string TypeName)> ExtraVariables,
-        IReadOnlyDictionary<string, string> RefinementTypes);
+        IReadOnlyDictionary<string, string> RefinementTypes)
+    {
+        public List<ScopedFact> CollectedFacts => Facts.ScopedFacts;
+    }
 
     private static string ResolveRefinementBaseType(
         string typeName,
