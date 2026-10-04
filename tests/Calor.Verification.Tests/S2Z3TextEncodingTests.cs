@@ -119,9 +119,68 @@ public sealed class S2Z3TextEncodingTests
             """;
         var outcome = VerifySinglePostcondition(source).EffectiveOutcome;
         Assert.Equal(ProofStatus.Refuted, outcome.Status);
-        // The model's s has at least two characters (with its quotes, at least 4).
+        // The model's s (Z3 rendering, \u{h} escapes decoded) has at least two characters.
         var s = Assert.Single(outcome.Counterexample!.Bindings, binding => binding.Name == "s");
-        Assert.True(s.Value.Length >= 4, s.Value);
+        var decoded = System.Text.RegularExpressions.Regex.Replace(
+            s.Value.Trim('"'), @"\\u\{([0-9a-fA-F]+)\}", m => ((char)Convert.ToInt32(m.Groups[1].Value, 16)).ToString());
+        Assert.True(decoded.Length >= 2, s.Value);
+    }
+
+    [Fact]
+    public void SubstringOverALocal_WithoutPrecondition_IsNotRefuted()
+    {
+        // Review round 2 witness: every normal return produces 1; s = "" throws in .NET.
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:pub} (str:s) -> i32
+                §E{}
+                §S (== result INT:1)
+                §B{i:i32} INT:1
+                §R (len (substr s i INT:1))
+            """;
+        Assert.NotEqual(ProofStatus.Refuted, VerifySinglePostcondition(source).EffectiveOutcome.Status);
+    }
+
+    [Fact]
+    public void NullSatisfiablePrecondition_IsNotReportedVacuous()
+    {
+        // Review round 2 witness: s = null satisfies the precondition at runtime; the solver's
+        // non-null strings make it unsatisfiable.
+        string? s = null;
+        Assert.True(string.IsNullOrEmpty(s) && s != "");
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:pub} (str:s) -> i32
+                §E{}
+                §Q (|| (!= (len STR:"\u00e9") INT:1) (&& (isempty s) (!= s STR:"")))
+                §S (== result INT:1)
+                §R INT:0
+            """;
+        var outcome = VerifySinglePostcondition(source).EffectiveOutcome;
+        Assert.False(outcome.Status == ProofStatus.Proven && outcome.IsVacuous);
+        Assert.Equal(ProofStatus.Unsupported, outcome.Status);
+    }
+
+    [Fact]
+    public void DollarQuantifierVariables_AreRefused()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+        Assert.True(translator.DeclareVariable("a", "i32[]"));
+        var diagnostics = new DiagnosticBag();
+        var module = new Calor.Compiler.Parsing.Parser(new Calor.Compiler.Parsing.Lexer("""
+            §M{m1:M}
+              §F{f1:P:pub} () -> i32
+                §E{}
+                §S (forall ((q i32)) (>= q INT:0))
+                §R INT:0
+            """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        var forall = (Calor.Compiler.Ast.ForallExpressionNode)module.Functions[0].Postconditions[0].Condition;
+        var renamed = new Calor.Compiler.Ast.ForallExpressionNode(
+            forall.Span,
+            [new Calor.Compiler.Ast.QuantifierVariableNode(forall.Span, "a$length", "u32")],
+            forall.Body);
+        Assert.Null(translator.TranslateBoolExpr(renamed));
     }
 
     [Fact]

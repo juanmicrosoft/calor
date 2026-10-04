@@ -59,7 +59,9 @@ public sealed class Z3Verifier : IDisposable
     /// produced genuine false <c>Proven</c>s that ELIDED a failing runtime check on the shipped
     /// <c>calor run --verify</c> path: <c>len(s)=0 ⟺ s=""</c> is a Z3 tautology while in C#
     /// <c>null</c> satisfies <c>IsNullOrEmpty</c> and <c>null == ""</c> is false; and
-    /// <c>"é".Length</c> is 1 in .NET, 2 under the byte model.
+    /// <c>"é".Length</c> is 1 in .NET, 2 under the byte model. Since #1413 literals are encoded
+    /// one code unit per character (\u{h}), so the length gap is closed; the null gap remains,
+    /// and this content-stable text is kept unchanged because assumption sets hash on it.
     /// <para>Unlike D4 and D9 these are <b>not closable by refusing an operation</b> — every total
     /// axiom of the sort is affected — so the proof is <b>demoted</b> rather than suppressed, and
     /// <c>Assumed</c> never elides. Lifting it is tracked by #875.</para>
@@ -72,6 +74,11 @@ public sealed class Z3Verifier : IDisposable
     private readonly bool _checkIntegerOverflow;
     private readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> _userTypeRegistry;
     private bool _disposed;
+
+    /// <summary>#1413 review: an unsatisfiable precondition set containing a null-tolerant string,
+    /// array, or user-type form may be satisfiable by a null the solver cannot represent.</summary>
+    private const string NonNullModelUnsat =
+        "The precondition set is unsatisfiable only in the solver's non-null string/reference model (a null may satisfy it); no vacuity or unsatisfiability is claimed. Runtime check kept.";
 
     internal static bool ArithmeticSafetyEntailed(Context context, IsolatedSolver solver, IEnumerable<BoolExpr> conditions)
     {
@@ -164,6 +171,9 @@ public sealed class Z3Verifier : IDisposable
 
             var status = solver.Check();
             var warnings = translator.Warnings.Count > 0 ? translator.Warnings.ToList() : null;
+            if (status == Status.UNSATISFIABLE && (translator.TouchedStringTheory || translator.TouchedNullableReferenceSort) && translator.TouchedNullTolerantReferenceForm)
+                return ContractVerificationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(NonNullModelUnsat)), warnings, sw.Elapsed);
 
             return ContractVerificationResult.FromOutcome(
                 ProofOutcome.Assign(ProofEvidence.SolverVerdict(
@@ -300,6 +310,9 @@ public sealed class Z3Verifier : IDisposable
                 }
                 if (preSolver.Check() == Status.UNSATISFIABLE)
                 {
+                    if ((translator.TouchedStringTheory || translator.TouchedNullableReferenceSort) && translator.TouchedNullTolerantReferenceForm)
+                        return ContractVerificationResult.FromOutcome(
+                            ProofOutcome.Assign(ProofEvidence.Unsupported(NonNullModelUnsat)), Duration: sw.Elapsed);
                     return ContractVerificationResult.FromOutcome(
                         ProofOutcome.Assign(ProofEvidence.VacuousProof(
                             "Precondition set is unsatisfiable: the postcondition holds vacuously because no valid call exists. Runtime check kept.")),
@@ -559,7 +572,7 @@ public sealed class Z3Verifier : IDisposable
                 if (stringModelAssumed)
                 {
                     assumptions.Add(StringModelAssumption);
-                    reasons.Add("the obligation is carried by the solver's string theory, whose strings are non-null and byte-counted while .NET's are nullable and UTF-16-code-unit-counted (v0.12, D3/D12)");
+                    reasons.Add("the obligation is carried by the solver's string theory, whose strings are non-null while .NET's are nullable (v0.12, D3/D12); literals are encoded per UTF-16 code unit since #1413, and the canonical assumption text is kept for hash stability");
                 }
                 if (referenceModelAssumed)
                 {
@@ -1014,8 +1027,13 @@ public static class FunctionBodyEncoder
         Context ctx,
         IReadOnlyList<StatementNode> statements,
         List<BoolExpr> constraints,
-        bool conditional)
+        bool conditional,
+        Dictionary<string, ExpressionNode>? bindings = null)
     {
+        // #1413 review: immutable bindings are substituted (as the encoder does) so that a side
+        // condition over a local translates; the encoder refuses mutable bindings anyway.
+        var env = new Dictionary<string, ExpressionNode>(bindings ?? new(), StringComparer.Ordinal);
+        ExpressionNode Bound(ExpressionNode expression) => SubstituteBindings(expression, env).Result ?? expression;
         foreach (var stmt in statements)
         {
             switch (stmt)
@@ -1023,7 +1041,7 @@ public static class FunctionBodyEncoder
                 case ReturnStatementNode ret:
                     if (ret.Expression != null)
                     {
-                        var retFailure = CollectDivisorsFromExpression(translator, ctx, ret.Expression, constraints, conditional);
+                        var retFailure = CollectDivisorsFromExpression(translator, ctx, Bound(ret.Expression), constraints, conditional);
                         if (retFailure != null)
                             return retFailure;
                     }
@@ -1039,9 +1057,11 @@ public static class FunctionBodyEncoder
                     // evaluation order stays here). An unused dividing initializer
                     // still throws at runtime on a zero divisor, so its side
                     // condition genuinely holds on every normal-return path.
-                    var bindFailure = CollectDivisorsFromExpression(translator, ctx, bind.Initializer, constraints, conditional);
+                    var bindFailure = CollectDivisorsFromExpression(translator, ctx, Bound(bind.Initializer), constraints, conditional);
                     if (bindFailure != null)
                         return bindFailure;
+                    if (!bind.IsMutable)
+                        env[bind.Name] = Bound(bind.Initializer);
                     break;
 
                 case IfStatementNode ifStmt:
@@ -1050,24 +1070,24 @@ public static class FunctionBodyEncoder
                     // reached; branch bodies, elseif conditions (evaluated only when
                     // prior conditions were false), the else body, and every statement
                     // AFTER the if (reached only via fall-through) are conditional.
-                    var condFailure = CollectDivisorsFromExpression(translator, ctx, ifStmt.Condition, constraints, conditional);
+                    var condFailure = CollectDivisorsFromExpression(translator, ctx, Bound(ifStmt.Condition), constraints, conditional);
                     if (condFailure != null)
                         return condFailure;
-                    var thenFailure = CollectDivisorsFromStatements(translator, ctx, ifStmt.ThenBody, constraints, conditional: true);
+                    var thenFailure = CollectDivisorsFromStatements(translator, ctx, ifStmt.ThenBody, constraints, conditional: true, env);
                     if (thenFailure != null)
                         return thenFailure;
                     foreach (var clause in ifStmt.ElseIfClauses)
                     {
-                        var clauseCondFailure = CollectDivisorsFromExpression(translator, ctx, clause.Condition, constraints, conditional: true);
+                        var clauseCondFailure = CollectDivisorsFromExpression(translator, ctx, Bound(clause.Condition), constraints, conditional: true);
                         if (clauseCondFailure != null)
                             return clauseCondFailure;
-                        var clauseFailure = CollectDivisorsFromStatements(translator, ctx, clause.Body, constraints, conditional: true);
+                        var clauseFailure = CollectDivisorsFromStatements(translator, ctx, clause.Body, constraints, conditional: true, env);
                         if (clauseFailure != null)
                             return clauseFailure;
                     }
                     if (ifStmt.ElseBody != null)
                     {
-                        var elseFailure = CollectDivisorsFromStatements(translator, ctx, ifStmt.ElseBody, constraints, conditional: true);
+                        var elseFailure = CollectDivisorsFromStatements(translator, ctx, ifStmt.ElseBody, constraints, conditional: true, env);
                         if (elseFailure != null)
                             return elseFailure;
                     }
@@ -1189,10 +1209,9 @@ public static class FunctionBodyEncoder
                 // divisor: an unconditional range condition is a side condition; one in a
                 // conditionally-evaluated position is not modeled.
                 var range = translator.GetStringRangeCondition(sop);
-                // A range over a body-local name cannot be translated here (the encoder
-                // substitutes bindings later): no side condition, which only weakens a
-                // refutation's guarantee, never a proof's.
-                if (range == null || range.IsTrue)
+                if (range == null)
+                    return "a string operation's index range could not be modeled";
+                if (range.IsTrue)
                     return null;
                 if (conditional)
                 {

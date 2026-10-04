@@ -1110,6 +1110,10 @@ public sealed class ContractTranslator
 
     private Expr? CreateVariableForType(string name, string typeName)
     {
+        // '$' names are reserved for synthetic solver variables (every caller-named path,
+        // including quantifier bound variables, comes through here).
+        if (name.Contains('$'))
+            return null;
         // Normalize type names
         var normalizedType = NormalizeTypeName(typeName);
 
@@ -1257,6 +1261,27 @@ public sealed class ContractTranslator
     /// enumerating its members by hand is what has failed repeatedly.</para>
     /// </summary>
     public bool TouchedNullableReferenceSort { get; private set; }
+
+    /// <summary>
+    /// #1413: true once a form was translated that a null string or reference can satisfy
+    /// without throwing (equality over a string or reference sort, <c>Equals</c>,
+    /// <c>IsNullOrEmpty</c>). Every other string/reference form throws on null, so a formula
+    /// without one cannot be satisfied by a null the solver does not model, and its
+    /// unsatisfiability carries over to runtime.
+    /// </summary>
+    public bool TouchedNullTolerantReferenceForm { get; private set; }
+
+    private void NoteNullTolerant(params Expr[] operands)
+    {
+        // A literal or a term built only from literals is never null.
+        if (operands.Any(HasFreeSymbol))
+            TouchedNullTolerantReferenceForm = true;
+    }
+
+    private static bool HasFreeSymbol(Expr expr)
+        => expr.IsVar
+            || (expr.IsApp && (expr.FuncDecl.DeclKind == Microsoft.Z3.Z3_decl_kind.Z3_OP_UNINTERPRETED
+                || expr.Args.Any(HasFreeSymbol)));
 
     /// <summary>
     /// Uninterpreted sorts stand in for user types, which are nullable reference types in C# —
@@ -1588,6 +1613,8 @@ public sealed class ContractTranslator
             var promoted = ApplyBinaryNumericPromotions(bvLeft, bvRight);
             return _ctx.MkEq(promoted.Left, promoted.Right);
         }
+        if (left is not (BoolExpr or IntExpr or RealExpr or FPExpr))
+            NoteNullTolerant(left, right);
         return _ctx.MkEq(left, right);
     }
 
@@ -1765,6 +1792,7 @@ public sealed class ContractTranslator
         if (str1 is not SeqExpr str1Expr || str2 is not SeqExpr str2Expr)
             return null;
 
+        NoteNullTolerant(str1Expr, str2Expr);
         return _ctx.MkEq(str1Expr, str2Expr);
     }
 
@@ -1787,6 +1815,7 @@ public sealed class ContractTranslator
             return null;
 
         // Check if length equals 0
+        NoteNullTolerant(seqExpr);
         var length = _ctx.MkLength(seqExpr);
         return _ctx.MkEq(length, _ctx.MkInt(0));
     }
