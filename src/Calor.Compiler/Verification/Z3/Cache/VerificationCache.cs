@@ -309,7 +309,7 @@ public sealed class VerificationCache : IDisposable
             return hash;
 
         return Convert.ToHexString(
-                SHA256.HashData(Encoding.UTF8.GetBytes($"{_keyScope}\n{hash}")))
+                SHA256.HashData(ContractHasher.LosslessBytes($"{_keyScope}\n{hash}")))
             .ToLowerInvariant();
     }
 
