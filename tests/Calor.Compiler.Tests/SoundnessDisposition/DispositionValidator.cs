@@ -41,8 +41,9 @@ internal static class DispositionValidator
         JsonNode s1RowStatus,
         string registrationCommit,
         bool closing,
-        ClosureEvidence? evidence = null,
-        IReadOnlyDictionary<(string Baseline, string Row), int>? validatedProofCounts = null)
+        ClosureEvidence? evidence,
+        IReadOnlyDictionary<(string Baseline, string Row), int> validatedProofCounts,
+        IReadOnlyCollection<string> requiredDiscoveryIds)
     {
         var v = new List<Violation>();
         void Add(string code, string message) => v.Add(new Violation(code, message));
@@ -188,9 +189,10 @@ internal static class DispositionValidator
                 if (string.IsNullOrWhiteSpace(Str(row, "reason")))
                     Add("D011", $"{baseline}: row {rowId} has no reason");
                 // D018: a VALIDATED row's proof-case count is recomputed from the S1 case results.
-                if (status == "CLEAN-WITHIN-BUDGET" && validatedProofCounts != null
+                if (status == "CLEAN-WITHIN-BUDGET"
                     && (row!["validatedProofCases"] is not JsonValue proofs || !proofs.TryGetValue<int>(out var count)
-                        || count != validatedProofCounts.GetValueOrDefault((baseline, rowId))))
+                        || !validatedProofCounts.TryGetValue((baseline, rowId), out var expectedCount)
+                        || count != expectedCount))
                     Add("D018", $"{baseline}: row {rowId} validatedProofCases is missing or differs from the S1 case results");
                 if ((disposition == "VALIDATED") != (status == "CLEAN-WITHIN-BUDGET"))
                     Add("D004", $"{baseline}: row {rowId} ({status}) cannot be {disposition}; VALIDATED is exactly the CLEAN-WITHIN-BUDGET rows");
@@ -245,6 +247,12 @@ internal static class DispositionValidator
                     referenced[repairId].Add(disposition!);
             }
         }
+        // D014: every discovery the caller pins is present exactly once, by stable id, so a known
+        // (e.g. milestone-failing) discovery cannot disappear from the record.
+        var discoveryIds = (record["discoveryFindings"]?.AsArray() ?? new JsonArray()).Select(d => Str(d, "id")).ToList();
+        foreach (var requiredId in requiredDiscoveryIds)
+            if (discoveryIds.Count(x => x == requiredId) != 1)
+                Add("D014", $"pinned discovery {requiredId} must be dispositioned exactly once");
         foreach (var issue in required)
         {
             var count = discoveryIssues.Count(x => x == issue);
@@ -287,8 +295,10 @@ internal static class DispositionValidator
             }
             if (status is not ("open" or "merged"))
                 Add("D008", $"{id}: status must be open, merged, or decision-required");
-            if (pr is not > 0 || string.IsNullOrWhiteSpace(Str(repair, "branch")) || witnesses.Length == 0)
-                Add("D008", $"{id}: an open or merged repair needs a PR, a branch, and a regression witness");
+            var branch = Str(repair, "branch");
+            if (pr is not > 0 || branch is null || !branch.StartsWith("milestone-0.24/s2-1413-", StringComparison.Ordinal)
+                || witnesses.Length == 0)
+                Add("D008", $"{id}: an open or merged repair needs a PR, an S2 branch (milestone-0.24/s2-1413-*), and a regression witness");
             var mergeCommit = Str(repair, "mergeCommit");
             if (status == "merged" && (mergeCommit is null || !FullSha.IsMatch(mergeCommit)))
                 Add("D008", $"{id}: a merged repair needs its full merge commit SHA");
@@ -302,10 +312,15 @@ internal static class DispositionValidator
                 {
                     if (witnesses.Any(w => !evidence.FileExistsAtCommit(mergeCommit, w)))
                         Add("D010", $"{id}: a regression witness is missing from the merge commit");
-                    if (evidence.CommitMessage(mergeCommit) is not { } message
-                        || !Regex.IsMatch(message, $@"#{pr}\b", RegexOptions.CultureInvariant))
-                        Add("D010", $"{id}: the merge commit does not name PR #{pr}");
+                    // The merge commit must be GitHub's merge of exactly this PR from this S2 branch.
+                    var firstLine = evidence.CommitMessage(mergeCommit)?.Split('\n')[0].Trim();
+                    if (branch is null || firstLine is null || !Regex.IsMatch(firstLine,
+                            $@"^Merge pull request #{pr} from [^/\s]+/{Regex.Escape(branch)}$", RegexOptions.CultureInvariant))
+                        Add("D010", $"{id}: the merge commit is not the merge of PR #{pr} from {branch}");
                 }
+                if (!string.IsNullOrWhiteSpace(Str(repair, "reviewRoundOverrun"))
+                    && string.IsNullOrWhiteSpace(Str(repair, "overrunAmendment")))
+                    Add("D010", $"{id}: review-round overrun without a recorded amendment (stopping rule 1)");
             }
         }
 

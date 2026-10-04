@@ -240,7 +240,7 @@ record = {
     'closure': {
         'status': 'OPEN',
         'result': None,
-        'note': 'OPEN until every repair is merged (status "merged" with its merge commit on main and its regression witnesses present) and R-NUM is decided. At closure, result is SUCCESS (no MILESTONE-FAILED anywhere) or MILESTONE-FAILED (required if any finding or discovery is MILESTONE-FAILED); only SUCCESS satisfies terminal predicates 4-5.',
+        'note': 'OPEN until every repair is merged (status "merged" with its merge commit on main, being the GitHub merge of its PR from its S2 branch, and containing its regression witnesses), R-NUM is decided, and the R-OBL review overrun has a recorded amendment (overrunAmendment). The discovery ids are pinned by the validator tests, so a discovery is resolved by a repair or amendment, never deleted. At closure, result is SUCCESS (no MILESTONE-FAILED anywhere) or MILESTONE-FAILED (required if any finding or discovery is MILESTONE-FAILED); only SUCCESS satisfies terminal predicates 4-5.',
     },
     'capacity': {'ceiling': 's2-repairs', 'maxRepairs': 6, 'maxNonTestChangedLinesPerRepair': 600,
                  'used': len(repairs), 'openedRepairPRs': 5, 'reservedSlots': 1,

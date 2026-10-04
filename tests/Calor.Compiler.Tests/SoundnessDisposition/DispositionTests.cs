@@ -55,9 +55,16 @@ public sealed class DispositionTests
         (sha, path) => Git($"cat-file -e {sha}:{path}").ExitCode == 0,
         sha => Git($"log -1 --format=%B {sha}") is (0, var message) ? message : null);
 
-    /// <summary>Every check passes; the message names every PR the merged record uses.</summary>
-    private static readonly DispositionValidator.ClosureEvidence AcceptAll = new(
-        _ => true, (_, _) => true, _ => "Merge pull request #1494 #1495 #1496 #1497 #1498 #9999");
+    /// <summary>Every check passes; each merge commit is the GitHub merge of its own repair PR.</summary>
+    private static DispositionValidator.ClosureEvidence AcceptAll(JsonNode record) => new(
+        _ => true, (_, _) => true,
+        sha => record["repairs"]!.AsArray()
+            .Where(r => r!["mergeCommit"]?.GetValue<string>() == sha)
+            .Select(r => $"Merge pull request #{r!["pr"]} from juanmicrosoft/{r["branch"]}\n\nbody")
+            .FirstOrDefault());
+
+    /// <summary>Discoveries the record must keep (by id), pinned outside the record.</summary>
+    private static readonly string[] PinnedDiscoveries = ["D-1493", "D-OBL-PROOF-GETTER", "D-OBL-THROWING-PREDECESSOR"];
 
     private static Dictionary<(string Baseline, string Row), int> ValidatedProofCounts()
     {
@@ -86,7 +93,8 @@ public sealed class DispositionTests
             FindString(Load("docs/plans/evidence/s1-1311/run2/pins.json"), "registrationCommit")!,
             closing,
             evidence ?? RepositoryEvidence,
-            ValidatedProofCounts());
+            ValidatedProofCounts(),
+            PinnedDiscoveries);
 
     private static void AssertCodes(IReadOnlyList<DispositionValidator.Violation> violations, params string[] codes)
         => Assert.Equal(
@@ -106,20 +114,27 @@ public sealed class DispositionTests
     private static JsonNode MergedRecord()
     {
         var record = Record();
+        var index = 0;
         foreach (var repair in record["repairs"]!.AsArray())
         {
             repair!["status"] = "merged";
-            repair["mergeCommit"] = new string('a', 40);
+            repair["mergeCommit"] = (index++).ToString("x").PadLeft(40, 'a');
             repair["pr"] ??= 9999;
             repair["branch"] ??= "milestone-0.24/s2-1413-fix-example";
+            if (repair["reviewRoundOverrun"] != null)
+                repair["overrunAmendment"] = "example: contract amendment recording the R-OBL overrun";
             if (repair["regressionWitness"]!.AsArray().Count == 0)
                 repair["regressionWitness"]!.AsArray().Add("tests/example.cs");
         }
-        // Discoveries that are not required (the review-found residuals) are dropped, so the
-        // positive control describes a record that has resolved them.
-        var discoveries = record["discoveryFindings"]!.AsArray();
-        foreach (var d in discoveries.Where(d => d!["issue"]!.GetValue<int>() != 1493).ToList())
-            discoveries.Remove(d);
+        // The review-found discoveries are kept (pinned) and resolved through a repair that lists
+        // them, as an accepted demotion would.
+        var obl = Repair(record, "R-OBL");
+        foreach (var d in record["discoveryFindings"]!.AsArray().Where(d => d!["disposition"]!.GetValue<string>() == "MILESTONE-FAILED"))
+        {
+            d!["disposition"] = "DEMOTE-IN-0.24";
+            d["repair"] = "R-OBL";
+            obl["discoveries"]!.AsArray().Add(d["id"]!.GetValue<string>());
+        }
         record["closure"]!["status"] = "CLOSED";
         record["closure"]!["result"] = "SUCCESS";
         return record;
@@ -170,7 +185,44 @@ public sealed class DispositionTests
 
     [Fact]
     public void FullyMergedRecord_Closes()
-        => AssertCodes(Validate(MergedRecord(), closing: true, AcceptAll));
+    {
+        var record = MergedRecord();
+        AssertCodes(Validate(record, closing: true, AcceptAll(record)));
+    }
+
+    [Fact]
+    public void CommittedDiscoveries_CloseOnlyAsMilestoneFailed()
+    {
+        // With the committed MILESTONE-FAILED discoveries unresolved, only a failed closure is valid.
+        var record = Record();
+        var merged = MergedRecord();
+        record["repairs"] = merged["repairs"]!.DeepClone();
+        Repair(record, "R-OBL")["discoveries"] = new JsonArray();
+        record["closure"]!["status"] = "CLOSED";
+        record["closure"]!["result"] = "SUCCESS";
+        AssertCodes(Validate(record, closing: true, AcceptAll(record)), "D016");
+        record["closure"]!["result"] = "MILESTONE-FAILED";
+        AssertCodes(Validate(record, closing: true, AcceptAll(record)));
+    }
+
+    [Fact]
+    public void D014_PinnedDiscoveryDeleted()
+    {
+        var record = Record();
+        var discoveries = record["discoveryFindings"]!.AsArray();
+        discoveries.Remove(discoveries.Single(d => d!["id"]!.GetValue<string>() == "D-OBL-PROOF-GETTER"));
+        AssertCodes(Validate(record), "D014");
+    }
+
+    [Fact]
+    public void D010_ReviewOverrunWithoutAmendment_DoesNotClose()
+    {
+        var record = MergedRecord();
+        Repair(record, "R-OBL").Remove("overrunAmendment");
+        var violations = Validate(record, closing: true, AcceptAll(record));
+        AssertCodes(violations, "D010");
+        Assert.Contains(violations, v => v.Message.Contains("R-OBL: review-round overrun without a recorded amendment"));
+    }
 
     [Fact]
     public void FailedRecord_ClosesOnlyAsMilestoneFailed()
@@ -178,10 +230,10 @@ public sealed class DispositionTests
         var record = MergedRecord();
         Finding(record, "B1", "F-B1-001")["disposition"] = "MILESTONE-FAILED";
         Row(record, "B1", "NUM-NARROW-ARITH")["disposition"] = "MILESTONE-FAILED";
-        AssertCodes(Validate(record, closing: true, AcceptAll), "D016");
+        AssertCodes(Validate(record, closing: true, AcceptAll(record)), "D016");
 
         record["closure"]!["result"] = "MILESTONE-FAILED";
-        AssertCodes(Validate(record, closing: true, AcceptAll));
+        AssertCodes(Validate(record, closing: true, AcceptAll(record)));
     }
 
     // ------------------------------------------------------------- negative controls
@@ -394,8 +446,9 @@ public sealed class DispositionTests
     [Fact]
     public void D010_CommitReachableOnlyFromABranch_DoesNotClose()
     {
-        var violations = Validate(MergedRecord(), closing: true,
-            AcceptAll with { CommitIsOnMain = _ => false });
+        var record = MergedRecord();
+        var violations = Validate(record, closing: true,
+            AcceptAll(record) with { CommitIsOnMain = _ => false });
         AssertCodes(violations, "D010");
         Assert.Contains(violations, v => v.Message.Contains("R-OBL: merge commit is not on main"));
     }
@@ -403,8 +456,9 @@ public sealed class DispositionTests
     [Fact]
     public void D010_WitnessAbsentFromTheMergeCommit_DoesNotClose()
     {
-        var violations = Validate(MergedRecord(), closing: true,
-            AcceptAll with { FileExistsAtCommit = (_, path) => !path.Contains("S2ObligationStateTests") });
+        var record = MergedRecord();
+        var violations = Validate(record, closing: true,
+            AcceptAll(record) with { FileExistsAtCommit = (_, path) => !path.Contains("S2ObligationStateTests") });
         AssertCodes(violations, "D010");
         Assert.Contains(violations, v => v.Message.Contains("R-OBL: a regression witness is missing from the merge commit"));
     }
@@ -412,21 +466,32 @@ public sealed class DispositionTests
     [Fact]
     public void D010_MergeCommitOfAnotherPr_DoesNotClose()
     {
-        // An unrelated existing commit (or an invented PR number) does not name the repair's PR.
-        var violations = Validate(MergedRecord(), closing: true,
-            AcceptAll with { CommitMessage = _ => "Merge pull request #1483 from juanmicrosoft/unrelated" });
+        // An unrelated main merge (round-3 witness: PR #1483, which also mentions #1426) is not the
+        // merge of the repair's PR from its S2 branch.
+        var record = MergedRecord();
+        var violations = Validate(record, closing: true, AcceptAll(record) with
+        {
+            CommitMessage = _ => "Merge pull request #1483 from juanmicrosoft/milestone-0.25/r0-1426-scope-baseline\n\n#1426",
+        });
         AssertCodes(violations, "D010");
-        Assert.Contains(violations, v => v.Message.Contains("R-OBL: the merge commit does not name PR #1496"));
+        Assert.Contains(violations, v => v.Message.Contains("R-OBL: the merge commit is not the merge of PR #1496"));
     }
 
-    [SkippableFact]
-    public void D010_RealHeadOnlyCommit_IsNotOnMain()
+    [Fact]
+    public void D008_RepairOnANonS2Branch()
     {
-        // The real callback: HEAD of an unmerged branch is not reachable from origin/main.
-        var head = Git("rev-parse HEAD").Output.Trim();
-        var onMain = Git($"merge-base --is-ancestor {head} origin/main").ExitCode == 0;
-        Skip.If(onMain, "HEAD is already on origin/main");
-        Assert.False(RepositoryEvidence.CommitIsOnMain(head));
+        var record = Record();
+        Repair(record, "R-OBL")["branch"] = "milestone-0.25/r0-1426-scope-baseline";
+        AssertCodes(Validate(record), "D008");
+    }
+
+    [Fact]
+    public void RealCallbacks_FailClosedOnAnUnknownCommit()
+    {
+        var absent = new string('0', 40);
+        Assert.False(RepositoryEvidence.CommitIsOnMain(absent));
+        Assert.False(RepositoryEvidence.FileExistsAtCommit(absent, "global.json"));
+        Assert.Null(RepositoryEvidence.CommitMessage(absent));
     }
 
     [Fact]
