@@ -1,6 +1,6 @@
 {
   "algorithm": "SHA-256 over LF-normalized bytes",
-  "count": 3616,
+  "count": 3617,
   "files": {
     "bench/Calor.Soundness.Sweep/BaselineHost.cs": "111b8d597189f985c4865ca18fecf7dd33cf2cbd19aafb063a670e4a706853eb",
     "bench/Calor.Soundness.Sweep/Calor.Soundness.Sweep.csproj": "b7bd026cd61089c57f63037588aaf9e792dcd8157b41533dfd8dbdb0fed8f879",
@@ -3607,6 +3607,7 @@
     "docs/plans/evidence/s1-1311/reviews/round-verification.json": "c0d3a3a225d330c665b7307e85ac631efc78ce3b5384f6bc86664f4234ac02af",
     "docs/plans/evidence/s1-1311/reviews/run2-round-1.md": "8c078c059e523cbc87e804e7581009fc614440b7a18fc5889f9b6c9d57ed3f0a",
     "docs/plans/evidence/s1-1311/reviews/run2-round-2.md": "1ae28566238496f7bb136a402a5c14d7409ac4ca01f6e99c11f3ad7388a74220",
+    "docs/plans/evidence/s1-1311/reviews/run2-verification.md": "fe14c5b6bc9425c3664332d2576a095df467aac7903e7bc6d846fa73e6f5e420",
     "docs/plans/evidence/s1-1311/run1-gate-status.json": "7f8063d733b7e1de687cb3918c3acef5f4108ff2cc002f4794caacca1f6a8605",
     "docs/plans/evidence/s1-1311/run1-report.md": "dc932e774a70882b91c32409e3ab54fd16454a7e1d661083b136ee4dfd5ec6fa",
     "docs/plans/evidence/s1-1311/run2/capacity.json": "5f5c7b7b2e2b412906ccffb8fe36ff2745aad1a656795ac579f1bcd5881e58cd",
