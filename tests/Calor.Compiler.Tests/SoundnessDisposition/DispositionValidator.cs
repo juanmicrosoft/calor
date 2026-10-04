@@ -43,7 +43,8 @@ internal static class DispositionValidator
         bool closing,
         ClosureEvidence? evidence,
         IReadOnlyDictionary<(string Baseline, string Row), int> validatedProofCounts,
-        IReadOnlyCollection<string> requiredDiscoveryIds)
+        IReadOnlyCollection<string> requiredDiscoveryIds,
+        IReadOnlyDictionary<string, int> pinnedRepairPrs)
     {
         var v = new List<Violation>();
         void Add(string code, string message) => v.Add(new Violation(code, message));
@@ -296,6 +297,8 @@ internal static class DispositionValidator
             if (status is not ("open" or "merged"))
                 Add("D008", $"{id}: status must be open, merged, or decision-required");
             var branch = Str(repair, "branch");
+            if (pinnedRepairPrs.TryGetValue(id, out var pinnedPr) && pr != pinnedPr)
+                Add("D008", $"{id}: PR #{pr} differs from the pinned repair PR #{pinnedPr}");
             if (pr is not > 0 || branch is null || !branch.StartsWith("milestone-0.24/s2-1413-", StringComparison.Ordinal)
                 || witnesses.Length == 0)
                 Add("D008", $"{id}: an open or merged repair needs a PR, an S2 branch (milestone-0.24/s2-1413-*), and a regression witness");

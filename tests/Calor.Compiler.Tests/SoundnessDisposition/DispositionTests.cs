@@ -66,6 +66,12 @@ public sealed class DispositionTests
     /// <summary>Discoveries the record must keep (by id), pinned outside the record.</summary>
     private static readonly string[] PinnedDiscoveries = ["D-1493", "D-OBL-PROOF-GETTER", "D-OBL-THROWING-PREDECESSOR"];
 
+    /// <summary>The opened repair PRs, pinned outside the record (an accepted R-NUM PR is added here).</summary>
+    private static readonly Dictionary<string, int> PinnedRepairPrs = new()
+    {
+        ["R-CACHE"] = 1494, ["R-IMPL"] = 1495, ["R-OBL"] = 1496, ["R-TEXT"] = 1497, ["R-QNT"] = 1498,
+    };
+
     private static Dictionary<(string Baseline, string Row), int> ValidatedProofCounts()
     {
         var counts = new Dictionary<(string Baseline, string Row), int>();
@@ -94,7 +100,8 @@ public sealed class DispositionTests
             closing,
             evidence ?? RepositoryEvidence,
             ValidatedProofCounts(),
-            PinnedDiscoveries);
+            PinnedDiscoveries,
+            PinnedRepairPrs);
 
     private static void AssertCodes(IReadOnlyList<DispositionValidator.Violation> violations, params string[] codes)
         => Assert.Equal(
@@ -475,6 +482,17 @@ public sealed class DispositionTests
         });
         AssertCodes(violations, "D010");
         Assert.Contains(violations, v => v.Message.Contains("R-OBL: the merge commit is not the merge of PR #1496"));
+    }
+
+    [Fact]
+    public void D008_RepairPrDiffersFromThePinnedPr()
+    {
+        // Review witness: every repair naming the disposition-record PR instead of its own.
+        var record = Record();
+        Repair(record, "R-OBL")["pr"] = 1499;
+        var violations = Validate(record);
+        AssertCodes(violations, "D008");
+        Assert.Contains(violations, v => v.Message.Contains("R-OBL: PR #1499 differs from the pinned repair PR #1496"));
     }
 
     [Fact]

@@ -39,6 +39,11 @@
     "reservedSlots": 1,
     "note": "Five repair PRs are open and one slot is reserved for R-NUM (no PR, no acceptance decision). nonTestChangedLines excludes committed review records."
   },
+  "validatorLimitations": [
+    "Repair acceptance is bound mechanically only to: the pinned PR number of each opened repair (tests), an S2 branch, a merge commit on main that is GitHub's merge of that PR from that branch, and the regression witnesses present in it. Whether the merged contents match the reviewed repair and its affected findings is the maintainer's merge review, not validated here.",
+    "A review-round overrun needs a non-empty overrunAmendment at closure; the validator cannot check that it names a merged contract amendment raising the ceiling (stopping rule 1). Enforcing Q8 is manual.",
+    "The R0 terminal validator does not read this record (Q6)."
+  ],
   "repairs": [
     {
       "id": "R-CACHE",
