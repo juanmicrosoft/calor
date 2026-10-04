@@ -731,7 +731,7 @@ public static class DiagnosticCode
     /// </summary>
     public const string ContractInheritanceValid = "Calor0814";
 
-    // Contract inheritance Z3 proving (Calor0815-0818)
+    // Contract inheritance Z3 proving (Calor0815-0819)
 
     /// <summary>
     /// Info: Contract implication proven by Z3 SMT solver.
@@ -752,6 +752,13 @@ public static class DiagnosticCode
     /// Error: Inherited postconditions cannot all be satisfied.
     /// </summary>
     public const string IncompatibleInheritedContracts = "Calor0818";
+
+    /// <summary>
+    /// Warning (#1413): a contract implication holds only under a named assumption —
+    /// a contract that can throw (zero divisor, checked overflow) or a null the solver
+    /// cannot represent — so it is Assumed, not proven, and nothing is claimed.
+    /// </summary>
+    public const string ImplicationAssumed = "Calor0819";
 
     // Legacy structural-ID lint (Calor0820-0822) — Phase 1/2 v6 plan
     // (drop structural IDs, then introduce compact 12-char IDs).

@@ -1393,7 +1393,8 @@ public class TranslatorTests
 
         translator.DeclareVariable("s", "string");
 
-        // (indexof s "hello" 5) - search starting from index 5
+        // (indexof s "hello" 5) - search starting from index 5. #1413 review: refused, because
+        // the emitted call (s.IndexOf("hello", Ordinal)) ignores the start index.
         var expr = new StringOperationNode(
             TextSpan.Empty,
             StringOp.IndexOf,
@@ -1407,10 +1408,7 @@ public class TranslatorTests
 
         var result = translator.Translate(expr);
 
-        Assert.NotNull(result);
-        Assert.IsType<Microsoft.Z3.BitVecExpr>(result);
-        var bvExpr = (Microsoft.Z3.BitVecExpr)result;
-        Assert.Equal(32u, bvExpr.SortSize);
+        Assert.Null(result);
     }
 
     [SkippableFact]

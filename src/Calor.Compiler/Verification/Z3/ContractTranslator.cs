@@ -393,6 +393,10 @@ public sealed class ContractTranslator
     /// <returns>True if the type is supported and variable was declared.</returns>
     public bool DeclareVariable(string name, string typeName)
     {
+        // #1413 review: '$' names are reserved for synthetic solver variables (an array's
+        // `a$length`); a caller-supplied `a$length` would otherwise be the same variable.
+        if (name.Contains('$'))
+            return false;
         var expr = CreateVariableForType(name, typeName);
         if (expr == null)
             return false;
@@ -549,7 +553,7 @@ public sealed class ContractTranslator
                         $"field '{coreType}.{fieldName}' has unsupported type '{fieldType}': " +
                         "modeling it as a guessed sort could produce an unsound proof");
                 }
-                accessor = _ctx.MkFuncDecl($"{coreType}_{fieldName}", new[] { receiverSort }, resultSort);
+                accessor = _ctx.MkFuncDecl(Z3Name($"{coreType}_{fieldName}"), new[] { receiverSort }, resultSort);
                 _fieldAccessors[key] = accessor;
             }
 
@@ -1106,6 +1110,10 @@ public sealed class ContractTranslator
 
     private Expr? CreateVariableForType(string name, string typeName)
     {
+        // '$' names are reserved for synthetic solver variables (every caller-named path,
+        // including quantifier bound variables, comes through here).
+        if (name.Contains('$'))
+            return null;
         // Normalize type names
         var normalizedType = NormalizeTypeName(typeName);
 
@@ -1119,20 +1127,20 @@ public sealed class ContractTranslator
         return normalizedType switch
         {
             // Signed integer types
-            "i8" or "sbyte" => TrackBitVec(_ctx.MkBVConst(name, 8), 8, isSigned: true),
-            "i16" or "short" => TrackBitVec(_ctx.MkBVConst(name, 16), 16, isSigned: true),
-            "i32" or "int" => TrackBitVec(_ctx.MkBVConst(name, 32), 32, isSigned: true),
-            "i64" or "long" => TrackBitVec(_ctx.MkBVConst(name, 64), 64, isSigned: true),
+            "i8" or "sbyte" => TrackBitVec(_ctx.MkBVConst(Z3Name(name), 8), 8, isSigned: true),
+            "i16" or "short" => TrackBitVec(_ctx.MkBVConst(Z3Name(name), 16), 16, isSigned: true),
+            "i32" or "int" => TrackBitVec(_ctx.MkBVConst(Z3Name(name), 32), 32, isSigned: true),
+            "i64" or "long" => TrackBitVec(_ctx.MkBVConst(Z3Name(name), 64), 64, isSigned: true),
 
             // Unsigned integer types
-            "u8" or "byte" => TrackBitVec(_ctx.MkBVConst(name, 8), 8, isSigned: false),
-            "u16" or "ushort" => TrackBitVec(_ctx.MkBVConst(name, 16), 16, isSigned: false),
-            "u32" or "uint" => TrackBitVec(_ctx.MkBVConst(name, 32), 32, isSigned: false),
-            "u64" or "ulong" => TrackBitVec(_ctx.MkBVConst(name, 64), 64, isSigned: false),
+            "u8" or "byte" => TrackBitVec(_ctx.MkBVConst(Z3Name(name), 8), 8, isSigned: false),
+            "u16" or "ushort" => TrackBitVec(_ctx.MkBVConst(Z3Name(name), 16), 16, isSigned: false),
+            "u32" or "uint" => TrackBitVec(_ctx.MkBVConst(Z3Name(name), 32), 32, isSigned: false),
+            "u64" or "ulong" => TrackBitVec(_ctx.MkBVConst(Z3Name(name), 64), 64, isSigned: false),
 
-            "bool" => _ctx.MkBoolConst(name),
+            "bool" => _ctx.MkBoolConst(Z3Name(name)),
             // String type - uses Z3's native string theory
-            "string" or "str" => TrackString((SeqExpr)_ctx.MkConst(name, _ctx.StringSort)),
+            "string" or "str" => TrackString((SeqExpr)_ctx.MkConst(Z3Name(name), _ctx.StringSort)),
             // Unsupported types
             "f32" or "f64" or "float" or "double" => null,
             _ => CreateUserDefinedTypeVariable(name, normalizedType, typeName)
@@ -1158,7 +1166,7 @@ public sealed class ContractTranslator
             sort = MarkUninterpretedSort(coreType);
             _userTypeSorts[coreType] = sort;
         }
-        return _ctx.MkConst(name, sort);
+        return _ctx.MkConst(Z3Name(name), sort);
     }
 
     /// <summary>
@@ -1174,7 +1182,7 @@ public sealed class ContractTranslator
         var bv64Sort = _ctx.MkBitVecSort(64);
         var elementSort = _ctx.MkBitVecSort(elementWidth);
         TouchedNullableReferenceSort = true;
-        var arrayExpr = _ctx.MkArrayConst(name, bv64Sort, elementSort);
+        var arrayExpr = _ctx.MkArrayConst(Z3Name(name), bv64Sort, elementSort);
 
         // Create associated length variable (unsigned 32-bit)
         var lengthVarName = $"{name}$length";
@@ -1255,13 +1263,38 @@ public sealed class ContractTranslator
     public bool TouchedNullableReferenceSort { get; private set; }
 
     /// <summary>
+    /// #1413: true once a form was translated that a null string or reference can satisfy
+    /// without throwing (equality over a string or reference sort, <c>Equals</c>,
+    /// <c>IsNullOrEmpty</c>). Every other string/reference form throws on null, so a formula
+    /// without one cannot be satisfied by a null the solver does not model, and its
+    /// unsatisfiability carries over to runtime.
+    /// </summary>
+    public bool TouchedNullTolerantReferenceForm { get; private set; }
+
+    private void NoteNullTolerant(params Expr[] operands)
+    {
+        // A literal or a term built only from literals is never null.
+        if (operands.Any(HasFreeSymbol))
+            TouchedNullTolerantReferenceForm = true;
+    }
+
+    // A free (uninterpreted) term of a reference sort (string, array, user type) may be null; a
+    // boolean or numeric symbol never is.
+    private static bool HasFreeSymbol(Expr expr)
+        => (IsReferenceSort(expr.Sort) && (expr.IsVar || expr.IsApp && expr.FuncDecl.DeclKind == Microsoft.Z3.Z3_decl_kind.Z3_OP_UNINTERPRETED))
+            || (expr.IsApp && expr.Args.Any(HasFreeSymbol));
+
+    private static bool IsReferenceSort(Sort sort)
+        => sort is not (BoolSort or BitVecSort or IntSort or RealSort or FPSort);
+
+    /// <summary>
     /// Uninterpreted sorts stand in for user types, which are nullable reference types in C# —
     /// same total-vs-nullable mismatch as arrays, so the same demotion applies.
     /// </summary>
     private Sort MarkUninterpretedSort(string name)
     {
         TouchedNullableReferenceSort = true;
-        return _ctx.MkUninterpretedSort(name);
+        return _ctx.MkUninterpretedSort(Z3Name(name));
     }
 
     /// <summary>Records the string-sort touch for sites that hand back a bare <c>Sort</c>.</summary>
@@ -1287,31 +1320,102 @@ public sealed class ContractTranslator
     private BitVecExpr MarkArrayLength(string lengthVarName)
     {
         TouchedNullableReferenceSort = true;
-        return TrackBitVec(_ctx.MkBVConst(lengthVarName, 32), 32, isSigned: false);
+        return TrackBitVec(_ctx.MkBVConst(Z3Name(lengthVarName), 32), 32, isSigned: false);
     }
 
     /// <summary>
-    /// The argument for <see cref="Context.MkString"/> that gives the same Z3 string on every
-    /// platform (#1135). The binding marshals it as an ANSI C string: UTF-8 on Linux and macOS,
-    /// the active code page on Windows. So <c>"é"</c> was two characters on Linux and macOS (the
-    /// byte model of <see cref="Z3Verifier.StringModelAssumption"/>) but one on Windows, and a
-    /// character outside the code page became <c>?</c>. Writing every non-ASCII UTF-8 byte as
-    /// Z3's <c>\u{hh}</c> escape and passing ASCII through unchanged makes the marshaled bytes
-    /// ASCII, which every code page maps identically, and reproduces the UTF-8 result exactly:
-    /// Z3 reads a raw byte and its escape as the same character.
+    /// The argument for <see cref="Context.MkString"/>. The binding marshals it as an ANSI C
+    /// string (UTF-8 on Linux and macOS, the active code page on Windows), so only ASCII is
+    /// passed through: every UTF-16 code unit outside printable ASCII, and the backslash, is
+    /// written as Z3's <c>\u{h}</c> escape (#1135 made the marshaled bytes ASCII). #1413 (S1
+    /// STR-NULL-NONASCII): the escape is per UTF-16 code unit, not per UTF-8 byte, so a literal
+    /// has its .NET <c>Length</c> — <c>"é"</c> is one character, not two, and the postcondition
+    /// <c>(&lt;= (len result) 1)</c> over it is no longer refuted with a counterexample the
+    /// program cannot produce. Escaping the backslash keeps a literal that contains the text
+    /// <c>\u{41}</c> from being read as <c>A</c> (the encoding is injective).
     /// </summary>
     internal static string ToZ3StringLiteral(string value)
     {
-        var bytes = System.Text.Encoding.UTF8.GetBytes(value);
-        var builder = new System.Text.StringBuilder(bytes.Length);
-        foreach (var b in bytes)
+        var builder = new System.Text.StringBuilder(value.Length);
+        foreach (var ch in value)
         {
-            if (b < 0x80)
-                builder.Append((char)b);
+            if (ch is >= ' ' and <= '~' && ch != '\\')
+                builder.Append(ch);
             else
-                builder.Append(@"\u{").Append(b.ToString("x2", System.Globalization.CultureInfo.InvariantCulture)).Append('}');
+                builder.Append(@"\u{").Append(((int)ch).ToString("x", System.Globalization.CultureInfo.InvariantCulture)).Append('}');
         }
         return builder.ToString();
+    }
+
+    /// <summary>
+    /// #1493: the Z3 symbol name for a Calor identifier, type, or field name. Symbol names take
+    /// the binding's ANSI marshaling too, so on Windows two non-ASCII identifiers outside the
+    /// code page (say <c>ж</c> and <c>щ</c>) both became <c>?</c> — one Z3 constant for two
+    /// variables, and a possible false proof. A name made only of printable ASCII other than
+    /// <c>~</c> is unchanged; any other name has each such character written as <c>~</c> plus
+    /// four hex digits of its UTF-16 code unit. Unchanged names contain no <c>~</c> and
+    /// changed names always do, and the per-character mapping is prefix-free, so the encoding
+    /// is injective and ASCII on every platform. Every site that names a Z3 symbol must use it,
+    /// so that equal Calor names still meet as one constant.
+    /// </summary>
+    internal static string Z3Name(string name)
+    {
+        var safe = true;
+        foreach (var ch in name)
+        {
+            if (ch is < ' ' or > '~' or '~')
+            {
+                safe = false;
+                break;
+            }
+        }
+        if (safe)
+            return name;
+        var builder = new System.Text.StringBuilder(name.Length * 2);
+        foreach (var ch in name)
+        {
+            if (ch is >= ' ' and < '~')
+                builder.Append(ch);
+            else
+                builder.Append('~').Append(((int)ch).ToString("x4", System.Globalization.CultureInfo.InvariantCulture));
+        }
+        return builder.ToString();
+    }
+
+    /// <summary>
+    /// #1413 (S1 STR-OPS-COUNT-INDEX): the condition under which a .NET string operation
+    /// completes instead of throwing <c>ArgumentOutOfRangeException</c>. The solver's
+    /// <c>str.substr</c>/<c>str.indexof</c> are total, so without it a model such as
+    /// <c>s = ""</c> for <c>s.Substring(1, 1)</c> was reported as a counterexample although
+    /// the body throws there. Collected with the divisor side conditions (same position
+    /// rules). Null receivers are not modeled (the string-model assumption).
+    /// </summary>
+    internal BoolExpr? GetStringRangeCondition(StringOperationNode node)
+    {
+        var isIndexed = node.Operation switch
+        {
+            StringOp.Substring => node.Arguments.Count >= 3,
+            StringOp.SubstringFrom => node.Arguments.Count >= 2,
+            _ => false
+        };
+        if (!isIndexed)
+            return _ctx.MkTrue();
+        if (Translate(node.Arguments[0]) is not SeqExpr str)
+            return null;
+        var start = ConvertToIntExpr(Translate(node.Arguments[1]));
+        if (start == null)
+            return null;
+        var length = _ctx.MkLength(str);
+        var zero = _ctx.MkInt(0);
+        if (node.Operation != StringOp.Substring)
+            return _ctx.MkAnd(_ctx.MkGe(start, zero), _ctx.MkLe(start, length));
+        var count = ConvertToIntExpr(Translate(node.Arguments[2]));
+        if (count == null)
+            return null;
+        return _ctx.MkAnd(
+            _ctx.MkGe(start, zero),
+            _ctx.MkGe(count, zero),
+            _ctx.MkLe((ArithExpr)_ctx.MkAdd(start, count), length));
     }
 
     private SeqExpr TrackString(SeqExpr expr, bool isNullable = false)
@@ -1513,6 +1617,8 @@ public sealed class ContractTranslator
             var promoted = ApplyBinaryNumericPromotions(bvLeft, bvRight);
             return _ctx.MkEq(promoted.Left, promoted.Right);
         }
+        if (left is not (BoolExpr or IntExpr or RealExpr or FPExpr))
+            NoteNullTolerant(left, right);
         return _ctx.MkEq(left, right);
     }
 
@@ -1690,6 +1796,7 @@ public sealed class ContractTranslator
         if (str1 is not SeqExpr str1Expr || str2 is not SeqExpr str2Expr)
             return null;
 
+        NoteNullTolerant(str1Expr, str2Expr);
         return _ctx.MkEq(str1Expr, str2Expr);
     }
 
@@ -1712,6 +1819,7 @@ public sealed class ContractTranslator
             return null;
 
         // Check if length equals 0
+        NoteNullTolerant(seqExpr);
         var length = _ctx.MkLength(seqExpr);
         return _ctx.MkEq(length, _ctx.MkInt(0));
     }
@@ -1727,6 +1835,12 @@ public sealed class ContractTranslator
     {
         if (node.Arguments.Count < 2)
             return null;
+        if (node.Arguments.Count >= 3)
+        {
+            // #1413 review: the emitter drops the start index (it emits s.IndexOf(t, mode)), so
+            // the solver's indexof-from-start would describe a different call.
+            return Refuse("IndexOf with a start index is not modeled: the emitted call ignores the start");
+        }
 
         var str = Translate(node.Arguments[0]);
         var search = Translate(node.Arguments[1]);
@@ -1921,7 +2035,7 @@ public sealed class ContractTranslator
                     $"field '{coreType}.{node.FieldName}' has unsupported type '{fieldType}': " +
                     "modeling it as a guessed sort could produce an unsound proof");
             }
-            accessor = _ctx.MkFuncDecl($"{coreType}_{node.FieldName}", new[] { receiverSort }, resultSort);
+            accessor = _ctx.MkFuncDecl(Z3Name($"{coreType}_{node.FieldName}"), new[] { receiverSort }, resultSort);
             _fieldAccessors[key] = accessor;
         }
 
@@ -1995,6 +2109,8 @@ public sealed class ContractTranslator
     /// <returns>True if the array was declared successfully.</returns>
     public bool DeclareArrayVariable(string name, string elementType)
     {
+        if (name.Contains('$'))
+            return false;
         var (elementWidth, elementSigned) = GetTypeWidthAndSignedness(elementType);
         if (elementWidth == 0)
             return false;
@@ -2003,7 +2119,7 @@ public sealed class ContractTranslator
         var bv64Sort = _ctx.MkBitVecSort(64);
         var elementSort = _ctx.MkBitVecSort(elementWidth);
         TouchedNullableReferenceSort = true;
-        var arrayExpr = _ctx.MkArrayConst(name, bv64Sort, elementSort);
+        var arrayExpr = _ctx.MkArrayConst(Z3Name(name), bv64Sort, elementSort);
 
         _variables[name] = (arrayExpr, $"array<{elementType}>");
 
