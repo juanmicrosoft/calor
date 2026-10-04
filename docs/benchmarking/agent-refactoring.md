@@ -138,7 +138,10 @@ See `.github/workflows/benchmark.yml` - the `agent-refactoring-benchmark` job.
 
 ### Results Location
 
-Results are committed to: `website/public/data/agent-refactoring-results.json`
+A run uploads its results as the `agent-refactoring-results` workflow artifact. The job never
+commits or pushes, and it fails when it cannot read a pass rate instead of recording 0 (#1422).
+The committed `website/public/data/agent-refactoring-results.json` is a historical record and is
+not comparable under the 0.24 benchmark method.
 
 ---
 

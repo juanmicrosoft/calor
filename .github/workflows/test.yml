@@ -87,6 +87,7 @@ jobs:
           python3 scripts/test_supply_chain.py
           python3 scripts/test_z3_hermetic.py
           python3 scripts/test_tier2_verification.py
+          python3 scripts/test_benchmark_publication_gate.py
 
       # #1421 (0.24 G2): the determinism protocol's gates. The validator checks these three
       # steps structurally (D014): own steps, no condition, unmasked, in this order. Main's copy

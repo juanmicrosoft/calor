@@ -49,7 +49,8 @@ class SupplyChainTests(unittest.TestCase):
         self.assertEqual(6, workflow.count("secrets.ANTHROPIC_API_KEY"))
         static_run = steps["Run static benchmarks"]
         self.assertIn("--statistical", static_run)
-        self.assertIn('--runs "${{ github.event.inputs.statistical_runs || \'30\' }}"', static_run)
+        self.assertIn("RUNS: ${{ github.event.inputs.statistical_runs || '30' }}", static_run)
+        self.assertIn('--runs "$RUNS"', static_run)
 
     def test_build_project_has_no_network_or_tracked_resource_mutation_targets(self) -> None:
         project = (REPO_ROOT / "src/Calor.Compiler/Calor.Compiler.csproj").read_text()
