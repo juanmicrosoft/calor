@@ -1,0 +1,127 @@
+diff --git a/tools/Calor.Soundness.Sweep/BaselineHost.cs b/bench/Calor.Soundness.Sweep/BaselineHost.cs
+similarity index 100%
+rename from tools/Calor.Soundness.Sweep/BaselineHost.cs
+rename to bench/Calor.Soundness.Sweep/BaselineHost.cs
+diff --git a/tools/Calor.Soundness.Sweep/Calor.Soundness.Sweep.csproj b/bench/Calor.Soundness.Sweep/Calor.Soundness.Sweep.csproj
+similarity index 100%
+rename from tools/Calor.Soundness.Sweep/Calor.Soundness.Sweep.csproj
+rename to bench/Calor.Soundness.Sweep/Calor.Soundness.Sweep.csproj
+diff --git a/tools/Calor.Soundness.Sweep/CaseExecutor.cs b/bench/Calor.Soundness.Sweep/CaseExecutor.cs
+similarity index 100%
+rename from tools/Calor.Soundness.Sweep/CaseExecutor.cs
+rename to bench/Calor.Soundness.Sweep/CaseExecutor.cs
+diff --git a/bench/Calor.Soundness.Sweep/LoadedImageCapture.cs b/bench/Calor.Soundness.Sweep/LoadedImageCapture.cs
+new file mode 100644
+index 00000000..58c27484
+--- /dev/null
++++ b/bench/Calor.Soundness.Sweep/LoadedImageCapture.cs
+@@ -0,0 +1,49 @@
++using System.Runtime.InteropServices;
++using System.Text.Json.Nodes;
++
++namespace Calor.Soundness.Sweep;
++
++// Contract amendment 1.2.0, s1-generated-cases exception condition 3 (run 2 only): the sweep process enumerates its OWN loaded images (dyld image
++// list on macOS, /proc/self/maps on Linux), takes the libz3 image mapped under each baseline's directory, and hashes that file. Called before case 1
++// and after the last case. A missing image or a hash other than the registered value invalidates the run.
++internal static class LoadedImageCapture
++{
++    // registration.json baselines: the osx-arm64 libz3.dylib registered for Z3 4.15.7 (B1 bootstrap and the N1 0.21.0 package).
++    private const string RegisteredLibz3Sha256 = "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada";
++
++    [DllImport("/usr/lib/libSystem.dylib")]
++    private static extern uint _dyld_image_count();
++
++    [DllImport("/usr/lib/libSystem.dylib")]
++    private static extern IntPtr _dyld_get_image_name(uint index);
++
++    private static (string Method, List<string> Paths) LoadedImages() => OperatingSystem.IsMacOS()
++        ? ("dyld image list (_dyld_image_count/_dyld_get_image_name, in-process)",
++            Enumerable.Range(0, (int)_dyld_image_count()).Select(i => Marshal.PtrToStringUTF8(_dyld_get_image_name((uint)i))).OfType<string>().ToList())
++        : ("/proc/self/maps (in-process)",
++            File.ReadLines("/proc/self/maps").Select(l => l.Split(' ', 6, StringSplitOptions.RemoveEmptyEntries)).Where(p => p.Length == 6).Select(p => p[5].Trim()).ToList());
++
++    // Appends one record per baseline to <out>/loaded-image-capture.jsonl; returns the reasons the capture fails (empty when it holds).
++    public static List<string> Capture(string outRoot, string phase, IEnumerable<BaselineHost> hosts)
++    {
++        var (method, paths) = LoadedImages();
++        var libz3 = paths.Where(p => Path.GetFileName(p).StartsWith("libz3", StringComparison.OrdinalIgnoreCase)).Distinct(StringComparer.Ordinal).ToList();
++        var failures = new List<string>();
++        foreach (var host in hosts)
++        {
++            var mapped = libz3.Where(p => p.StartsWith(host.Directory + Path.DirectorySeparatorChar, StringComparison.Ordinal)).ToList();
++            var hashed = mapped.Select(p => (Path: p, Sha256: File.Exists(p) ? Hashing.Sha256File(p) : null)).ToList();
++            var ok = hashed.Count == 1 && hashed[0].Sha256 == RegisteredLibz3Sha256;
++            if (!ok) failures.Add($"{host.Id} {phase}: {hashed.Count} libz3 image(s) mapped under {host.Directory}" + string.Concat(hashed.Select(h => $" [{h.Path} {h.Sha256 ?? "missing file"}]")));
++            File.AppendAllText(Path.Combine(outRoot, "loaded-image-capture.jsonl"), new JsonObject
++            {
++                ["baseline"] = host.Id, ["phase"] = phase, ["utc"] = DateTime.UtcNow.ToString("O"), ["pid"] = Environment.ProcessId, ["method"] = method,
++                ["path"] = hashed.Count == 1 ? hashed[0].Path : null, ["sha256"] = hashed.Count == 1 ? hashed[0].Sha256 : null,
++                ["registeredSha256"] = RegisteredLibz3Sha256, ["ok"] = ok,
++                ["mappedUnderBaseline"] = new JsonArray(hashed.Select(h => (JsonNode)new JsonObject { ["path"] = h.Path, ["sha256"] = h.Sha256 }).ToArray()),
++                ["allLibz3ImagesInProcess"] = new JsonArray(libz3.Select(p => (JsonNode)p).ToArray()),
++            }.ToJsonString() + "\n");
++        }
++        return failures;
++    }
++}
+diff --git a/tools/Calor.Soundness.Sweep/OracleRuntime.cs b/bench/Calor.Soundness.Sweep/OracleRuntime.cs
+similarity index 100%
+rename from tools/Calor.Soundness.Sweep/OracleRuntime.cs
+rename to bench/Calor.Soundness.Sweep/OracleRuntime.cs
+diff --git a/tools/Calor.Soundness.Sweep/Program.cs b/bench/Calor.Soundness.Sweep/Program.cs
+similarity index 97%
+rename from tools/Calor.Soundness.Sweep/Program.cs
+rename to bench/Calor.Soundness.Sweep/Program.cs
+index 07ca174a..60e82789 100644
+--- a/tools/Calor.Soundness.Sweep/Program.cs
++++ b/bench/Calor.Soundness.Sweep/Program.cs
+@@ -11,7 +11,7 @@ namespace Calor.Soundness.Sweep;
+ // #1311 sweep driver: run, report, reclassify (optional O2 re-replay), crossrun, native-check. Follows registration.json "execution" and "budget".
+ internal static partial class Program
+ {
+-    private const int CaseWallClockSeconds = 120, Reserve = 74, ExecutionCeiling = 1500;
++    private const int CaseWallClockSeconds = 120, Reserve = 74, ExecutionCeiling = 1508;
+     internal static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
+     private static readonly string[] Pair = ["B1", "N1"];
+ 
+@@ -80,6 +80,8 @@ internal static partial class Program
+                 || Native(pinned, host.Directory) is not { } native || native != Native(pins, host.Directory))
+                 return Fail($"INVALID RUN: {id} pin missing or changed before the first case", 4);
+         }
++        if (LoadedImageCapture.Capture(outRoot, "before-case-1", hosts.Values) is { Count: > 0 } beforeCapture)
++            return Fail("INVALID RUN: loaded libz3 capture before the first case: " + string.Join("; ", beforeCapture), 4);
+         var ledger = new Ledger(Path.Combine(outRoot, "ledger.jsonl"));
+         var byRow = cases.GroupBy(c => c.RowId).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
+         var sw = Stopwatch.StartNew();
+@@ -109,6 +111,8 @@ internal static partial class Program
+                     Exec(b, byRow[r.Id][k], "sweep");
+                 }
+         done:
++        if (LoadedImageCapture.Capture(outRoot, "after-last-case", hosts.Values) is { Count: > 0 } afterCapture)
++            return Fail("INVALID RUN: loaded libz3 capture after the last case: " + string.Join("; ", afterCapture), 4);
+         foreach (var (id, host) in hosts)
+         {
+             var after = Pins(host, opts["registration-commit"]);
+@@ -263,6 +267,8 @@ internal static partial class Program
+         bool Drift() => hosts.Values.Any(h => Pins(h, "") is var now && JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, h.Id, "pins.json"))) is var then && (Native(now, h.Directory) is null || Native(now, h.Directory) != Native(then, h.Directory)
+             || new[] { "calorDllSha256", "calorRuntimeDllSha256", "microsoftZ3DllSha256", "dotnetVersion", "os" }.Any(k => now[k]?.ToJsonString() != then![k]?.ToJsonString())));
+         if (Drift()) return Fail("INVALID: a pin (binary, native image, or SDK) differs before crossrun", 4);
++        if (LoadedImageCapture.Capture(outRoot, "crossrun-before-case-1", hosts.Values) is { Count: > 0 } beforeCapture)
++            return Fail("INVALID: loaded libz3 capture before crossrun: " + string.Join("; ", beforeCapture), 4);
+         string[] priority = ["false-unconditional-proof", "stale-cache-proof", "required-demotion-absent", "spurious-refutation"];
+         var work = Pair.SelectMany(source => JsonNode.Parse(File.ReadAllText(Path.Combine(outRoot, source, "findings-index.json")))!.AsArray()
+             .GroupBy(f => S(f!["caseId"])).Select(g => (Rank: g.Min(f => Array.IndexOf(priority, S(f!["class"])) is var i and >= 0 ? i : priority.Length), Target: source == "B1" ? "N1" : "B1", CaseId: g.Key)));
+@@ -280,6 +286,8 @@ internal static partial class Program
+                 };
+             File.AppendAllText(path, line.ToJsonString() + "\n");
+         }
++        if (LoadedImageCapture.Capture(outRoot, "crossrun-after-last-case", hosts.Values) is { Count: > 0 } afterCapture)
++            return Fail("INVALID: loaded libz3 capture after crossrun: " + string.Join("; ", afterCapture), 4);
+         if (Drift()) return Fail("INVALID: a pin (binary, native image, or SDK) differs after crossrun", 4);
+         Console.WriteLine($"ledger {ledger.Total}, reserve used {ledger.ReserveUsed}");
+         return 0;
+diff --git a/tools/Calor.Soundness.Sweep/Report.cs b/bench/Calor.Soundness.Sweep/Report.cs
+similarity index 100%
+rename from tools/Calor.Soundness.Sweep/Report.cs
+rename to bench/Calor.Soundness.Sweep/Report.cs

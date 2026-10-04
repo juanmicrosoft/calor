@@ -1,0 +1,97 @@
+{
+  "executedUtc": "2026-10-04T02:03:28.7831010Z",
+  "pass": true,
+  "controls": [
+    {
+      "id": "O-POS-ZERO-AND",
+      "expect": "holds-exhaustive",
+      "got": "holds-exhaustive",
+      "witness": null,
+      "ok": true
+    },
+    {
+      "id": "O-POS-PROMOTION",
+      "expect": "holds-exhaustive",
+      "got": "holds-exhaustive",
+      "witness": null,
+      "ok": true
+    },
+    {
+      "id": "O-POS-UNCHECKED-ROUNDTRIP",
+      "expect": "holds-sampled",
+      "got": "holds-sampled",
+      "witness": null,
+      "ok": true
+    },
+    {
+      "id": "O-NEG-UNCHECKED-WRAP",
+      "expect": "violated",
+      "got": "violated",
+      "witness": "(2147483647)",
+      "ok": true
+    },
+    {
+      "id": "O-NEG-CHECKED-THROWS",
+      "expect": "violated",
+      "got": "violated",
+      "witness": "(2147483647)",
+      "ok": true
+    },
+    {
+      "id": "O-NEG-MIXED-SIGN",
+      "expect": "violated",
+      "got": "violated",
+      "witness": "(-1, 4294967295)",
+      "ok": true
+    },
+    {
+      "id": "O-NEG-SHIFT-MASK",
+      "expect": "violated",
+      "got": "violated",
+      "witness": "(-2147483648)",
+      "ok": true
+    },
+    {
+      "id": "O-NEG-NULL-STRING",
+      "expect": "violated",
+      "got": "violated",
+      "witness": "(null) -\u003E result=(null)",
+      "ok": true
+    },
+    {
+      "id": "O-NEG-CULTURE",
+      "expect": "violated",
+      "got": "violated",
+      "witness": "(\u0022abc\u0022)",
+      "ok": true
+    },
+    {
+      "id": "O-NEG-BODY-EXCLUDED",
+      "expect": "holds-sampled",
+      "got": "holds-sampled",
+      "witness": null,
+      "ok": true
+    },
+    {
+      "id": "O-EXISTS-WITNESS",
+      "expect": "witness-found",
+      "got": "witness-found",
+      "witness": "(-7)",
+      "ok": true
+    },
+    {
+      "id": "O-EXISTS-NONE",
+      "expect": "no-witness-exhaustive",
+      "got": "no-witness-exhaustive",
+      "witness": null,
+      "ok": true
+    },
+    {
+      "id": "O-VACUOUS",
+      "expect": "vacuous-in-domain",
+      "got": "vacuous-in-domain",
+      "witness": null,
+      "ok": true
+    }
+  ]
+}

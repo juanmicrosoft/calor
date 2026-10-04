@@ -1,0 +1,51 @@
+{
+  "ceilings": {
+    "s1-generated-cases": "3,008 for #1311 (1,500 base + 1,508 run-2 exception, amendments 1.2.0/1.2.1)",
+    "s1-timebox": "2026-10-13T00:36:51Z",
+    "s1-agent-hours": 20,
+    "s1-ci-minutes": 600,
+    "s1-local-machine-hours": 10,
+    "paid-spend-usd": 0
+  },
+  "run2": {
+    "caseExecutions": 1508,
+    "of": 1508,
+    "byBucket": {
+      "controls": 64,
+      "p845": 6,
+      "reserve-cross-baseline": 64,
+      "reserve-p845-availability": 14,
+      "reserve-retry": 4,
+      "sweep": 1356
+    },
+    "byBaseline": {
+      "B1": 744,
+      "N1": 744,
+      "P845": 20
+    },
+    "reserveUsed": 82,
+    "reserveAvailable": "74 registered + 8 for the cross-baseline re-runs",
+    "invalidRunRestarts": 0,
+    "sweepWallClockSeconds": 199.1,
+    "startedUtc": "2026-10-04T02:03:29.4045070Z",
+    "lastExecutionStartedUtc": "2026-10-04T02:07:14.5591120Z"
+  },
+  "run1": {
+    "caseExecutions": 1500,
+    "of": 1500,
+    "source": "docs/plans/evidence/s1-1311/capacity.json"
+  },
+  "combined": {
+    "caseExecutions": 3008,
+    "of": 3008,
+    "agentHours": "about 3 (run 1) + about 2.5 (run 2: preparation, the amendment-1.2.1 wait excluded, execution, packet, reviews) = about 5.5 of 20",
+    "localMachineHours": "under 1 (run 1) + under 1 (run 2: sweep 199 s, crossrun 7 s, builds and tests minutes) = under 2 of 10",
+    "ciRunnerMinutes": "0 of 600 (PR CI is ordinary PR CI, contract section 9)",
+    "paidSpendUsd": 0,
+    "timebox": "run 2 finished 2026-10-04, inside 2026-10-13T00:36:51Z"
+  },
+  "notes": [
+    "Every run-2 execution is in run2/ledger.jsonl (1,508 lines): run (1,444: controls 64, P845 6, P845 availability 14 from the reserve, sweep 1,356, retries 4 from the reserve) then crossrun (64 from the reserve: the 56 run 1 executed and the 8 it could not). No restart, no invalid run, nothing outside the ledger.",
+    "The crossrun not-run reason text in the harness still says \"1,500-execution ceiling reached\"; no case reached it in run 2 (amendment 1.2.1 review note: left unchanged)."
+  ]
+}

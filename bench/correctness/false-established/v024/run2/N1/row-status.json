@@ -1,0 +1,1894 @@
+{
+  "baseline": "N1",
+  "counts": {
+    "CLEAN-WITHIN-BUDGET": 79,
+    "FALSE-PROOF": 4,
+    "FINDING": 10,
+    "NOT-INVESTIGATED": 7
+  },
+  "rows": [
+    {
+      "id": "N1:NUM-ARITH-ADD",
+      "row": "NUM-ARITH-ADD",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 16,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 11,
+        "refusal-validated": 2,
+        "validated-proof": 3
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-ARITH-ADD.jsonl"
+    },
+    {
+      "id": "N1:NUM-ARITH-SUB",
+      "row": "NUM-ARITH-SUB",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 16,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 11,
+        "refusal-validated": 3,
+        "validated-proof": 2
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-ARITH-SUB.jsonl"
+    },
+    {
+      "id": "N1:NUM-ARITH-MUL",
+      "row": "NUM-ARITH-MUL",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 16,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 10,
+        "refusal-validated": 4,
+        "validated-proof": 2
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-ARITH-MUL.jsonl"
+    },
+    {
+      "id": "N1:NUM-DIVMOD-LITERAL",
+      "row": "NUM-DIVMOD-LITERAL",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 14,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 10,
+        "validated-proof": 4
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-DIVMOD-LITERAL.jsonl"
+    },
+    {
+      "id": "N1:NUM-DIVMOD-VAR-ENTAILED",
+      "row": "NUM-DIVMOD-VAR-ENTAILED",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 11,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 9,
+        "validated-proof": 2
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-DIVMOD-VAR-ENTAILED.jsonl"
+    },
+    {
+      "id": "N1:NUM-DIVMOD-VAR-UNGUARDED",
+      "row": "NUM-DIVMOD-VAR-UNGUARDED",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 11,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 10,
+        "refusal-validated": 1
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-DIVMOD-VAR-UNGUARDED.jsonl"
+    },
+    {
+      "id": "N1:NUM-SHIFT",
+      "row": "NUM-SHIFT",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 17,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 16,
+        "validated-proof": 1
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 4,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-SHIFT.jsonl"
+    },
+    {
+      "id": "N1:NUM-BITWISE",
+      "row": "NUM-BITWISE",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 14,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 11,
+        "validated-proof": 3
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 8,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-BITWISE.jsonl"
+    },
+    {
+      "id": "N1:NUM-COMPARE",
+      "row": "NUM-COMPARE",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 17,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 13,
+        "validated-proof": 4
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 4,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-COMPARE.jsonl"
+    },
+    {
+      "id": "N1:NUM-EQUALITY",
+      "row": "NUM-EQUALITY",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 11,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 9,
+        "validated-proof": 2
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 2,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-EQUALITY.jsonl"
+    },
+    {
+      "id": "N1:NUM-NEGATE",
+      "row": "NUM-NEGATE",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 11,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 7,
+        "validated-proof": 4
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-NEGATE.jsonl"
+    },
+    {
+      "id": "N1:NUM-NARROW-ARITH",
+      "row": "NUM-NARROW-ARITH",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "FINDING",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 7,
+        "required-demotion-absent": 1
+      },
+      "findingClasses": [
+        "required-demotion-absent"
+      ],
+      "exhaustiveDomains": 1,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-NARROW-ARITH.jsonl"
+    },
+    {
+      "id": "N1:NUM-NARROW-COMPARE",
+      "row": "NUM-NARROW-COMPARE",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 3,
+        "validated-proof": 5
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 2,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-NARROW-COMPARE.jsonl"
+    },
+    {
+      "id": "N1:NUM-LITERAL-TYPED",
+      "row": "NUM-LITERAL-TYPED",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 11,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 10,
+        "validated-proof": 1
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-LITERAL-TYPED.jsonl"
+    },
+    {
+      "id": "N1:NUM-LITERAL-OVERSIZE",
+      "row": "NUM-LITERAL-OVERSIZE",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "FINDING",
+      "blockedAtTimebox": false,
+      "allocated": 4,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 3,
+        "required-demotion-absent": 1
+      },
+      "findingClasses": [
+        "required-demotion-absent"
+      ],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-LITERAL-OVERSIZE.jsonl"
+    },
+    {
+      "id": "N1:NUM-MIXED-U64-SIGNED",
+      "row": "NUM-MIXED-U64-SIGNED",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 5,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 5
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-MIXED-U64-SIGNED.jsonl"
+    },
+    {
+      "id": "N1:NUM-UNWHITELISTED-OPS",
+      "row": "NUM-UNWHITELISTED-OPS",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 3,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 3
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-UNWHITELISTED-OPS.jsonl"
+    },
+    {
+      "id": "N1:NUM-OVERFLOW-CHECKED",
+      "row": "NUM-OVERFLOW-CHECKED",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "status": "FINDING",
+      "blockedAtTimebox": false,
+      "allocated": 12,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 8,
+        "required-demotion-absent": 3,
+        "timed-out": 1
+      },
+      "findingClasses": [
+        "required-demotion-absent"
+      ],
+      "exhaustiveDomains": 0,
+      "reasons": [
+        "1 timed-out"
+      ],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-OVERFLOW-CHECKED.jsonl"
+    },
+    {
+      "id": "N1:NUM-OVERFLOW-UNCHECKED",
+      "row": "NUM-OVERFLOW-UNCHECKED",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 12,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 3,
+        "validated-proof": 9
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/NUM-OVERFLOW-UNCHECKED.jsonl"
+    },
+    {
+      "id": "N1:BOOL-CONNECTIVES",
+      "row": "BOOL-CONNECTIVES",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 16,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 13,
+        "validated-proof": 3
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 16,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BOOL-CONNECTIVES.jsonl"
+    },
+    {
+      "id": "N1:BOOL-SHORTCIRCUIT",
+      "row": "BOOL-SHORTCIRCUIT",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 8
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BOOL-SHORTCIRCUIT.jsonl"
+    },
+    {
+      "id": "N1:BOOL-CONDITIONAL",
+      "row": "BOOL-CONDITIONAL",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 11,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 9,
+        "validated-proof": 2
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 5,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BOOL-CONDITIONAL.jsonl"
+    },
+    {
+      "id": "N1:BOOL-IMPLICATION",
+      "row": "BOOL-IMPLICATION",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 4,
+        "refusal-validated": 1,
+        "validated-proof": 3
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 5,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BOOL-IMPLICATION.jsonl"
+    },
+    {
+      "id": "N1:BOOL-NESTING",
+      "row": "BOOL-NESTING",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 7,
+        "validated-proof": 1
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 8,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BOOL-NESTING.jsonl"
+    },
+    {
+      "id": "N1:BODY-RETURN-EXPR",
+      "row": "BODY-RETURN-EXPR",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 14,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 12,
+        "refusal-validated": 1,
+        "validated-proof": 1
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BODY-RETURN-EXPR.jsonl"
+    },
+    {
+      "id": "N1:BODY-IF-ELSE",
+      "row": "BODY-IF-ELSE",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 14,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 11,
+        "validated-proof": 3
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BODY-IF-ELSE.jsonl"
+    },
+    {
+      "id": "N1:BODY-GUARD-CLAUSE",
+      "row": "BODY-GUARD-CLAUSE",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 11,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 7,
+        "validated-proof": 4
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BODY-GUARD-CLAUSE.jsonl"
+    },
+    {
+      "id": "N1:BODY-NESTED-RETURN",
+      "row": "BODY-NESTED-RETURN",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 7,
+        "validated-proof": 1
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BODY-NESTED-RETURN.jsonl"
+    },
+    {
+      "id": "N1:BODY-IMMUTABLE-BIND",
+      "row": "BODY-IMMUTABLE-BIND",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 11,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 8,
+        "validated-proof": 3
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BODY-IMMUTABLE-BIND.jsonl"
+    },
+    {
+      "id": "N1:BODY-WIDTH-BIND",
+      "row": "BODY-WIDTH-BIND",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 5,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 5
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BODY-WIDTH-BIND.jsonl"
+    },
+    {
+      "id": "N1:BODY-DIVISION",
+      "row": "BODY-DIVISION",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 7,
+        "refusal-validated": 1
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BODY-DIVISION.jsonl"
+    },
+    {
+      "id": "N1:BODY-LOOP-CALL-MUTABLE",
+      "row": "BODY-LOOP-CALL-MUTABLE",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 8
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BODY-LOOP-CALL-MUTABLE.jsonl"
+    },
+    {
+      "id": "N1:BODY-ARRAY-RETURN",
+      "row": "BODY-ARRAY-RETURN",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 4,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 4
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/BODY-ARRAY-RETURN.jsonl"
+    },
+    {
+      "id": "N1:POST-PARAM-PRESERVED",
+      "row": "POST-PARAM-PRESERVED",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 7,
+        "validated-proof": 1
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/POST-PARAM-PRESERVED.jsonl"
+    },
+    {
+      "id": "N1:POST-PARAM-MUTATED",
+      "row": "POST-PARAM-MUTATED",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 8
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/POST-PARAM-MUTATED.jsonl"
+    },
+    {
+      "id": "N1:POST-RESULT-PARAM-COLLISION",
+      "row": "POST-RESULT-PARAM-COLLISION",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 3,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 3
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/POST-RESULT-PARAM-COLLISION.jsonl"
+    },
+    {
+      "id": "N1:POST-ARRAY-ALIAS",
+      "row": "POST-ARRAY-ALIAS",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 5,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 5
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/POST-ARRAY-ALIAS.jsonl"
+    },
+    {
+      "id": "N1:POST-METHOD-RECEIVER",
+      "row": "POST-METHOD-RECEIVER",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 5,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 5
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/POST-METHOD-RECEIVER.jsonl"
+    },
+    {
+      "id": "N1:QNT-FORALL-BOUNDED",
+      "row": "QNT-FORALL-BOUNDED",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 11,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 7,
+        "validated-proof": 4
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/QNT-FORALL-BOUNDED.jsonl"
+    },
+    {
+      "id": "N1:QNT-EXISTS-BOUNDED",
+      "row": "QNT-EXISTS-BOUNDED",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 6,
+        "validated-proof": 2
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/QNT-EXISTS-BOUNDED.jsonl"
+    },
+    {
+      "id": "N1:QNT-UNBOUNDED",
+      "row": "QNT-UNBOUNDED",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 5,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 5
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/QNT-UNBOUNDED.jsonl"
+    },
+    {
+      "id": "N1:QNT-BOUND-TYPES",
+      "row": "QNT-BOUND-TYPES",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 6,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 6
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/QNT-BOUND-TYPES.jsonl"
+    },
+    {
+      "id": "N1:QNT-NESTED",
+      "row": "QNT-NESTED",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "FINDING",
+      "blockedAtTimebox": false,
+      "allocated": 5,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 2,
+        "required-demotion-absent": 3
+      },
+      "findingClasses": [
+        "required-demotion-absent"
+      ],
+      "exhaustiveDomains": 5,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/QNT-NESTED.jsonl"
+    },
+    {
+      "id": "N1:ARR-LENGTH",
+      "row": "ARR-LENGTH",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 6,
+        "refusal-validated": 2
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/ARR-LENGTH.jsonl"
+    },
+    {
+      "id": "N1:ARR-INDEX",
+      "row": "ARR-INDEX",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 6,
+        "refusal-validated": 2
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/ARR-INDEX.jsonl"
+    },
+    {
+      "id": "N1:ARR-ELEMENT-TYPES",
+      "row": "ARR-ELEMENT-TYPES",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 8
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/ARR-ELEMENT-TYPES.jsonl"
+    },
+    {
+      "id": "N1:ARR-COMPUTED-BASE",
+      "row": "ARR-COMPUTED-BASE",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 4,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 4
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/ARR-COMPUTED-BASE.jsonl"
+    },
+    {
+      "id": "N1:STR-OPS-PREDICATE",
+      "row": "STR-OPS-PREDICATE",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 11,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 6,
+        "refusal-validated": 5
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/STR-OPS-PREDICATE.jsonl"
+    },
+    {
+      "id": "N1:STR-OPS-COUNT-INDEX",
+      "row": "STR-OPS-COUNT-INDEX",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "status": "FINDING",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 5,
+        "refusal-validated": 1,
+        "spurious-refutation": 1,
+        "timed-out": 1
+      },
+      "findingClasses": [
+        "spurious-refutation"
+      ],
+      "exhaustiveDomains": 0,
+      "reasons": [
+        "1 timed-out"
+      ],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/STR-OPS-COUNT-INDEX.jsonl"
+    },
+    {
+      "id": "N1:STR-CULTURE-MODE",
+      "row": "STR-CULTURE-MODE",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 7,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 7
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/STR-CULTURE-MODE.jsonl"
+    },
+    {
+      "id": "N1:STR-UNMODELED-OPS",
+      "row": "STR-UNMODELED-OPS",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 5,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 5
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/STR-UNMODELED-OPS.jsonl"
+    },
+    {
+      "id": "N1:STR-NULL-NONASCII",
+      "row": "STR-NULL-NONASCII",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "status": "FINDING",
+      "blockedAtTimebox": false,
+      "allocated": 5,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 2,
+        "refusal-validated": 1,
+        "spurious-refutation": 2
+      },
+      "findingClasses": [
+        "spurious-refutation"
+      ],
+      "exhaustiveDomains": 5,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/STR-NULL-NONASCII.jsonl"
+    },
+    {
+      "id": "N1:FLD-ACCESS",
+      "row": "FLD-ACCESS",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 7,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 7
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/FLD-ACCESS.jsonl"
+    },
+    {
+      "id": "N1:FLD-INHERITED-NESTED",
+      "row": "FLD-INHERITED-NESTED",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 5,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 5
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/FLD-INHERITED-NESTED.jsonl"
+    },
+    {
+      "id": "N1:FLD-IMPLICIT-RECEIVER",
+      "row": "FLD-IMPLICIT-RECEIVER",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 4,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 4
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/FLD-IMPLICIT-RECEIVER.jsonl"
+    },
+    {
+      "id": "N1:FLT-REFUSAL",
+      "row": "FLT-REFUSAL",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 8
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/FLT-REFUSAL.jsonl"
+    },
+    {
+      "id": "N1:CALL-IN-CONTRACT",
+      "row": "CALL-IN-CONTRACT",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 5,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 5
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CALL-IN-CONTRACT.jsonl"
+    },
+    {
+      "id": "N1:GEN-REFUSAL",
+      "row": "GEN-REFUSAL",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 4,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 2,
+        "refusal-validated": 2
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/GEN-REFUSAL.jsonl"
+    },
+    {
+      "id": "N1:VAC-UNSAT-PRECONDITIONS",
+      "row": "VAC-UNSAT-PRECONDITIONS",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 8
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 4,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/VAC-UNSAT-PRECONDITIONS.jsonl"
+    },
+    {
+      "id": "N1:VAC-PRECONDITION-SAT-CLAIM",
+      "row": "VAC-PRECONDITION-SAT-CLAIM",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 7,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 2,
+        "validated-proof": 5
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 3,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/VAC-PRECONDITION-SAT-CLAIM.jsonl"
+    },
+    {
+      "id": "N1:OBL-PROOF",
+      "row": "OBL-PROOF",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 11,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 8,
+        "validated-proof": 3
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-PROOF.jsonl"
+    },
+    {
+      "id": "N1:OBL-BRANCH-FACTS",
+      "row": "OBL-BRANCH-FACTS",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "FINDING",
+      "blockedAtTimebox": false,
+      "allocated": 13,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 11,
+        "spurious-refutation": 2
+      },
+      "findingClasses": [
+        "spurious-refutation"
+      ],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-BRANCH-FACTS.jsonl"
+    },
+    {
+      "id": "N1:OBL-LOOP-FACTS",
+      "row": "OBL-LOOP-FACTS",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 3,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 3
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 3,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-LOOP-FACTS.jsonl"
+    },
+    {
+      "id": "N1:OBL-MUTATION-KILL",
+      "row": "OBL-MUTATION-KILL",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "FALSE-PROOF",
+      "blockedAtTimebox": false,
+      "allocated": 7,
+      "unexecuted": 0,
+      "classCounts": {
+        "false-unconditional-proof": 2,
+        "spurious-refutation": 4,
+        "validated-proof": 1
+      },
+      "findingClasses": [
+        "false-unconditional-proof",
+        "spurious-refutation"
+      ],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-MUTATION-KILL.jsonl"
+    },
+    {
+      "id": "N1:OBL-LOOP-VARIABLE",
+      "row": "OBL-LOOP-VARIABLE",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 2,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 2
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 2,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-LOOP-VARIABLE.jsonl"
+    },
+    {
+      "id": "N1:OBL-REFINEMENT-ENTRY",
+      "row": "OBL-REFINEMENT-ENTRY",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 6,
+        "validated-proof": 2
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-REFINEMENT-ENTRY.jsonl"
+    },
+    {
+      "id": "N1:OBL-REFINEMENT-RETURN",
+      "row": "OBL-REFINEMENT-RETURN",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "FINDING",
+      "blockedAtTimebox": false,
+      "allocated": 5,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 4,
+        "spurious-refutation": 1
+      },
+      "findingClasses": [
+        "spurious-refutation"
+      ],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-REFINEMENT-RETURN.jsonl"
+    },
+    {
+      "id": "N1:OBL-SUBTYPE",
+      "row": "OBL-SUBTYPE",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "FINDING",
+      "blockedAtTimebox": false,
+      "allocated": 5,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 4,
+        "spurious-refutation": 1
+      },
+      "findingClasses": [
+        "spurious-refutation"
+      ],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-SUBTYPE.jsonl"
+    },
+    {
+      "id": "N1:OBL-INDEX-BOUNDS",
+      "row": "OBL-INDEX-BOUNDS",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 4,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 4
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-INDEX-BOUNDS.jsonl"
+    },
+    {
+      "id": "N1:OBL-SELFREF",
+      "row": "OBL-SELFREF",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "FINDING",
+      "blockedAtTimebox": false,
+      "allocated": 5,
+      "unexecuted": 0,
+      "classCounts": {
+        "spurious-refutation": 5
+      },
+      "findingClasses": [
+        "spurious-refutation"
+      ],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-SELFREF.jsonl"
+    },
+    {
+      "id": "N1:OBL-UNGATED-FORMS",
+      "row": "OBL-UNGATED-FORMS",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 8
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-UNGATED-FORMS.jsonl"
+    },
+    {
+      "id": "N1:OBL-UNGATED-REFERENCE",
+      "row": "OBL-UNGATED-REFERENCE",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 5,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 5
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/OBL-UNGATED-REFERENCE.jsonl"
+    },
+    {
+      "id": "N1:IMPL-PRECONDITION-WEAKENING",
+      "row": "IMPL-PRECONDITION-WEAKENING",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 7,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 6,
+        "validated-proof": 1
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/IMPL-PRECONDITION-WEAKENING.jsonl"
+    },
+    {
+      "id": "N1:IMPL-POSTCONDITION-STRENGTHENING",
+      "row": "IMPL-POSTCONDITION-STRENGTHENING",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 5,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 2,
+        "validated-proof": 3
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/IMPL-POSTCONDITION-STRENGTHENING.jsonl"
+    },
+    {
+      "id": "N1:IMPL-ASSUMPTION-FORMS",
+      "row": "IMPL-ASSUMPTION-FORMS",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "FALSE-PROOF",
+      "blockedAtTimebox": false,
+      "allocated": 5,
+      "unexecuted": 0,
+      "classCounts": {
+        "false-unconditional-proof": 3,
+        "no-claim": 2
+      },
+      "findingClasses": [
+        "false-unconditional-proof"
+      ],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/IMPL-ASSUMPTION-FORMS.jsonl"
+    },
+    {
+      "id": "N1:IMPL-DIVISION-TOTALIZED",
+      "row": "IMPL-DIVISION-TOTALIZED",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "FALSE-PROOF",
+      "blockedAtTimebox": false,
+      "allocated": 4,
+      "unexecuted": 0,
+      "classCounts": {
+        "false-unconditional-proof": 1,
+        "no-claim": 3
+      },
+      "findingClasses": [
+        "false-unconditional-proof"
+      ],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/IMPL-DIVISION-TOTALIZED.jsonl"
+    },
+    {
+      "id": "N1:INH-INHERITED-GUARD-EMISSION",
+      "row": "INH-INHERITED-GUARD-EMISSION",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 4,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 4
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/INH-INHERITED-GUARD-EMISSION.jsonl"
+    },
+    {
+      "id": "N1:CACHE-BODY-CHANGE",
+      "row": "CACHE-BODY-CHANGE",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 5,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 5
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CACHE-BODY-CHANGE.jsonl"
+    },
+    {
+      "id": "N1:CACHE-PRECONDITION-CHANGE",
+      "row": "CACHE-PRECONDITION-CHANGE",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 5,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 5
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CACHE-PRECONDITION-CHANGE.jsonl"
+    },
+    {
+      "id": "N1:CACHE-DEPENDENCY-CHANGE",
+      "row": "CACHE-DEPENDENCY-CHANGE",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 4,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 4
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CACHE-DEPENDENCY-CHANGE.jsonl"
+    },
+    {
+      "id": "N1:CACHE-LITERAL-WIDTH",
+      "row": "CACHE-LITERAL-WIDTH",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "FALSE-PROOF",
+      "blockedAtTimebox": false,
+      "allocated": 2,
+      "unexecuted": 0,
+      "classCounts": {
+        "false-unconditional-proof": 1,
+        "spurious-refutation": 1
+      },
+      "findingClasses": [
+        "false-unconditional-proof",
+        "stale-cache-proof",
+        "spurious-refutation"
+      ],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CACHE-LITERAL-WIDTH.jsonl"
+    },
+    {
+      "id": "N1:CACHE-SEMANTICS-VERSION",
+      "row": "CACHE-SEMANTICS-VERSION",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 3,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 3
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CACHE-SEMANTICS-VERSION.jsonl"
+    },
+    {
+      "id": "N1:SIMP-CONSTANT-FOLDING",
+      "row": "SIMP-CONSTANT-FOLDING",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 7,
+        "validated-proof": 1
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/SIMP-CONSTANT-FOLDING.jsonl"
+    },
+    {
+      "id": "N1:SIMP-H1-UNARY-FOLD",
+      "row": "SIMP-H1-UNARY-FOLD",
+      "classification": "modeled",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 11,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 11
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/SIMP-H1-UNARY-FOLD.jsonl"
+    },
+    {
+      "id": "N1:SIMP-H1-INVALID-TYPING",
+      "row": "SIMP-H1-INVALID-TYPING",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 2,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 2
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/SIMP-H1-INVALID-TYPING.jsonl"
+    },
+    {
+      "id": "N1:MIX-QNT-ARRAY",
+      "row": "MIX-QNT-ARRAY",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 4,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 4
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/MIX-QNT-ARRAY.jsonl"
+    },
+    {
+      "id": "N1:MIX-STR-COND",
+      "row": "MIX-STR-COND",
+      "classification": "assumed",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 3,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 3
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/MIX-STR-COND.jsonl"
+    },
+    {
+      "id": "N1:MIX-DIV-IMPL",
+      "row": "MIX-DIV-IMPL",
+      "classification": "unsupported-refused",
+      "releaseCritical": true,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 3,
+      "unexecuted": 0,
+      "classCounts": {
+        "refusal-validated": 3
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/MIX-DIV-IMPL.jsonl"
+    },
+    {
+      "id": "N1:CTRL-POSITIVE",
+      "row": "CTRL-POSITIVE",
+      "classification": "modeled",
+      "releaseCritical": false,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "validated-proof": 8
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 4,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CTRL-POSITIVE.jsonl"
+    },
+    {
+      "id": "N1:CTRL-NEGATIVE",
+      "row": "CTRL-NEGATIVE",
+      "classification": "modeled",
+      "releaseCritical": false,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 6,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 6
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CTRL-NEGATIVE.jsonl"
+    },
+    {
+      "id": "N1:CTRL-MUTATION",
+      "row": "CTRL-MUTATION",
+      "classification": "modeled",
+      "releaseCritical": false,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 4,
+      "unexecuted": 0,
+      "classCounts": {
+        "validated-proof": 4
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CTRL-MUTATION.jsonl"
+    },
+    {
+      "id": "N1:CTRL-RETRO-845",
+      "row": "CTRL-RETRO-845",
+      "classification": "modeled",
+      "releaseCritical": false,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 6,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 3,
+        "validated-proof": 3
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CTRL-RETRO-845.jsonl"
+    },
+    {
+      "id": "N1:CTRL-RETRO-FIXED",
+      "row": "CTRL-RETRO-FIXED",
+      "classification": "modeled",
+      "releaseCritical": false,
+      "status": "CLEAN-WITHIN-BUDGET",
+      "blockedAtTimebox": false,
+      "allocated": 8,
+      "unexecuted": 0,
+      "classCounts": {
+        "no-claim": 7,
+        "validated-proof": 1
+      },
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/CTRL-RETRO-FIXED.jsonl"
+    },
+    {
+      "id": "N1:XCL-KINDUCTION",
+      "row": "XCL-KINDUCTION",
+      "classification": "not-investigated",
+      "releaseCritical": false,
+      "status": "NOT-INVESTIGATED",
+      "blockedAtTimebox": false,
+      "allocated": 0,
+      "unexecuted": 0,
+      "classCounts": {},
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/XCL-KINDUCTION.jsonl"
+    },
+    {
+      "id": "N1:XCL-BUGPATTERNS",
+      "row": "XCL-BUGPATTERNS",
+      "classification": "not-investigated",
+      "releaseCritical": false,
+      "status": "NOT-INVESTIGATED",
+      "blockedAtTimebox": false,
+      "allocated": 0,
+      "unexecuted": 0,
+      "classCounts": {},
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/XCL-BUGPATTERNS.jsonl"
+    },
+    {
+      "id": "N1:XCL-SURFACE-PARITY",
+      "row": "XCL-SURFACE-PARITY",
+      "classification": "not-investigated",
+      "releaseCritical": false,
+      "status": "NOT-INVESTIGATED",
+      "blockedAtTimebox": false,
+      "allocated": 0,
+      "unexecuted": 0,
+      "classCounts": {},
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/XCL-SURFACE-PARITY.jsonl"
+    },
+    {
+      "id": "N1:XCL-WEAKENING-CHECK",
+      "row": "XCL-WEAKENING-CHECK",
+      "classification": "not-investigated",
+      "releaseCritical": false,
+      "status": "NOT-INVESTIGATED",
+      "blockedAtTimebox": false,
+      "allocated": 0,
+      "unexecuted": 0,
+      "classCounts": {},
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/XCL-WEAKENING-CHECK.jsonl"
+    },
+    {
+      "id": "N1:XCL-QNT-NONNUMERIC-BOUND",
+      "row": "XCL-QNT-NONNUMERIC-BOUND",
+      "classification": "not-investigated",
+      "releaseCritical": false,
+      "status": "NOT-INVESTIGATED",
+      "blockedAtTimebox": false,
+      "allocated": 0,
+      "unexecuted": 0,
+      "classCounts": {},
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/XCL-QNT-NONNUMERIC-BOUND.jsonl"
+    },
+    {
+      "id": "N1:XCL-PRECONDITION-SAT-FORMS",
+      "row": "XCL-PRECONDITION-SAT-FORMS",
+      "classification": "not-investigated",
+      "releaseCritical": false,
+      "status": "NOT-INVESTIGATED",
+      "blockedAtTimebox": false,
+      "allocated": 0,
+      "unexecuted": 0,
+      "classCounts": {},
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/XCL-PRECONDITION-SAT-FORMS.jsonl"
+    },
+    {
+      "id": "N1:XCL-HEAP-GENERICS",
+      "row": "XCL-HEAP-GENERICS",
+      "classification": "not-investigated",
+      "releaseCritical": false,
+      "status": "NOT-INVESTIGATED",
+      "blockedAtTimebox": false,
+      "allocated": 0,
+      "unexecuted": 0,
+      "classCounts": {},
+      "findingClasses": [],
+      "exhaustiveDomains": 0,
+      "reasons": [],
+      "controlMismatchesGuardingThisRow": [],
+      "resultPath": "bench/correctness/false-established/v024/N1/rows/XCL-HEAP-GENERICS.jsonl"
+    }
+  ]
+}
