@@ -13,6 +13,7 @@ public sealed class ObligationSolver : IDisposable
 {
     private readonly Context _ctx;
     private readonly uint _timeoutMs;
+    private HashSet<string> _propertyNames = new(StringComparer.Ordinal);
     private bool _checkIntegerOverflow = true;
     private bool _disposed;
 
@@ -30,6 +31,10 @@ public sealed class ObligationSolver : IDisposable
         ModuleNode module)
     {
         _checkIntegerOverflow = module.ShouldCheckIntegerOverflow();
+        _propertyNames = module.Classes.SelectMany(type => type.Properties)
+            .Concat(module.Interfaces.SelectMany(type => type.Properties))
+            .Select(property => property.Name)
+            .ToHashSet(StringComparer.Ordinal);
         // Build a lookup of function info for parameter declarations
         var functionInfo = BuildFunctionInfo(module);
         var userTypeRegistry = ContractTranslator.BuildUserTypeRegistry(module);
@@ -310,6 +315,8 @@ public sealed class ObligationSolver : IDisposable
                         .Append(obligation.Condition)
                         .Any(e => FactCollector.ReferencedNames(e).Overlaps(info.Facts.DroppedFactNames)))
                     inexact.Add("a dropped entry refinement constrains a variable this query reads");
+                if (FactCollector.ReadsProperty(obligation.Condition, _propertyNames))
+                    inexact.Add("the obligation reads a property, whose getter is not modeled");
             }
             if (status == Status.SATISFIABLE && inexact.Count > 0)
             {

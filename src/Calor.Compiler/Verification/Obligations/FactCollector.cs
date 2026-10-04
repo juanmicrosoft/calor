@@ -220,7 +220,7 @@ public sealed class FactCollector
             switch (stmt)
             {
                 case ForStatementNode forStmt:
-                    var bounded = CollectFromForLoop(forStmt);
+                    var bounded = CollectFromForLoop(forStmt) && !MayThrow(forStmt.From) && !MayThrow(forStmt.To);
                     Walk(forStmt.Body, reachedExactly && bounded);
                     break;
 
@@ -228,11 +228,12 @@ public sealed class FactCollector
                     // The while condition holds on entry to each iteration, but a
                     // body that reassigns its variables invalidates it mid-body.
                     var guarded = AddGuardFact(whileStmt.Condition, whileStmt.Body);
-                    Walk(whileStmt.Body, reachedExactly && guarded);
+                    Walk(whileStmt.Body, reachedExactly && guarded && !MayThrow(whileStmt.Condition));
                     break;
 
                 case IfStatementNode ifStmt:
-                    CollectFromIf(ifStmt, reachedExactly);
+                    CollectFromIf(ifStmt, reachedExactly && !MayThrow(ifStmt.Condition)
+                        && !ifStmt.ElseIfClauses.Any(clause => MayThrow(clause.Condition)));
                     break;
 
                 case DoWhileStatementNode doWhile:
@@ -254,10 +255,42 @@ public sealed class FactCollector
                     break;
             }
 
-            if (CanDivert(stmt))
+            // #1413 (discovery D-OBL-THROWING-PREDECESSOR, amendment 1.3.0): a statement that may
+            // throw stops the paths on which it throws, which the solver does not model.
+            if (CanDivert(stmt) || MayThrow(stmt))
                 diverted = true;
         }
     }
+
+    /// <summary>
+    /// #1413 (D-OBL-THROWING-PREDECESSOR): whether evaluating the node may throw. Only names,
+    /// literals, comparisons, logic, bitwise operators and shifts, conditionals, bindings, and
+    /// assignments to plain names count as non-throwing. Any other form may throw, including
+    /// checked or dividing arithmetic, calls, member and element reads, casts, and a retained
+    /// proof guard.
+    /// </summary>
+    internal static bool MayThrow(AstNode node)
+        => DescendantsAndSelf(node).Any(n => n switch
+        {
+            ReferenceNode reference => reference.Name.Contains('.'),
+            IntLiteralNode or BoolLiteralNode or StringLiteralNode or FloatLiteralNode or DecimalLiteralNode => false,
+            BinaryOperationNode binary => binary.Operator is BinaryOperator.Add or BinaryOperator.Subtract
+                or BinaryOperator.Multiply or BinaryOperator.Divide or BinaryOperator.Modulo or BinaryOperator.Power,
+            UnaryOperationNode unary => unary.Operator is not (UnaryOperator.Not or UnaryOperator.BitwiseNot),
+            ConditionalExpressionNode or BindStatementNode or AssignmentStatementNode or IfStatementNode or ElseIfClauseNode => false,
+            _ => true,
+        });
+
+    /// <summary>
+    /// #1413 (discovery D-OBL-PROOF-GETTER, amendment 1.3.0): whether an expression reads a member
+    /// that a declared property has (a getter the solver does not model, or a property that hides
+    /// an inherited field the solver models instead).
+    /// </summary>
+    internal static bool ReadsProperty(ExpressionNode expression, IReadOnlySet<string> propertyNames)
+        => DescendantsAndSelf(expression).Any(n =>
+            n is FieldAccessNode field && propertyNames.Contains(field.FieldName)
+            || n is ReferenceNode reference && reference.Name.Contains('.')
+               && reference.Name.Split('.').Skip(1).Any(propertyNames.Contains));
 
     /// <summary>Each condition is a fact only within the body it guards; #1413 (S1 OBL-BRANCH-FACTS):
     /// elseif and else bodies also get the negations of the earlier conditions.</summary>
