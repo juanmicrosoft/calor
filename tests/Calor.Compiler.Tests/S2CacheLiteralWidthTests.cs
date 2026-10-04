@@ -277,7 +277,10 @@ public sealed class S2CacheLiteralWidthTests : IDisposable
     [Fact]
     public void FormatVersion_EvictsPreFixEntries()
     {
-        // Entries of 1.19 and earlier were written under value-only literal keys.
-        Assert.Equal("1.20", VerificationCacheEntry.CurrentFormatVersion);
+        // Entries of 1.19 and earlier were written under value-only literal keys. Later repairs
+        // (#1413 S2) bump the format again, so the pin is a lower bound.
+        var minor = int.Parse(VerificationCacheEntry.CurrentFormatVersion.Split('.')[1]);
+        Assert.StartsWith("1.", VerificationCacheEntry.CurrentFormatVersion);
+        Assert.True(minor >= 20, VerificationCacheEntry.CurrentFormatVersion);
     }
 }

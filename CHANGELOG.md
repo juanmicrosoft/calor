@@ -21,6 +21,24 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Text reaches the solver with .NET's meaning (#1413, #1493).** A string literal is now sent to
+  Z3 one UTF-16 code unit at a time, so `"é"` has length 1 there, as `"é".Length` does in .NET.
+  Before, it had length 2 (one per UTF-8 byte), and a true postcondition such as
+  `(<= (len result) 1)` was reported as possibly violated (`Calor0712`) with a counterexample
+  the program cannot produce. A backslash in a literal is no longer read as a Z3 escape.
+  `s.Substring(i, n)` and `s.Substring(i)` now carry their range conditions, so a
+  counterexample is not an input where that substring throws. A substring in a conditionally
+  evaluated position, or one whose range reads a local binding, makes the result
+  `Unsupported`. `IndexOf` with a start index is now
+  `Unsupported`: the generated C# ignores the start index, so the solver must not model one.
+  Separately, Z3 symbol names for non-ASCII identifiers are now escaped to ASCII. On Windows,
+  two different identifiers outside the code page (say `ж` and `щ`) used to become one solver
+  variable, which could prove a false contract. Proofs that touch strings stay `Assumed` and
+  keep their runtime checks. A precondition set that is unsatisfiable only in the solver's
+  null-free model is no longer reported as vacuous or unsatisfiable when a null could satisfy
+  it (through `==`, `Equals`, or `IsNullOrEmpty` on a parameter); the result is `Unsupported`.
+  The verification cache format moves to 1.21, so older entries are invalidated.
+
 - **Three causes of run-to-run and platform-dependent verifier verdicts are fixed (#1135).**
   Whether the verifier is now deterministic on every supported platform is decided by the
   registered determinism protocol (#1421), which runs after this change.
@@ -43,6 +61,41 @@ All notable changes to this project will be documented in this file.
   - **User-level cache on Windows.** The default verification cache and the user effect
     manifests (`~/.calor`) now honor `USERPROFILE` on Windows, as NuGet does. Linux and macOS
     are unchanged.
+
+- **Proof obligations no longer use facts that an assignment made stale (#1413).** With
+  `§Q (> x -1)`, then `§ASSIGN x -5`, then `§PROOF (> x -1)`, the obligation solver still
+  assumed the precondition, reported the obligation discharged, and removed its runtime check.
+  A precondition or parameter refinement is now ignored for every obligation in a body that
+  may write a name it reads, wherever that write is. Writes include `ref`/`out` arguments and
+  writes through an aliased `ref`/`in` parameter. A fact that reads an array element or field
+  is ignored once the body can change them, including through a call, a property getter, an
+  indexer, or `foreach`. A body with raw C# (`§RAW`, `§CS`), unsafe or pointer code, or a
+  lambda gets no facts at all; raw C# in a parameter refinement or precondition makes every
+  obligation of that function `Calor1124`. A failed obligation
+  (`Calor1121`/`Calor1140`, a compile error) is now reported only when the solver's state
+  matches the program's at that point: no reassigned name, no unasserted enclosing guard,
+  and no earlier loop or exit. Otherwise the result is `Calor1124` ("unsupported") and the
+  runtime check stays. This does not track statements that throw before the obligation.
+  New facts: an `else`/`elseif` body knows that the earlier conditions were false, and a
+  parameter of a named refinement type (`§I{Pos:x}`) satisfies its predicate on entry.
+- **Interface contract checks no longer prove what can throw (#1413).** When a class implements
+  an interface, Calor checks that the class's precondition accepts every input the interface
+  accepts. That check treated `s.Length` as defined for a null string and `x % y` as defined
+  for `y = 0`, and reported "Precondition weakening proven" (`Calor0815`) for preconditions that
+  throw on such inputs. The check now models when a quantifier-free integer contract can throw:
+  an unconditional zero divisor, or checked overflow. When such a class precondition throws on
+  an input the interface accepts, Calor reports an LSP error (`Calor0810`) with that input as
+  the counterexample. The interface's precondition limits which inputs its postcondition must
+  cover. A proof that depends on string, array, or user-type values is reported as the new
+  warning `Calor0819` ("Assumed, not proven"), because the solver cannot model them as null.
+  A counterexample over such values is not claimed, because index, substring, and null
+  failures are not modeled. In those cases, and for conditional divisors and quantified
+  contracts, the check says that it could not decide (`Calor0816`). This includes the check
+  that inherited guarantees are compatible. Two identical contracts always count as
+  compatible. Calor reports the inheritance as valid (`Calor0814`) only when every check was
+  proven or the contracts are identical. The syntactic fallback no longer treats `x != c` as
+  weaker than `x == c`. The weakening check (`calor verify --weakening-check`) reports
+  contracts as incomparable when the two files use different overflow policies.
 
 - **The verification cache no longer mixes up `INT:1` and `LONG:1` (#1413).** The cache key
   hashed an integer literal by its value only. After compiling `x + LONG:1`, a later compile
