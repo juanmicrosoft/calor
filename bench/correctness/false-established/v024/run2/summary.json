@@ -1,0 +1,22 @@
+{
+  "B1": {
+    "rowStatusCounts": {
+      "CLEAN-WITHIN-BUDGET": 79,
+      "FALSE-PROOF": 4,
+      "FINDING": 10,
+      "NOT-INVESTIGATED": 7
+    },
+    "findings": 34,
+    "runValidity": "pinned"
+  },
+  "N1": {
+    "rowStatusCounts": {
+      "CLEAN-WITHIN-BUDGET": 79,
+      "FALSE-PROOF": 4,
+      "FINDING": 10,
+      "NOT-INVESTIGATED": 7
+    },
+    "findings": 34,
+    "runValidity": "pinned"
+  }
+}

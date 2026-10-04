@@ -1,0 +1,84 @@
+{
+  "findingId": "F-N1-004",
+  "baseline": "N1",
+  "registrationCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67",
+  "rowId": "NUM-OVERFLOW-CHECKED",
+  "caseId": "R1-NUM-OVERFLOW-CHECKED-008",
+  "templateId": "T-OVF-CHECKED-2",
+  "caseSha256": {
+    "calor": "e2fd7c560c540b600c05d6fccc59109d0f42f0f928ba5814997af8ccad9f7808",
+    "oracle": "2204167d77d43c0bb5b3ebe1452b518c5a21b1d86ce3ffeb673c58c5ca297c36",
+    "prime": null
+  },
+  "class": "required-demotion-absent",
+  "claim": {
+    "site": "postcondition",
+    "token": "Proven",
+    "rawStatus": "Proven",
+    "isVacuous": false,
+    "assumptions": [],
+    "guardInElidedEmission": false,
+    "guardInForcedEmission": true
+  },
+  "witness": {
+    "inputs": null,
+    "source": "the O1 witness",
+    "o1": "holds-sampled",
+    "o2": "not-run",
+    "o2Detail": null
+  },
+  "nonVacuityCheck": {
+    "id": "R1-O1-reached",
+    "result": "passed"
+  },
+  "classReason": null,
+  "minimized": {
+    "status": "registered-case: a single-function probe generated from one template; not reduced further",
+    "calorSource": "\u00A7M{m1:R1Case}\n  \u00A7F{f1:Probe:pub} (u64:x) -\u003E i32\n    \u00A7E{}\n    \u00A7Q (\u003E= x ULONG:4294967296)\n    \u00A7S (\u003C (- x INT:1) x)\n    \u00A7R INT:0\n",
+    "calorPrimeSource": null,
+    "csharpReproduction": "// R1 #1419 independent oracle for R1-NUM-OVERFLOW-CHECKED-008\nusing System;\nusing System.Collections.Generic;\nusing System.Linq;\nusing System.Numerics;\npublic static class R1Oracle\n{\n    public const string Claim = \u0022forall\u0022;\n    public const bool Exhaustive = false;\n    public const bool Checked = true;\n    public static bool Hyp(ulong x) =\u003E x \u003E= 4294967296UL;\n    public static bool Prop(ulong x) =\u003E x - 1 \u003C x;\n    public static bool HypO(object?[] a) =\u003E Hyp((ulong)a[0]!);\n    public static bool HasBody =\u003E false;\n    public static object? BodyO(object?[] a) =\u003E null;\n    public static bool PropO(object?[] a, object? r) =\u003E Prop((ulong)a[0]!);\n    public static IEnumerable\u003Cobject?[]\u003E Inputs()\n    {\n        yield return new object?[] { (ulong)(0) };\n        yield return new object?[] { (ulong)(1) };\n        yield return new object?[] { (ulong)(2) };\n        yield return new object?[] { (ulong)(2147483647) };\n        yield return new object?[] { (ulong)(2147483648UL) };\n        yield return new object?[] { (ulong)(4294967295UL) };\n        yield return new object?[] { (ulong)(4294967296UL) };\n        yield return new object?[] { (ulong)(4294967297UL) };\n        yield return new object?[] { (ulong)(277897317872765881UL) };\n        yield return new object?[] { (ulong)(4640060304820558984UL) };\n        yield return new object?[] { (ulong)(8525092734193960509UL) };\n        yield return new object?[] { (ulong)(9223372036854775807UL) };\n        yield return new object?[] { (ulong)(9223372036854775808UL) };\n        yield return new object?[] { (ulong)(9345543079864817493UL) };\n        yield return new object?[] { (ulong)(10155079698898189145UL) };\n        yield return new object?[] { (ulong)(15828752347621418075UL) };\n        yield return new object?[] { (ulong)(18446744073709551614UL) };\n        yield return new object?[] { (ulong)(18446744073709551615UL) };\n    }\n}\n\npublic static class Repro\n{\n    public static int Main()\n    {\n        int reached = 0;\n        foreach (var a in R1Oracle.Inputs())\n        {\n            bool hyp; object? r = null; bool ok; string why;\n            try { hyp = R1Oracle.HypO(a); } catch { continue; }\n            if (!hyp) continue;\n            if (R1Oracle.HasBody) { try { r = R1Oracle.BodyO(a); } catch { continue; } }\n            reached\u002B\u002B;\n            try { ok = R1Oracle.PropO(a, r); why = \u0022false\u0022; } catch (Exception e) { ok = false; why = \u0022throws \u0022 \u002B e.GetType().Name; }\n            var shown = \u0022(\u0022 \u002B string.Join(\u0022, \u0022, a.Select(v =\u003E v is null ? \u0022null\u0022 : v is Array arr ? \u0022[\u0022 \u002B string.Join(\u0022, \u0022, arr.Cast\u003Cobject\u003E()) \u002B \u0022]\u0022 : v is string s ? \u0022\\\u0022\u0022 \u002B s \u002B \u0022\\\u0022\u0022 : Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture))) \u002B \u0022)\u0022;\n            if (R1Oracle.Claim == \u0022exists\u0022) { if (ok) { Console.WriteLine(\u0022witness \u0022 \u002B shown); return 0; } continue; }\n            if (!ok) { Console.WriteLine(\u0022property \u0022 \u002B why \u002B \u0022 at \u0022 \u002B shown \u002B (R1Oracle.HasBody ? \u0022 result=\u0022 \u002B Convert.ToString(r, System.Globalization.CultureInfo.InvariantCulture) : \u0022\u0022)); return 1; }\n        }\n        Console.WriteLine((R1Oracle.Claim == \u0022exists\u0022 ? \u0022no witness\u0022 : \u0022no violation\u0022) \u002B \u0022 in the registered domain; reached inputs: \u0022 \u002B reached);\n        return 0;\n    }\n}",
+    "reproductionOutput": "no violation in the registered domain; reached inputs: 12 (exit 0)",
+    "sha256": "e2fd7c560c540b600c05d6fccc59109d0f42f0f928ba5814997af8ccad9f7808"
+  },
+  "environment": {
+    "calorDllSha256": "794b28d4956f786fe41e0e5ab2199cad1ab1271a2893ee42d9f9d303289b515b",
+    "z3NativeSha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+    "z3NativeSource": "post-run native-check.json (same process layout)",
+    "dotnetVersion": "10.0.401",
+    "os": "macOS 27.0.1",
+    "translatorSemanticsVersion": "z3-executable-semantics-v2"
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "bucket": "sweep",
+      "status": "executed",
+      "token": "Proven",
+      "class": "required-demotion-absent",
+      "startedUtc": "2026-10-03T16:53:38.7900030Z",
+      "durationMs": 19,
+      "path": "attempts/R1-NUM-OVERFLOW-CHECKED-008/sweep-attempt-1.json"
+    }
+  ],
+  "otherBaseline": {
+    "id": "B1",
+    "result": "reproduces",
+    "rerun": {
+      "caseId": "R1-NUM-OVERFLOW-CHECKED-008",
+      "baseline": "B1",
+      "status": "executed",
+      "token": "Proven",
+      "class": "required-demotion-absent",
+      "addedFindings": [],
+      "path": "attempts/R1-NUM-OVERFLOW-CHECKED-008/reserve-cross-baseline-attempt-1.json"
+    },
+    "otherSweepResult": {
+      "token": "Proven",
+      "class": "required-demotion-absent",
+      "result": "reproduces"
+    }
+  },
+  "affectedGuarantee": "Form: Overflow-sensitive contract shapes under the default checked module: Assumed (checked-arithmetic) unless entailed (row NUM-OVERFLOW-CHECKED). Guard path: a non-vacuous Proven postcondition is elided from the emitted C# by default (ElideProvenGuards, CSharpEmitter postcondition site). Public surfaces that describe this form: docs/verification-modeled-forms.md, website/content/guides/verification-guarantees.mdx, website/content/cli/compile.mdx (located by search; their wording was not audited by S1). No experiment relying on this form was identified by S1; S2 (#1413) confirms.",
+  "filedIssue": null,
+  "disposition": null
+}

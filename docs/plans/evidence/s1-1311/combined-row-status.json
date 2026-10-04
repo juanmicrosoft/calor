@@ -1,0 +1,1494 @@
+{
+  "rule": "Per baseline and row: run-1 findings persist (amendment 1.2.0 condition 7). Combined status is the more severe of the two runs (FALSE-PROOF > FINDING > INCOMPLETE > CLEAN-WITHIN-BUDGET); a row is CLEAN-WITHIN-BUDGET only if it is CLEAN-WITHIN-BUDGET in both runs and run 2 is valid. NOT-INVESTIGATED (excluded XCL-* rows) stays. Run 1 remains provenance-unconfirmed; run 2 is provenance-confirmed. No pooling across baselines.",
+  "run2Valid": true,
+  "baselines": {
+    "B1": {
+      "releaseCritical": {
+        "run1": {
+          "CLEAN-WITHIN-BUDGET": 74,
+          "INCOMPLETE": 0,
+          "FINDING": 10,
+          "FALSE-PROOF": 4
+        },
+        "run2": {
+          "CLEAN-WITHIN-BUDGET": 74,
+          "INCOMPLETE": 0,
+          "FINDING": 10,
+          "FALSE-PROOF": 4
+        },
+        "combined": {
+          "CLEAN-WITHIN-BUDGET": 74,
+          "INCOMPLETE": 0,
+          "FINDING": 10,
+          "FALSE-PROOF": 4
+        }
+      },
+      "allRows": {
+        "run1": {
+          "CLEAN-WITHIN-BUDGET": 79,
+          "FINDING": 10,
+          "FALSE-PROOF": 4,
+          "NOT-INVESTIGATED": 7
+        },
+        "run2": {
+          "CLEAN-WITHIN-BUDGET": 79,
+          "FINDING": 10,
+          "FALSE-PROOF": 4,
+          "NOT-INVESTIGATED": 7
+        },
+        "combined": {
+          "CLEAN-WITHIN-BUDGET": 79,
+          "FINDING": 10,
+          "FALSE-PROOF": 4,
+          "NOT-INVESTIGATED": 7
+        }
+      },
+      "rows": [
+        {
+          "row": "NUM-ARITH-ADD",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-ARITH-SUB",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-ARITH-MUL",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-DIVMOD-LITERAL",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-DIVMOD-VAR-ENTAILED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-DIVMOD-VAR-UNGUARDED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-SHIFT",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-BITWISE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-COMPARE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-EQUALITY",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-NEGATE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-NARROW-ARITH",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "NUM-NARROW-COMPARE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-LITERAL-TYPED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-LITERAL-OVERSIZE",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "NUM-MIXED-U64-SIGNED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-UNWHITELISTED-OPS",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-OVERFLOW-CHECKED",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "NUM-OVERFLOW-UNCHECKED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BOOL-CONNECTIVES",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BOOL-SHORTCIRCUIT",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BOOL-CONDITIONAL",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BOOL-IMPLICATION",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BOOL-NESTING",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BODY-RETURN-EXPR",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BODY-IF-ELSE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BODY-GUARD-CLAUSE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BODY-NESTED-RETURN",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BODY-IMMUTABLE-BIND",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BODY-WIDTH-BIND",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BODY-DIVISION",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BODY-LOOP-CALL-MUTABLE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BODY-ARRAY-RETURN",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "POST-PARAM-PRESERVED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "POST-PARAM-MUTATED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "POST-RESULT-PARAM-COLLISION",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "POST-ARRAY-ALIAS",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "POST-METHOD-RECEIVER",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "QNT-FORALL-BOUNDED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "QNT-EXISTS-BOUNDED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "QNT-UNBOUNDED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "QNT-BOUND-TYPES",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "QNT-NESTED",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "ARR-LENGTH",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "ARR-INDEX",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "ARR-ELEMENT-TYPES",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "ARR-COMPUTED-BASE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "STR-OPS-PREDICATE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "STR-OPS-COUNT-INDEX",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "STR-CULTURE-MODE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "STR-UNMODELED-OPS",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "STR-NULL-NONASCII",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "FLD-ACCESS",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "FLD-INHERITED-NESTED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "FLD-IMPLICIT-RECEIVER",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "FLT-REFUSAL",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CALL-IN-CONTRACT",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "GEN-REFUSAL",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "VAC-UNSAT-PRECONDITIONS",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "VAC-PRECONDITION-SAT-CLAIM",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "OBL-PROOF",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "OBL-BRANCH-FACTS",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "OBL-LOOP-FACTS",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "OBL-MUTATION-KILL",
+          "releaseCritical": true,
+          "run1": "FALSE-PROOF",
+          "run2": "FALSE-PROOF",
+          "combined": "FALSE-PROOF"
+        },
+        {
+          "row": "OBL-LOOP-VARIABLE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "OBL-REFINEMENT-ENTRY",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "OBL-REFINEMENT-RETURN",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "OBL-SUBTYPE",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "OBL-INDEX-BOUNDS",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "OBL-SELFREF",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "OBL-UNGATED-FORMS",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "OBL-UNGATED-REFERENCE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "IMPL-PRECONDITION-WEAKENING",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "IMPL-POSTCONDITION-STRENGTHENING",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "IMPL-ASSUMPTION-FORMS",
+          "releaseCritical": true,
+          "run1": "FALSE-PROOF",
+          "run2": "FALSE-PROOF",
+          "combined": "FALSE-PROOF"
+        },
+        {
+          "row": "IMPL-DIVISION-TOTALIZED",
+          "releaseCritical": true,
+          "run1": "FALSE-PROOF",
+          "run2": "FALSE-PROOF",
+          "combined": "FALSE-PROOF"
+        },
+        {
+          "row": "INH-INHERITED-GUARD-EMISSION",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CACHE-BODY-CHANGE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CACHE-PRECONDITION-CHANGE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CACHE-DEPENDENCY-CHANGE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CACHE-LITERAL-WIDTH",
+          "releaseCritical": true,
+          "run1": "FALSE-PROOF",
+          "run2": "FALSE-PROOF",
+          "combined": "FALSE-PROOF"
+        },
+        {
+          "row": "CACHE-SEMANTICS-VERSION",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "SIMP-CONSTANT-FOLDING",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "SIMP-H1-UNARY-FOLD",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "SIMP-H1-INVALID-TYPING",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "MIX-QNT-ARRAY",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "MIX-STR-COND",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "MIX-DIV-IMPL",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CTRL-POSITIVE",
+          "releaseCritical": false,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CTRL-NEGATIVE",
+          "releaseCritical": false,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CTRL-MUTATION",
+          "releaseCritical": false,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CTRL-RETRO-845",
+          "releaseCritical": false,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CTRL-RETRO-FIXED",
+          "releaseCritical": false,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "XCL-KINDUCTION",
+          "releaseCritical": false,
+          "run1": "NOT-INVESTIGATED",
+          "run2": "NOT-INVESTIGATED",
+          "combined": "NOT-INVESTIGATED"
+        },
+        {
+          "row": "XCL-BUGPATTERNS",
+          "releaseCritical": false,
+          "run1": "NOT-INVESTIGATED",
+          "run2": "NOT-INVESTIGATED",
+          "combined": "NOT-INVESTIGATED"
+        },
+        {
+          "row": "XCL-SURFACE-PARITY",
+          "releaseCritical": false,
+          "run1": "NOT-INVESTIGATED",
+          "run2": "NOT-INVESTIGATED",
+          "combined": "NOT-INVESTIGATED"
+        },
+        {
+          "row": "XCL-WEAKENING-CHECK",
+          "releaseCritical": false,
+          "run1": "NOT-INVESTIGATED",
+          "run2": "NOT-INVESTIGATED",
+          "combined": "NOT-INVESTIGATED"
+        },
+        {
+          "row": "XCL-QNT-NONNUMERIC-BOUND",
+          "releaseCritical": false,
+          "run1": "NOT-INVESTIGATED",
+          "run2": "NOT-INVESTIGATED",
+          "combined": "NOT-INVESTIGATED"
+        },
+        {
+          "row": "XCL-PRECONDITION-SAT-FORMS",
+          "releaseCritical": false,
+          "run1": "NOT-INVESTIGATED",
+          "run2": "NOT-INVESTIGATED",
+          "combined": "NOT-INVESTIGATED"
+        },
+        {
+          "row": "XCL-HEAP-GENERICS",
+          "releaseCritical": false,
+          "run1": "NOT-INVESTIGATED",
+          "run2": "NOT-INVESTIGATED",
+          "combined": "NOT-INVESTIGATED"
+        }
+      ]
+    },
+    "N1": {
+      "releaseCritical": {
+        "run1": {
+          "CLEAN-WITHIN-BUDGET": 74,
+          "INCOMPLETE": 0,
+          "FINDING": 10,
+          "FALSE-PROOF": 4
+        },
+        "run2": {
+          "CLEAN-WITHIN-BUDGET": 74,
+          "INCOMPLETE": 0,
+          "FINDING": 10,
+          "FALSE-PROOF": 4
+        },
+        "combined": {
+          "CLEAN-WITHIN-BUDGET": 74,
+          "INCOMPLETE": 0,
+          "FINDING": 10,
+          "FALSE-PROOF": 4
+        }
+      },
+      "allRows": {
+        "run1": {
+          "CLEAN-WITHIN-BUDGET": 79,
+          "FINDING": 10,
+          "FALSE-PROOF": 4,
+          "NOT-INVESTIGATED": 7
+        },
+        "run2": {
+          "CLEAN-WITHIN-BUDGET": 79,
+          "FINDING": 10,
+          "FALSE-PROOF": 4,
+          "NOT-INVESTIGATED": 7
+        },
+        "combined": {
+          "CLEAN-WITHIN-BUDGET": 79,
+          "FINDING": 10,
+          "FALSE-PROOF": 4,
+          "NOT-INVESTIGATED": 7
+        }
+      },
+      "rows": [
+        {
+          "row": "NUM-ARITH-ADD",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-ARITH-SUB",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-ARITH-MUL",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-DIVMOD-LITERAL",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-DIVMOD-VAR-ENTAILED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-DIVMOD-VAR-UNGUARDED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-SHIFT",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-BITWISE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-COMPARE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-EQUALITY",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-NEGATE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-NARROW-ARITH",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "NUM-NARROW-COMPARE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-LITERAL-TYPED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-LITERAL-OVERSIZE",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "NUM-MIXED-U64-SIGNED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-UNWHITELISTED-OPS",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "NUM-OVERFLOW-CHECKED",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "NUM-OVERFLOW-UNCHECKED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BOOL-CONNECTIVES",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BOOL-SHORTCIRCUIT",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BOOL-CONDITIONAL",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BOOL-IMPLICATION",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BOOL-NESTING",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BODY-RETURN-EXPR",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BODY-IF-ELSE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BODY-GUARD-CLAUSE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BODY-NESTED-RETURN",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BODY-IMMUTABLE-BIND",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BODY-WIDTH-BIND",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BODY-DIVISION",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BODY-LOOP-CALL-MUTABLE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "BODY-ARRAY-RETURN",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "POST-PARAM-PRESERVED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "POST-PARAM-MUTATED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "POST-RESULT-PARAM-COLLISION",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "POST-ARRAY-ALIAS",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "POST-METHOD-RECEIVER",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "QNT-FORALL-BOUNDED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "QNT-EXISTS-BOUNDED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "QNT-UNBOUNDED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "QNT-BOUND-TYPES",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "QNT-NESTED",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "ARR-LENGTH",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "ARR-INDEX",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "ARR-ELEMENT-TYPES",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "ARR-COMPUTED-BASE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "STR-OPS-PREDICATE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "STR-OPS-COUNT-INDEX",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "STR-CULTURE-MODE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "STR-UNMODELED-OPS",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "STR-NULL-NONASCII",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "FLD-ACCESS",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "FLD-INHERITED-NESTED",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "FLD-IMPLICIT-RECEIVER",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "FLT-REFUSAL",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CALL-IN-CONTRACT",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "GEN-REFUSAL",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "VAC-UNSAT-PRECONDITIONS",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "VAC-PRECONDITION-SAT-CLAIM",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "OBL-PROOF",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "OBL-BRANCH-FACTS",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "OBL-LOOP-FACTS",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "OBL-MUTATION-KILL",
+          "releaseCritical": true,
+          "run1": "FALSE-PROOF",
+          "run2": "FALSE-PROOF",
+          "combined": "FALSE-PROOF"
+        },
+        {
+          "row": "OBL-LOOP-VARIABLE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "OBL-REFINEMENT-ENTRY",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "OBL-REFINEMENT-RETURN",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "OBL-SUBTYPE",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "OBL-INDEX-BOUNDS",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "OBL-SELFREF",
+          "releaseCritical": true,
+          "run1": "FINDING",
+          "run2": "FINDING",
+          "combined": "FINDING"
+        },
+        {
+          "row": "OBL-UNGATED-FORMS",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "OBL-UNGATED-REFERENCE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "IMPL-PRECONDITION-WEAKENING",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "IMPL-POSTCONDITION-STRENGTHENING",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "IMPL-ASSUMPTION-FORMS",
+          "releaseCritical": true,
+          "run1": "FALSE-PROOF",
+          "run2": "FALSE-PROOF",
+          "combined": "FALSE-PROOF"
+        },
+        {
+          "row": "IMPL-DIVISION-TOTALIZED",
+          "releaseCritical": true,
+          "run1": "FALSE-PROOF",
+          "run2": "FALSE-PROOF",
+          "combined": "FALSE-PROOF"
+        },
+        {
+          "row": "INH-INHERITED-GUARD-EMISSION",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CACHE-BODY-CHANGE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CACHE-PRECONDITION-CHANGE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CACHE-DEPENDENCY-CHANGE",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CACHE-LITERAL-WIDTH",
+          "releaseCritical": true,
+          "run1": "FALSE-PROOF",
+          "run2": "FALSE-PROOF",
+          "combined": "FALSE-PROOF"
+        },
+        {
+          "row": "CACHE-SEMANTICS-VERSION",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "SIMP-CONSTANT-FOLDING",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "SIMP-H1-UNARY-FOLD",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "SIMP-H1-INVALID-TYPING",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "MIX-QNT-ARRAY",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "MIX-STR-COND",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "MIX-DIV-IMPL",
+          "releaseCritical": true,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CTRL-POSITIVE",
+          "releaseCritical": false,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CTRL-NEGATIVE",
+          "releaseCritical": false,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CTRL-MUTATION",
+          "releaseCritical": false,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CTRL-RETRO-845",
+          "releaseCritical": false,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "CTRL-RETRO-FIXED",
+          "releaseCritical": false,
+          "run1": "CLEAN-WITHIN-BUDGET",
+          "run2": "CLEAN-WITHIN-BUDGET",
+          "combined": "CLEAN-WITHIN-BUDGET"
+        },
+        {
+          "row": "XCL-KINDUCTION",
+          "releaseCritical": false,
+          "run1": "NOT-INVESTIGATED",
+          "run2": "NOT-INVESTIGATED",
+          "combined": "NOT-INVESTIGATED"
+        },
+        {
+          "row": "XCL-BUGPATTERNS",
+          "releaseCritical": false,
+          "run1": "NOT-INVESTIGATED",
+          "run2": "NOT-INVESTIGATED",
+          "combined": "NOT-INVESTIGATED"
+        },
+        {
+          "row": "XCL-SURFACE-PARITY",
+          "releaseCritical": false,
+          "run1": "NOT-INVESTIGATED",
+          "run2": "NOT-INVESTIGATED",
+          "combined": "NOT-INVESTIGATED"
+        },
+        {
+          "row": "XCL-WEAKENING-CHECK",
+          "releaseCritical": false,
+          "run1": "NOT-INVESTIGATED",
+          "run2": "NOT-INVESTIGATED",
+          "combined": "NOT-INVESTIGATED"
+        },
+        {
+          "row": "XCL-QNT-NONNUMERIC-BOUND",
+          "releaseCritical": false,
+          "run1": "NOT-INVESTIGATED",
+          "run2": "NOT-INVESTIGATED",
+          "combined": "NOT-INVESTIGATED"
+        },
+        {
+          "row": "XCL-PRECONDITION-SAT-FORMS",
+          "releaseCritical": false,
+          "run1": "NOT-INVESTIGATED",
+          "run2": "NOT-INVESTIGATED",
+          "combined": "NOT-INVESTIGATED"
+        },
+        {
+          "row": "XCL-HEAP-GENERICS",
+          "releaseCritical": false,
+          "run1": "NOT-INVESTIGATED",
+          "run2": "NOT-INVESTIGATED",
+          "combined": "NOT-INVESTIGATED"
+        }
+      ]
+    }
+  }
+}

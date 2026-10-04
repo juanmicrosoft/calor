@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- #1311 sweep harness: references NO Calor project. The compiler under test is loaded by path and bound by
+       reflection; the generator and oracle are the registered, unmodified sources linked from the test project. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
+    <RestoreLockedMode>false</RestoreLockedMode>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../tests/Calor.Compiler.Tests/SoundnessRegistration/SweepCaseGenerator.cs" Link="Registered/SweepCaseGenerator.cs" />
+    <Compile Include="../../tests/Calor.Compiler.Tests/SoundnessRegistration/IndependentOracle.cs" Link="Registered/IndependentOracle.cs" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+</Project>
