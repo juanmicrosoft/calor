@@ -11,7 +11,7 @@ namespace Calor.Soundness.Sweep;
 // #1311 sweep driver: run, report, reclassify (optional O2 re-replay), crossrun, native-check. Follows registration.json "execution" and "budget".
 internal static partial class Program
 {
-    private const int CaseWallClockSeconds = 120, Reserve = 74, ExecutionCeiling = 1500;
+    private const int CaseWallClockSeconds = 120, Reserve = 74, ExecutionCeiling = 1508;
     internal static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
     private static readonly string[] Pair = ["B1", "N1"];
 
