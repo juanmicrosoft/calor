@@ -114,6 +114,13 @@ public sealed class Z3Verifier : IDisposable
     {
         var sw = Stopwatch.StartNew();
 
+        if (QuantifierNesting.ContainsNestedQuantifier(precondition.Condition))
+        {
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(QuantifierNesting.Refusal)),
+                Duration: sw.Elapsed);
+        }
+
         var translator = CreateTranslator();
 
         // Declare all parameters
@@ -208,6 +215,14 @@ public sealed class Z3Verifier : IDisposable
             outputType = null;
 
         var translator = CreateTranslator();
+
+        if (preconditions.Select(p => p.Condition).Append(postcondition.Condition)
+            .Any(QuantifierNesting.ContainsNestedQuantifier))
+        {
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(QuantifierNesting.Refusal)),
+                Duration: sw.Elapsed);
+        }
 
         // A parameter named `result` collides with the postcondition result variable:
         // DeclareVariable("result") would silently overwrite it, aliasing the two into one

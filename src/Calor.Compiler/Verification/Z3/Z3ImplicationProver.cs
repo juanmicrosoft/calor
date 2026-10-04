@@ -98,6 +98,14 @@ public sealed class Z3ImplicationProver : IDisposable
     {
         var sw = Stopwatch.StartNew();
 
+        if (QuantifierNesting.ContainsNestedQuantifier(antecedent)
+            || QuantifierNesting.ContainsNestedQuantifier(consequent))
+        {
+            return ImplicationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(QuantifierNesting.Refusal)),
+                Duration: sw.Elapsed);
+        }
+
         var translator = new ContractTranslator(_ctx);
 
         // Declare all parameters
@@ -205,6 +213,14 @@ public sealed class Z3ImplicationProver : IDisposable
         ExpressionNode implementerPostcondition)
     {
         var sw = Stopwatch.StartNew();
+
+        if (QuantifierNesting.ContainsNestedQuantifier(interfacePostcondition)
+            || QuantifierNesting.ContainsNestedQuantifier(implementerPostcondition))
+        {
+            return ImplicationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(QuantifierNesting.Refusal)),
+                Duration: sw.Elapsed);
+        }
 
         var translator = new ContractTranslator(_ctx);
 

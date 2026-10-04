@@ -58,6 +58,13 @@ public sealed class ObligationSolver : IDisposable
     {
         var sw = Stopwatch.StartNew();
 
+        if (QuantifierNesting.ContainsNestedQuantifier(obligation.Condition))
+        {
+            obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(QuantifierNesting.Refusal)));
+            obligation.SolverDuration = sw.Elapsed;
+            return;
+        }
+
         var translator = new ContractTranslator(_ctx);
         translator.SetUserTypeRegistry(userTypeRegistry);
 
