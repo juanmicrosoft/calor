@@ -74,21 +74,25 @@
     "projects": "Every project in eng/test-manifest.json. Each one references Calor.Compiler directly or transitively and links the guard.",
     "expectedRidVariable": "CALOR_Z3_EXPECTED_RID",
     "platformDivergences": {
-      "note": "Calor.Verification.Tests cases that load Z3 and run, but give a different result on Windows than on Linux and macOS. They are not Z3-delivery failures and G1 does not repair them; they are reported for the determinism and soundness gates (#1421, #1135, #1419). z3-consumer-matrix deselects exactly these on the listed RIDs, and its TRX check requires every other case to pass with zero skips. Observed on PR #1471, run 37020428891.",
+      "note": "Calor.Verification.Tests cases that load Z3 and run, but give a different result on Windows than on Linux and macOS. z3-consumer-matrix deselects exactly the cases in tests on the listed RIDs, and its TRX check requires every other case to pass with zero skips. G1 (PR #1471, run 37020428891) registered three; the #1135 repair fixed their causes and removed them (resolved), so nothing is deselected. Whether they are deterministic is decided by the #1421 protocol execution, not by this list.",
       "rids": ["win-x64", "win-arm64"],
       "project": "tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj",
-      "tests": [
+      "tests": [],
+      "resolved": [
         {
           "name": "Calor.Verification.Tests.IntegrationTests.StringInBodyOnly_StillNeverElides",
-          "observed": "Windows reports Calor0712 (postcondition may be violated, counterexample result=1) where Linux and macOS report the expected Assumed demotion. Platform-dependent verifier verdict."
+          "observed": "Windows reports Calor0712 (postcondition may be violated, counterexample result=1) where Linux and macOS report the expected Assumed demotion. Platform-dependent verifier verdict.",
+          "cause": "Context.MkString marshals its argument as an ANSI string: UTF-8 on Linux and macOS, the active code page on Windows, so \"é\" had length 1 on Windows instead of the byte model's 2. ContractTranslator now passes non-ASCII UTF-8 bytes as Z3 escapes (#1135)."
         },
         {
           "name": "Calor.Verification.Tests.ContractTranslatorSemanticsVersionGuardTests.TranslatorOutputMatchesCommittedBaseline",
-          "observed": "Translator fixture hash 4df8978f... on Windows against committed 95e8039c... (same SemanticsVersion); the committed baseline is platform-specific."
+          "observed": "Translator fixture hash 4df8978f... on Windows against committed 95e8039c... (same SemanticsVersion).",
+          "cause": "The fixture text was joined with AppendLine (CRLF on Windows). It now joins with LF (#1135)."
         },
         {
           "name": "Calor.Verification.Tests.VerifierRuntimeDifferential.VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle",
-          "observed": "The regenerated differential report contains CR (13) bytes on Windows; the committed report is LF-only."
+          "observed": "The regenerated differential report contains CR (13) bytes on Windows; the committed report is LF-only.",
+          "cause": "System.Text.Json's indented writer uses Environment.NewLine. The report writer now sets NewLine to LF, and the Markdown writer writes LF directly (#1135)."
         }
       ]
     }

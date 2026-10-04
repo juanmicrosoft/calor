@@ -35,6 +35,7 @@ import time
 import urllib.request
 from datetime import datetime
 from pathlib import Path
+from xml.sax.saxutils import escape as xml_escape
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import determinism_protocol as dp  # noqa: E402
@@ -52,9 +53,13 @@ UNDER_HOME = {"APPDATA": "AppData/Roaming", "LOCALAPPDATA": "AppData/Local", "XD
 INSTALLER = {"base": "https://raw.githubusercontent.com/actions/setup-dotnet/67a3573c9a986a3f9c594539f4ab511d57bb3ce9/externals/",
              "install-dotnet.sh": "19b0a7890c371201b944bf0f8cdbb6460d053d63ddbea18cfed3e4199769ce17",
              "install-dotnet.ps1": "7e9969069558023daf52bbf6fc55eb37032eb23c7ff55a7d6afc659d54d6c23b"}
-PROBE = "System.Console.WriteLine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile));\n"
+# Amendment 1.2.0: the probe compiles the verifier's own user-home resolver (the root of its default
+# user-level cache) from the checked-out tree, instead of asking SpecialFolder.UserProfile, which on
+# Windows ignores USERPROFILE.
+USER_HOME_SOURCE = "src/Calor.Compiler/Verification/Z3/Cache/UserHome.cs"
+PROBE = "System.Console.WriteLine(Calor.Compiler.Verification.Z3.Cache.UserHome.Resolve());\n"
 PROBE_PROJECT = ('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework>'
-                 '<UseAppHost>false</UseAppHost></PropertyGroup></Project>\n')
+                 '<UseAppHost>false</UseAppHost></PropertyGroup><ItemGroup><Compile Include="{source}" /></ItemGroup></Project>\n')
 
 
 class Refusal(Exception):
@@ -298,14 +303,14 @@ def physical_memory_bytes():
 
 
 def home_probe(env_vars, probe: Path, nuget: str) -> bool:
-    """Does the pinned runtime resolve SpecialFolder.UserProfile (the root of the verifier's default
-    user-level cache, VerificationCacheOptions) to an isolated home? A probe project outside the
-    repository, built with every output under the probe directory (no file-based-app cache), prints it;
-    any failure is False. Only the comparison is recorded."""
+    """Does the verifier's user-home resolver (UserHome.Resolve, the root of its default user-level
+    cache and user manifests), compiled from this tree and run on the pinned runtime, follow an isolated
+    home? A probe project outside the repository, built with every output under the probe directory (no
+    file-based-app cache), prints it; any failure is False. Only the comparison is recorded."""
     home = probe / "home"
     (home / "tmp").mkdir(parents=True, exist_ok=False)
     (probe / "Program.cs").write_text(PROBE, encoding="utf-8")
-    (probe / "probe.csproj").write_text(PROBE_PROJECT, encoding="utf-8")
+    (probe / "probe.csproj").write_text(PROBE_PROJECT.format(source=xml_escape(str(ROOT / USER_HOME_SOURCE))), encoding="utf-8")
     child = invocation_env(env_vars, probe, "", nuget)
     try:
         built = subprocess.run(["dotnet", "build", str(probe / "probe.csproj"), "-c", "Release", "-o", str(probe / "bin")], cwd=probe,

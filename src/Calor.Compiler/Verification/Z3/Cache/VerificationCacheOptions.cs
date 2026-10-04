@@ -65,7 +65,7 @@ public sealed class VerificationCacheOptions
         }
 
         // Fall back to user-level cache
-        var userHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var userHome = UserHome.Resolve();
         return Path.Combine(userHome, ".calor", "cache", "z3", "v1");
     }
 }

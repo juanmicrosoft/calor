@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The contract verifier gives the same verdict on every run and every platform (#1135).**
+  Three causes are fixed:
+  - **Run to run.** The verifier now checks each query in a fresh Z3 context. Before, Z3 reused
+    the ids of terms that .NET's garbage collector had released, so the order Z3 searched in
+    depended on when the GC ran. The same query took up to three times as much solver work from
+    one run to the next. Once in CI, a query of a kind that takes 30 to 65 ms hit the 5-second
+    timeout and failed the release-critical oracle on an unchanged tree. Verification adds about 1.4 ms per solver check.
+  - **Windows strings.** A string literal with a non-ASCII character reached Z3 in the Windows
+    code page instead of UTF-8. For example, `"é"` had length 1 on Windows but 2 on Linux and
+    macOS, so a postcondition about its length was refuted (`Calor0712`) on Windows only. All
+    platforms now use the UTF-8 byte model. A proof that depends on string semantics is still
+    reported as assumed and keeps its runtime check.
+  - **User-level cache on Windows.** The default verification cache and the user effect
+    manifests (`~/.calor`) now honor `USERPROFILE` on Windows, as NuGet does. Linux and macOS
+    are unchanged.
+
 ### Changed
 
 - **Benchmark publication refuses incomparable results (#1422).** The benchmark workflow now

@@ -73,9 +73,9 @@ public sealed class Z3Verifier : IDisposable
     private readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> _userTypeRegistry;
     private bool _disposed;
 
-    internal static bool ArithmeticSafetyEntailed(Context context, Solver solver, IEnumerable<BoolExpr> conditions)
+    internal static bool ArithmeticSafetyEntailed(Context context, IsolatedSolver solver, IEnumerable<BoolExpr> conditions)
     {
-        var safety = (BoolExpr)context.MkAnd(conditions.ToArray()).Simplify();
+        var safety = IsolatedSolver.Simplify(context, context.MkAnd(conditions.ToArray()));
         if (safety.IsTrue)
             return true;
         solver.Push();
@@ -159,8 +159,7 @@ public sealed class Z3Verifier : IDisposable
         // This is informational - preconditions are always kept as runtime checks
         try
         {
-            var solver = _ctx.MkSolver();
-            solver.Set("timeout", _timeoutMs);
+            using var solver = new IsolatedSolver(_timeoutMs);
             solver.Assert(preconditionExpr);
 
             var status = solver.Check();
@@ -168,7 +167,7 @@ public sealed class Z3Verifier : IDisposable
 
             return ContractVerificationResult.FromOutcome(
                 ProofOutcome.Assign(ProofEvidence.SolverVerdict(
-                    status, solver, translator.Variables, SatPolarity.SatIsProof,
+                    status, solver.CheckedSolver, solver.TranslateVariables(translator.Variables), SatPolarity.SatIsProof,
                     unsatNote: "Precondition is never satisfiable - function can never be called correctly")),
                 warnings,
                 sw.Elapsed);
@@ -294,8 +293,7 @@ public sealed class Z3Verifier : IDisposable
         {
             try
             {
-                var preSolver = _ctx.MkSolver();
-                preSolver.Set("timeout", _timeoutMs);
+                using var preSolver = new IsolatedSolver(_timeoutMs);
                 foreach (var preExpr in preconditionExprs)
                 {
                     preSolver.Assert(preExpr);
@@ -449,8 +447,7 @@ public sealed class Z3Verifier : IDisposable
         // Create solver and perform verification
         try
         {
-            var solver = _ctx.MkSolver();
-            solver.Set("timeout", _timeoutMs);
+            using var solver = new IsolatedSolver(_timeoutMs);
 
             // Assert all preconditions
             foreach (var binding in translator.BindingConstraints)
@@ -579,7 +576,7 @@ public sealed class Z3Verifier : IDisposable
 
             return ContractVerificationResult.FromOutcome(
                 ProofOutcome.Assign(ProofEvidence.SolverVerdict(
-                    status, solver, translator.Variables, SatPolarity.SatIsRefutation)),
+                    status, solver.CheckedSolver, solver.TranslateVariables(translator.Variables), SatPolarity.SatIsRefutation)),
                 warnings,
                 sw.Elapsed);
         }

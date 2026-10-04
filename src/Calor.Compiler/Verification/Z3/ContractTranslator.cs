@@ -460,7 +460,7 @@ public sealed class ContractTranslator
             FieldAccessNode fieldAccess => TranslateFieldAccess(fieldAccess),
 
             // String support using Z3's native string theory
-            StringLiteralNode strLit => TrackString(_ctx.MkString(strLit.Value)),
+            StringLiteralNode strLit => TrackString(_ctx.MkString(ToZ3StringLiteral(strLit.Value))),
             StringOperationNode strOp => TranslateStringOperation(strOp),
 
             // Dependent Types: Self-reference in refinement predicates
@@ -1288,6 +1288,30 @@ public sealed class ContractTranslator
     {
         TouchedNullableReferenceSort = true;
         return TrackBitVec(_ctx.MkBVConst(lengthVarName, 32), 32, isSigned: false);
+    }
+
+    /// <summary>
+    /// The argument for <see cref="Context.MkString"/> that gives the same Z3 string on every
+    /// platform (#1135). The binding marshals it as an ANSI C string: UTF-8 on Linux and macOS,
+    /// the active code page on Windows. So <c>"é"</c> was two characters on Linux and macOS (the
+    /// byte model of <see cref="Z3Verifier.StringModelAssumption"/>) but one on Windows, and a
+    /// character outside the code page became <c>?</c>. Writing every non-ASCII UTF-8 byte as
+    /// Z3's <c>\u{hh}</c> escape and passing ASCII through unchanged makes the marshaled bytes
+    /// ASCII, which every code page maps identically, and reproduces the UTF-8 result exactly:
+    /// Z3 reads a raw byte and its escape as the same character.
+    /// </summary>
+    internal static string ToZ3StringLiteral(string value)
+    {
+        var bytes = System.Text.Encoding.UTF8.GetBytes(value);
+        var builder = new System.Text.StringBuilder(bytes.Length);
+        foreach (var b in bytes)
+        {
+            if (b < 0x80)
+                builder.Append((char)b);
+            else
+                builder.Append(@"\u{").Append(b.ToString("x2", System.Globalization.CultureInfo.InvariantCulture)).Append('}');
+        }
+        return builder.ToString();
     }
 
     private SeqExpr TrackString(SeqExpr expr, bool isNullable = false)

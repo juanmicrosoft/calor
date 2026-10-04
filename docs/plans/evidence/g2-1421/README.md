@@ -198,7 +198,7 @@ Deviations (`workflow.deviations`):
 - `env-check` runs a file-based app on the pinned runtime to check that
   `SpecialFolder.UserProfile` (the root of the verifier's default user-level cache) follows the
   isolated home. If it does not, as may happen on Windows, every attempt there is an
-  `environment-violation` (`limitations`).
+  `environment-violation` (`limitations`). Amendment 1.2.0 replaces this probe (below).
 - The decider re-judges every attempt's environment observations and rejects an invocation
   whose home already held `.calor`. `harnessSha256` now covers the validator, the runner, and
   the workflow.
@@ -211,6 +211,24 @@ Residual (`workflow.residual`): a plan job's minutes are spent before it can ref
 deleted before #1135 records it in the ledger leaves no history.
 
 No control run was dispatched: `workflow_dispatch` needs the workflow on the default branch.
+
+## Amendment 1.2.0: the home probe checks the verifier's resolver (#1135)
+
+Made by the #1135 repair PR before any execution. On Windows, `SpecialFolder.UserProfile` comes
+from the account's known folder and ignores `USERPROFILE`, so the 1.1.0 probe would have recorded
+every win-x64 and win-arm64 attempt as an `environment-violation`, and no execution could resolve
+the three Windows determinism rows.
+
+- The verifier resolves its user-level root (default cache, user effect manifests) through
+  `src/Calor.Compiler/Verification/Z3/Cache/UserHome.cs`: `USERPROFILE` on Windows when set and
+  fully qualified, otherwise `SpecialFolder.UserProfile` (unchanged on Linux and macOS).
+- `env-check`'s probe compiles that file from the tree under test and prints `UserHome.Resolve()`,
+  so it checks the root the verifier actually uses. The `userProfileFollowsIsolatedHome` field
+  keeps its name and its rule (false is an `environment-violation`).
+- A new control checks that the probe compiles the tree's resolver.
+
+No case, environment, attempt, determinism row, gate, agreement rule, record format, or budget
+value changes. No registered case was run.
 
 ## What G2 executed
 

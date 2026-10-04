@@ -118,7 +118,10 @@ public class ContractTranslatorSemanticsVersionGuardTests
             var rendered = fixture.Build(translator);
             buffer.Append(fixture.Name);
             buffer.Append(" :: ");
-            buffer.AppendLine(rendered);
+            // '\n', not AppendLine: Environment.NewLine is CRLF on Windows, which made the
+            // fixture hash platform-dependent (#1135, contract determinism row
+            // platform-TranslatorOutputMatchesCommittedBaseline).
+            buffer.Append(rendered).Append('\n');
         }
 
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(buffer.ToString()));
