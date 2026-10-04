@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "kind": "benchmark-headline",
+  "gate": "0.24 B2 (#1422)",
+  "generatorVersion": "b1-1276-results-generator-v1",
+  "source": {
+    "results": "docs/plans/evidence/b1-1276/results/results.json",
+    "pairManifest": "docs/plans/evidence/b1-1276/results/pair-manifest.json",
+    "registrationCommit": "f0e0eb682a8658364170ad49aff2d2c433d570f8"
+  },
+  "comparability": {
+    "pairManifestSha256": "eec09eab95c60c18b650bd70ee7ad4f807d649cf2f2800665a4f9589a6fe1813",
+    "metricSetSha256": "3d284bb04ec7bf247aedfbc535636914caad8ed3e1706366d3a3c1099381a0b3",
+    "metricImplementationVersion": "calor-evaluation-static-metrics@72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1",
+    "aggregationMethod": "b1-1276-agg-v1: geometric mean of r over EQUIVALENT program pairs; percentile bootstrap over pairs, 10000 resamples, SplitMix64 seed 1276, 95%; no interval below 2 pairs",
+    "samplingUnit": "program-pair",
+    "runCount": 2,
+    "generatorVersion": "b1-1276-results-generator-v1",
+    "exclusionsSha256": "d76623d8617aa8b5706fa7053e7c2917cdcfddfbaa732e04e9fe015e59caf755"
+  },
+  "comparabilityKeySha256": "35ee7f8e33a8ef176728ead7b56dc0c64153b59a5db9f06fa87b7acda052104e",
+  "comparableWithPublished": null,
+  "comparison": "no headline is published yet; nothing is compared",
+  "denominator": {
+    "registered": 226,
+    "excludedPreRegistered": 9,
+    "sentToOracle": 217,
+    "included": 17,
+    "byDisposition": {
+      "EQUIVALENT": 17,
+      "EXCLUDED-PRE-REGISTERED": 9,
+      "NOT-EQUIVALENT": 192,
+      "UNCLASSIFIED": 8
+    }
+  },
+  "headline": {
+    "metric": "TokenEconomics/CompositeTokenEconomics",
+    "perPairValue": "r = csharpSize / calorSize (r > 1: the C# file is larger; r < 1: the Calor file is larger)",
+    "population": "registered manifest.benchmarks pairs dispositioned EQUIVALENT by the reconciled oracle result",
+    "samplingUnit": "program-pair",
+    "intervalLabel": "corpus-resampling interval for this fixed corpus; not a confidence interval for any population",
+    "overall": {
+      "pairs": 17,
+      "geometricMeanR": "1.2349617720447104",
+      "interval95": [
+        "1.114699569538594",
+        "1.3565810319607556"
+      ],
+      "intervalNote": null,
+      "medianR": "1.321529937041751",
+      "pairsRAbove1": 13,
+      "pairsRBelow1": 4,
+      "pairsREqual1": 0
+    },
+    "perCategory": {
+      "ErrorHandling": {
+        "pairs": 1,
+        "geometricMeanR": "1.3426683548814256",
+        "interval95": null,
+        "intervalNote": "no interval: fewer than 2 included pairs",
+        "medianR": "1.3426683548814256",
+        "pairsRAbove1": 1,
+        "pairsRBelow1": 0,
+        "pairsREqual1": 0
+      },
+      "PatternMatching": {
+        "pairs": 1,
+        "geometricMeanR": "0.795462156469749",
+        "interval95": null,
+        "intervalNote": "no interval: fewer than 2 included pairs",
+        "medianR": "0.795462156469749",
+        "pairsRAbove1": 0,
+        "pairsRBelow1": 1,
+        "pairsREqual1": 0
+      },
+      "TokenEconomics": {
+        "pairs": 15,
+        "geometricMeanR": "1.2646434464674599",
+        "interval95": [
+          "1.1481511458031728",
+          "1.3865198401531722"
+        ],
+        "intervalNote": null,
+        "medianR": "1.321529937041751",
+        "pairsRAbove1": 12,
+        "pairsRBelow1": 3,
+        "pairsREqual1": 0
+      }
+    }
+  },
+  "label": "Describes this fixed, author-built corpus only. r is a static source-size ratio of two committed files, not a coding-agent outcome or a language advantage. EQUIVALENT means no observed disagreement on the registered finite inputs; it is not a proof and not a correctness claim about either arm.",
+  "limitations": [
+    "Corpus only: the corpus is fixed and author-built. It is not a sample of real-world code, tasks, or developers, and no figure here generalizes beyond these files.",
+    "EQUIVALENT means the two arms showed no observable difference on the registered finite inputs under the registered oracle. It is not a proof of equivalence and not a claim that either arm is correct with respect to its task statement.",
+    "17 pairs are included of the 217 pairs sent to the oracle (226 registered, 9 excluded before registration). The figure describes those 17 pairs, not the corpus.",
+    "r is a static source-size ratio of two committed files. It is not a coding-agent outcome and not a measured language, productivity, correctness, or safety advantage.",
+    "The interval is a corpus-resampling interval for this fixed corpus, not a confidence interval for any population."
+  ],
+  "provenance": {
+    "commit": "ffa75e8bf2e899826a2cfa9c524835d735d9b1c5",
+    "resolvedVia": "refs/remotes/origin/main",
+    "treeHashes": {
+      "/": "f25ae7bee0458a90dcc3ec430570b34abdd0401d",
+      "src": "d525d0354e55d43f00885913c01ce8045937be1b",
+      "tests/Calor.Evaluation": "e8dc0746c32d5f3f409550bb6688d2bb945ebf57",
+      "tests/TestData/Benchmarks": "3d29b2176c7b6da5556285befd2060edd3e017f0",
+      "docs/plans/evidence/b1-1276": "370c4616263c28e1bb67c3791ee3cdc3c871a0e9",
+      "scripts/benchmark_publication_gate.py": "ba43f38250bfcdea3d22c2c2407253e4cb6bd0d6"
+    },
+    "inputContentHashes": {
+      "docs/plans/evidence/b1-1276/results/results.json": "ed10ba1bff736dba936f112d557296f7c8ffb9f49db3c2ee8925e096fab2ed1f",
+      "docs/plans/evidence/b1-1276/results/pair-manifest.json": "eec09eab95c60c18b650bd70ee7ad4f807d649cf2f2800665a4f9589a6fe1813",
+      "docs/plans/evidence/b1-1276/registration/pairs.json": "0f0d760a3f247dc6c952c39d5499656ecd0b08b99e8c4148a809302e62a93a7f",
+      "docs/plans/evidence/evidence-contract-1407/contract.json": "10acc1c007bb840063e96acf02a6a191ac6a297fbf6b2195237417770f8b125a"
+    }
+  }
+}
