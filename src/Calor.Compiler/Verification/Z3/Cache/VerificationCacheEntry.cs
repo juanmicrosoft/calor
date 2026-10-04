@@ -79,7 +79,10 @@ public sealed class VerificationCacheEntry
     // Evict entry-state-only proofs produced before the exit-state gate (#1183).
     // 1.16: contract simplification preserves typed evaluation and IEEE equality.
     // Recheck proofs made from predicates rewritten by the former untyped rules.
-    public const string CurrentFormatVersion = "1.18";
+    // 1.19 (#1135): on Windows, non-ASCII string literals reached Z3 in the code page instead of
+    // UTF-8, so a Windows entry for one may hold a verdict the byte model does not give. Linux and
+    // macOS output is unchanged, so SemanticsVersion stays; the bump evicts every entry instead.
+    public const string CurrentFormatVersion = "1.19";
 
     /// <summary>#778: the compiler-semantics ledger version that produced this entry.
     /// A verdict computed under different compile semantics must not be served, even

@@ -403,8 +403,9 @@ internal static class DifferentialGate
                 ?? throw new InvalidOperationException(
                     $"SelfRef differential case '{testCase.Id}' did not translate.");
 
-            using var solver = context.MkSolver();
-            solver.Set("timeout", VerificationOptions.DefaultTimeoutMs);
+            // #1135: checked in a fresh context, like the verifier, so the verdict does not
+            // depend on when the GC released earlier terms of the shared context.
+            using var solver = new IsolatedSolver(context, VerificationOptions.DefaultTimeoutMs);
             var polarity = testCase.Position == ContractPosition.Precondition
                 ? SatPolarity.SatIsProof
                 : SatPolarity.SatIsRefutation;
@@ -412,11 +413,12 @@ internal static class DifferentialGate
                 testCase.Position == ContractPosition.Precondition
                     ? translated
                     : context.MkNot(translated));
+            var status = solver.Check();
             outcomes[testCase.Function.Id] = ProofOutcome.Assign(
                 ProofEvidence.SolverVerdict(
-                    solver.Check(),
-                    solver,
-                    translator.Variables,
+                    status,
+                    solver.CheckedSolver,
+                    solver.TranslateVariables(translator.Variables),
                     polarity,
                     unsatNote: testCase.Position == ContractPosition.Precondition
                         ? "Precondition is never satisfiable"

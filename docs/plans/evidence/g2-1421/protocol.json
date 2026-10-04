@@ -7,7 +7,7 @@
     1135,
     1424
   ],
-  "protocolVersion": "1.1.0",
+  "protocolVersion": "1.2.0",
   "status": "FROZEN-AT-MERGE",
   "freeze": {
     "event": "The merge commit on main of the PR that adds this file. Every execution record names protocolVersion and the SHA-256 of this file; the decider rejects a record made under any other protocol bytes.",
@@ -139,14 +139,16 @@
     "randomSeed": {
       "value": "42",
       "source": "tests/Shared/Z3TestSeeding.cs",
-      "pattern": "public const string RandomSeed = \"42\";"
+      "pattern": "public const string RandomSeed = \"42\";",
+      "applied": false,
+      "effect": "Amendment 1.2.0 (found in the #1135 repair review): Z3 4.15.7 rejects random_seed as a context parameter (it prints \"unknown parameter 'random_seed'\" and ignores it), so the constant has never reached the solver and every context runs with Z3's default seed. The pin still freezes the tree's constant; the effective solver configuration is the Z3 defaults plus the per-check timeout. Applying the seed would change every Z3-backed test's search and is not done."
     },
     "perCaseTimeoutMs": {
       "value": 5000,
       "source": "src/Calor.Compiler/Verification/VerificationOptions.cs",
       "pattern": "public const uint DefaultTimeoutMs = 5000;"
     },
-    "rule": "The harness never overrides a Z3 parameter. The seed and per-case timeout are properties of the tree; the validator checks them against these values, so a change to either is a protocol amendment."
+    "rule": "The harness never overrides a Z3 parameter. The seed and per-case timeout are properties of the tree; the validator checks them against these values, so a change to either is a protocol amendment. Amendment 1.2.0: the seed constant is pinned but not applied by Z3 (randomSeed.effect)."
   },
   "checkout": {
     "coreAutocrlf": false,
@@ -445,7 +447,7 @@
       "toolchain.installRoot named setup-dotnet, which installs a floating LTS runtime and CLI before the requested SDK; the machinery runs setup-dotnet's own pinned install script with only the SDK version instead (workflow.requirements: installs nothing else).",
       "Stricter than retryPolicy: the API does not expose a prior verdict, so every execution run that did not conclude success is treated as possibly NON-DETERMINISTIC or FAILING, and the next execution needs a commit that changes a path outside docs/.",
       "Stricter than budget.charges: a dispatched run with a title the plan cannot read is charged and counted as an execution. A dispatched execution-mode run whose attempts never started (refused by plan, or replaced in the concurrency queue) is charged its minutes but is not an execution.",
-      "Added checks: env-check runs a file-based app on the pinned runtime with an isolated HOME/USERPROFILE and records whether SpecialFolder.UserProfile (the root of the verifier's default user-level cache, VerificationCacheOptions) follows it; false is an environment-violation. The decider re-judges every attempt's observations (amendment 1.1.0 to _record_problem) and rejects an invocation whose home already held .calor, so an attestation cannot contradict its observations.",
+      "Added checks: env-check builds and runs a probe app on the pinned runtime with an isolated HOME/USERPROFILE and records whether the root of the verifier's default user-level cache follows it; false is an environment-violation. Amendment 1.2.0: the probe compiles the verifier's own resolver, UserHome.Resolve in src/Calor.Compiler/Verification/Z3/Cache/VerificationCacheOptions.cs (used by VerificationCacheOptions and the user effect-manifest loader), from the checked-out tree, instead of printing SpecialFolder.UserProfile, which on Windows comes from the account's known folder and ignores USERPROFILE. The decider re-judges every attempt's observations (amendment 1.1.0 to _record_problem) and rejects an invocation whose home already held .calor, so an attestation cannot contradict its observations.",
       "Contract amendment 1.2.0 (capacity.chargeRules c2-candidate-determinism-protocol, merged after protocol 1.0.0) charges #1424's candidate-time execution to regeneration-compute when its commit is the #1423 candidate and #1424's regeneration ledger records it. Neither the manifest nor that ledger exists yet, so plan cannot verify a qualifying run: it charges every dispatched run to determinism-compute (over-counting, fail closed). Excluding a qualifying run from that count needs a protocol amendment that names those files; until then reaching a limit is contract stopping rule 1."
     ],
     "residual": "Runner-minutes for a plan job are spent before plan can refuse, so dispatches after the ceiling still cost up to planJobTimeoutMinutes each; they are charged and visible in the inventory. A run deleted before #1135 records it in the ledger leaves no history. A dispatched ref whose workflow or runner bytes differ produces records whose harnessSha256 main's decider rejects; review and the ledger are the controls for anything else."
@@ -508,6 +510,13 @@
         "pr": 1486,
         "afterDecisionBearingExecution": false,
         "justification": "Registers the execution machinery required by workflow.requirements (the second G2 PR): .github/workflows/determinism-protocol.yml and scripts/determinism_runner.py, frozen by sha256.json. Records how each requirement is implemented (workflow.implementation), the deviations (pinned installer instead of setup-dotnet; stricter repair and charge rules; an added home probe and attestation re-check in the decider; harnessSha256 binding the runner and workflow; contract 1.2.0's #1424 charge rule not yet applied by plan, which over-counts), the residual, and one limitation. No case, environment, attempt, determinism row, gate, agreement rule, or budget value changes. No registered case was run."
+      },
+      {
+        "version": "1.2.0",
+        "timestampUtc": "2026-10-04T02:47:43Z",
+        "pr": 1492,
+        "afterDecisionBearingExecution": false,
+        "justification": "#1135 repair, before any execution. On Windows, SpecialFolder.UserProfile comes from the account's known folder and ignores USERPROFILE, so the registered home probe would have recorded every win-x64 and win-arm64 attempt as an environment-violation, and no execution could resolve the three Windows determinism rows. The verifier now resolves its user-level root through UserHome.Resolve (USERPROFILE on Windows when set and fully qualified; SpecialFolder.UserProfile otherwise, unchanged on Linux and macOS), and env-check's probe compiles that resolver from the tree under test instead of asking the runtime. It also records that the registered seed constant is not applied (Z3 rejects random_seed as a context parameter; z3.randomSeed.applied false), which changes no behavior. Changes scripts/determinism_runner.py (the probe), scripts/test_determinism_protocol.py (a control that the probe compiles the tree's resolver), the deviation and limitation texts, and the README. No case, environment, attempt, determinism row, gate, agreement rule, record format, or budget value changes. No decision-bearing protocol execution was run; the repair PR ran local and ordinary-CI tests."
       }
     ]
   },
@@ -517,7 +526,7 @@
     "compiler-verifier is covered on linux-x64 only.",
     "Thirty attempts per environment bound, but cannot exclude, rare non-determinism (runPlan.statisticalBound).",
     "Theory rows whose display names are identical (truncated arguments) are compared as a multiset of outcomes per name. Any failure among them is detected, but which row failed is not identified.",
-    "If the pinned runtime on a runner resolves SpecialFolder.UserProfile from the account profile rather than HOME/USERPROFILE (possible on Windows, where .NET uses the shell known-folder API), the verifier's default user-level cache would persist across the invocations of a job; env-check then records every attempt there as an environment-violation and the execution is INCOMPLETE until the cache root can be isolated. Not observed before registration."
+    "The home probe checks the verifier's user-home resolver (UserHome.Resolve): USERPROFILE on Windows when set and fully qualified, otherwise SpecialFolder.UserProfile (which follows HOME on Linux and macOS). A user-level path read through any other lookup is not covered; at amendment 1.2.0 the verifier's default cache and the user effect manifests both use the resolver."
   ],
   "scope": {
     "covered": "The release-critical verifier test host (every Calor.Verification.Tests case), the F-4 oracle alone and its 1,170 cells and 2 reports, the translator fixture, and the Calor.Compiler.Tests classes that construct the verifier or Z3 directly (linux-x64).",

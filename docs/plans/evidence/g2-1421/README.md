@@ -101,7 +101,7 @@ A different processor count, or memory below 90% of the registered value, is an
 (the values the 0.22 Stage B packet recorded; CI's floating `10.0.x` is the `toolchain-pins`
 open defect). Z3 4.15.7 through the owned bootstrap, both pin files by SHA-256, each attempt's
 asset hashes checked against the pins. Z3 `random_seed` 42 and per-case timeout 5,000 ms, both
-checked against the tree (`D006`). Checkout with `core.autocrlf=false`. xUnit runs with project
+checked against the tree (`D006`); Z3 does not apply the seed (amendment 1.2.0). Checkout with `core.autocrlf=false`. xUnit runs with project
 defaults.
 
 **Run plan.** 2 jobs × 15 attempts per environment: 30 attempts per environment, 150 per
@@ -198,7 +198,7 @@ Deviations (`workflow.deviations`):
 - `env-check` runs a file-based app on the pinned runtime to check that
   `SpecialFolder.UserProfile` (the root of the verifier's default user-level cache) follows the
   isolated home. If it does not, as may happen on Windows, every attempt there is an
-  `environment-violation` (`limitations`).
+  `environment-violation` (`limitations`). Amendment 1.2.0 replaces this probe (below).
 - The decider re-judges every attempt's environment observations and rejects an invocation
   whose home already held `.calor`. `harnessSha256` now covers the validator, the runner, and
   the workflow.
@@ -211,6 +211,30 @@ Residual (`workflow.residual`): a plan job's minutes are spent before it can ref
 deleted before #1135 records it in the ledger leaves no history.
 
 No control run was dispatched: `workflow_dispatch` needs the workflow on the default branch.
+
+## Amendment 1.2.0: the home probe checks the verifier's resolver (#1135)
+
+Made by the #1135 repair PR before any execution. On Windows, `SpecialFolder.UserProfile` comes
+from the account's known folder and ignores `USERPROFILE`, so the 1.1.0 probe would have recorded
+every win-x64 and win-arm64 attempt as an `environment-violation`, and no execution could resolve
+the three Windows determinism rows.
+
+- The verifier resolves its user-level root (default cache, user effect manifests) through
+  `UserHome.Resolve` in `src/Calor.Compiler/Verification/Z3/Cache/VerificationCacheOptions.cs`:
+  `USERPROFILE` on Windows when set and fully qualified, otherwise `SpecialFolder.UserProfile`
+  (unchanged on Linux and macOS).
+- `env-check`'s probe compiles that file (BCL only) from the tree under test and prints
+  `UserHome.Resolve()`, so it checks the root the verifier actually uses. The `userProfileFollowsIsolatedHome` field
+  keeps its name and its rule (false is an `environment-violation`).
+- A new control checks that the probe compiles the tree's resolver.
+
+- The Z3 seed pin stays, but the amendment records that it is not applied: Z3 4.15.7 rejects
+  `random_seed` as a context parameter, so every context has always run with Z3's default seed
+  (`z3.randomSeed.applied: false`). Nothing changes behavior.
+
+No case, environment, attempt, determinism row, gate, agreement rule, record format, or budget
+value changes. No decision-bearing protocol execution was run; the repair PR ran local and
+ordinary-CI tests.
 
 ## What G2 executed
 
