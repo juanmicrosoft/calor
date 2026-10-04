@@ -7,7 +7,7 @@
     1135,
     1424
   ],
-  "protocolVersion": "1.0.0",
+  "protocolVersion": "1.1.0",
   "status": "FROZEN-AT-MERGE",
   "freeze": {
     "event": "The merge commit on main of the PR that adds this file. Every execution record names protocolVersion and the SHA-256 of this file; the decider rejects a record made under any other protocol bytes.",
@@ -114,7 +114,7 @@
   "toolchain": {
     "sdk": "10.0.401",
     "runtime": "10.0.12",
-    "installRoot": "setup-dotnet with DOTNET_INSTALL_DIR set to a private directory under the runner temp directory, so the dotnet root holds exactly one SDK and one Microsoft.NETCore.App runtime. Preinstalled SDKs are not on the path.",
+    "installRoot": "The dotnet-install script bundled with actions/setup-dotnet v4 (pinned by commit and SHA-256), run with only toolchain.sdk into an empty private directory under the runner temp directory, so the dotnet root holds exactly one SDK and one Microsoft.NETCore.App runtime. Preinstalled SDKs are not on the path (amendment 1.1.0; the original text named setup-dotnet).",
     "globalJson": {
       "version": "10.0.100",
       "rollForward": "latestMinor"
@@ -416,9 +416,12 @@
   "workflow": {
     "path": ".github/workflows/determinism-protocol.yml",
     "runner": "scripts/determinism_runner.py",
-    "status": "pending-second-g2-pr",
-    "frozenFiles": [],
-    "rule": "The execution machinery (workflow, environment check, attempt runner, plan with budget, history, and amendment guards) is the second G2 PR. It is registered by a recorded protocol amendment that sets status to registered and adds its files to frozenFiles. Until then the validator rejects its presence (D013), so nothing can execute this protocol.",
+    "status": "registered",
+    "frozenFiles": [
+      ".github/workflows/determinism-protocol.yml",
+      "scripts/determinism_runner.py"
+    ],
+    "rule": "The execution machinery (workflow, environment check, attempt runner, plan with budget, history, and amendment guards) was added by the second G2 PR and registered by amendment 1.1.0, which set status to registered and froze its files (D015). D013 checks the workflow's structure (workflow_problems: triggers, inputs, jobs, steps, commands, conditions), rejects any other workflow that runs the runner, and checks that no harness file looks up the real home directory. Changing either file is a protocol amendment.",
     "requirements": [
       "Jobs plan -> attempts matrix -> decide. fail-fast false; no continue-on-error, no masked exit status; runner labels, timeouts, and SDK from this file.",
       "Exact SDK and runtime installed into a private dotnet root by a procedure that installs nothing else; the environment check rejects any other SDK or Microsoft.NETCore.App runtime.",
@@ -427,7 +430,25 @@
       "decide receives the dispatched commit SHA and the run id; records from any other commit or run are INVALID.",
       "Pull-request runs are control mode only.",
       "Absolute paths for every record directory passed to a test host, and an isolated HOME/USERPROFILE under the job temp directory for every invocation; no code path deletes or writes the real home directory."
-    ]
+    ],
+    "amendment": "1.1.0",
+    "implementation": [
+      "Jobs plan -> attempts matrix -> decide, each starting with the same step that refuses GITHUB_RUN_ATTEMPT other than 1 before any action runs. fail-fast false; no continue-on-error, ||, or set +e (D013); runner labels and job timeouts come from this file through the plan matrix; plan and decide timeouts equal budget.planJobTimeoutMinutes and decideJobTimeoutMinutes.",
+      "install-sdk downloads the dotnet-install script bundled with actions/setup-dotnet v4 (commit 67a3573c), checks its pinned SHA-256, and runs it with only the toolchain.sdk version into an empty private root under the runner temp directory. env-check records an environment-violation unless dotnet resolves inside that root (path components, case-insensitive on Windows) and it lists exactly toolchain.sdk and exactly one Microsoft.NETCore.App runtime, toolchain.runtime.",
+      "run-job writes the attempt record (status invalid, reason 'attempt in progress') after every profile invocation and the final record when the attempt ends, by atomic replace. A TRX that exists after a timeout is read; unreadable record files keep the TRX values and make the invocation invalid. run-job starts no invocation, and cuts a running one, 5 minutes before the job timeout (from the job's start time), so fill-missing and the upload run; unrun attempts are recorded invalid (harness started), environment-violation, or infrastructure-failure (setup failed). An existing record is never replaced.",
+      "plan runs this tree's validator and main's validator against origin/main (D016) and reads the paginated GitHub API inventory of every run of the workflow (all branches and run attempts; a missing total_count, short read, or duplicate fails closed). It refuses: a non-dispatch event; GITHUB_RUN_ATTEMPT other than 1; a GITHUB_WORKFLOW_REF other than this workflow, or a run not listed in its inventory under its own title; a reused execution id; a ledger run missing from the inventory; a commit any earlier execution-mode run started attempts on (or the ledger records as executed), or an unfinished execution; after an execution run that did not conclude success, a commit whose diff from that run's commit (NUL-separated names) touches only docs/; and a run for which dryRunSpent plus every dispatched run's measured minutes (the larger of API and ledger) plus the worst case of every unfinished run plus this run's worst case exceed ceilingRunnerMinutes, or that would exceed maxExecutions (runs that started attempts) or maxDispatchedControlRuns (every dispatched control run).",
+      "decide passes the dispatched commit (GITHUB_SHA) and the run id (GITHUB_RUN_ID) to the frozen decider and downloads only run-attempt-1 artifacts; every machinery command refuses GITHUB_RUN_ATTEMPT other than 1 and a foreign GITHUB_WORKFLOW_REF.",
+      "The workflow has no pull_request (or any other automatic) trigger, so no pull-request run exists; D013 rejects any trigger other than workflow_dispatch.",
+      "The first step of every job moves HOME, USERPROFILE, DOTNET_CLI_HOME, APPDATA, LOCALAPPDATA, XDG_*, TEMP, TMP, TMPDIR, the NuGet HTTP, plugin, and scratch caches, the global VCS config, and NUGET_PACKAGES under the runner temp directory. Every test invocation then gets HOME, USERPROFILE, and DOTNET_CLI_HOME set to one fresh, empty directory under the job's output directory with the same per-user and temp roots inside it, an absolute CALOR_DETERMINISM_RECORD_DIR, the build step's NUGET_PACKAGES, CALOR_Z3_EXPECTED_RID, no CALOR_UPDATE_* variable, and MSBUILDDISABLENODEREUSE=1; check_isolation fails closed otherwise."
+    ],
+    "deviations": [
+      "toolchain.installRoot named setup-dotnet, which installs a floating LTS runtime and CLI before the requested SDK; the machinery runs setup-dotnet's own pinned install script with only the SDK version instead (workflow.requirements: installs nothing else).",
+      "Stricter than retryPolicy: the API does not expose a prior verdict, so every execution run that did not conclude success is treated as possibly NON-DETERMINISTIC or FAILING, and the next execution needs a commit that changes a path outside docs/.",
+      "Stricter than budget.charges: a dispatched run with a title the plan cannot read is charged and counted as an execution. A dispatched execution-mode run whose attempts never started (refused by plan, or replaced in the concurrency queue) is charged its minutes but is not an execution.",
+      "Added checks: env-check runs a file-based app on the pinned runtime with an isolated HOME/USERPROFILE and records whether SpecialFolder.UserProfile (the root of the verifier's default user-level cache, VerificationCacheOptions) follows it; false is an environment-violation. The decider re-judges every attempt's observations (amendment 1.1.0 to _record_problem) and rejects an invocation whose home already held .calor, so an attestation cannot contradict its observations.",
+      "Contract amendment 1.2.0 (capacity.chargeRules c2-candidate-determinism-protocol, merged after protocol 1.0.0) charges #1424's candidate-time execution to regeneration-compute when its commit is the #1423 candidate and #1424's regeneration ledger records it. Neither the manifest nor that ledger exists yet, so plan cannot verify a qualifying run: it charges every dispatched run to determinism-compute (over-counting, fail closed). Excluding a qualifying run from that count needs a protocol amendment that names those files; until then reaching a limit is contract stopping rule 1."
+    ],
+    "residual": "Runner-minutes for a plan job are spent before plan can refuse, so dispatches after the ceiling still cost up to planJobTimeoutMinutes each; they are charged and visible in the inventory. A run deleted before #1135 records it in the ledger leaves no history. A dispatched ref whose workflow or runner bytes differ produces records whose harnessSha256 main's decider rejects; review and the ledger are the controls for anything else."
   },
   "recordFormats": {
     "attempt": [
@@ -475,18 +496,28 @@
       "environments",
       "limitations"
     ],
-    "decideInputs": "Every attempt record of the execution, the execution id with its run id, the dispatched full commit SHA, and the mode."
+    "decideInputs": "Every attempt record of the execution, the execution id with its run id, the dispatched full commit SHA, and the mode.",
+    "harnessSha256": "Amendment 1.1.0: SHA-256 over 'path sha256' lines of scripts/determinism_protocol.py, scripts/determinism_runner.py, and .github/workflows/determinism-protocol.yml (harness_digest)."
   },
   "amendments": {
     "rule": "Any change after merge to the frozen files (sha256.json, D015) is a new protocolVersion with an appended amendmentLog entry (UTC timestamp, reviewed PR, justification, whether it follows a decision-bearing execution); earlier entries are immutable. The required calor-first-guard job runs main's copy of the validator (the trusted entry point) and this tree's copy against the packet on protected main (D016): an unrecorded change, or one that removes a case, environment, determinism row, or attempt, fails. An amendment that follows a decision-bearing execution is followed by a complete new execution on a new commit. Moving a case between the deterministic and timing-sensitive sets also needs a #1407 amendment. Every attempt record carries the SHA-256 of protocol.json and of the harness; the decider rejects records made under other bytes. D016 compares the contribution matrix (every case's expected contributions per environment, with test multiplicity) and each determinism row's cases and environments; any reduction fails. A baseline ref that does not resolve, or a partial packet on it, fails closed.",
-    "amendmentLog": []
+    "amendmentLog": [
+      {
+        "version": "1.1.0",
+        "timestampUtc": "2026-10-03T23:02:46Z",
+        "pr": 1486,
+        "afterDecisionBearingExecution": false,
+        "justification": "Registers the execution machinery required by workflow.requirements (the second G2 PR): .github/workflows/determinism-protocol.yml and scripts/determinism_runner.py, frozen by sha256.json. Records how each requirement is implemented (workflow.implementation), the deviations (pinned installer instead of setup-dotnet; stricter repair and charge rules; an added home probe and attestation re-check in the decider; harnessSha256 binding the runner and workflow; contract 1.2.0's #1424 charge rule not yet applied by plan, which over-counts), the residual, and one limitation. No case, environment, attempt, determinism row, gate, agreement rule, or budget value changes. No registered case was run."
+      }
+    ]
   },
   "limitations": [
     "Hosted runner images change underneath a pinned label; image versions are recorded, not pinned.",
     "Determinism is established only for the registered environments, profiles, toolchain, and checkout settings. A Windows checkout with core.autocrlf=true is not covered.",
     "compiler-verifier is covered on linux-x64 only.",
     "Thirty attempts per environment bound, but cannot exclude, rare non-determinism (runPlan.statisticalBound).",
-    "Theory rows whose display names are identical (truncated arguments) are compared as a multiset of outcomes per name. Any failure among them is detected, but which row failed is not identified."
+    "Theory rows whose display names are identical (truncated arguments) are compared as a multiset of outcomes per name. Any failure among them is detected, but which row failed is not identified.",
+    "If the pinned runtime on a runner resolves SpecialFolder.UserProfile from the account profile rather than HOME/USERPROFILE (possible on Windows, where .NET uses the shell known-folder API), the verifier's default user-level cache would persist across the invocations of a job; env-check then records every attempt there as an environment-violation and the execution is INCOMPLETE until the cache root can be isolated. Not observed before registration."
   ],
   "scope": {
     "covered": "The release-critical verifier test host (every Calor.Verification.Tests case), the F-4 oracle alone and its 1,170 cells and 2 reports, the translator fixture, and the Calor.Compiler.Tests classes that construct the verifier or Z3 directly (linux-x64).",
