@@ -67,6 +67,14 @@ public sealed class ObligationSolver : IDisposable
             return;
         }
 
+        // #1413 review: raw C# in an entry predicate runs before the body and may change any state.
+        if (info.Facts.HasOpaqueEntry || info.Preconditions.Any(pre => FactCollector.IsOpaque(pre.Condition)))
+        {
+            obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
+                "an entry predicate contains raw C#, whose effects are not modeled. Runtime check kept.")));
+            return;
+        }
+
         var translator = new ContractTranslator(_ctx);
         translator.SetUserTypeRegistry(userTypeRegistry);
 
@@ -293,9 +301,13 @@ public sealed class ObligationSolver : IDisposable
                     inexact.Add("the returned value is not modeled (the solver's `result` is unconstrained)");
                 if (!info.Facts.IsExact(obligation.Span))
                     inexact.Add("the path to the obligation is not fully modeled (an enclosing guard, loop, try, or earlier exit is not asserted)");
-                if (info.Facts.IsStaleAfterEntry(obligation.Condition)
-                    || FactCollector.ReferencedNames(obligation.Condition).Overlaps(info.Facts.DroppedFactNames))
+                if (info.Facts.IsStaleAfterEntry(obligation.Condition))
                     inexact.Add("the obligation reads a variable or heap state the body may change, whose current value is not modeled");
+                if (info.Preconditions.Select(pre => pre.Condition)
+                        .Concat(info.CollectedFacts.Where(f => f.AppliesTo(obligation.Span)).Select(f => f.Fact))
+                        .Append(obligation.Condition)
+                        .Any(e => FactCollector.ReferencedNames(e).Overlaps(info.Facts.DroppedFactNames)))
+                    inexact.Add("a dropped entry refinement constrains a variable this query reads");
             }
             if (status == Status.SATISFIABLE && inexact.Count > 0)
             {

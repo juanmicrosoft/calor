@@ -217,6 +217,73 @@ public sealed class S2ObligationStateTests
     }
 
     [Fact]
+    public void DroppedRefinement_ReachedThroughARetainedPrecondition_IsNotFailed()
+    {
+        // Review round 3 witness: y > 0 (dropped entry refinement) and y == z (retained
+        // precondition) make the claim hold; a model y = z = 0 is unreachable.
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:pub}
+                §I{i32:x} | (&& (> # INT:0) (> y INT:0))
+                §I{i32:y}
+                §I{i32:z}
+                §O{void}
+                §E{}
+                §Q (== y z)
+                §ASSIGN x INT:1
+                §PROOF{p1:claim} (> z INT:0)
+            """;
+        var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
+        Assert.NotEqual(ObligationStatus.Failed, proof.Status);
+    }
+
+    [Fact]
+    public void RawCSharpInAParameterRefinement_KillsEntryFacts()
+    {
+        // Review round 3 witness: Probe(1, 0) passes x's guard, then y's guard runs
+        // `x = -5` and is true, so the claim is false.
+        const string source = """
+            §M{m1:M}
+              §RTYPE{r1:Pos:i32} (> # INT:0)
+              §F{f1:Probe:pub}
+                §I{Pos:x}
+                §I{i32:y} | §CS{((x = -5) == -5)}
+                §O{i32}
+                §E{mut}
+                §PROOF{p1:claim} (> x INT:0)
+                §R x
+            """;
+        var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
+        Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
+    }
+
+    [Fact]
+    public void PropertyGetterRead_KillsAliasedRefParameterFact()
+    {
+        // Review round 3 witness: box.Probe(ref box.Value) with Value = 1; reading Trigger
+        // runs a getter that stores -5 through the alias.
+        const string source = """
+            §M{m1:M}
+              §CL{c1:Box:pub}
+                §FLD{i32:Value:pub}
+                §PROP{pr1:Trigger:i32:pub}
+                  §GET
+                    §ASSIGN this.Value INT:-5
+                    §R INT:0
+                §MT{mt1:Probe:pub}
+                  §I{i32:x:ref}
+                  §O{i32}
+                  §E{mut}
+                  §Q (> x INT:0)
+                  §B{sink:i32} this.Trigger
+                  §PROOF{p1:claim} (> x INT:0)
+                  §R x
+            """;
+        var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
+        Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
+    }
+
+    [Fact]
     public void ParameterNamedResult_DoesNotDischargeTheRefinedReturn()
     {
         const string source = """

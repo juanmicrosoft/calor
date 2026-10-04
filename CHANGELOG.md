@@ -50,8 +50,10 @@ All notable changes to this project will be documented in this file.
   A precondition or parameter refinement is now ignored for every obligation in a body that
   may write a name it reads, wherever that write is. Writes include `ref`/`out` arguments and
   writes through an aliased `ref`/`in` parameter. A fact that reads an array element or field
-  is ignored once the body can change them. A body with raw C# (`§RAW`, `§CS`), unsafe or
-  pointer code, or a lambda gets no facts at all. A failed obligation
+  is ignored once the body can change them, including through a call, a property getter, an
+  indexer, or `foreach`. A body with raw C# (`§RAW`, `§CS`), unsafe or pointer code, or a
+  lambda gets no facts at all; raw C# in a parameter refinement or precondition makes every
+  obligation of that function `Calor1124`. A failed obligation
   (`Calor1121`/`Calor1140`, a compile error) is now reported only when the solver's state
   matches the program's at that point: no reassigned name, no unasserted enclosing guard,
   and no earlier loop or exit. Otherwise the result is `Calor1124` ("unsupported") and the

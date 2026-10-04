@@ -55,34 +55,29 @@ public sealed class FactCollector
     /// an obligation reading one of them has an incompletely modeled entry state.</summary>
     public HashSet<string> DroppedFactNames { get; } = new(StringComparer.Ordinal);
 
-    /// <summary>
-    /// #1413 (S1 OBL-MUTATION-KILL): every name the body may rebind — assignments,
-    /// compound assignments, increments, bindings, loop variables, and `ref`/`out`
-    /// call arguments. An entry fact (precondition, parameter refinement) about such a
-    /// name may be stale at an obligation site, and a solver model for it is not the
-    /// value the program has there.
-    /// </summary>
+    /// <summary>#1413 (S1 OBL-MUTATION-KILL): every name the body may rebind (assignments, bindings,
+    /// loop variables, `ref`/`out` arguments); an entry fact about one may be stale.</summary>
     public IReadOnlySet<string> AssignedNames => _assignedNames;
 
-    /// <summary>
-    /// #1413: the body contains code the collector cannot see into (raw C#), which may
-    /// rebind any name. Every entry fact is then unusable and no state is exact.
-    /// </summary>
+    /// <summary>#1413: the body contains code the collector cannot see into; no fact is usable.</summary>
     public bool HasOpaqueCode { get; private set; }
 
-    /// <summary>
-    /// #1413: the body can change heap state a fact may read — a call (which may write any
-    /// object or array it can reach), a collection mutation, a store into an array element
-    /// or field, or object creation. A fact that reads an array element, a field, or a dotted
-    /// path is then stale after entry.
-    /// </summary>
+    /// <summary>#1413: an entry predicate (parameter refinement) contains raw C#, which runs
+    /// before the body and may rebind anything; no entry fact is then usable.</summary>
+    public bool HasOpaqueEntry { get; private set; }
+
+    /// <summary>#1413: the body may change heap state: a call (including a getter, indexer, or
+    /// enumerator a member read or foreach may run), a collection mutation, a heap store, or new.</summary>
     public bool MutatesHeap { get; private set; }
 
-    /// <summary>
-    /// #1413: true when <paramref name="fact"/>, true on entry or at a guard, may be false later
-    /// in the body: it reads a name the body may rebind, or reads heap state the body may
-    /// change, or the body is opaque.
-    /// </summary>
+    private static bool IsHeapMutation(AstNode node)
+        => IsHeapStore(node) || node is CallExpressionNode or CallStatementNode or ExpressionCallNode
+            or EventSubscribeNode or EventUnsubscribeNode or UsingStatementNode or NewExpressionNode
+            or CollectionPushNode or DictionaryPutNode or CollectionRemoveNode or CollectionSetIndexNode
+            or CollectionClearNode or CollectionInsertNode or ForeachStatementNode or DictionaryForeachNode
+            || IsHeapRead(node);
+
+    /// <summary>#1413: whether a fact true on entry or at a guard may be false later in the body.</summary>
     public bool IsStaleAfterEntry(ExpressionNode fact)
         => HasOpaqueCode
            || ReferencedNames(fact).Overlaps(_assignedNames)
@@ -90,9 +85,11 @@ public sealed class FactCollector
 
     /// <summary>Whether an expression reads an array element, a field, or a dotted path.</summary>
     public static bool ReadsHeap(ExpressionNode expression)
-        => DescendantsAndSelf(expression).Any(node =>
-            node is ArrayAccessNode or FieldAccessNode
-            || node is ReferenceNode reference && reference.Name.Contains('.'));
+        => DescendantsAndSelf(expression).Any(IsHeapRead);
+
+    private static bool IsHeapRead(AstNode node)
+        => node is ArrayAccessNode or MultiDimArrayAccessNode or FieldAccessNode
+            || node is ReferenceNode reference && reference.Name.Contains('.');
 
     private HashSet<string> _assignedNames = new(StringComparer.Ordinal);
     private readonly HashSet<string> _aliasWritten = new(StringComparer.Ordinal);
@@ -106,16 +103,9 @@ public sealed class FactCollector
     /// </summary>
     public void MarkAssigned(string name) => _assignedNames.Add(name);
 
-    /// <summary>
-    /// #1413 (S1 OBL-MUTATION-KILL, OBL-BRANCH-FACTS): true when the solver's state at
-    /// <paramref name="span"/> is exact — the span lies in a simple statement reached
-    /// through the function body, then/elseif/else bodies, while/for bodies, and
-    /// do-while bodies only, every enclosing guard is asserted as a fact, and no
-    /// earlier statement can return, throw, break, continue, or jump. Only then does a
-    /// satisfying model describe an input that actually reaches the obligation; any
-    /// other model is not a counterexample. Residual: a preceding statement that throws
-    /// (checked overflow, a call, an earlier guard) is not tracked.
-    /// </summary>
+    /// <summary>#1413 (S1 OBL-MUTATION-KILL, OBL-BRANCH-FACTS): the span is a simple statement reached
+    /// only through bodies whose guards are all asserted, after no statement that can exit or jump,
+    /// so a model reaches it. Residual: an earlier statement that throws is not tracked.</summary>
     public bool IsExact(TextSpan span)
         => !HasOpaqueCode
            && _exactStatements.Any(statement =>
@@ -160,13 +150,8 @@ public sealed class FactCollector
             _aliasWritten.UnionWith(byReference);
         }
 
-        // Parameter refinements hold on entry for the whole function: the entry guard
-        // is emitted unless the entry obligation is discharged. They are dropped when
-        // the body may rebind the parameter (the refinement may no longer describe the
-        // current value) and for out parameters, which have no entry value. #1413
-        // (S1 OBL-SELFREF, OBL-SUBTYPE): named refinement types (`§I{Pos:x}`) are entry
-        // facts exactly like inline refinements; omitting them refuted obligations
-        // with models the entry guard rules out.
+        // Parameter refinements, inline or named (#1413 S1 OBL-SELFREF, OBL-SUBTYPE), hold on
+        // entry; dropped when the body may rebind them, and for out parameters.
         foreach (var param in parameters)
         {
             if (param.Modifier == ParameterModifier.Out)
@@ -176,6 +161,7 @@ public sealed class FactCollector
                 predicate = predicate == null ? named : new BinaryOperationNode(named.Span, BinaryOperator.And, predicate, named);
             if (predicate == null)
                 continue;
+            HasOpaqueEntry |= IsOpaque(predicate);
             var fact = SubstituteSelfRefStatic(predicate, param.Name);
             if (IsStaleAfterEntry(fact))
                 DroppedFactNames.UnionWith(ReferencedNames(fact));
@@ -202,27 +188,8 @@ public sealed class FactCollector
         _bodyInitialized = true;
         _assignedNames = CollectAssignedNames(body);
         var nodes = body.SelectMany(DescendantsAndSelf).ToArray();
-        // #1413 review: code the collector cannot follow — raw C# (statement or §CS
-        // expression), unsafe/pointer code (writes through addresses), and lambdas (deferred
-        // bodies that may write captured variables or run after their guards stop holding) —
-        // makes the body opaque: no entry or guard facts, no exact state.
-        HasOpaqueCode = nodes.Any(node => node is RawCSharpNode or RawCSharpExpressionNode or CompilerDirectiveNode
-            or UnsafeBlockNode or FixedStatementNode or AddressOfNode or PointerDereferenceNode
-            or LambdaExpressionNode);
-        MutatesHeap = nodes.Any(node => IsHeapStore(node)
-            || node is CallExpressionNode
-            or CallStatementNode
-            or ExpressionCallNode
-            or EventSubscribeNode
-            or EventUnsubscribeNode
-            or UsingStatementNode
-            or NewExpressionNode
-            or CollectionPushNode
-            or DictionaryPutNode
-            or CollectionRemoveNode
-            or CollectionSetIndexNode
-            or CollectionClearNode
-            or CollectionInsertNode);
+        HasOpaqueCode = nodes.Any(node => IsOpaque(node));
+        MutatesHeap = nodes.Any(IsHeapMutation);
         _hasJumps = nodes.Any(node => node is GotoStatementNode or LabelStatementNode);
     }
 
@@ -278,12 +245,8 @@ public sealed class FactCollector
         }
     }
 
-    /// <summary>
-    /// Each condition is a fact only within the body it guards. #1413 (S1
-    /// OBL-BRANCH-FACTS): an elseif body is reached only when every earlier condition
-    /// was false and its own is true, and the else body only when all were false, so
-    /// those negations are facts there too.
-    /// </summary>
+    /// <summary>Each condition is a fact only within the body it guards; #1413 (S1 OBL-BRANCH-FACTS):
+    /// elseif and else bodies also get the negations of the earlier conditions.</summary>
     private void CollectFromIf(IfStatementNode ifStmt, bool exact)
     {
         var conditions = new List<ExpressionNode> { ifStmt.Condition };
@@ -318,6 +281,14 @@ public sealed class FactCollector
     private static ExpressionNode Conjoin(IEnumerable<ExpressionNode> conjuncts, TextSpan span)
         => conjuncts.Aggregate((left, right) =>
             new BinaryOperationNode(span, BinaryOperator.And, left, right));
+
+    /// <summary>#1413 review: code the collector cannot follow: raw C# (statement or §CS
+    /// expression), unsafe/pointer code, and lambdas (deferred bodies). It makes the body opaque:
+    /// no entry or guard facts, no exact state.</summary>
+    internal static bool IsOpaque(AstNode root)
+        => DescendantsAndSelf(root).Any(node => node is RawCSharpNode or RawCSharpExpressionNode
+            or CompilerDirectiveNode or UnsafeBlockNode or FixedStatementNode or AddressOfNode
+            or PointerDereferenceNode or LambdaExpressionNode);
 
     /// <summary>A store whose target is not a plain local or parameter (element, field, dotted path).</summary>
     private static bool IsHeapStore(AstNode node)
@@ -441,12 +412,7 @@ public sealed class FactCollector
         if (referenced.Overlaps(assigned) || referenced.Overlaps(_aliasWritten))
             return false;
         // #1413: a guard over heap state is stale once the body can change the heap.
-        if (ReadsHeap(fact) && body.SelectMany(DescendantsAndSelf).Any(node => node
-                is CallExpressionNode or CallStatementNode or NewExpressionNode
-                or CollectionPushNode or DictionaryPutNode or CollectionRemoveNode
-                or CollectionSetIndexNode or CollectionClearNode or CollectionInsertNode
-                or AssignmentStatementNode { Target: not ReferenceNode }
-                or CompoundAssignmentStatementNode { Target: not ReferenceNode }))
+        if (ReadsHeap(fact) && body.SelectMany(DescendantsAndSelf).Any(IsHeapMutation))
             return false;
 
         var scopeStart = body.Min(s => s.Span.Start);
