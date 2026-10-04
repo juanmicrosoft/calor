@@ -79,7 +79,11 @@ public sealed class VerificationCacheEntry
     // Evict entry-state-only proofs produced before the exit-state gate (#1183).
     // 1.16: contract simplification preserves typed evaluation and IEEE equality.
     // Recheck proofs made from predicates rewritten by the former untyped rules.
-    public const string CurrentFormatVersion = "1.18";
+    // 1.19 (#1413, S1 CACHE-LITERAL-WIDTH): integer literal keys include width and
+    // signedness. 1.18 keys hashed only the value, so `x + INT:1` and `x + LONG:1`
+    // shared one entry and a warm cache served the LONG proof for the INT text — a
+    // false Proven that elides the guard. The bump evicts every 1.18 entry.
+    public const string CurrentFormatVersion = "1.19";
 
     /// <summary>#778: the compiler-semantics ledger version that produced this entry.
     /// A verdict computed under different compile semantics must not be served, even

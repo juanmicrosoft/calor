@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The verification cache no longer mixes up `INT:1` and `LONG:1` (#1413).** The cache key
+  hashed an integer literal by its value only. After compiling `x + LONG:1`, a later compile
+  of `x + INT:1` reused the cached `Proven`, although `int.MaxValue + 1` overflows; the
+  runtime check was then removed. Keys now include each literal's width, signedness, and
+  (for real literals) float/double/decimal kind. The cache format moves to 1.19, so every
+  older entry is invalidated.
+
 ### Changed
 
 - **Benchmark publication refuses incomparable results (#1422).** The benchmark workflow now
