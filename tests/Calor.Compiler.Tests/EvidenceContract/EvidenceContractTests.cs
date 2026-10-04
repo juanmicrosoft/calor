@@ -1650,7 +1650,19 @@ public class EvidenceContractTests
                 exceptions.Add(copy);
                 break;
         }
-        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C011");
+        // Review round 1: the committed contract is clean, and the mutation fails on its own subject,
+        // so a control cannot pass on an unrelated C011.
+        Assert.Empty(EvidenceContractValidator.ValidateContract(Contract()));
+        var violations = EvidenceContractValidator.ValidateContract(contract);
+        AssertViolation(violations, "C011");
+        var subject = mutation switch
+        {
+            "wrong-pr" => "exception review-rounds-per-pr #1497",
+            "added-for-another-pr" => "exception review-rounds-per-pr #1498",
+            "duplicated" => "exception review-rounds-per-pr",
+            _ => $"exception review-rounds-per-pr #{pr}",
+        };
+        Assert.Contains(violations, v => v.Code == "C011" && v.Subject == subject);
     }
 
     [Theory]
