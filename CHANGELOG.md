@@ -44,15 +44,19 @@ All notable changes to this project will be documented in this file.
     manifests (`~/.calor`) now honor `USERPROFILE` on Windows, as NuGet does. Linux and macOS
     are unchanged.
 
-- **Two more kinds of unreachable counterexample are withheld (#1413).** A failed proof
-  obligation (`Calor1121`, a compile error) is no longer reported in two cases where its
-  counterexample may be an input that never reaches the obligation:
-  - an earlier statement, or an enclosing condition, may throw on that input. Examples are
-    checked or dividing arithmetic, a call, a member read, and an earlier `§PROOF` guard;
-  - the obligation reads a property, whose getter the solver does not model. This includes a
-    property that hides an inherited field.
+- **Two more kinds of unreachable counterexample are withheld (#1413).** A failed proof or
+  refinement obligation (`Calor1121`, a compile error) is no longer reported in two cases where
+  its counterexample may be an input that never reaches the obligation:
+  - Something evaluated before the obligation may throw on that input. This covers an earlier
+    statement, an earlier operand in the same statement, an enclosing `if`, `elseif`, or loop
+    condition, and a compiler-inserted refinement guard on a binding or assignment. It also
+    covers checked or dividing arithmetic, a call, a member read, an earlier `§PROOF` guard, and
+    any operator when the module defines operator overloads.
+  - The obligation reads a property, whose getter the solver does not model. This includes a
+    property that hides an inherited field, and properties of nested types.
 
-  The result is `Calor1124` ("unsupported"), and the runtime check stays.
+  The result is `Calor1124` ("unsupported"), and the runtime check stays. A property is matched
+  by name, so a field that shares a name with any property in the module is also withheld.
 
 - **Proof obligations no longer use facts that an assignment made stale (#1413).** With
   `§Q (> x -1)`, then `§ASSIGN x -5`, then `§PROOF (> x -1)`, the obligation solver still

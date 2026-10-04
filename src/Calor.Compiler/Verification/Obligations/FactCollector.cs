@@ -151,6 +151,18 @@ public sealed class FactCollector
 
         // #1413: two ref/out parameters may alias one variable, so a write through either
         // rebinds both.
+        // #1413 (D-OBL-THROWING-PREDECESSOR): a binding or assignment to a refined name runs a
+        // compiler-inserted refinement guard, which throws.
+        _refinedTypes.UnionWith(refinementPredicates?.Keys ?? []);
+        _refinedNames.UnionWith(parameters
+            .Where(p => p.InlineRefinement != null || _refinedTypes.Contains(p.TypeName))
+            .Select(p => p.Name));
+        _refinedNames.UnionWith(body.SelectMany(DescendantsAndSelf).OfType<BindStatementNode>()
+            .Where(bind => bind.TypeName is { } refined && _refinedTypes.Contains(refined))
+            .Select(bind => bind.Name));
+        _throwingSpans = body.SelectMany(DescendantsAndSelf).Where(IsThrowingNode)
+            .Select(node => node.Span).Where(span => span.Length > 0).ToList();
+
         var byReference = parameters
             .Where(p => (p.Modifier & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In)) != 0)
             .Select(p => p.Name)
@@ -232,8 +244,7 @@ public sealed class FactCollector
                     break;
 
                 case IfStatementNode ifStmt:
-                    CollectFromIf(ifStmt, reachedExactly && !MayThrow(ifStmt.Condition)
-                        && !ifStmt.ElseIfClauses.Any(clause => MayThrow(clause.Condition)));
+                    CollectFromIf(ifStmt, reachedExactly);
                     break;
 
                 case DoWhileStatementNode doWhile:
@@ -269,17 +280,44 @@ public sealed class FactCollector
     /// checked or dividing arithmetic, calls, member and element reads, casts, and a retained
     /// proof guard.
     /// </summary>
-    internal static bool MayThrow(AstNode node)
-        => DescendantsAndSelf(node).Any(n => n switch
-        {
-            ReferenceNode reference => reference.Name.Contains('.'),
-            IntLiteralNode or BoolLiteralNode or StringLiteralNode or FloatLiteralNode or DecimalLiteralNode => false,
-            BinaryOperationNode binary => binary.Operator is BinaryOperator.Add or BinaryOperator.Subtract
-                or BinaryOperator.Multiply or BinaryOperator.Divide or BinaryOperator.Modulo or BinaryOperator.Power,
-            UnaryOperationNode unary => unary.Operator is not (UnaryOperator.Not or UnaryOperator.BitwiseNot),
-            ConditionalExpressionNode or BindStatementNode or AssignmentStatementNode or IfStatementNode or ElseIfClauseNode => false,
-            _ => true,
-        });
+    internal bool MayThrow(AstNode node) => DescendantsAndSelf(node).Any(IsThrowingNode);
+
+    /// <summary>Whether the module declares operator overloads (then no operator is assumed not to throw).</summary>
+    public bool OperatorsMayBeOverloaded { get; init; }
+
+    private readonly HashSet<string> _refinedTypes = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _refinedNames = new(StringComparer.Ordinal);
+    private List<TextSpan> _throwingSpans = new();
+
+    private bool IsThrowingNode(AstNode node) => node switch
+    {
+        ReferenceNode reference => reference.Name.Contains('.'),
+        IntLiteralNode or BoolLiteralNode or StringLiteralNode or FloatLiteralNode or DecimalLiteralNode => false,
+        BinaryOperationNode binary => OperatorsMayBeOverloaded || binary.Operator is BinaryOperator.Add
+            or BinaryOperator.Subtract or BinaryOperator.Multiply or BinaryOperator.Divide or BinaryOperator.Modulo
+            or BinaryOperator.Power,
+        UnaryOperationNode unary => OperatorsMayBeOverloaded || unary.Operator is not (UnaryOperator.Not or UnaryOperator.BitwiseNot),
+        BindStatementNode bind => bind.TypeName is { } refined && _refinedTypes.Contains(refined),
+        AssignmentStatementNode assignment => assignment.Target is not ReferenceNode target || _refinedNames.Contains(target.Name),
+        ConditionalExpressionNode or IfStatementNode or ElseIfClauseNode => false,
+        _ => true,
+    };
+
+    /// <summary>
+    /// #1413 (D-OBL-THROWING-PREDECESSOR, review round 1): whether, inside the simple statement that
+    /// holds <paramref name="span"/>, a node that may throw is evaluated before it (it ends before
+    /// the span starts; operands evaluate left to right).
+    /// </summary>
+    public bool ThrowsEarlierInStatement(TextSpan span)
+        => _exactStatements.Where(statement => span.Start >= statement.Start && span.End <= statement.End)
+            .Any(statement => _throwingSpans.Any(t => t.Start >= statement.Start && t.End <= span.Start));
+
+    /// <summary>All property names a module declares, nested types included.</summary>
+    internal static HashSet<string> PropertyNames(ModuleNode module)
+        => DescendantsAndSelf(module).OfType<PropertyNode>().Select(property => property.Name).ToHashSet(StringComparer.Ordinal);
+
+    internal static bool OverloadsOperators(ModuleNode module)
+        => DescendantsAndSelf(module).Any(node => node is OperatorOverloadNode);
 
     /// <summary>
     /// #1413 (discovery D-OBL-PROOF-GETTER, amendment 1.3.0): whether an expression reads a member
@@ -302,8 +340,10 @@ public sealed class FactCollector
         // is evaluated against a changing state: neither it nor its negation is a stable fact.
         var negationsUsable = !conditions.Any(ChangesState);
 
+        // #1413 (D-OBL-THROWING-PREDECESSOR): a body is reached only when every condition evaluated
+        // before it completed; a later condition is never evaluated on that path.
         var thenGuarded = negationsUsable && AddGuardFact(ifStmt.Condition, ifStmt.ThenBody);
-        Walk(ifStmt.ThenBody, exact && thenGuarded);
+        Walk(ifStmt.ThenBody, exact && thenGuarded && !MayThrow(ifStmt.Condition));
         for (var index = 0; index < ifStmt.ElseIfClauses.Count; index++)
         {
             var clause = ifStmt.ElseIfClauses[index];
@@ -311,14 +351,14 @@ public sealed class FactCollector
                 ? Conjoin(conditions.Take(index + 1).Select(Negate).Append(clause.Condition), clause.Condition.Span)
                 : clause.Condition;
             var clauseGuarded = negationsUsable && AddGuardFact(fact, clause.Body);
-            Walk(clause.Body, exact && clauseGuarded);
+            Walk(clause.Body, exact && clauseGuarded && !conditions.Take(index + 2).Any(MayThrow));
         }
         if (ifStmt.ElseBody != null)
         {
             var added = negationsUsable && AddGuardFact(
                 Conjoin(conditions.Select(Negate), ifStmt.Span),
                 ifStmt.ElseBody);
-            Walk(ifStmt.ElseBody, exact && added);
+            Walk(ifStmt.ElseBody, exact && added && !conditions.Any(MayThrow));
         }
     }
 

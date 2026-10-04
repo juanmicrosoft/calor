@@ -31,10 +31,7 @@ public sealed class ObligationSolver : IDisposable
         ModuleNode module)
     {
         _checkIntegerOverflow = module.ShouldCheckIntegerOverflow();
-        _propertyNames = module.Classes.SelectMany(type => type.Properties)
-            .Concat(module.Interfaces.SelectMany(type => type.Properties))
-            .Select(property => property.Name)
-            .ToHashSet(StringComparer.Ordinal);
+        _propertyNames = FactCollector.PropertyNames(module);
         // Build a lookup of function info for parameter declarations
         var functionInfo = BuildFunctionInfo(module);
         var userTypeRegistry = ContractTranslator.BuildUserTypeRegistry(module);
@@ -315,9 +312,12 @@ public sealed class ObligationSolver : IDisposable
                         .Append(obligation.Condition)
                         .Any(e => FactCollector.ReferencedNames(e).Overlaps(info.Facts.DroppedFactNames)))
                     inexact.Add("a dropped entry refinement constrains a variable this query reads");
-                if (FactCollector.ReadsProperty(obligation.Condition, _propertyNames))
-                    inexact.Add("the obligation reads a property, whose getter is not modeled");
+                if (info.Facts.ThrowsEarlierInStatement(obligation.Span))
+                    inexact.Add("an operand evaluated before the obligation may throw");
             }
+            // #1413 (D-OBL-PROOF-GETTER): entry obligations included.
+            if (status == Status.SATISFIABLE && FactCollector.ReadsProperty(obligation.Condition, _propertyNames))
+                inexact.Add("the obligation reads a property, whose getter is not modeled");
             if (status == Status.SATISFIABLE && inexact.Count > 0)
             {
                 // Not a refutation: the model may describe a state the program never
@@ -349,6 +349,7 @@ public sealed class ObligationSolver : IDisposable
 
     private static Dictionary<string, FunctionInfo> BuildFunctionInfo(ModuleNode module)
     {
+        var overloads = FactCollector.OverloadsOperators(module);
         var result = new Dictionary<string, FunctionInfo>(StringComparer.Ordinal);
 
         // Build indexed type lookup for size parameter injection
@@ -376,7 +377,7 @@ public sealed class ObligationSolver : IDisposable
                 .ToList();
 
             // Collect flow-sensitive facts (loop bounds, etc.)
-            var factCollector = new FactCollector();
+            var factCollector = new FactCollector { OperatorsMayBeOverloaded = overloads };
             factCollector.CollectFromFunction(func, refinementPredicates);
 
             // Add size parameter variables for indexed-typed parameters
@@ -420,7 +421,7 @@ public sealed class ObligationSolver : IDisposable
                 var parameters = method.Parameters
                     .Select(p => (p.Name, p.TypeName))
                     .ToList();
-                var factCollector = new FactCollector();
+                var factCollector = new FactCollector { OperatorsMayBeOverloaded = overloads };
                 factCollector.CollectFromFunction(method, refinementPredicates);
                 var extraVars = new List<(string Name, string TypeName)>();
                 foreach (var param in method.Parameters)
@@ -462,7 +463,7 @@ public sealed class ObligationSolver : IDisposable
                 var parameters = constructor.Parameters
                     .Select(p => (p.Name, p.TypeName))
                     .ToList();
-                var factCollector = new FactCollector();
+                var factCollector = new FactCollector { OperatorsMayBeOverloaded = overloads };
                 factCollector.CollectFromCallable(constructor.Parameters, constructor.Body, refinementPredicates);
                 result[constructor.Id] = new FunctionInfo(
                     parameters,
@@ -478,7 +479,7 @@ public sealed class ObligationSolver : IDisposable
                 var parameters = method.Parameters
                     .Select(p => (p.Name, p.TypeName))
                     .ToList();
-                var factCollector = new FactCollector();
+                var factCollector = new FactCollector { OperatorsMayBeOverloaded = overloads };
                 factCollector.CollectFromMethod(method, refinementPredicates);
                 var extraVars = new List<(string Name, string TypeName)>();
                 foreach (var param in method.Parameters)
@@ -517,7 +518,7 @@ public sealed class ObligationSolver : IDisposable
                 var parameters = operatorOverload.Parameters
                     .Select(p => (p.Name, p.TypeName))
                     .ToList();
-                var factCollector = new FactCollector();
+                var factCollector = new FactCollector { OperatorsMayBeOverloaded = overloads };
                 factCollector.CollectFromCallable(operatorOverload.Parameters, operatorOverload.Body, refinementPredicates);
                 var extraVars = new List<(string Name, string TypeName)>();
                 foreach (var param in operatorOverload.Parameters)
