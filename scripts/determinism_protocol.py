@@ -4,8 +4,9 @@
 The protocol is docs/plans/evidence/g2-1421/protocol.json; its case registry is cases.json.
 This module holds what the registration freezes: the validator (codes D001-D016), the value
 rules that turn one test invocation into registered case values, and the agreement decider.
-The execution machinery (workflow, environment check, attempt runner, budget and ledger
-guards) is the second G2 PR; #1135 executes after both merge.
+The execution machinery (workflow, environment check, attempt runner, budget and history
+guards) is scripts/determinism_runner.py and .github/workflows/determinism-protocol.yml,
+registered by amendment 1.1.0; #1135 executes it.
 
   validate [--baseline-ref REF]   fail closed on registration defects; with a baseline,
                                   also on unrecorded or weakening changes to the packet
@@ -18,6 +19,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import ntpath
+import posixpath
 import re
 import subprocess
 import sys
@@ -176,6 +179,150 @@ def check_gates(protocol, text) -> list[str]:
             if not cmds or cmds[0] != (0, "set -euo pipefail") or masked or not any("dotnet test" in c for _, c in cmds):
                 problems.append(f"{where}: shard script lacks set -euo pipefail, runs no dotnet test, or masks a status")
     return problems
+
+
+WORKFLOW, RUNNER = ".github/workflows/determinism-protocol.yml", "scripts/determinism_runner.py"
+DECIDE_IF = "always() && needs.plan.result == 'success'"
+WORKFLOW_PARTS = {  # amendment 1.1.0: SHA-256 (16 hex) of each job's keys (index 0) and each step, as parse_workflow reads them
+    "plan:0": "5a48c415c7fc964b", "plan:1": "2db9c7c8a7174f79", "plan:2": "1f8548f9a3cb9cae", "plan:3": "47e7e3c7ab7763dc",
+    "attempts:0": "95c5a75705cbffaf", "attempts:1": "2db9c7c8a7174f79", "attempts:2": "664d96a21de47fa7", "attempts:3": "39bc936fd2af1aad",
+    "attempts:4": "1b3c075981f376c2", "attempts:5": "871788616e61c5e0", "attempts:6": "ab7077183f82fb38", "attempts:7": "a841980fb7493496",
+    "attempts:8": "526ff9b79dab0c0c", "attempts:9": "0d3233caf79b9ded", "decide:0": "f998a4391dcc9b1a", "decide:1": "2db9c7c8a7174f79",
+    "decide:2": "664d96a21de47fa7", "decide:3": "d2835a355d99568d", "decide:4": "88f16bb61829ff93", "decide:5": "86288b3699fae02e",
+}
+ISOLATE = "Isolate the home directory and refuse a re-run"
+JOB_SHAPE = {  # job -> (job keys compared exactly, [(step name, required runner command or action, if)])
+    "plan": ({"runs-on": "ubuntu-24.04", "timeout-minutes": "planJobTimeoutMinutes"},
+             [(ISOLATE, None, None), ("Checkout code", "actions/checkout@v4", None),
+              ("Validate, check history and budget, and plan the run", "plan", None)]),
+    "attempts": ({"needs": "plan", "name": "attempts (${{ matrix.env }} job ${{ matrix.job }})", "runs-on": "${{ matrix.runner }}",
+                  "timeout-minutes": "${{ matrix.timeout }}"},
+                 [(ISOLATE, None, None), ("Checkout code", "actions/checkout@v4", None),
+                  ("Install the pinned SDK into a private root", "install-sdk", None),
+                  ("Bootstrap verified Z3 assets", "./.github/actions/bootstrap-z3", None),
+                  ("Check and record the environment", "env-check", None), ("Build the registered test hosts", None, None),
+                  ("Run every attempt of this job", "run-job", None), ("Record attempts that did not run", "fill-missing", "always()"),
+                  ("Upload attempt records", "actions/upload-artifact@v4", "always()")]),
+    "decide": ({"needs": "[plan, attempts]", "if": DECIDE_IF, "runs-on": "ubuntu-24.04", "timeout-minutes": "decideJobTimeoutMinutes"},
+               [(ISOLATE, None, None), ("Checkout code", "actions/checkout@v4", None),
+                ("Download every attempt record", "actions/download-artifact@v4", None),
+                ("Decide agreement under the frozen rule", "decide", None),
+                ("Upload the result record", "actions/upload-artifact@v4", "always()")]),
+}
+
+
+def _block(lines, key, indent) -> list[str]:
+    if key not in lines:
+        return []
+    out = []
+    for ln in lines[lines.index(key) + 1:]:
+        if ln.strip() and len(ln) - len(ln.lstrip()) <= indent:
+            break
+        if ln.strip():
+            out.append(ln)
+    return out
+
+
+def workflow_problems(text: str, protocol) -> list[str]:
+    """D013 structure of the registered workflow: dispatch only with exactly the registered inputs; the
+    three jobs with their registered keys, steps, order, runner commands, and timeouts; fail-fast false;
+    nothing that can mask a status; no YAML form the minimal parser does not read."""
+    problems, lines = [], [ln for ln in text.splitlines() if not ln.lstrip().startswith("#")]
+    top = [ln for ln in lines if ln and not ln.startswith(" ")]
+    if sorted(t.split(":")[0] for t in top) != sorted(["name", "run-name", "on", "permissions", "concurrency", "jobs"]) or "on:" not in top:
+        problems.append(f"top-level keys differ from the registered set: {top}")
+    triggers = [ln.strip() for ln in _block(lines, "on:", 0) if len(ln) - len(ln.lstrip()) == 2]
+    if triggers != ["workflow_dispatch:"]:
+        problems.append(f"triggers must be exactly workflow_dispatch (no automatic trigger): {triggers}")
+    if [ln.strip() for ln in _block(lines, "    inputs:", 4)] != ["mode:", "type: choice", "options: [control, execution]", "required: true",
+                                                               "execution_id:", "type: string", "required: true"]:
+        problems.append("inputs must be exactly mode (choice of control, execution) and execution_id")
+    if sorted(ln.strip() for ln in _block(lines, "permissions:", 0)) != ["actions: read", "contents: read"]:
+        problems.append("permissions must be exactly contents: read and actions: read")
+    if [ln.strip() for ln in _block(lines, "concurrency:", 0)] != ["group: determinism-protocol", "cancel-in-progress: false"]:
+        problems.append("concurrency must be one global group that never cancels a run in progress")
+    if re.search(r"continue-on-error|\|\||set \+[a-z]*e\b|<<:|:\s+[&*!]\w|^\s*-\s+[&*!]\w|:\s+\{(?!\{)|\s#|^---|^\.\.\.", re.sub(r"\$\{\{.*?\}\}", "", "\n".join(lines)), re.M):
+        problems.append("a status can be masked (continue-on-error, ||, set +e) or the file uses YAML the checker does not read")
+    jobs, budget = parse_workflow(text), protocol["budget"]
+    if sorted(jobs) != sorted(JOB_SHAPE):
+        return problems + [f"jobs must be exactly plan, attempts, decide: {sorted(jobs)}"]
+    for name, (keys, steps) in JOB_SHAPE.items():
+        job = jobs[name]
+        want = {k: str(budget[v]) if v in budget else v for k, v in keys.items()}
+        got = {k: v for k, v in job["keys"].items() if k not in ("outputs", "strategy", "defaults", "env")}
+        if got != want:
+            problems.append(f"job {name}: keys {got} differ from {want}")
+        if [s.get("name") for s in job["steps"]] != [s[0] for s in steps]:
+            problems.append(f"job {name}: steps differ from the registered steps")
+            continue
+        for step, (sname, command, condition) in zip(job["steps"], steps):
+            run, uses = step.get("run", ""), step.get("uses", "")
+            used = uses if uses else next(iter(re.findall(r"scripts/determinism_runner\.py (\S+)", run)), None)
+            if "__unparsed__" in step or step.get("if") != condition or (command and used != command) or (uses and run) \
+                    or (run and not run.startswith("set -euo pipefail\n")) or (not command and (uses or "determinism_runner" in run)) \
+                    or len(re.findall(r"determinism_runner\.py", run)) > 1 or "timeout-minutes" in step:
+                problems.append(f"job {name} step {sname!r}: command, condition, or form differs from the registration")
+    strategy = [ln.strip() for ln in jobs["attempts"]["keys"].get("strategy", "").splitlines() if ln.strip()]
+    if strategy != ["fail-fast: false", "matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}"]:
+        problems.append(f"attempts strategy must be exactly fail-fast false with the plan matrix: {strategy}")
+    if 'test "$GITHUB_RUN_ATTEMPT" = 1' not in jobs["plan"]["steps"][0].get("run", "") or \
+            len({j["steps"][0].get("run") for j in jobs.values()}) != 1:
+        problems.append(f"every job must start with the same '{ISOLATE}' step")
+    # Every job's keys and every step (script, action inputs, env, condition) are frozen line for line, so an
+    # unconditional command cannot be negated, skipped, looped, or retried without amending this table.
+    digests = {f"{n}:{i}": sha256_bytes(json.dumps(part, sort_keys=True).encode("utf-8"))[:16]
+               for n, job in jobs.items() for i, part in enumerate([job["keys"]] + job["steps"])}
+    if digests != WORKFLOW_PARTS:
+        problems.append(f"job keys or step bodies differ from the registered ones: {sorted(k for k in digests.keys() | WORKFLOW_PARTS.keys() if digests.get(k) != WORKFLOW_PARTS.get(k))}")
+    return problems
+
+
+def _inside(path, roots) -> bool:
+    if not isinstance(path, str) or not path or not roots:
+        return False
+    pm = ntpath if re.match(r"^[A-Za-z]:[\\/]", roots[0]) else posixpath
+    norm = pm.normcase(pm.normpath(path))
+    return any(norm == r or norm.startswith(r.rstrip(pm.sep) + pm.sep) for r in (pm.normcase(pm.normpath(x)) for x in roots))
+
+
+def judge(protocol, env: dict, observed, commit: str) -> list[str]:
+    """Environment violations of one job's observations (run by env-check and again by the decider)."""
+    o, tc, v = observed if isinstance(observed, dict) else {}, protocol["toolchain"], []
+    roots = [r for r in o.get("dotnetRoots") or [] if isinstance(r, str)]
+    sdks = [re.match(r"^(\S+) \[(.+)\]$", s) if isinstance(s, str) else None for s in o.get("sdks") or []]
+    runtimes = [re.match(r"^(\S+) (\S+) \[(.+)\]$", s) if isinstance(s, str) else None for s in o.get("runtimes") or []]
+    if not sdks or not runtimes or None in sdks + runtimes:
+        return ["SDK or runtime listing missing or unreadable"]
+    netcore = [m.group(2) for m in runtimes if m.group(1) == "Microsoft.NETCore.App"]
+    if [m.group(1) for m in sdks] != [tc["sdk"]] or o.get("dotnetVersion") != tc["sdk"]:
+        v.append(f"SDKs {[m.group(1) for m in sdks]} (dotnet --version {o.get('dotnetVersion')}) are not exactly {tc['sdk']}")
+    if netcore != [tc["runtime"]]:
+        v.append(f"Microsoft.NETCore.App runtimes {netcore} are not exactly {tc['runtime']}")
+    if not _inside(o.get("dotnetPath"), roots) or not all(_inside(m.group(m.lastindex), roots) for m in sdks + runtimes):
+        v.append(f"dotnet {o.get('dotnetPath')} or an SDK or runtime is outside the private root {roots}")
+    if (o.get("runnerOs"), o.get("runnerArch")) != (env["runnerOs"], env["runnerArch"]):
+        v.append(f"runner {o.get('runnerOs')}/{o.get('runnerArch')} is not {env['runnerOs']}/{env['runnerArch']}")
+    if o.get("logicalProcessors") != env["logicalProcessors"]:
+        v.append(f"{o.get('logicalProcessors')} logical processors, registered {env['logicalProcessors']}")
+    memory = o.get("memoryBytes")
+    if not isinstance(memory, int) or memory < 0.9 * env["memoryGiB"] * 2 ** 30:
+        v.append(f"physical memory {memory} bytes is below 90% of {env['memoryGiB']} GiB")
+    rid = next(r for r in load(ROOT, Z3_CONSUMERS)["supportedRids"] if r["rid"] == env["rid"])
+    pins = {p[1]: p[0] for p in (ln.split() for ln in (ROOT / ".github/z3-binaries-4.15.7.sha256").read_text(encoding="utf-8").splitlines()
+                                 if ln.strip() and not ln.startswith("#")) if len(p) == 3}
+    if o.get("z3") != {a: pins[a] for a in (rid["asset"], "Microsoft.Z3.dll")}:
+        v.append(f"Z3 assets {o.get('z3')} differ from their pins")
+    for key, want in (("commit", commit), ("autocrlf", "false"), ("dirty", ""), ("runAttempt", "1"), ("userProfileFollowsIsolatedHome", True)):
+        if o.get(key) != want:
+            v.append(f"{key} is {o.get(key)!r}, required {want!r}")
+    if not all(isinstance(o.get(k), str) and o.get(k) for k in ("imageOs", "imageVersion")):
+        v.append("the runner image (ImageOS, ImageVersion) is not recorded")
+    return v
+
+
+def harness_digest(root: Path) -> str:
+    """harnessSha256 of a record (amendment 1.1.0): SHA-256 over the validator/decider, runner, and workflow bytes."""
+    return sha256_bytes("\n".join(f"{rel} {sha256_file(root / rel)}" for rel in (HARNESS, RUNNER, WORKFLOW)).encode("utf-8"))
 
 
 ATTEMPT_STATUSES = ["completed", "timeout", "crash", "infrastructure-failure", "environment-violation", "invalid"]
@@ -447,6 +594,13 @@ def validate(root: Path, protocol=None, cases=None, contract=None, texts=None, b
             add("D013", "execution machinery exists while the protocol records it as pending")
     elif wf.get("status") != "registered" or wf.get("amendment") not in amended or not all((root / wf.get(k, "missing")).exists() for k in ("path", "runner")):
         add("D013", "execution machinery must be registered by a recorded amendment")
+    else:
+        for problem in workflow_problems(text(wf["path"]), protocol):
+            add("D013", f"{wf['path']}: {problem}")
+        for other in sorted((root / ".github/workflows").glob("*.y*ml")):
+            rel = other.relative_to(root).as_posix()
+            if rel != wf["path"] and "determinism_runner" in text(rel):
+                add("D013", f"{rel} runs the execution machinery outside the registered workflow")
 
     if any(not home_safe(text(rel)) for rel in [HARNESS] + [f for f in wf.get("frozenFiles", []) if f.endswith(".py")]):
         add("D013", "a harness file references the real home directory")
@@ -605,6 +759,11 @@ def _record_problem(r, protocol, cases, mode, envs, shape, expected_commit, run_
     statuses = [x["status"] for x in r["profiles"]]
     if r["status"] in VALUE_STATUSES and r["status"] != next(s for s in ("invalid", "timeout", "crash", "completed") if s in statuses + ["completed"]):
         return "attempt status inconsistent with its profiles"
+    if r["status"] not in ("infrastructure-failure", "environment-violation"):
+        # Amendment 1.1.0: the attestation is re-judged here, so an empty violations list cannot hide observations.
+        bad = [] if check["violations"] else judge(protocol, envs[r["environment"]], check["observed"], expected_commit)
+        if bad or any(p.get("calorCacheExisted") is not False for p in r["profiles"]):
+            return f"environment observations contradict the attestation or a home was not fresh: {bad[:3]}"
     return None
 
 
@@ -617,7 +776,7 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
     else:
         shape = (protocol["profiles"], protocol["runPlan"]["jobsPerEnvironment"], protocol["runPlan"]["attemptsPerJob"])
     profiles, jobs, attempts = shape
-    hashes = (sha256_file(root / PROTOCOL), sha256_file(root / HARNESS))
+    hashes = (sha256_file(root / PROTOCOL), harness_digest(root))
     expected_artifacts = {a["name"]: sha256_file(root / a["committedPath"]) if "committedPath" in a else sha256_bytes(a["expected"].encode())
                           for a in cases["artifacts"]}
     invalid, seen = [], {}
