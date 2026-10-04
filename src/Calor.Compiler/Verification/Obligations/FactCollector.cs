@@ -70,13 +70,16 @@ public sealed class FactCollector
     /// enumerator a member read or foreach may run), a collection mutation, a heap store, or new.</summary>
     public bool MutatesHeap { get; private set; }
 
-    // A member or element read outside a §PROOF condition (which only evaluates the check) may run a
-    // getter, indexer, or enumerator.
+    // A member or element read anywhere, a §PROOF condition included, may run a getter, indexer, or
+    // enumerator.
     private static bool MayChangeHeap(IReadOnlyList<StatementNode> body)
-        => body.SelectMany(DescendantsAndSelf).Any(IsHeapMutation) || body.SelectMany(OutsideProofs).Any(IsHeapRead);
+        => body.SelectMany(DescendantsAndSelf).Any(node => IsHeapMutation(node) || IsHeapRead(node));
 
-    private static IEnumerable<AstNode> OutsideProofs(AstNode node)
-        => node is ProofObligationNode ? [] : Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node).SelectMany(OutsideProofs).Prepend(node);
+    /// <summary>For a counterexample only: whether a fact may be stale at <paramref name="span"/>
+    /// through code outside that span (the obligation's own reads are its evaluation).</summary>
+    public bool IsStaleBefore(ExpressionNode fact, TextSpan span)
+        => HasOpaqueCode || ReferencedNames(fact).Overlaps(_assignedNames) || ReadsHeap(fact)
+            && (_heapWritten || _heapReads.Any(read => read.Start < span.Start || read.End > span.End));
 
     private static bool IsHeapMutation(AstNode node)
         => IsHeapStore(node) || node is CallExpressionNode or CallStatementNode or ExpressionCallNode
@@ -99,6 +102,8 @@ public sealed class FactCollector
             || node is ReferenceNode reference && reference.Name.Contains('.');
 
     private HashSet<string> _assignedNames = new(StringComparer.Ordinal);
+    private bool _heapWritten;
+    private List<TextSpan> _heapReads = new();
     private readonly HashSet<string> _aliasWritten = new(StringComparer.Ordinal);
     private bool _bodyInitialized;
     private bool _hasJumps;
@@ -197,6 +202,8 @@ public sealed class FactCollector
         var nodes = body.SelectMany(DescendantsAndSelf).ToArray();
         HasOpaqueCode = nodes.Any(node => IsOpaque(node));
         MutatesHeap = MayChangeHeap(body);
+        _heapWritten = nodes.Any(IsHeapMutation);
+        _heapReads = nodes.Where(IsHeapRead).Select(node => node.Span).ToList();
         _hasJumps = nodes.Any(node => node is GotoStatementNode or LabelStatementNode);
     }
 

@@ -284,6 +284,33 @@ public sealed class S2ObligationStateTests
     }
 
     [Fact]
+    public void PropertyGetterReadInAnEarlierProof_KillsAliasedRefParameterFact()
+    {
+        // Verification-pass witness: p0's retained guard runs the getter, which stores -5 through
+        // the alias before p1 is checked.
+        const string source = """
+            §M{m1:M}
+              §CL{c1:Box:pub}
+                §FLD{i32:Value:pub}
+                §PROP{pr1:Trigger:i32:pub}
+                  §GET
+                    §ASSIGN this.Value INT:-5
+                    §R INT:0
+                §MT{mt1:Probe:pub}
+                  §I{i32:x:ref}
+                  §O{i32}
+                  §E{mut}
+                  §Q (> x INT:0)
+                  §PROOF{p0:trigger} (== this.Trigger INT:0)
+                  §PROOF{p1:claim} (> x INT:0)
+                  §R x
+            """;
+        var proof = Assert.Single(Solve(source).Obligations,
+            obligation => obligation.Kind == ObligationKind.ProofObligation && obligation.SourceProofId == "p1");
+        Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
+    }
+
+    [Fact]
     public void ParameterNamedResult_DoesNotDischargeTheRefinedReturn()
     {
         const string source = """
