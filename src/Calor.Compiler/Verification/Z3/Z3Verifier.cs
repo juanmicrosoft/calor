@@ -1027,13 +1027,12 @@ public static class FunctionBodyEncoder
         Context ctx,
         IReadOnlyList<StatementNode> statements,
         List<BoolExpr> constraints,
-        bool conditional,
-        Dictionary<string, ExpressionNode>? bindings = null)
+        bool conditional)
     {
-        // #1413 review: immutable bindings are substituted (as the encoder does) so that a side
-        // condition over a local translates; the encoder refuses mutable bindings anyway.
-        var env = new Dictionary<string, ExpressionNode>(bindings ?? new(), StringComparer.Ordinal);
-        ExpressionNode Bound(ExpressionNode expression) => SubstituteBindings(expression, env).Result ?? expression;
+        // #1413 review round 3: a side condition over a body local is not substituted (that would
+        // re-evaluate the initializer at each use and change its integer promotion); the
+        // translator cannot see the local, so the condition fails to model and the result is
+        // Unsupported.
         foreach (var stmt in statements)
         {
             switch (stmt)
@@ -1041,7 +1040,7 @@ public static class FunctionBodyEncoder
                 case ReturnStatementNode ret:
                     if (ret.Expression != null)
                     {
-                        var retFailure = CollectDivisorsFromExpression(translator, ctx, Bound(ret.Expression), constraints, conditional);
+                        var retFailure = CollectDivisorsFromExpression(translator, ctx, ret.Expression, constraints, conditional);
                         if (retFailure != null)
                             return retFailure;
                     }
@@ -1057,11 +1056,9 @@ public static class FunctionBodyEncoder
                     // evaluation order stays here). An unused dividing initializer
                     // still throws at runtime on a zero divisor, so its side
                     // condition genuinely holds on every normal-return path.
-                    var bindFailure = CollectDivisorsFromExpression(translator, ctx, Bound(bind.Initializer), constraints, conditional);
+                    var bindFailure = CollectDivisorsFromExpression(translator, ctx, bind.Initializer, constraints, conditional);
                     if (bindFailure != null)
                         return bindFailure;
-                    if (!bind.IsMutable)
-                        env[bind.Name] = Bound(bind.Initializer);
                     break;
 
                 case IfStatementNode ifStmt:
@@ -1070,24 +1067,24 @@ public static class FunctionBodyEncoder
                     // reached; branch bodies, elseif conditions (evaluated only when
                     // prior conditions were false), the else body, and every statement
                     // AFTER the if (reached only via fall-through) are conditional.
-                    var condFailure = CollectDivisorsFromExpression(translator, ctx, Bound(ifStmt.Condition), constraints, conditional);
+                    var condFailure = CollectDivisorsFromExpression(translator, ctx, ifStmt.Condition, constraints, conditional);
                     if (condFailure != null)
                         return condFailure;
-                    var thenFailure = CollectDivisorsFromStatements(translator, ctx, ifStmt.ThenBody, constraints, conditional: true, env);
+                    var thenFailure = CollectDivisorsFromStatements(translator, ctx, ifStmt.ThenBody, constraints, conditional: true);
                     if (thenFailure != null)
                         return thenFailure;
                     foreach (var clause in ifStmt.ElseIfClauses)
                     {
-                        var clauseCondFailure = CollectDivisorsFromExpression(translator, ctx, Bound(clause.Condition), constraints, conditional: true);
+                        var clauseCondFailure = CollectDivisorsFromExpression(translator, ctx, clause.Condition, constraints, conditional: true);
                         if (clauseCondFailure != null)
                             return clauseCondFailure;
-                        var clauseFailure = CollectDivisorsFromStatements(translator, ctx, clause.Body, constraints, conditional: true, env);
+                        var clauseFailure = CollectDivisorsFromStatements(translator, ctx, clause.Body, constraints, conditional: true);
                         if (clauseFailure != null)
                             return clauseFailure;
                     }
                     if (ifStmt.ElseBody != null)
                     {
-                        var elseFailure = CollectDivisorsFromStatements(translator, ctx, ifStmt.ElseBody, constraints, conditional: true, env);
+                        var elseFailure = CollectDivisorsFromStatements(translator, ctx, ifStmt.ElseBody, constraints, conditional: true);
                         if (elseFailure != null)
                             return elseFailure;
                     }

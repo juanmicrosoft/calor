@@ -1278,10 +1278,14 @@ public sealed class ContractTranslator
             TouchedNullTolerantReferenceForm = true;
     }
 
+    // A free (uninterpreted) term of a reference sort (string, array, user type) may be null; a
+    // boolean or numeric symbol never is.
     private static bool HasFreeSymbol(Expr expr)
-        => expr.IsVar
-            || (expr.IsApp && (expr.FuncDecl.DeclKind == Microsoft.Z3.Z3_decl_kind.Z3_OP_UNINTERPRETED
-                || expr.Args.Any(HasFreeSymbol)));
+        => (IsReferenceSort(expr.Sort) && (expr.IsVar || expr.IsApp && expr.FuncDecl.DeclKind == Microsoft.Z3.Z3_decl_kind.Z3_OP_UNINTERPRETED))
+            || (expr.IsApp && expr.Args.Any(HasFreeSymbol));
+
+    private static bool IsReferenceSort(Sort sort)
+        => sort is not (BoolSort or BitVecSort or IntSort or RealSort or FPSort);
 
     /// <summary>
     /// Uninterpreted sorts stand in for user types, which are nullable reference types in C# —

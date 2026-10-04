@@ -27,8 +27,9 @@ All notable changes to this project will be documented in this file.
   `(<= (len result) 1)` was reported as possibly violated (`Calor0712`) with a counterexample
   the program cannot produce. A backslash in a literal is no longer read as a Z3 escape.
   `s.Substring(i, n)` and `s.Substring(i)` now carry their range conditions, so a
-  counterexample is never an input where the body throws. In a conditionally evaluated
-  position they make the result `Unsupported`. `IndexOf` with a start index is now
+  counterexample is not an input where that substring throws. A substring in a conditionally
+  evaluated position, or one whose range reads a local binding, makes the result
+  `Unsupported`. `IndexOf` with a start index is now
   `Unsupported`: the generated C# ignores the start index, so the solver must not model one.
   Separately, Z3 symbol names for non-ASCII identifiers are now escaped to ASCII. On Windows,
   two different identifiers outside the code page (say `ж` and `щ`) used to become one solver

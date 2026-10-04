@@ -176,10 +176,15 @@ public sealed class S2Z3TextEncodingTests
                 §R INT:0
             """, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         var forall = (Calor.Compiler.Ast.ForallExpressionNode)module.Functions[0].Postconditions[0].Condition;
+        // Control: the quantifier as written translates.
+        Assert.NotNull(translator.TranslateBoolExpr(forall));
+        // Witness: binder and body both renamed to the array's synthetic length symbol.
+        var body = (Calor.Compiler.Ast.BinaryOperationNode)forall.Body;
         var renamed = new Calor.Compiler.Ast.ForallExpressionNode(
             forall.Span,
             [new Calor.Compiler.Ast.QuantifierVariableNode(forall.Span, "a$length", "u32")],
-            forall.Body);
+            new Calor.Compiler.Ast.BinaryOperationNode(body.Span, body.Operator,
+                new Calor.Compiler.Ast.ReferenceNode(body.Span, "a$length"), body.Right));
         Assert.Null(translator.TranslateBoolExpr(renamed));
     }
 
@@ -198,7 +203,7 @@ public sealed class S2Z3TextEncodingTests
     }
 
     [Fact]
-    public void SubstringOverALocal_StaysAssumed()
+    public void SubstringOverALocal_IsUnsupported()
     {
         const string source = """
             §M{m1:M}
@@ -209,7 +214,61 @@ public sealed class S2Z3TextEncodingTests
                 §B{i:i32} INT:1
                 §R (len (substr s i INT:1))
             """;
+        // Review round 3: a range over a body local is not modeled (no substitution).
+        Assert.Equal(ProofStatus.Unsupported, VerifySinglePostcondition(source).EffectiveOutcome.Status);
+    }
+
+    [Fact]
+    public void MixedWidthLocalInASubstringStart_IsNotRefuted()
+    {
+        // Review round 3 witness: x + i is 4294967296L at runtime (start 1), and "".Substring(1, 0)
+        // throws; substituting the literal 1 for i would wrap to start 0.
+        Assert.Throws<ArgumentOutOfRangeException>(() => "".Substring(1, 0));
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:pub} (u32:x, str:s) -> i32
+                §E{}
+                §Q (== x UINT:4294967295)
+                §Q (== s STR:"")
+                §S (== result INT:1)
+                §B{i:i32} INT:1
+                §R (len (substr s (? (> (+ x i) LONG:4294967295) INT:1 INT:0) INT:0))
+            """;
+        Assert.NotEqual(ProofStatus.Refuted, VerifySinglePostcondition(source).EffectiveOutcome.Status);
+    }
+
+    [Fact]
+    public void EagerSubstringInitializerReadInBothArms_StaysAssumed()
+    {
+        // Review round 3 witness: the substring runs once, at the binding, not in the arms.
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:pub} (str:s, bool:c) -> i32
+                §E{}
+                §Q (== s STR:"ab")
+                §S (== result INT:1)
+                §B{t:str} (substr s INT:1 INT:1)
+                §R (? c (len t) (len t))
+            """;
         Assert.Equal(ProofStatus.Assumed, VerifySinglePostcondition(source).EffectiveOutcome.Status);
+    }
+
+    [Fact]
+    public void LiteralOnlyStringsUnderABooleanSymbol_StayVacuous()
+    {
+        // Review round 3 witness: every string operand is a non-null literal, so the
+        // precondition is unsatisfiable at runtime too.
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:pub} (bool:c) -> i32
+                §E{}
+                §Q (== (? c STR:"a" STR:"b") STR:"c")
+                §S (== result INT:1)
+                §R INT:0
+            """;
+        var outcome = VerifySinglePostcondition(source).EffectiveOutcome;
+        Assert.NotEqual(ProofStatus.Unsupported, outcome.Status);
+        Assert.True(outcome.IsVacuous);
     }
 
     [Fact]
