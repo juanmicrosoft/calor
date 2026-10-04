@@ -47,16 +47,17 @@ All notable changes to this project will be documented in this file.
 - **Proof obligations no longer use facts that an assignment made stale (#1413).** With
   `§Q (> x -1)`, then `§ASSIGN x -5`, then `§PROOF (> x -1)`, the obligation solver still
   assumed the precondition, reported the obligation discharged, and removed its runtime check.
-  A precondition or parameter refinement is now ignored after any reassignment of a name it
-  reads (including `ref`/`out` arguments, writes through an aliased `ref` parameter, and raw C#
-  blocks), and a fact that reads an array element or field is ignored once the body can
-  change them (a call, a store, or a collection update). The solver also reports a failed
-  obligation (`Calor1121`/`Calor1140`, a compile error) only when its counterexample can
-  actually reach the obligation. When the reached state is not fully modeled (after a
-  reassignment, an early exit, or for a refined return value), the result is `Calor1124`
-  ("unsupported") and the runtime check stays. New facts: an `else`/`elseif` body knows that
-  the earlier conditions were false, and a parameter of a named refinement type (`§I{Pos:x}`)
-  satisfies its predicate on entry.
+  A precondition or parameter refinement is now ignored for every obligation in a body that
+  may write a name it reads, wherever that write is. Writes include `ref`/`out` arguments and
+  writes through an aliased `ref`/`in` parameter. A fact that reads an array element or field
+  is ignored once the body can change them. A body with raw C# (`§RAW`, `§CS`), unsafe or
+  pointer code, or a lambda gets no facts at all. A failed obligation
+  (`Calor1121`/`Calor1140`, a compile error) is now reported only when the solver's state
+  matches the program's at that point: no reassigned name, no unasserted enclosing guard,
+  and no earlier loop or exit. Otherwise the result is `Calor1124` ("unsupported") and the
+  runtime check stays. This does not track statements that throw before the obligation.
+  New facts: an `else`/`elseif` body knows that the earlier conditions were false, and a
+  parameter of a named refinement type (`§I{Pos:x}`) satisfies its predicate on entry.
 
 - **An empty clause body no longer swallows the next statement (#1485).** A
   clause such as `§CA` (catch) with no indented lines used to pull the next

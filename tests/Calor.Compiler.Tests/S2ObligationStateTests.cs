@@ -121,6 +121,116 @@ public sealed class S2ObligationStateTests
         Assert.NotEqual(ObligationStatus.Failed, proof.Status);
     }
 
+    // Review round 1 witnesses: each was a false Discharged (guard elided) or a lost proof.
+    [Theory]
+    [InlineData("""
+        §M{m1:M}
+          §F{f1:Probe:priv} (i32:x) -> i32
+            §E{}
+            §Q (> x INT:0)
+            §B{sink:i32} §CS{(x = -5)}
+            §PROOF{p1:claim} (> x INT:0)
+            §R x
+        """)]
+    [InlineData("""
+        §M{m1:M}
+          §F{f1:Probe:priv} (i32:x:ref, i32:y:ref) -> i32
+            §E{}
+            §IF{if1} (< x INT:0)
+              §R INT:0
+            §EL
+              §ASSIGN y INT:-5
+              §PROOF{p1:claim} (>= x INT:0)
+            §R x
+        """)]
+    [InlineData("""
+        §M{m1:M}
+          §F{f1:Probe:priv} (i32:x) -> i32
+            §E{unsafe}
+            §Q (> x INT:0)
+            §UNSAFE{u1}
+              §B{ptr:i32*} §ADDR x
+              §ASSIGN §DEREF ptr INT:-5
+            §PROOF{p1:claim} (> x INT:0)
+            §R x
+        """)]
+    [InlineData("""
+        §M{m1:M}
+          §F{f1:Probe:priv} (i32:x) -> i32
+            §E{}
+            §B{bump:Func<i32>} §LAM{l1} §ASSIGN x INT:-5 §R INT:0 §/LAM{l1}
+            §IF{if1} (< x INT:0)
+              §R INT:0
+            §EL
+              §B{z:i32} §C{bump} §/C
+              §PROOF{p1:claim} (>= x INT:0)
+            §R x
+        """)]
+    public void IndirectWrite_KillsFacts(string source)
+    {
+        var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
+        Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
+    }
+
+    [Fact]
+    public void ParameterNamedResult_DoesNotDischargeTheRefinedReturn()
+    {
+        const string source = """
+            §M{m1:M}
+              §RTYPE{r1:Pos:i32} (> # INT:0)
+              §F{f1:Probe:pub} (Pos:result) -> Pos
+                §E{}
+                §R INT:-5
+            """;
+        var (obligations, csharp, _) = Solve(source);
+        Assert.NotEqual(ObligationStatus.Discharged, Single(obligations, ObligationKind.RefinementReturn).Status);
+        Assert.Contains("Return value violates refinement type 'Pos'", csharp);
+    }
+
+    [Fact]
+    public void GuardAfterEarlyExit_StillUsedAsAFact()
+    {
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:priv} (i32:x) -> i32
+                §E{}
+                §IF{e1} (< x INT:0)
+                  §R INT:0
+                §IF{p2} (> x INT:5)
+                  §PROOF{p1:claim} (> x INT:0)
+                §R x
+            """;
+        Assert.Equal(ObligationStatus.Discharged, Single(Solve(source).Obligations, ObligationKind.ProofObligation).Status);
+    }
+
+    [Fact]
+    public void ObligationAfterLoop_IsNotRefutedWithANonExitingModel()
+    {
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:priv} (i32:x) -> i32
+                §E{cw}
+                §WH{w1} (< x INT:0)
+                  §P x
+                §PROOF{p1:claim} (>= x INT:0)
+                §R x
+            """;
+        Assert.NotEqual(ObligationStatus.Failed, Single(Solve(source).Obligations, ObligationKind.ProofObligation).Status);
+    }
+
+    [Fact]
+    public void ConstructorNamedRefinementParameter_IsAnEntryFact()
+    {
+        const string source = """
+            §M{m1:M}
+              §RTYPE{r1:Pos:i32} (> # INT:0)
+              §CL{c001:Box:pub}
+                §CTOR{ctor1:pub} (Pos:value)
+                  §PROOF{p1:claim} (> value INT:0)
+            """;
+        Assert.Equal(ObligationStatus.Discharged, Single(Solve(source).Obligations, ObligationKind.ProofObligation).Status);
+    }
+
     [Fact]
     public void RawCSharpKillsPreconditionFact()
     {

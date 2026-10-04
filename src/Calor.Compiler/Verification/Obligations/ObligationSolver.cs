@@ -58,6 +58,15 @@ public sealed class ObligationSolver : IDisposable
     {
         var sw = Stopwatch.StartNew();
 
+        // #1413 review: a parameter named `result` would share the return value's solver
+        // constant, turning the parameter's refinement into a "proof" of the return's.
+        if (obligation.Kind == ObligationKind.RefinementReturn && info.Parameters.Any(p => p.Name == "result"))
+        {
+            obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
+                "a parameter is named 'result', which collides with the return value. Runtime check kept.")));
+            return;
+        }
+
         var translator = new ContractTranslator(_ctx);
         translator.SetUserTypeRegistry(userTypeRegistry);
 
@@ -432,7 +441,7 @@ public sealed class ObligationSolver : IDisposable
                     .Select(p => (p.Name, p.TypeName))
                     .ToList();
                 var factCollector = new FactCollector();
-                factCollector.CollectFromStatements(constructor.Body);
+                factCollector.CollectFromCallable(constructor.Parameters, constructor.Body, refinementPredicates);
                 result[constructor.Id] = new FunctionInfo(
                     parameters,
                     constructor.Preconditions,
@@ -487,7 +496,7 @@ public sealed class ObligationSolver : IDisposable
                     .Select(p => (p.Name, p.TypeName))
                     .ToList();
                 var factCollector = new FactCollector();
-                factCollector.CollectFromStatements(operatorOverload.Body);
+                factCollector.CollectFromCallable(operatorOverload.Parameters, operatorOverload.Body, refinementPredicates);
                 var extraVars = new List<(string Name, string TypeName)>();
                 foreach (var param in operatorOverload.Parameters)
                 {
