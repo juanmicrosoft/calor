@@ -33,6 +33,7 @@ repairs = [
         'regressionWitness': ['tests/Calor.Compiler.Tests/S2CacheLiteralWidthTests.cs'],
         'rows': ['CACHE-LITERAL-WIDTH'],
         'reviews': REVIEWS + 'fix-cache-literal-width/',
+        'reviewVerdict': 'Rounds 1-2 REQUEST-CHANGES (fixed), round 3 APPROVE, verification pass APPROVE.',
     },
     {
         'id': 'R-IMPL', 'pr': 1495,
@@ -43,16 +44,19 @@ repairs = [
         'regressionWitness': ['tests/Calor.Compiler.Tests/S2ImplicationDefinednessTests.cs', 'tests/Calor.Verification.Tests/S2ImplicationProverDefinednessTests.cs'],
         'rows': ['IMPL-ASSUMPTION-FORMS', 'IMPL-DIVISION-TOTALIZED'],
         'reviews': REVIEWS + 'fix-implication-definedness/',
+        'reviewVerdict': 'Rounds 1-3 REQUEST-CHANGES (fixed), verification pass APPROVE (one MINOR: the conflict test does not assert the Unestablished status directly).',
     },
     {
         'id': 'R-OBL', 'pr': 1496,
         'branch': 'milestone-0.24/s2-1413-fix-obligation-state',
         'rootCause': 'ObligationSolver asserted preconditions for every obligation even after the body reassigned their variables (false Discharged, guard elided), and reported SAT models as counterexamples although its state over-approximated the program state (reassignments, else bodies without negated guards, unbound refined return values, unassumed named-refinement parameters).',
         'change': 'Entry facts are dropped when the body may write a name they read (incl. ref/out/in aliasing, element/field stores, collection updates); raw C#, unsafe/pointer code, and lambdas make a body opaque, and raw C# in an entry predicate makes every obligation Unsupported; member/element reads and foreach outside a proof condition count as possible heap writes (getters, indexers, enumerators); a SAT model is a refutation only when the state is exact, otherwise Unsupported (guard kept), including when a dropped entry refinement constrains any name the query reads; else/elseif negation facts and named-refinement parameter facts (functions, methods, constructors, operators) are added.',
-        'nonTestChangedLines': 582,
+        'nonTestChangedLines': 591,
+        'residual': 'In a §PROOF counterexample, reads inside the proof condition are its evaluation; a getter there that writes state the same condition reads later, or a property hiding an inherited field (which ContractTranslator models as the field, pre-existing on every channel), can still give a spurious refutation (never a false Discharged).',
         'regressionWitness': ['tests/Calor.Compiler.Tests/S2ObligationStateTests.cs'],
         'rows': ['OBL-MUTATION-KILL', 'OBL-BRANCH-FACTS', 'OBL-REFINEMENT-RETURN', 'OBL-SUBTYPE', 'OBL-SELFREF'],
         'reviews': REVIEWS + 'fix-obligation-state/',
+        'reviewVerdict': 'Rounds 1-3 REQUEST-CHANGES (fixed); verification pass 1 found one BLOCKING in the round-3 fix (fixed), verification pass 2 found one MAJOR (fixed, not re-reviewed: budget exhausted); see residual.',
     },
     {
         'id': 'R-TEXT', 'pr': 1497,
@@ -65,6 +69,7 @@ repairs = [
         'discoveries': ['D-1493'],
         'dependsOn': [1495, 1494],
         'reviews': REVIEWS + 'fix-z3-text-encoding/',
+        'reviewVerdict': 'Rounds 1-3 REQUEST-CHANGES (fixed), verification pass APPROVE.',
     },
     {
         'id': 'R-QNT', 'pr': 1498,
@@ -76,6 +81,7 @@ repairs = [
         'rows': ['QNT-NESTED'],
         'dependsOn': [1495],
         'reviews': REVIEWS + 'fix-nested-quantifier-claim/',
+        'reviewVerdict': 'Rounds 1-3 REQUEST-CHANGES (round 3 MINOR only, addressed), verification pass REQUEST-CHANGES for the PR-body merge prerequisite only (added; no code change requested).',
     },
     {
         'id': 'R-NUM', 'pr': None,
