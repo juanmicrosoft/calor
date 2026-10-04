@@ -406,6 +406,7 @@ public sealed class ContractInheritanceChecker : IDisposable
         var combinedInherited = orderedSources.Any(source => source.HasContracts)
             ? CreateInheritedContractInfo(implementingMethod, orderedSources)
             : null;
+        _implicationUnestablished = false;
         if (combinedInherited != null)
         {
             AddInheritedConflictViolation(
@@ -438,13 +439,12 @@ public sealed class ContractInheritanceChecker : IDisposable
             return new MethodInheritanceResult(
                 implementingMethod.Id,
                 implementingMethod.Name,
-                violations.Count == 0
-                    ? ContractInheritanceStatus.Inherited
-                    : ContractInheritanceStatus.Violation,
+                violations.Count > 0 ? ContractInheritanceStatus.Violation
+                    : _implicationUnestablished ? ContractInheritanceStatus.Unestablished
+                    : ContractInheritanceStatus.Inherited,
                 violations);
         }
 
-        _implicationUnestablished = false;
         var parameters = GetParameterList(implementingMethod.Parameters);
         var implementerPrecondition = Conjoin(
             implementingMethod.Preconditions.Select(contract => contract.Condition),
@@ -1476,9 +1476,19 @@ public sealed class ContractInheritanceChecker : IDisposable
         if (impossible.Outcome?.Status == ProofStatus.Assumed)
         {
             // #1413: contradictory only in the solver's non-null model (null may satisfy both).
+            _implicationUnestablished = true;
             _diagnostics.ReportWarning(implementingMethod.Span, DiagnosticCode.ImplicationAssumed,
                 $"Inherited contracts for '{classNode.Name}.{implementingMethod.Name}' are contradictory only under "
                 + $"an assumption [{string.Join("; ", impossible.Outcome.Assumptions)}]; not reported as incompatible.");
+            return;
+        }
+        if (impossible.Status is ImplicationStatus.Unknown or ImplicationStatus.Unsupported)
+        {
+            // #1413 review round 3: a refusal is reported, and compatibility is not claimed.
+            _implicationUnestablished = true;
+            _diagnostics.ReportWarning(implementingMethod.Span, DiagnosticCode.ImplicationUnknown,
+                $"Could not establish whether the inherited contracts for '{classNode.Name}.{implementingMethod.Name}' "
+                + $"are compatible: {impossible.Outcome?.Reason}");
             return;
         }
         if (impossible.Status != ImplicationStatus.Proven)
@@ -1585,6 +1595,9 @@ public sealed class ContractInheritanceChecker : IDisposable
         string sourceMethodName,
         TextSpan implSpan)
     {
+        if (AreIdentical(interfacePrecondition, implementerPrecondition))
+            return null;
+
         // Try Z3 first if available
         if (_z3Prover != null)
         {
@@ -1676,6 +1689,9 @@ public sealed class ContractInheritanceChecker : IDisposable
         string sourceMethodName,
         TextSpan implSpan)
     {
+        if (AreIdentical(interfaceGuarantee, implementerPostcondition))
+            return null;
+
         // Try Z3 first if available
         if (_z3Prover != null)
         {
@@ -2041,6 +2057,35 @@ public sealed class ContractInheritanceChecker : IDisposable
         return new TypeReference(
             typeName[..genericStart],
             arguments);
+    }
+
+    /// <summary>
+    /// #1413 review round 3: identical contracts imply each other whatever they evaluate to (if A
+    /// completes true, so does A), so identity is decided before the solver, whose definedness
+    /// query may decline a partial contract. Compares every non-span property; unknown values
+    /// compare by Equals, so an uncertain match is "not identical".
+    /// </summary>
+    internal static bool AreIdentical(object? left, object? right)
+    {
+        if (left is null || right is null)
+            return left is null && right is null;
+        var type = left.GetType();
+        if (left is not string && left is System.Collections.IEnumerable leftItems
+            && right is not string && right is System.Collections.IEnumerable rightItems)
+        {
+            var leftList = leftItems.Cast<object?>().ToList();
+            var rightList = rightItems.Cast<object?>().ToList();
+            return leftList.Count == rightList.Count && leftList.Zip(rightList).All(pair => AreIdentical(pair.First, pair.Second));
+        }
+        if (type != right.GetType())
+            return false;
+        if (left is string || type.IsPrimitive || type.IsEnum || left is decimal)
+            return left.Equals(right);
+        if (left is not AstNode)
+            return left.Equals(right);
+        return type.GetProperties()
+            .Where(property => property.GetIndexParameters().Length == 0 && property.PropertyType != typeof(TextSpan))
+            .All(property => AreIdentical(property.GetValue(left), property.GetValue(right)));
     }
 
     /// <summary>

@@ -48,16 +48,20 @@ All notable changes to this project will be documented in this file.
   an interface, Calor checks that the class's precondition accepts every input the interface
   accepts. That check treated `s.Length` as defined for a null string and `x % y` as defined
   for `y = 0`, and reported "Precondition weakening proven" (`Calor0815`) for preconditions that
-  throw on such inputs. The check now models when a quantifier-free contract can throw (a zero
-  divisor, or checked overflow). A class precondition that throws on an input the interface
-  accepts is now reported as an LSP error (`Calor0810`) with that input as the counterexample.
-  The interface's precondition limits which inputs its postcondition must cover. A proof that
-  depends on string, array, or user-type values, which the solver cannot model as null, is
-  reported as the new warning `Calor0819` ("Assumed, not proven"). When the solver cannot
-  decide, the check now says so (`Calor0816`). Calor reports the inheritance as valid
-  (`Calor0814`) only when every check was proven. The syntactic fallback no longer treats
-  `x != c` as weaker than `x == c`. The weakening check (`calor verify --weakening-check`)
-  reports contracts as incomparable when the two files use different overflow policies.
+  throw on such inputs. The check now models when a quantifier-free integer contract can throw:
+  an unconditional zero divisor, or checked overflow. When such a class precondition throws on
+  an input the interface accepts, Calor reports an LSP error (`Calor0810`) with that input as
+  the counterexample. The interface's precondition limits which inputs its postcondition must
+  cover. A proof that depends on string, array, or user-type values is reported as the new
+  warning `Calor0819` ("Assumed, not proven"), because the solver cannot model them as null.
+  A counterexample over such values is not claimed, because index, substring, and null
+  failures are not modeled. In those cases, and for conditional divisors and quantified
+  contracts, the check says that it could not decide (`Calor0816`). This includes the check
+  that inherited guarantees are compatible. Two identical contracts always count as
+  compatible. Calor reports the inheritance as valid (`Calor0814`) only when every check was
+  proven or the contracts are identical. The syntactic fallback no longer treats `x != c` as
+  weaker than `x == c`. The weakening check (`calor verify --weakening-check`) reports
+  contracts as incomparable when the two files use different overflow policies.
 
 - **An empty clause body no longer swallows the next statement (#1485).** A
   clause such as `§CA` (catch) with no indented lines used to pull the next

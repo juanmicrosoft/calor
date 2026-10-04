@@ -208,7 +208,12 @@ public sealed class Z3ImplicationProver : IDisposable
                 : consequentExpr));
 
             var status = solver.Check();
-            if (status == Status.SATISFIABLE && (antecedentDefined == null || consequentDefined == null || !consequentExact))
+            // #1413 review round 3: string ranges, array bounds, and null receivers are total in the
+            // solver, so a model over them may be an input where a contract throws.
+            if (status == Status.SATISFIABLE && (translator.TouchedStringTheory || translator.TouchedNullableReferenceSort))
+                antecedentFailure = "a contract reads a string, array, or user-type value whose throwing operations (index bounds, substring ranges, null receivers) are not modeled";
+            if (status == Status.SATISFIABLE && (antecedentDefined == null || consequentDefined == null || !consequentExact
+                || translator.TouchedStringTheory || translator.TouchedNullableReferenceSort))
             {
                 return ImplicationResult.FromOutcome(
                     ProofOutcome.Assign(ProofEvidence.Unsupported(

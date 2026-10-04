@@ -100,4 +100,29 @@ public sealed class S2ImplicationProverDefinednessTests
         Assert.Equal(ProofStatus.Assumed, result.Outcome!.Status);
         Assert.Contains(Z3Verifier.StringModelAssumption, result.Outcome.Assumptions);
     }
+
+    [Theory]
+    [InlineData("(== §IDX arr INT:-1 INT:0)")]                      // index out of range throws
+    [InlineData("(== (substr s INT:-1 INT:1) STR:\"\")")]      // negative substring start throws
+    public void ThrowingReferenceAntecedent_IsNotRefuted(string antecedent)
+    {
+        // Review round 3 witnesses: no input completes these antecedents, so A -> false holds
+        // at runtime; the solver's total select/extract must not yield a counterexample.
+        var source = $$"""
+            §M{m1:M}
+              §F{f1:P:pub} (i32[]:arr, str:s) -> i32
+                §E{}
+                §Q {{antecedent}}
+                §R INT:1
+            """;
+        var diagnostics = new DiagnosticBag();
+        var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+        var pre = Assert.Single(Assert.Single(module.Functions).Preconditions);
+        using var ctx = Z3ContextFactory.Create();
+        using var prover = new Z3ImplicationProver(ctx);
+        var result = prover.ProveImplication(
+            [("arr", "i32[]"), ("s", "str")], pre.Condition, new BoolLiteralNode(pre.Span, false));
+        Assert.NotEqual(ImplicationStatus.Disproven, result.Status);
+    }
 }
