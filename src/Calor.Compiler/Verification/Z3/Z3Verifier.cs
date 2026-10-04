@@ -1717,16 +1717,18 @@ public sealed class IsolatedSolver : IDisposable
 }
 
 /// <summary>
-/// #1413 (S1 row QNT-NESTED, registered unsupported-refused): a quantifier inside another
-/// quantifier's body has no runtime lowering — the emitter rejects the contract with
-/// <c>Calor0326</c> — yet the verifier reported it <c>Proven</c> (the claim exists even though
-/// compilation then fails). Every verifier channel refuses such an expression instead, so no
-/// claim is made about a form the runtime cannot check.
+/// #1413 (S1 row QNT-NESTED, registered unsupported-refused): for the registered nested bounded
+/// forall the emitter rejects the runtime lowering (<c>Calor0326</c>), yet the verifier reported
+/// it <c>Proven</c>. As a conservative restriction, the verifier channels (contracts,
+/// obligations and their assumptions, implications, guard validation) refuse any quantifier
+/// inside another — including forms the emitter can lower, such as a bounded inner quantifier
+/// under <c>(cast bool …)</c>. It applies to the expression the verifier sees, after
+/// simplification.
 /// </summary>
 internal static class QuantifierNesting
 {
     public const string Refusal =
-        "nested quantifiers are refused: the runtime check cannot evaluate a quantifier inside another (Calor0326). Runtime check kept.";
+        "nested quantifiers are not verified (the runtime lowering of a quantifier inside another is generally rejected, Calor0326). Runtime check kept.";
 
     public static bool ContainsNestedQuantifier(ExpressionNode expression)
         => DescendantsAndSelf(expression)

@@ -258,6 +258,10 @@ public sealed class GuardDiscovery
     {
         try
         {
+            // #1413: a nested quantifier is refused by every verifier channel; no validated guard.
+            if (QuantifierNesting.ContainsNestedQuantifier(obligation.Condition))
+                return false;
+
             var translator = new ContractTranslator(ctx);
 
             foreach (var (name, type) in parameters)

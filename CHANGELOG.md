@@ -21,11 +21,15 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- **No proof is claimed for a nested quantifier (#1413).** A postcondition with a `forall`
-  inside another `forall` cannot be checked at run time, and the compiler rejects it
-  (`Calor0326`). The verifier still reported it `Proven` before that error. It now reports
-  `Unsupported` for a quantifier nested inside another, in contracts, proof obligations, and
-  interface contract checks, and the verification cache never stores or serves such a result.
+- **No proof is claimed for a nested quantifier (#1413).** A postcondition with a bounded
+  `forall` inside another `forall` was reported `Proven`, although the compiler then rejected
+  its runtime check (`Calor0326`). As a conservative restriction, the verifier now does not
+  verify any quantifier nested inside another. This covers contracts, proof obligations and
+  the preconditions and facts they assume, interface contract checks, and guard validation.
+  The result is `Unsupported` and the runtime check is kept, even for nested forms the
+  compiler can check at run time. The verification cache never stores or serves such a
+  result. A k-induction invariant with a conjunct the prover cannot parse is no longer
+  reported proven from the conjuncts it could parse.
 
 - **Three causes of run-to-run and platform-dependent verifier verdicts are fixed (#1135).**
   Whether the verifier is now deterministic on every supported platform is decided by the

@@ -62,7 +62,7 @@ public sealed class S2NestedQuantifierTests : IDisposable
     {
         var (outcome, result) = Verify(Nested(comparison));
         Assert.Equal(ProofStatus.Unsupported, outcome.Status);
-        Assert.Contains("nested quantifiers are refused", outcome.Reason);
+        Assert.Contains("nested quantifiers are not verified", outcome.Reason);
         // The front end still rejects the runtime lowering; the verifier no longer claims a proof.
         Assert.Contains(result.Diagnostics, d => d.Code == DiagnosticCode.QuantifierRuntimeLoweringUnsupported);
     }
@@ -100,6 +100,10 @@ public sealed class S2NestedQuantifierTests : IDisposable
         cache.CachePostconditionResult(parameters, "i32", function.Preconditions, post, function.Body,
             new Calor.Compiler.Verification.Z3.ContractVerificationResult(ContractVerificationStatus.Proven));
         Assert.False(cache.TryGetPostconditionResult(parameters, "i32", function.Preconditions, post, function.Body, out _));
+        // Nothing was written: the key is never stored, so no stale entry can exist either.
+        Assert.Empty(Directory.Exists(_cacheDir)
+            ? Directory.GetFiles(_cacheDir, "*.json", SearchOption.AllDirectories)
+            : []);
     }
 
     [Fact]
