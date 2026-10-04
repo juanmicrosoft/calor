@@ -256,13 +256,15 @@ public sealed class ObligationTests
     {
         Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
 
-        // (== (len "\u00e9") 2) is TRUE under Z3's byte model and FALSE in .NET, where Length is 1.
+        // (== (len "\u00e9") 1) holds in .NET; since #1413 literals reach Z3 per UTF-16 code unit,
+        // so the solver proves it too. The proof is still carried by the string theory (null
+        // strings are unmodeled), so it must stay Assumed, never Discharged.
         var source = """
             §M{m001:Test}
               §F{f001:Check:priv}
                   §I{i32:x}
                   §O{void}
-                  §PROOF{p1:bytelen} (== (len STR:"\u00e9") INT:2)
+                  §PROOF{p1:bytelen} (== (len STR:"\u00e9") INT:1)
             """;
 
         var options = new CompilationOptions { VerifyRefinements = true };
