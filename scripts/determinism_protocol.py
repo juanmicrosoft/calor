@@ -183,6 +183,13 @@ def check_gates(protocol, text) -> list[str]:
 
 WORKFLOW, RUNNER = ".github/workflows/determinism-protocol.yml", "scripts/determinism_runner.py"
 DECIDE_IF = "always() && needs.plan.result == 'success'"
+WORKFLOW_PARTS = {  # amendment 1.1.0: SHA-256 (16 hex) of each job's keys (index 0) and each step, as parse_workflow reads them
+    "plan:0": "5a48c415c7fc964b", "plan:1": "b5834c25ac255fe6", "plan:2": "1f8548f9a3cb9cae", "plan:3": "47e7e3c7ab7763dc",
+    "attempts:0": "95c5a75705cbffaf", "attempts:1": "b5834c25ac255fe6", "attempts:2": "664d96a21de47fa7", "attempts:3": "39bc936fd2af1aad",
+    "attempts:4": "1b3c075981f376c2", "attempts:5": "871788616e61c5e0", "attempts:6": "ab7077183f82fb38", "attempts:7": "a841980fb7493496",
+    "attempts:8": "526ff9b79dab0c0c", "attempts:9": "0d3233caf79b9ded", "decide:0": "f998a4391dcc9b1a", "decide:1": "b5834c25ac255fe6",
+    "decide:2": "664d96a21de47fa7", "decide:3": "d2835a355d99568d", "decide:4": "88f16bb61829ff93", "decide:5": "86288b3699fae02e",
+}
 ISOLATE = "Isolate the home directory and refuse a re-run"
 JOB_SHAPE = {  # job -> (job keys compared exactly, [(step name, required runner command or action, if)])
     "plan": ({"runs-on": "ubuntu-24.04", "timeout-minutes": "planJobTimeoutMinutes"},
@@ -261,6 +268,12 @@ def workflow_problems(text: str, protocol) -> list[str]:
     if 'test "$GITHUB_RUN_ATTEMPT" = 1' not in jobs["plan"]["steps"][0].get("run", "") or \
             len({j["steps"][0].get("run") for j in jobs.values()}) != 1:
         problems.append(f"every job must start with the same '{ISOLATE}' step")
+    # Every job's keys and every step (script, action inputs, env, condition) are frozen line for line, so an
+    # unconditional command cannot be negated, skipped, looped, or retried without amending this table.
+    digests = {f"{n}:{i}": sha256_bytes(json.dumps(part, sort_keys=True).encode("utf-8"))[:16]
+               for n, job in jobs.items() for i, part in enumerate([job["keys"]] + job["steps"])}
+    if digests != WORKFLOW_PARTS:
+        problems.append(f"job keys or step bodies differ from the registered ones: {sorted(k for k in digests.keys() | WORKFLOW_PARTS.keys() if digests.get(k) != WORKFLOW_PARTS.get(k))}")
     return problems
 
 

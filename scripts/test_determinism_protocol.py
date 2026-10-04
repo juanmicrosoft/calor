@@ -523,7 +523,10 @@ class PlanGuards(unittest.TestCase):
                          ("    needs: plan\n", ""), ("      - name: Build the registered test hosts\n",
                                                      "      - name: Build the registered test hosts\n        continue-on-error: true\n"),
                          ("      - name: Run every attempt of this job\n", "      - name: Run every attempt of this job\n        if: always()\n"),
-                         ("  actions: read\n", "  actions: write\n"), ("    strategy:\n", "    strategy: &s\n")):
+                         ("  actions: read\n", "  actions: write\n"), ("    strategy:\n", "    strategy: &s\n"),
+                         ('          "$PY" scripts/determinism_runner.py decide', '          ! "$PY" scripts/determinism_runner.py decide'),
+                         ('          "$PY" scripts/determinism_runner.py run-job', '          exit 0\n          "$PY" scripts/determinism_runner.py run-job'),
+                         ('            dotnet build "$project" -c Release\n', '            until dotnet build "$project" -c Release; do :; done\n')):
             self.assertIn(old, WORKFLOW_TEXT)
             self.assertTrue(dp.workflow_problems(WORKFLOW_TEXT.replace(old, new, 1), PROTOCOL), new)
 
@@ -550,7 +553,11 @@ class PlanGuards(unittest.TestCase):
         self.assertTrue(dp.home_safe(runner))
         self.assertEqual({"D013"}, codes(texts={dp.RUNNER: runner + "\nshutil.rmtree(Path.home() / '.calor')\n"}))
         self.assertIn('test "$GITHUB_RUN_ATTEMPT" = 1\n', WORKFLOW_TEXT)
-        self.assertTrue(dp.workflow_problems(WORKFLOW_TEXT.replace('          mkdir -p "$home"\n', "", 1), PROTOCOL))
+        for old in ('          mkdir -p "$home"\n', "          printf 'APPDATA=%s"):  # removed from every job at once
+            self.assertTrue(dp.workflow_problems("\n".join(ln for ln in WORKFLOW_TEXT.splitlines() if not ln.startswith(old.rstrip("\n"))), PROTOCOL))
+        for k in dr.UNDER_HOME:
+            with self.assertRaises(dr.Refusal):
+                dr.check_isolation(dict(child, **{k: "/real-home-never-used/AppData"}), inv)
 
     def test_environment_check_rejects_any_other_toolchain_or_runner(self) -> None:
         env = dp.env_by_id(PROTOCOL)["linux-x64"]
@@ -592,10 +599,15 @@ class PlanGuards(unittest.TestCase):
             with self.assertRaises(dr.Refusal):
                 dr.paged("/runs", "workflow_runs", "t", lambda path, token, b=broken: b)
         inventory = [past(1, "determinism control C1", minutes=13), past(2, "determinism execution E1", minutes=300)]
-        self.assertEqual([], dr.ledger_problems({"entries": [{"runId": 1, "runnerMinutes": 13}, {"runId": "2", "runnerMinutes": 300}]}, inventory))
-        self.assertEqual(2, len(dr.ledger_problems({"entries": [{"runId": 1, "runnerMinutes": 12}]}, inventory)))
-        self.assertEqual(1, len(dr.ledger_problems({"entries": [{"runId": 1, "runnerMinutes": 13}, {"runId": 2, "runnerMinutes": 300},
-                                                                {"runId": 9, "runnerMinutes": 5}]}, inventory)))
+        one, two = {"runId": 1, "mode": "control", "commit": OLD, "runnerMinutes": 13}, {"runId": "2", "mode": "execution", "commit": OLD, "runnerMinutes": 300}
+        self.assertEqual([], dr.ledger_problems({"entries": [one, two]}, inventory))
+        self.assertEqual(2, len(dr.ledger_problems({"entries": [dict(one, runnerMinutes=12)]}, inventory)))
+        self.assertEqual(1, len(dr.ledger_problems({"entries": [one, two, dict(one, runId=9)]}, inventory)))
+        for wrong in (dict(two, commit=NEW), dict(two, mode="control")):
+            self.assertEqual(1, len(dr.ledger_problems({"entries": [one, wrong]}, inventory)))
+            self.refused("another commit or mode", inventory=inventory, ledger={"entries": [wrong]})
+        with self.assertRaises(dr.Refusal):
+            dr.job_minutes([{"id": 6, "started_at": None, "completed_at": "2026-10-03T10:04:00Z", "conclusion": "success"}], True)
 
 
 FAKE_DOTNET = """#!/bin/sh
@@ -605,7 +617,8 @@ case "$1" in
   --list-sdks) echo "10.0.401 [$FAKE_ROOT/sdk]"; exit 0;;
   --list-runtimes) echo "Microsoft.NETCore.App 10.0.12 [$FAKE_ROOT/shared/Microsoft.NETCore.App]"; exit 0;;
   --version) echo "10.0.401"; exit 0;;
-  run) echo "$USERPROFILE"; exit 0;;
+  build) [ "$4" = Release ] && [ -n "$APPDATA" ] && exit 0; exit 1;;
+  *.dll) echo "$USERPROFILE"; exit 0;;
 esac
 echo "$HOME|$USERPROFILE|$DOTNET_CLI_HOME|$CALOR_DETERMINISM_RECORD_DIR|${CALOR_UPDATE_X:-unset}|$NUGET_PACKAGES" >> "$FAKE_LOG"
 prev=""; dir=""; name=""

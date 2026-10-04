@@ -43,12 +43,17 @@ ROOT = dp.ROOT
 EXECUTION_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]{0,39}$")
 TITLE = re.compile(r"^determinism (control|execution) (\S+)$")
 ISOLATED = ("HOME", "USERPROFILE", "DOTNET_CLI_HOME")
+# Per-user configuration and cache roots that .NET, NuGet, and Windows read besides the home variables.
+UNDER_HOME = {"APPDATA": "AppData/Roaming", "LOCALAPPDATA": "AppData/Local", "XDG_CONFIG_HOME": ".config", "XDG_DATA_HOME": ".local/share",
+              "XDG_CACHE_HOME": ".cache", "NUGET_HTTP_CACHE_PATH": "nuget-http", "NUGET_PLUGINS_CACHE_PATH": "nuget-plugins"}
 # The dotnet-install scripts bundled with actions/setup-dotnet at v4 (commit below), pinned by SHA-256.
 # setup-dotnet itself first installs a floating LTS runtime, so it is not used (amendment 1.1.0).
 INSTALLER = {"base": "https://raw.githubusercontent.com/actions/setup-dotnet/67a3573c9a986a3f9c594539f4ab511d57bb3ce9/externals/",
              "install-dotnet.sh": "19b0a7890c371201b944bf0f8cdbb6460d053d63ddbea18cfed3e4199769ce17",
              "install-dotnet.ps1": "7e9969069558023daf52bbf6fc55eb37032eb23c7ff55a7d6afc659d54d6c23b"}
 PROBE = "System.Console.WriteLine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile));\n"
+PROBE_PROJECT = ('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework>'
+                 '<UseAppHost>false</UseAppHost></PropertyGroup></Project>\n')
 
 
 class Refusal(Exception):
@@ -109,6 +114,8 @@ def plan_problems(protocol, *, mode, execution_id, env, inventory, ledger, chang
         run = listed.get(str(entry.get("runId")))
         if run is None:
             problems.append(f"ledger run {entry.get('runId')} is missing from the API inventory (deleted?); history cannot be trusted")
+        elif entry.get("commit", run["headSha"]) != run["headSha"] or entry.get("mode", classify(run)) != classify(run):
+            problems.append(f"ledger run {entry.get('runId')} names another commit or mode than the API inventory")
         else:  # the larger of the two records counts, and a ledgered execution's commit stays executed
             run["minutes"] = max(run["minutes"], int(entry.get("runnerMinutes") or 0))
             run["attemptsStarted"] = run["attemptsStarted"] or entry.get("mode") == "execution"
@@ -183,6 +190,8 @@ def job_minutes(jobs: list[dict], finished: bool) -> int:
     A job of a finished run that started without finishing, or ends before it starts, fails closed."""
     total = 0
     for job in jobs:
+        if not job.get("started_at") and job.get("completed_at") and job.get("conclusion") != "skipped":
+            raise Refusal(f"job {job.get('id')} completed without a start time")
         if not job.get("started_at") or (not job.get("completed_at") and not finished):
             continue
         if not job.get("completed_at"):
@@ -289,16 +298,19 @@ def physical_memory_bytes():
 
 def home_probe(env_vars, probe: Path, nuget: str) -> bool:
     """Does the pinned runtime resolve SpecialFolder.UserProfile (the root of the verifier's default
-    user-level cache, VerificationCacheOptions) to an isolated home? A file-based app run outside the
-    repository prints it; any failure is False. Only the comparison is recorded."""
+    user-level cache, VerificationCacheOptions) to an isolated home? A probe project outside the
+    repository, built with every output under the probe directory (no file-based-app cache), prints it;
+    any failure is False. Only the comparison is recorded."""
     home = probe / "home"
     home.mkdir(parents=True, exist_ok=False)
-    (probe / "probe.cs").write_text(PROBE, encoding="utf-8")
-    child = {k: v for k, v in env_vars.items() if not k.upper().startswith("CALOR_")}
-    child.update({k: str(home) for k in ISOLATED}, NUGET_PACKAGES=nuget)
+    (probe / "Program.cs").write_text(PROBE, encoding="utf-8")
+    (probe / "probe.csproj").write_text(PROBE_PROJECT, encoding="utf-8")
+    child = invocation_env(env_vars, probe, "", nuget)
     try:
-        result = subprocess.run(["dotnet", "run", "--file", str(probe / "probe.cs")], cwd=probe, env=child,
-                                capture_output=True, text=True, check=False, timeout=600)
+        built = subprocess.run(["dotnet", "build", str(probe / "probe.csproj"), "-c", "Release", "-o", str(probe / "bin")], cwd=probe,
+                               env=child, capture_output=True, text=True, check=False, timeout=600)
+        result = subprocess.run(["dotnet", str(probe / "bin" / "probe.dll")], cwd=probe, env=child, capture_output=True, text=True,
+                                check=False, timeout=120) if built.returncode == 0 else built
     except (OSError, subprocess.TimeoutExpired):
         return False
     lines = result.stdout.strip().splitlines()
@@ -353,6 +365,7 @@ def invocation_env(base, invocation_dir: Path, rid: str, nuget: str) -> dict:
     home, record = (invocation_dir / "home").resolve(), (invocation_dir / "record").resolve()
     child = {k: v for k, v in base.items() if not k.upper().startswith("CALOR_UPDATE_")}
     child.update({k: str(home) for k in ISOLATED})
+    child.update({k: str(home / sub) for k, sub in UNDER_HOME.items()})
     child.update(NUGET_PACKAGES=nuget, CALOR_Z3_EXPECTED_RID=rid, CALOR_DETERMINISM_RECORD_DIR=str(record), MSBUILDDISABLENODEREUSE="1")
     return child
 
@@ -366,6 +379,9 @@ def check_isolation(child: dict, invocation_dir: Path) -> None:
             raise Refusal(f"{key}={value!r} is not an isolated home under {base}")
         if Path(value).exists() and any(Path(value).iterdir()):
             raise Refusal(f"{key}={value} is not empty before the invocation")
+    home = Path(child[ISOLATED[0]]).resolve()
+    if any(Path(child.get(k) or ".").resolve() != home / sub for k, sub in UNDER_HOME.items()):
+        raise Refusal(f"a per-user configuration or cache root ({', '.join(UNDER_HOME)}) is not under the invocation's home")
     if len({child[k] for k in ISOLATED}) != 1 or not Path(child.get("CALOR_DETERMINISM_RECORD_DIR", "")).is_absolute() \
             or not Path(child.get("NUGET_PACKAGES", "")).is_absolute() or any(k.upper().startswith("CALOR_UPDATE_") for k in child):
         raise Refusal("home variables differ, a record or package path is relative, or a CALOR_UPDATE_* variable remains")
@@ -415,9 +431,20 @@ def run_profile(protocol, cases, profile, env, invocation_dir: Path, base, nuget
             outcomes, summary, broken = None, "Malformed", error
     try:
         values = dp.profile_values(profile, cases, outcomes, summary, code, timed_out, Path(child["CALOR_DETERMINISM_RECORD_DIR"]))
-    except Exception as error:  # noqa: BLE001 - keep the TRX values; the record files could not be read
-        values, broken = dp.profile_values(profile, cases, outcomes, summary, code, timed_out, None), error
-        values["cells"] = {k: "Malformed" for k in values["cells"]} if values["cells"] else values["cells"]
+    except Exception as error:  # noqa: BLE001 - keep every value that can still be read, file by file
+        record, broken = Path(child["CALOR_DETERMINISM_RECORD_DIR"]), error
+        values = dp.profile_values(profile, cases, outcomes, summary, code, timed_out, None)
+        if values["cells"] is not None:
+            try:
+                values["cells"] = dp.profile_values(profile, dict(cases, artifacts=[]), outcomes, summary, code, timed_out, record)["cells"]
+            except Exception:  # noqa: BLE001 - cells.json itself is unreadable
+                values["cells"] = {k: "Malformed" for k in values["cells"]}
+        for name in values["artifacts"]:
+            try:
+                if (record / "generated" / name).exists():
+                    values["artifacts"][name] = dp.sha256_file(record / "generated" / name)
+            except OSError:
+                pass
     fills = any(part in dp.FILL_VALUES for val in values["tests"].values() for part in val.split(","))
     status = "invalid" if cut or (broken and outcomes is not None) else "timeout" if timed_out else "crash" if fills else \
         "invalid" if outcomes is None else "completed"
@@ -547,6 +574,8 @@ def ledger_problems(ledger: dict, inventory: list[dict]) -> list[str]:
         entry = entries.get(i)
         if entry is None:
             problems.append(f"run {i} ({run['title']}) is not in the ledger")
+        elif entry.get("commit") != run["headSha"] or entry.get("mode") != classify(run):
+            problems.append(f"run {i}: ledger commit or mode differs from the API inventory")
         elif run["status"] == "completed" and entry.get("runnerMinutes") != run["minutes"]:
             problems.append(f"run {i}: ledger says {entry.get('runnerMinutes')} runner-minutes, measured {run['minutes']}")
     return problems
