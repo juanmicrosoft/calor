@@ -49,40 +49,103 @@ public sealed class FactCollector
         => ScopedFacts.Add(ScopedFact.FunctionWide(fact));
 
     /// <summary>
+    /// #1413 (S1 OBL-MUTATION-KILL): every name the body may rebind — assignments,
+    /// compound assignments, increments, bindings, loop variables, and `ref`/`out`
+    /// call arguments. An entry fact (precondition, parameter refinement) about such a
+    /// name may be stale at an obligation site, and a solver model for it is not the
+    /// value the program has there.
+    /// </summary>
+    public IReadOnlySet<string> AssignedNames => _assignedNames;
+
+    /// <summary>
+    /// #1413: the body contains code the collector cannot see into (raw C#), which may
+    /// rebind any name. Every entry fact is then unusable and no state is exact.
+    /// </summary>
+    public bool HasOpaqueCode { get; private set; }
+
+    private HashSet<string> _assignedNames = new(StringComparer.Ordinal);
+    private bool _bodyInitialized;
+    private bool _hasJumps;
+    private readonly List<(int Start, int End)> _exactStatements = new();
+
+    /// <summary>
+    /// Marks an additional name as possibly rebound (e.g. the size variable of an
+    /// indexed-type parameter that the body reassigns).
+    /// </summary>
+    public void MarkAssigned(string name) => _assignedNames.Add(name);
+
+    /// <summary>
+    /// #1413 (S1 OBL-MUTATION-KILL, OBL-BRANCH-FACTS): true when the solver's state at
+    /// <paramref name="span"/> is exact — the span lies in a simple statement reached
+    /// through the function body, then/elseif/else bodies, while/for bodies, and
+    /// do-while bodies only, every enclosing guard is asserted as a fact, and no
+    /// earlier statement can return, throw, break, continue, or jump. Only then does a
+    /// satisfying model describe an input that actually reaches the obligation; any
+    /// other model is not a counterexample. Residual: a preceding statement that throws
+    /// (checked overflow, a call, an earlier guard) is not tracked.
+    /// </summary>
+    public bool IsExact(TextSpan span)
+        => !HasOpaqueCode
+           && _exactStatements.Any(statement =>
+               span.Start >= statement.Start && span.End <= statement.End);
+
+    /// <summary>
     /// Collects facts from a function's body and parameter refinements that are relevant
     /// to proving obligations within the given statements.
     /// Inline refinements are added as facts for non-RefinementEntry obligations
     /// (e.g., IndexBounds can use parameter refinements as assumptions).
     /// </summary>
-    public void CollectFromFunction(FunctionNode func)
-        => CollectFromCallable(func.Parameters, func.Body);
+    public void CollectFromFunction(
+        FunctionNode func,
+        IReadOnlyDictionary<string, ExpressionNode>? refinementPredicates = null)
+        => CollectFromCallable(func.Parameters, func.Body, refinementPredicates);
 
     /// <summary>
     /// Collects facts from a class method using the same rules as module functions.
     /// </summary>
-    public void CollectFromMethod(MethodNode method)
-        => CollectFromCallable(method.Parameters, method.Body);
+    public void CollectFromMethod(
+        MethodNode method,
+        IReadOnlyDictionary<string, ExpressionNode>? refinementPredicates = null)
+        => CollectFromCallable(method.Parameters, method.Body, refinementPredicates);
 
     private void CollectFromCallable(
         IReadOnlyList<ParameterNode> parameters,
-        IReadOnlyList<StatementNode> body)
+        IReadOnlyList<StatementNode> body,
+        IReadOnlyDictionary<string, ExpressionNode>? refinementPredicates)
     {
-        // Parameter inline refinements hold on entry for the whole function —
-        // unless the body rebinds the parameter name, in which case the
-        // refinement may no longer describe the current value.
-        var bodyAssigned = CollectAssignedNames(body);
+        InitializeBody(body);
+
+        // Parameter refinements hold on entry for the whole function: the entry guard
+        // is emitted unless the entry obligation is discharged. They are dropped when
+        // the body may rebind the parameter (the refinement may no longer describe the
+        // current value) and for out parameters, which have no entry value. #1413
+        // (S1 OBL-SELFREF, OBL-SUBTYPE): named refinement types (`§I{Pos:x}`) are entry
+        // facts exactly like inline refinements; omitting them refuted obligations
+        // with models the entry guard rules out.
         foreach (var param in parameters)
         {
-            if (param.InlineRefinement != null && !bodyAssigned.Contains(param.Name))
+            if (HasOpaqueCode
+                || param.Modifier == ParameterModifier.Out
+                || _assignedNames.Contains(param.Name))
+            {
+                continue;
+            }
+            if (param.InlineRefinement != null)
             {
                 ScopedFacts.Add(ScopedFact.FunctionWide(
                     SubstituteSelfRefStatic(
                         param.InlineRefinement.Predicate,
                         param.Name)));
             }
+            if (refinementPredicates != null
+                && refinementPredicates.TryGetValue(param.TypeName, out var predicate))
+            {
+                ScopedFacts.Add(ScopedFact.FunctionWide(
+                    SubstituteSelfRefStatic(predicate, param.Name)));
+            }
         }
 
-        CollectFromStatements(body);
+        Walk(body, exact: true);
     }
 
     /// <summary>
@@ -90,59 +153,140 @@ public sealed class FactCollector
     /// </summary>
     public void CollectFromStatements(IReadOnlyList<StatementNode> statements)
     {
+        InitializeBody(statements);
+        Walk(statements, exact: true);
+    }
+
+    private void InitializeBody(IReadOnlyList<StatementNode> body)
+    {
+        if (_bodyInitialized)
+            return;
+        _bodyInitialized = true;
+        _assignedNames = CollectAssignedNames(body);
+        var nodes = body.SelectMany(DescendantsAndSelf).ToArray();
+        HasOpaqueCode = nodes.Any(node => node is RawCSharpNode);
+        _hasJumps = nodes.Any(node => node is GotoStatementNode or LabelStatementNode);
+    }
+
+    /// <summary>
+    /// Walks a statement list collecting scoped facts. <paramref name="exact"/> says
+    /// whether reaching this list is fully described by the facts collected so far.
+    /// </summary>
+    private void Walk(IReadOnlyList<StatementNode> statements, bool exact)
+    {
+        var diverted = false;
         foreach (var stmt in statements)
         {
-            CollectFromStatement(stmt);
+            var reachedExactly = exact && !diverted && !_hasJumps;
+            switch (stmt)
+            {
+                case ForStatementNode forStmt:
+                    Walk(forStmt.Body, reachedExactly && CollectFromForLoop(forStmt));
+                    break;
+
+                case WhileStatementNode whileStmt:
+                    // The while condition holds on entry to each iteration, but a
+                    // body that reassigns its variables invalidates it mid-body.
+                    Walk(whileStmt.Body,
+                        reachedExactly && AddGuardFact(whileStmt.Condition, whileStmt.Body));
+                    break;
+
+                case IfStatementNode ifStmt:
+                    CollectFromIf(ifStmt, reachedExactly);
+                    break;
+
+                case DoWhileStatementNode doWhile:
+                    // The first iteration runs unconditionally.
+                    Walk(doWhile.Body, reachedExactly);
+                    break;
+
+                case ForeachStatementNode foreach_:
+                    Walk(foreach_.Body, exact: false);
+                    break;
+
+                case TryStatementNode tryStmt:
+                    Walk(tryStmt.TryBody, exact: false);
+                    break;
+
+                default:
+                    if (reachedExactly && !ContainsNestedStatement(stmt))
+                        _exactStatements.Add((stmt.Span.Start, stmt.Span.End));
+                    break;
+            }
+
+            if (CanDivert(stmt))
+                diverted = true;
         }
     }
 
-    private void CollectFromStatement(StatementNode stmt)
+    /// <summary>
+    /// Each condition is a fact only within the body it guards. #1413 (S1
+    /// OBL-BRANCH-FACTS): an elseif body is reached only when every earlier condition
+    /// was false and its own is true, and the else body only when all were false, so
+    /// those negations are facts there too.
+    /// </summary>
+    private void CollectFromIf(IfStatementNode ifStmt, bool exact)
     {
-        switch (stmt)
+        var conditions = new List<ExpressionNode> { ifStmt.Condition };
+        conditions.AddRange(ifStmt.ElseIfClauses.Select(clause => clause.Condition));
+        // A condition that itself rebinds a name (an increment) evaluates against a
+        // changing state; its negation is not a stable fact.
+        var negationsUsable = !conditions.Any(condition =>
+            DescendantsAndSelf(condition).Any(IsIncrement));
+
+        Walk(ifStmt.ThenBody, exact && AddGuardFact(ifStmt.Condition, ifStmt.ThenBody));
+        for (var index = 0; index < ifStmt.ElseIfClauses.Count; index++)
         {
-            case ForStatementNode forStmt:
-                CollectFromForLoop(forStmt);
-                break;
-
-            case WhileStatementNode whileStmt:
-                // The while condition holds on entry to each iteration, but a
-                // body that reassigns its variables invalidates it mid-body.
-                AddGuardFact(whileStmt.Condition, whileStmt.Body);
-                CollectFromStatements(whileStmt.Body);
-                break;
-
-            case IfStatementNode ifStmt:
-                // Each condition is a fact only within the body it guards.
-                AddGuardFact(ifStmt.Condition, ifStmt.ThenBody);
-                CollectFromStatements(ifStmt.ThenBody);
-                foreach (var elseIf in ifStmt.ElseIfClauses)
-                {
-                    AddGuardFact(elseIf.Condition, elseIf.Body);
-                    CollectFromStatements(elseIf.Body);
-                }
-                if (ifStmt.ElseBody != null)
-                    CollectFromStatements(ifStmt.ElseBody);
-                break;
-
-            case DoWhileStatementNode doWhile:
-                CollectFromStatements(doWhile.Body);
-                break;
-
-            case ForeachStatementNode foreach_:
-                CollectFromStatements(foreach_.Body);
-                break;
-
-            case TryStatementNode tryStmt:
-                CollectFromStatements(tryStmt.TryBody);
-                break;
+            var clause = ifStmt.ElseIfClauses[index];
+            var fact = negationsUsable
+                ? Conjoin(conditions.Take(index + 1).Select(Negate).Append(clause.Condition), clause.Condition.Span)
+                : clause.Condition;
+            Walk(clause.Body, exact && negationsUsable && AddGuardFact(fact, clause.Body));
+        }
+        if (ifStmt.ElseBody != null)
+        {
+            var added = negationsUsable && AddGuardFact(
+                Conjoin(conditions.Select(Negate), ifStmt.Span),
+                ifStmt.ElseBody);
+            Walk(ifStmt.ElseBody, exact && added);
         }
     }
+
+    private static ExpressionNode Negate(ExpressionNode condition)
+        => new UnaryOperationNode(condition.Span, UnaryOperator.Not, condition);
+
+    private static ExpressionNode Conjoin(IEnumerable<ExpressionNode> conjuncts, TextSpan span)
+        => conjuncts.Aggregate((left, right) =>
+            new BinaryOperationNode(span, BinaryOperator.And, left, right));
+
+    private static bool IsIncrement(AstNode node)
+        => node is UnaryOperationNode
+        {
+            Operator: UnaryOperator.PreIncrement
+                or UnaryOperator.PreDecrement
+                or UnaryOperator.PostIncrement
+                or UnaryOperator.PostDecrement
+        };
+
+    private static bool ContainsNestedStatement(StatementNode statement)
+        => DescendantsAndSelf(statement).Skip(1).Any(node => node is StatementNode);
+
+    /// <summary>Whether control may leave the statement other than by falling through.</summary>
+    private static bool CanDivert(StatementNode statement)
+        => DescendantsAndSelf(statement).Any(node => node
+            is ReturnStatementNode
+            or ThrowStatementNode
+            or RethrowStatementNode
+            or BreakStatementNode
+            or ContinueStatementNode
+            or GotoStatementNode
+            or YieldBreakStatementNode);
 
     /// <summary>
     /// Extracts loop bounds from a for-loop.
     /// §L{id:i:from:to:step} uses inclusive bounds, matching C# emission.
     /// </summary>
-    private void CollectFromForLoop(ForStatementNode forStmt)
+    private bool CollectFromForLoop(ForStatementNode forStmt)
     {
         var dummySpan = new TextSpan(0, 0, 1, 1);
         var loopVar = new ReferenceNode(dummySpan, forStmt.VariableName);
@@ -159,63 +303,75 @@ public sealed class FactCollector
                 Operator: UnaryOperator.Negate,
                 Operand: IntLiteralNode { Value: > 0 }
             };
+        // Both bounds must be facts for the body's state to be exact; the body
+        // itself is walked by the caller.
         if (isPositiveStep)
         {
-            AddGuardFact(
+            var lower = AddGuardFact(
                 new BinaryOperationNode(
                     dummySpan,
                     BinaryOperator.GreaterOrEqual,
                     loopVar,
                     forStmt.From),
                 forStmt.Body);
-            AddGuardFact(
+            var upper = AddGuardFact(
                 new BinaryOperationNode(
                     dummySpan,
                     BinaryOperator.LessOrEqual,
                     loopVar,
                     forStmt.To),
                 forStmt.Body);
+            return lower && upper;
         }
-        else if (isNegativeStep)
+        if (isNegativeStep)
         {
-            AddGuardFact(
+            var upper = AddGuardFact(
                 new BinaryOperationNode(
                     dummySpan,
                     BinaryOperator.LessOrEqual,
                     loopVar,
                     forStmt.From),
                 forStmt.Body);
-            AddGuardFact(
+            var lower = AddGuardFact(
                 new BinaryOperationNode(
                     dummySpan,
                     BinaryOperator.GreaterOrEqual,
                     loopVar,
                     forStmt.To),
                 forStmt.Body);
+            return lower && upper;
         }
-
-        CollectFromStatements(forStmt.Body);
+        return false;
     }
 
     /// <summary>
     /// Records a guard fact scoped to the body it governs, unless the body
     /// rebinds a variable the fact mentions (conservative assignment kill).
     /// </summary>
-    private void AddGuardFact(ExpressionNode fact, IReadOnlyList<StatementNode> body)
+    private bool AddGuardFact(ExpressionNode fact, IReadOnlyList<StatementNode> body)
     {
-        if (body.Count == 0)
-            return;
+        if (body.Count == 0 || HasOpaqueCode)
+            return false;
 
         var referenced = new HashSet<string>(StringComparer.Ordinal);
         CollectReferencedNames(fact, referenced);
 
         var assigned = CollectAssignedNames(body);
         if (referenced.Overlaps(assigned))
-            return;
+            return false;
 
         var scopeStart = body.Min(s => s.Span.Start);
         var scopeEnd = body.Max(s => s.Span.End);
         ScopedFacts.Add(new ScopedFact(fact, scopeStart, scopeEnd));
+        return true;
+    }
+
+    /// <summary>The names an expression reads.</summary>
+    public static HashSet<string> ReferencedNames(ExpressionNode expr)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        CollectReferencedNames(expr, names);
+        return names;
     }
 
     private static void CollectReferencedNames(ExpressionNode expr, HashSet<string> names)
@@ -269,10 +425,35 @@ public sealed class FactCollector
                 case ForeachStatementNode foreachStmt:
                     names.Add(foreachStmt.VariableName);
                     break;
+                case CallExpressionNode call:
+                    AddByReferenceArguments(call.Arguments, call.ArgumentModifiers, names);
+                    break;
+                case CallStatementNode callStatement:
+                    AddByReferenceArguments(
+                        callStatement.Arguments, callStatement.ArgumentModifiers, names);
+                    break;
             }
         }
 
         return names;
+    }
+
+    /// <summary>#1413: a variable passed as `ref` or `out` may be rebound by the callee.</summary>
+    private static void AddByReferenceArguments(
+        IReadOnlyList<ExpressionNode> arguments,
+        IReadOnlyList<string?>? modifiers,
+        HashSet<string> names)
+    {
+        if (modifiers == null)
+            return;
+        for (var index = 0; index < arguments.Count && index < modifiers.Count; index++)
+        {
+            if (modifiers[index] is "ref" or "out"
+                && arguments[index] is ReferenceNode reference)
+            {
+                names.Add(reference.Name);
+            }
+        }
     }
 
     /// <summary>
