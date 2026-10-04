@@ -632,7 +632,9 @@ public static class Program
 
         if (format is "markdown" or "both")
         {
-            var mdGenerator = new MarkdownReportGenerator();
+            // result.CommitHash came from git in the current directory (BenchmarkRunner), so look up
+            // the source-declared version in that same repository.
+            var mdGenerator = new MarkdownReportGenerator(Directory.GetCurrentDirectory());
             var mdPath = format == "both" ? Path.ChangeExtension(output, ".md") : output;
             await mdGenerator.SaveAsync(result, mdPath);
             Console.WriteLine($"Markdown report saved to: {mdPath}");

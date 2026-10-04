@@ -106,6 +106,14 @@ public sealed class Z3ImplicationProver : IDisposable
     {
         var sw = Stopwatch.StartNew();
 
+        if (QuantifierNesting.ContainsNestedQuantifier(antecedent)
+            || QuantifierNesting.ContainsNestedQuantifier(consequent))
+        {
+            return ImplicationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(QuantifierNesting.Refusal)),
+                Duration: sw.Elapsed);
+        }
+
         var translator = new ContractTranslator(_ctx);
 
         // Declare the parameters the contracts read (#1413: an unused string, array, or
@@ -360,6 +368,15 @@ public sealed class Z3ImplicationProver : IDisposable
         ExpressionNode? interfacePrecondition = null)
     {
         var sw = Stopwatch.StartNew();
+
+        if (QuantifierNesting.ContainsNestedQuantifier(interfacePostcondition)
+            || interfacePrecondition is not null && QuantifierNesting.ContainsNestedQuantifier(interfacePrecondition)
+            || QuantifierNesting.ContainsNestedQuantifier(implementerPostcondition))
+        {
+            return ImplicationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(QuantifierNesting.Refusal)),
+                Duration: sw.Elapsed);
+        }
 
         // #1413 review round 2: the interface guarantees its postcondition only on inputs its
         // precondition accepts (completes true), so the precondition joins the assumptions; as

@@ -79,6 +79,18 @@ public sealed class ObligationSolver : IDisposable
             return;
         }
 
+        // The condition, and every assumption the query could use, must be free of nesting.
+        if (QuantifierNesting.ContainsNestedQuantifier(obligation.Condition)
+            || info.Preconditions.Any(pre => QuantifierNesting.ContainsNestedQuantifier(pre.Condition))
+            || obligation.Kind != ObligationKind.RefinementEntry
+               && info.CollectedFacts.Any(fact => fact.AppliesTo(obligation.Span)
+                   && QuantifierNesting.ContainsNestedQuantifier(fact.Fact)))
+        {
+            obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(QuantifierNesting.Refusal)));
+            obligation.SolverDuration = sw.Elapsed;
+            return;
+        }
+
         var translator = new ContractTranslator(_ctx);
         translator.SetUserTypeRegistry(userTypeRegistry);
 

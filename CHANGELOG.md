@@ -38,6 +38,17 @@ All notable changes to this project will be documented in this file.
   null-free model is no longer reported as vacuous or unsatisfiable when a null could satisfy
   it (through `==`, `Equals`, or `IsNullOrEmpty` on a parameter); the result is `Unsupported`.
   The verification cache format moves to 1.21, so older entries are invalidated.
+- **No proof is claimed for a nested quantifier (#1413).** A postcondition with a bounded
+  `forall` inside another `forall` was reported `Proven`, although the compiler then rejected
+  its runtime check (`Calor0326`). As a conservative restriction, the verifier now does not
+  verify any quantifier nested inside another. This covers contracts, proof obligations and
+  the preconditions and facts they assume, interface contract checks, and guard validation.
+  The result is `Unsupported` and the runtime check is kept, even for nested forms the
+  compiler can check at run time. The rule applies to the contract after simplification (a
+  nested quantifier that simplifies to `true` is still proven). For interface contract checks,
+  the refusal is reported once #1495 merges. The verification cache never stores or serves such a
+  result. A k-induction invariant with a conjunct the prover cannot parse is no longer
+  reported proven from the conjuncts it could parse.
 
 - **Three causes of run-to-run and platform-dependent verifier verdicts are fixed (#1135).**
   Whether the verifier is now deterministic on every supported platform is decided by the

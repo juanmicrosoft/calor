@@ -13,6 +13,12 @@ namespace Calor.Evaluation.Tests;
 /// differential check on the registered denominator. Each negative control differs from a positive
 /// control in one observable respect and must be caught for that reason.
 /// </summary>
+/// <remarks>
+/// The oracle swaps process-wide state (Environment.CurrentDirectory, Console.Out, Console.In)
+/// around each invocation, so this class runs in a non-parallel collection: no other test class
+/// in the assembly runs while it does.
+/// </remarks>
+[Collection(ProcessGlobalStateCollection.Name)]
 public class PairDifferentialOracleTests
 {
     private const string CalorIsEven = "§M{m001:Ctl}\n  §F{f001:IsEven:pub} (i32:n) -> bool\n    §R (== (% n 2) 0)\n";
