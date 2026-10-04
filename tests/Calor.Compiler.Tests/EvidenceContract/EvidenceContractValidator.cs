@@ -287,7 +287,7 @@ internal static partial class EvidenceContractValidator
         new("s1-generated-cases", null, 1311, 3008, "1.2.0", "addedExecutions", 1508, "1.2.1", "d9a57518b7e26e744fe7080177cdfb5e3ea9051f9eaaec5c233f083ccf896bac"),
         new("s2-repairs", null, 1413, 7, "1.3.0", "addedPrs", 1, "1.3.0", "2254c411e46b2f8aa9cc0c262328bd68dc491a8a84855ed3fa92be80ab656fab",
             ["D-OBL-PROOF-GETTER", "D-OBL-THROWING-PREDECESSOR"]),
-        new("review-rounds-per-pr", 1496, 1413, 5, "1.3.0", null, null, "1.3.0", "e87f23917e6b60cf7d4f132418151a16db5cfcb8b9354a214398ed5ef829110b"),
+        new("review-rounds-per-pr", 1496, 1413, 5, "1.3.0", null, null, "1.3.0", "755c4c7d3da8630de5f9648f017c00d0c44485531c6f646fa9f4d902e4c89fa8"),
     ];
 
     private sealed record RegisteredException(

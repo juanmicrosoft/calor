@@ -1360,6 +1360,8 @@ public class EvidenceContractTests
         Assert.StartsWith("Final verification pass required.", conditions[0], StringComparison.Ordinal);
         Assert.Contains(LastRoblFix, conditions[0], StringComparison.Ordinal);
         Assert.StartsWith("Clean or not accepted.", conditions[1], StringComparison.Ordinal);
+        Assert.StartsWith("Repair frozen at the last fix.", conditions[2], StringComparison.Ordinal);
+        Assert.Contains("before and after the pass", conditions[2], StringComparison.Ordinal);
 
         // Exactly one review-round exception exists, and it is #1496's.
         var reviewExceptions = capacity["exceptions"]!.AsArray().Where(e => e!["ceiling"]!.GetValue<string>() == "review-rounds-per-pr").ToList();
@@ -1449,6 +1451,7 @@ public class EvidenceContractTests
     [InlineData("no-scope")]
     [InlineData("weakened-final-pass")]
     [InlineData("other-last-fix")]
+    [InlineData("repair-not-frozen-before-pass")]
     [InlineData("names-findings")]
     [InlineData("added-prs-field")]
     [InlineData("unlogged-amendment")]
@@ -1482,6 +1485,10 @@ public class EvidenceContractTests
                 break;
             case "other-last-fix":
                 conditions[0] = conditions[0]!.GetValue<string>().Replace(LastRoblFix, "05df19c0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", StringComparison.Ordinal);
+                break;
+            case "repair-not-frozen-before-pass":
+                // Review round 1: freezing only after the pass would let another fix land before it.
+                conditions[2] = "No change after the pass. After the pass, the PR's changes under src/ and tests/ do not change before merge. Only a merge from main whose conflicts are confined to CHANGELOG.md or eng/test-manifest.json may follow it.";
                 break;
             case "names-findings": exception["findings"] = new JsonArray("D-OBL-PROOF-GETTER"); break;
             case "added-prs-field": exception["addedPrs"] = 1; break;
