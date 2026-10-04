@@ -159,7 +159,7 @@ public sealed class Z3Verifier : IDisposable
         // This is informational - preconditions are always kept as runtime checks
         try
         {
-            using var solver = new IsolatedSolver(_timeoutMs);
+            using var solver = new IsolatedSolver(_ctx, _timeoutMs);
             solver.Assert(preconditionExpr);
 
             var status = solver.Check();
@@ -293,7 +293,7 @@ public sealed class Z3Verifier : IDisposable
         {
             try
             {
-                using var preSolver = new IsolatedSolver(_timeoutMs);
+                using var preSolver = new IsolatedSolver(_ctx, _timeoutMs);
                 foreach (var preExpr in preconditionExprs)
                 {
                     preSolver.Assert(preExpr);
@@ -447,7 +447,7 @@ public sealed class Z3Verifier : IDisposable
         // Create solver and perform verification
         try
         {
-            using var solver = new IsolatedSolver(_timeoutMs);
+            using var solver = new IsolatedSolver(_ctx, _timeoutMs);
 
             // Assert all preconditions
             foreach (var binding in translator.BindingConstraints)
@@ -1522,8 +1522,8 @@ public static class FunctionBodyEncoder
 
 /// <summary>
 /// A solver whose every <see cref="Check"/> runs in a fresh Z3 context, so that its verdict
-/// depends only on the asserted formulas and not on the history of the context that built them
-/// (#1135).
+/// depends only on the asserted formulas and the context configuration, not on the history of the
+/// context that built them (#1135).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -1536,17 +1536,25 @@ public static class FunctionBodyEncoder
 /// 5 s per-check limit (#1135, run 33139062112, <c>case-000307</c>); its siblings take 30 to 65 ms.
 /// </para>
 /// <para>
+/// How: assertions are recorded in their push scopes. <see cref="Check"/> translates them into a
+/// new context with the building context's settings (<see cref="Z3ContextFactory.CreateLike"/>; a
+/// deterministic traversal, and nothing else lives there), creates a solver with the same timeout,
+/// and checks. Z3's default solver picks its engine by whether it has seen a push or an assertion
+/// after a check (its incremental mode); that choice is replayed, so each check runs the engine the
+/// shared-context solver ran. The query, the timeout, the settings, and the engine are unchanged.
+/// What is lost is the incremental solver's state from earlier checks of the same solver (learned
+/// clauses, phases): a satisfiable check can return a different, equally valid model (so a
+/// different counterexample), and a check near the timeout can finish differently. That state was
+/// itself GC-dependent.
+/// </para>
+/// <para>
+/// A context this factory did not create has unknown settings; then the check runs in that
+/// context itself, as before, without the isolation.
+/// </para>
+/// <para>
 /// With this class and <see cref="Simplify"/>, two runs of the oracle, one under GC stress, one
 /// with the server GC and no tiered compilation, issued byte-identical queries with identical
 /// rlimit counts (2,382 checks).
-/// </para>
-/// <para>
-/// How: assertions are recorded in their push scopes in the building context. <see cref="Check"/>
-/// translates them into a new context (a deterministic traversal; nothing else lives there),
-/// creates a solver with the same timeout, and checks. Z3's default solver picks its engine by
-/// whether it has seen a push or an assertion after a check (its incremental mode); that choice
-/// is replayed, so each check uses the engine the shared-context solver used. The query, the
-/// timeout, and the engine are unchanged; only the context's history is removed.
 /// </para>
 /// <para>
 /// The checked solver and its context stay alive until the next <see cref="Check"/> or
@@ -1557,14 +1565,19 @@ public static class FunctionBodyEncoder
 public sealed class IsolatedSolver : IDisposable
 {
     private readonly List<List<BoolExpr>> _scopes = [[]];
+    private readonly Context _source;
     private readonly uint _timeoutMs;
     private bool _incremental;
     private bool _checked;
     private Context? _checkContext;
+    private bool _ownsCheckContext;
     private Solver? _checkSolver;
 
-    public IsolatedSolver(uint timeoutMs)
+    /// <param name="source">The context the asserted terms are built in.</param>
+    /// <param name="timeoutMs">The per-check timeout.</param>
+    public IsolatedSolver(Context source, uint timeoutMs)
     {
+        _source = source ?? throw new ArgumentNullException(nameof(source));
         _timeoutMs = timeoutMs;
     }
 
@@ -1601,8 +1614,10 @@ public sealed class IsolatedSolver : IDisposable
         ReleaseCheck();
         _checked = true;
 
-        var context = Z3ContextFactory.Create();
+        var fresh = Z3ContextFactory.CreateLike(_source);
+        var context = fresh ?? _source;
         _checkContext = context;
+        _ownsCheckContext = fresh != null;
         var solver = context.MkSolver();
         _checkSolver = solver;
         solver.Set("timeout", _timeoutMs);
@@ -1619,21 +1634,24 @@ public sealed class IsolatedSolver : IDisposable
             if (level > 0)
                 solver.Push();
             foreach (var constraint in _scopes[level])
-                solver.Assert((BoolExpr)constraint.Translate(context));
+                solver.Assert(fresh == null ? constraint : (BoolExpr)constraint.Translate(fresh));
         }
 
         return solver.Check();
     }
 
     /// <summary>
-    /// <see cref="Expr.Simplify"/> run in a fresh context, with the result translated back into
-    /// <paramref name="context"/>. Z3's rewriter orders the arguments of commutative operators by
-    /// term id, so simplifying in a long-lived context gives an argument order that depends on
-    /// when the GC released earlier terms (#1135), and the order reaches the solver.
+    /// <see cref="Expr.Simplify"/> run in a fresh context with <paramref name="context"/>'s
+    /// settings, with the result translated back into <paramref name="context"/>. Z3's rewriter
+    /// orders the arguments of commutative operators by term id, so simplifying in a long-lived
+    /// context gives an argument order that depends on when the GC released earlier terms
+    /// (#1135), and the order reaches the solver.
     /// </summary>
     public static BoolExpr Simplify(Context context, BoolExpr expr)
     {
-        using var isolated = Z3ContextFactory.Create();
+        using var isolated = Z3ContextFactory.CreateLike(context);
+        if (isolated == null)
+            return (BoolExpr)expr.Simplify();
         var simplified = (BoolExpr)expr.Translate(isolated).Simplify();
         return (BoolExpr)simplified.Translate(context);
     }
@@ -1651,6 +1669,8 @@ public sealed class IsolatedSolver : IDisposable
     {
         var context = _checkContext
             ?? throw new InvalidOperationException("Check has not been called.");
+        if (!_ownsCheckContext)
+            return variables;
         var translated = new Dictionary<string, (Expr Expr, string Type)>(variables.Count);
         foreach (var (name, (expr, type)) in variables)
         {
@@ -1674,7 +1694,9 @@ public sealed class IsolatedSolver : IDisposable
     {
         _checkSolver?.Dispose();
         _checkSolver = null;
-        _checkContext?.Dispose();
+        if (_ownsCheckContext)
+            _checkContext?.Dispose();
         _checkContext = null;
+        _ownsCheckContext = false;
     }
 }

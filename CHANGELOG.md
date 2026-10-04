@@ -6,18 +6,23 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- **The contract verifier gives the same verdict on every run and every platform (#1135).**
-  Three causes are fixed:
-  - **Run to run.** The verifier now checks each query in a fresh Z3 context. Before, Z3 reused
-    the ids of terms that .NET's garbage collector had released, so the order Z3 searched in
-    depended on when the GC ran. The same query took up to three times as much solver work from
-    one run to the next. Once in CI, a query of a kind that takes 30 to 65 ms hit the 5-second
-    timeout and failed the release-critical oracle on an unchanged tree. Verification adds about 1.4 ms per solver check.
+- **Three causes of run-to-run and platform-dependent verifier verdicts are fixed (#1135).**
+  Whether the verifier is now deterministic on every supported platform is decided by the
+  registered determinism protocol (#1421), which runs after this change.
+  - **Run to run.** The contract verifier, the obligation solver, and the implication prover now
+    check each query in a fresh Z3 context with the same settings. Before, Z3 reused the ids of
+    terms that .NET's garbage collector had released, so the order Z3 searched in depended on
+    when the GC ran. The same query took up to three times as much solver work from one run to
+    the next. Once in CI, a query of a kind that takes 30 to 65 ms hit the 5-second timeout and
+    failed the release-critical oracle on an unchanged tree. Each solver check now costs about
+    1.4 ms more. A refuted contract can report a different, equally valid counterexample than
+    before, because a check no longer reuses search state from earlier checks.
   - **Windows strings.** A string literal with a non-ASCII character reached Z3 in the Windows
     code page instead of UTF-8. For example, `"é"` had length 1 on Windows but 2 on Linux and
     macOS, so a postcondition about its length was refuted (`Calor0712`) on Windows only. All
     platforms now use the UTF-8 byte model. A proof that depends on string semantics is still
-    reported as assumed and keeps its runtime check.
+    reported as assumed and keeps its runtime check. The verification cache format moves to
+    1.19, so old cached verdicts are recomputed once.
   - **User-level cache on Windows.** The default verification cache and the user effect
     manifests (`~/.calor`) now honor `USERPROFILE` on Windows, as NuGet does. Linux and macOS
     are unchanged.

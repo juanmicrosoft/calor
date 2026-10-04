@@ -133,7 +133,7 @@ public sealed class ObligationSolver : IDisposable
         IsolatedSolver? solver = null;
         try
         {
-            solver = new IsolatedSolver(_timeoutMs);
+            solver = new IsolatedSolver(_ctx, _timeoutMs);
 
             // ASSUME: Assert all translatable preconditions
             var preconditionExprs = new List<BoolExpr>();
@@ -174,7 +174,7 @@ public sealed class ObligationSolver : IDisposable
             if (solver.Check() == Status.UNSATISFIABLE)
             {
                 solver.Dispose();
-                solver = new IsolatedSolver(_timeoutMs);
+                solver = new IsolatedSolver(_ctx, _timeoutMs);
                 foreach (var preExpr in preconditionExprs)
                 {
                     solver.Assert(preExpr);

@@ -139,14 +139,16 @@
     "randomSeed": {
       "value": "42",
       "source": "tests/Shared/Z3TestSeeding.cs",
-      "pattern": "public const string RandomSeed = \"42\";"
+      "pattern": "public const string RandomSeed = \"42\";",
+      "applied": false,
+      "effect": "Amendment 1.2.0 (found in the #1135 repair review): Z3 4.15.7 rejects random_seed as a context parameter (it prints \"unknown parameter 'random_seed'\" and ignores it), so the constant has never reached the solver and every context runs with Z3's default seed. The pin still freezes the tree's constant; the effective solver configuration is the Z3 defaults plus the per-check timeout. Applying the seed would change every Z3-backed test's search and is not done."
     },
     "perCaseTimeoutMs": {
       "value": 5000,
       "source": "src/Calor.Compiler/Verification/VerificationOptions.cs",
       "pattern": "public const uint DefaultTimeoutMs = 5000;"
     },
-    "rule": "The harness never overrides a Z3 parameter. The seed and per-case timeout are properties of the tree; the validator checks them against these values, so a change to either is a protocol amendment."
+    "rule": "The harness never overrides a Z3 parameter. The seed and per-case timeout are properties of the tree; the validator checks them against these values, so a change to either is a protocol amendment. Amendment 1.2.0: the seed constant is pinned but not applied by Z3 (randomSeed.effect)."
   },
   "checkout": {
     "coreAutocrlf": false,
@@ -514,7 +516,7 @@
         "timestampUtc": "2026-10-04T02:47:43Z",
         "pr": 1492,
         "afterDecisionBearingExecution": false,
-        "justification": "#1135 repair, before any execution. On Windows, SpecialFolder.UserProfile comes from the account's known folder and ignores USERPROFILE, so the registered home probe would have recorded every win-x64 and win-arm64 attempt as an environment-violation, and no execution could resolve the three Windows determinism rows. The verifier now resolves its user-level root through UserHome.Resolve (USERPROFILE on Windows when set and fully qualified; SpecialFolder.UserProfile otherwise, unchanged on Linux and macOS), and env-check's probe compiles that resolver from the tree under test instead of asking the runtime. Changes scripts/determinism_runner.py (the probe), scripts/test_determinism_protocol.py (a control that the probe compiles the tree's resolver), the deviation and limitation texts, and the README. No case, environment, attempt, determinism row, gate, agreement rule, record format, or budget value changes. No registered case was run."
+        "justification": "#1135 repair, before any execution. On Windows, SpecialFolder.UserProfile comes from the account's known folder and ignores USERPROFILE, so the registered home probe would have recorded every win-x64 and win-arm64 attempt as an environment-violation, and no execution could resolve the three Windows determinism rows. The verifier now resolves its user-level root through UserHome.Resolve (USERPROFILE on Windows when set and fully qualified; SpecialFolder.UserProfile otherwise, unchanged on Linux and macOS), and env-check's probe compiles that resolver from the tree under test instead of asking the runtime. It also records that the registered seed constant is not applied (Z3 rejects random_seed as a context parameter; z3.randomSeed.applied false), which changes no behavior. Changes scripts/determinism_runner.py (the probe), scripts/test_determinism_protocol.py (a control that the probe compiles the tree's resolver), the deviation and limitation texts, and the README. No case, environment, attempt, determinism row, gate, agreement rule, record format, or budget value changes. No decision-bearing protocol execution was run; the repair PR ran local and ordinary-CI tests."
       }
     ]
   },

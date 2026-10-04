@@ -148,7 +148,7 @@ public sealed class Z3ImplicationProver : IDisposable
         try
         {
             // Create solver and add constraint: A AND NOT(C)
-            using var solver = new IsolatedSolver(_timeoutMs);
+            using var solver = new IsolatedSolver(_ctx, _timeoutMs);
             solver.Assert(antecedentExpr);
             solver.Assert(_ctx.MkNot(consequentExpr));
 
@@ -264,7 +264,7 @@ public sealed class Z3ImplicationProver : IDisposable
             // For LSP: implementer postcondition must imply interface postcondition
             // i.e., anything the implementer guarantees should also satisfy what the interface guarantees
             // This means the implementer can only guarantee MORE (stronger postcondition)
-            using var solver = new IsolatedSolver(_timeoutMs);
+            using var solver = new IsolatedSolver(_ctx, _timeoutMs);
             solver.Assert(implementerExpr);
             solver.Assert(_ctx.MkNot(interfaceExpr));
 

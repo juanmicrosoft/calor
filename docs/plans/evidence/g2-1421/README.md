@@ -101,7 +101,7 @@ A different processor count, or memory below 90% of the registered value, is an
 (the values the 0.22 Stage B packet recorded; CI's floating `10.0.x` is the `toolchain-pins`
 open defect). Z3 4.15.7 through the owned bootstrap, both pin files by SHA-256, each attempt's
 asset hashes checked against the pins. Z3 `random_seed` 42 and per-case timeout 5,000 ms, both
-checked against the tree (`D006`). Checkout with `core.autocrlf=false`. xUnit runs with project
+checked against the tree (`D006`); Z3 does not apply the seed (amendment 1.2.0). Checkout with `core.autocrlf=false`. xUnit runs with project
 defaults.
 
 **Run plan.** 2 jobs × 15 attempts per environment: 30 attempts per environment, 150 per
@@ -228,8 +228,13 @@ the three Windows determinism rows.
   keeps its name and its rule (false is an `environment-violation`).
 - A new control checks that the probe compiles the tree's resolver.
 
+- The Z3 seed pin stays, but the amendment records that it is not applied: Z3 4.15.7 rejects
+  `random_seed` as a context parameter, so every context has always run with Z3's default seed
+  (`z3.randomSeed.applied: false`). Nothing changes behavior.
+
 No case, environment, attempt, determinism row, gate, agreement rule, record format, or budget
-value changes. No registered case was run.
+value changes. No decision-bearing protocol execution was run; the repair PR ran local and
+ordinary-CI tests.
 
 ## What G2 executed
 

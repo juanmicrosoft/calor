@@ -405,7 +405,7 @@ internal static class DifferentialGate
 
             // #1135: checked in a fresh context, like the verifier, so the verdict does not
             // depend on when the GC released earlier terms of the shared context.
-            using var solver = new IsolatedSolver(VerificationOptions.DefaultTimeoutMs);
+            using var solver = new IsolatedSolver(context, VerificationOptions.DefaultTimeoutMs);
             var polarity = testCase.Position == ContractPosition.Precondition
                 ? SatPolarity.SatIsProof
                 : SatPolarity.SatIsRefutation;
