@@ -1196,8 +1196,8 @@ public class EvidenceContractTests
         // Removing amendments 1.2.1 and 1.2.0 from the log leaves the exception and charge rule unregistered.
         var contract = Contract();
         var log = contract["amendmentLog"]!.AsArray();
-        while (log.Last()!["version"]!.GetValue<string>() is "1.2.1" or "1.2.0")
-            log.RemoveAt(log.Count - 1);
+        foreach (var entry in log.Where(a => a!["version"]!.GetValue<string>() is "1.2.1" or "1.2.0").ToList())
+            log.Remove(entry);
         contract["contractVersion"] = log.Last()!["version"]!.DeepClone();
         var violations = EvidenceContractValidator.ValidateContract(contract);
         AssertViolation(violations, "C011");
@@ -1271,9 +1271,7 @@ public class EvidenceContractTests
         Assert.StartsWith("Same harness.", conditions[3], StringComparison.Ordinal);
         Assert.Contains(Amended4, conditions[3], StringComparison.Ordinal);
         Assert.Single(conditions, c => c.Contains("ExecutionCeiling", StringComparison.Ordinal));
-        var last = contract["amendmentLog"]!.AsArray().Last()!;
-        Assert.Equal("1.2.1", last["version"]!.GetValue<string>());
-        Assert.Equal("1.2.1", contract["contractVersion"]!.GetValue<string>());
+        var last = contract["amendmentLog"]!.AsArray().Single(a => a!["version"]!.GetValue<string>() == "1.2.1")!;
         Assert.True(last["afterDecisionBearingInspection"]!.GetValue<bool>());
         Assert.True(last["reviewedInPr"]!.GetValue<int>() > 1484);
         Assert.Single(last["weakens"]!.AsArray());
@@ -1314,9 +1312,7 @@ public class EvidenceContractTests
         // while the 1.2.0 charge rule stays registered.
         var contract = Contract();
         var log = contract["amendmentLog"]!.AsArray();
-        Assert.Equal("1.2.1", log.Last()!["version"]!.GetValue<string>());
-        log.RemoveAt(log.Count - 1);
-        contract["contractVersion"] = "1.2.0";
+        log.Remove(log.Single(a => a!["version"]!.GetValue<string>() == "1.2.1"));
         var violations = EvidenceContractValidator.ValidateContract(contract);
         Assert.Contains(violations, v => v.Code == "C011" && v.Subject == "exception s1-generated-cases issue #1311");
         Assert.DoesNotContain(violations, v => v.Subject == "charge rule c2-candidate-determinism-protocol");
@@ -1325,6 +1321,210 @@ public class EvidenceContractTests
     private static JsonNode S1Exception(JsonNode contract)
         => contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray()
             .First(e => e?["pr"] is null && e?["issue"]?.GetValue<int>() == 1311)!;
+
+    // ------------------------------------------------------------------
+    // Amendment 1.3.0: S2 discovery demotion slot (A) and #1496 review overrun (B) (C011)
+    // ------------------------------------------------------------------
+
+    private const string S2Subject = "exception s2-repairs issue #1413";
+    private const string ReviewSubject = "exception review-rounds-per-pr #1496";
+    private const string LastRoblFix = "674e3bdff202486c6d3815bc02c5b7b267ee9146";
+
+    [Fact]
+    public void CommittedContractRegistersAmendment130Exceptions()
+    {
+        // A raises s2-repairs to 7 for #1413 only, scoped to the two discovery findings; B raises
+        // review-rounds-per-pr to 5 for PR #1496 only, conditioned on a final verification pass.
+        // Neither changes a ceiling's own value.
+        var contract = Contract();
+        var capacity = contract["authorityCapacity"]!["capacity"]!;
+        var ceilings = capacity["ceilings"]!.AsArray().ToDictionary(c => c!["id"]!.GetValue<string>(), c => c!["value"]!.GetValue<int>());
+        Assert.Equal(6, ceilings["s2-repairs"]);
+        Assert.Equal(600, ceilings["s2-repair-size"]);
+        Assert.Equal(3, ceilings["review-rounds-per-pr"]);
+
+        var a = S2Exception(contract);
+        Assert.Equal(7, a["value"]!.GetValue<int>());
+        Assert.Equal(1, a["addedPrs"]!.GetValue<int>());
+        Assert.Equal("1.3.0", a["amendment"]!.GetValue<string>());
+        Assert.Equal(["D-OBL-PROOF-GETTER", "D-OBL-THROWING-PREDECESSOR"], a["findings"]!.AsArray().Select(f => f!.GetValue<string>()));
+        Assert.Contains("D-OBL-PROOF-GETTER and D-OBL-THROWING-PREDECESSOR", a["scope"]!.GetValue<string>(), StringComparison.Ordinal);
+
+        var b = ReviewException(contract);
+        Assert.Equal(5, b["value"]!.GetValue<int>());
+        Assert.Equal(1413, b["issue"]!.GetValue<int>());
+        Assert.Equal("1.3.0", b["amendment"]!.GetValue<string>());
+        Assert.Null(b["addedPrs"]);
+        Assert.Null(b["findings"]);
+        var conditions = b["conditions"]!.AsArray().Select(c => c!.GetValue<string>()).ToList();
+        Assert.StartsWith("Final verification pass required.", conditions[0], StringComparison.Ordinal);
+        Assert.Contains(LastRoblFix, conditions[0], StringComparison.Ordinal);
+        Assert.StartsWith("Clean or not accepted.", conditions[1], StringComparison.Ordinal);
+
+        // Exactly one review-round exception exists, and it is #1496's.
+        var reviewExceptions = capacity["exceptions"]!.AsArray().Where(e => e!["ceiling"]!.GetValue<string>() == "review-rounds-per-pr").ToList();
+        Assert.Single(reviewExceptions);
+
+        var last = contract["amendmentLog"]!.AsArray().Last()!;
+        Assert.Equal("1.3.0", last["version"]!.GetValue<string>());
+        Assert.Equal("1.3.0", contract["contractVersion"]!.GetValue<string>());
+        Assert.True(last["afterDecisionBearingInspection"]!.GetValue<bool>());
+        Assert.True(last["reviewedInPr"]!.GetValue<int>() > 1499);
+        Assert.Equal(2, last["weakens"]!.AsArray().Count);
+        Assert.Empty(last["removedRows"]!.AsArray());
+        Assert.Equal("1.3.0", Inventory()["contractVersion"]!.GetValue<string>());
+    }
+
+    [Theory]
+    [InlineData("other-discovery-id")]
+    [InlineData("extra-finding")]
+    [InlineData("dropped-finding")]
+    [InlineData("reordered-findings")]
+    [InlineData("no-findings")]
+    [InlineData("scope-names-other-discovery")]
+    [InlineData("value-8")]
+    [InlineData("other-issue")]
+    [InlineData("adds-pr")]
+    [InlineData("other-added-prs")]
+    [InlineData("no-added-prs")]
+    [InlineData("added-executions-field")]
+    [InlineData("unlogged-amendment")]
+    [InlineData("no-conditions")]
+    [InlineData("dropped-condition")]
+    [InlineData("weakened-condition")]
+    [InlineData("no-justification")]
+    [InlineData("duplicated")]
+    public void S2RepairExceptionOtherThanTheRegisteredOneFails(string mutation)
+    {
+        var contract = Contract();
+        var exceptions = contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray();
+        var exception = S2Exception(contract);
+        var findings = exception["findings"]!.AsArray();
+        var conditions = exception["conditions"]!.AsArray();
+        switch (mutation)
+        {
+            case "other-discovery-id": findings[1] = "D-OBL-HEAP-ALIAS"; break;
+            case "extra-finding": findings.Add("NUM-NARROW-ARITH-001"); break;
+            case "dropped-finding": findings.RemoveAt(1); break;
+            case "reordered-findings":
+                var first = findings[0]!.DeepClone();
+                findings.RemoveAt(0);
+                findings.Add(first);
+                break;
+            case "no-findings": exception.AsObject().Remove("findings"); break;
+            case "scope-names-other-discovery":
+                exception["scope"] = exception["scope"]!.GetValue<string>().Replace("D-OBL-THROWING-PREDECESSOR", "D-OBL-HEAP-ALIAS", StringComparison.Ordinal);
+                break;
+            case "value-8": exception["value"] = 8; break;
+            case "other-issue": exception["issue"] = 1311; break;
+            case "adds-pr": exception["pr"] = 1496; break;
+            case "other-added-prs": exception["addedPrs"] = 2; break;
+            case "no-added-prs": exception.AsObject().Remove("addedPrs"); break;
+            case "added-executions-field": exception["addedExecutions"] = 1; break;
+            case "unlogged-amendment": exception["amendment"] = "1.2.9"; break;
+            case "no-conditions": exception["conditions"] = new JsonArray(); break;
+            case "dropped-condition": conditions.RemoveAt(1); break;
+            case "weakened-condition":
+                conditions[1] = conditions[1]!.GetValue<string>().Replace(", and no runtime guard is removed", "", StringComparison.Ordinal);
+                break;
+            case "no-justification": exception["justification"] = " "; break;
+            case "duplicated": exceptions.Add(exception.DeepClone()); break;
+        }
+        var violations = EvidenceContractValidator.ValidateContract(contract);
+        AssertViolation(violations, "C011");
+        if (mutation is not ("other-issue" or "adds-pr" or "duplicated"))
+            Assert.Contains(violations, v => v.Code == "C011" && v.Subject == S2Subject);
+    }
+
+    [Theory]
+    [InlineData("other-pr")]
+    [InlineData("added-for-another-pr")]
+    [InlineData("value-6")]
+    [InlineData("other-ceiling")]
+    [InlineData("other-issue")]
+    [InlineData("as-per-gate")]
+    [InlineData("missing-final-pass-condition")]
+    [InlineData("missing-clean-condition")]
+    [InlineData("no-conditions")]
+    [InlineData("no-scope")]
+    [InlineData("weakened-final-pass")]
+    [InlineData("other-last-fix")]
+    [InlineData("names-findings")]
+    [InlineData("added-prs-field")]
+    [InlineData("unlogged-amendment")]
+    [InlineData("no-justification")]
+    [InlineData("duplicated")]
+    public void ReviewOverrunExceptionOtherThanTheRegisteredOneFails(string mutation)
+    {
+        var contract = Contract();
+        var exceptions = contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray();
+        var exception = ReviewException(contract);
+        var conditions = exception["conditions"]!.AsArray();
+        switch (mutation)
+        {
+            case "other-pr": exception["pr"] = 1495; break;
+            case "added-for-another-pr":
+                // The overrun allowance is #1496's alone; the same text for another PR is unregistered.
+                var copy = exception.DeepClone();
+                copy["pr"] = 1497;
+                exceptions.Add(copy);
+                break;
+            case "value-6": exception["value"] = 6; break;
+            case "other-ceiling": exception["ceiling"] = "maintainer-review-per-pr"; break;
+            case "other-issue": exception["issue"] = 1311; break;
+            case "as-per-gate": exception.AsObject().Remove("pr"); break;
+            case "missing-final-pass-condition": conditions.RemoveAt(0); break;
+            case "missing-clean-condition": conditions.RemoveAt(1); break;
+            case "no-conditions": exception.AsObject().Remove("conditions"); break;
+            case "no-scope": exception["scope"] = ""; break;
+            case "weakened-final-pass":
+                conditions[1] = conditions[1]!.GetValue<string>().Replace("must request no change", "should request little change", StringComparison.Ordinal);
+                break;
+            case "other-last-fix":
+                conditions[0] = conditions[0]!.GetValue<string>().Replace(LastRoblFix, "05df19c0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", StringComparison.Ordinal);
+                break;
+            case "names-findings": exception["findings"] = new JsonArray("D-OBL-PROOF-GETTER"); break;
+            case "added-prs-field": exception["addedPrs"] = 1; break;
+            case "unlogged-amendment": exception["amendment"] = "1.2.9"; break;
+            case "no-justification": exception.AsObject().Remove("justification"); break;
+            case "duplicated": exceptions.Add(exception.DeepClone()); break;
+        }
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C011");
+    }
+
+    [Fact]
+    public void ExceptionWithoutRegisteredTextCannotCarryConditions()
+    {
+        // The 1.1.0 per-PR exception has no registered text; adding a scope or conditions is unregistered.
+        var contract = Contract();
+        var exception = contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray().First(e => e?["pr"]?.GetValue<int>() == 1473)!;
+        exception["conditions"] = new JsonArray("Any later overrun is also allowed.");
+        AssertViolation(EvidenceContractValidator.ValidateContract(contract), "C011");
+    }
+
+    [Fact]
+    public void Amendment130ExceptionsWithoutAmendment130InTheLogFail()
+    {
+        // Dropping 1.3.0 from the log leaves both of its exceptions unregistered; the earlier ones stay valid.
+        var contract = Contract();
+        var log = contract["amendmentLog"]!.AsArray();
+        log.Remove(log.Single(a => a!["version"]!.GetValue<string>() == "1.3.0"));
+        contract["contractVersion"] = log.Last()!["version"]!.DeepClone();
+        var violations = EvidenceContractValidator.ValidateContract(contract);
+        AssertViolation(violations, "C011");
+        Assert.Contains(violations, v => v.Subject == S2Subject);
+        Assert.Contains(violations, v => v.Subject == ReviewSubject);
+        Assert.DoesNotContain(violations, v => v.Subject == "exception s1-generated-cases issue #1311");
+        Assert.DoesNotContain(violations, v => v.Subject == "exception pr-size #1473");
+    }
+
+    private static JsonNode S2Exception(JsonNode contract)
+        => contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray()
+            .First(e => e?["pr"] is null && e?["issue"]?.GetValue<int>() == 1413)!;
+
+    private static JsonNode ReviewException(JsonNode contract)
+        => contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray()
+            .First(e => e?["pr"]?.GetValue<int>() == 1496)!;
 
     // ------------------------------------------------------------------
     // Amendment 1.1.0: pending inventory updates (I013)

@@ -141,29 +141,58 @@ internal static partial class EvidenceContractValidator
             var recordedIn = Str(exception?["amendment"]);
             var match = RegisteredCeilingExceptions.FirstOrDefault(e =>
                 e.Ceiling == ceilingId && e.Value == raised && e.Amendment == recordedIn
-                && (e.Pr is { } registeredPr ? hasPr && pr == registeredPr : !hasPr && issue == e.Issue));
-            if (match.Ceiling is null || recordedIn is null || !amendmentVersions.Contains(recordedIn))
-                v.Add(new("C011", subject, "ceiling exception is not one registered by a logged amendment (1.1.0: pr-size, #1473, 1520; 1.2.0: s1-generated-cases, issue #1311, 3008)"));
+                && (e.Pr is { } registeredPr ? hasPr && pr == registeredPr && issue == e.Issue : !hasPr && issue == e.Issue));
+            if (match is null || recordedIn is null || !amendmentVersions.Contains(recordedIn))
+                v.Add(new("C011", subject, "ceiling exception is not one registered by a logged amendment (1.1.0: pr-size, #1473, 1520; 1.2.0: s1-generated-cases, issue #1311, 3008; 1.3.0: s2-repairs, issue #1413, 7, and review-rounds-per-pr, #1496, 5)"));
             // A later amendment that changed the registered text must itself be logged (1.2.1
             // amended condition 4 of the #1311 exception).
-            if (match.TextAmendment is { } textAmendment && !amendmentVersions.Contains(textAmendment))
+            if (match?.TextAmendment is { } textAmendment && !amendmentVersions.Contains(textAmendment))
                 v.Add(new("C011", subject, $"the registered text of this exception was set by amendment {textAmendment}, which is not in the amendment log"));
             if (string.IsNullOrWhiteSpace(Str(exception?["justification"])))
                 v.Add(new("C011", subject, "exception needs a justification"));
-            // A per-gate exception authorizes work, not just a number. Its scope, conditions, and
-            // justification are the registered text, bound by hash: weakening, dropping, adding, or
-            // reordering a condition needs a new amendment and a validator change.
-            if (match.Ceiling is not null && match.Pr is null)
+            // An exception that authorizes work, not just a number (every per-gate exception, and the
+            // 1.3.0 per-PR review exception), carries registered text bound by hash: its scope,
+            // conditions, and justification. Weakening, dropping, adding, or reordering a condition
+            // needs a new amendment and a validator change.
+            if (match?.TextSha256 is { } registeredText)
             {
                 var conditions = Array(exception?["conditions"]);
                 if (string.IsNullOrWhiteSpace(Str(exception?["scope"])) || conditions.Count == 0
                     || conditions.Any(c => string.IsNullOrWhiteSpace(Str(c))))
-                    v.Add(new("C011", subject, "a per-gate exception needs a scope and non-empty conditions"));
+                    v.Add(new("C011", subject, "this exception needs a scope and non-empty conditions"));
                 var text = TextSha256([Str(exception?["scope"]), .. conditions.Select(Str), Str(exception?["justification"])]);
-                if (text != match.TextSha256)
-                    v.Add(new("C011", subject, "per-gate exception scope, conditions, or justification differ from the registered text"));
-                if (Int(exception?["addedExecutions"]) != match.Added)
-                    v.Add(new("C011", subject, $"per-gate exception must record addedExecutions {match.Added}"));
+                if (text != registeredText)
+                    v.Add(new("C011", subject, "exception scope, conditions, or justification differ from the registered text"));
+            }
+            else if (match is not null && (exception?["scope"] is not null || exception?["conditions"] is not null))
+            {
+                v.Add(new("C011", subject, "this exception has no registered scope or conditions"));
+            }
+            if (match is not null)
+            {
+                // The added amount is recorded in exactly the registered field (1.2.0: addedExecutions;
+                // 1.3.0: addedPrs); any other added-amount field is unregistered.
+                foreach (var field in AddedAmountFields)
+                {
+                    if (field == match.AddedField)
+                    {
+                        if (Int(exception?[field]) != match.Added)
+                            v.Add(new("C011", subject, $"exception must record {field} {match.Added}"));
+                    }
+                    else if (exception?[field] is not null)
+                    {
+                        v.Add(new("C011", subject, $"exception records an unregistered {field}"));
+                    }
+                }
+                // A finding-scoped exception (1.3.0 decision A) names exactly its registered findings,
+                // in order; any other exception names none.
+                var findings = exception?["findings"] is null ? null : Array(exception["findings"]).Select(Str).ToList();
+                if (match.Findings is { } registeredFindings
+                    ? findings is null || !findings.SequenceEqual(registeredFindings, StringComparer.Ordinal)
+                    : findings is not null)
+                    v.Add(new("C011", subject, match.Findings is null
+                        ? "this exception is not scoped to findings"
+                        : $"exception must name exactly the findings {string.Join(", ", match.Findings)}"));
             }
         }
         // One exception per identity: a per-PR exception is identified by ceiling and PR, a per-gate
@@ -241,19 +270,33 @@ internal static partial class EvidenceContractValidator
     }
 
     /// <summary>
-    /// Ceiling raises registered by amendments (stopping rule 1). A per-PR raise names its PR; a
-    /// per-gate raise (amendment 1.2.0) has no PR and is keyed by the gate's issue.
-    /// A per-gate raise also binds its scope, conditions, and justification by
-    /// <see cref="TextSha256"/> and its added executions. <c>TextAmendment</c> names the amendment
-    /// that last changed that text, which must be in the log: amendment 1.2.1 amended condition 4 of
-    /// the #1311 exception (run-2 harness: the libz3 capture and ExecutionCeiling 1500 to 1508), so the
-    /// hash is of the 1.2.1 text and the 1.2.0 text no longer validates.
+    /// Ceiling raises registered by amendments (stopping rule 1). A per-PR raise names its PR (and its
+    /// gate's issue); a per-gate raise (amendment 1.2.0) has no PR and is keyed by the gate's issue.
+    /// A raise that authorizes work also binds its scope, conditions, and justification by
+    /// <see cref="TextSha256"/>, and may record its added amount in one registered field.
+    /// <c>TextAmendment</c> names the amendment that last changed that text, which must be in the log:
+    /// amendment 1.2.1 amended condition 4 of the #1311 exception (run-2 harness: the libz3 capture and
+    /// ExecutionCeiling 1500 to 1508), so the hash is of the 1.2.1 text and the 1.2.0 text no longer
+    /// validates. Amendment 1.3.0 registers a seventh S2 repair PR scoped to exactly two
+    /// review-found discovery findings (decision A), and PR #1496's review-round overrun with its
+    /// required final verification pass (decision B).
     /// </summary>
-    private static readonly (string Ceiling, int? Pr, int? Issue, double Value, string Amendment, int? Added, string? TextAmendment, string? TextSha256)[] RegisteredCeilingExceptions =
+    private static readonly RegisteredException[] RegisteredCeilingExceptions =
     [
-        ("pr-size", 1473, 1276, 1520, "1.1.0", null, null, null),
-        ("s1-generated-cases", null, 1311, 3008, "1.2.0", 1508, "1.2.1", "d9a57518b7e26e744fe7080177cdfb5e3ea9051f9eaaec5c233f083ccf896bac"),
+        new("pr-size", 1473, 1276, 1520, "1.1.0"),
+        new("s1-generated-cases", null, 1311, 3008, "1.2.0", "addedExecutions", 1508, "1.2.1", "d9a57518b7e26e744fe7080177cdfb5e3ea9051f9eaaec5c233f083ccf896bac"),
+        new("s2-repairs", null, 1413, 7, "1.3.0", "addedPrs", 1, "1.3.0", "2254c411e46b2f8aa9cc0c262328bd68dc491a8a84855ed3fa92be80ab656fab",
+            ["D-OBL-PROOF-GETTER", "D-OBL-THROWING-PREDECESSOR"]),
+        new("review-rounds-per-pr", 1496, 1413, 5, "1.3.0", null, null, "1.3.0", "e87f23917e6b60cf7d4f132418151a16db5cfcb8b9354a214398ed5ef829110b"),
     ];
+
+    private sealed record RegisteredException(
+        string Ceiling, int? Pr, int? Issue, double Value, string Amendment,
+        string? AddedField = null, int? Added = null, string? TextAmendment = null, string? TextSha256 = null,
+        string[]? Findings = null);
+
+    /// <summary>Fields in which an exception may record the amount it adds; at most the registered one appears.</summary>
+    private static readonly string[] AddedAmountFields = ["addedExecutions", "addedPrs"];
 
     /// <summary>
     /// Charge reallocations registered by amendments; they change no ceiling value. The work, rule,
