@@ -30,8 +30,8 @@ All notable changes to this project will be documented in this file.
     `docs/verification-modeled-forms.md`. Comparisons on narrow values are still modeled.
   - An `INT:` literal outside the 32-bit range, such as `INT:3000000000`, is `Unsupported`
     (divergence D2). Spell it `LONG:` to have it modeled. The verifier keeps the refusal even
-    when simplification would fold the literal away. Loop proofs by k-induction refuse a bound
-    or step outside the 32-bit range instead of truncating or replacing it.
+    when simplification would fold the literal away. Loop proofs by k-induction (`for` and
+    `while`) refuse a bound or step outside the 32-bit range instead of truncating or replacing it.
   - In a checked module, a postcondition (`§S`) whose arithmetic can overflow for some value of
     its operand types is now `Assumed` with the `checked-arithmetic` assumption. This holds even
     when the preconditions rule the overflow out. Before, such postconditions were `Proven`,

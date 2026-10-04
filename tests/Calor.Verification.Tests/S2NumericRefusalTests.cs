@@ -209,7 +209,11 @@ public sealed class S2NumericRefusalTests
                     Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Select(d => d.Message)));
                     return Assert.Single(Assert.Single(options.VerificationResults!.Functions).PostconditionResults);
                 }
-                Compile(first);
+                var primed = Compile(first);
+                // The LONG text is cacheable (Proven) and writes an entry; the refused INT text writes none.
+                Assert.Equal(first == longSource ? ContractVerificationStatus.Proven : ContractVerificationStatus.Unsupported, primed.Status);
+                var written = Directory.Exists(directory) ? Directory.GetFiles(directory, "*.json", SearchOption.AllDirectories).Length : 0;
+                Assert.Equal(first == longSource, written > 0);
                 Assert.Equal(expected, Compile(second).Status);
             }
             finally
@@ -217,6 +221,79 @@ public sealed class S2NumericRefusalTests
                 try { Directory.Delete(directory, recursive: true); } catch (IOException) { }
             }
         }
+    }
+
+    [Theory]
+    [InlineData(null)]      // control: the current format is served
+    [InlineData("1.20")]
+    [InlineData("1.21")]
+    public void ForgedProvenEntriesFromOlderFormats_AreNotServed(string? stamp)
+    {
+        // Review round 3: an entry written before R-NUM (format 1.20 or 1.21) may hold Proven for an
+        // overflow-sensitive shape that is now Assumed.
+        const string source = """
+            §M{m1:R1Case}
+              §F{f1:Probe:pub} (u32:x) -> i32
+                §E{}
+                §Q (>= x UINT:1702287129)
+                §S (< (- x INT:1) x)
+                §R INT:0
+            """;
+        var directory = Path.Combine(Path.GetTempPath(), "calor-s2-num-forge-" + Guid.NewGuid().ToString("N")[..8]);
+        try
+        {
+            ProofStatus Verify()
+            {
+                var options = new CompilationOptions
+                {
+                    VerifyContracts = true,
+                    VerificationCacheOptions = new VerificationCacheOptions { Enabled = true, CacheDirectory = directory },
+                };
+                Program.Compile(source, "case.calr", options);
+                return Assert.Single(Assert.Single(options.VerificationResults!.Functions).PostconditionResults).EffectiveOutcome.Status;
+            }
+            Assert.Equal(ProofStatus.Assumed, Verify());
+            var entries = Directory.GetFiles(directory, "*.json", SearchOption.AllDirectories);
+            Assert.NotEmpty(entries);
+            foreach (var file in entries)
+            {
+                var json = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(file))!.AsObject();
+                if (json["proofStatus"]?.GetValue<string>() != "assumed")
+                    continue;
+                json["status"] = (int)ContractVerificationStatus.Proven;
+                json["proofStatus"] = "proven";
+                json["assumptions"] = null;
+                if (stamp != null)
+                    json["version"] = stamp;
+                File.WriteAllText(file, json.ToJsonString());
+            }
+            Assert.Equal(stamp == null ? ProofStatus.Proven : ProofStatus.Assumed, Verify());
+        }
+        finally
+        {
+            try { Directory.Delete(directory, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void WrappedMagnitudeLiteral_IsRefused()
+    {
+        // Review round 3: a positive 32-bit signed literal with magnitude ulong.MaxValue wraps its
+        // Value to -1; the refusal checks sign and magnitude.
+        Assert.True(Z3ContextFactory.IsAvailable, "this witness needs Z3");
+        var span = Calor.Compiler.Parsing.TextSpan.Empty;
+        var literal = new Calor.Compiler.Ast.IntLiteralNode(span, ulong.MaxValue,
+            Calor.Compiler.Parsing.IntegerLiteralSign.Positive, Calor.Compiler.Parsing.IntegerLiteralBase.Decimal,
+            Calor.Compiler.Parsing.IntegerLiteralWidth.Bits32, Calor.Compiler.Parsing.IntegerLiteralSignedness.Signed);
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+        var result = verifier.VerifyPostcondition(
+            [], "i32", [],
+            new Calor.Compiler.Ast.EnsuresNode(span,
+                new Calor.Compiler.Ast.BinaryOperationNode(span, Calor.Compiler.Ast.BinaryOperator.LessThan,
+                    literal, new Calor.Compiler.Ast.IntLiteralNode(span, 0)),
+                null, new Calor.Compiler.Ast.AttributeCollection()));
+        Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
     }
 
     [Fact]

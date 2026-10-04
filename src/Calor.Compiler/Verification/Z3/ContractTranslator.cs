@@ -88,10 +88,23 @@ public sealed class ContractTranslator
 
     /// <summary>#1413 (S2 R-NUM): whether an expression holds an INT: literal the verifier refuses (D2).</summary>
     internal static bool ContainsRefusedLiteral(AstNode node)
-        => node is IntLiteralNode literal
-               && (literal.WidthInferred
-                   || !literal.IsUnsigned && !literal.IsLong && literal.Value is > int.MaxValue or < int.MinValue)
+        => node is IntLiteralNode literal && IsRefusedLiteral(literal)
            || Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node).Any(ContainsRefusedLiteral);
+
+    /// <summary>
+    /// D2 (#1413 S2 R-NUM): an inferred-width INT: literal, or a signed literal whose sign and
+    /// magnitude do not fit its declared width (checked on the magnitude, not on the possibly
+    /// wrapped Value).
+    /// </summary>
+    internal static bool IsRefusedLiteral(IntLiteralNode literal)
+    {
+        if (literal.WidthInferred)
+            return true;
+        if (literal.IsUnsigned)
+            return false;
+        var limit = literal.IsLong ? (ulong)long.MaxValue : int.MaxValue;
+        return literal.Sign == Calor.Compiler.Parsing.IntegerLiteralSign.Negative ? literal.Magnitude > limit + 1 : literal.Magnitude > limit;
+    }
 
     /// <summary>
     /// Tracks metadata for bit-vector expressions (width and signedness).
@@ -504,8 +517,7 @@ public sealed class ContractTranslator
     {
         // A 32-bit signed literal whose value does not fit (an AST built without the lexer) is the
         // same D2 form; LONG:/UINT:/ULONG: and 64-bit literals stay modeled.
-        if (literal.WidthInferred
-            || !literal.IsUnsigned && !literal.IsLong && literal.Value is > int.MaxValue or < int.MinValue)
+        if (IsRefusedLiteral(literal))
         {
             // #1413 (S1 NUM-LITERAL-OVERSIZE, registered unsupported-refused): divergence D2 —
             // an INT: literal outside the int32 range is refused. LONG:/UINT:/ULONG: spell an
