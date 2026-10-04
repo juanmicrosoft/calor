@@ -57,6 +57,8 @@ public sealed class S2ImplicationDefinednessTests
     {
         var options = new CompilationOptions { ContractMode = ContractMode.Debug };
         var result = Program.Compile(source, "case.calr", options);
+        // Lexer and parser diagnostics (Calor0001-0199) mean the witness never reached the checker.
+        Assert.DoesNotContain(result.Diagnostics, d => d.IsError && string.CompareOrdinal(d.Code, "Calor0200") < 0);
         return result.Diagnostics.ToList();
     }
 
@@ -336,6 +338,102 @@ public sealed class S2ImplicationDefinednessTests
                   §R INT:0
             """;
         Assert.Contains(Compile(source), d => d.Code == DiagnosticCode.IncompatibleInheritedContracts);
+    }
+
+    private const string QuantifiedPredicate =
+        "(exists ((i i32)) (&& (>= i INT:0) (&& (< i INT:2) (>= (+ VAR i) INT:0))))";
+
+    [Fact]
+    public void IdenticalQuantifiedContracts_AreValid()
+    {
+        // Review round 3 witness: at x = int.MaxValue both identical expressions complete true at
+        // i = 0, while the consequent's universal overflow safety fails at i = 1. Identity
+        // decides the implication; it must not reach the heuristic's Calor0810/Calor0811.
+        var pre = QuantifiedPredicate.Replace("VAR", "x");
+        var post = QuantifiedPredicate.Replace("VAR", "result");
+        var source = $$"""
+            §M{m1:M}
+              §IFACE{i1:IProbe}
+                §MT{m1:Run}
+                  §I{i32:x}
+                  §O{i32}
+                  §Q {{pre}}
+                  §S {{post}}
+              §CL{c1:Impl:pub}
+                §IMPL{IProbe}
+                §MT{mt1:Run:pub}
+                  §I{i32:x}
+                  §O{i32}
+                  §Q {{pre}}
+                  §S {{post}}
+                  §R INT:0
+            """;
+        var diagnostics = Compile(source);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.StrongerPrecondition);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.WeakerPostcondition);
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.ContractInheritanceValid);
+    }
+
+    [Fact]
+    public void UndecidedInheritedConflict_IsVisibleAndNotClaimedValid()
+    {
+        // Review round 3 witness: y != 0 fails IA, and y == 0 makes IB throw, so no input satisfies
+        // both. The conditional divisor is not modeled: the check must say it could not decide.
+        Assert.Throws<DivideByZeroException>(() => { var y = 0; return 100 / y == -1; });
+        const string source = """
+            §M{m1:M}
+              §IFACE{i1:IA}
+                §MT{m1:Run}
+                  §I{i32:y}
+                  §O{i32}
+                  §S (== y INT:0)
+              §IFACE{i2:IB}
+                §MT{m2:Run}
+                  §I{i32:y}
+                  §O{i32}
+                  §S (== (/ INT:100 y) INT:-1)
+              §CL{c1:Impl:pub}
+                §IMPL{IA}
+                §IMPL{IB}
+                §MT{mt1:Run:pub}
+                  §I{i32:y}
+                  §O{i32}
+                  §R INT:0
+            """;
+        var diagnostics = Compile(source);
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.ImplicationUnknown
+            && d.Message.StartsWith("Could not establish whether the inherited contracts", StringComparison.Ordinal));
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ContractInheritanceValid);
+    }
+
+    [Fact]
+    public void WeakeningCheck_DifferentOverflowPolicies_AreIndeterminate()
+    {
+        const string frozen = """
+            §M{m1:M}
+              §F{f1:Run:pub} (i32:x) -> i32
+                §Q (> (* x INT:2) INT:0)
+                §R x
+            """;
+        var dir = Path.Combine(Path.GetTempPath(), "calor-s2-overflow-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var frozenPath = Path.Combine(dir, "frozen.calr");
+            var finalPath = Path.Combine(dir, "final.calr");
+            File.WriteAllText(frozenPath, frozen);
+            File.WriteAllText(finalPath, frozen.Replace("§M{m1:M}", "§M{m1:M:overflow=unchecked}"));
+            var (exit, stdOut, _) = CliTestHarness.RunCli(dir, "verify", frozenPath, finalPath, "--weakening-check", "f1");
+            Assert.Equal(0, exit);
+            var line = stdOut.Split('\n').First(l => l.TrimStart().StartsWith('{'));
+            var json = System.Text.Json.JsonDocument.Parse(line).RootElement;
+            Assert.True(json.GetProperty("indeterminate").GetBoolean());
+            Assert.Contains("overflow policies", json.GetProperty("reason").GetString());
+        }
+        finally
+        {
+            try { Directory.Delete(dir, recursive: true); } catch (IOException) { }
+        }
     }
 
     [Fact]
