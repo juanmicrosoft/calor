@@ -47,8 +47,8 @@ internal static class DifferentialFormRegistry
     /// i64/u64 discriminators multiply under a guarding antecedent, an overflow-sensitive shape
     /// whose proof is now Assumed even though the guard rules the overflow out.
     /// </summary>
-    private static IReadOnlyList<string> CheckedArithmeticAssumptions(string type)
-        => type is "i64" or "u64" ? [Z3Verifier.CheckedArithmeticAssumption] : Array.Empty<string>();
+    private static IReadOnlyList<string>? CheckedArithmeticAssumptions(string type, params string[] others)
+        => type is "i64" or "u64" ? [Z3Verifier.CheckedArithmeticAssumption, .. others] : null;
 
     private static DifferentialForm BuildScalarType(string type)
     {
@@ -57,7 +57,7 @@ internal static class DifferentialFormRegistry
             "scalar-type",
             true,
             null,
-            IsStringType(type) ? [Z3Verifier.StringModelAssumption] : CheckedArithmeticAssumptions(type),
+            IsStringType(type) ? [Z3Verifier.StringModelAssumption] : Array.Empty<string>(),
             polarity =>
             {
                 var predicate = BuildScalarTypePredicate(type, Ref("value"));
@@ -67,7 +67,10 @@ internal static class DifferentialFormRegistry
                         : new UnaryOperationNode(Span, UnaryOperator.Not, predicate),
                     [Parameter("value", type)]);
             },
-            condition => ContainsReference(condition, "value"));
+            condition => ContainsReference(condition, "value"))
+        {
+            PostconditionAssumptions = CheckedArithmeticAssumptions(type),
+        };
     }
 
     private static DifferentialForm BuildArrayElementType(string type)
@@ -77,7 +80,7 @@ internal static class DifferentialFormRegistry
             "array-element-type",
             true,
             null,
-            [Z3Verifier.NullableReferenceModelAssumption, .. CheckedArithmeticAssumptions(type)],
+            [Z3Verifier.NullableReferenceModelAssumption],
             polarity =>
             {
                 var access = new ArrayAccessNode(Span, Ref("values"), Int(0));
@@ -88,7 +91,10 @@ internal static class DifferentialFormRegistry
                         : new UnaryOperationNode(Span, UnaryOperator.Not, predicate),
                     [Parameter("values", $"{type}[]")]);
             },
-            condition => Contains<ArrayAccessNode>(condition));
+            condition => Contains<ArrayAccessNode>(condition))
+        {
+            PostconditionAssumptions = CheckedArithmeticAssumptions(type, Z3Verifier.NullableReferenceModelAssumption),
+        };
     }
 
     private static DifferentialForm BuildExpressionKind(string kind)

@@ -57,7 +57,7 @@ public class OverflowSoundnessBenchmark
                 BinOp(BinaryOperator.Add, Ref("x"), Int(1)),
                 Ref("x")));
 
-        AssertProven(result, "x + 1 > x (bounded by x < INT_MAX)");
+        AssertCheckedArithmeticAssumed(result, "x + 1 > x (bounded by x < INT_MAX)");
     }
 
     [SkippableFact]
@@ -97,7 +97,7 @@ public class OverflowSoundnessBenchmark
                 BinOp(BinaryOperator.Add, Ref("x"), Ref("y")),
                 Int(0)));
 
-        AssertProven(result, "x > 0 && y > 0 && bounded => x + y > 0");
+        AssertCheckedArithmeticAssumed(result, "x > 0 && y > 0 && bounded => x + y > 0");
     }
 
     #endregion
@@ -135,7 +135,7 @@ public class OverflowSoundnessBenchmark
                 BinOp(BinaryOperator.Subtract, Ref("x"), Int(1)),
                 Ref("x")));
 
-        AssertProven(result, "x - 1 < x (bounded by x > INT_MIN)");
+        AssertCheckedArithmeticAssumed(result, "x - 1 < x (bounded by x > INT_MIN)");
     }
 
     #endregion
@@ -176,7 +176,7 @@ public class OverflowSoundnessBenchmark
                 BinOp(BinaryOperator.Multiply, Ref("x"), Int(2)),
                 Ref("x")));
 
-        AssertProven(result, "x > 0 && x < 1B => x * 2 > x");
+        AssertCheckedArithmeticAssumed(result, "x > 0 && x < 1B => x * 2 > x");
     }
 
     [SkippableFact]
@@ -214,7 +214,7 @@ public class OverflowSoundnessBenchmark
                 BinOp(BinaryOperator.Multiply, Ref("x"), Ref("x")),
                 Int(0)));
 
-        AssertProven(result, "x >= 0 && x <= 46340 => x * x >= 0");
+        AssertCheckedArithmeticAssumed(result, "x >= 0 && x <= 46340 => x * x >= 0");
     }
 
     #endregion
@@ -278,7 +278,7 @@ public class OverflowSoundnessBenchmark
                 UnaryOp(UnaryOperator.Negate, Ref("x")),
                 Int(0)));
 
-        AssertProven(result, "x < 0 && x > INT_MIN => -x > 0");
+        AssertCheckedArithmeticAssumed(result, "x < 0 && x > INT_MIN => -x > 0");
     }
 
     #endregion
@@ -362,11 +362,13 @@ public class OverflowSoundnessBenchmark
             ("i64: x + 1 > x", () => VerifySimple("i64", null, "(> (+ x 1) x)")),
         };
 
-        var mustBeProven = new (string Name, Func<ContractVerificationResult> Test)[]
+        // #1413 (S2 R-NUM): the bounded overflow shapes are Assumed (checked-arithmetic) under the
+        // frozen row NUM-OVERFLOW-CHECKED; the comparison-only control must still be Proven.
+        var mustBeProven = new (string Name, Func<ContractVerificationResult> Test, bool Bounded)[]
         {
-            ("x < MAX => x + 1 > x", () => VerifySimple("i32", "(< x 2147483647)", "(> (+ x 1) x)")),
-            ("x > MIN => x - 1 < x", () => VerifySimple("i32", "(> x -2147483648)", "(< (- x 1) x)")),
-            ("u32: x >= 0", () => VerifySimple("u32", null, "(>= x 0)")),
+            ("x < MAX => x + 1 > x", () => VerifySimple("i32", "(< x 2147483647)", "(> (+ x 1) x)"), true),
+            ("x > MIN => x - 1 < x", () => VerifySimple("i32", "(> x -2147483648)", "(< (- x 1) x)"), true),
+            ("u32: x >= 0", () => VerifySimple("u32", null, "(>= x 0)"), false),
         };
 
         _output.WriteLine("=== Overflow Soundness Benchmark ===\n");
@@ -386,11 +388,12 @@ public class OverflowSoundnessBenchmark
 
         int proven = 0, missedProofs = 0;
         _output.WriteLine("\nContracts that MUST be PROVEN (properly bounded):");
-        foreach (var (name, test) in mustBeProven)
+        foreach (var (name, test, bounded) in mustBeProven)
         {
             var result = test();
-            var status = IsBoundedVerdict(result) ? "PASS" : "FAIL (MISSED PROOF)";
-            if (IsBoundedVerdict(result)) proven++;
+            var expected = bounded ? IsCheckedArithmeticAssumed(result) : result.Status == ContractVerificationStatus.Proven;
+            var status = expected ? "PASS" : "FAIL (MISSED PROOF)";
+            if (expected) proven++;
             else missedProofs++;
             _output.WriteLine($"  [{status}] {name}");
         }
@@ -521,19 +524,23 @@ public class OverflowSoundnessBenchmark
     /// <summary>
     /// #1413 (S2 R-NUM): the frozen row NUM-OVERFLOW-CHECKED classifies overflow-sensitive shapes
     /// under the checked module as "Assumed (checked-arithmetic)"; a precondition that rules the
-    /// overflow out no longer upgrades the verdict to Proven. A bounded contract therefore holds as
-    /// Assumed with exactly the checked-arithmetic assumption, or Proven when no arithmetic can overflow.
+    /// overflow out no longer upgrades the verdict to Proven.
     /// </summary>
-    private static bool IsBoundedVerdict(ContractVerificationResult result)
-        => result.Status == ContractVerificationStatus.Proven
-           || result.EffectiveOutcome.Status == ProofStatus.Assumed
-              && result.EffectiveOutcome.Assumptions.SequenceEqual([Z3Verifier.CheckedArithmeticAssumption]);
+    private static bool IsCheckedArithmeticAssumed(ContractVerificationResult result)
+        => result.EffectiveOutcome.Status == ProofStatus.Assumed
+           && result.EffectiveOutcome.Assumptions.SequenceEqual([Z3Verifier.CheckedArithmeticAssumption]);
+
+    private void AssertCheckedArithmeticAssumed(ContractVerificationResult result, string description)
+    {
+        _output.WriteLine($"[{result.Status}] {description}");
+        Assert.True(IsCheckedArithmeticAssumed(result),
+            $"{description}: expected Assumed (checked-arithmetic), got {result.EffectiveOutcome.Status} [{string.Join("; ", result.EffectiveOutcome.Assumptions)}]");
+    }
 
     private void AssertProven(ContractVerificationResult result, string description)
     {
         _output.WriteLine($"[{result.Status}] {description}");
-        Assert.True(IsBoundedVerdict(result),
-            $"{description}: expected Assumed (checked-arithmetic), got {result.EffectiveOutcome.Status} [{string.Join("; ", result.EffectiveOutcome.Assumptions)}]");
+        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
     }
 
     // AST construction helpers

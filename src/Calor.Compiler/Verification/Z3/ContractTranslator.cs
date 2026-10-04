@@ -492,7 +492,10 @@ public sealed class ContractTranslator
 
     private BitVecExpr? TranslateIntLiteral(IntLiteralNode literal)
     {
-        if (literal.WidthInferred)
+        // A 32-bit signed literal whose value does not fit (an AST built without the lexer) is the
+        // same D2 form; LONG:/UINT:/ULONG: and 64-bit literals stay modeled.
+        if (literal.WidthInferred
+            || !literal.IsUnsigned && !literal.IsLong && literal.Value is > int.MaxValue or < int.MinValue)
         {
             // #1413 (S1 NUM-LITERAL-OVERSIZE, registered unsupported-refused): divergence D2 —
             // an INT: literal outside the int32 range is refused. LONG:/UINT:/ULONG: spell an

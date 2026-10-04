@@ -90,8 +90,8 @@ public sealed class S2NumericRefusalTests
     [Theory]
     [InlineData("u32", "UINT:1702287129", "(< (- x INT:1) x)")]          // T-OVF-CHECKED-2 (R1-NUM-OVERFLOW-CHECKED-007 shape)
     [InlineData("i64", "LONG:1", "(< (- x INT:1) x)")]
-    [InlineData("i32", "INT:0", "(== (- (+ x INT:1) INT:1) x)")]        // T-OVF-CHECKED-3 needs x < MaxValue: not entailed
-    public void EntailedCheckedArithmetic_IsAssumedNotProven(string type, string lower, string claim)
+    [InlineData("i32", "INT:0", "(== (- (+ x INT:1) INT:1) x)")]        // T-OVF-CHECKED-3
+    public void OverflowSensitiveCheckedArithmetic_IsAssumed(string type, string lower, string claim)
     {
         var source = $$"""
             §M{m1:R1Case}
@@ -102,9 +102,54 @@ public sealed class S2NumericRefusalTests
                 §R INT:0
             """;
         var outcome = VerifySinglePostcondition(source).EffectiveOutcome;
-        Assert.NotEqual(ProofStatus.Proven, outcome.Status);
-        if (outcome.Status == ProofStatus.Assumed)
-            Assert.Contains(Z3Verifier.CheckedArithmeticAssumption, outcome.Assumptions);
+        Assert.Equal(ProofStatus.Assumed, outcome.Status);
+        Assert.Equal([Z3Verifier.CheckedArithmeticAssumption], outcome.Assumptions);
+    }
+
+    [Theory]
+    [InlineData("i32", "(> (+ x LONG:1) x)")]     // promoted to 64-bit: no i32 input overflows
+    [InlineData("u32", "(>= (- x INT:-1) x)")]    // u32 - int promotes to long: no overflow
+    public void Control_ArithmeticThatCannotOverflow_StaysProven(string type, string claim)
+    {
+        var source = $$"""
+            §M{m1:R1Case}
+              §F{f1:Probe:pub} ({{type}}:x) -> i32
+                §E{}
+                §S {{claim}}
+                §R INT:0
+            """;
+        Assert.Equal(ContractVerificationStatus.Proven, VerifySinglePostcondition(source).Status);
+    }
+
+    [Fact]
+    public void OversizeLiteralBuiltWithoutTheLexer_IsRefused()
+    {
+        // Review round 1: an SDK-built 32-bit literal holding a 64-bit value is the same D2 form.
+        Assert.True(Z3ContextFactory.IsAvailable, "this witness needs Z3");
+        var span = Calor.Compiler.Parsing.TextSpan.Empty;
+        var literal = new Calor.Compiler.Ast.IntLiteralNode(span, long.MaxValue) { IsLong = false };
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+        var result = verifier.VerifyPostcondition(
+            [("x", "i64")], "i32", [],
+            new Calor.Compiler.Ast.EnsuresNode(span,
+                new Calor.Compiler.Ast.BinaryOperationNode(span, Calor.Compiler.Ast.BinaryOperator.LessOrEqual,
+                    new Calor.Compiler.Ast.ReferenceNode(span, "x"), literal),
+                null, new Calor.Compiler.Ast.AttributeCollection()));
+        Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
+    }
+
+    [Fact]
+    public void InferredWidthLiteral_HasItsOwnCacheKey_AndTheFormatEvictsOlderEntries()
+    {
+        var span = Calor.Compiler.Parsing.TextSpan.Empty;
+        var hasher = new ContractHasher();
+        var inferred = hasher.GetCanonicalExpression(new Calor.Compiler.Ast.IntLiteralNode(span, 3_000_000_000) { WidthInferred = true });
+        var spelled = hasher.GetCanonicalExpression(new Calor.Compiler.Ast.IntLiteralNode(span, 3_000_000_000));
+        Assert.NotEqual(inferred, spelled);
+        // Entries of 1.21 and earlier may hold Proven for the forms R-NUM refuses or demotes.
+        Assert.True(int.Parse(VerificationCacheEntry.CurrentFormatVersion.Split('.')[1]) >= 22,
+            VerificationCacheEntry.CurrentFormatVersion);
     }
 
     [Fact]

@@ -577,7 +577,8 @@ public sealed class KInductionProver : IDisposable
     {
         return expr switch
         {
-            BoundIntLiteral intLit => intLit.Value,
+            // #1413 (S2 R-NUM, D2): the bounds are modeled as 32-bit; a value outside int32 is refused.
+            BoundIntLiteral intLit when intLit.Value is >= int.MinValue and <= int.MaxValue => intLit.Value,
             _ => null
         };
     }

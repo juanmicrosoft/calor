@@ -30,7 +30,15 @@ internal sealed record DifferentialForm(
     string? ExclusionReason,
     IReadOnlyList<string> AllowedAssumptions,
     Func<CasePolarity, FormExpression> Build,
-    Func<ExpressionNode, bool> ContainsTarget);
+    Func<ExpressionNode, bool> ContainsTarget)
+{
+    /// <summary>
+    /// #1413 (S2 R-NUM): when set, the exact assumption set the POSTCONDITION channel must report
+    /// for provable cases (Proven is then not accepted there) — the frozen row
+    /// NUM-OVERFLOW-CHECKED names the postcondition channel only.
+    /// </summary>
+    public IReadOnlyList<string>? PostconditionAssumptions { get; init; }
+}
 
 internal sealed record FormExpression(
     ExpressionNode Condition,
@@ -45,7 +53,8 @@ internal sealed record DifferentialCase(
     CasePolarity Polarity,
     FunctionNode Function,
     string? ProofId,
-    IReadOnlyList<string> AllowedAssumptions);
+    IReadOnlyList<string> AllowedAssumptions,
+    bool RequiresAssumed = false);
 
 internal sealed record CaseResult(
     string Id,

@@ -73,6 +73,20 @@ public sealed class Z3Verifier : IDisposable
     private readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> _userTypeRegistry;
     private bool _disposed;
 
+    /// <summary>#1413 (S2 R-NUM): whether some value of the operands' types violates the
+    /// conditions, decided without any precondition (an unknown answer counts as yes).</summary>
+    private bool CanFailForSomeInput(IReadOnlyCollection<BoolExpr> conditions)
+    {
+        if (conditions.Count == 0)
+            return false;
+        var all = IsolatedSolver.Simplify(_ctx, _ctx.MkAnd(conditions.ToArray()));
+        if (all.IsTrue)
+            return false;
+        using var probe = new IsolatedSolver(_ctx, _timeoutMs);
+        probe.Assert(_ctx.MkNot(all));
+        return probe.Check() != Status.UNSATISFIABLE;
+    }
+
     internal static bool ArithmeticSafetyEntailed(Context context, IsolatedSolver solver, IEnumerable<BoolExpr> conditions)
     {
         var safety = IsolatedSolver.Simplify(context, context.MkAnd(conditions.ToArray()));
@@ -496,10 +510,9 @@ public sealed class Z3Verifier : IDisposable
             // arithmetic can overflow on SOME input of its types is an overflow-sensitive shape,
             // and Assumed is the strongest outcome the registration allows for it — even when
             // the preconditions rule the overflow out (the entailment the solver used to accept
-            // as an unconditional Proven). Only arithmetic that cannot overflow at all stays
-            // unconditional.
-            var checkedArithmeticAssumed = !IsolatedSolver.Simplify(
-                _ctx, _ctx.MkAnd(checkedArithmeticConditions.ToArray())).IsTrue;
+            // as an unconditional Proven). Only arithmetic that cannot overflow for any value of its
+            // types (checked without the preconditions) stays unconditional.
+            var checkedArithmeticAssumed = CanFailForSomeInput(checkedArithmeticConditions);
             foreach (var condition in checkedArithmeticConditions)
                 solver.Assert(condition);
             if ((checkedArithmeticAssumed || bodyArithmeticSafety is { IsTrue: false })
