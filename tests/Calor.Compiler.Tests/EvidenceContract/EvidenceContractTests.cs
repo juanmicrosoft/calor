@@ -1363,18 +1363,16 @@ public class EvidenceContractTests
         Assert.StartsWith("Repair frozen at the last fix.", conditions[2], StringComparison.Ordinal);
         Assert.Contains("before and after the pass", conditions[2], StringComparison.Ordinal);
 
-        // Exactly one review-round exception exists, and it is #1496's.
-        var reviewExceptions = capacity["exceptions"]!.AsArray().Where(e => e!["ceiling"]!.GetValue<string>() == "review-rounds-per-pr").ToList();
-        Assert.Single(reviewExceptions);
+        // Exactly one review-round exception comes from 1.3.0, and it is #1496's (1.3.1 adds #1502 and #1503).
+        var reviewExceptions = capacity["exceptions"]!.AsArray()
+            .Where(e => e!["ceiling"]!.GetValue<string>() == "review-rounds-per-pr" && e["amendment"]!.GetValue<string>() == "1.3.0").ToList();
+        Assert.Equal(1496, Assert.Single(reviewExceptions)!["pr"]!.GetValue<int>());
 
-        var last = contract["amendmentLog"]!.AsArray().Last()!;
-        Assert.Equal("1.3.0", last["version"]!.GetValue<string>());
-        Assert.Equal("1.3.0", contract["contractVersion"]!.GetValue<string>());
-        Assert.True(last["afterDecisionBearingInspection"]!.GetValue<bool>());
-        Assert.True(last["reviewedInPr"]!.GetValue<int>() > 1499);
-        Assert.Equal(2, last["weakens"]!.AsArray().Count);
-        Assert.Empty(last["removedRows"]!.AsArray());
-        Assert.Equal("1.3.0", Inventory()["contractVersion"]!.GetValue<string>());
+        var entry = contract["amendmentLog"]!.AsArray().Single(a => a!["version"]!.GetValue<string>() == "1.3.0")!;
+        Assert.True(entry["afterDecisionBearingInspection"]!.GetValue<bool>());
+        Assert.True(entry["reviewedInPr"]!.GetValue<int>() > 1499);
+        Assert.Equal(2, entry["weakens"]!.AsArray().Count);
+        Assert.Empty(entry["removedRows"]!.AsArray());
     }
 
     [Theory]
@@ -1524,6 +1522,265 @@ public class EvidenceContractTests
         Assert.DoesNotContain(violations, v => v.Subject == "exception s1-generated-cases issue #1311");
         Assert.DoesNotContain(violations, v => v.Subject == "exception pr-size #1473");
     }
+
+    // ------------------------------------------------------------------
+    // Amendment 1.3.1: one registered change each for #1502 (three parts) and #1503 (revert-only) (C011)
+    // ------------------------------------------------------------------
+
+    private const string Base1502 = "3f3016d2297491fca1734e931946747833def32d";
+    private const string Base1503 = "9b54c9c3d8d7fb178c5594ddc757d871fbb34ab4";
+    private const string WhileBoundFinding = "D-NUM-WHILE-BOUND";
+
+    [Theory]
+    [InlineData(1502, Base1502, "Three changes only.", "WhileConditionAnalyzer.GetIntValue", false)]
+    [InlineData(1503, Base1503, "Revert only.", "FactCollector.CollectFromIf", true)]
+    public void CommittedContractRegistersAmendment131Exceptions(int pr, string baseCommit, string scopeCondition, string hunk, bool revertOnly)
+    {
+        // Each PR gets exactly one registered change on its base, then one verification pass that must
+        // APPROVE: 3 rounds + 2 passes = 5. No ceiling value changes.
+        var contract = Contract();
+        var capacity = contract["authorityCapacity"]!["capacity"]!;
+        var ceilings = capacity["ceilings"]!.AsArray().ToDictionary(c => c!["id"]!.GetValue<string>(), c => c!["value"]!.GetValue<int>());
+        Assert.Equal(3, ceilings["review-rounds-per-pr"]);
+        Assert.Equal(6, ceilings["s2-repairs"]);
+        Assert.Equal(600, ceilings["s2-repair-size"]);
+
+        var exception = ChangeException(contract, pr);
+        Assert.Equal(5, exception["value"]!.GetValue<int>());
+        Assert.Equal(1413, exception["issue"]!.GetValue<int>());
+        Assert.Equal("1.3.1", exception["amendment"]!.GetValue<string>());
+        Assert.Equal(revertOnly, exception["revertOnly"]!.GetValue<bool>());
+        Assert.Equal(baseCommit, exception["baseCommit"]!.GetValue<string>());
+        Assert.Null(exception["addedPrs"]);
+        Assert.Contains(baseCommit, exception["scope"]!.GetValue<string>(), StringComparison.Ordinal);
+        var conditions = exception["conditions"]!.AsArray().Select(c => c!.GetValue<string>()).ToList();
+        Assert.StartsWith(scopeCondition, conditions[0], StringComparison.Ordinal);
+        Assert.Contains(baseCommit, conditions[0], StringComparison.Ordinal);
+        Assert.Contains(hunk, conditions[0], StringComparison.Ordinal);
+        var approve = Assert.Single(conditions, c => c.StartsWith("Verification pass must APPROVE.", StringComparison.Ordinal));
+        Assert.Contains("no further fix or pass is allowed", approve, StringComparison.Ordinal);
+        Assert.Contains(conditions, c => c.StartsWith("Frozen at the", StringComparison.Ordinal)
+            && c.Contains("before and after the pass", StringComparison.Ordinal));
+
+        var entry = contract["amendmentLog"]!.AsArray().Last()!;
+        Assert.Equal("1.3.1", entry["version"]!.GetValue<string>());
+        Assert.Equal("1.3.1", contract["contractVersion"]!.GetValue<string>());
+        Assert.True(entry["afterDecisionBearingInspection"]!.GetValue<bool>());
+        Assert.True(entry["reviewedInPr"]!.GetValue<int>() > 1503);
+        Assert.Equal(2, entry["weakens"]!.AsArray().Count);
+        Assert.Empty(entry["removedRows"]!.AsArray());
+        Assert.Equal("1.3.1", Inventory()["contractVersion"]!.GetValue<string>());
+
+        // Review-round overruns exist for exactly #1496, #1502, and #1503.
+        Assert.Equal([1496, 1502, 1503], capacity["exceptions"]!.AsArray()
+            .Where(e => e!["ceiling"]!.GetValue<string>() == "review-rounds-per-pr")
+            .Select(e => e!["pr"]!.GetValue<int>()).Order());
+    }
+
+    [Fact]
+    public void Pr1502ChangeIsExactlyTheThreeRegisteredParts()
+    {
+        // Maintainer decision 2026-10-04 ("Decide by operand widths") plus the whole-loop demotion of
+        // the reopened while-bound false proof, which #1502 owns as a discovery finding.
+        var exception = ChangeException(Contract(), 1502);
+        Assert.Equal([WhileBoundFinding], exception["findings"]!.AsArray().Select(f => f!.GetValue<string>()));
+        var conditions = exception["conditions"]!.AsArray().Select(c => c!.GetValue<string>()).ToList();
+        var scope = conditions[0];
+        Assert.Contains("(a) It reverts the round-3 hunk of WhileConditionAnalyzer.GetIntValue", scope, StringComparison.Ordinal);
+        Assert.Contains("(b) The no-overflow check of checked arithmetic (Z3Verifier.CanFailForSomeInput and its caller) decides statically from operand bit widths and signedness", scope, StringComparison.Ordinal);
+        Assert.Contains("never Assumed and never Proven", scope, StringComparison.Ordinal);
+        Assert.Contains("(c) When a k-induction loop bound or loop-condition operand is not representable", scope, StringComparison.Ordinal);
+        Assert.Contains("the k-induction result for that whole loop is Unsupported", scope, StringComparison.Ordinal);
+        Assert.DoesNotContain("(d)", scope, StringComparison.Ordinal);
+        Assert.Contains(conditions, c => c.StartsWith("Tests pin (b) and (c).", StringComparison.Ordinal)
+            && c.Contains("i32(-2147483648) Multiply u32(0)", StringComparison.Ordinal)
+            && c.Contains("a while loop with a bound outside int32 giving Unsupported", StringComparison.Ordinal));
+        Assert.Contains(conditions, c => c.StartsWith("No false proof, and deterministic.", StringComparison.Ordinal)
+            && c.Contains("not on solver time, timeouts, or platform", StringComparison.Ordinal)
+            && c.Contains("at most 600 changed non-test lines", StringComparison.Ordinal));
+        Assert.Contains(conditions, c => c.StartsWith("Discovery finding on record.", StringComparison.Ordinal)
+            && c.Contains(WhileBoundFinding + " (", StringComparison.Ordinal)
+            && c.Contains("is MILESTONE-FAILED unless", StringComparison.Ordinal));
+        Assert.Contains("run 37220572221", exception["scope"]!.GetValue<string>(), StringComparison.Ordinal);
+        var weakens = Contract()["amendmentLog"]!.AsArray().Last()!["weakens"]!.AsArray().Select(w => w!.GetValue<string>()).ToList();
+        Assert.Contains(weakens, w => w.Contains("PR #1502", StringComparison.Ordinal) && w.Contains("new logic", StringComparison.Ordinal)
+            && w.Contains(WhileBoundFinding, StringComparison.Ordinal));
+        Assert.Contains(weakens, w => w.Contains("PR #1503", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(1502, "wrong-pr")]
+    [InlineData(1503, "wrong-pr")]
+    [InlineData(1502, "swapped-prs")]
+    [InlineData(1502, "value-plus-one")]
+    [InlineData(1503, "value-plus-one")]
+    [InlineData(1502, "missing-approve-condition")]
+    [InlineData(1503, "missing-approve-condition")]
+    [InlineData(1502, "weakened-approve-condition")]
+    [InlineData(1502, "broadened-scope")]
+    [InlineData(1503, "broadened-scope")]
+    [InlineData(1503, "non-revert-condition")]
+    [InlineData(1502, "fourth-change")]
+    [InlineData(1502, "unknown-becomes-assumed")]
+    [InlineData(1502, "dropped-determinism")]
+    [InlineData(1502, "dropped-finding")]
+    [InlineData(1502, "other-finding")]
+    [InlineData(1502, "dropped-discovery-condition")]
+    [InlineData(1502, "revert-only-flipped")]
+    [InlineData(1503, "revert-only-flipped")]
+    [InlineData(1503, "no-revert-only")]
+    [InlineData(1502, "other-base-commit")]
+    [InlineData(1503, "other-base-commit")]
+    [InlineData(1503, "no-base-commit")]
+    [InlineData(1502, "reordered-conditions")]
+    [InlineData(1503, "other-issue")]
+    [InlineData(1502, "unlogged-amendment")]
+    [InlineData(1503, "names-findings")]
+    [InlineData(1502, "duplicated")]
+    [InlineData(1503, "added-for-another-pr")]
+    public void Amendment131ExceptionOtherThanTheRegisteredOneFails(int pr, string mutation)
+    {
+        var contract = Contract();
+        var exceptions = contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray();
+        var exception = ChangeException(contract, pr);
+        var conditions = exception["conditions"]!.AsArray();
+        int IndexOf(string prefix) => conditions.Select((c, i) => (Text: c!.GetValue<string>(), Index: i))
+            .Single(x => x.Text.StartsWith(prefix, StringComparison.Ordinal)).Index;
+        var approveIndex = IndexOf("Verification pass must APPROVE.");
+        switch (mutation)
+        {
+            case "wrong-pr": exception["pr"] = 1497; break;
+            case "swapped-prs":
+                var other = ChangeException(contract, 1503);
+                exception["pr"] = 1503;
+                other["pr"] = 1502;
+                break;
+            case "value-plus-one": exception["value"] = 6; break;
+            case "missing-approve-condition": conditions.RemoveAt(approveIndex); break;
+            case "weakened-approve-condition":
+                conditions[approveIndex] = conditions[approveIndex]!.GetValue<string>()
+                    .Replace("Its verdict must be APPROVE, with no BLOCKING or MAJOR finding.", "Its verdict should have no BLOCKING finding.", StringComparison.Ordinal);
+                break;
+            case "broadened-scope":
+                exception["scope"] = exception["scope"]!.GetValue<string>()
+                    .Replace(pr == 1502 ? "exactly one further change, limited to three parts" : "exactly one revert-only change",
+                        "exactly one further fix", StringComparison.Ordinal);
+                break;
+            case "non-revert-condition":
+                conditions[0] = conditions[0]!.GetValue<string>()
+                    .Replace("It adds no logic", "It may add the logic the pass needs", StringComparison.Ordinal);
+                break;
+            case "fourth-change":
+                conditions[0] = conditions[0]!.GetValue<string>()
+                    .Replace("Every other change in the PR stays", "(d) It may fix anything else the pass reports. Every other change in the PR stays", StringComparison.Ordinal);
+                break;
+            case "unknown-becomes-assumed":
+                conditions[0] = conditions[0]!.GetValue<string>()
+                    .Replace("never Assumed and never Proven", "or Assumed", StringComparison.Ordinal);
+                break;
+            case "dropped-determinism": conditions.RemoveAt(IndexOf("No false proof, and deterministic.")); break;
+            case "dropped-finding": exception.AsObject().Remove("findings"); break;
+            case "other-finding": exception["findings"] = new JsonArray("D-NUM-OTHER"); break;
+            case "dropped-discovery-condition": conditions.RemoveAt(IndexOf("Discovery finding on record.")); break;
+            case "revert-only-flipped": exception["revertOnly"] = !exception["revertOnly"]!.GetValue<bool>(); break;
+            case "no-revert-only": exception.AsObject().Remove("revertOnly"); break;
+            case "other-base-commit": exception["baseCommit"] = "0123456789abcdef0123456789abcdef01234567"; break;
+            case "no-base-commit": exception.AsObject().Remove("baseCommit"); break;
+            case "reordered-conditions":
+                var first = conditions[0]!.DeepClone();
+                conditions.RemoveAt(0);
+                conditions.Add(first);
+                break;
+            case "other-issue": exception["issue"] = 1311; break;
+            case "unlogged-amendment": exception["amendment"] = "1.3.2"; break;
+            case "names-findings": exception["findings"] = new JsonArray("D-OBL-PROOF-GETTER"); break;
+            case "duplicated": exceptions.Add(exception.DeepClone()); break;
+            case "added-for-another-pr":
+                // The allowance is #1502's and #1503's alone; the same text for another PR is unregistered.
+                var copy = exception.DeepClone();
+                copy["pr"] = 1498;
+                exceptions.Add(copy);
+                break;
+        }
+        // Review round 1: the committed contract is clean, and the mutation fails on its own subject,
+        // so a control cannot pass on an unrelated C011.
+        Assert.Empty(EvidenceContractValidator.ValidateContract(Contract()));
+        var violations = EvidenceContractValidator.ValidateContract(contract);
+        AssertViolation(violations, "C011");
+        var subject = mutation switch
+        {
+            "wrong-pr" => "exception review-rounds-per-pr #1497",
+            "added-for-another-pr" => "exception review-rounds-per-pr #1498",
+            "duplicated" => "exception review-rounds-per-pr",
+            _ => $"exception review-rounds-per-pr #{pr}",
+        };
+        Assert.Contains(violations, v => v.Code == "C011" && v.Subject == subject);
+    }
+
+    [Theory]
+    [InlineData(1502, "missing-approve-condition", "this exception needs the condition that the verification pass must APPROVE")]
+    [InlineData(1502, "revert-only-flipped", "this exception must record revertOnly false")]
+    [InlineData(1503, "revert-only-flipped", "this exception must record revertOnly true")]
+    [InlineData(1502, "other-base-commit", "this exception must record baseCommit " + Base1502)]
+    [InlineData(1502, "reordered-conditions", "the first condition must be the 'Three changes only.' condition naming the base commit")]
+    [InlineData(1503, "reordered-conditions", "the first condition must be the 'Revert only.' condition naming the base commit")]
+    [InlineData(1502, "dropped-finding", "exception must name exactly the findings " + WhileBoundFinding)]
+    public void Amendment131StructuralChecksReportTheirOwnViolation(int pr, string mutation, string message)
+    {
+        // Beyond the text hash, each structural rule of a base-bound exception has its own violation.
+        var contract = Contract();
+        var exception = ChangeException(contract, pr);
+        var conditions = exception["conditions"]!.AsArray();
+        switch (mutation)
+        {
+            case "missing-approve-condition":
+                conditions.Remove(conditions.Single(c => c!.GetValue<string>().StartsWith("Verification pass must APPROVE.", StringComparison.Ordinal)));
+                break;
+            case "revert-only-flipped": exception["revertOnly"] = !exception["revertOnly"]!.GetValue<bool>(); break;
+            case "other-base-commit": exception["baseCommit"] = "0123456789abcdef0123456789abcdef01234567"; break;
+            case "reordered-conditions":
+                var first = conditions[0]!.DeepClone();
+                conditions.RemoveAt(0);
+                conditions.Add(first);
+                break;
+            case "dropped-finding": exception.AsObject().Remove("findings"); break;
+        }
+        Assert.Contains(EvidenceContractValidator.ValidateContract(contract),
+            v => v.Code == "C011" && v.Subject == $"exception review-rounds-per-pr #{pr}" && v.Message == message);
+    }
+
+    [Theory]
+    [InlineData("revertOnly")]
+    [InlineData("baseCommit")]
+    public void ExceptionNotRegisteredWithABaseCommitCannotCarryItsFields(string field)
+    {
+        // #1496's 1.3.0 exception has no registered base commit; adding either field is unregistered.
+        var contract = Contract();
+        var exception = ReviewException(contract);
+        exception[field] = field == "revertOnly" ? JsonValue.Create(true) : JsonValue.Create(LastRoblFix);
+        Assert.Contains(EvidenceContractValidator.ValidateContract(contract),
+            v => v.Code == "C011" && v.Subject == ReviewSubject && v.Message == "this exception is not registered with a base commit");
+    }
+
+    [Fact]
+    public void Amendment131ExceptionsWithoutAmendment131InTheLogFail()
+    {
+        // Dropping 1.3.1 from the log leaves both of its exceptions unregistered; 1.3.0's stay valid.
+        var contract = Contract();
+        var log = contract["amendmentLog"]!.AsArray();
+        log.Remove(log.Single(a => a!["version"]!.GetValue<string>() == "1.3.1"));
+        contract["contractVersion"] = log.Last()!["version"]!.DeepClone();
+        var violations = EvidenceContractValidator.ValidateContract(contract);
+        AssertViolation(violations, "C011");
+        Assert.Contains(violations, v => v.Subject == "exception review-rounds-per-pr #1502");
+        Assert.Contains(violations, v => v.Subject == "exception review-rounds-per-pr #1503");
+        Assert.DoesNotContain(violations, v => v.Subject == ReviewSubject);
+        Assert.DoesNotContain(violations, v => v.Subject == S2Subject);
+    }
+
+    private static JsonNode ChangeException(JsonNode contract, int pr)
+        => contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray()
+            .Single(e => e?["ceiling"]?.GetValue<string>() == "review-rounds-per-pr" && e?["pr"]?.GetValue<int>() == pr)!;
 
     private static JsonNode S2Exception(JsonNode contract)
         => contract["authorityCapacity"]!["capacity"]!["exceptions"]!.AsArray()
