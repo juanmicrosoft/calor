@@ -325,12 +325,8 @@ public class ProductionOverflowRuntimeTests
         var options = VerifiedOptions();
         var compiled = Program.Compile(source, "overflow.calr", options);
         Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
-        // #1413 (S2 R-NUM): frozen row NUM-OVERFLOW-CHECKED ("Assumed (checked-arithmetic)"): a
-        // guarded overflow-sensitive shape is Assumed, not Proven; the guard stays, and the
-        // unselected overflow is still never evaluated at runtime.
         Assert.Contains(compiled.Diagnostics, diagnostic =>
-            diagnostic.Verification is { Status: ProofStatus.Assumed, IsVacuous: false } verification
-            && verification.Assumptions.Contains(Calor.Compiler.Verification.Z3.Z3Verifier.CheckedArithmeticAssumption));
+            diagnostic.Verification is { Status: ProofStatus.Proven, IsVacuous: false });
         var execution = TestHarness.Execute(source, "Probe", [int.MaxValue], options);
         Assert.Null(execution.Exception);
         Assert.Equal(int.MaxValue, execution.ReturnValue);

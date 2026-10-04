@@ -27,8 +27,8 @@
     "mismatches": 0
   },
   "outcomeCounts": {
-    "assumed": 156,
-    "proven": 429,
+    "assumed": 150,
+    "proven": 435,
     "refuted": 585
   },
   "encodingNotes": {
@@ -103,9 +103,7 @@
       "id": "scalar-type:i64",
       "category": "scalar-type",
       "applicable": true,
-      "allowedAssumptions": [
-        "checked-arithmetic \u2014 modeled integer operations complete without overflow; overflowing operations throw and runtime guards are retained"
-      ],
+      "allowedAssumptions": [],
       "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
@@ -116,8 +114,7 @@
       "elides": true,
       "mismatches": 0,
       "statuses": {
-        "assumed": 3,
-        "proven": 6,
+        "proven": 9,
         "refuted": 9
       }
     },
@@ -182,9 +179,7 @@
       "id": "scalar-type:u64",
       "category": "scalar-type",
       "applicable": true,
-      "allowedAssumptions": [
-        "checked-arithmetic \u2014 modeled integer operations complete without overflow; overflowing operations throw and runtime guards are retained"
-      ],
+      "allowedAssumptions": [],
       "solverHandled": true,
       "cases": 18,
       "provableCases": 9,
@@ -195,8 +190,7 @@
       "elides": true,
       "mismatches": 0,
       "statuses": {
-        "assumed": 3,
-        "proven": 6,
+        "proven": 9,
         "refuted": 9
       }
     },
@@ -312,8 +306,7 @@
       "category": "array-element-type",
       "applicable": true,
       "allowedAssumptions": [
-        "reference-model \u2014 the solver\u0027s arrays and user-type sorts are total and non-null, while .NET\u0027s are nullable references (D14); a proof touching them is conditional on the value being non-null",
-        "checked-arithmetic \u2014 modeled integer operations complete without overflow; overflowing operations throw and runtime guards are retained"
+        "reference-model \u2014 the solver\u0027s arrays and user-type sorts are total and non-null, while .NET\u0027s are nullable references (D14); a proof touching them is conditional on the value being non-null"
       ],
       "solverHandled": true,
       "cases": 18,
@@ -401,8 +394,7 @@
       "category": "array-element-type",
       "applicable": true,
       "allowedAssumptions": [
-        "reference-model \u2014 the solver\u0027s arrays and user-type sorts are total and non-null, while .NET\u0027s are nullable references (D14); a proof touching them is conditional on the value being non-null",
-        "checked-arithmetic \u2014 modeled integer operations complete without overflow; overflowing operations throw and runtime guards are retained"
+        "reference-model \u2014 the solver\u0027s arrays and user-type sorts are total and non-null, while .NET\u0027s are nullable references (D14); a proof touching them is conditional on the value being non-null"
       ],
       "solverHandled": true,
       "cases": 18,

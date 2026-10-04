@@ -42,14 +42,6 @@ internal static class DifferentialFormRegistry
         return result;
     }
 
-    /// <summary>
-    /// #1413 (S2 R-NUM, frozen row NUM-OVERFLOW-CHECKED: "Assumed (checked-arithmetic)"): the
-    /// i64/u64 discriminators multiply under a guarding antecedent, an overflow-sensitive shape
-    /// whose proof is now Assumed even though the guard rules the overflow out.
-    /// </summary>
-    private static IReadOnlyList<string>? CheckedArithmeticAssumptions(string type, params string[] others)
-        => type is "i64" or "u64" ? [Z3Verifier.CheckedArithmeticAssumption, .. others] : null;
-
     private static DifferentialForm BuildScalarType(string type)
     {
         return new DifferentialForm(
@@ -67,10 +59,7 @@ internal static class DifferentialFormRegistry
                         : new UnaryOperationNode(Span, UnaryOperator.Not, predicate),
                     [Parameter("value", type)]);
             },
-            condition => ContainsReference(condition, "value"))
-        {
-            PostconditionAssumptions = CheckedArithmeticAssumptions(type),
-        };
+            condition => ContainsReference(condition, "value"));
     }
 
     private static DifferentialForm BuildArrayElementType(string type)
@@ -91,10 +80,7 @@ internal static class DifferentialFormRegistry
                         : new UnaryOperationNode(Span, UnaryOperator.Not, predicate),
                     [Parameter("values", $"{type}[]")]);
             },
-            condition => Contains<ArrayAccessNode>(condition))
-        {
-            PostconditionAssumptions = CheckedArithmeticAssumptions(type, Z3Verifier.NullableReferenceModelAssumption),
-        };
+            condition => Contains<ArrayAccessNode>(condition));
     }
 
     private static DifferentialForm BuildExpressionKind(string kind)

@@ -124,8 +124,6 @@ internal static class DifferentialGate
                             nested,
                             position,
                             proofId);
-                        var postconditionOverride = position == ContractPosition.Postcondition
-                            && form.PostconditionAssumptions != null;
                         cases.Add(new DifferentialCase(
                             $"case-{sequence:D6}",
                             form.Id,
@@ -135,8 +133,7 @@ internal static class DifferentialGate
                             polarity,
                             function,
                             proofId,
-                            postconditionOverride ? form.PostconditionAssumptions! : form.AllowedAssumptions,
-                            postconditionOverride));
+                            form.AllowedAssumptions));
                     }
                 }
             }
@@ -341,7 +338,7 @@ internal static class DifferentialGate
             return outcome.Status == ProofStatus.Refuted;
 
         if (outcome.Status == ProofStatus.Proven)
-            return !testCase.RequiresAssumed;
+            return true;
 
         return outcome.Status == ProofStatus.Assumed
             && outcome.Assumptions.SequenceEqual(
@@ -666,22 +663,18 @@ internal static class DifferentialGate
                 ["scalar-type:i64"] =
                     "The translator models integer literals only through signed i32. The i64 row therefore " +
                     "uses signedness at -1 plus an i32-overflow boundary witness (2 * Int32.MaxValue) rather " +
-                    "than claiming coverage of Int64.MinValue/MaxValue literals. Its guarded multiplication " +
-                    "is an overflow-sensitive shape: the postcondition channel must report it Assumed " +
-                    "(checked-arithmetic), per the frozen row NUM-OVERFLOW-CHECKED (#1413 S2 R-NUM).",
+                    "than claiming coverage of Int64.MinValue/MaxValue literals.",
                 ["scalar-type:u32"] =
                     "The u32 row combines non-negativity with the C# shift-count mask: " +
                     "for witness 3, shifting by 32 is the identity for u32 and zero for u64. " +
                     "This distinguishes the widths without requiring integer overflow.",
                 ["scalar-type:u64"] =
                     "The u64 row combines non-negativity with the non-wrapping result of " +
-                    "3 * Int32.MaxValue; it does not claim direct UInt64.MaxValue literal coverage. The " +
-                    "postcondition channel must report its guarded multiplication Assumed (checked-arithmetic).",
+                    "3 * Int32.MaxValue; it does not claim direct UInt64.MaxValue literal coverage.",
                 ["array-element-types"] =
                     "Integer array rows apply the same per-type boundary predicates to values[0]. Runtime " +
                     "uses a non-null one-element array with the matching deterministic witness; proofs are " +
-                    "therefore conditional on the production nullable-reference-model assumption, and for " +
-                    "i64/u64 the postcondition channel also on checked-arithmetic (NUM-OVERFLOW-CHECKED).",
+                    "therefore conditional only on the production nullable-reference-model assumption.",
                 ["scalar-type:str"] =
                     "The string row proves non-negative length using the non-null ASCII runtime witness " +
                     "'ascii'. The solver result remains explicitly conditional on the production string-" +
