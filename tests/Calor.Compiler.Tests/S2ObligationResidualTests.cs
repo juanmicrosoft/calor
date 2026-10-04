@@ -249,8 +249,8 @@ public sealed class S2ObligationResidualTests
                   §R (/ INT:10 value.Value)
               §F{f1:Probe:pub} (Box:box, i32:x) -> i32
                 §E{}
-                §B{q:i32} x
-                §PROOF{p1:claim} (!= x INT:0)
+                §B{q:i32} box
+                §PROOF{p1:claim} (!= box.Value INT:0)
                 §R q
             """;
         AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "p1"));
@@ -264,13 +264,19 @@ public sealed class S2ObligationResidualTests
             §M{m1:M}
               §CL{c1:Box:pub}
                 §FLD{i32:Value:pub}
-                §MT{mt1:op_LessThan:pub}
-                  §I{Box:right}
+                §MT{mt1:op_LessThan:pub:stat}
+                  §I{Box:left}
+                  §I{i32:right}
+                  §O{bool}
+                  §R (> (/ INT:10 right) INT:0)
+                §MT{mt2:op_GreaterThan:pub:stat}
+                  §I{Box:left}
+                  §I{i32:right}
                   §O{bool}
                   §R true
-              §F{f1:Probe:pub} (i32:x) -> i32
+              §F{f1:Probe:pub} (Box:box, i32:x) -> i32
                 §E{}
-                §B{q:bool} (< x INT:3)
+                §B{q:bool} (< box x)
                 §PROOF{p1:claim} (!= x INT:0)
                 §R x
             """;
@@ -329,6 +335,114 @@ public sealed class S2ObligationResidualTests
                 §R x
             """;
         Assert.Equal(ObligationStatus.Failed, Proof(Solve(source, typeCheck: false).Obligations, "p1").Status);
+    }
+
+    [Fact]
+    public void EntryRefinementAfterAThrowingPrecondition_IsWithheld()
+    {
+        // Review round 3: the precondition runs before the parameter guard; only x = 0 completes it.
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:priv}
+                §I{i32:x} | (< # INT:2147483647)
+                §O{void}
+                §E{}
+                §Q (|| (== x INT:0) (== (+ x INT:1) INT:-2147483648))
+            """;
+        AssertWithheld(Assert.Single(Solve(source).Obligations, o => o.Kind == ObligationKind.RefinementEntry));
+    }
+
+    [Fact]
+    public void ProofAfterALengthOfADefaultNullLocal_IsWithheld()
+    {
+        // Review round 3: an initializer-free array local is null, so its length throws first.
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:pub} (i32:x) -> void
+                §E{}
+                §B{items:i32[]}
+                §B{length:i32} §LEN items
+                §PROOF{p1:claim} (> x INT:0)
+            """;
+        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "p1"));
+    }
+
+    [Fact]
+    public void ProofReadingALengthProperty_IsWithheld()
+    {
+        // Review round 3: §LEN emits `.Length`, here a getter that always returns 0.
+        const string source = """
+            §M{m1:M}
+              §CL{c1:Box:pub}
+                §PROP{pr1:Length:i32:pub}
+                  §GET
+                    §R INT:0
+              §F{f1:Probe:pub} (Box:box) -> void
+                §E{}
+                §PROOF{p1:claim} (== §LEN box INT:0)
+            """;
+        var proof = Proof(Solve(source, typeCheck: false).Obligations, "p1");
+        Assert.NotEqual(ObligationStatus.Failed, proof.Status);
+        Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
+    }
+
+    [Fact]
+    public void ProofWithRawCSharpMembersInTheModule_IsWithheld()
+    {
+        // Review round 3: a raw C# property hiding the inherited field is invisible to the scan.
+        const string source = """
+            §M{m1:M}
+              §CL{c1:Base:pub}
+                §FLD{i32:Trigger:pub}
+              §CL{c2:Box:pub}
+                §EXT{Base}
+                §CSHARP{public new int Trigger => 0;}§/CSHARP
+              §F{f1:Probe:pub} (Box:box) -> void
+                §E{}
+                §PROOF{p1:claim} (== box.Trigger INT:0)
+            """;
+        var proof = Proof(Solve(source, typeCheck: false).Obligations, "p1");
+        Assert.NotEqual(ObligationStatus.Failed, proof.Status);
+        Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
+    }
+
+    [Fact]
+    public void ProofAfterAThrowingConstructorInitializer_IsWithheld()
+    {
+        // Review round 3: the base(...) argument (/ 10 x) runs before the body; x = 0 never reaches p1.
+        const string source = """
+            §M{m1:M}
+              §CL{c1:Base:pub}
+                §CTOR{ct0:pub}
+                  §I{i32:v}
+              §CL{c2:Derived:pub}
+                §EXT{Base}
+                §CTOR{ct1:pub}
+                  §I{i32:x}
+                  §BASE
+                    §A (/ INT:10 x)
+                  §/BASE
+                  §PROOF{p1:claim} (!= x INT:0)
+            """;
+        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "p1"));
+    }
+
+    [Fact]
+    public void Control_ThenBodyGuardStillDischargesTheSameClaim()
+    {
+        // Review round 3: ordering the state-change check restores the then-body guard fact, so a
+        // claim it implies is (correctly) Discharged.
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:pub} (i32:x) -> i32
+                §E{}
+                §IF{if1} (> x INT:0)
+                  §PROOF{p1:claim} (> x INT:0)
+                §EI (> §C{Math.Abs} §A x §/C INT:1)
+                  §R INT:2
+                §R x
+            """;
+        Assert.Equal(ObligationStatus.Discharged, Proof(Solve(source, typeCheck: false).Obligations, "p1").Status);
     }
 
     [Fact]

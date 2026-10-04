@@ -154,6 +154,7 @@ public sealed class FactCollector
         // #1413 (D-OBL-THROWING-PREDECESSOR): a binding or assignment to a refined name runs a
         // compiler-inserted refinement guard, which throws.
         _refinedTypes.UnionWith(refinementPredicates?.Keys ?? []);
+        _parameterNames.UnionWith(parameters.Select(p => p.Name));
         _refinedNames.UnionWith(parameters
             .Where(p => p.InlineRefinement != null || _refinedTypes.Contains(p.TypeName))
             .Select(p => p.Name));
@@ -289,10 +290,16 @@ public sealed class FactCollector
     public bool OperatorsMayBeOverloaded { get; init; }
 
     /// <summary>#1413 (review round 2): a parameter refinement (entry guard) may throw.</summary>
-    public bool EntryMayThrow { get; private set; }
+    public bool EntryMayThrow { get; set; }
 
     private readonly HashSet<string> _refinedTypes = new(StringComparer.Ordinal);
     private readonly HashSet<string> _refinedNames = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _parameterNames = new(StringComparer.Ordinal);
+
+    /// <summary>A name, literal, or `#` whose value the solver models (never null in a model).</summary>
+    private bool IsModeledOperand(ExpressionNode operand)
+        => operand is IntLiteralNode or BoolLiteralNode or StringLiteralNode or FloatLiteralNode or DecimalLiteralNode or SelfRefNode
+            || operand is ReferenceNode reference && !reference.Name.Contains('.') && _parameterNames.Contains(reference.Name);
     private List<TextSpan> _throwingSpans = new();
 
     private bool IsThrowingNode(AstNode node) => node switch
@@ -310,13 +317,14 @@ public sealed class FactCollector
         BindStatementNode bind => bind.TypeName is { } refined && _refinedTypes.Contains(refined) || _refinedNames.Contains(bind.Name),
         AssignmentStatementNode assignment => assignment.Target is not ReferenceNode target || _refinedNames.Contains(target.Name),
         ConditionalExpressionNode => false,
-        // Solver models never hold null, so a null receiver cannot make a model unreachable; only
-        // forms that throw on non-null values count (ranges, padding, formatting, regexes).
-        ArrayLengthNode => false,
+        // Over modeled operands (parameters, literals, `#`, never null in a model) these do not
+        // throw; over locals (possibly default null) or other forms they may.
+        ArrayLengthNode length => !IsModeledOperand(length.Array),
         StringOperationNode text => text.Operation is not (StringOp.Length or StringOp.Contains or StringOp.StartsWith
             or StringOp.EndsWith or StringOp.IsNullOrEmpty or StringOp.IsNullOrWhiteSpace
             or StringOp.Equals or StringOp.Concat or StringOp.ToUpper or StringOp.ToLower or StringOp.Trim
-            or StringOp.TrimStart or StringOp.TrimEnd),
+            or StringOp.TrimStart or StringOp.TrimEnd)
+            || !text.Arguments.All(IsModeledOperand),
         _ => true,
     };
 
@@ -338,18 +346,27 @@ public sealed class FactCollector
     /// <summary>Operator or conversion declarations, including migrated op_* methods.</summary>
     internal static bool OverloadsOperators(ModuleNode module)
         => DescendantsAndSelf(module).Any(node => node is OperatorOverloadNode
-            || node is MethodNode method && method.Name.StartsWith("op_", StringComparison.Ordinal));
+            || node is MethodNode method && method.Name.StartsWith("op_", StringComparison.Ordinal))
+           || HasOpaqueMembers(module);
+
+    /// <summary>#1413 (review round 3): raw C# type members (operators, properties, conversions) the
+    /// verifier cannot see.</summary>
+    internal static bool HasOpaqueMembers(ModuleNode module)
+        => DescendantsAndSelf(module).Any(node => node is ClassDefinitionNode type && type.InteropBlocks.Count > 0
+            || node is InterfaceDefinitionNode iface && iface.InteropBlocks.Count > 0);
 
     /// <summary>
     /// #1413 (discovery D-OBL-PROOF-GETTER, amendment 1.3.0): whether an expression reads a member
     /// that a declared property has (a getter the solver does not model, or a property that hides
     /// an inherited field the solver models instead).
     /// </summary>
-    internal static bool ReadsProperty(ExpressionNode expression, IReadOnlySet<string> propertyNames)
+    internal static bool ReadsProperty(ExpressionNode expression, IReadOnlySet<string> propertyNames, bool anyMember = false)
         => DescendantsAndSelf(expression).Any(n =>
-            n is FieldAccessNode field && propertyNames.Contains(field.FieldName)
+            n is FieldAccessNode field && (anyMember || propertyNames.Contains(field.FieldName))
             || n is ReferenceNode reference && reference.Name.Contains('.')
-               && reference.Name.Split('.').Skip(1).Any(propertyNames.Contains));
+               && (anyMember || reference.Name.Split('.').Skip(1).Any(propertyNames.Contains))
+            // §LEN emits `.Length`, which a declared (or raw) Length property may implement.
+            || n is ArrayLengthNode && (anyMember || propertyNames.Contains("Length")));
 
     /// <summary>Each condition is a fact only within the body it guards; #1413 (S1 OBL-BRANCH-FACTS):
     /// elseif and else bodies also get the negations of the earlier conditions.</summary>

@@ -53,18 +53,22 @@ All notable changes to this project will be documented in this file.
     - an earlier statement;
     - another operand in the same statement;
     - an enclosing `if`, `elseif`, or loop condition;
-    - a precondition or parameter refinement;
+    - a precondition, parameter refinement, or constructor initializer (`§BASE`/`§THIS`);
     - a compiler-inserted refinement guard on a binding, rebinding, or assignment.
 
     Forms that may throw include checked or dividing arithmetic, a call, a member read, a
-    substring, and an earlier `§PROOF` guard. When the module declares operator overloads or
-    conversions, every non-literal form counts.
+    substring, a length or string query on a local that may be null, and an earlier `§PROOF`
+    guard. When the module declares operator overloads, conversions, or raw C# members, every
+    non-literal form counts.
   - **The obligation reads a property, whose getter the solver does not model.** This includes
-    a property that hides an inherited field, and properties of nested types.
+    a property that hides an inherited field, properties of nested types, a `Length` property read
+    by `§LEN`, and, when the module has raw C# members, any member read.
 
   The result is `Calor1124` ("unsupported"), and the runtime check stays. This can withhold
   counterexamples that were real. Properties are matched by name, so a field that shares a name
-  with any property in the module is also withheld. No obligation becomes proven or discharged.
+  with any property in the module is also withheld. These checks never make an obligation proven
+  or discharged. Separately, an `if` body now keeps its guard fact when only a later `elseif`
+  condition has a call, so a claim that guard implies is discharged, as it should be.
 
 - **Proof obligations no longer use facts that an assignment made stale (#1413).** With
   `§Q (> x -1)`, then `§ASSIGN x -5`, then `§PROOF (> x -1)`, the obligation solver still
