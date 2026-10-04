@@ -291,8 +291,8 @@ public sealed class ObligationSolver : IDisposable
                 if (translator.TouchedStringTheory)
                 {
                     assumptions.Add(Z3Verifier.StringModelAssumption);
-                    reasons.Add("the solver's string theory, whose strings are non-null and " +
-                                "byte-counted while .NET's are nullable and UTF-16-code-unit-counted (D3/D12)");
+                    reasons.Add("the solver's string theory, whose strings are non-null while .NET's are " +
+                                "nullable (D3/D12; literals are UTF-16-encoded since #1413)");
                 }
                 if (translator.TouchedNullableReferenceSort)
                 {

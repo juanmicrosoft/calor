@@ -242,7 +242,7 @@ public sealed class KInductionProver : IDisposable
             solver.Set("timeout", _options.TimeoutMs);
 
             // Create variables
-            var loopVar = _ctx.MkBVConst(loop.LoopVariable.Name, 32);
+            var loopVar = _ctx.MkBVConst(ContractTranslator.Z3Name(loop.LoopVariable.Name), 32);
 
             // Get bounds
             var fromValue = GetIntValue(loop.From);
@@ -288,7 +288,7 @@ public sealed class KInductionProver : IDisposable
             var iterations = new List<BitVecExpr> { loopVar };
             for (var i = 1; i <= k; i++)
             {
-                iterations.Add(_ctx.MkBVConst($"{loop.LoopVariable.Name}_{i}", 32));
+                iterations.Add(_ctx.MkBVConst(ContractTranslator.Z3Name($"{loop.LoopVariable.Name}_{i}"), 32));
             }
 
             // Assert invariant holds for first k iterations
@@ -363,7 +363,7 @@ public sealed class KInductionProver : IDisposable
             var solver = _ctx.MkSolver();
             solver.Set("timeout", _options.TimeoutMs);
 
-            var loopVar = _ctx.MkBVConst(loopVarName, 32);
+            var loopVar = _ctx.MkBVConst(ContractTranslator.Z3Name(loopVarName), 32);
 
             // Step 4: Base case - invariant holds at loop entry
             // For while loops, we assume the loop variable starts at some value
@@ -406,7 +406,7 @@ public sealed class KInductionProver : IDisposable
             var iterations = new List<BitVecExpr> { loopVar };
             for (var i = 1; i <= k; i++)
             {
-                iterations.Add(_ctx.MkBVConst($"{loopVarName}_{i}", 32));
+                iterations.Add(_ctx.MkBVConst(ContractTranslator.Z3Name($"{loopVarName}_{i}"), 32));
             }
 
             // Assert loop condition holds for all k iterations

@@ -21,6 +21,23 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Text reaches the solver with .NET's meaning (#1413, #1493).** A string literal is now sent to
+  Z3 one UTF-16 code unit at a time, so `"é"` has length 1 there, as `"é".Length` does in .NET.
+  Before, it had length 2 (one per UTF-8 byte), and a true postcondition such as
+  `(<= (len result) 1)` was reported as possibly violated (`Calor0712`) with a counterexample
+  the program cannot produce. A backslash in a literal is no longer read as a Z3 escape.
+  `s.Substring(i, n)` and `s.Substring(i)` now carry their range conditions, so a
+  counterexample is not an input where that substring throws. A substring in a conditionally
+  evaluated position, or one whose range reads a local binding, makes the result
+  `Unsupported`. `IndexOf` with a start index is now
+  `Unsupported`: the generated C# ignores the start index, so the solver must not model one.
+  Separately, Z3 symbol names for non-ASCII identifiers are now escaped to ASCII. On Windows,
+  two different identifiers outside the code page (say `ж` and `щ`) used to become one solver
+  variable, which could prove a false contract. Proofs that touch strings stay `Assumed` and
+  keep their runtime checks. A precondition set that is unsatisfiable only in the solver's
+  null-free model is no longer reported as vacuous or unsatisfiable when a null could satisfy
+  it (through `==`, `Equals`, or `IsNullOrEmpty` on a parameter); the result is `Unsupported`.
+  The verification cache format moves to 1.21, so older entries are invalidated.
 - **No proof is claimed for a nested quantifier (#1413).** A postcondition with a bounded
   `forall` inside another `forall` was reported `Proven`, although the compiler then rejected
   its runtime check (`Calor0326`). As a conservative restriction, the verifier now does not
