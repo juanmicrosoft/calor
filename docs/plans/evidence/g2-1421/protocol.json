@@ -524,7 +524,7 @@
       {
         "version": "1.3.0",
         "timestampUtc": "2026-10-04T06:10:00Z",
-        "pr": 0,
+        "pr": 1500,
         "afterDecisionBearingExecution": true,
         "justification": "After execution g3-exec-1 (run 37177387101, commit 0142438f, NON-DETERMINISTIC, complete false). Two machinery defects, not verifier findings: (1) the Linux and macOS jobs (6 of 10) ran every attempt, but upload-artifact rejected their output directories because the home probe's and the invocations' NuGet HTTP caches hold file names with ':'; (2) the Windows jobs needed more than the 45 minutes the harness allows under a 50-minute job timeout, and the cut invocations' Timeout values made 1,580 cases DISAGREE. Every value a completed Windows invocation observed equals the pass value. Repairs: homes are removed before upload and checked by fill-missing; the probe builds beside the output directory; win-x64 and win-arm64 jobTimeoutMinutes 50 -> 75; maxDispatchedControlRuns 2 -> 0 so the worst case (3 x 655 = 1,965) stays under the 2,000 ceiling. The decider's treatment of harness-cut invocations is unchanged and recorded as a known inconsistency (runPlan.harnessCutInconsistency). No case, environment, attempt count, determinism row, gate, agreement rule, or record format changes. Per the amendments rule, a complete new execution on a new commit follows."
       }
