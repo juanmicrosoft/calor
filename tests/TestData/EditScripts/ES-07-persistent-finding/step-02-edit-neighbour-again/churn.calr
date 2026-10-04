@@ -1,5 +1,6 @@
 §M{m003:Churn}
   §CT "documented, edited every step to keep the build warm"
   §F{f001:Tick:pub} () -> void
+    §AS{doc} "prints one fixed line"
     §E{cw}
     §P "tick 2"
