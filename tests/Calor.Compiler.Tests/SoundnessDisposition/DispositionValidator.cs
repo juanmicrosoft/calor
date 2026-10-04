@@ -10,16 +10,22 @@ namespace Calor.Compiler.Tests.SoundnessDisposition;
 /// vocabulary (contract.json <c>findingDispositions</c>), consistent with the registration's
 /// disposition handoff; every required discovery finding must be dispositioned too. Every rule
 /// fails closed: a missing field is a violation, never a default. With
-/// <paramref name="closing"/> the closure rules apply: every repair merged (its merge commit
-/// present on the checked-out history, its regression witnesses present), nothing undecided,
+/// <paramref name="closing"/> the closure rules apply: every repair merged (its merge commit on
+/// main, its regression witnesses present in that commit, and the commit naming its PR), nothing
+/// undecided,
 /// and an explicit SUCCESS or MILESTONE-FAILED result.
 /// </summary>
 internal static class DispositionValidator
 {
     internal sealed record Violation(string Code, string Message);
 
-    /// <summary>Closure evidence the validator cannot read from the record itself.</summary>
-    internal sealed record ClosureEvidence(Func<string, bool> CommitIsMerged, Func<string, bool> FileExists);
+    /// <summary>Closure evidence the validator cannot read from the record itself: whether a commit
+    /// is reachable from main (not merely from a branch head), whether a file exists in a given
+    /// commit, and a commit's message (which must name the repair's PR).</summary>
+    internal sealed record ClosureEvidence(
+        Func<string, bool> CommitIsOnMain,
+        Func<string, string, bool> FileExistsAtCommit,
+        Func<string, string?> CommitMessage);
 
     private static readonly string[] Baselines = ["B1", "N1"];
     private static readonly Regex FullSha = new("^[0-9a-f]{40}$", RegexOptions.CultureInvariant);
@@ -35,7 +41,8 @@ internal static class DispositionValidator
         JsonNode s1RowStatus,
         string registrationCommit,
         bool closing,
-        ClosureEvidence? evidence = null)
+        ClosureEvidence? evidence = null,
+        IReadOnlyDictionary<(string Baseline, string Row), int>? validatedProofCounts = null)
     {
         var v = new List<Violation>();
         void Add(string code, string message) => v.Add(new Violation(code, message));
@@ -180,6 +187,11 @@ internal static class DispositionValidator
                 }
                 if (string.IsNullOrWhiteSpace(Str(row, "reason")))
                     Add("D011", $"{baseline}: row {rowId} has no reason");
+                // D018: a VALIDATED row's proof-case count is recomputed from the S1 case results.
+                if (status == "CLEAN-WITHIN-BUDGET" && validatedProofCounts != null
+                    && (row!["validatedProofCases"] is not JsonValue proofs || !proofs.TryGetValue<int>(out var count)
+                        || count != validatedProofCounts.GetValueOrDefault((baseline, rowId))))
+                    Add("D018", $"{baseline}: row {rowId} validatedProofCases is missing or differs from the S1 case results");
                 if ((disposition == "VALIDATED") != (status == "CLEAN-WITHIN-BUDGET"))
                     Add("D004", $"{baseline}: row {rowId} ({status}) cannot be {disposition}; VALIDATED is exactly the CLEAN-WITHIN-BUDGET rows");
                 if ((disposition == "NOT-INVESTIGATED") != (status == "NOT-INVESTIGATED"))
@@ -284,10 +296,16 @@ internal static class DispositionValidator
             {
                 if (status != "merged")
                     Add("D010", $"{id}: not merged at closure");
-                else if (evidence == null
-                         || mergeCommit is null || !evidence.CommitIsMerged(mergeCommit)
-                         || witnesses.Any(w => !evidence.FileExists(w)))
-                    Add("D010", $"{id}: merge commit not on the checked-out history, or a regression witness is missing");
+                else if (evidence == null || mergeCommit is null || !evidence.CommitIsOnMain(mergeCommit))
+                    Add("D010", $"{id}: merge commit is not on main");
+                else
+                {
+                    if (witnesses.Any(w => !evidence.FileExistsAtCommit(mergeCommit, w)))
+                        Add("D010", $"{id}: a regression witness is missing from the merge commit");
+                    if (evidence.CommitMessage(mergeCommit) is not { } message
+                        || !Regex.IsMatch(message, $@"#{pr}\b", RegexOptions.CultureInvariant))
+                        Add("D010", $"{id}: the merge commit does not name PR #{pr}");
+                }
             }
         }
 

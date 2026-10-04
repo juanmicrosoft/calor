@@ -34,23 +34,46 @@ public sealed class DispositionTests
         _ => null
     };
 
-    /// <summary>Real closure evidence: the commit is an ancestor of HEAD; the file exists.</summary>
-    private static readonly DispositionValidator.ClosureEvidence RepositoryEvidence = new(
-        sha =>
+    private static (int ExitCode, string Output) Git(string arguments)
+    {
+        var start = new ProcessStartInfo("git", arguments)
         {
-            var start = new ProcessStartInfo("git", $"merge-base --is-ancestor {sha} HEAD")
-            {
-                WorkingDirectory = RepoRoot(),
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-            };
-            using var process = Process.Start(start)!;
-            process.WaitForExit();
-            return process.ExitCode == 0;
-        },
-        path => File.Exists(Path.Combine(RepoRoot(), path)));
+            WorkingDirectory = RepoRoot(),
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+        };
+        using var process = Process.Start(start)!;
+        var output = process.StandardOutput.ReadToEnd();
+        process.WaitForExit();
+        return (process.ExitCode, output);
+    }
 
-    private static readonly DispositionValidator.ClosureEvidence AcceptAll = new(_ => true, _ => true);
+    /// <summary>Real closure evidence: the commit is reachable from origin/main (a missing ref
+    /// fails closed), the witness exists in that commit, and the commit message is read from git.</summary>
+    private static readonly DispositionValidator.ClosureEvidence RepositoryEvidence = new(
+        sha => Git($"merge-base --is-ancestor {sha} origin/main").ExitCode == 0,
+        (sha, path) => Git($"cat-file -e {sha}:{path}").ExitCode == 0,
+        sha => Git($"log -1 --format=%B {sha}") is (0, var message) ? message : null);
+
+    /// <summary>Every check passes; the message names every PR the merged record uses.</summary>
+    private static readonly DispositionValidator.ClosureEvidence AcceptAll = new(
+        _ => true, (_, _) => true, _ => "Merge pull request #1494 #1495 #1496 #1497 #1498 #9999");
+
+    private static Dictionary<(string Baseline, string Row), int> ValidatedProofCounts()
+    {
+        var counts = new Dictionary<(string Baseline, string Row), int>();
+        foreach (var baseline in new[] { "B1", "N1" })
+        {
+            var path = Path.Combine(RepoRoot(), $"bench/correctness/false-established/v024/run2/{baseline}/case-results.jsonl");
+            foreach (var line in File.ReadLines(path).Where(l => l.Trim().Length > 0))
+            {
+                var row = JsonNode.Parse(line)!;
+                var key = (baseline, row["rowId"]!.GetValue<string>());
+                counts[key] = counts.GetValueOrDefault(key) + (row["class"]!.GetValue<string>() == "validated-proof" ? 1 : 0);
+            }
+        }
+        return counts;
+    }
 
     private static IReadOnlyList<DispositionValidator.Violation> Validate(
         JsonNode record, bool closing = false, DispositionValidator.ClosureEvidence? evidence = null)
@@ -62,7 +85,8 @@ public sealed class DispositionTests
             Load("docs/plans/evidence/s1-1311/combined-row-status.json"),
             FindString(Load("docs/plans/evidence/s1-1311/run2/pins.json"), "registrationCommit")!,
             closing,
-            evidence ?? RepositoryEvidence);
+            evidence ?? RepositoryEvidence,
+            ValidatedProofCounts());
 
     private static void AssertCodes(IReadOnlyList<DispositionValidator.Violation> violations, params string[] codes)
         => Assert.Equal(
@@ -91,6 +115,11 @@ public sealed class DispositionTests
             if (repair["regressionWitness"]!.AsArray().Count == 0)
                 repair["regressionWitness"]!.AsArray().Add("tests/example.cs");
         }
+        // Discoveries that are not required (the review-found residuals) are dropped, so the
+        // positive control describes a record that has resolved them.
+        var discoveries = record["discoveryFindings"]!.AsArray();
+        foreach (var d in discoveries.Where(d => d!["issue"]!.GetValue<int>() != 1493).ToList())
+            discoveries.Remove(d);
         record["closure"]!["status"] = "CLOSED";
         record["closure"]!["result"] = "SUCCESS";
         return record;
@@ -359,7 +388,67 @@ public sealed class DispositionTests
         // A syntactically valid but absent merge commit and a nonexistent witness file.
         var violations = Validate(MergedRecord(), closing: true, RepositoryEvidence);
         AssertCodes(violations, "D010");
-        Assert.Contains(violations, v => v.Message.Contains("merge commit not on the checked-out history"));
+        Assert.Contains(violations, v => v.Message.Contains("merge commit is not on main"));
+    }
+
+    [Fact]
+    public void D010_CommitReachableOnlyFromABranch_DoesNotClose()
+    {
+        var violations = Validate(MergedRecord(), closing: true,
+            AcceptAll with { CommitIsOnMain = _ => false });
+        AssertCodes(violations, "D010");
+        Assert.Contains(violations, v => v.Message.Contains("R-OBL: merge commit is not on main"));
+    }
+
+    [Fact]
+    public void D010_WitnessAbsentFromTheMergeCommit_DoesNotClose()
+    {
+        var violations = Validate(MergedRecord(), closing: true,
+            AcceptAll with { FileExistsAtCommit = (_, path) => !path.Contains("S2ObligationStateTests") });
+        AssertCodes(violations, "D010");
+        Assert.Contains(violations, v => v.Message.Contains("R-OBL: a regression witness is missing from the merge commit"));
+    }
+
+    [Fact]
+    public void D010_MergeCommitOfAnotherPr_DoesNotClose()
+    {
+        // An unrelated existing commit (or an invented PR number) does not name the repair's PR.
+        var violations = Validate(MergedRecord(), closing: true,
+            AcceptAll with { CommitMessage = _ => "Merge pull request #1483 from juanmicrosoft/unrelated" });
+        AssertCodes(violations, "D010");
+        Assert.Contains(violations, v => v.Message.Contains("R-OBL: the merge commit does not name PR #1496"));
+    }
+
+    [SkippableFact]
+    public void D010_RealHeadOnlyCommit_IsNotOnMain()
+    {
+        // The real callback: HEAD of an unmerged branch is not reachable from origin/main.
+        var head = Git("rev-parse HEAD").Output.Trim();
+        var onMain = Git($"merge-base --is-ancestor {head} origin/main").ExitCode == 0;
+        Skip.If(onMain, "HEAD is already on origin/main");
+        Assert.False(RepositoryEvidence.CommitIsOnMain(head));
+    }
+
+    [Fact]
+    public void D018_ValidatedProofCases_MustMatchTheS1CaseResults()
+    {
+        var record = Record();
+        Row(record, "B1", "NUM-MIXED-U64-SIGNED")["validatedProofCases"] = 999;
+        Row(record, "N1", "NUM-MIXED-U64-SIGNED").Remove("validatedProofCases");
+        var violations = Validate(record);
+        AssertCodes(violations, "D018");
+        Assert.Equal(2, violations.Count);
+    }
+
+    [Fact]
+    public void ReviewRecordsExistForEveryOpenedRepair()
+    {
+        foreach (var repair in Record()["repairs"]!.AsArray().Where(r => r!["pr"] is JsonValue))
+        {
+            var directory = Path.Combine(RepoRoot(), repair!["reviews"]!.GetValue<string>());
+            Assert.True(Directory.Exists(directory), directory);
+            Assert.NotEmpty(Directory.GetFiles(directory, "*.md"));
+        }
     }
 
     [Fact]

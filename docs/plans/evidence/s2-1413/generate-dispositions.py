@@ -50,9 +50,10 @@ repairs = [
         'id': 'R-OBL', 'pr': 1496,
         'branch': 'milestone-0.24/s2-1413-fix-obligation-state',
         'rootCause': 'ObligationSolver asserted preconditions for every obligation even after the body reassigned their variables (false Discharged, guard elided), and reported SAT models as counterexamples although its state over-approximated the program state (reassignments, else bodies without negated guards, unbound refined return values, unassumed named-refinement parameters).',
-        'change': 'Entry facts are dropped when the body may write a name they read (incl. ref/out/in aliasing, element/field stores, collection updates); raw C#, unsafe/pointer code, and lambdas make a body opaque, and raw C# in an entry predicate makes every obligation Unsupported; member/element reads and foreach outside a proof condition count as possible heap writes (getters, indexers, enumerators); a SAT model is a refutation only when the state is exact, otherwise Unsupported (guard kept), including when a dropped entry refinement constrains any name the query reads; else/elseif negation facts and named-refinement parameter facts (functions, methods, constructors, operators) are added.',
+        'change': 'Entry facts are dropped when the body may write a name they read (incl. ref/out/in aliasing, element/field stores, collection updates); raw C#, unsafe/pointer code, and lambdas make a body opaque, and raw C# in an entry predicate makes every obligation Unsupported; every member/element read (a proof condition included) and foreach counts as a possible heap write (getters, indexers, enumerators), and only the exactness of a §PROOF counterexample ignores reads inside its own condition; a SAT model is a refutation only when the state is exact, otherwise Unsupported (guard kept), including when a dropped entry refinement constrains any name the query reads; else/elseif negation facts and named-refinement parameter facts (functions, methods, constructors, operators) are added.',
         'nonTestChangedLines': 591,
-        'residual': 'In a §PROOF counterexample, reads inside the proof condition are its evaluation; a getter there that writes state the same condition reads later, or a property hiding an inherited field (which ContractTranslator models as the field, pre-existing on every channel), can still give a spurious refutation (never a false Discharged).',
+        'residual': 'See discoveries D-OBL-PROOF-GETTER and D-OBL-THROWING-PREDECESSOR (MILESTONE-FAILED pending decision Q7).',
+        'reviewRoundOverrun': 'After its three review rounds R-OBL had two further Codex passes, each of which found a defect in the previous fix (BLOCKING, then MAJOR) and led to a compiler change with a regression. Under the frozen ceiling (three rounds per PR, then close and rescope; stopping rule 1) this is an overrun, recorded here; acceptance of R-OBL needs the maintainer decision Q8.',
         'regressionWitness': ['tests/Calor.Compiler.Tests/S2ObligationStateTests.cs'],
         'rows': ['OBL-MUTATION-KILL', 'OBL-BRANCH-FACTS', 'OBL-REFINEMENT-RETURN', 'OBL-SUBTYPE', 'OBL-SELFREF'],
         'reviews': REVIEWS + 'fix-obligation-state/',
@@ -194,7 +195,26 @@ baselines['N1']['artifact'] = {
     'publishedArtifactObligation': 'Proposed, needs a maintainer decision: the first release that carries these repairs says in its release notes that 0.21.0 (and the v0.22.0 prerelease) are affected, distinguishing the mechanisms: (1) proof obligations after a reassignment (OBL-MUTATION-KILL) and warm-cache literal-width proofs (CACHE-LITERAL-WIDTH) could remove a runtime guard that the program then needed; (2) interface contract checks (IMPL-ASSUMPTION-FORMS, IMPL-DIVISION-TOTALIZED) could accept an implementer precondition that throws on inputs the interface allows (no guard is removed; the acceptance is wrong); (3) #1493 is a potential, not observed, Windows-only collision of non-ASCII identifiers. Nothing claims the published package is fixed (contract §8 History).',
 }
 
-discoveries = [{
+discoveries = [
+    {
+    'id': 'D-OBL-PROOF-GETTER', 'issue': 1413, 'registered': False,
+    'source': 'Found by the R-OBL second verification pass (static, not executed); not part of the registered #1311 sweep. No separate issue is filed (agents do not file issues); #1413 tracks it.',
+    'finding': 'In a §PROOF counterexample the reads inside the proof condition count as its evaluation. A getter there that writes state the same condition reads later, or a property that hides an inherited field (ContractTranslator models it as the field, on every channel), can make the SAT model an unreachable state: a spurious refutation (Failed, a compile error). Never a false Discharged: facts use the global heap rule.',
+    'affects': ['B1', 'N1', 'candidate with R-OBL'],
+    'observed': False,
+    'disposition': 'MILESTONE-FAILED',
+    'reason': 'Neither fixed nor demoted: R-OBL is past its review-round ceiling and the six-PR capacity is allocated. MILESTONE-FAILED is the frozen default until decision Q7 (amend, use the reserved slot, or accept the failure).',
+    },
+    {
+    'id': 'D-OBL-THROWING-PREDECESSOR', 'issue': 1413, 'registered': False,
+    'source': 'Residual documented by R-OBL since review round 1 (FactCollector.IsExact) and confirmed by its verification passes (static); not part of the registered #1311 sweep. No separate issue is filed; #1413 tracks it.',
+    'finding': 'Obligation exactness does not track an earlier statement that throws implicitly (checked overflow, a call, an earlier guard), so a SAT model that such a statement would stop can be reported as a counterexample: a spurious refutation (Failed, a compile error). Pre-existing on B1/N1. Never a false Discharged.',
+    'affects': ['B1', 'N1', 'candidate with R-OBL'],
+    'observed': False,
+    'disposition': 'MILESTONE-FAILED',
+    'reason': 'Neither fixed nor demoted within capacity (see D-OBL-PROOF-GETTER). MILESTONE-FAILED is the frozen default until decision Q7.',
+    },
+    {
     'id': 'D-1493', 'issue': 1493, 'registered': False,
     'source': 'Discovery by code reading during #1135 (G3, PR #1492); not part of the registered #1311 sweep and not executed by S1.',
     'finding': 'Z3 symbol names take the .NET binding\'s ANSI marshaling; on Windows two non-ASCII identifiers outside the code page can become one Z3 constant, a possible false proof (Windows only).',
@@ -202,7 +222,8 @@ discoveries = [{
     'observed': False,
     'disposition': FIX, 'repair': 'R-TEXT',
     'reason': 'Fixed by the injective ASCII symbol encoding in R-TEXT; the end-to-end witness runs on Windows in the z3-consumer-matrix job.',
-}]
+    },
+]
 
 record = {
     'schemaVersion': 1, 'issue': 1413, 'gate': 'S2', 'epic': 1409,
@@ -232,6 +253,9 @@ record = {
         {'id': 'Q2-O2-GEN-REFUSAL', 'question': 'S1 condition 10: O2 ran only partially on GEN-REFUSAL-002/-004 (the frozen input new object() cannot be passed to the compiled double[] parameter), so the registered O2 coverage for those cases is incomplete. The registered row status does not use O2 completeness, both cases are Unsupported (refusal-validated) with guards retained, O1 agrees, and the partial replay shows no divergence; proposed: keep GEN-REFUSAL VALIDATED and record the O2 gap as a coverage limitation of the frozen generator. Condition 10 itself stays the maintainer\'s decision.'},
         {'id': 'Q3-N1-ADVISORY', 'question': 'Whether to adopt the N1 publishedArtifactObligation (release-notes advisory for 0.21.0 / v0.22.0).'},
         {'id': 'Q4-ISSUE-LINKS', 'question': 'Issue acceptance: each repair PR must be attached to #1409 and encoded as blocking #1423. Agents do not edit issues; the maintainer links PRs #1494-#1498 (and R-NUM if opened).'},
+        {'id': 'Q6-TERMINAL-BINDING', 'question': 'The terminal-success validator (EvidenceContractValidator, R0 #1407) does not read this record: a closed S2 record with result MILESTONE-FAILED does not by itself reject a MILESTONE-SUCCEEDED terminal record that marks gate:#1413 satisfied. Binding the terminal validator to this record is an R0 change outside S2; until then the maintainer must carry closure.result into the terminal adjudication by hand.'},
+        {'id': 'Q7-REVIEW-DISCOVERIES', 'question': 'D-OBL-PROOF-GETTER and D-OBL-THROWING-PREDECESSOR (spurious refutations found or confirmed in review; never false proofs) are MILESTONE-FAILED by default. Options: (a) amend the contract to give review-found, unobserved spurious refutations a recorded known-limitation path; (b) spend the reserved sixth slot on a demotion (any SAT model after a possibly throwing statement, or reading a member in a proof condition, becomes Unsupported) instead of R-NUM; (c) accept MILESTONE-FAILED.'},
+        {'id': 'Q8-R-OBL-REVIEW-OVERRUN', 'question': 'R-OBL exceeded the three-round review ceiling (two post-round-3 passes with code changes). Stopping rule 1: record the overrun (done in repairs[R-OBL].reviewRoundOverrun) and either amend before accepting R-OBL or treat it as BLOCKED and rescope.'},
         {'id': 'Q5-MERGE-ORDER', 'question': 'Merge order: #1494 (R-CACHE) and #1495 (R-IMPL) before #1497 (R-TEXT, stacked on #1495) and #1498 (R-QNT); #1496 (R-OBL) is independent. The cache-format constant (1.20/1.21) and eng/test-manifest.json/CHANGELOG.md need the usual merge resolution across the S2 PRs.'},
     ],
 }
