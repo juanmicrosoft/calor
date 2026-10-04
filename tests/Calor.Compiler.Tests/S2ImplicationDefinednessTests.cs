@@ -194,6 +194,96 @@ public sealed class S2ImplicationDefinednessTests
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ImplicationProvenByZ3
             && d.Message.StartsWith("Precondition weakening proven", StringComparison.Ordinal));
         Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ContractInheritanceValid);
+        // The refusal is visible (review round 2).
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.ImplicationUnknown
+            && d.Message.StartsWith("Could not establish precondition weakening", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void QuantifiedInterfacePrecondition_DefinednessDoesNotRestrictTheAssumption()
+    {
+        // Review round 2 witness: at x = int.MaxValue the exists completes true at i = 0, the
+        // interface accepts, and the implementer rejects. The universal overflow safety of the
+        // quantifier must not exclude that input and "prove" the weakening.
+        var diagnostics = CompileInteger(
+            "(exists ((i i32)) (&& (>= i INT:0) (&& (< i INT:2) (>= (+ x i) INT:0))))",
+            "(< x INT:2147483647)");
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ImplicationProvenByZ3
+            && d.Message.StartsWith("Precondition weakening proven", StringComparison.Ordinal));
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ContractInheritanceValid);
+    }
+
+    [Fact]
+    public void IdenticalContracts_WithAPartialInterfacePrecondition_AreNotAViolation()
+    {
+        // Review round 2 witness: the interface precondition throws at x = int.MaxValue; that
+        // input is never accepted, so it creates no postcondition obligation.
+        const string source = """
+            §M{m1:M}
+              §IFACE{i1:IProbe}
+                §MT{m1:Run}
+                  §I{i32:x}
+                  §O{i32}
+                  §Q (> (+ x INT:1) INT:0)
+                  §S (== result INT:0)
+              §CL{c1:Impl:pub}
+                §IMPL{IProbe}
+                §MT{mt1:Run:pub}
+                  §I{i32:x}
+                  §O{i32}
+                  §Q (> (+ x INT:1) INT:0)
+                  §S (== result INT:0)
+                  §R INT:0
+            """;
+        var diagnostics = Compile(source);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.WeakerPostcondition);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.StrongerPrecondition);
+    }
+
+    [Fact]
+    public void NullCompatibleInheritedGuarantees_AreNotReportedIncompatible()
+    {
+        // Review round 2 witness: result = null satisfies both IsNullOrEmpty(result) and
+        // result != "", which the solver's non-null strings cannot represent.
+        string? result = null;
+        Assert.True(string.IsNullOrEmpty(result) && result != "");
+        const string source = """
+            §M{m1:M}
+              §IFACE{i1:IA}
+                §MT{m1:Run}
+                  §I{i32:x}
+                  §O{str}
+                  §S (isempty result)
+              §IFACE{i2:IB}
+                §MT{m2:Run}
+                  §I{i32:x}
+                  §O{str}
+                  §S (!= result STR:"")
+              §CL{c1:Impl:pub}
+                §IMPL{IA}
+                §IMPL{IB}
+                §MT{mt1:Run:pub}
+                  §I{i32:x}
+                  §O{str}
+                  §R STR:""
+            """;
+        var diagnostics = Compile(source);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.IncompatibleInheritedContracts);
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.ImplicationAssumed);
+    }
+
+    [Fact]
+    public void WithoutTheSolver_HeuristicNeverClaimsValidityAndInequalityIsNotWeaker()
+    {
+        // Review round 2 witness: (!= x 0) is not a weakening of (== x 0).
+        var source = IntegerTemplate.Replace("IFACEPRE", "(== x INT:0)").Replace("IMPLPRE", "(!= x INT:0)");
+        var diagnostics = new DiagnosticBag();
+        var module = new Calor.Compiler.Parsing.Parser(
+            new Calor.Compiler.Parsing.Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
+        using var checker = new ContractInheritanceChecker(diagnostics, useZ3: false);
+        checker.Check(module);
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ContractInheritanceValid);
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.StrongerPrecondition);
     }
 
     [Fact]

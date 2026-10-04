@@ -74,9 +74,9 @@ public sealed class Z3ImplicationProver : IDisposable
 
     /// <summary>
     /// Whether the contracts run under checked integer arithmetic (the module default).
-    /// When true, a consequent whose arithmetic can overflow on an antecedent-satisfying
-    /// input would throw at runtime, so its proof is demoted to Assumed. Defaults to
-    /// true: assuming checked can only demote a proof, never produce one.
+    /// When true, checked overflow is a throw: it makes the required contract fail and excludes the
+    /// input from the assumed contract. Set it to the module's policy (the inheritance checker and
+    /// the weakening command do); the default is the checked module default.
     /// </summary>
     public bool CheckIntegerOverflow { get; set; } = true;
 
@@ -190,7 +190,13 @@ public sealed class Z3ImplicationProver : IDisposable
     {
         try
         {
-            var antecedentDefined = Definedness(translator, antecedent, out var antecedentFailure);
+            // D() is exact only for quantifier-free contracts; under a quantifier it is a sufficient
+            // condition (safety for every bound value), which must never restrict the antecedent and
+            // never back a refutation (#1413 review round 2).
+            var antecedentExact = !ContainsQuantifier(antecedent);
+            var consequentExact = !ContainsQuantifier(consequent);
+            string? antecedentFailure = "the assumed contract quantifies, so its definedness is not modeled exactly";
+            var antecedentDefined = antecedentExact ? Definedness(translator, antecedent, out antecedentFailure) : null;
             var consequentDefined = Definedness(translator, consequent, out var consequentFailure);
 
             using var solver = new IsolatedSolver(_ctx, _timeoutMs);
@@ -202,11 +208,11 @@ public sealed class Z3ImplicationProver : IDisposable
                 : consequentExpr));
 
             var status = solver.Check();
-            if (status == Status.SATISFIABLE && (antecedentDefined == null || consequentDefined == null))
+            if (status == Status.SATISFIABLE && (antecedentDefined == null || consequentDefined == null || !consequentExact))
             {
                 return ImplicationResult.FromOutcome(
                     ProofOutcome.Assign(ProofEvidence.Unsupported(
-                        $"No counterexample established: {antecedentFailure ?? consequentFailure}, so the "
+                        $"No counterexample established: {antecedentFailure ?? consequentFailure ?? "the required contract quantifies, so its definedness is not modeled exactly"}, so the "
                         + "solver's model may be an input where a contract throws. Implication not established.")),
                     Duration: sw.Elapsed);
             }
@@ -288,6 +294,10 @@ public sealed class Z3ImplicationProver : IDisposable
         return _ctx.MkAnd(divisors.Append(overflow).ToArray());
     }
 
+    private static bool ContainsQuantifier(AstNode node)
+        => node is ForallExpressionNode or ExistsExpressionNode
+           || Analysis.RecursiveAstWalker.GetAllChildren(node).Any(ContainsQuantifier);
+
     /// <summary>The variable names (dotted paths by their root) two contracts read.</summary>
     private static HashSet<string> ReferencedRoots(params ExpressionNode[] contracts)
     {
@@ -341,9 +351,19 @@ public sealed class Z3ImplicationProver : IDisposable
         IReadOnlyList<(string Name, string Type)> parameters,
         string? outputType,
         ExpressionNode interfacePostcondition,
-        ExpressionNode implementerPostcondition)
+        ExpressionNode implementerPostcondition,
+        ExpressionNode? interfacePrecondition = null)
     {
         var sw = Stopwatch.StartNew();
+
+        // #1413 review round 2: the interface guarantees its postcondition only on inputs its
+        // precondition accepts (completes true), so the precondition joins the assumptions; as
+        // part of the required contract its throws would read as broken guarantees.
+        if (interfacePrecondition is not null and not BoolLiteralNode { Value: true })
+        {
+            implementerPostcondition = new BinaryOperationNode(
+                implementerPostcondition.Span, BinaryOperator.And, interfacePrecondition, implementerPostcondition);
+        }
 
         var translator = new ContractTranslator(_ctx);
 

@@ -471,17 +471,19 @@ public sealed class ContractInheritanceChecker : IDisposable
             if (preconditionViolation != null)
                 violations.Add(preconditionViolation);
 
-            var sourcePostcondition = Conjoin(
+            var guaranteedPostcondition = Conjoin(
                 source.Postconditions.Select(contract => contract.Condition),
                 implementingMethod.Span);
-            sourcePostcondition = QualifyPostcondition(
+            var sourcePostcondition = QualifyPostcondition(
                 sourcePrecondition,
-                sourcePostcondition,
+                guaranteedPostcondition,
                 implementingMethod.Span);
             var postconditionViolation = CheckPostconditionImplication(
                 parameters,
                 outputType,
                 sourcePostcondition,
+                guaranteedPostcondition,
+                sourcePrecondition,
                 implementerPostcondition,
                 classNode,
                 implementingMethod,
@@ -1471,11 +1473,15 @@ public sealed class ContractInheritanceChecker : IDisposable
             implementingMethod.Output?.TypeName,
             new BoolLiteralNode(implementingMethod.Span, false),
             combined);
-        // #1413: an Assumed contradiction (one that relies on the solver's non-null reference
-        // sorts) is still reported, as it was before the definedness change: the error makes no
-        // proof claim and removes no guard.
-        if (impossible.Status != ImplicationStatus.Proven
-            && impossible.Outcome?.Status != ProofStatus.Assumed)
+        if (impossible.Outcome?.Status == ProofStatus.Assumed)
+        {
+            // #1413: contradictory only in the solver's non-null model (null may satisfy both).
+            _diagnostics.ReportWarning(implementingMethod.Span, DiagnosticCode.ImplicationAssumed,
+                $"Inherited contracts for '{classNode.Name}.{implementingMethod.Name}' are contradictory only under "
+                + $"an assumption [{string.Join("; ", impossible.Outcome.Assumptions)}]; not reported as incompatible.");
+            return;
+        }
+        if (impossible.Status != ImplicationStatus.Proven)
             return;
 
         var violation = new ContractViolation(
@@ -1628,7 +1634,11 @@ public sealed class ContractInheritanceChecker : IDisposable
                     break;
 
                 case ImplicationStatus.Unsupported:
-                    // Unsupported constructs - fall back to heuristics silently
+                    // #1413: a refusal is reported; the heuristic that follows establishes nothing.
+                    _diagnostics.ReportWarning(
+                        implSpan,
+                        DiagnosticCode.ImplicationUnknown,
+                        $"Could not establish precondition weakening for '{classNode.Name}.{implementingMethod.Name}': {z3Result.Outcome?.Reason}");
                     break;
             }
         }
@@ -1644,7 +1654,7 @@ public sealed class ContractInheritanceChecker : IDisposable
             implSpan);
         // #1413: a syntactic heuristic establishes nothing. After the solver declined, a
         // heuristic acceptance must not turn into a "contract inheritance valid" claim.
-        if (heuristicViolation == null && _z3Prover != null)
+        if (heuristicViolation == null)
             _implicationUnestablished = true;
         return heuristicViolation;
     }
@@ -1657,6 +1667,8 @@ public sealed class ContractInheritanceChecker : IDisposable
         IReadOnlyList<(string Name, string Type)> parameters,
         string? outputType,
         ExpressionNode interfacePostcondition,
+        ExpressionNode interfaceGuarantee,
+        ExpressionNode interfacePrecondition,
         ExpressionNode implementerPostcondition,
         ClassDefinitionNode classNode,
         MethodNode implementingMethod,
@@ -1670,8 +1682,9 @@ public sealed class ContractInheritanceChecker : IDisposable
             var z3Result = _z3Prover.CheckPostconditionStrengthening(
                 parameters,
                 outputType,
-                interfacePostcondition,
-                implementerPostcondition);
+                interfaceGuarantee,
+                implementerPostcondition,
+                interfacePrecondition);
 
             switch (z3Result.Status)
             {
@@ -1711,7 +1724,11 @@ public sealed class ContractInheritanceChecker : IDisposable
                     break;
 
                 case ImplicationStatus.Unsupported:
-                    // Unsupported constructs - fall back to heuristics silently
+                    // #1413: a refusal is reported; the heuristic that follows establishes nothing.
+                    _diagnostics.ReportWarning(
+                        implSpan,
+                        DiagnosticCode.ImplicationUnknown,
+                        $"Could not establish postcondition strengthening for '{classNode.Name}.{implementingMethod.Name}': {z3Result.Outcome?.Reason}");
                     break;
             }
         }
@@ -1725,7 +1742,7 @@ public sealed class ContractInheritanceChecker : IDisposable
             sourceTypeName,
             sourceMethodName,
             implSpan);
-        if (heuristicViolation == null && _z3Prover != null)
+        if (heuristicViolation == null)
             _implicationUnestablished = true;
         return heuristicViolation;
     }
@@ -2160,7 +2177,6 @@ public sealed class ContractInheritanceChecker : IDisposable
         {
             (BinaryOperator.GreaterOrEqual, BinaryOperator.GreaterThan) => true,
             (BinaryOperator.LessOrEqual, BinaryOperator.LessThan) => true,
-            (BinaryOperator.NotEqual, BinaryOperator.Equal) => true,
             _ => false
         };
     }
@@ -2175,7 +2191,6 @@ public sealed class ContractInheritanceChecker : IDisposable
         {
             (BinaryOperator.GreaterThan, BinaryOperator.GreaterOrEqual) => true,
             (BinaryOperator.LessThan, BinaryOperator.LessOrEqual) => true,
-            (BinaryOperator.Equal, BinaryOperator.NotEqual) => true,
             _ => false
         };
     }
