@@ -312,8 +312,10 @@ public sealed class ObligationSolver : IDisposable
                         .Append(obligation.Condition)
                         .Any(e => FactCollector.ReferencedNames(e).Overlaps(info.Facts.DroppedFactNames)))
                     inexact.Add("a dropped entry refinement constrains a variable this query reads");
-                if (info.Facts.ThrowsEarlierInStatement(obligation.Span))
-                    inexact.Add("an operand evaluated before the obligation may throw");
+                if (info.Facts.ThrowsElsewhereInStatement(obligation.Span))
+                    inexact.Add("another operand of the obligation's statement may throw");
+                if (info.Preconditions.Any(pre => info.Facts.MayThrow(pre.Condition)) || info.Facts.EntryMayThrow)
+                    inexact.Add("a precondition or entry guard may throw before the body");
             }
             // #1413 (D-OBL-PROOF-GETTER): entry obligations included.
             if (status == Status.SATISFIABLE && FactCollector.ReadsProperty(obligation.Condition, _propertyNames))

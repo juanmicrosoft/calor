@@ -13,7 +13,7 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public sealed class S2ObligationResidualTests
 {
-    private static (List<Obligation> Obligations, string CSharp) Solve(string source, bool typeCheck = true)
+    private static (List<Obligation> Obligations, string CSharp, List<string> Codes) Solve(string source, bool typeCheck = true)
     {
         Assert.True(Z3ContextFactory.IsAvailable, "these witnesses need Z3");
         var options = new CompilationOptions
@@ -27,7 +27,8 @@ public sealed class S2ObligationResidualTests
         };
         var result = Program.Compile(source, "case.calr", options);
         Assert.True(options.ObligationResults != null, string.Join("\n", result.Diagnostics.Select(d => d.Message)));
-        return (options.ObligationResults!.Obligations.ToList(), result.GeneratedCode);
+        return (options.ObligationResults!.Obligations.ToList(), result.GeneratedCode,
+            result.Diagnostics.Select(d => d.Code).ToList());
     }
 
     private static Obligation Proof(List<Obligation> obligations, string id)
@@ -57,9 +58,11 @@ public sealed class S2ObligationResidualTests
                 §E{}
                 §PROOF{p1:claim} (== box.Trigger INT:0)
             """;
-        var (obligations, csharp) = Solve(source);
+        var (obligations, csharp, codes) = Solve(source);
         AssertWithheld(Proof(obligations, "p1"));
         Assert.Contains("box.Trigger == 0", csharp);   // the runtime check stays
+        Assert.Contains("Calor1124", codes);           // reported as unsupported
+        Assert.DoesNotContain("Calor1140", codes);     // no failed-proof error
     }
 
     [Fact]
@@ -80,8 +83,7 @@ public sealed class S2ObligationResidualTests
                 §O{void}
                 §E{}
             """;
-        var entry = Assert.Single(Solve(source).Obligations, o => o.Kind == ObligationKind.RefinementEntry);
-        Assert.NotEqual(ObligationStatus.Failed, entry.Status);
+        AssertWithheld(Assert.Single(Solve(source).Obligations, o => o.Kind == ObligationKind.RefinementEntry));
     }
 
     [Fact]
@@ -212,9 +214,121 @@ public sealed class S2ObligationResidualTests
                 §E{}
                 §PROOF{p1:claim} (== box.Trigger INT:0)
             """;
-        var proof = Proof(Solve(source, typeCheck: false).Obligations, "p1");
-        Assert.NotEqual(ObligationStatus.Failed, proof.Status);
-        Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
+        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "p1"));
+    }
+
+    [Fact]
+    public void ProofAfterAMutableRebindOfARefinedParameter_IsWithheld()
+    {
+        // Review round 2: the unannotated rebind of q runs q's refinement guard, which throws at x = 0.
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:pub}
+                §I{i32:q} | (!= # INT:0)
+                §I{i32:x}
+                §O{i32}
+                §E{}
+                §B{~q} x
+                §PROOF{p1:claim} (!= x INT:0)
+                §R q
+            """;
+        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "p1"));
+    }
+
+    [Fact]
+    public void ProofAfterAConversionWithAUserDefinedConversionInTheModule_IsWithheld()
+    {
+        // Review round 2: with a conversion operator declared, a plain binding may run it.
+        const string source = """
+            §M{m1:M}
+              §CL{c1:Box:pub}
+                §FLD{i32:Value:pub}
+                §OP{op1:implicit:pub}
+                  §I{Box:value}
+                  §O{i32}
+                  §R (/ INT:10 value.Value)
+              §F{f1:Probe:pub} (Box:box, i32:x) -> i32
+                §E{}
+                §B{q:i32} x
+                §PROOF{p1:claim} (!= x INT:0)
+                §R q
+            """;
+        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "p1"));
+    }
+
+    [Fact]
+    public void MigratedOperatorMethods_CountAsOperatorOverloads()
+    {
+        // Review round 2: C# migration declares operators as op_* methods.
+        const string source = """
+            §M{m1:M}
+              §CL{c1:Box:pub}
+                §FLD{i32:Value:pub}
+                §MT{mt1:op_LessThan:pub}
+                  §I{Box:right}
+                  §O{bool}
+                  §R true
+              §F{f1:Probe:pub} (i32:x) -> i32
+                §E{}
+                §B{q:bool} (< x INT:3)
+                §PROOF{p1:claim} (!= x INT:0)
+                §R x
+            """;
+        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "p1"));
+    }
+
+    [Fact]
+    public void ObligationInsideAFoldedMultiOperandOperation_IsWithheld()
+    {
+        // Review round 2: (+ a b c) folds into nested additions spanning the whole expression;
+        // 2147483647 + i throws at i = 1 before the indexed access.
+        const string source = """
+            §M{m1:M}
+              §ITYPE{it1:Sized:i32[]:n}
+              §F{f1:Probe:priv}
+                §I{Sized:items}
+                §I{i32:n}
+                §I{i32:i}
+                §O{i32}
+                §E{}
+                §Q (== n INT:1)
+                §Q (&& (>= i INT:0) (<= i INT:1))
+                §R (+ INT:2147483647 i §IDX items i)
+            """;
+        AssertWithheld(Assert.Single(Solve(source, typeCheck: false).Obligations, o => o.Kind == ObligationKind.IndexBounds));
+    }
+
+    [Fact]
+    public void ProofAfterAPreconditionThatMayThrow_IsWithheld()
+    {
+        // Review round 2: x = 2147483647 satisfies the modeled precondition, but its checked
+        // addition throws before the body; only x = 0 enters, and it satisfies the claim.
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:pub} (i32:x) -> i32
+                §E{}
+                §Q (|| (== x INT:0) (== (+ x INT:1) INT:-2147483648))
+                §PROOF{p1:claim} (< x INT:2147483647)
+                §R x
+            """;
+        AssertWithheld(Proof(Solve(source).Obligations, "p1"));
+    }
+
+    [Fact]
+    public void ThenBodyIgnoresALaterElseIfCall()
+    {
+        // Review round 2 control: the later call is never evaluated on the then path.
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:pub} (i32:x) -> i32
+                §E{}
+                §IF{if1} (> x INT:0)
+                  §PROOF{p1:claim} (> x INT:1)
+                §EI (> §C{Math.Abs} §A x §/C INT:1)
+                  §R INT:2
+                §R x
+            """;
+        Assert.Equal(ObligationStatus.Failed, Proof(Solve(source, typeCheck: false).Obligations, "p1").Status);
     }
 
     [Fact]
