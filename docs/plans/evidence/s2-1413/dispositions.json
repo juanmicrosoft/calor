@@ -209,11 +209,12 @@
       "rootCause": "The registration classifies NUM-NARROW-ARITH and NUM-LITERAL-OVERSIZE as unsupported-refused (divergences D1/D2 of the frozen docs/verification-modeled-forms.md say \"refused\") and NUM-OVERFLOW-CHECKED as assumed, but the verifier modeled C# narrow promotion (W1 Slice 1), typed out-of-range INT: literals as 64-bit (#774), and proved checked-arithmetic contracts whose overflow the preconditions rule out. Each Proven agreed with the oracle; none was a false proof.",
       "change": "Opened by maintainer decision Q1 (2026-10-04): demote per the frozen table exactly. Sub-32-bit arithmetic/shifts/negation are refused (D1); an INT: literal outside int32 is refused (D2; lexer marks the inferred width, the cache key distinguishes it); checked arithmetic that can overflow for some value of its types is Assumed (checked-arithmetic) even when entailed. Overflow sensitivity is decided without preconditions (some value of the operand types overflows), so arithmetic that cannot overflow stays Proven. The 15 Calor.Verification.Tests cases that pinned the old behavior are updated (each justified by the frozen table); the #1135 differential reports are unchanged; cache format 1.22.",
       "decision": "Q1 (2026-10-04): open the sixth repair PR and demote per the frozen table exactly, with no reinterpretation of \"unless entailed\"; update the tests that pinned the old behavior; regenerate the #1135 reports if they change (they do not).",
-      "nonTestChangedLines": 141,
+      "nonTestChangedLines": 157,
       "regressionWitness": [
         "tests/Calor.Verification.Tests/S2NumericRefusalTests.cs"
       ],
       "reviews": "docs/plans/evidence/s2-1413/reviews/fix-num-refusal/",
+      "reviewVerdict": "Rounds 1-3 REQUEST-CHANGES (fixed); verification pass REQUEST-CHANGES (one MAJOR: the round-3 while-loop k-induction bound refusal drops only the refused conjunct, so a while loop whose real condition is unsatisfiable can get a fabricated Disproven; outside the registered postcondition row). The review ceiling is reached: no further change was made (stopping rule 1). Decision needed: amend for one more fix-and-verify pass, revert the while-analyzer hunk (restoring the pre-existing main behavior), or record the residual.",
       "rows": [
         "NUM-NARROW-ARITH",
         "NUM-LITERAL-OVERSIZE",
@@ -245,12 +246,13 @@
         "D-OBL-PROOF-GETTER",
         "D-OBL-THROWING-PREDECESSOR"
       ],
-      "nonTestChangedLines": 162,
+      "nonTestChangedLines": 190,
       "regressionWitness": [
         "tests/Calor.Compiler.Tests/S2ObligationResidualTests.cs"
       ],
       "rows": [],
       "reviews": "docs/plans/evidence/s2-1413/reviews/fix-obligation-residuals/",
+      "reviewVerdict": "Rounds 1-3 REQUEST-CHANGES (fixed); verification pass REQUEST-CHANGES: MAJOR, exception A requires that the PR make no outcome stronger, but ordering the if/elseif state-change check (round-2 finding 6) restores a then-body guard fact and turns one previously Unsupported obligation into a (correct) Discharged; MINOR, two fixtures do not check emitted code or diagnostics. The review ceiling (3, exception A) is reached: no further change was made (stopping rule 1). Decision needed: revert the ordered state-change hunk under an amendment allowing one more change, or rescope.",
       "status": "open",
       "mergeCommit": null,
       "owner": "Claude Code agent (S2 #1413 session); agents never merge",
