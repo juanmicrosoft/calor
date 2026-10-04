@@ -56,10 +56,11 @@ INSTALLER = {"base": "https://raw.githubusercontent.com/actions/setup-dotnet/67a
 # Amendment 1.2.0: the probe compiles the verifier's own user-home resolver (the root of its default
 # user-level cache) from the checked-out tree, instead of asking SpecialFolder.UserProfile, which on
 # Windows ignores USERPROFILE.
-USER_HOME_SOURCE = "src/Calor.Compiler/Verification/Z3/Cache/UserHome.cs"
+USER_HOME_SOURCE = "src/Calor.Compiler/Verification/Z3/Cache/VerificationCacheOptions.cs"
 PROBE = "System.Console.WriteLine(Calor.Compiler.Verification.Z3.Cache.UserHome.Resolve());\n"
 PROBE_PROJECT = ('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework>'
-                 '<UseAppHost>false</UseAppHost></PropertyGroup><ItemGroup><Compile Include="{source}" /></ItemGroup></Project>\n')
+                 '<UseAppHost>false</UseAppHost><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>'
+                 '<ItemGroup><Compile Include="{source}" /></ItemGroup></Project>\n')
 
 
 class Refusal(Exception):

@@ -220,10 +220,11 @@ every win-x64 and win-arm64 attempt as an `environment-violation`, and no execut
 the three Windows determinism rows.
 
 - The verifier resolves its user-level root (default cache, user effect manifests) through
-  `src/Calor.Compiler/Verification/Z3/Cache/UserHome.cs`: `USERPROFILE` on Windows when set and
-  fully qualified, otherwise `SpecialFolder.UserProfile` (unchanged on Linux and macOS).
-- `env-check`'s probe compiles that file from the tree under test and prints `UserHome.Resolve()`,
-  so it checks the root the verifier actually uses. The `userProfileFollowsIsolatedHome` field
+  `UserHome.Resolve` in `src/Calor.Compiler/Verification/Z3/Cache/VerificationCacheOptions.cs`:
+  `USERPROFILE` on Windows when set and fully qualified, otherwise `SpecialFolder.UserProfile`
+  (unchanged on Linux and macOS).
+- `env-check`'s probe compiles that file (BCL only) from the tree under test and prints
+  `UserHome.Resolve()`, so it checks the root the verifier actually uses. The `userProfileFollowsIsolatedHome` field
   keeps its name and its rule (false is an `environment-violation`).
 - A new control checks that the probe compiles the tree's resolver.
 

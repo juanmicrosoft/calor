@@ -685,6 +685,7 @@ class AttemptRunnerControls(unittest.TestCase):
         # Amendment 1.2.0: the probe compiles the verifier's own resolver from this tree.
         resolver = ROOT / dr.USER_HOME_SOURCE
         self.assertTrue(resolver.is_file())
+        self.assertIn("public static class UserHome", resolver.read_text(encoding="utf-8"))
         self.assertIn("public static string Resolve()", resolver.read_text(encoding="utf-8"))
         self.assertIn(f'<Compile Include="{resolver}" />', (self.out / "ok" / "probe.csproj").read_text(encoding="utf-8"))
         self.assertIn("UserHome.Resolve()", (self.out / "ok" / "Program.cs").read_text(encoding="utf-8"))
