@@ -68,6 +68,8 @@ class SupplyChainTests(unittest.TestCase):
     def test_maintained_package_references_are_centrally_versioned_and_locked(self) -> None:
         isolated = (
             "bench/corpus/",
+            # Frozen #1311 evidence harness: byte-identical to the run harness (contract amendment 1.2.1), so its csproj cannot gain a lock file.
+            "bench/Calor.Soundness.Sweep/",
             "bench/phase0-agent-native/",
             "tests/E2E/",
             "tests/SdkConsumer/",
