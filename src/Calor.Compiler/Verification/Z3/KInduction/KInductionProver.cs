@@ -501,9 +501,12 @@ public sealed class KInductionProver : IDisposable
                 var conjuncts = new List<BoolExpr>();
                 foreach (var part in parts)
                 {
+                    // #1413 review: a conjunct that cannot be parsed (e.g. a nested quantifier)
+                    // must not be dropped — proving the rest would report the whole invariant.
                     var parsed = ParseSimpleInvariant(part, varName, varExpr);
-                    if (parsed != null)
-                        conjuncts.Add(parsed);
+                    if (parsed == null)
+                        return null;
+                    conjuncts.Add(parsed);
                 }
                 if (conjuncts.Count > 0)
                     return _ctx.MkAnd(conjuncts.ToArray());
