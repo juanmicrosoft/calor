@@ -143,7 +143,7 @@ internal static partial class EvidenceContractValidator
                 e.Ceiling == ceilingId && e.Value == raised && e.Amendment == recordedIn
                 && (e.Pr is { } registeredPr ? hasPr && pr == registeredPr && issue == e.Issue : !hasPr && issue == e.Issue));
             if (match is null || recordedIn is null || !amendmentVersions.Contains(recordedIn))
-                v.Add(new("C011", subject, "ceiling exception is not one registered by a logged amendment (1.1.0: pr-size, #1473, 1520; 1.2.0: s1-generated-cases, issue #1311, 3008; 1.3.0: s2-repairs, issue #1413, 7, and review-rounds-per-pr, #1496, 5; 1.3.1: review-rounds-per-pr, #1502 and #1503, 5, revert-only)"));
+                v.Add(new("C011", subject, "ceiling exception is not one registered by a logged amendment (1.1.0: pr-size, #1473, 1520; 1.2.0: s1-generated-cases, issue #1311, 3008; 1.3.0: s2-repairs, issue #1413, 7, and review-rounds-per-pr, #1496, 5; 1.3.1: review-rounds-per-pr, #1502 (three registered changes) and #1503 (revert-only), 5)"));
             // A later amendment that changed the registered text must itself be logged (1.2.1
             // amended condition 4 of the #1311 exception).
             if (match?.TextAmendment is { } textAmendment && !amendmentVersions.Contains(textAmendment))
@@ -184,7 +184,7 @@ internal static partial class EvidenceContractValidator
                         v.Add(new("C011", subject, $"exception records an unregistered {field}"));
                     }
                 }
-                // A finding-scoped exception (1.3.0 decision A) names exactly its registered findings,
+                // A finding-scoped exception (1.3.0 decision A; 1.3.1 #1502) names exactly its registered findings,
                 // in order; any other exception names none.
                 var findings = exception?["findings"] is null ? null : Array(exception["findings"]).Select(Str).ToList();
                 if (match.Findings is { } registeredFindings
@@ -193,26 +193,28 @@ internal static partial class EvidenceContractValidator
                     v.Add(new("C011", subject, match.Findings is null
                         ? "this exception is not scoped to findings"
                         : $"exception must name exactly the findings {string.Join(", ", match.Findings)}"));
-                // A revert-only exception (1.3.1) records revertOnly true and its registered base commit,
-                // names that commit in its first condition ("Revert only."), and requires an APPROVE
+                // A base-bound change exception (1.3.1) records its registered revertOnly flag (#1503:
+                // true; #1502: false, three registered changes) and base commit, names that commit in its
+                // first condition (the registered change-scope condition), and requires an APPROVE
                 // verdict; any other exception carries neither field.
                 if (match.BaseCommit is { } baseCommit)
                 {
-                    if (exception?["revertOnly"] is not JsonValue ro || !ro.TryGetValue<bool>(out var revertOnly) || !revertOnly)
-                        v.Add(new("C011", subject, "this exception must record revertOnly true"));
+                    var expectedRevertOnly = match.RevertOnly == true;
+                    if (exception?["revertOnly"] is not JsonValue ro || !ro.TryGetValue<bool>(out var revertOnly) || revertOnly != expectedRevertOnly)
+                        v.Add(new("C011", subject, $"this exception must record revertOnly {(expectedRevertOnly ? "true" : "false")}"));
                     if (Str(exception?["baseCommit"]) != baseCommit)
                         v.Add(new("C011", subject, $"this exception must record baseCommit {baseCommit}"));
                     var conditionTexts = Array(exception?["conditions"]).Select(Str).ToList();
-                    if (conditionTexts.FirstOrDefault() is not { } revertCondition
-                        || !revertCondition.StartsWith("Revert only.", StringComparison.Ordinal)
-                        || !revertCondition.Contains(baseCommit, StringComparison.Ordinal))
-                        v.Add(new("C011", subject, "the first condition must be the revert-only condition naming the base commit"));
+                    if (conditionTexts.FirstOrDefault() is not { } scopeCondition
+                        || !scopeCondition.StartsWith(match.ScopeCondition!, StringComparison.Ordinal)
+                        || !scopeCondition.Contains(baseCommit, StringComparison.Ordinal))
+                        v.Add(new("C011", subject, $"the first condition must be the '{match.ScopeCondition}' condition naming the base commit"));
                     if (!conditionTexts.Any(c => c is not null && c.StartsWith("Verification pass must APPROVE.", StringComparison.Ordinal)))
                         v.Add(new("C011", subject, "this exception needs the condition that the verification pass must APPROVE"));
                 }
                 else if (exception?["revertOnly"] is not null || exception?["baseCommit"] is not null)
                 {
-                    v.Add(new("C011", subject, "this exception is not registered as revert-only"));
+                    v.Add(new("C011", subject, "this exception is not registered with a base commit"));
                 }
             }
         }
@@ -300,7 +302,8 @@ internal static partial class EvidenceContractValidator
     /// ExecutionCeiling 1500 to 1508), so the hash is of the 1.2.1 text and the 1.2.0 text no longer
     /// validates. Amendment 1.3.0 registers a seventh S2 repair PR scoped to exactly two
     /// review-found discovery findings (decision A), and PR #1496's review-round overrun with its
-    /// required final verification pass (decision B). Amendment 1.3.1 registers one revert-only change
+    /// required final verification pass (decision B). Amendment 1.3.1 registers one change after the ceiling
+    /// (#1502: exactly three registered changes, owning discovery D-NUM-WHILE-BOUND; #1503: revert-only)
     /// and one verification-only pass that must APPROVE for each of PRs #1502 and #1503, each bound
     /// to its base commit (the PR head when the amendment was drafted).
     /// </summary>
@@ -311,16 +314,16 @@ internal static partial class EvidenceContractValidator
         new("s2-repairs", null, 1413, 7, "1.3.0", "addedPrs", 1, "1.3.0", "2254c411e46b2f8aa9cc0c262328bd68dc491a8a84855ed3fa92be80ab656fab",
             ["D-OBL-PROOF-GETTER", "D-OBL-THROWING-PREDECESSOR"]),
         new("review-rounds-per-pr", 1496, 1413, 5, "1.3.0", null, null, "1.3.0", "755c4c7d3da8630de5f9648f017c00d0c44485531c6f646fa9f4d902e4c89fa8"),
-        new("review-rounds-per-pr", 1502, 1413, 5, "1.3.1", null, null, "1.3.1", "bb0c906ae66d74cecfb8352dcd84da1fb634c754ac8be41f40925d30a315a6ea",
-            BaseCommit: "3f3016d2297491fca1734e931946747833def32d"),
+        new("review-rounds-per-pr", 1502, 1413, 5, "1.3.1", null, null, "1.3.1", "ebeaa53a51160fa57ae4664afb4b5cf984ac6340458d277604611543e62199e8",
+            ["D-NUM-WHILE-BOUND"], BaseCommit: "3f3016d2297491fca1734e931946747833def32d", RevertOnly: false, ScopeCondition: "Three changes only."),
         new("review-rounds-per-pr", 1503, 1413, 5, "1.3.1", null, null, "1.3.1", "fd4a1147a5ebdf12ec319f87b3ac3e074d9a82c82e95509b52c127901b118bf7",
-            BaseCommit: "9b54c9c3d8d7fb178c5594ddc757d871fbb34ab4"),
+            BaseCommit: "9b54c9c3d8d7fb178c5594ddc757d871fbb34ab4", RevertOnly: true, ScopeCondition: "Revert only."),
     ];
 
     private sealed record RegisteredException(
         string Ceiling, int? Pr, int? Issue, double Value, string Amendment,
         string? AddedField = null, int? Added = null, string? TextAmendment = null, string? TextSha256 = null,
-        string[]? Findings = null, string? BaseCommit = null);
+        string[]? Findings = null, string? BaseCommit = null, bool? RevertOnly = null, string? ScopeCondition = null);
 
     /// <summary>Fields in which an exception may record the amount it adds; at most the registered one appears.</summary>
     private static readonly string[] AddedAmountFields = ["addedExecutions", "addedPrs"];
