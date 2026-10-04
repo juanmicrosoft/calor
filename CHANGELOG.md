@@ -48,7 +48,9 @@ All notable changes to this project will be documented in this file.
   `§Q (> x -1)`, then `§ASSIGN x -5`, then `§PROOF (> x -1)`, the obligation solver still
   assumed the precondition, reported the obligation discharged, and removed its runtime check.
   A precondition or parameter refinement is now ignored after any reassignment of a name it
-  reads (including `ref`/`out` arguments and raw C# blocks). The solver also reports a failed
+  reads (including `ref`/`out` arguments, writes through an aliased `ref` parameter, and raw C#
+  blocks), and a fact that reads an array element or field is ignored once the body can
+  change them (a call, a store, or a collection update). The solver also reports a failed
   obligation (`Calor1121`/`Calor1140`, a compile error) only when its counterexample can
   actually reach the obligation. When the reached state is not fully modeled (after a
   reassignment, an early exit, or for a refined return value), the result is `Calor1124`

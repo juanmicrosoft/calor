@@ -148,11 +148,9 @@ public sealed class ObligationSolver : IDisposable
             var preconditionExprs = new List<BoolExpr>();
             foreach (var pre in info.Preconditions)
             {
-                if (!isEntry
-                    && (info.Facts.HasOpaqueCode
-                        || FactCollector.ReferencedNames(pre.Condition).Overlaps(info.Facts.AssignedNames)))
+                if (!isEntry && info.Facts.IsStaleAfterEntry(pre.Condition))
                 {
-                    inexact.Add("a precondition reads a variable the body reassigns");
+                    inexact.Add("a precondition reads a variable or heap state the body may change");
                     continue;
                 }
                 var preExpr = translator.TranslateBoolExpr(pre.Condition);
@@ -286,8 +284,8 @@ public sealed class ObligationSolver : IDisposable
                     inexact.Add("the returned value is not modeled (the solver's `result` is unconstrained)");
                 if (!info.Facts.IsExact(obligation.Span))
                     inexact.Add("the path to the obligation is not fully modeled (an enclosing guard, loop, try, or earlier exit is not asserted)");
-                if (FactCollector.ReferencedNames(obligation.Condition).Overlaps(info.Facts.AssignedNames))
-                    inexact.Add("the obligation reads a variable the body reassigns, whose current value is not modeled");
+                if (info.Facts.IsStaleAfterEntry(obligation.Condition))
+                    inexact.Add("the obligation reads a variable or heap state the body may change, whose current value is not modeled");
             }
             if (status == Status.SATISFIABLE && inexact.Count > 0)
             {

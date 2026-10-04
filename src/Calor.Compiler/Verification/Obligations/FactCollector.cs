@@ -63,6 +63,30 @@ public sealed class FactCollector
     /// </summary>
     public bool HasOpaqueCode { get; private set; }
 
+    /// <summary>
+    /// #1413: the body can change heap state a fact may read — a call (which may write any
+    /// object or array it can reach), a collection mutation, a store into an array element
+    /// or field, or object creation. A fact that reads an array element, a field, or a dotted
+    /// path is then stale after entry.
+    /// </summary>
+    public bool MutatesHeap { get; private set; }
+
+    /// <summary>
+    /// #1413: true when <paramref name="fact"/>, true on entry or at a guard, may be false later
+    /// in the body: it reads a name the body may rebind, or reads heap state the body may
+    /// change, or the body is opaque.
+    /// </summary>
+    public bool IsStaleAfterEntry(ExpressionNode fact)
+        => HasOpaqueCode
+           || ReferencedNames(fact).Overlaps(_assignedNames)
+           || (MutatesHeap && ReadsHeap(fact));
+
+    /// <summary>Whether an expression reads an array element, a field, or a dotted path.</summary>
+    public static bool ReadsHeap(ExpressionNode expression)
+        => DescendantsAndSelf(expression).Any(node =>
+            node is ArrayAccessNode or FieldAccessNode
+            || node is ReferenceNode reference && reference.Name.Contains('.'));
+
     private HashSet<string> _assignedNames = new(StringComparer.Ordinal);
     private bool _bodyInitialized;
     private bool _hasJumps;
@@ -115,6 +139,15 @@ public sealed class FactCollector
     {
         InitializeBody(body);
 
+        // #1413: two ref/out parameters may alias one variable, so a write through either
+        // rebinds both.
+        var byReference = parameters
+            .Where(p => p.Modifier.HasFlag(ParameterModifier.Ref) || p.Modifier.HasFlag(ParameterModifier.Out))
+            .Select(p => p.Name)
+            .ToArray();
+        if (byReference.Length > 1 && byReference.Any(_assignedNames.Contains))
+            _assignedNames.UnionWith(byReference);
+
         // Parameter refinements hold on entry for the whole function: the entry guard
         // is emitted unless the entry obligation is discharged. They are dropped when
         // the body may rebind the parameter (the refinement may no longer describe the
@@ -132,16 +165,16 @@ public sealed class FactCollector
             }
             if (param.InlineRefinement != null)
             {
-                ScopedFacts.Add(ScopedFact.FunctionWide(
-                    SubstituteSelfRefStatic(
-                        param.InlineRefinement.Predicate,
-                        param.Name)));
+                var fact = SubstituteSelfRefStatic(param.InlineRefinement.Predicate, param.Name);
+                if (!IsStaleAfterEntry(fact))
+                    ScopedFacts.Add(ScopedFact.FunctionWide(fact));
             }
             if (refinementPredicates != null
                 && refinementPredicates.TryGetValue(param.TypeName, out var predicate))
             {
-                ScopedFacts.Add(ScopedFact.FunctionWide(
-                    SubstituteSelfRefStatic(predicate, param.Name)));
+                var fact = SubstituteSelfRefStatic(predicate, param.Name);
+                if (!IsStaleAfterEntry(fact))
+                    ScopedFacts.Add(ScopedFact.FunctionWide(fact));
             }
         }
 
@@ -165,6 +198,18 @@ public sealed class FactCollector
         _assignedNames = CollectAssignedNames(body);
         var nodes = body.SelectMany(DescendantsAndSelf).ToArray();
         HasOpaqueCode = nodes.Any(node => node is RawCSharpNode);
+        MutatesHeap = nodes.Any(node => node
+            is CallExpressionNode
+            or CallStatementNode
+            or NewExpressionNode
+            or CollectionPushNode
+            or DictionaryPutNode
+            or CollectionRemoveNode
+            or CollectionSetIndexNode
+            or CollectionClearNode
+            or CollectionInsertNode
+            or AssignmentStatementNode { Target: not ReferenceNode }
+            or CompoundAssignmentStatementNode { Target: not ReferenceNode });
         _hasJumps = nodes.Any(node => node is GotoStatementNode or LabelStatementNode);
     }
 
@@ -229,12 +274,11 @@ public sealed class FactCollector
     {
         var conditions = new List<ExpressionNode> { ifStmt.Condition };
         conditions.AddRange(ifStmt.ElseIfClauses.Select(clause => clause.Condition));
-        // A condition that itself rebinds a name (an increment) evaluates against a
-        // changing state; its negation is not a stable fact.
-        var negationsUsable = !conditions.Any(condition =>
-            DescendantsAndSelf(condition).Any(IsIncrement));
+        // A condition that itself changes state (an increment, a ref/out argument, or a call)
+        // is evaluated against a changing state: neither it nor its negation is a stable fact.
+        var negationsUsable = !conditions.Any(ChangesState);
 
-        Walk(ifStmt.ThenBody, exact && AddGuardFact(ifStmt.Condition, ifStmt.ThenBody));
+        Walk(ifStmt.ThenBody, exact && negationsUsable && AddGuardFact(ifStmt.Condition, ifStmt.ThenBody));
         for (var index = 0; index < ifStmt.ElseIfClauses.Count; index++)
         {
             var clause = ifStmt.ElseIfClauses[index];
@@ -258,6 +302,10 @@ public sealed class FactCollector
     private static ExpressionNode Conjoin(IEnumerable<ExpressionNode> conjuncts, TextSpan span)
         => conjuncts.Aggregate((left, right) =>
             new BinaryOperationNode(span, BinaryOperator.And, left, right));
+
+    private static bool ChangesState(ExpressionNode condition)
+        => DescendantsAndSelf(condition).Any(node => IsIncrement(node)
+            || node is CallExpressionNode or NewExpressionNode);
 
     private static bool IsIncrement(AstNode node)
         => node is UnaryOperationNode
@@ -359,6 +407,14 @@ public sealed class FactCollector
         var assigned = CollectAssignedNames(body);
         if (referenced.Overlaps(assigned))
             return false;
+        // #1413: a guard over heap state is stale once the body can change the heap.
+        if (ReadsHeap(fact) && body.SelectMany(DescendantsAndSelf).Any(node => node
+                is CallExpressionNode or CallStatementNode or NewExpressionNode
+                or CollectionPushNode or DictionaryPutNode or CollectionRemoveNode
+                or CollectionSetIndexNode or CollectionClearNode or CollectionInsertNode
+                or AssignmentStatementNode { Target: not ReferenceNode }
+                or CompoundAssignmentStatementNode { Target: not ReferenceNode }))
+            return false;
 
         var scopeStart = body.Min(s => s.Span.Start);
         var scopeEnd = body.Max(s => s.Span.End);
@@ -405,9 +461,34 @@ public sealed class FactCollector
                     break;
                 case AssignmentStatementNode { Target: ReferenceNode target }:
                     names.Add(target.Name);
+                    names.Add(target.Name.Split('.')[0]);
                     break;
                 case CompoundAssignmentStatementNode { Target: ReferenceNode compoundTarget }:
                     names.Add(compoundTarget.Name);
+                    break;
+                case AssignmentStatementNode assignment when RootName(assignment.Target) is { } root:
+                    names.Add(root);
+                    break;
+                case CompoundAssignmentStatementNode compound when RootName(compound.Target) is { } compoundRoot:
+                    names.Add(compoundRoot);
+                    break;
+                case CollectionPushNode push:
+                    names.Add(push.CollectionName);
+                    break;
+                case DictionaryPutNode put:
+                    names.Add(put.DictionaryName);
+                    break;
+                case CollectionRemoveNode remove:
+                    names.Add(remove.CollectionName);
+                    break;
+                case CollectionSetIndexNode setIndex:
+                    names.Add(setIndex.CollectionName);
+                    break;
+                case CollectionClearNode clear:
+                    names.Add(clear.CollectionName);
+                    break;
+                case CollectionInsertNode insert:
+                    names.Add(insert.CollectionName);
                     break;
                 case UnaryOperationNode
                 {
@@ -437,6 +518,15 @@ public sealed class FactCollector
 
         return names;
     }
+
+    /// <summary>The variable at the root of an element or field store target (a[i], o.f).</summary>
+    private static string? RootName(ExpressionNode target) => target switch
+    {
+        ReferenceNode reference => reference.Name.Split('.')[0],
+        ArrayAccessNode access => RootName(access.Array),
+        FieldAccessNode field => RootName(field.Target),
+        _ => null
+    };
 
     /// <summary>#1413: a variable passed as `ref` or `out` may be rebound by the callee.</summary>
     private static void AddByReferenceArguments(

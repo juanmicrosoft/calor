@@ -63,7 +63,7 @@ public sealed class S2ObligationStateTests
         var proof = Single(obligations, ObligationKind.ProofObligation);
         Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
         Assert.Equal(ProofStatus.Unsupported, proof.Outcome!.Status);
-        Assert.Contains("reassigns", proof.Outcome.Reason);
+        Assert.Contains("may change", proof.Outcome.Reason);
         // The runtime guard stays in the default (elision-enabled) emission.
         Assert.Contains("Proof obligation [p1", csharp);
     }
@@ -85,6 +85,40 @@ public sealed class S2ObligationStateTests
             """;
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
         Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
+    }
+
+    [Fact]
+    public void AliasedRefParameterWriteKillsPreconditionFact()
+    {
+        // Probe(ref a, ref a) passes one variable twice: writing y also writes x.
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:priv} (i32:x:ref, i32:y:ref) -> i32
+                §E{}
+                §Q (> x INT:0)
+                §ASSIGN y INT:-5
+                §PROOF{p1:claim} (> x INT:0)
+                §R x
+            """;
+        var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
+        Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
+    }
+
+    [Fact]
+    public void ArrayElementStoreKillsPreconditionFact()
+    {
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:priv} ([i32]:a) -> i32
+                §E{mut}
+                §Q (> §IDX a INT:0 INT:0)
+                §SETIDX{a} INT:0 INT:-5
+                §PROOF{p1:claim} (> §IDX a INT:0 INT:0)
+                §R INT:0
+            """;
+        var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
+        Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
+        Assert.NotEqual(ObligationStatus.Failed, proof.Status);
     }
 
     [Fact]
