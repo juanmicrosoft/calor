@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "issue": 1135,
+  "protocol": "docs/plans/evidence/g2-1421/protocol.json",
+  "rule": "protocol.json executions.ledgerCheck: every workflow_dispatch run of .github/workflows/determinism-protocol.yml appears here with its measured runner-minutes (each job's completed_at - started_at rounded up, no OS multiplier, as determinism_runner.job_minutes computes from the API). Entries are append-only.",
+  "budget": {
+    "ceilingRunnerMinutes": 2000,
+    "dryRunSpent": 13,
+    "recordedRunnerMinutes": 401,
+    "executionsUsed": 1,
+    "maxExecutions": 3,
+    "dispatchedControlRuns": 0
+  },
+  "entries": [
+    {
+      "runId": 37177387101,
+      "title": "determinism execution g3-exec-1",
+      "executionId": "g3-exec-1",
+      "mode": "execution",
+      "commit": "0142438f42278021d95c6169dfe397a7f63eea3c",
+      "protocolVersion": "1.2.0",
+      "runnerMinutes": 388,
+      "attemptsStarted": true,
+      "conclusion": "failure",
+      "verdict": "NON-DETERMINISTIC",
+      "complete": false,
+      "classCounts": {"AGREE-FAIL": 0, "AGREE-PASS": 0, "DISAGREE": 1580, "INCOMPLETE": 557},
+      "result": "docs/plans/evidence/g3-1135/executions/g3-exec-1/result.json",
+      "resultSha256": "0da5c5d5f67eb67636933eeeb9fd8e3e5653ff930b5d0c4018e44dfcd4f2696f",
+      "attemptRecords": "docs/plans/evidence/g3-1135/executions/g3-exec-1/attempts.tar.gz",
+      "attemptRecordsSha256": "789fc990a53bd5d258a4845da7a434bb86d3afab522f56b7756a6cacd2560262",
+      "recordsRetained": "win-x64 jobs 1-2 and win-arm64 jobs 1-2: 60 attempt records and env.json. linux-x64, linux-arm64, and osx-arm64 (6 jobs): every attempt ran, but upload-artifact rejected the output directory (a NuGet cache file name with ':'), so no record of those jobs exists; the decider filled them as missing.",
+      "repairAddressed": "Protocol amendment 1.3.0 (machinery only): isolated homes removed before upload and checked by fill-missing, probe beside the output directory, Windows job timeouts 75 minutes, no dispatched control runs."
+    }
+  ],
+  "nextExecution": "Execution 2 needs amendment 1.3.0 merged to main (protocol freeze: a protocol version is merged before it governs an execution). It is dispatched on that merge commit, and its records go into C2's (#1424) regeneration evidence, not a third G3 pull request (maintainer decision, 2026-10-04)."
+}
