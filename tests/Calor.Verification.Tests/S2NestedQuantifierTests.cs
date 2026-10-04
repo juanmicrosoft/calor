@@ -84,8 +84,8 @@ public sealed class S2NestedQuantifierTests : IDisposable
     [Fact]
     public void NestedForall_IsNeverCached()
     {
-        // A cache written before the refusal may hold Proven for a nested quantifier: the key
-        // is neither stored nor looked up, so such an entry can never be served.
+        // A cache written before the refusal may hold Proven for a nested quantifier. The key is
+        // still computable, but the hasher flags it, so it is neither stored nor served.
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(Nested("(< (- i j) INT:29)"), diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         var function = Assert.Single(module.Functions);
@@ -100,10 +100,21 @@ public sealed class S2NestedQuantifierTests : IDisposable
         cache.CachePostconditionResult(parameters, "i32", function.Preconditions, post, function.Body,
             new Calor.Compiler.Verification.Z3.ContractVerificationResult(ContractVerificationStatus.Proven));
         Assert.False(cache.TryGetPostconditionResult(parameters, "i32", function.Preconditions, post, function.Body, out _));
-        // Nothing was written: the key is never stored, so no stale entry can exist either.
         Assert.Empty(Directory.Exists(_cacheDir)
             ? Directory.GetFiles(_cacheDir, "*.json", SearchOption.AllDirectories)
             : []);
+
+        // Review round 3: an older compiler could have stored Proven under this very key (the
+        // hasher still computes one). Seed such an entry, show it is readable by key, and
+        // show the lookup still refuses to serve it.
+        var key = hasher.HashPostcondition(parameters, "i32", function.Preconditions, post, function.Body);
+        var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var scoped = (string)typeof(VerificationCache).GetMethod("ApplyKeyScope", flags)!.Invoke(cache, [key])!;
+        typeof(VerificationCache).GetMethod("CacheResult", flags)!.Invoke(cache,
+            [scoped, new Calor.Compiler.Verification.Z3.ContractVerificationResult(ContractVerificationStatus.Proven)]);
+        object?[] lookup = [scoped, null];
+        Assert.True((bool)typeof(VerificationCache).GetMethod("TryGetCachedResult", flags)!.Invoke(cache, lookup)!);
+        Assert.False(cache.TryGetPostconditionResult(parameters, "i32", function.Preconditions, post, function.Body, out _));
     }
 
     [Fact]
