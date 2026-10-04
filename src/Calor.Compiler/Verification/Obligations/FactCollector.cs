@@ -70,12 +70,19 @@ public sealed class FactCollector
     /// enumerator a member read or foreach may run), a collection mutation, a heap store, or new.</summary>
     public bool MutatesHeap { get; private set; }
 
+    // A member or element read outside a §PROOF condition (which only evaluates the check) may run a
+    // getter, indexer, or enumerator.
+    private static bool MayChangeHeap(IReadOnlyList<StatementNode> body)
+        => body.SelectMany(DescendantsAndSelf).Any(IsHeapMutation) || body.SelectMany(OutsideProofs).Any(IsHeapRead);
+
+    private static IEnumerable<AstNode> OutsideProofs(AstNode node)
+        => node is ProofObligationNode ? [] : Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node).SelectMany(OutsideProofs).Prepend(node);
+
     private static bool IsHeapMutation(AstNode node)
         => IsHeapStore(node) || node is CallExpressionNode or CallStatementNode or ExpressionCallNode
             or EventSubscribeNode or EventUnsubscribeNode or UsingStatementNode or NewExpressionNode
             or CollectionPushNode or DictionaryPutNode or CollectionRemoveNode or CollectionSetIndexNode
-            or CollectionClearNode or CollectionInsertNode or ForeachStatementNode or DictionaryForeachNode
-            || IsHeapRead(node);
+            or CollectionClearNode or CollectionInsertNode or ForeachStatementNode or DictionaryForeachNode;
 
     /// <summary>#1413: whether a fact true on entry or at a guard may be false later in the body.</summary>
     public bool IsStaleAfterEntry(ExpressionNode fact)
@@ -189,7 +196,7 @@ public sealed class FactCollector
         _assignedNames = CollectAssignedNames(body);
         var nodes = body.SelectMany(DescendantsAndSelf).ToArray();
         HasOpaqueCode = nodes.Any(node => IsOpaque(node));
-        MutatesHeap = nodes.Any(IsHeapMutation);
+        MutatesHeap = MayChangeHeap(body);
         _hasJumps = nodes.Any(node => node is GotoStatementNode or LabelStatementNode);
     }
 
@@ -412,7 +419,7 @@ public sealed class FactCollector
         if (referenced.Overlaps(assigned) || referenced.Overlaps(_aliasWritten))
             return false;
         // #1413: a guard over heap state is stale once the body can change the heap.
-        if (ReadsHeap(fact) && body.SelectMany(DescendantsAndSelf).Any(IsHeapMutation))
+        if (ReadsHeap(fact) && MayChangeHeap(body))
             return false;
 
         var scopeStart = body.Min(s => s.Span.Start);
