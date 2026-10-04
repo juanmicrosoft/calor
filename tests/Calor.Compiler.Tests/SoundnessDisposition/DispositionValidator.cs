@@ -48,6 +48,11 @@ internal static class DispositionValidator
     {
         var v = new List<Violation>();
         void Add(string code, string message) => v.Add(new Violation(code, message));
+        IEnumerable<string> findingAllowanceViolations(string? allowanceRepair)
+            => allowanceRepair == null ? [] : Baselines
+                .SelectMany(b => record["baselines"]?[b]?["findings"]?.AsArray() ?? new JsonArray())
+                .Where(f => Str(f, "repair") == allowanceRepair)
+                .Select(f => $"{Str(f, "findingId")}: the amendment allowance covers discoveries only, not S1 findings");
 
         // D001 vocabulary: exactly the frozen set, in the record and as used.
         var frozen = contract["findingDispositions"]?.AsArray().Select(x => x!.GetValue<string>()).ToArray() ?? [];
@@ -71,8 +76,27 @@ internal static class DispositionValidator
         var capacity = record["capacity"];
         if (capacity?["maxRepairs"]?.GetValue<int>() != 6 || capacity?["maxNonTestChangedLinesPerRepair"]?.GetValue<int>() != 600)
             Add("D009", "capacity must state the contract's s2-repairs ceilings (6 repairs, 600 non-test lines)");
-        if (repairs.Count > 6)
-            Add("D009", $"{repairs.Count} repairs exceed the 6-repair ceiling");
+        // A contract amendment may add repairs for named discoveries only (amendment 1.3.0: one
+        // repair for the two review-found obligation discoveries). It holds while the record is
+        // open; at closure the contract must carry that amendment (checked below).
+        var allowance = capacity?["amendmentAllowance"];
+        var allowedExtra = 0;
+        var allowanceVersion = Str(allowance, "amendment");
+        var allowanceRepair = Str(allowance, "repair");
+        if (allowance != null)
+        {
+            var allowedDiscoveries = allowance["discoveries"]?.AsArray().Select(x => x!.GetValue<string>()).Order().ToArray() ?? [];
+            var target = repairs.FirstOrDefault(r => Str(r, "id") == allowanceRepair);
+            var listed = target?["discoveries"]?.AsArray().Select(x => x!.GetValue<string>()).Order().ToArray() ?? [];
+            if (allowanceVersion is null || target is null || allowedDiscoveries.Length == 0
+                || !listed.SequenceEqual(allowedDiscoveries) || target["rows"]?.AsArray().Count is not 0
+                || allowance["extraRepairs"]?.GetValue<int>() != 1)
+                Add("D009", "capacity.amendmentAllowance must name one amendment, one repair, and exactly the discoveries that repair carries");
+            else
+                allowedExtra = 1;
+        }
+        if (repairs.Count > 6 + allowedExtra)
+            Add("D009", $"{repairs.Count} repairs exceed the {6 + allowedExtra}-repair ceiling");
         if (capacity?["used"]?.GetValue<int>() != repairs.Count)
             Add("D009", "capacity.used must equal the number of repairs");
 
@@ -322,10 +346,16 @@ internal static class DispositionValidator
                         Add("D010", $"{id}: the merge commit is not the merge of PR #{pr} from {branch}");
                 }
                 if (!string.IsNullOrWhiteSpace(Str(repair, "reviewRoundOverrun"))
-                    && string.IsNullOrWhiteSpace(Str(repair, "overrunAmendment")))
-                    Add("D010", $"{id}: review-round overrun without a recorded amendment (stopping rule 1)");
+                    && (Str(repair, "overrunAmendment") is not { } overrunVersion
+                        || !VersionAtLeast(Str(contract, "contractVersion"), overrunVersion)))
+                    Add("D010", $"{id}: review-round overrun without a merged amendment (stopping rule 1)");
             }
         }
+
+        if (closing && allowanceVersion != null && !VersionAtLeast(Str(contract, "contractVersion"), allowanceVersion))
+            Add("D010", $"capacity amendment {allowanceVersion} is not in the contract (not merged)");
+        foreach (var finding in findingAllowanceViolations(allowanceRepair))
+            Add("D009", finding);
 
         // D010/D016 closure state and result.
         var closureStatus = Str(record["closure"], "status");
@@ -347,6 +377,9 @@ internal static class DispositionValidator
 
         return v;
     }
+
+    private static bool VersionAtLeast(string? actual, string required)
+        => Version.TryParse(actual, out var a) && Version.TryParse(required, out var r) && a >= r;
 
     private static string? Str(JsonNode? node, string name)
         => node?[name] is JsonValue value && value.TryGetValue<string>(out var s) ? s : null;

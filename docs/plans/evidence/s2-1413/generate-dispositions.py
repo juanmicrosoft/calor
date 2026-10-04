@@ -25,7 +25,7 @@ REVIEWS = 'docs/plans/evidence/s2-1413/reviews/'
 
 repairs = [
     {
-        'id': 'R-CACHE', 'pr': 1494,
+        'id': 'R-CACHE', 'pr': 1494, 'status': 'merged', 'mergeCommit': 'ef89c027dd933f4991fd3a85db4b1d1fd707c8db',
         'branch': 'milestone-0.24/s2-1413-fix-cache-literal-width',
         'rootCause': 'ContractHasher keyed an integer literal by value only, so x + INT:1 and x + LONG:1 shared a verification-cache entry; a warm cache served the LONG text\'s Proven to the INT text (false proof, guard elided) and the INT text\'s Refuted to the LONG text.',
         'change': 'Literal keys carry width/signedness/base/sign/magnitude (and real-literal kind); output types are length-prefixed; inferred binding types hash distinctly; keys hash raw UTF-16 code units; cache format 1.20.',
@@ -53,11 +53,12 @@ repairs = [
         'change': 'Entry facts are dropped when the body may write a name they read (incl. ref/out/in aliasing, element/field stores, collection updates); raw C#, unsafe/pointer code, and lambdas make a body opaque, and raw C# in an entry predicate makes every obligation Unsupported; every member/element read (a proof condition included) and foreach counts as a possible heap write (getters, indexers, enumerators), and only the exactness of a §PROOF counterexample ignores reads inside its own condition; a SAT model is a refutation only when the state is exact, otherwise Unsupported (guard kept), including when a dropped entry refinement constrains any name the query reads; else/elseif negation facts and named-refinement parameter facts (functions, methods, constructors, operators) are added.',
         'nonTestChangedLines': 591,
         'residual': 'See discoveries D-OBL-PROOF-GETTER and D-OBL-THROWING-PREDECESSOR (MILESTONE-FAILED pending decision Q7).',
+        'overrunAmendment': '1.3.0',
         'reviewRoundOverrun': 'After its three review rounds R-OBL had two further Codex passes, each of which found a defect in the previous fix (BLOCKING, then MAJOR) and led to a compiler change with a regression. Under the frozen ceiling (three rounds per PR, then close and rescope; stopping rule 1) this is an overrun, recorded here; acceptance of R-OBL needs the maintainer decision Q8.',
         'regressionWitness': ['tests/Calor.Compiler.Tests/S2ObligationStateTests.cs'],
         'rows': ['OBL-MUTATION-KILL', 'OBL-BRANCH-FACTS', 'OBL-REFINEMENT-RETURN', 'OBL-SUBTYPE', 'OBL-SELFREF'],
         'reviews': REVIEWS + 'fix-obligation-state/',
-        'reviewVerdict': 'Rounds 1-3 REQUEST-CHANGES (fixed); verification pass 1 found one BLOCKING in the round-3 fix (fixed), verification pass 2 found one MAJOR (fixed, not re-reviewed: budget exhausted); see residual.',
+        'reviewVerdict': 'Rounds 1-3 REQUEST-CHANGES (fixed); verification pass 1 found one BLOCKING in the round-3 fix (fixed), verification pass 2 found one MAJOR (fixed); a final verification-only pass authorized by the maintainer (decision Q8, amendment 1.3.0) on that last fix: APPROVE.',
     },
     {
         'id': 'R-TEXT', 'pr': 1497,
@@ -85,21 +86,31 @@ repairs = [
         'reviewVerdict': 'Rounds 1-3 REQUEST-CHANGES (round 3 MINOR only, addressed), verification pass REQUEST-CHANGES for the PR-body merge prerequisite only (added; no code change requested).',
     },
     {
-        'id': 'R-NUM', 'pr': None,
-        'branch': None,
-        'status': 'decision-required',
-        'rootCause': 'The registration classifies NUM-NARROW-ARITH and NUM-LITERAL-OVERSIZE as unsupported-refused (divergences D1/D2 of the frozen docs/verification-modeled-forms.md say "refused") and NUM-OVERFLOW-CHECKED as assumed, but the verifier deliberately models C# narrow promotion (W1 Slice 1), types INT: literals as C# does (#774), and proves checked-arithmetic contracts whose overflow the preconditions rule out. Each Proven agrees with the oracle; none is a false proof.',
-        'change': 'Not opened. A draft implementing the registered refusals (docs/plans/evidence/s2-1413/r-num-draft.patch, against main 0142438f: 77 added and 4 removed non-test lines) breaks 19 existing tests that pin the deliberate semantics: Calor.Verification.Tests NumericExecutableSemanticsTests.{UnaryNegationMatchesExecutableCSharpSemantics, IntegralOperatorsMatchExecutableCSharpSemantics}; OverflowSoundnessBenchmark.{Addition_TwoVariables_Bounded, Subtraction_Bounded, Negation_Bounded, Multiplication_Bounded, Square_Bounded, Addition_Bounded}_MustBeProven and RunFullBenchmark; W1Slice1SoundnessTests.{NarrowUnsignedArithmetic_PromotesToSignedInt, NarrowIntNegation_UsesCSharpPromotion, NarrowIntArithmetic_UsesCSharpPromotion}; VerifierTests.{ProvesSquareNonNegative, ProvesSubtractionWithBounds, ProvesBoundedOverflow}; VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle (the committed #1135 differential reports); and Calor.Compiler.Tests ProductionOverflowRuntimeTests.GuardedArithmetic_ProvesWithoutEvaluatingUnselectedOverflow (3 rows). That reverses accepted verifier semantics and changes a G3 artifact, so it needs a maintainer decision.',
-        'decisionOptions': [
-            'Accept the demotion: open R-NUM as the sixth and last repair PR within the s2-repairs ceiling (the slot is reserved, not yet accepted), update the 19 tests, and regenerate the #1135 differential reports under G3.',
-            'Amend, after decision-bearing inspection and recorded as such: the contract (§8/§9 as needed) and the frozen #1419 registration classifications/classification table for the three rows, keeping the S1 findings and their last statuses on record; the 5 findings would then be re-dispositioned under the amended table.',
-            'Record MILESTONE-FAILED for the 5 findings per baseline (terminal success predicate 5 then fails).',
-        ],
-        'nonTestChangedLines': 81,
-        'regressionWitness': [],
+        'id': 'R-NUM', 'pr': 1502,
+        'branch': 'milestone-0.24/s2-1413-fix-num-refusal',
+        'rootCause': 'The registration classifies NUM-NARROW-ARITH and NUM-LITERAL-OVERSIZE as unsupported-refused (divergences D1/D2 of the frozen docs/verification-modeled-forms.md say "refused") and NUM-OVERFLOW-CHECKED as assumed, but the verifier modeled C# narrow promotion (W1 Slice 1), typed out-of-range INT: literals as 64-bit (#774), and proved checked-arithmetic contracts whose overflow the preconditions rule out. Each Proven agreed with the oracle; none was a false proof.',
+        'change': 'Opened by maintainer decision Q1 (2026-10-04): demote per the frozen table exactly. Sub-32-bit arithmetic/shifts/negation are refused (D1); an INT: literal outside int32 is refused (D2; lexer marks the inferred width, the cache key distinguishes it); checked arithmetic that can overflow for some value of its types is Assumed (checked-arithmetic) even when entailed. Overflow sensitivity is decided without preconditions (some value of the operand types overflows), so arithmetic that cannot overflow stays Proven. The 15 Calor.Verification.Tests cases that pinned the old behavior are updated (each justified by the frozen table); the #1135 differential reports are unchanged; cache format 1.22.',
+        'decision': 'Q1 (2026-10-04): open the sixth repair PR and demote per the frozen table exactly, with no reinterpretation of "unless entailed"; update the tests that pinned the old behavior; regenerate the #1135 reports if they change (they do not).',
+        'nonTestChangedLines': 109,
+        'regressionWitness': ['tests/Calor.Verification.Tests/S2NumericRefusalTests.cs'],
+        'reviews': REVIEWS + 'fix-num-refusal/',
         'rows': ['NUM-NARROW-ARITH', 'NUM-LITERAL-OVERSIZE', 'NUM-OVERFLOW-CHECKED'],
     },
 ]
+repairs.append({
+    'id': 'R-OBL-RESIDUALS', 'pr': 1503,
+    'branch': 'milestone-0.24/s2-1413-fix-obligation-residuals',
+    'rootCause': 'Review-found residuals of the obligation solver (discoveries D-OBL-THROWING-PREDECESSOR and D-OBL-PROOF-GETTER): exactness did not track an earlier statement or enclosing condition that throws implicitly, and a proof reading a property (getter, or a property hiding an inherited field) could be refuted with an unreachable model. Spurious refutations, never false proofs.',
+    'change': 'Visible demotion: after a statement that may throw (checked or dividing arithmetic, calls, member/element reads, casts, a retained proof guard), or under a guard condition that may throw, the state is not exact; an obligation reading a member named like a declared property is not exact. A SAT result is Unsupported (Calor1124, guard kept); UNSAT handling is unchanged. Stacked on #1496.',
+    'decision': 'Q7 (2026-10-04): contract amendment 1.3.0 raises the S2 repair cap 6 -> 7 for these two discoveries only; merges only after the amendment.',
+    'dependsOnAmendment': '1.3.0',
+    'dependsOn': [1496],
+    'discoveries': ['D-OBL-PROOF-GETTER', 'D-OBL-THROWING-PREDECESSOR'],
+    'nonTestChangedLines': 121,
+    'regressionWitness': ['tests/Calor.Compiler.Tests/S2ObligationResidualTests.cs'],
+    'rows': [],
+    'reviews': REVIEWS + 'fix-obligation-residuals/',
+})
 for r in repairs:
     r.setdefault('status', 'open')
     r.setdefault('mergeCommit', None)
@@ -136,9 +147,9 @@ F([26], DEMOTE, 'R-OBL', 'Spurious refutation (SELFREF-005, oracle vacuous-in-do
 F([10, 11], FIX, 'R-TEXT', 'Spurious refutation: "é" had length 2 in the solver (UTF-8 bytes) and 1 in .NET. Fixed: literals are sent per UTF-16 code unit; no refutation remains, and the postcondition stays Assumed under the existing string-model limitation, as the assumed row requires (oracle: holds).')
 F([9], FIX, 'R-TEXT', 'Spurious refutation: the model s = "" makes s.Substring(1, 1) throw. Fixed: Substring carries its range side condition; the refutation now has the reaching model s = "AB" (result 1, oracle: violated).')
 F([6, 7, 8], DEMOTE, 'R-QNT', 'Required demotion absent: Proven for a nested bounded forall (oracle holds) on a row registered unsupported-refused. Demoted: nested quantifiers are refused (Unsupported) on every verifier channel and never served from cache.')
-F([1], DEMOTE, 'R-NUM', 'Required demotion absent: Proven for i8 * i8 (oracle: holds) on a row registered unsupported-refused (D1). Pending maintainer decision; see repair R-NUM.')
-F([2], DEMOTE, 'R-NUM', 'Required demotion absent: Proven for an INT: literal outside int32 (oracle: holds) on a row registered unsupported-refused (D2). Pending maintainer decision; see repair R-NUM.')
-F([3, 4, 5], DEMOTE, 'R-NUM', 'Required demotion absent: Proven for (< (- x 1) x) where §Q rules out the overflow (oracle: holds) on a row registered assumed. The row title says "unless entailed", but the frozen classification table makes any Proven on an assumed row a finding. Pending maintainer decision; see repair R-NUM.')
+F([1], DEMOTE, 'R-NUM', 'Required demotion absent: Proven for i8 * i8 (oracle: holds) on a row registered unsupported-refused (D1). Demoted by R-NUM (#1502): sub-32-bit arithmetic is refused (Unsupported, guard kept).')
+F([2], DEMOTE, 'R-NUM', 'Required demotion absent: Proven for an INT: literal outside int32 (oracle: holds) on a row registered unsupported-refused (D2). Demoted by R-NUM (#1502): the out-of-range INT: literal is refused (Unsupported, guard kept); LONG: spells it modeled.')
+F([3, 4, 5], DEMOTE, 'R-NUM', 'Required demotion absent: Proven for (< (- x 1) x) where §Q rules out the overflow (oracle: holds) on a row registered assumed. The row title says "unless entailed", but the frozen classification table makes any Proven on an assumed row a finding. Demoted by R-NUM (#1502): Assumed (checked-arithmetic), guard kept.')
 assert sorted(plan) == list(range(1, 35))
 
 def most_conservative(dispositions):
@@ -147,7 +158,7 @@ def most_conservative(dispositions):
     return DEMOTE if DEMOTE in dispositions else FIX
 
 for r in repairs:
-    r['kind'] = most_conservative({d for d, rep, _ in plan.values() if rep == r['id']})
+    r['kind'] = most_conservative({d for d, rep, _ in plan.values() if rep == r['id']} or {DEMOTE})
 
 baselines = {}
 for b in ('B1', 'N1'):
@@ -192,7 +203,8 @@ baselines['N1']['artifact'] = {
     'identity': 'Calor 0.21.0 on nuget.org, packed from 88b5d38df97fd7e438882c956b9f9dcdc7a6cef5 (the binary users install)',
     'immutable': True,
     'dispositionScope': 'Candidate-side, as for B1. A fix in 0.24 source does not change the published 0.21.0 package; its false unconditional proofs remain in it.',
-    'publishedArtifactObligation': 'Proposed, needs a maintainer decision: the first release that carries these repairs says in its release notes that 0.21.0 (and the v0.22.0 prerelease) are affected, distinguishing the mechanisms: (1) proof obligations after a reassignment (OBL-MUTATION-KILL) and warm-cache literal-width proofs (CACHE-LITERAL-WIDTH) could remove a runtime guard that the program then needed; (2) interface contract checks (IMPL-ASSUMPTION-FORMS, IMPL-DIVISION-TOTALIZED) could accept an implementer precondition that throws on inputs the interface allows (no guard is removed; the acceptance is wrong); (3) #1493 is a potential, not observed, Windows-only collision of non-ASCII identifiers. Nothing claims the published package is fixed (contract §8 History).',
+    'releaseNotesAdvisoryDraft': 'Calor 0.21.0 (NuGet) and the v0.22.0 prerelease contain verifier defects fixed in 0.24. (1) A proof obligation after a reassignment, and a warm verification cache that confused INT:1 with LONG:1, could report a proof and remove a runtime check the program then needed. (2) Interface contract checks could accept an implementing method whose precondition throws on inputs the interface allows; no runtime check was removed, but the acceptance was wrong. (3) On Windows, two non-ASCII identifiers could in principle share one solver symbol (#1493; not observed). The published packages are not changed; upgrade to 0.24 for the fixes.',
+    'publishedArtifactObligation': 'Adopted (maintainer decision Q3, 2026-10-04): the first release that carries these repairs says in its release notes that 0.21.0 that carries these repairs says in its release notes that 0.21.0 (and the v0.22.0 prerelease) are affected, distinguishing the mechanisms: (1) proof obligations after a reassignment (OBL-MUTATION-KILL) and warm-cache literal-width proofs (CACHE-LITERAL-WIDTH) could remove a runtime guard that the program then needed; (2) interface contract checks (IMPL-ASSUMPTION-FORMS, IMPL-DIVISION-TOTALIZED) could accept an implementer precondition that throws on inputs the interface allows (no guard is removed; the acceptance is wrong); (3) #1493 is a potential, not observed, Windows-only collision of non-ASCII identifiers. Nothing claims the published package is fixed (contract §8 History).',
 }
 
 discoveries = [
@@ -202,8 +214,8 @@ discoveries = [
     'finding': 'In a §PROOF counterexample the reads inside the proof condition count as its evaluation. A getter there that writes state the same condition reads later, or a property that hides an inherited field (ContractTranslator models it as the field, on every channel), can make the SAT model an unreachable state: a spurious refutation (Failed, a compile error). Never a false Discharged: facts use the global heap rule.',
     'affects': ['B1', 'N1', 'candidate with R-OBL'],
     'observed': False,
-    'disposition': 'MILESTONE-FAILED',
-    'reason': 'Neither fixed nor demoted: R-OBL is past its review-round ceiling and the six-PR capacity is allocated. MILESTONE-FAILED is the frozen default until decision Q7 (amend, use the reserved slot, or accept the failure).',
+    'disposition': DEMOTE, 'repair': 'R-OBL-RESIDUALS',
+    'reason': 'Visibly demoted (counterexample withheld: Unsupported, guard kept) by R-OBL-RESIDUALS (#1503) under contract amendment 1.3.0, which raises the S2 repair cap to 7 for these two discoveries only (maintainer decision Q7, 2026-10-04).',
     },
     {
     'id': 'D-OBL-THROWING-PREDECESSOR', 'issue': 1413, 'registered': False,
@@ -211,8 +223,8 @@ discoveries = [
     'finding': 'Obligation exactness does not track an earlier statement that throws implicitly (checked overflow, a call, an earlier guard), so a SAT model that such a statement would stop can be reported as a counterexample: a spurious refutation (Failed, a compile error). Pre-existing on B1/N1. Never a false Discharged.',
     'affects': ['B1', 'N1', 'candidate with R-OBL'],
     'observed': False,
-    'disposition': 'MILESTONE-FAILED',
-    'reason': 'Neither fixed nor demoted within capacity (see D-OBL-PROOF-GETTER). MILESTONE-FAILED is the frozen default until decision Q7.',
+    'disposition': DEMOTE, 'repair': 'R-OBL-RESIDUALS',
+    'reason': 'Visibly demoted (counterexample withheld: Unsupported, guard kept) by R-OBL-RESIDUALS (#1503) under contract amendment 1.3.0, which raises the S2 repair cap to 7 for these two discoveries only (maintainer decision Q7, 2026-10-04).',
     },
     {
     'id': 'D-1493', 'issue': 1493, 'registered': False,
@@ -240,28 +252,30 @@ record = {
     'closure': {
         'status': 'OPEN',
         'result': None,
-        'note': 'OPEN until every repair is merged (status "merged" with its merge commit on main, being the GitHub merge of its PR from its S2 branch, and containing its regression witnesses), R-NUM is decided, and the R-OBL review overrun has a recorded amendment (overrunAmendment). The discovery ids are pinned by the validator tests, so a discovery is resolved by a repair or amendment, never deleted. At closure, result is SUCCESS (no MILESTONE-FAILED anywhere) or MILESTONE-FAILED (required if any finding or discovery is MILESTONE-FAILED); only SUCCESS satisfies terminal predicates 4-5.',
+        'note': 'OPEN until every repair is merged (status "merged" with its merge commit on main, being the GitHub merge of its PR from its S2 branch, and containing its regression witnesses), amendment 1.3.0 (capacity allowance and the R-OBL review overrun) has merged. The discovery ids are pinned by the validator tests, so a discovery is resolved by a repair or amendment, never deleted. At closure, result is SUCCESS (no MILESTONE-FAILED anywhere) or MILESTONE-FAILED (required if any finding or discovery is MILESTONE-FAILED); only SUCCESS satisfies terminal predicates 4-5.',
     },
     'capacity': {'ceiling': 's2-repairs', 'maxRepairs': 6, 'maxNonTestChangedLinesPerRepair': 600,
-                 'used': len(repairs), 'openedRepairPRs': 5, 'reservedSlots': 1,
-                 'note': 'Five repair PRs are open and one slot is reserved for R-NUM (no PR, no acceptance decision). nonTestChangedLines excludes committed review records.'},
+                 'amendmentAllowance': {'amendment': '1.3.0', 'extraRepairs': 1, 'repair': 'R-OBL-RESIDUALS',
+                                        'discoveries': ['D-OBL-PROOF-GETTER', 'D-OBL-THROWING-PREDECESSOR']},
+                 'used': len(repairs), 'openedRepairPRs': len(repairs), 'reservedSlots': 0,
+                 'note': 'Seven repair PRs: six within the frozen ceiling and one (R-OBL-RESIDUALS) under amendment 1.3.0, for the two review-found discoveries only. The validator accepts the seventh while the record is open and requires the amendment merged (contract version >= 1.3.0) at closure. nonTestChangedLines excludes committed review records.'},
     'validatorLimitations': [
         'Repair acceptance is bound mechanically only to: the pinned PR number of each opened repair (tests), an S2 branch, a merge commit on main that is GitHub\'s merge of that PR from that branch, and the regression witnesses present in it. Whether the merged contents match the reviewed repair and its affected findings is the maintainer\'s merge review, not validated here.',
-        'A review-round overrun needs a non-empty overrunAmendment at closure; the validator cannot check that it names a merged contract amendment raising the ceiling (stopping rule 1). Enforcing Q8 is manual.',
+        'A review-round overrun names its amendment version (overrunAmendment); at closure the contract version must be at least that version. That the amendment text actually covers the overrun is the maintainer\'s review.',
         'The R0 terminal validator does not read this record (Q6).',
     ],
     'repairs': repairs,
     'baselines': baselines,
     'discoveryFindings': discoveries,
-    'openQuestions': [
-        {'id': 'Q1-R-NUM', 'question': 'Disposition path for NUM-NARROW-ARITH, NUM-LITERAL-OVERSIZE, NUM-OVERFLOW-CHECKED (5 findings per baseline); see repair R-NUM decisionOptions.'},
-        {'id': 'Q2-O2-GEN-REFUSAL', 'question': 'S1 condition 10: O2 ran only partially on GEN-REFUSAL-002/-004 (the frozen input new object() cannot be passed to the compiled double[] parameter), so the registered O2 coverage for those cases is incomplete. The registered row status does not use O2 completeness, both cases are Unsupported (refusal-validated) with guards retained, O1 agrees, and the partial replay shows no divergence; proposed: keep GEN-REFUSAL VALIDATED and record the O2 gap as a coverage limitation of the frozen generator. Condition 10 itself stays the maintainer\'s decision.'},
-        {'id': 'Q3-N1-ADVISORY', 'question': 'Whether to adopt the N1 publishedArtifactObligation (release-notes advisory for 0.21.0 / v0.22.0).'},
-        {'id': 'Q4-ISSUE-LINKS', 'question': 'Issue acceptance: each repair PR must be attached to #1409 and encoded as blocking #1423. Agents do not edit issues; the maintainer links PRs #1494-#1498 (and R-NUM if opened).'},
-        {'id': 'Q6-TERMINAL-BINDING', 'question': 'The terminal-success validator (EvidenceContractValidator, R0 #1407) does not read this record: a closed S2 record with result MILESTONE-FAILED does not by itself reject a MILESTONE-SUCCEEDED terminal record that marks gate:#1413 satisfied. Binding the terminal validator to this record is an R0 change outside S2; until then the maintainer must carry closure.result into the terminal adjudication by hand.'},
-        {'id': 'Q7-REVIEW-DISCOVERIES', 'question': 'D-OBL-PROOF-GETTER and D-OBL-THROWING-PREDECESSOR (spurious refutations found or confirmed in review; never false proofs) are MILESTONE-FAILED by default. Options: (a) amend the contract to give review-found, unobserved spurious refutations a recorded known-limitation path; (b) spend the reserved sixth slot on a demotion (any SAT model after a possibly throwing statement, or reading a member in a proof condition, becomes Unsupported) instead of R-NUM; (c) accept MILESTONE-FAILED.'},
-        {'id': 'Q8-R-OBL-REVIEW-OVERRUN', 'question': 'R-OBL exceeded the three-round review ceiling (two post-round-3 passes with code changes). Stopping rule 1: record the overrun (done in repairs[R-OBL].reviewRoundOverrun) and either amend before accepting R-OBL or treat it as BLOCKED and rescope.'},
-        {'id': 'Q5-MERGE-ORDER', 'question': 'Merge order: #1494 (R-CACHE) and #1495 (R-IMPL) before #1497 (R-TEXT, stacked on #1495) and #1498 (R-QNT); #1496 (R-OBL) is independent. The cache-format constant (1.20/1.21) and eng/test-manifest.json/CHANGELOG.md need the usual merge resolution across the S2 PRs.'},
+    'maintainerDecisions': [
+        {'id': 'Q1-R-NUM', 'date': '2026-10-04', 'decision': 'Open the sixth repair PR (R-NUM, #1502): demote per the frozen table exactly, update the 19 tests, regenerate the #1135 reports.'},
+        {'id': 'Q2-O2-GEN-REFUSAL', 'date': '2026-10-04', 'decision': 'Keep GEN-REFUSAL VALIDATED; the partial O2 replay of GEN-REFUSAL-002/-004 is recorded as a coverage limitation of the frozen generator.'},
+        {'id': 'Q3-N1-ADVISORY', 'date': '2026-10-04', 'decision': 'Adopted: baselines.N1.artifact.releaseNotesAdvisoryDraft is published with the first release that carries the repairs (CHANGELOG/release notes at release time).'},
+        {'id': 'Q4-ISSUE-LINKS', 'date': '2026-10-04', 'decision': 'Each repair PR body states that it blocks #1423; agents do not edit issues.'},
+        {'id': 'Q5-MERGE-ORDER', 'date': '2026-10-04', 'decision': 'As proposed: #1494 and #1495 first, then #1497 (retargeted to main after #1495) and #1498; #1496, then #1503 after amendment 1.3.0; #1502 independent. Cache-format numbers and manifest/CHANGELOG resolve at merge.'},
+        {'id': 'Q6-TERMINAL-BINDING', 'date': '2026-10-04', 'decision': 'Noted: closure.result is carried into the terminal adjudication by hand.'},
+        {'id': 'Q7-REVIEW-DISCOVERIES', 'date': '2026-10-04', 'decision': 'Amendment 1.3.0 raises the S2 repair cap 6 -> 7 for D-OBL-PROOF-GETTER and D-OBL-THROWING-PREDECESSOR only; both are demoted visibly in R-OBL-RESIDUALS (#1503), which merges after the amendment.'},
+        {'id': 'Q8-R-OBL-REVIEW-OVERRUN', 'date': '2026-10-04', 'decision': 'Amendment 1.3.0 records the overrun; one final verification-only pass on the last fix (APPROVE, reviews/fix-obligation-state/verification-3-codex.md); #1496 merges only after the amendment.'},
     ],
 }
 open('docs/plans/evidence/s2-1413/dispositions.json', 'w').write(json.dumps(record, indent=2, ensure_ascii=False) + '\n')

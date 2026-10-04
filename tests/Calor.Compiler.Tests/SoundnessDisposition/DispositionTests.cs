@@ -70,6 +70,7 @@ public sealed class DispositionTests
     private static readonly Dictionary<string, int> PinnedRepairPrs = new()
     {
         ["R-CACHE"] = 1494, ["R-IMPL"] = 1495, ["R-OBL"] = 1496, ["R-TEXT"] = 1497, ["R-QNT"] = 1498,
+        ["R-NUM"] = 1502, ["R-OBL-RESIDUALS"] = 1503,
     };
 
     private static Dictionary<(string Baseline, string Row), int> ValidatedProofCounts()
@@ -88,11 +89,20 @@ public sealed class DispositionTests
         return counts;
     }
 
+    /// <summary>
+    /// At closure, a record stating a later contract version than the committed contract.json is
+    /// validated against that contract as amended (the version is the only field the closure rules
+    /// read); open-state validation always uses the committed contract.
+    /// </summary>
     private static IReadOnlyList<DispositionValidator.Violation> Validate(
         JsonNode record, bool closing = false, DispositionValidator.ClosureEvidence? evidence = null)
-        => DispositionValidator.Validate(
+    {
+        var contract = Load("docs/plans/evidence/evidence-contract-1407/contract.json");
+        if (closing && record["contractVersion"]?.GetValue<string>() is { } stated && stated != contract["contractVersion"]!.GetValue<string>())
+            contract["contractVersion"] = stated;
+        return DispositionValidator.Validate(
             record,
-            Load("docs/plans/evidence/evidence-contract-1407/contract.json"),
+            contract,
             Load("docs/plans/evidence/s1-1311/run2/findings.json"),
             Load("docs/plans/evidence/s1-1311/findings.json"),
             Load("docs/plans/evidence/s1-1311/combined-row-status.json"),
@@ -102,6 +112,7 @@ public sealed class DispositionTests
             ValidatedProofCounts(),
             PinnedDiscoveries,
             PinnedRepairPrs);
+    }
 
     private static void AssertCodes(IReadOnlyList<DispositionValidator.Violation> violations, params string[] codes)
         => Assert.Equal(
@@ -128,20 +139,12 @@ public sealed class DispositionTests
             repair["mergeCommit"] = (index++).ToString("x").PadLeft(40, 'a');
             repair["pr"] ??= 9999;
             repair["branch"] ??= "milestone-0.24/s2-1413-fix-example";
-            if (repair["reviewRoundOverrun"] != null)
-                repair["overrunAmendment"] = "example: contract amendment recording the R-OBL overrun";
+
             if (repair["regressionWitness"]!.AsArray().Count == 0)
                 repair["regressionWitness"]!.AsArray().Add("tests/example.cs");
         }
-        // The review-found discoveries are kept (pinned) and resolved through a repair that lists
-        // them, as an accepted demotion would.
-        var obl = Repair(record, "R-OBL");
-        foreach (var d in record["discoveryFindings"]!.AsArray().Where(d => d!["disposition"]!.GetValue<string>() == "MILESTONE-FAILED"))
-        {
-            d!["disposition"] = "DEMOTE-IN-0.24";
-            d["repair"] = "R-OBL";
-            obl["discoveries"]!.AsArray().Add(d["id"]!.GetValue<string>());
-        }
+        // Closing assumes amendment 1.3.0 has merged (capacity allowance and the R-OBL overrun).
+        record["contractVersion"] = "1.3.0";
         record["closure"]!["status"] = "CLOSED";
         record["closure"]!["result"] = "SUCCESS";
         return record;
@@ -156,11 +159,14 @@ public sealed class DispositionTests
     [Fact]
     public void CommittedRecord_IsNotYetClosable()
     {
-        // Unmerged repairs and the undecided R-NUM keep S2 open; there is no closure result yet.
+        // Unmerged repairs and the unmerged amendment 1.3.0 keep S2 open; there is no closure
+        // result yet. R-CACHE (#1494) is merged: its real merge commit passes the real git checks.
         var violations = Validate(Record(), closing: true);
         AssertCodes(violations, "D010", "D016");
-        Assert.Contains(violations, v => v.Message.Contains("R-NUM: undecided at closure"));
-        Assert.Contains(violations, v => v.Message.Contains("R-CACHE: not merged at closure"));
+        Assert.Contains(violations, v => v.Message.Contains("R-OBL: not merged at closure"));
+        Assert.Contains(violations, v => v.Message.Contains("capacity amendment 1.3.0 is not in the contract"));
+        if (Git("rev-parse --verify --quiet origin/main").ExitCode == 0) // the real check needs the main ref
+            Assert.DoesNotContain(violations, v => v.Message.StartsWith("R-CACHE:", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -198,18 +204,35 @@ public sealed class DispositionTests
     }
 
     [Fact]
-    public void CommittedDiscoveries_CloseOnlyAsMilestoneFailed()
+    public void D010_AmendmentNotMerged_DoesNotClose()
     {
-        // With the committed MILESTONE-FAILED discoveries unresolved, only a failed closure is valid.
+        // With the committed contract (no amendment 1.3.0), neither the seventh repair nor the
+        // R-OBL review overrun can close.
+        var record = MergedRecord();
+        record["contractVersion"] = Record()["contractVersion"]!.DeepClone();
+        var violations = Validate(record, closing: true, AcceptAll(record));
+        AssertCodes(violations, "D010");
+        Assert.Contains(violations, v => v.Message.Contains("capacity amendment 1.3.0 is not in the contract"));
+        Assert.Contains(violations, v => v.Message.Contains("R-OBL: review-round overrun without a merged amendment"));
+    }
+
+    [Fact]
+    public void D009_AmendmentAllowanceCoversOnlyItsDiscoveries()
+    {
         var record = Record();
-        var merged = MergedRecord();
-        record["repairs"] = merged["repairs"]!.DeepClone();
-        Repair(record, "R-OBL")["discoveries"] = new JsonArray();
-        record["closure"]!["status"] = "CLOSED";
-        record["closure"]!["result"] = "SUCCESS";
-        AssertCodes(Validate(record, closing: true, AcceptAll(record)), "D016");
-        record["closure"]!["result"] = "MILESTONE-FAILED";
-        AssertCodes(Validate(record, closing: true, AcceptAll(record)));
+        Finding(record, "B1", "F-B1-001")["repair"] = "R-OBL-RESIDUALS";
+        var violations = Validate(record);
+        Assert.Contains(violations, v => v.Code == "D009" && v.Message.Contains("covers discoveries only"));
+    }
+
+    [Fact]
+    public void D009_AmendmentAllowanceMustMatchTheRepairsDiscoveries()
+    {
+        var record = Record();
+        record["capacity"]!["amendmentAllowance"]!["discoveries"] = new JsonArray("D-OBL-PROOF-GETTER");
+        var violations = Validate(record);
+        AssertCodes(violations, "D009");
+        Assert.Contains(violations, v => v.Message.Contains("exceed the 6-repair ceiling"));
     }
 
     [Fact]
@@ -228,7 +251,7 @@ public sealed class DispositionTests
         Repair(record, "R-OBL").Remove("overrunAmendment");
         var violations = Validate(record, closing: true, AcceptAll(record));
         AssertCodes(violations, "D010");
-        Assert.Contains(violations, v => v.Message.Contains("R-OBL: review-round overrun without a recorded amendment"));
+        Assert.Contains(violations, v => v.Message.Contains("R-OBL: review-round overrun without a merged amendment"));
     }
 
     [Fact]
@@ -580,7 +603,8 @@ public sealed class DispositionTests
     {
         var record = Record();
         record["discoveryFindings"] = new JsonArray();
-        AssertCodes(Validate(record), "D014");
+        // R-OBL-RESIDUALS then carries no discovery and is referenced by nothing (D015).
+        AssertCodes(Validate(record), "D014", "D015");
     }
 
     [Fact]
