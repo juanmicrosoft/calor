@@ -832,11 +832,21 @@ public static class VerifyCommand
             parameters.Add(("result", frozenFn.Output!.TypeName));
         }
 
+        // #1413: the implication prover models checked overflow as a throwing contract. The
+        // frozen and final files must run under one overflow policy for their contracts to be
+        // comparable at all.
+        var checkOverflow = frozenModule!.ShouldCheckIntegerOverflow();
+        if (finalModule.ShouldCheckIntegerOverflow() != checkOverflow)
+        {
+            return Emit(declarationId, weakened: null, indeterminate: true,
+                "frozen and final modules use different overflow policies — contracts incomparable");
+        }
+
         return RunWeakeningProofs(
             declarationId, parameters,
             Conjoin(frozenQ), Conjoin(finalQ),
             Conjoin(frozenS), Conjoin(finalS),
-            timeoutMs, Emit);
+            timeoutMs, checkOverflow, Emit);
     }
 
     /// <summary>
@@ -859,10 +869,14 @@ public static class VerifyCommand
         Ast.ExpressionNode frozenS,
         Ast.ExpressionNode finalS,
         uint timeoutMs,
+        bool checkIntegerOverflow,
         Func<string, bool?, bool, string, bool?, string?, string?, string?, string?, int> emit)
     {
         using var ctx = Verification.Z3.Z3ContextFactory.Create();
-        var prover = new Verification.Z3.Z3ImplicationProver(ctx, timeoutMs);
+        var prover = new Verification.Z3.Z3ImplicationProver(ctx, timeoutMs)
+        {
+            CheckIntegerOverflow = checkIntegerOverflow,
+        };
         var typedParams = parameters.Select(p => (p.Name, p.TypeName)).ToList();
 
         var sForward = prover.ProveImplication(typedParams, frozenS, finalS);

@@ -48,10 +48,15 @@ All notable changes to this project will be documented in this file.
   an interface, Calor checks that the class's precondition accepts every input the interface
   accepts. That check treated `s.Length` as defined for a null string and `x % y` as defined
   for `y = 0`, and reported "Precondition weakening proven" (`Calor0815`) for preconditions that
-  throw on such inputs. Now a check that depends on a possibly-zero divisor, possible checked
-  overflow, or a string, array, or user-type value reports the new warning `Calor0819`
-  ("Assumed, not proven") with the named assumption, and Calor no longer reports the
-  inheritance as valid (`Calor0814`). Checks over plain integers are unchanged.
+  throw on such inputs. The check now asks whether the class's contract completes and holds
+  wherever the interface's contract completes and holds. A contract that throws on an accepted
+  input (a zero divisor, or checked overflow) is now an LSP error with that input as the
+  counterexample (`Calor0810`/`Calor0811`). A check that depends on string, array, or
+  user-type values, which the solver cannot model as null, reports the new warning `Calor0819`
+  ("Assumed, not proven"). In both cases Calor no longer reports the inheritance as valid
+  (`Calor0814`), and it no longer reports `Calor0814` when only the syntactic fallback
+  accepted the contracts. The weakening check (`calor verify --weakening-check`) reports
+  contracts as incomparable when the two files use different overflow policies.
 
 - **An empty clause body no longer swallows the next statement (#1485).** A
   clause such as `§CA` (catch) with no indented lines used to pull the next

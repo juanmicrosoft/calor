@@ -1471,7 +1471,11 @@ public sealed class ContractInheritanceChecker : IDisposable
             implementingMethod.Output?.TypeName,
             new BoolLiteralNode(implementingMethod.Span, false),
             combined);
-        if (impossible.Status != ImplicationStatus.Proven)
+        // #1413: an Assumed contradiction (one that relies on the solver's non-null reference
+        // sorts) is still reported, as it was before the definedness change: the error makes no
+        // proof claim and removes no guard.
+        if (impossible.Status != ImplicationStatus.Proven
+            && impossible.Outcome?.Status != ProofStatus.Assumed)
             return;
 
         var violation = new ContractViolation(
@@ -1630,7 +1634,7 @@ public sealed class ContractInheritanceChecker : IDisposable
         }
 
         // Fall back to heuristic checking
-        return CheckPreconditionHeuristic(
+        var heuristicViolation = CheckPreconditionHeuristic(
             interfacePrecondition,
             implementerPrecondition,
             classNode,
@@ -1638,6 +1642,11 @@ public sealed class ContractInheritanceChecker : IDisposable
             sourceTypeName,
             sourceMethodName,
             implSpan);
+        // #1413: a syntactic heuristic establishes nothing. After the solver declined, a
+        // heuristic acceptance must not turn into a "contract inheritance valid" claim.
+        if (heuristicViolation == null && _z3Prover != null)
+            _implicationUnestablished = true;
+        return heuristicViolation;
     }
 
     /// <summary>
@@ -1708,7 +1717,7 @@ public sealed class ContractInheritanceChecker : IDisposable
         }
 
         // Fall back to heuristic checking
-        return CheckPostconditionHeuristic(
+        var heuristicViolation = CheckPostconditionHeuristic(
             interfacePostcondition,
             implementerPostcondition,
             classNode,
@@ -1716,6 +1725,9 @@ public sealed class ContractInheritanceChecker : IDisposable
             sourceTypeName,
             sourceMethodName,
             implSpan);
+        if (heuristicViolation == null && _z3Prover != null)
+            _implicationUnestablished = true;
+        return heuristicViolation;
     }
 
     private void ReportImplicationAssumed(

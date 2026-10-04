@@ -31,7 +31,7 @@ public sealed class S2ImplicationProverDefinednessTests
     }
 
     [Fact]
-    public void PostconditionDirection_ThrowingInterfaceGuarantee_IsAssumed()
+    public void PostconditionDirection_ThrowingInterfaceGuarantee_IsRefutedAtTheThrowingInput()
     {
         // The implementer guarantees result >= 0; the interface guarantees
         // (100 / result) >= -1, which throws at result = 0 (the solver totalizes 100/0 to -1).
@@ -40,9 +40,9 @@ public sealed class S2ImplicationProverDefinednessTests
         using var prover = new Z3ImplicationProver(ctx);
         var result = prover.CheckPostconditionStrengthening(
             [("x", "i32"), ("y", "i32")], "i32", posts[1].Condition, posts[0].Condition);
-        Assert.Equal(ImplicationStatus.Unknown, result.Status);
-        Assert.Equal(ProofStatus.Assumed, result.Outcome!.Status);
-        Assert.Contains(Z3Verifier.ContractExpressionDivisionAssumption, result.Outcome.Assumptions);
+        // The implementer allows result = 0, where the interface's guarantee throws.
+        Assert.Equal(ImplicationStatus.Disproven, result.Status);
+        Assert.Contains(result.Outcome!.Counterexample!.Bindings, b => b.Name == "result" && b.Value == "0");
     }
 
     [Fact]
@@ -58,16 +58,18 @@ public sealed class S2ImplicationProverDefinednessTests
     }
 
     [Fact]
-    public void ConditionallyEvaluatedDivisor_IsUnsupported()
+    public void ConditionallyEvaluatedDivisor_IsAssumed()
     {
-        // A divisor on the right of || is evaluated only on some inputs; no side condition
-        // is modeled for it, so nothing is established.
+        // A divisor on the right of || is evaluated only on some inputs; no side condition is
+        // modeled for it, so the (UNSAT) implication is only Assumed.
         var posts = Postconditions("    §S (>= x INT:1)\n    §S (|| (> x INT:0) (> (/ INT:1 y) INT:0))");
         using var ctx = Z3ContextFactory.Create();
         using var prover = new Z3ImplicationProver(ctx);
         var result = prover.ProveImplication(
             [("x", "i32"), ("y", "i32")], posts[0].Condition, posts[1].Condition);
-        Assert.Equal(ImplicationStatus.Unsupported, result.Status);
+        Assert.Equal(ImplicationStatus.Unknown, result.Status);
+        Assert.Equal(ProofStatus.Assumed, result.Outcome!.Status);
+        Assert.Contains(Z3Verifier.ContractExpressionDivisionAssumption, result.Outcome.Assumptions);
     }
 
     [Fact]

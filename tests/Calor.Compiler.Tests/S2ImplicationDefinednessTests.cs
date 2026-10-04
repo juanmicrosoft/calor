@@ -87,15 +87,27 @@ public sealed class S2ImplicationDefinednessTests
         AssertPreconditionWeakeningAssumed(diagnostics, "string-model");
     }
 
-    [Fact]
-    public void ModuloByPossiblyZeroDivisor_IsAssumedNotProven()
+    private static void AssertPreconditionWeakeningRefuted(List<Diagnostic> diagnostics, string witness)
     {
-        // R1-IMPL-DIVISION-TOTALIZED-001, oracle witness (x = 3, y = 0): x % y throws.
+        Assert.True(Z3ContextFactory.IsAvailable, "these witnesses need Z3");
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ImplicationProvenByZ3
+            && d.Message.StartsWith("Precondition weakening proven", StringComparison.Ordinal));
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ContractInheritanceValid);
+        var violation = Assert.Single(diagnostics, d => d.Code == DiagnosticCode.StrongerPrecondition);
+        Assert.Equal(DiagnosticSeverity.Error, violation.Severity);
+        Assert.Contains(witness, violation.Message);
+    }
+
+    [Fact]
+    public void ModuloByPossiblyZeroDivisor_IsRefutedAtTheThrowingInput()
+    {
+        // R1-IMPL-DIVISION-TOTALIZED-001, oracle witness (x = 3, y = 0): the interface accepts
+        // it and the implementer's precondition throws there — a real LSP violation, now
+        // reported with that input as the counterexample instead of "proven".
         int x = 3, y = 0;
         Assert.Throws<DivideByZeroException>(() => x % y > -2);
 
-        var diagnostics = Compile(DivisionSource);
-        AssertPreconditionWeakeningAssumed(diagnostics, "exceptional-paths:contract-division");
+        AssertPreconditionWeakeningRefuted(Compile(DivisionSource), "y=0");
     }
 
     private const string IntegerTemplate = """
@@ -147,15 +159,93 @@ public sealed class S2ImplicationDefinednessTests
     }
 
     [Fact]
-    public void CheckedOverflowInImplementerPrecondition_IsAssumedNotProven()
+    public void CheckedOverflowInImplementerPrecondition_IsRefuted()
     {
-        // x * 2 is always even under wrapping, so the solver alone "proves" (x*2 != 1);
-        // under the default checked module x * 2 throws for x > int.MaxValue / 2.
+        // x * 2 is always even under wrapping, so the solver alone "proved" (x*2 != 1); under
+        // the default checked module x * 2 throws for x > int.MaxValue / 2, which the
+        // interface accepts.
         int x = int.MaxValue;
         Assert.Throws<OverflowException>(() => checked(x * 2) != 1);
 
-        var diagnostics = CompileInteger("(> x INT:0)", "(!= (* x INT:2) INT:1)");
-        AssertPreconditionWeakeningAssumed(diagnostics, "checked-arithmetic");
+        AssertPreconditionWeakeningRefuted(CompileInteger("(> x INT:0)", "(!= (* x INT:2) INT:1)"), "x=");
+    }
+
+    [Fact]
+    public void ThrowingInterfacePrecondition_DoesNotYieldAFalseRefutation()
+    {
+        // Review round 1 witness: x + 1 < 0 completes true only for x < -1, where x < 0 holds.
+        // At x = int.MaxValue the wrapped sum is negative, but the checked contract throws, so
+        // that input is not one the interface accepts.
+        var diagnostics = CompileInteger("(< (+ x INT:1) INT:0)", "(< x INT:0)");
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.StrongerPrecondition);
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.ImplicationProvenByZ3
+            && d.Message.StartsWith("Precondition weakening proven", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ConditionalDivisor_NoProofAndNoHeuristicValidityClaim()
+    {
+        // Review round 1 witness: the interface accepts x = 0, y = 1 and the implementer rejects
+        // it. The divisor is conditionally evaluated, so no solver verdict is established, and
+        // a syntactic heuristic must not turn that into "contract inheritance valid".
+        var diagnostics = CompileInteger(
+            "(== (|| (== x INT:0) (== (% x y) INT:0)) BOOL:true)",
+            "(!= (|| (== x INT:0) (== (% x y) INT:0)) BOOL:true)");
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ImplicationProvenByZ3
+            && d.Message.StartsWith("Precondition weakening proven", StringComparison.Ordinal));
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ContractInheritanceValid);
+    }
+
+    [Fact]
+    public void UnusedStringParameter_DoesNotDemoteAnIntegerImplication()
+    {
+        const string source = """
+            §M{m1:M}
+              §IFACE{i1:IProbe}
+                §MT{m1:Run}
+                  §I{i32:x}
+                  §I{str:s}
+                  §O{i32}
+                  §Q (>= x INT:1)
+              §CL{c1:Impl:pub}
+                §IMPL{IProbe}
+                §MT{mt1:Run:pub}
+                  §I{i32:x}
+                  §I{str:s}
+                  §O{i32}
+                  §Q (>= x INT:0)
+                  §R INT:0
+            """;
+        var diagnostics = Compile(source);
+        Assert.Contains(diagnostics, d => d.Code == DiagnosticCode.ImplicationProvenByZ3
+            && d.Message.StartsWith("Precondition weakening proven", StringComparison.Ordinal));
+        Assert.DoesNotContain(diagnostics, d => d.Code == DiagnosticCode.ImplicationAssumed);
+    }
+
+    [Fact]
+    public void IncompatibleInheritedGuarantees_StillReportedWithAStringParameter()
+    {
+        const string source = """
+            §M{m1:M}
+              §IFACE{i1:IA}
+                §MT{m1:Run}
+                  §I{str:s}
+                  §O{i32}
+                  §S (== result INT:0)
+              §IFACE{i2:IB}
+                §MT{m2:Run}
+                  §I{str:s}
+                  §O{i32}
+                  §S (== result INT:1)
+              §CL{c1:Impl:pub}
+                §IMPL{IA}
+                §IMPL{IB}
+                §MT{mt1:Run:pub}
+                  §I{str:s}
+                  §O{i32}
+                  §R INT:0
+            """;
+        Assert.Contains(Compile(source), d => d.Code == DiagnosticCode.IncompatibleInheritedContracts);
     }
 
     [Fact]

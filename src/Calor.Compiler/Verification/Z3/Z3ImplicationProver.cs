@@ -108,9 +108,13 @@ public sealed class Z3ImplicationProver : IDisposable
 
         var translator = new ContractTranslator(_ctx);
 
-        // Declare all parameters
+        // Declare the parameters the contracts read (#1413: an unused string, array, or
+        // user-type parameter must not put a reference sort into an integer-only query).
+        var referenced = ReferencedRoots(antecedent, consequent);
         foreach (var (name, type) in parameters)
         {
+            if (!referenced.Contains(name))
+                continue;
             if (!translator.DeclareVariable(name, type))
             {
                 // Unsupported parameter type (strings, floats, etc.)
@@ -153,23 +157,32 @@ public sealed class Z3ImplicationProver : IDisposable
                 Duration: sw.Elapsed);
         }
 
-        return Solve(translator, antecedentExpr, consequent, consequentExpr, sw);
+        return Solve(translator, antecedent, antecedentExpr, consequent, consequentExpr, sw);
     }
 
     /// <summary>
-    /// Decides A → C, where A (an assumed contract) and C (a contract that must then hold)
-    /// are runtime-evaluated C# expressions. The solver's terms are total — x/0 has a value,
-    /// arithmetic wraps, strings and arrays are never null — while at runtime C may throw
-    /// (a zero or MinValue÷−1 divisor, checked overflow, a null receiver). A throwing C
-    /// rejects the input (precondition) or fails the guarantee (postcondition), so
-    /// "A → C" is established only when A also entails C's definedness and the query uses
-    /// no sort whose null the solver cannot represent; otherwise the verdict is Assumed,
-    /// which is never reported as proven (#1413, S1 rows IMPL-ASSUMPTION-FORMS and
-    /// IMPL-DIVISION-TOTALIZED). A's own partiality needs no condition: treating a
-    /// throwing A as a total value only adds inputs to check.
+    /// Decides A → C, where A (an assumed contract) and C (a contract that must then hold) are
+    /// runtime-evaluated C# expressions. The solver's terms are total — x/0 has a value,
+    /// arithmetic wraps, strings and arrays are never null — while at runtime a contract can
+    /// throw (a zero or MinValue÷−1 divisor, checked overflow, a null receiver). #1413 (S1 rows
+    /// IMPL-ASSUMPTION-FORMS, IMPL-DIVISION-TOTALIZED): the question is asked with definedness
+    /// made explicit. An input matters only when A completes and is true; there C must
+    /// complete and be true. So the query is <c>A ∧ D(A) ∧ ¬(D(C) ∧ C)</c>, where D(e) is e's
+    /// divisor and (checked module) overflow side conditions:
+    /// <list type="bullet">
+    /// <item>UNSAT: proven — unless the query touched a string, array, or user-type sort,
+    /// whose null the solver cannot represent (then Assumed), or D(C) could not be modeled
+    /// (then Assumed: C may throw where the solver cannot see it).</item>
+    /// <item>SAT: refuted, and the model is a real input where A completes true and C throws
+    /// or is false — unless D(A) or D(C) could not be modeled, in which case the model may
+    /// describe an input where A throws: Unsupported, no counterexample claimed.</item>
+    /// </list>
+    /// When D(A) cannot be modeled it is omitted; A alone over-approximates "A completes and
+    /// is true", so an UNSAT verdict stays sound.
     /// </summary>
     private ImplicationResult Solve(
         ContractTranslator translator,
+        ExpressionNode antecedent,
         BoolExpr antecedentExpr,
         ExpressionNode consequent,
         BoolExpr consequentExpr,
@@ -177,34 +190,26 @@ public sealed class Z3ImplicationProver : IDisposable
     {
         try
         {
-            var (divisorConditions, divisorFailure) =
-                FunctionBodyEncoder.CollectDivisorNonZeroConstraintsFromExpression(translator, _ctx, consequent);
-            if (divisorFailure != null)
-            {
-                return ImplicationResult.FromOutcome(
-                    ProofOutcome.Assign(ProofEvidence.Unsupported(
-                        $"{divisorFailure}. Implication not established.")),
-                    Duration: sw.Elapsed);
-            }
-            var overflowSafety = CheckIntegerOverflow
-                ? translator.GetCheckedArithmeticSafety(consequent)
-                : _ctx.MkTrue();
-            if (overflowSafety == null)
-            {
-                return ImplicationResult.FromOutcome(
-                    ProofOutcome.Assign(ProofEvidence.Unsupported(
-                        "The contract's checked arithmetic could not be modeled. Implication not established.")),
-                    Duration: sw.Elapsed);
-            }
+            var antecedentDefined = Definedness(translator, antecedent, out var antecedentFailure);
+            var consequentDefined = Definedness(translator, consequent, out var consequentFailure);
 
-            // Create solver and add constraint: A AND NOT(C) — the same query as before the
-            // definedness checks, so its verdict and model are unchanged.
             using var solver = new IsolatedSolver(_ctx, _timeoutMs);
             solver.Assert(antecedentExpr);
-            solver.Assert(_ctx.MkNot(consequentExpr));
+            if (antecedentDefined != null)
+                solver.Assert(antecedentDefined);
+            solver.Assert(_ctx.MkNot(consequentDefined != null
+                ? _ctx.MkAnd(consequentDefined, consequentExpr)
+                : consequentExpr));
 
-            // Check satisfiability: UNSAT means A always implies C (under total semantics)
             var status = solver.Check();
+            if (status == Status.SATISFIABLE && (antecedentDefined == null || consequentDefined == null))
+            {
+                return ImplicationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(
+                        $"No counterexample established: {antecedentFailure ?? consequentFailure}, so the "
+                        + "solver's model may be an input where a contract throws. Implication not established.")),
+                    Duration: sw.Elapsed);
+            }
             if (status != Status.UNSATISFIABLE)
             {
                 return ImplicationResult.FromOutcome(
@@ -216,16 +221,12 @@ public sealed class Z3ImplicationProver : IDisposable
 
             var assumptions = new List<string>();
             var reasons = new List<string>();
-            if (divisorConditions.Count > 0
-                && !Entailed(antecedentExpr, _ctx.MkAnd(divisorConditions.ToArray())))
+            if (consequentDefined == null)
             {
-                assumptions.Add(Z3Verifier.ContractExpressionDivisionAssumption);
-                reasons.Add("no divisor in the required contract is zero (or MinValue ÷ -1)");
-            }
-            if (!Entailed(antecedentExpr, overflowSafety))
-            {
-                assumptions.Add(Z3Verifier.CheckedArithmeticAssumption);
-                reasons.Add("the required contract's checked arithmetic does not overflow");
+                assumptions.Add(consequentFailure!.Contains("overflow", StringComparison.Ordinal)
+                    ? Z3Verifier.CheckedArithmeticAssumption
+                    : Z3Verifier.ContractExpressionDivisionAssumption);
+                reasons.Add($"the required contract does not throw ({consequentFailure})");
             }
             if (translator.TouchedStringTheory)
             {
@@ -262,17 +263,48 @@ public sealed class Z3ImplicationProver : IDisposable
         }
     }
 
-    /// <summary>True when <paramref name="antecedent"/> entails <paramref name="condition"/>
-    /// (an unknown or timed-out check counts as not entailed). Each check runs in a fresh
-    /// isolated context (#1135).</summary>
-    private bool Entailed(BoolExpr antecedent, BoolExpr condition)
+    /// <summary>
+    /// The condition under which <paramref name="contract"/> completes without throwing:
+    /// divisor side conditions and, in a checked module, overflow safety. Null (with
+    /// <paramref name="failure"/>) when a condition cannot be modeled, e.g. a divisor in a
+    /// conditionally evaluated position.
+    /// </summary>
+    private BoolExpr? Definedness(ContractTranslator translator, ExpressionNode contract, out string? failure)
     {
-        if (IsolatedSolver.Simplify(_ctx, condition).IsTrue)
-            return true;
-        using var solver = new IsolatedSolver(_ctx, _timeoutMs);
-        solver.Assert(antecedent);
-        solver.Assert(_ctx.MkNot(condition));
-        return solver.Check() == Status.UNSATISFIABLE;
+        var (divisors, divisorFailure) =
+            FunctionBodyEncoder.CollectDivisorNonZeroConstraintsFromExpression(translator, _ctx, contract);
+        if (divisorFailure != null)
+        {
+            failure = divisorFailure;
+            return null;
+        }
+        var overflow = CheckIntegerOverflow ? translator.GetCheckedArithmeticSafety(contract) : _ctx.MkTrue();
+        if (overflow == null)
+        {
+            failure = "the contract's checked overflow could not be modeled";
+            return null;
+        }
+        failure = null;
+        return _ctx.MkAnd(divisors.Append(overflow).ToArray());
+    }
+
+    /// <summary>The variable names (dotted paths by their root) two contracts read.</summary>
+    private static HashSet<string> ReferencedRoots(params ExpressionNode[] contracts)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        void Walk(AstNode node)
+        {
+            if (node is ReferenceNode reference)
+            {
+                names.Add(reference.Name);
+                names.Add(reference.Name.Split('.')[0]);
+            }
+            foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(node))
+                Walk(child);
+        }
+        foreach (var contract in contracts)
+            Walk(contract);
+        return names;
     }
 
     /// <summary>
@@ -315,9 +347,12 @@ public sealed class Z3ImplicationProver : IDisposable
 
         var translator = new ContractTranslator(_ctx);
 
-        // Declare all parameters
+        // Declare the parameters the contracts read (see ProveImplication).
+        var referenced = ReferencedRoots(interfacePostcondition, implementerPostcondition);
         foreach (var (name, type) in parameters)
         {
+            if (!referenced.Contains(name))
+                continue;
             if (!translator.DeclareVariable(name, type))
             {
                 return ImplicationResult.FromOutcome(
@@ -328,7 +363,11 @@ public sealed class Z3ImplicationProver : IDisposable
         }
 
         // Declare 'result' variable for postconditions
-        if (!string.IsNullOrEmpty(outputType))
+        if (!referenced.Contains("result"))
+        {
+            // Neither contract reads the result: no result variable.
+        }
+        else if (!string.IsNullOrEmpty(outputType))
         {
             if (!translator.DeclareVariable("result", outputType))
             {
@@ -369,7 +408,7 @@ public sealed class Z3ImplicationProver : IDisposable
         // For LSP: implementer postcondition must imply interface postcondition
         // i.e., anything the implementer guarantees should also satisfy what the interface guarantees
         // This means the implementer can only guarantee MORE (stronger postcondition)
-        return Solve(translator, implementerExpr, interfacePostcondition, interfaceExpr, sw);
+        return Solve(translator, implementerPostcondition, implementerExpr, interfacePostcondition, interfaceExpr, sw);
     }
 
     public void Dispose()
