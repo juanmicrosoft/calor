@@ -19,4 +19,4 @@ The reviewer also ran the validator against `origin/main` (D001–D016 and froze
 23 selected Python controls (pass). It found no unregistered test additions. Not verified by
 the reviewer, which was read-only: a real probe build, and timings on the five platforms. It
 estimates the overhead at about 100 seconds per job for the two oracle invocations across 15
-attempts, which shows no timeout risk.
+attempts and found no timeout defect; that estimate is not a measurement on the five runners.
