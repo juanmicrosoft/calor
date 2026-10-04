@@ -75,6 +75,13 @@ All notable changes to this project will be documented in this file.
   New facts: an `else`/`elseif` body knows that the earlier conditions were false, and a
   parameter of a named refinement type (`§I{Pos:x}`) satisfies its predicate on entry.
 
+- **The verification cache no longer mixes up `INT:1` and `LONG:1` (#1413).** The cache key
+  hashed an integer literal by its value only. After compiling `x + LONG:1`, a later compile
+  of `x + INT:1` reused the cached `Proven`, although `int.MaxValue + 1` overflows; the
+  runtime check was then removed. Keys now include each literal's width, signedness, and
+  (for real literals) float/double/decimal kind. The cache format moves to 1.20, so every
+  older entry is invalidated.
+
 - **An empty clause body no longer swallows the next statement (#1485).** A
   clause such as `§CA` (catch) with no indented lines used to pull the next
   statement at the same column into its body. The program compiled with no
