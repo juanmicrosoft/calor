@@ -444,8 +444,10 @@ class PlanGuards(unittest.TestCase):
         self.refused("already executed", inventory=[past(1, "unreadable title", sha=NEW)])  # fail closed: counted as an execution
         self.refused("unfinished", inventory=[past(1, "determinism execution E1", status="in_progress", started=False)])
         self.assertEqual([], self.plan(inventory=[past(1, "determinism control C1", sha=NEW)]))  # a control run is not an execution
-        ledgered = {"entries": [{"runId": 1, "mode": "execution", "commit": NEW, "runnerMinutes": 1}]}
+        ledgered = {"entries": [{"runId": 1, "mode": "execution", "commit": NEW, "runnerMinutes": 1, "attemptsStarted": True}]}
         self.refused("already executed", inventory=[past(1, "determinism execution E1", sha=NEW, started=False)], ledger=ledgered)
+        refused_run = {"entries": [dict(ledgered["entries"][0], attemptsStarted=False)]}  # a ledgered plan refusal is not an execution
+        self.assertEqual([], self.plan(inventory=[past(1, "determinism execution E1", sha=NEW, started=False)], ledger=refused_run))
 
     def test_deleted_or_foreign_runs_are_refused(self) -> None:
         self.refused("missing from the API inventory", ledger={"entries": [{"runId": 7, "mode": "execution", "runnerMinutes": 300}]})
@@ -617,8 +619,10 @@ case "$1" in
   --list-sdks) echo "10.0.401 [$FAKE_ROOT/sdk]"; exit 0;;
   --list-runtimes) echo "Microsoft.NETCore.App 10.0.12 [$FAKE_ROOT/shared/Microsoft.NETCore.App]"; exit 0;;
   --version) echo "10.0.401"; exit 0;;
-  build) [ "$4" = Release ] && [ -n "$APPDATA" ] && exit 0; exit 1;;
-  *.dll) echo "$USERPROFILE"; exit 0;;
+  build) echo build >> "$FAKE_LOG.probe"; [ "$FAKE_PROBE" != buildfail ] && [ "$4" = Release ] && [ -n "$APPDATA" ] && exit 0; exit 1;;
+  *.dll) echo run >> "$FAKE_LOG.probe"
+         case "$FAKE_PROBE" in runfail) echo "$USERPROFILE"; exit 1;; empty) exit 0;; foreign) echo /real-home; exit 0;; esac
+         echo "$USERPROFILE"; exit 0;;
 esac
 echo "$HOME|$USERPROFILE|$DOTNET_CLI_HOME|$CALOR_DETERMINISM_RECORD_DIR|${CALOR_UPDATE_X:-unset}|$NUGET_PACKAGES" >> "$FAKE_LOG"
 prev=""; dir=""; name=""
@@ -675,6 +679,13 @@ class AttemptRunnerControls(unittest.TestCase):
         self.assertEqual(len(dp.judge(PROTOCOL, dp.env_by_id(PROTOCOL)["linux-x64"], observed, self.head)), len(check["violations"]))
         self.assertTrue(observed["dotnetPath"].startswith(str(self.tmp / "bin")))
         self.assertEqual([], self.lines())  # the environment check runs no test
+
+    def test_the_home_probe_fails_closed(self) -> None:
+        self.assertTrue(dr.home_probe(self.base, self.out / "ok", self.base["NUGET_PACKAGES"]))
+        for mode, runs in (("buildfail", 0), ("runfail", 1), ("empty", 1), ("foreign", 1)):
+            Path(f"{self.log}.probe").unlink()
+            self.assertFalse(dr.home_probe(dict(self.base, FAKE_PROBE=mode), self.out / mode, self.base["NUGET_PACKAGES"]), mode)
+            self.assertEqual(runs, Path(f"{self.log}.probe").read_text(encoding="utf-8").count("run"), mode)  # a failed build never runs
 
     def test_every_attempt_runs_once_in_its_own_isolated_home(self) -> None:
         self.assertEqual(0, self.run_job())

@@ -49,6 +49,8 @@ jobs:
           printf 'APPDATA=%s\nLOCALAPPDATA=%s\n' "$home/AppData/Roaming" "$home/AppData/Local" >> "$GITHUB_ENV"
           printf 'XDG_CONFIG_HOME=%s\nXDG_DATA_HOME=%s\nXDG_CACHE_HOME=%s\n' "$home/.config" "$home/.local/share" "$home/.cache" >> "$GITHUB_ENV"
           printf 'NUGET_HTTP_CACHE_PATH=%s\nNUGET_PLUGINS_CACHE_PATH=%s\n' "$home/nuget-http" "$home/nuget-plugins" >> "$GITHUB_ENV"
+          mkdir -p "$home/tmp"
+          printf 'TEMP=%s\nTMP=%s\nTMPDIR=%s\nNUGET_SCRATCH=%s\n' "$home/tmp" "$home/tmp" "$home/tmp" "$home/tmp/NuGetScratch" >> "$GITHUB_ENV"
           printf 'NUGET_PACKAGES=%s\nOUT=%s\n' "$RUNNER_TEMP/determinism-nuget" "$RUNNER_TEMP/determinism" >> "$GITHUB_ENV"
           printf 'JOB_STARTED=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
           if [ "$RUNNER_OS" = Windows ]; then echo "PY=python" >> "$GITHUB_ENV"; else echo "PY=python3" >> "$GITHUB_ENV"; fi
@@ -101,6 +103,8 @@ jobs:
           printf 'APPDATA=%s\nLOCALAPPDATA=%s\n' "$home/AppData/Roaming" "$home/AppData/Local" >> "$GITHUB_ENV"
           printf 'XDG_CONFIG_HOME=%s\nXDG_DATA_HOME=%s\nXDG_CACHE_HOME=%s\n' "$home/.config" "$home/.local/share" "$home/.cache" >> "$GITHUB_ENV"
           printf 'NUGET_HTTP_CACHE_PATH=%s\nNUGET_PLUGINS_CACHE_PATH=%s\n' "$home/nuget-http" "$home/nuget-plugins" >> "$GITHUB_ENV"
+          mkdir -p "$home/tmp"
+          printf 'TEMP=%s\nTMP=%s\nTMPDIR=%s\nNUGET_SCRATCH=%s\n' "$home/tmp" "$home/tmp" "$home/tmp" "$home/tmp/NuGetScratch" >> "$GITHUB_ENV"
           printf 'NUGET_PACKAGES=%s\nOUT=%s\n' "$RUNNER_TEMP/determinism-nuget" "$RUNNER_TEMP/determinism" >> "$GITHUB_ENV"
           printf 'JOB_STARTED=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
           if [ "$RUNNER_OS" = Windows ]; then echo "PY=python" >> "$GITHUB_ENV"; else echo "PY=python3" >> "$GITHUB_ENV"; fi
@@ -175,6 +179,8 @@ jobs:
           printf 'APPDATA=%s\nLOCALAPPDATA=%s\n' "$home/AppData/Roaming" "$home/AppData/Local" >> "$GITHUB_ENV"
           printf 'XDG_CONFIG_HOME=%s\nXDG_DATA_HOME=%s\nXDG_CACHE_HOME=%s\n' "$home/.config" "$home/.local/share" "$home/.cache" >> "$GITHUB_ENV"
           printf 'NUGET_HTTP_CACHE_PATH=%s\nNUGET_PLUGINS_CACHE_PATH=%s\n' "$home/nuget-http" "$home/nuget-plugins" >> "$GITHUB_ENV"
+          mkdir -p "$home/tmp"
+          printf 'TEMP=%s\nTMP=%s\nTMPDIR=%s\nNUGET_SCRATCH=%s\n' "$home/tmp" "$home/tmp" "$home/tmp" "$home/tmp/NuGetScratch" >> "$GITHUB_ENV"
           printf 'NUGET_PACKAGES=%s\nOUT=%s\n' "$RUNNER_TEMP/determinism-nuget" "$RUNNER_TEMP/determinism" >> "$GITHUB_ENV"
           printf 'JOB_STARTED=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
           if [ "$RUNNER_OS" = Windows ]; then echo "PY=python" >> "$GITHUB_ENV"; else echo "PY=python3" >> "$GITHUB_ENV"; fi

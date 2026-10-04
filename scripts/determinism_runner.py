@@ -45,7 +45,8 @@ TITLE = re.compile(r"^determinism (control|execution) (\S+)$")
 ISOLATED = ("HOME", "USERPROFILE", "DOTNET_CLI_HOME")
 # Per-user configuration and cache roots that .NET, NuGet, and Windows read besides the home variables.
 UNDER_HOME = {"APPDATA": "AppData/Roaming", "LOCALAPPDATA": "AppData/Local", "XDG_CONFIG_HOME": ".config", "XDG_DATA_HOME": ".local/share",
-              "XDG_CACHE_HOME": ".cache", "NUGET_HTTP_CACHE_PATH": "nuget-http", "NUGET_PLUGINS_CACHE_PATH": "nuget-plugins"}
+              "XDG_CACHE_HOME": ".cache", "NUGET_HTTP_CACHE_PATH": "nuget-http", "NUGET_PLUGINS_CACHE_PATH": "nuget-plugins",
+              "TEMP": "tmp", "TMP": "tmp", "TMPDIR": "tmp", "NUGET_SCRATCH": "tmp/NuGetScratch"}
 # The dotnet-install scripts bundled with actions/setup-dotnet at v4 (commit below), pinned by SHA-256.
 # setup-dotnet itself first installs a floating LTS runtime, so it is not used (amendment 1.1.0).
 INSTALLER = {"base": "https://raw.githubusercontent.com/actions/setup-dotnet/67a3573c9a986a3f9c594539f4ab511d57bb3ce9/externals/",
@@ -118,7 +119,7 @@ def plan_problems(protocol, *, mode, execution_id, env, inventory, ledger, chang
             problems.append(f"ledger run {entry.get('runId')} names another commit or mode than the API inventory")
         else:  # the larger of the two records counts, and a ledgered execution's commit stays executed
             run["minutes"] = max(run["minutes"], int(entry.get("runnerMinutes") or 0))
-            run["attemptsStarted"] = run["attemptsStarted"] or entry.get("mode") == "execution"
+            run["attemptsStarted"] = run["attemptsStarted"] or entry.get("attemptsStarted") is True
     b = protocol["budget"]
     execution_worst, control_worst, _ = dp.worst_case(protocol)
     worst = {"execution": execution_worst, "control": control_worst, "unknown": execution_worst}
@@ -271,7 +272,7 @@ def cmd_install_sdk(args, env=os.environ) -> int:
     script = work / name
     script.write_bytes(data)
     cmd = ["pwsh", "-NoProfile", "-NonInteractive", "-File", str(script), "-Version", sdk, "-InstallDir", str(root), "-NoPath"] \
-        if os.name == "nt" else ["bash", str(script), "--version", sdk, "--install-dir", str(root), "--no-path"]
+        + ["-ZipPath", str(work / "sdk.zip")] if os.name == "nt" else ["bash", str(script), "--version", sdk, "--install-dir", str(root), "--no-path"]
     subprocess.run(cmd, check=True)
     with open(env["GITHUB_PATH"], "a", encoding="utf-8") as handle:
         handle.write(f"{root}\n")
@@ -302,7 +303,7 @@ def home_probe(env_vars, probe: Path, nuget: str) -> bool:
     repository, built with every output under the probe directory (no file-based-app cache), prints it;
     any failure is False. Only the comparison is recorded."""
     home = probe / "home"
-    home.mkdir(parents=True, exist_ok=False)
+    (home / "tmp").mkdir(parents=True, exist_ok=False)
     (probe / "Program.cs").write_text(PROBE, encoding="utf-8")
     (probe / "probe.csproj").write_text(PROBE_PROJECT, encoding="utf-8")
     child = invocation_env(env_vars, probe, "", nuget)
@@ -417,6 +418,7 @@ def run_profile(protocol, cases, profile, env, invocation_dir: Path, base, nuget
     for d in (Path(child["HOME"]), trx_dir):
         d.mkdir()
     check_isolation(child, invocation_dir)
+    Path(child["TEMP"]).mkdir()
     existed = (Path(child["HOME"]) / ".calor").exists()
     started = time.monotonic()
     budget = profile["processTimeoutMinutes"] * 60
@@ -436,7 +438,8 @@ def run_profile(protocol, cases, profile, env, invocation_dir: Path, base, nuget
         values = dp.profile_values(profile, cases, outcomes, summary, code, timed_out, None)
         if values["cells"] is not None:
             try:
-                values["cells"] = dp.profile_values(profile, dict(cases, artifacts=[]), outcomes, summary, code, timed_out, record)["cells"]
+                recovered = dp.profile_values(profile, dict(cases, artifacts=[]), outcomes, summary, code, timed_out, record)
+                values["cells"], values["unregistered"] = recovered["cells"], recovered["unregistered"]
             except Exception:  # noqa: BLE001 - cells.json itself is unreadable
                 values["cells"] = {k: "Malformed" for k in values["cells"]}
         for name in values["artifacts"]:
