@@ -1184,6 +1184,21 @@ public static class FunctionBodyEncoder
                     if (failure != null)
                         return failure;
                 }
+                // #1413 (S1 STR-OPS-COUNT-INDEX): Substring and IndexOf-with-start throw
+                // outside their range while the solver's versions are total. Same rule as a
+                // divisor: an unconditional range condition is a side condition; one in a
+                // conditionally-evaluated position is not modeled.
+                var range = translator.GetStringRangeCondition(sop);
+                if (range == null)
+                    return "a string operation's index range could not be modeled";
+                if (range.IsTrue)
+                    return null;
+                if (conditional)
+                {
+                    return "the body contains an indexed string operation (Substring/IndexOf with a start) "
+                        + "in a conditionally-evaluated position, which is not yet modeled for exception-path soundness";
+                }
+                constraints.Add(range);
                 return null;
             }
             default:

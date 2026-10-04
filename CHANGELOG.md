@@ -21,6 +21,19 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Text reaches the solver with .NET's meaning (#1413, #1493).** A string literal is now sent to
+  Z3 one UTF-16 code unit at a time, so `"é"` has length 1 there, as `"é".Length` does in .NET.
+  Before, it had length 2 (one per UTF-8 byte), and a true postcondition such as
+  `(<= (len result) 1)` was reported as possibly violated (`Calor0712`) with a counterexample
+  the program cannot produce. A backslash in a literal is no longer read as a Z3 escape.
+  `s.Substring(i, n)`, `s.Substring(i)`, and `s.IndexOf(t, i)` now carry their range
+  conditions, so a counterexample is never an input where the body throws; in a conditionally
+  evaluated position they make the result `Unsupported`. Separately, Z3 symbol names for
+  non-ASCII identifiers are now escaped to ASCII. On Windows, two different identifiers
+  outside the code page (say `ж` and `щ`) used to become one solver variable, which could
+  prove a false contract. Proofs that touch strings stay `Assumed` and keep their runtime
+  checks. The verification cache format moves to 1.21, so older entries are invalidated.
+
 - **Three causes of run-to-run and platform-dependent verifier verdicts are fixed (#1135).**
   Whether the verifier is now deterministic on every supported platform is decided by the
   registered determinism protocol (#1421), which runs after this change.

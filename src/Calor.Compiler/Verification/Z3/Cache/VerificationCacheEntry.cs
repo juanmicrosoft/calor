@@ -82,7 +82,12 @@ public sealed class VerificationCacheEntry
     // 1.19 (#1135): on Windows, non-ASCII string literals reached Z3 in the code page instead of
     // UTF-8, so a Windows entry for one may hold a verdict the byte model does not give. Linux and
     // macOS output is unchanged, so SemanticsVersion stays; the bump evicts every entry instead.
-    public const string CurrentFormatVersion = "1.19";
+    // 1.21 (#1413, S1 STR-NULL-NONASCII; #1493): string literals reach Z3 per UTF-16 code unit
+    // (not per UTF-8 byte) and non-ASCII identifiers get injective ASCII symbol names, on every
+    // platform, so verdicts over non-ASCII text change. SemanticsVersion stays (the translator
+    // fixture output is unchanged); the bump evicts every entry instead. (1.20 is taken by the
+    // #1413 cache-literal-width repair; if that merges second, take the next number.)
+    public const string CurrentFormatVersion = "1.21";
 
     /// <summary>#778: the compiler-semantics ledger version that produced this entry.
     /// A verdict computed under different compile semantics must not be served, even
