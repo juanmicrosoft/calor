@@ -1,0 +1,23 @@
+{
+  "runId": 37213336898,
+  "title": "determinism execution g3-exec-2",
+  "executionId": "g3-exec-2",
+  "mode": "execution",
+  "commit": "d42d031352f2d8d5c1df56fffc19d901186bb94d",
+  "protocolVersion": "1.3.0",
+  "runnerMinutes": 401,
+  "attemptsStarted": true,
+  "conclusion": "success",
+  "verdict": "DETERMINISTIC",
+  "complete": true,
+  "classCounts": {
+    "AGREE-FAIL": 0,
+    "AGREE-PASS": 2137,
+    "DISAGREE": 0,
+    "INCOMPLETE": 0
+  },
+  "resultSha256": "06460f2959e278219b0c71b4c0d000c11b938c2dc50d936667db92a9e2e3fba9",
+  "attemptRecordsSha256": "6ccd38c9d8934a06f832b2f0dcc619fe3134b9b4c16e4666c84482519167c1d1",
+  "recordsRetained": "all 10 jobs: 150 attempt records and 10 env.json",
+  "destination": "C2 (#1424) regeneration evidence (maintainer decision 2026-10-04)"
+}
