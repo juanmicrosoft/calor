@@ -27,7 +27,9 @@ All notable changes to this project will be documented in this file.
   verify any quantifier nested inside another. This covers contracts, proof obligations and
   the preconditions and facts they assume, interface contract checks, and guard validation.
   The result is `Unsupported` and the runtime check is kept, even for nested forms the
-  compiler can check at run time. The verification cache never stores or serves such a
+  compiler can check at run time. The rule applies to the contract after simplification (a
+  nested quantifier that simplifies to `true` is still proven). For interface contract checks,
+  the refusal is reported once #1495 merges. The verification cache never stores or serves such a
   result. A k-induction invariant with a conjunct the prover cannot parse is no longer
   reported proven from the conjuncts it could parse.
 

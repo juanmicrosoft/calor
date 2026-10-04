@@ -61,7 +61,9 @@ public sealed class ObligationSolver : IDisposable
         // The condition, and every assumption the query could use, must be free of nesting.
         if (QuantifierNesting.ContainsNestedQuantifier(obligation.Condition)
             || info.Preconditions.Any(pre => QuantifierNesting.ContainsNestedQuantifier(pre.Condition))
-            || info.CollectedFacts.Any(fact => QuantifierNesting.ContainsNestedQuantifier(fact.Fact)))
+            || obligation.Kind != ObligationKind.RefinementEntry
+               && info.CollectedFacts.Any(fact => fact.AppliesTo(obligation.Span)
+                   && QuantifierNesting.ContainsNestedQuantifier(fact.Fact)))
         {
             obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(QuantifierNesting.Refusal)));
             obligation.SolverDuration = sw.Elapsed;
