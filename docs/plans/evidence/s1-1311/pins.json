@@ -1,0 +1,104 @@
+{
+  "registrationCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67",
+  "registrationMergedUtc": "2026-10-03T00:36:51Z",
+  "harnessCommits": {
+    "run": "8e33f08019303cf805e5098775032face6017a27",
+    "crossRun": "dcd6f34a59e9276ef28e45e543a64865ed819a05",
+    "o2Rereplay": "449b4ec5d7b07b2c36209e4fd1e0fec4edbd5712",
+    "reclassify": "fa2ff938098e6e64aadaa888c746b6249995762c",
+    "finalHarnessAndReport": "e7cbce77c5eefbfa7b6c7338f17b57bb4b06127e"
+  },
+  "baselines": {
+    "B1": {
+      "baseline": "B1",
+      "registrationCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67",
+      "binaryDirectory": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin",
+      "calorDllSha256": "79839f6c8681bb7132df876c624339385969cc69c5b9914eea09fdfbf48e6651",
+      "calorRuntimeDllSha256": "921582e70e858e875c38baeb4afe80a496d44a5a1507b3ce63c80a1112ceabed",
+      "microsoftZ3DllSha256": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175",
+      "z3Available": true,
+      "nativeZ3Path": null,
+      "nativeZ3Sha256": null,
+      "translatorSemanticsVersion": "z3-executable-semantics-v2",
+      "dotnetVersion": "10.0.401",
+      "runtime": ".NET 10.0.12",
+      "os": "macOS 27.0.1",
+      "rid": "osx-arm64",
+      "architecture": "Arm64",
+      "CALOR_NO_TYPE_CHECK": null,
+      "culture": "en-US for O1/O2",
+      "recordedUtc": "2026-10-03T16:50:44.3329360Z"
+    },
+    "N1": {
+      "baseline": "N1",
+      "registrationCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67",
+      "binaryDirectory": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin",
+      "calorDllSha256": "794b28d4956f786fe41e0e5ab2199cad1ab1271a2893ee42d9f9d303289b515b",
+      "calorRuntimeDllSha256": "b5b6dd8adfa76fff306e6a643f6a896852e45b45b0b613435bcf50df12658753",
+      "microsoftZ3DllSha256": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175",
+      "z3Available": true,
+      "nativeZ3Path": null,
+      "nativeZ3Sha256": null,
+      "translatorSemanticsVersion": "z3-executable-semantics-v2",
+      "dotnetVersion": "10.0.401",
+      "runtime": ".NET 10.0.12",
+      "os": "macOS 27.0.1",
+      "rid": "osx-arm64",
+      "architecture": "Arm64",
+      "CALOR_NO_TYPE_CHECK": null,
+      "culture": "en-US for O1/O2",
+      "recordedUtc": "2026-10-03T16:50:44.4097060Z"
+    },
+    "P845": {
+      "baseline": "P845",
+      "registrationCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67",
+      "binaryDirectory": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/P845bin",
+      "calorDllSha256": "4515cc2ac2f687a513421ec1c2f5f10965165c3c44d2ce8930f2ce153bc99537",
+      "calorRuntimeDllSha256": "fc050591d11061c40a68f4641668e1672355cc7430985eeb69efdef2a13885e6",
+      "microsoftZ3DllSha256": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175",
+      "z3Available": true,
+      "nativeZ3Path": null,
+      "nativeZ3Sha256": null,
+      "translatorSemanticsVersion": null,
+      "dotnetVersion": "10.0.401",
+      "runtime": ".NET 10.0.12",
+      "os": "macOS 27.0.1",
+      "rid": "osx-arm64",
+      "architecture": "Arm64",
+      "CALOR_NO_TYPE_CHECK": null,
+      "culture": "en-US for O1/O2",
+      "recordedUtc": "2026-10-03T16:50:44.4832660Z"
+    }
+  },
+  "nativeSolverImageCheck": {
+    "file": "bench/correctness/false-established/v024/native-z3-check.json",
+    "note": "PROVENANCE GAP: the registration asks for the platform libz3 hash in pins.json before case 1 (B1) and for the image actually loaded (N1). The in-run pins left nativeZ3Path null: the load-context hook was not called for libz3, so the mapped image was not captured during the run. The file hashes were taken before the run (preflight.json preRunBinaryHashes). A post-run process with the same layout (B1, N1, P845 loaded in that order) mapped B1bin/libz3.dylib for B1, N1bin/runtimes/osx-arm64/native/libz3.dylib for N1, and P845bin/libz3.dylib for P845; every libz3.dylib in the three binary directories hashes 8d1f5438...59ada, the value registered for osx-arm64."
+  },
+  "acquisition": {
+    "B1": {
+      "procedure": "registration baselines[B1].binary.procedure, executed 2026-10-03: git worktree at 72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1; download-z3.sh (verified against z3-upstream-4.15.7.sha256); dotnet build -c Release; output copied unchanged to B1bin before the first case",
+      "calor.dll": "79839f6c8681bb7132df876c624339385969cc69c5b9914eea09fdfbf48e6651",
+      "Calor.Runtime.dll": "921582e70e858e875c38baeb4afe80a496d44a5a1507b3ce63c80a1112ceabed",
+      "Microsoft.Z3.dll": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175",
+      "libz3.dylib (root and runtimes/osx-arm64/native)": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada"
+    },
+    "N1": {
+      "url": "https://api.nuget.org/v3-flatcontainer/calor/0.21.0/calor.0.21.0.nupkg",
+      "nupkgSha256": "8a1937ce645f4708b258615e2bbd7b995bf6f012ebb25fa358107a3e4462836c (matches registration)",
+      "nupkgSha512Base64": "0KbgH5KSwU97EiYWPQhdzC7D3g+F9n2iMwuB99z65MRN6H2dxulUSvbE/yzur47N5jrblhLjmq+brkSxJRO3AA== (matches registration)",
+      "catalogPackageHash": "nuget.org catalog 2026.09.12.01.17.58/calor.0.21.0.json packageHash equals nupkgSha512Base64 (SHA512, 61,869,455 bytes, published 2026-09-12T01:11:04.2Z), fetched 2026-10-03",
+      "contents": {
+        "tools/net10.0/any/calor.dll": "794b28d4956f786fe41e0e5ab2199cad1ab1271a2893ee42d9f9d303289b515b (matches)",
+        "tools/net10.0/any/Microsoft.Z3.dll": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175 (matches)",
+        "tools/net10.0/any/runtimes/osx-arm64/native/libz3.dylib": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada (matches)",
+        "tools/net10.0/any/runtimes/linux-x64/native/libz3.so": "3e70217bc6b05b6204912698becf9f853a7a2f07bb5338dad84aef79aee9bec8 (matches; not loaded on osx-arm64)",
+        "tools/net10.0/any/Calor.Runtime.dll": "b5b6dd8adfa76fff306e6a643f6a896852e45b45b0b613435bcf50df12658753"
+      },
+      "note": "The 88b5d38 source was not built."
+    },
+    "P845": {
+      "procedure": "as B1 at 17d253dff964e37538a5f503d3744b576bd2fb52",
+      "calor.dll": "4515cc2ac2f687a513421ec1c2f5f10965165c3c44d2ce8930f2ce153bc99537"
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "executedUtc": "2026-10-03T16:33Z..16:50Z",
+  "deriveManifestsCheck": {
+    "command": "python3 docs/plans/evidence/r1-1419/derive-manifests.py --check",
+    "output": [
+      "ok manifest-B1.json",
+      "ok manifest-N1.json"
+    ],
+    "exit": 0
+  },
+  "packetHashes": {
+    "file": "docs/plans/evidence/r1-1419/sha256.json",
+    "result": "all 7 entries match (LF-normalized SHA-256)"
+  },
+  "registrationAncestry": "6a1a78db71b04bee3f2d42268e92800d94333f67 is an ancestor of the sweep branch base (origin/main 91fa7780); since the merge, only SoundnessRegistrationValidator.cs/Tests.cs changed (402834bd, contract-version check); SweepCaseGenerator.cs, IndependentOracle.cs, and the r1-1419 packet are unchanged",
+  "registrationTests": {
+    "command": "dotnet test tests/Calor.Compiler.Tests/ --filter FullyQualifiedName~SoundnessRegistration",
+    "result": "Passed 26, Failed 0"
+  },
+  "caseIndex": "the harness regenerated all 710 cases with the linked, unmodified SweepCaseGenerator and matched every id, Calor hash, and oracle hash in cases-index.json before the first case",
+  "oracleControls": {
+    "file": "bench/correctness/false-established/v024/oracle-controls.json",
+    "result": "13 of 13 produced their registered verdicts on the executing machine"
+  },
+  "environment": {
+    "dotnet": "10.0.401",
+    "runtime": ".NET 10.0.12",
+    "os": "macOS 27.0.1",
+    "rid": "osx-arm64",
+    "CALOR_NO_TYPE_CHECK": "unset",
+    "culture": "en-US for O1/O2",
+    "parallelism": "sequential, one process"
+  },
+  "harnessSelfTest": "Executor-written synthetic inputs (selftest-templates.json at harness 8e33f080; 13 inputs at dcd6f34a), never registered cases and never counted, ran on B1, N1, and P845 before the first case and again before the HC4/HC5 re-replay. The first found one harness defect (cache tamper used PascalCase keys; the baseline cache is camelCase), fixed before the run. The self-test command was removed from the final tree to fit the PR-size ceiling; it remains in the branch history.",
+  "preRunBinaryHashes": "Before the first case (16:35Z), the executor hashed in a shell: B1bin calor.dll 79839f6c...6e6651, Calor.Runtime.dll 921582e7...ceabed, Microsoft.Z3.dll 59cb6de1...426175, libz3.dylib (root and runtimes/osx-arm64/native) 8d1f5438...59ada; P845bin calor.dll 4515cc2a...99537, same Z3 hashes; N1 package contents as in pins.json acquisition. These match pins.json; the native image the process mapped was not captured in-run (see pins.json nativeSolverImageCheck). No other libz3 exists in the harness output directory, /opt/homebrew/lib, or /usr/local/lib."
+}

@@ -1,0 +1,167 @@
+{
+  "baseline": "B1",
+  "caseId": "R1-IMPL-PRECONDITION-WEAKENING-005",
+  "rowId": "IMPL-PRECONDITION-WEAKENING",
+  "templateId": "T-IMPL-PRE",
+  "caseSha256": {
+    "calor": "6636507c959ba3ad378a6fe39700b40caf75018151f93f54a812a142f6d00f4d",
+    "oracle": "a26cba86adbd9962494e903c2ba839b5c17b994d5e538be17f119bab28680e6d",
+    "prime": null
+  },
+  "claimSite": "implication",
+  "obligationKind": null,
+  "o1": {
+    "Kind": "violated",
+    "Inputs": 19,
+    "HypothesisHeld": 7,
+    "Reached": 7,
+    "HypothesisThrew": 0,
+    "BodyThrew": 0,
+    "Violations": 7,
+    "ViolationKind": "prop-false",
+    "Witness": "(2)",
+    "Error": null,
+    "ReachedSample": [
+      "(2)",
+      "(3)",
+      "(943434448)",
+      "(1306038199)",
+      "(1939181402)",
+      "(2147483646)",
+      "(2147483647)"
+    ]
+  },
+  "channels": {
+    "CH-CONTRACT": {
+      "elided": {
+        "hasErrors": true,
+        "diagnostics": [
+          {
+            "code": "Calor0810",
+            "severity": "Error",
+            "line": 9,
+            "message": "LSP violation: Precondition in \u0027Impl.Run\u0027 is stronger than \u0027IProbe.Run\u0027. Counterexample: x=1073741824, result=0"
+          },
+          {
+            "code": "Calor0815",
+            "severity": "Info",
+            "line": 9,
+            "message": "Postcondition strengthening proven by Z3 for \u0027Impl.Run\u0027"
+          }
+        ],
+        "contracts": null,
+        "obligations": null,
+        "emitted": ""
+      },
+      "forced": {
+        "hasErrors": true,
+        "diagnostics": [
+          {
+            "code": "Calor0810",
+            "severity": "Error",
+            "line": 9,
+            "message": "LSP violation: Precondition in \u0027Impl.Run\u0027 is stronger than \u0027IProbe.Run\u0027. Counterexample: x=1073741824, result=0"
+          },
+          {
+            "code": "Calor0815",
+            "severity": "Info",
+            "line": 9,
+            "message": "Postcondition strengthening proven by Z3 for \u0027Impl.Run\u0027"
+          }
+        ],
+        "contracts": null,
+        "obligations": null,
+        "emitted": ""
+      }
+    }
+  },
+  "o2": {
+    "status": "not-applicable"
+  },
+  "claim": {
+    "compileErrors": [
+      "Calor0810"
+    ],
+    "direction": "Precondition",
+    "implicationDiagnostics": [
+      {
+        "code": "Calor0810",
+        "severity": "Error",
+        "line": 9,
+        "message": "LSP violation: Precondition in \u0027Impl.Run\u0027 is stronger than \u0027IProbe.Run\u0027. Counterexample: x=1073741824, result=0"
+      },
+      {
+        "code": "Calor0815",
+        "severity": "Info",
+        "line": 9,
+        "message": "Postcondition strengthening proven by Z3 for \u0027Impl.Run\u0027"
+      }
+    ],
+    "claimFound": true,
+    "token": "Failed",
+    "rawStatus": "Failed",
+    "isVacuous": false,
+    "counterexample": [
+      {
+        "name": "x",
+        "value": "1073741824"
+      },
+      {
+        "name": "result",
+        "value": "0"
+      }
+    ],
+    "modelReplay": {
+      "input": "(1073741824)",
+      "o1": "violated"
+    }
+  },
+  "forcedClaim": {
+    "compileErrors": [
+      "Calor0810"
+    ],
+    "direction": "Precondition",
+    "implicationDiagnostics": [
+      {
+        "code": "Calor0810",
+        "severity": "Error",
+        "line": 9,
+        "message": "LSP violation: Precondition in \u0027Impl.Run\u0027 is stronger than \u0027IProbe.Run\u0027. Counterexample: x=1073741824, result=0"
+      },
+      {
+        "code": "Calor0815",
+        "severity": "Info",
+        "line": 9,
+        "message": "Postcondition strengthening proven by Z3 for \u0027Impl.Run\u0027"
+      }
+    ],
+    "claimFound": true,
+    "token": "Failed",
+    "rawStatus": "Failed",
+    "isVacuous": false,
+    "counterexample": [
+      {
+        "name": "x",
+        "value": "1073741824"
+      },
+      {
+        "name": "result",
+        "value": "0"
+      }
+    ]
+  },
+  "guards": {
+    "marker": null,
+    "applicable": false
+  },
+  "status": "executed",
+  "class": "no-claim",
+  "classReason": "Failed with a genuine counterexample (model replayed under O1)",
+  "addedFindings": [],
+  "nonVacuityCheck": null,
+  "attempt": 1,
+  "bucket": "sweep",
+  "startedUtc": "2026-10-04T02:06:26.4019060Z",
+  "endedUtc": "2026-10-04T02:06:26.4131610Z",
+  "durationMs": 11
+}

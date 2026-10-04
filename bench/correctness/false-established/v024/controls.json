@@ -1,0 +1,483 @@
+{
+  "solverAvailability": {
+    "P845": {
+      "pass": true,
+      "cases": [
+        {
+          "caseId": "R1-CTRL-POSITIVE-001",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-002",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-003",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-004",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-005",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-006",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-007",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-008",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-NEGATIVE-001",
+          "expected": "Failed",
+          "token": "Failed",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-NEGATIVE-002",
+          "expected": "Failed",
+          "token": "Failed",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-NEGATIVE-003",
+          "expected": "Failed",
+          "token": "Failed",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-NEGATIVE-004",
+          "expected": "Failed",
+          "token": "Failed",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-NEGATIVE-005",
+          "expected": "Failed",
+          "token": "Failed",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-NEGATIVE-006",
+          "expected": "Failed",
+          "token": "Failed",
+          "ok": true
+        }
+      ]
+    },
+    "B1": {
+      "pass": true,
+      "cases": [
+        {
+          "caseId": "R1-CTRL-POSITIVE-001",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-002",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-003",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-004",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-005",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-006",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-007",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-008",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-NEGATIVE-001",
+          "expected": "Failed",
+          "token": "Failed",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-NEGATIVE-002",
+          "expected": "Failed",
+          "token": "Failed",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-NEGATIVE-003",
+          "expected": "Failed",
+          "token": "Failed",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-NEGATIVE-004",
+          "expected": "Failed",
+          "token": "Failed",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-NEGATIVE-005",
+          "expected": "Failed",
+          "token": "Failed",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-NEGATIVE-006",
+          "expected": "Failed",
+          "token": "Failed",
+          "ok": true
+        }
+      ]
+    },
+    "N1": {
+      "pass": true,
+      "cases": [
+        {
+          "caseId": "R1-CTRL-POSITIVE-001",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-002",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-003",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-004",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-005",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-006",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-007",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-POSITIVE-008",
+          "expected": "Proven",
+          "token": "Proven",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-NEGATIVE-001",
+          "expected": "Failed",
+          "token": "Failed",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-NEGATIVE-002",
+          "expected": "Failed",
+          "token": "Failed",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-NEGATIVE-003",
+          "expected": "Failed",
+          "token": "Failed",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-NEGATIVE-004",
+          "expected": "Failed",
+          "token": "Failed",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-NEGATIVE-005",
+          "expected": "Failed",
+          "token": "Failed",
+          "ok": true
+        },
+        {
+          "caseId": "R1-CTRL-NEGATIVE-006",
+          "expected": "Failed",
+          "token": "Failed",
+          "ok": true
+        }
+      ]
+    }
+  },
+  "mutationPairs": {
+    "B1": [
+      {
+        "pair": "M1",
+        "row": "CTRL-MUTATION",
+        "cases": [
+          "R1-CTRL-MUTATION-001",
+          "R1-CTRL-MUTATION-002"
+        ],
+        "o1": [
+          "holds-sampled",
+          "holds-sampled"
+        ],
+        "tokens": [
+          "Proven",
+          "Proven"
+        ],
+        "oracleEqual": true
+      },
+      {
+        "pair": "M2",
+        "row": "CTRL-MUTATION",
+        "cases": [
+          "R1-CTRL-MUTATION-003",
+          "R1-CTRL-MUTATION-004"
+        ],
+        "o1": [
+          "holds-sampled",
+          "holds-sampled"
+        ],
+        "tokens": [
+          "Proven",
+          "Proven"
+        ],
+        "oracleEqual": true
+      }
+    ],
+    "N1": [
+      {
+        "pair": "M1",
+        "row": "CTRL-MUTATION",
+        "cases": [
+          "R1-CTRL-MUTATION-001",
+          "R1-CTRL-MUTATION-002"
+        ],
+        "o1": [
+          "holds-sampled",
+          "holds-sampled"
+        ],
+        "tokens": [
+          "Proven",
+          "Proven"
+        ],
+        "oracleEqual": true
+      },
+      {
+        "pair": "M2",
+        "row": "CTRL-MUTATION",
+        "cases": [
+          "R1-CTRL-MUTATION-003",
+          "R1-CTRL-MUTATION-004"
+        ],
+        "o1": [
+          "holds-sampled",
+          "holds-sampled"
+        ],
+        "tokens": [
+          "Proven",
+          "Proven"
+        ],
+        "oracleEqual": true
+      }
+    ]
+  },
+  "controlMismatches": {
+    "B1": [],
+    "N1": []
+  },
+  "retro845": {
+    "B1": {
+      "p845AvailabilityPass": true,
+      "discriminates": true,
+      "cases": [
+        {
+          "caseId": "R1-CTRL-RETRO-845-001",
+          "template": "C-845-ULONG-SAT",
+          "widthCase": true,
+          "p845Expected": "Unsupported",
+          "p845Token": "Unsupported",
+          "expected": "Proven",
+          "token": "Proven",
+          "discriminates": true
+        },
+        {
+          "caseId": "R1-CTRL-RETRO-845-002",
+          "template": "C-845-ULONG-VIOL",
+          "widthCase": true,
+          "p845Expected": "Unsupported",
+          "p845Token": "Unsupported",
+          "expected": "Failed",
+          "token": "Failed",
+          "discriminates": true
+        },
+        {
+          "caseId": "R1-CTRL-RETRO-845-003",
+          "template": "C-845-LONG-VIOL",
+          "widthCase": true,
+          "p845Expected": "Proven",
+          "p845Token": "Proven",
+          "expected": "Failed",
+          "token": "Failed",
+          "discriminates": true
+        },
+        {
+          "caseId": "R1-CTRL-RETRO-845-004",
+          "template": "C-845-LONG-SAT",
+          "widthCase": true,
+          "p845Expected": "Failed",
+          "p845Token": "Failed",
+          "expected": "Proven",
+          "token": "Proven",
+          "discriminates": true
+        },
+        {
+          "caseId": "R1-CTRL-RETRO-845-005",
+          "template": "C-845-UINT-VIOL",
+          "widthCase": true,
+          "p845Expected": "Proven",
+          "p845Token": "Proven",
+          "expected": "Failed",
+          "token": "Failed",
+          "discriminates": true
+        },
+        {
+          "caseId": "R1-CTRL-RETRO-845-006",
+          "template": "C-845-UINT-SAT",
+          "widthCase": true,
+          "p845Expected": "Failed",
+          "p845Token": "Failed",
+          "expected": "Proven",
+          "token": "Proven",
+          "discriminates": true
+        }
+      ]
+    },
+    "N1": {
+      "p845AvailabilityPass": true,
+      "discriminates": true,
+      "cases": [
+        {
+          "caseId": "R1-CTRL-RETRO-845-001",
+          "template": "C-845-ULONG-SAT",
+          "widthCase": true,
+          "p845Expected": "Unsupported",
+          "p845Token": "Unsupported",
+          "expected": "Proven",
+          "token": "Proven",
+          "discriminates": true
+        },
+        {
+          "caseId": "R1-CTRL-RETRO-845-002",
+          "template": "C-845-ULONG-VIOL",
+          "widthCase": true,
+          "p845Expected": "Unsupported",
+          "p845Token": "Unsupported",
+          "expected": "Failed",
+          "token": "Failed",
+          "discriminates": true
+        },
+        {
+          "caseId": "R1-CTRL-RETRO-845-003",
+          "template": "C-845-LONG-VIOL",
+          "widthCase": true,
+          "p845Expected": "Proven",
+          "p845Token": "Proven",
+          "expected": "Failed",
+          "token": "Failed",
+          "discriminates": true
+        },
+        {
+          "caseId": "R1-CTRL-RETRO-845-004",
+          "template": "C-845-LONG-SAT",
+          "widthCase": true,
+          "p845Expected": "Failed",
+          "p845Token": "Failed",
+          "expected": "Proven",
+          "token": "Proven",
+          "discriminates": true
+        },
+        {
+          "caseId": "R1-CTRL-RETRO-845-005",
+          "template": "C-845-UINT-VIOL",
+          "widthCase": true,
+          "p845Expected": "Proven",
+          "p845Token": "Proven",
+          "expected": "Failed",
+          "token": "Failed",
+          "discriminates": true
+        },
+        {
+          "caseId": "R1-CTRL-RETRO-845-006",
+          "template": "C-845-UINT-SAT",
+          "widthCase": true,
+          "p845Expected": "Failed",
+          "p845Token": "Failed",
+          "expected": "Proven",
+          "token": "Proven",
+          "discriminates": true
+        }
+      ]
+    }
+  }
+}

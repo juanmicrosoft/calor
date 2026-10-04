@@ -1,0 +1,92 @@
+{
+  "findingId": "F-B1-031",
+  "baseline": "B1",
+  "registrationCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67",
+  "rowId": "CACHE-LITERAL-WIDTH",
+  "caseId": "R1-CACHE-LITERAL-WIDTH-001",
+  "templateId": "T-CACHE-LITWIDTH",
+  "caseSha256": {
+    "calor": "ec1e9444f132781d4ee328e972c854b4cf82b5b4f1ba88e1fe4745e5863f67f4",
+    "oracle": "a49ad3231da90fadb487c63fcca4e6abf78ed5b84919296350f3895c80e19759",
+    "prime": "2a9fb2edf916ee2df77a241e51efde478d13768d253ffc4c97cf840d89c69a08"
+  },
+  "class": "false-unconditional-proof",
+  "claim": {
+    "site": "postcondition",
+    "token": "Proven",
+    "rawStatus": "Proven",
+    "isVacuous": false,
+    "assumptions": [],
+    "guardInElidedEmission": false,
+    "guardInForcedEmission": true
+  },
+  "witness": {
+    "inputs": "(2147483647)",
+    "source": "the O1 witness",
+    "o1": "violated prop-false",
+    "o2": "guard threw",
+    "o2Detail": {
+      "input": "(2147483647)",
+      "o1": "violated",
+      "o2": "guard-threw",
+      "exception": "Calor.Runtime.ContractViolationException: Postcondition failed: unchecked(x \u002B 1) \u003E 0",
+      "divergence": false
+    }
+  },
+  "nonVacuityCheck": {
+    "id": "R1-O1-reached",
+    "result": "passed"
+  },
+  "classReason": null,
+  "minimized": {
+    "status": "registered-case: a single-function probe generated from one template; not reduced further",
+    "calorSource": "\u00A7M{m1:R1Case:overflow=unchecked}\n  \u00A7F{f1:Probe:pub} (i32:x) -\u003E i32\n    \u00A7E{}\n    \u00A7Q (== x INT:2147483647)\n    \u00A7S (\u003E (\u002B x INT:1) INT:0)\n    \u00A7R INT:0\n",
+    "calorPrimeSource": "\u00A7M{m1:R1Case:overflow=unchecked}\n  \u00A7F{f1:Probe:pub} (i32:x) -\u003E i32\n    \u00A7E{}\n    \u00A7Q (== x INT:2147483647)\n    \u00A7S (\u003E (\u002B x LONG:1) INT:0)\n    \u00A7R INT:0\n",
+    "csharpReproduction": "// R1 #1419 independent oracle for R1-CACHE-LITERAL-WIDTH-001\nusing System;\nusing System.Collections.Generic;\nusing System.Linq;\nusing System.Numerics;\npublic static class R1Oracle\n{\n    public const string Claim = \u0022forall\u0022;\n    public const bool Exhaustive = false;\n    public const bool Checked = false;\n    public static bool Hyp(int x) =\u003E x == 2147483647;\n    public static bool Prop(int x) =\u003E x \u002B 1 \u003E 0;\n    public static bool HypO(object?[] a) =\u003E Hyp((int)a[0]!);\n    public static bool HasBody =\u003E false;\n    public static object? BodyO(object?[] a) =\u003E null;\n    public static bool PropO(object?[] a, object? r) =\u003E Prop((int)a[0]!);\n    public static IEnumerable\u003Cobject?[]\u003E Inputs()\n    {\n        yield return new object?[] { (int)((-2147483648)) };\n        yield return new object?[] { (int)((-2147483647)) };\n        yield return new object?[] { (int)((-2064405538)) };\n        yield return new object?[] { (int)((-879593064)) };\n        yield return new object?[] { (int)((-8708260)) };\n        yield return new object?[] { (int)((-2)) };\n        yield return new object?[] { (int)((-1)) };\n        yield return new object?[] { (int)(0) };\n        yield return new object?[] { (int)(1) };\n        yield return new object?[] { (int)(2) };\n        yield return new object?[] { (int)(133132430) };\n        yield return new object?[] { (int)(1272499919) };\n        yield return new object?[] { (int)(1962520212) };\n        yield return new object?[] { (int)(2147483646) };\n        yield return new object?[] { (int)(2147483647) };\n    }\n}\n\npublic static class Repro\n{\n    public static int Main()\n    {\n        int reached = 0;\n        foreach (var a in R1Oracle.Inputs())\n        {\n            bool hyp; object? r = null; bool ok; string why;\n            try { hyp = R1Oracle.HypO(a); } catch { continue; }\n            if (!hyp) continue;\n            if (R1Oracle.HasBody) { try { r = R1Oracle.BodyO(a); } catch { continue; } }\n            reached\u002B\u002B;\n            try { ok = R1Oracle.PropO(a, r); why = \u0022false\u0022; } catch (Exception e) { ok = false; why = \u0022throws \u0022 \u002B e.GetType().Name; }\n            var shown = \u0022(\u0022 \u002B string.Join(\u0022, \u0022, a.Select(v =\u003E v is null ? \u0022null\u0022 : v is Array arr ? \u0022[\u0022 \u002B string.Join(\u0022, \u0022, arr.Cast\u003Cobject\u003E()) \u002B \u0022]\u0022 : v is string s ? \u0022\\\u0022\u0022 \u002B s \u002B \u0022\\\u0022\u0022 : Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture))) \u002B \u0022)\u0022;\n            if (R1Oracle.Claim == \u0022exists\u0022) { if (ok) { Console.WriteLine(\u0022witness \u0022 \u002B shown); return 0; } continue; }\n            if (!ok) { Console.WriteLine(\u0022property \u0022 \u002B why \u002B \u0022 at \u0022 \u002B shown \u002B (R1Oracle.HasBody ? \u0022 result=\u0022 \u002B Convert.ToString(r, System.Globalization.CultureInfo.InvariantCulture) : \u0022\u0022)); return 1; }\n        }\n        Console.WriteLine((R1Oracle.Claim == \u0022exists\u0022 ? \u0022no witness\u0022 : \u0022no violation\u0022) \u002B \u0022 in the registered domain; reached inputs: \u0022 \u002B reached);\n        return 0;\n    }\n}",
+    "reproductionOutput": "property false at (2147483647) (exit 1)",
+    "sha256": "ec1e9444f132781d4ee328e972c854b4cf82b5b4f1ba88e1fe4745e5863f67f4"
+  },
+  "environment": {
+    "calorDllSha256": "79839f6c8681bb7132df876c624339385969cc69c5b9914eea09fdfbf48e6651",
+    "z3NativeSha256": null,
+    "z3NativeSource": "not captured",
+    "dotnetVersion": "10.0.401",
+    "os": "macOS 27.0.1",
+    "translatorSemanticsVersion": "z3-executable-semantics-v2"
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "bucket": "sweep",
+      "status": "executed",
+      "token": "Proven",
+      "class": "false-unconditional-proof",
+      "startedUtc": "2026-10-04T02:05:17.5842210Z",
+      "durationMs": 22,
+      "path": "attempts/R1-CACHE-LITERAL-WIDTH-001/sweep-attempt-1.json"
+    }
+  ],
+  "otherBaseline": {
+    "id": "N1",
+    "result": "reproduces",
+    "rerun": {
+      "caseId": "R1-CACHE-LITERAL-WIDTH-001",
+      "baseline": "N1",
+      "status": "executed",
+      "token": "Proven",
+      "class": "false-unconditional-proof",
+      "addedFindings": [
+        "stale-cache-proof"
+      ],
+      "path": "attempts/R1-CACHE-LITERAL-WIDTH-001/reserve-cross-baseline-attempt-1.json"
+    },
+    "otherSweepResult": {
+      "token": "Proven",
+      "class": "false-unconditional-proof",
+      "result": "reproduces"
+    }
+  },
+  "affectedGuarantee": "Form: Prime and final differ only in integer literal width (row CACHE-LITERAL-WIDTH). Guard path: a cached (warm) Proven postcondition is elided from the emitted C# by default (verification cache, then CSharpEmitter postcondition site). Public surfaces that describe this form: docs/verification-modeled-forms.md, website/content/guides/verification-guarantees.mdx, website/content/cli/compile.mdx (located by search; their wording was not audited by S1). No experiment relying on this form was identified by S1; S2 (#1413) confirms.",
+  "filedIssue": null,
+  "disposition": null
+}

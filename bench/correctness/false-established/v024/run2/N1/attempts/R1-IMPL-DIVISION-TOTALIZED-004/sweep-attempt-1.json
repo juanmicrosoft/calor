@@ -1,0 +1,184 @@
+{
+  "baseline": "N1",
+  "caseId": "R1-IMPL-DIVISION-TOTALIZED-004",
+  "rowId": "IMPL-DIVISION-TOTALIZED",
+  "templateId": "T-IMPL-DIV",
+  "caseSha256": {
+    "calor": "e30362387d4be49a20b2e8a640bc6e523d93071035f142f5bf6ef7d7d4f7a813",
+    "oracle": "a4ca2894684146de158dbacfc952f4e06aa74d73f8ebd9274d019bcde1b65d44",
+    "prime": null
+  },
+  "claimSite": "implication",
+  "obligationKind": null,
+  "o1": {
+    "Kind": "violated",
+    "Inputs": 256,
+    "HypothesisHeld": 80,
+    "Reached": 80,
+    "HypothesisThrew": 0,
+    "BodyThrew": 0,
+    "Violations": 72,
+    "ViolationKind": "prop-false",
+    "Witness": "(3, -128)",
+    "Error": null,
+    "ReachedSample": [
+      "(3, -128)",
+      "(3, -127)",
+      "(3, -106)",
+      "(3, -18)",
+      "(3, -10)",
+      "(3, -8)",
+      "(3, -2)",
+      "(3, -1)",
+      "(3, 0)",
+      "(3, 1)",
+      "(3, 2)",
+      "(3, 3)",
+      "(3, 12)",
+      "(3, 81)",
+      "(3, 126)",
+      "(3, 127)"
+    ]
+  },
+  "channels": {
+    "CH-CONTRACT": {
+      "elided": {
+        "hasErrors": true,
+        "diagnostics": [
+          {
+            "code": "Calor0810",
+            "severity": "Error",
+            "line": 10,
+            "message": "LSP violation: Precondition in \u0027Impl.Run\u0027 is stronger than \u0027IProbe.Run\u0027. Counterexample: x=1341128704, y=1342177281, result=0"
+          },
+          {
+            "code": "Calor0815",
+            "severity": "Info",
+            "line": 10,
+            "message": "Postcondition strengthening proven by Z3 for \u0027Impl.Run\u0027"
+          }
+        ],
+        "contracts": null,
+        "obligations": null,
+        "emitted": ""
+      },
+      "forced": {
+        "hasErrors": true,
+        "diagnostics": [
+          {
+            "code": "Calor0810",
+            "severity": "Error",
+            "line": 10,
+            "message": "LSP violation: Precondition in \u0027Impl.Run\u0027 is stronger than \u0027IProbe.Run\u0027. Counterexample: x=1341128704, y=1342177281, result=0"
+          },
+          {
+            "code": "Calor0815",
+            "severity": "Info",
+            "line": 10,
+            "message": "Postcondition strengthening proven by Z3 for \u0027Impl.Run\u0027"
+          }
+        ],
+        "contracts": null,
+        "obligations": null,
+        "emitted": ""
+      }
+    }
+  },
+  "o2": {
+    "status": "not-applicable"
+  },
+  "claim": {
+    "compileErrors": [
+      "Calor0810"
+    ],
+    "direction": "Precondition",
+    "implicationDiagnostics": [
+      {
+        "code": "Calor0810",
+        "severity": "Error",
+        "line": 10,
+        "message": "LSP violation: Precondition in \u0027Impl.Run\u0027 is stronger than \u0027IProbe.Run\u0027. Counterexample: x=1341128704, y=1342177281, result=0"
+      },
+      {
+        "code": "Calor0815",
+        "severity": "Info",
+        "line": 10,
+        "message": "Postcondition strengthening proven by Z3 for \u0027Impl.Run\u0027"
+      }
+    ],
+    "claimFound": true,
+    "token": "Failed",
+    "rawStatus": "Failed",
+    "isVacuous": false,
+    "counterexample": [
+      {
+        "name": "x",
+        "value": "1341128704"
+      },
+      {
+        "name": "y",
+        "value": "1342177281"
+      },
+      {
+        "name": "result",
+        "value": "0"
+      }
+    ],
+    "modelReplay": {
+      "input": null,
+      "o1": "no replayable model"
+    }
+  },
+  "forcedClaim": {
+    "compileErrors": [
+      "Calor0810"
+    ],
+    "direction": "Precondition",
+    "implicationDiagnostics": [
+      {
+        "code": "Calor0810",
+        "severity": "Error",
+        "line": 10,
+        "message": "LSP violation: Precondition in \u0027Impl.Run\u0027 is stronger than \u0027IProbe.Run\u0027. Counterexample: x=1341128704, y=1342177281, result=0"
+      },
+      {
+        "code": "Calor0815",
+        "severity": "Info",
+        "line": 10,
+        "message": "Postcondition strengthening proven by Z3 for \u0027Impl.Run\u0027"
+      }
+    ],
+    "claimFound": true,
+    "token": "Failed",
+    "rawStatus": "Failed",
+    "isVacuous": false,
+    "counterexample": [
+      {
+        "name": "x",
+        "value": "1341128704"
+      },
+      {
+        "name": "y",
+        "value": "1342177281"
+      },
+      {
+        "name": "result",
+        "value": "0"
+      }
+    ]
+  },
+  "guards": {
+    "marker": null,
+    "applicable": false
+  },
+  "status": "executed",
+  "class": "no-claim",
+  "classReason": "Failed with no replayable model on a sampled domain",
+  "addedFindings": [],
+  "nonVacuityCheck": null,
+  "attempt": 1,
+  "bucket": "sweep",
+  "startedUtc": "2026-10-04T02:06:20.5294310Z",
+  "endedUtc": "2026-10-04T02:06:20.5851860Z",
+  "durationMs": 55
+}
