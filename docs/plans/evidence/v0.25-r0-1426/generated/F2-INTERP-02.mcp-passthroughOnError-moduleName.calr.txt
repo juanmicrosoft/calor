@@ -1,0 +1,19 @@
+§M{m001:Custom:overflow=unchecked}
+  §U{System}
+  §U{System.Globalization}
+
+  §CL{c001:Probe:pub:stat}
+    §MT{m002:Kind:pub:stat} (FormattableString:f) -> str
+      §R (+ (+ (+ "fs:" f.Format) ":") f.ArgumentCount)
+
+    §MT{m003:Kind:pub:stat} (any:o) -> str
+      §R (+ "object:" o)
+
+    §MT{m004:Run:pub:stat} () -> str
+      §B{i32:x} 5
+      §B{FormattableString:f} "x=${x}"
+      §B{IFormattable:g} "y=${x:D3}"
+      §B{str:viaInvariant} §C{FormattableString.Invariant} "${1.5}"
+      §R (+ (+ (+ (+ (+ (+ (+ (+ f.Format "|") f.ArgumentCount) "|") §C{g.ToString} §A null §A CultureInfo.InvariantCulture §/C) "|") viaInvariant) "|") §C{Kind} §A "k=${x}" §/C)
+
+

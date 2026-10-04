@@ -144,6 +144,10 @@ internal static partial class EvidenceContractValidator
                 && (e.Pr is { } registeredPr ? hasPr && pr == registeredPr : !hasPr && issue == e.Issue));
             if (match.Ceiling is null || recordedIn is null || !amendmentVersions.Contains(recordedIn))
                 v.Add(new("C011", subject, "ceiling exception is not one registered by a logged amendment (1.1.0: pr-size, #1473, 1520; 1.2.0: s1-generated-cases, issue #1311, 3008)"));
+            // A later amendment that changed the registered text must itself be logged (1.2.1
+            // amended condition 4 of the #1311 exception).
+            if (match.TextAmendment is { } textAmendment && !amendmentVersions.Contains(textAmendment))
+                v.Add(new("C011", subject, $"the registered text of this exception was set by amendment {textAmendment}, which is not in the amendment log"));
             if (string.IsNullOrWhiteSpace(Str(exception?["justification"])))
                 v.Add(new("C011", subject, "exception needs a justification"));
             // A per-gate exception authorizes work, not just a number. Its scope, conditions, and
@@ -240,12 +244,15 @@ internal static partial class EvidenceContractValidator
     /// Ceiling raises registered by amendments (stopping rule 1). A per-PR raise names its PR; a
     /// per-gate raise (amendment 1.2.0) has no PR and is keyed by the gate's issue.
     /// A per-gate raise also binds its scope, conditions, and justification by
-    /// <see cref="TextSha256"/> and its added executions.
+    /// <see cref="TextSha256"/> and its added executions. <c>TextAmendment</c> names the amendment
+    /// that last changed that text, which must be in the log: amendment 1.2.1 amended condition 4 of
+    /// the #1311 exception (run-2 harness: the libz3 capture and ExecutionCeiling 1500 to 1508), so the
+    /// hash is of the 1.2.1 text and the 1.2.0 text no longer validates.
     /// </summary>
-    private static readonly (string Ceiling, int? Pr, int? Issue, double Value, string Amendment, int? Added, string? TextSha256)[] RegisteredCeilingExceptions =
+    private static readonly (string Ceiling, int? Pr, int? Issue, double Value, string Amendment, int? Added, string? TextAmendment, string? TextSha256)[] RegisteredCeilingExceptions =
     [
-        ("pr-size", 1473, 1276, 1520, "1.1.0", null, null),
-        ("s1-generated-cases", null, 1311, 3008, "1.2.0", 1508, "166a99f1bdda97509c3c29f329c69420ef405a84c8a94d5c67cd34078024df77"),
+        ("pr-size", 1473, 1276, 1520, "1.1.0", null, null, null),
+        ("s1-generated-cases", null, 1311, 3008, "1.2.0", 1508, "1.2.1", "d9a57518b7e26e744fe7080177cdfb5e3ea9051f9eaaec5c233f083ccf896bac"),
     ];
 
     /// <summary>

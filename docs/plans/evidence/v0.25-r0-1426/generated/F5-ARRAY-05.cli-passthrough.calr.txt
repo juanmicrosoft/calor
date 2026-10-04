@@ -1,0 +1,33 @@
+§M{m001:F5-ARRAY-05:overflow=unchecked}
+  §U{System}
+
+  §NS{ns_global:_global:global}
+    §CSHARP{public static class Probe
+{
+    public static int[][] Jagged()
+    {
+        return new int[][] { new int[] { 1 }, new int[] { 2, 3 } };
+    }
+
+    public static int[,,] Cube()
+    {
+        return new int[,,] { { { 1, 2 } }, { { 3, 4 } } };
+    }
+
+    public static int[] Sized()
+    {
+        return new int[3] { 7, 8, 9 };
+    }
+
+    public static string Run()
+    {
+        var implicitArr = new[] { "a", "b" };
+        var nested = new object[] { new int[] { 5, 6 }, "s" };
+        var j = Jagged();
+        var c = Cube();
+        var s = Sized();
+        return j[1][1] + "|" + c[1, 0, 1] + "|" + c.Rank + "|" + s[2] + "|" + implicitArr[1] + "|" + ((int[])nested[0])[1];
+    }
+}}§/CSHARP
+
+
