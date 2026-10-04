@@ -253,7 +253,11 @@ public sealed class S2ObligationResidualTests
                 §PROOF{p1:claim} (!= box.Value INT:0)
                 §R q
             """;
-        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "p1"));
+        var (obligations, csharp, codes) = Solve(source, typeCheck: false);
+        AssertWithheld(Proof(obligations, "p1"));
+        Assert.Contains("box.Value != 0", csharp);           // the runtime check stays
+        Assert.Contains("Calor1124", codes);          // reported as unsupported
+        Assert.DoesNotContain("Calor1140", codes);    // no failed-proof error
     }
 
     [Fact]
@@ -280,7 +284,11 @@ public sealed class S2ObligationResidualTests
                 §PROOF{p1:claim} (!= x INT:0)
                 §R x
             """;
-        AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "p1"));
+        var (obligations, csharp, codes) = Solve(source, typeCheck: false);
+        AssertWithheld(Proof(obligations, "p1"));
+        Assert.Contains("x != 0", csharp);           // the runtime check stays
+        Assert.Contains("Calor1124", codes);          // reported as unsupported
+        Assert.DoesNotContain("Calor1140", codes);    // no failed-proof error
     }
 
     [Fact]
@@ -318,23 +326,6 @@ public sealed class S2ObligationResidualTests
                 §R x
             """;
         AssertWithheld(Proof(Solve(source).Obligations, "p1"));
-    }
-
-    [Fact]
-    public void ThenBodyIgnoresALaterElseIfCall()
-    {
-        // Review round 2 control: the later call is never evaluated on the then path.
-        const string source = """
-            §M{m1:M}
-              §F{f1:Probe:pub} (i32:x) -> i32
-                §E{}
-                §IF{if1} (> x INT:0)
-                  §PROOF{p1:claim} (> x INT:1)
-                §EI (> §C{Math.Abs} §A x §/C INT:1)
-                  §R INT:2
-                §R x
-            """;
-        Assert.Equal(ObligationStatus.Failed, Proof(Solve(source, typeCheck: false).Obligations, "p1").Status);
     }
 
     [Fact]
@@ -425,24 +416,6 @@ public sealed class S2ObligationResidualTests
                   §PROOF{p1:claim} (!= x INT:0)
             """;
         AssertWithheld(Proof(Solve(source, typeCheck: false).Obligations, "p1"));
-    }
-
-    [Fact]
-    public void Control_ThenBodyGuardStillDischargesTheSameClaim()
-    {
-        // Review round 3: ordering the state-change check restores the then-body guard fact, so a
-        // claim it implies is (correctly) Discharged.
-        const string source = """
-            §M{m1:M}
-              §F{f1:Probe:pub} (i32:x) -> i32
-                §E{}
-                §IF{if1} (> x INT:0)
-                  §PROOF{p1:claim} (> x INT:0)
-                §EI (> §C{Math.Abs} §A x §/C INT:1)
-                  §R INT:2
-                §R x
-            """;
-        Assert.Equal(ObligationStatus.Discharged, Proof(Solve(source, typeCheck: false).Obligations, "p1").Status);
     }
 
     [Fact]

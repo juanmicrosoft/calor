@@ -67,8 +67,7 @@ All notable changes to this project will be documented in this file.
   The result is `Calor1124` ("unsupported"), and the runtime check stays. This can withhold
   counterexamples that were real. Properties are matched by name, so a field that shares a name
   with any property in the module is also withheld. These checks never make an obligation proven
-  or discharged. Separately, an `if` body now keeps its guard fact when only a later `elseif`
-  condition has a call, so a claim that guard implies is discharged, as it should be.
+  or discharged.
 
 - **Proof obligations no longer use facts that an assignment made stale (#1413).** With
   `§Q (> x -1)`, then `§ASSIGN x -5`, then `§PROOF (> x -1)`, the obligation solver still

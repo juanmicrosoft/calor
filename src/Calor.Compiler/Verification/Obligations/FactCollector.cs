@@ -377,18 +377,18 @@ public sealed class FactCollector
         // A condition that itself changes state (an increment, a ref/out argument, or a call)
         // is evaluated against a changing state: neither it nor its negation is a stable fact.
         var negationsUsable = !conditions.Any(ChangesState);
-        // #1413 (review round 2): a body is guarded only by the conditions evaluated before it.
-        bool UsableUpTo(int count) => !conditions.Take(count).Any(ChangesState);
 
         // #1413 (D-OBL-THROWING-PREDECESSOR): a body is reached only when every condition evaluated
         // before it completed; a later condition is never evaluated on that path.
-        var thenGuarded = UsableUpTo(1) && AddGuardFact(ifStmt.Condition, ifStmt.ThenBody);
+        var thenGuarded = negationsUsable && AddGuardFact(ifStmt.Condition, ifStmt.ThenBody);
         Walk(ifStmt.ThenBody, exact && thenGuarded && !MayThrow(ifStmt.Condition));
         for (var index = 0; index < ifStmt.ElseIfClauses.Count; index++)
         {
             var clause = ifStmt.ElseIfClauses[index];
-            var fact = Conjoin(conditions.Take(index + 1).Select(Negate).Append(clause.Condition), clause.Condition.Span);
-            var clauseGuarded = UsableUpTo(index + 2) && AddGuardFact(fact, clause.Body);
+            var fact = negationsUsable
+                ? Conjoin(conditions.Take(index + 1).Select(Negate).Append(clause.Condition), clause.Condition.Span)
+                : clause.Condition;
+            var clauseGuarded = negationsUsable && AddGuardFact(fact, clause.Body);
             Walk(clause.Body, exact && clauseGuarded && !conditions.Take(index + 2).Any(MayThrow));
         }
         if (ifStmt.ElseBody != null)
