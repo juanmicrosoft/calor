@@ -20,6 +20,9 @@ public sealed class ContractInheritanceChecker : IDisposable
     private readonly bool _useZ3;
     private readonly uint _timeoutMs;
     private bool _z3UnavailableReported;
+    // #1413: set when an implication check for the current method came back Assumed —
+    // the method's inheritance is then neither a violation nor established-valid.
+    private bool _implicationUnestablished;
     private bool _disposed;
     private readonly Dictionary<AstNode, string> _qualifiedNames = new();
     private readonly Dictionary<AstNode, string> _displayNames = new();
@@ -68,6 +71,8 @@ public sealed class ContractInheritanceChecker : IDisposable
         _displayNames.Clear();
         _enclosingDeclarations.Clear();
         _moduleNamespace = module.Name == "_global" ? "" : module.Name;
+        if (_z3Prover != null)
+            _z3Prover.CheckIntegerOverflow = module.ShouldCheckIntegerOverflow();
         var interfaces = new List<InterfaceDefinitionNode>();
         var classes = new List<ClassDefinitionNode>();
         void Collect(AstNode declaration, AstNode? enclosing)
@@ -439,6 +444,7 @@ public sealed class ContractInheritanceChecker : IDisposable
                 violations);
         }
 
+        _implicationUnestablished = false;
         var parameters = GetParameterList(implementingMethod.Parameters);
         var implementerPrecondition = Conjoin(
             implementingMethod.Preconditions.Select(contract => contract.Condition),
@@ -488,7 +494,9 @@ public sealed class ContractInheritanceChecker : IDisposable
 
         var status = violations.Count > 0
             ? ContractInheritanceStatus.Violation
-            : ContractInheritanceStatus.Valid;
+            : _implicationUnestablished
+                ? ContractInheritanceStatus.Unestablished
+                : ContractInheritanceStatus.Valid;
         if (status == ContractInheritanceStatus.Valid)
         {
             _diagnostics.ReportInfo(
@@ -1494,6 +1502,7 @@ public sealed class ContractInheritanceChecker : IDisposable
         ExpressionNode postcondition,
         TextSpan span) =>
         precondition is BoolLiteralNode { Value: true }
+            || postcondition is BoolLiteralNode { Value: true }
             ? postcondition
             : new ImplicationExpressionNode(
                 span,
@@ -1598,6 +1607,14 @@ public sealed class ContractInheritanceChecker : IDisposable
                         $"LSP violation: Precondition in '{classNode.Name}.{implementingMethod.Name}' is stronger than '{sourceTypeName}.{sourceMethodName}'. {z3Result.CounterexampleDescription}");
                     return violation;
 
+                case ImplicationStatus.Unknown when z3Result.Outcome?.Status == ProofStatus.Assumed:
+                    // #1413: the solver's proof rests on a named assumption (a contract that
+                    // can throw, or a null the solver cannot represent). Report it as Assumed
+                    // and claim nothing: no "proven", no syntactic heuristic, no "valid".
+                    ReportImplicationAssumed(implSpan, "Precondition weakening",
+                        classNode, implementingMethod, z3Result.Outcome);
+                    return null;
+
                 case ImplicationStatus.Unknown:
                     // Could not determine - fall back to heuristics
                     _diagnostics.ReportWarning(
@@ -1671,6 +1688,11 @@ public sealed class ContractInheritanceChecker : IDisposable
                         $"LSP violation: Postcondition in '{classNode.Name}.{implementingMethod.Name}' is weaker than '{sourceTypeName}.{sourceMethodName}'. {z3Result.CounterexampleDescription}");
                     return violation;
 
+                case ImplicationStatus.Unknown when z3Result.Outcome?.Status == ProofStatus.Assumed:
+                    ReportImplicationAssumed(implSpan, "Postcondition strengthening",
+                        classNode, implementingMethod, z3Result.Outcome);
+                    return null;
+
                 case ImplicationStatus.Unknown:
                     // Could not determine - fall back to heuristics
                     _diagnostics.ReportWarning(
@@ -1694,6 +1716,21 @@ public sealed class ContractInheritanceChecker : IDisposable
             sourceTypeName,
             sourceMethodName,
             implSpan);
+    }
+
+    private void ReportImplicationAssumed(
+        TextSpan implSpan,
+        string check,
+        ClassDefinitionNode classNode,
+        MethodNode implementingMethod,
+        ProofOutcome outcome)
+    {
+        _implicationUnestablished = true;
+        _diagnostics.ReportWarning(
+            implSpan,
+            DiagnosticCode.ImplicationAssumed,
+            $"{check} for '{classNode.Name}.{implementingMethod.Name}' is Assumed, not proven "
+            + $"[{string.Join("; ", outcome.Assumptions)}]: {outcome.Reason}");
     }
 
     /// <summary>
@@ -2164,7 +2201,14 @@ public enum ContractInheritanceStatus
     /// <summary>
     /// Contract inheritance violates LSP.
     /// </summary>
-    Violation
+    Violation,
+
+    /// <summary>
+    /// #1413: no violation was found, but an implication check is only Assumed (it rests
+    /// on a contract that can throw, or a null the solver cannot represent), so
+    /// compatibility is not established. Nothing is claimed.
+    /// </summary>
+    Unestablished
 }
 
 /// <summary>

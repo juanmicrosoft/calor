@@ -44,6 +44,15 @@ All notable changes to this project will be documented in this file.
     manifests (`~/.calor`) now honor `USERPROFILE` on Windows, as NuGet does. Linux and macOS
     are unchanged.
 
+- **Interface contract checks no longer prove what can throw (#1413).** When a class implements
+  an interface, Calor checks that the class's precondition accepts every input the interface
+  accepts. That check treated `s.Length` as defined for a null string and `x % y` as defined
+  for `y = 0`, and reported "Precondition weakening proven" (`Calor0815`) for preconditions that
+  throw on such inputs. Now a check that depends on a possibly-zero divisor, possible checked
+  overflow, or a string, array, or user-type value reports the new warning `Calor0819`
+  ("Assumed, not proven") with the named assumption, and Calor no longer reports the
+  inheritance as valid (`Calor0814`). Checks over plain integers are unchanged.
+
 - **An empty clause body no longer swallows the next statement (#1485).** A
   clause such as `§CA` (catch) with no indented lines used to pull the next
   statement at the same column into its body. The program compiled with no

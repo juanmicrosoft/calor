@@ -73,6 +73,14 @@ public sealed class Z3ImplicationProver : IDisposable
     private bool _disposed;
 
     /// <summary>
+    /// Whether the contracts run under checked integer arithmetic (the module default).
+    /// When true, a consequent whose arithmetic can overflow on an antecedent-satisfying
+    /// input would throw at runtime, so its proof is demoted to Assumed. Defaults to
+    /// true: assuming checked can only demote a proof, never produce one.
+    /// </summary>
+    public bool CheckIntegerOverflow { get; set; } = true;
+
+    /// <summary>
     /// Creates a new implication prover with the given Z3 context.
     /// </summary>
     /// <param name="ctx">The Z3 context to use for proving.</param>
@@ -145,19 +153,105 @@ public sealed class Z3ImplicationProver : IDisposable
                 Duration: sw.Elapsed);
         }
 
+        return Solve(translator, antecedentExpr, consequent, consequentExpr, sw);
+    }
+
+    /// <summary>
+    /// Decides A → C, where A (an assumed contract) and C (a contract that must then hold)
+    /// are runtime-evaluated C# expressions. The solver's terms are total — x/0 has a value,
+    /// arithmetic wraps, strings and arrays are never null — while at runtime C may throw
+    /// (a zero or MinValue÷−1 divisor, checked overflow, a null receiver). A throwing C
+    /// rejects the input (precondition) or fails the guarantee (postcondition), so
+    /// "A → C" is established only when A also entails C's definedness and the query uses
+    /// no sort whose null the solver cannot represent; otherwise the verdict is Assumed,
+    /// which is never reported as proven (#1413, S1 rows IMPL-ASSUMPTION-FORMS and
+    /// IMPL-DIVISION-TOTALIZED). A's own partiality needs no condition: treating a
+    /// throwing A as a total value only adds inputs to check.
+    /// </summary>
+    private ImplicationResult Solve(
+        ContractTranslator translator,
+        BoolExpr antecedentExpr,
+        ExpressionNode consequent,
+        BoolExpr consequentExpr,
+        Stopwatch sw)
+    {
         try
         {
-            // Create solver and add constraint: A AND NOT(C)
+            var (divisorConditions, divisorFailure) =
+                FunctionBodyEncoder.CollectDivisorNonZeroConstraintsFromExpression(translator, _ctx, consequent);
+            if (divisorFailure != null)
+            {
+                return ImplicationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(
+                        $"{divisorFailure}. Implication not established.")),
+                    Duration: sw.Elapsed);
+            }
+            var overflowSafety = CheckIntegerOverflow
+                ? translator.GetCheckedArithmeticSafety(consequent)
+                : _ctx.MkTrue();
+            if (overflowSafety == null)
+            {
+                return ImplicationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(
+                        "The contract's checked arithmetic could not be modeled. Implication not established.")),
+                    Duration: sw.Elapsed);
+            }
+
+            // Create solver and add constraint: A AND NOT(C) — the same query as before the
+            // definedness checks, so its verdict and model are unchanged.
             using var solver = new IsolatedSolver(_ctx, _timeoutMs);
             solver.Assert(antecedentExpr);
             solver.Assert(_ctx.MkNot(consequentExpr));
 
-            // Check satisfiability: UNSAT means A always implies C
+            // Check satisfiability: UNSAT means A always implies C (under total semantics)
             var status = solver.Check();
+            if (status != Status.UNSATISFIABLE)
+            {
+                return ImplicationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.SolverVerdict(
+                        status, solver.CheckedSolver, solver.TranslateVariables(translator.Variables),
+                        SatPolarity.SatIsRefutation)),
+                    Duration: sw.Elapsed);
+            }
+
+            var assumptions = new List<string>();
+            var reasons = new List<string>();
+            if (divisorConditions.Count > 0
+                && !Entailed(antecedentExpr, _ctx.MkAnd(divisorConditions.ToArray())))
+            {
+                assumptions.Add(Z3Verifier.ContractExpressionDivisionAssumption);
+                reasons.Add("no divisor in the required contract is zero (or MinValue ÷ -1)");
+            }
+            if (!Entailed(antecedentExpr, overflowSafety))
+            {
+                assumptions.Add(Z3Verifier.CheckedArithmeticAssumption);
+                reasons.Add("the required contract's checked arithmetic does not overflow");
+            }
+            if (translator.TouchedStringTheory)
+            {
+                assumptions.Add(Z3Verifier.StringModelAssumption);
+                reasons.Add("no string is null or non-ASCII (the solver's strings are non-null and differently counted, D3/D12)");
+            }
+            if (translator.TouchedNullableReferenceSort)
+            {
+                assumptions.Add(Z3Verifier.NullableReferenceModelAssumption);
+                reasons.Add("no array or user-type reference is null (the solver's sorts are non-null, D14)");
+            }
+            // A literal `true` requirement (e.g. no contract on that side) cannot throw and
+            // holds for every input, including those the solver cannot represent.
+            if (assumptions.Count > 0 && consequent is not BoolLiteralNode { Value: true })
+            {
+                return ImplicationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.AssumedProof(
+                        $"The implication holds only if {string.Join("; and ", reasons)}, which the contracts do not guarantee. Not established.",
+                        assumptions)),
+                    Duration: sw.Elapsed);
+            }
 
             return ImplicationResult.FromOutcome(
                 ProofOutcome.Assign(ProofEvidence.SolverVerdict(
-                    status, solver.CheckedSolver, solver.TranslateVariables(translator.Variables), SatPolarity.SatIsRefutation)),
+                    status, solver.CheckedSolver, solver.TranslateVariables(translator.Variables),
+                    SatPolarity.SatIsRefutation)),
                 Duration: sw.Elapsed);
         }
         catch (Z3Exception ex)
@@ -166,6 +260,19 @@ public sealed class Z3ImplicationProver : IDisposable
                 ProofOutcome.Assign(ProofEvidence.SolverError(ex)),
                 Duration: sw.Elapsed);
         }
+    }
+
+    /// <summary>True when <paramref name="antecedent"/> entails <paramref name="condition"/>
+    /// (an unknown or timed-out check counts as not entailed). Each check runs in a fresh
+    /// isolated context (#1135).</summary>
+    private bool Entailed(BoolExpr antecedent, BoolExpr condition)
+    {
+        if (IsolatedSolver.Simplify(_ctx, condition).IsTrue)
+            return true;
+        using var solver = new IsolatedSolver(_ctx, _timeoutMs);
+        solver.Assert(antecedent);
+        solver.Assert(_ctx.MkNot(condition));
+        return solver.Check() == Status.UNSATISFIABLE;
     }
 
     /// <summary>
@@ -259,28 +366,10 @@ public sealed class Z3ImplicationProver : IDisposable
                 Duration: sw.Elapsed);
         }
 
-        try
-        {
-            // For LSP: implementer postcondition must imply interface postcondition
-            // i.e., anything the implementer guarantees should also satisfy what the interface guarantees
-            // This means the implementer can only guarantee MORE (stronger postcondition)
-            using var solver = new IsolatedSolver(_ctx, _timeoutMs);
-            solver.Assert(implementerExpr);
-            solver.Assert(_ctx.MkNot(interfaceExpr));
-
-            var status = solver.Check();
-
-            return ImplicationResult.FromOutcome(
-                ProofOutcome.Assign(ProofEvidence.SolverVerdict(
-                    status, solver.CheckedSolver, solver.TranslateVariables(translator.Variables), SatPolarity.SatIsRefutation)),
-                Duration: sw.Elapsed);
-        }
-        catch (Z3Exception ex)
-        {
-            return ImplicationResult.FromOutcome(
-                ProofOutcome.Assign(ProofEvidence.SolverError(ex)),
-                Duration: sw.Elapsed);
-        }
+        // For LSP: implementer postcondition must imply interface postcondition
+        // i.e., anything the implementer guarantees should also satisfy what the interface guarantees
+        // This means the implementer can only guarantee MORE (stronger postcondition)
+        return Solve(translator, implementerExpr, interfacePostcondition, interfaceExpr, sw);
     }
 
     public void Dispose()
