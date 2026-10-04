@@ -3,7 +3,7 @@
   "issue": 1413,
   "gate": "S2",
   "epic": 1409,
-  "contractVersion": "1.2.1",
+  "contractVersion": "1.3.0",
   "vocabulary": [
     "VALIDATED",
     "FIX-IN-0.24",
@@ -28,7 +28,7 @@
   "closure": {
     "status": "OPEN",
     "result": null,
-    "note": "OPEN until every repair is merged (status \"merged\" with its merge commit on main, being the GitHub merge of its PR from its S2 branch, and containing its regression witnesses), amendment 1.3.0 (capacity allowance and the R-OBL review overrun) has merged. The discovery ids are pinned by the validator tests, so a discovery is resolved by a repair or amendment, never deleted. At closure, result is SUCCESS (no MILESTONE-FAILED anywhere) or MILESTONE-FAILED (required if any finding or discovery is MILESTONE-FAILED); only SUCCESS satisfies terminal predicates 4-5."
+    "note": "OPEN until every repair is merged (status \"merged\" with its merge commit on main, being the GitHub merge of its PR from its S2 branch, and containing its regression witnesses), amendment 1.3.0 (capacity allowance and the R-OBL review overrun) is in the contract (merged as ffa75e8b; contract version 1.3.0). The discovery ids are pinned by the validator tests, so a discovery is resolved by a repair or amendment, never deleted. At closure, result is SUCCESS (no MILESTONE-FAILED anywhere) or MILESTONE-FAILED (required if any finding or discovery is MILESTONE-FAILED); only SUCCESS satisfies terminal predicates 4-5."
   },
   "capacity": {
     "ceiling": "s2-repairs",
@@ -209,7 +209,7 @@
       "rootCause": "The registration classifies NUM-NARROW-ARITH and NUM-LITERAL-OVERSIZE as unsupported-refused (divergences D1/D2 of the frozen docs/verification-modeled-forms.md say \"refused\") and NUM-OVERFLOW-CHECKED as assumed, but the verifier modeled C# narrow promotion (W1 Slice 1), typed out-of-range INT: literals as 64-bit (#774), and proved checked-arithmetic contracts whose overflow the preconditions rule out. Each Proven agreed with the oracle; none was a false proof.",
       "change": "Opened by maintainer decision Q1 (2026-10-04): demote per the frozen table exactly. Sub-32-bit arithmetic/shifts/negation are refused (D1); an INT: literal outside int32 is refused (D2; lexer marks the inferred width, the cache key distinguishes it); checked arithmetic that can overflow for some value of its types is Assumed (checked-arithmetic) even when entailed. Overflow sensitivity is decided without preconditions (some value of the operand types overflows), so arithmetic that cannot overflow stays Proven. The 15 Calor.Verification.Tests cases that pinned the old behavior are updated (each justified by the frozen table); the #1135 differential reports are unchanged; cache format 1.22.",
       "decision": "Q1 (2026-10-04): open the sixth repair PR and demote per the frozen table exactly, with no reinterpretation of \"unless entailed\"; update the tests that pinned the old behavior; regenerate the #1135 reports if they change (they do not).",
-      "nonTestChangedLines": 109,
+      "nonTestChangedLines": 141,
       "regressionWitness": [
         "tests/Calor.Verification.Tests/S2NumericRefusalTests.cs"
       ],
@@ -236,7 +236,7 @@
       "branch": "milestone-0.24/s2-1413-fix-obligation-residuals",
       "rootCause": "Review-found residuals of the obligation solver (discoveries D-OBL-THROWING-PREDECESSOR and D-OBL-PROOF-GETTER): exactness did not track an earlier statement or enclosing condition that throws implicitly, and a proof reading a property (getter, or a property hiding an inherited field) could be refuted with an unreachable model. Spurious refutations, never false proofs.",
       "change": "Visible demotion: after a statement that may throw (checked or dividing arithmetic, calls, member/element reads, casts, a retained proof guard), or under a guard condition that may throw, the state is not exact; an obligation reading a member named like a declared property is not exact. A SAT result is Unsupported (Calor1124, guard kept); UNSAT handling is unchanged. Stacked on #1496.",
-      "decision": "Q7 (2026-10-04): contract amendment 1.3.0 raises the S2 repair cap 6 -> 7 for these two discoveries only; merges only after the amendment.",
+      "decision": "Q7 (2026-10-04): contract amendment 1.3.0 (merged, ffa75e8b) raises the S2 repair cap 6 -> 7 for these two discoveries only (capacity.exceptions[ceiling=s2-repairs]); at most 3 review rounds.",
       "dependsOnAmendment": "1.3.0",
       "dependsOn": [
         1496
@@ -245,7 +245,7 @@
         "D-OBL-PROOF-GETTER",
         "D-OBL-THROWING-PREDECESSOR"
       ],
-      "nonTestChangedLines": 121,
+      "nonTestChangedLines": 162,
       "regressionWitness": [
         "tests/Calor.Compiler.Tests/S2ObligationResidualTests.cs"
       ],

@@ -159,12 +159,12 @@ public sealed class DispositionTests
     [Fact]
     public void CommittedRecord_IsNotYetClosable()
     {
-        // Unmerged repairs and the unmerged amendment 1.3.0 keep S2 open; there is no closure
-        // result yet. R-CACHE (#1494) is merged: its real merge commit passes the real git checks.
+        // Unmerged repairs keep S2 open; there is no closure result yet. Amendment 1.3.0 is merged
+        // (contract 1.3.0). R-CACHE (#1494) is merged: its real merge commit passes the real git checks.
         var violations = Validate(Record(), closing: true);
         AssertCodes(violations, "D010", "D016");
         Assert.Contains(violations, v => v.Message.Contains("R-OBL: not merged at closure"));
-        Assert.Contains(violations, v => v.Message.Contains("capacity amendment 1.3.0 is not in the contract"));
+        Assert.DoesNotContain(violations, v => v.Message.Contains("capacity amendment"));
         if (Git("rev-parse --verify --quiet origin/main").ExitCode == 0) // the real check needs the main ref
             Assert.DoesNotContain(violations, v => v.Message.StartsWith("R-CACHE:", StringComparison.Ordinal));
     }
@@ -206,10 +206,10 @@ public sealed class DispositionTests
     [Fact]
     public void D010_AmendmentNotMerged_DoesNotClose()
     {
-        // With the committed contract (no amendment 1.3.0), neither the seventh repair nor the
-        // R-OBL review overrun can close.
+        // Against a contract without amendment 1.3.0, neither the seventh repair nor the R-OBL
+        // review overrun can close.
         var record = MergedRecord();
-        record["contractVersion"] = Record()["contractVersion"]!.DeepClone();
+        record["contractVersion"] = "1.2.0";
         var violations = Validate(record, closing: true, AcceptAll(record));
         AssertCodes(violations, "D010");
         Assert.Contains(violations, v => v.Message.Contains("capacity amendment 1.3.0 is not in the contract"));
