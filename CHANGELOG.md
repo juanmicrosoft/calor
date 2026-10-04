@@ -62,6 +62,22 @@ All notable changes to this project will be documented in this file.
     manifests (`~/.calor`) now honor `USERPROFILE` on Windows, as NuGet does. Linux and macOS
     are unchanged.
 
+- **Proof obligations no longer use facts that an assignment made stale (#1413).** With
+  `§Q (> x -1)`, then `§ASSIGN x -5`, then `§PROOF (> x -1)`, the obligation solver still
+  assumed the precondition, reported the obligation discharged, and removed its runtime check.
+  A precondition or parameter refinement is now ignored for every obligation in a body that
+  may write a name it reads, wherever that write is. Writes include `ref`/`out` arguments and
+  writes through an aliased `ref`/`in` parameter. A fact that reads an array element or field
+  is ignored once the body can change them, including through a call, a property getter, an
+  indexer, or `foreach`. A body with raw C# (`§RAW`, `§CS`), unsafe or pointer code, or a
+  lambda gets no facts at all; raw C# in a parameter refinement or precondition makes every
+  obligation of that function `Calor1124`. A failed obligation
+  (`Calor1121`/`Calor1140`, a compile error) is now reported only when the solver's state
+  matches the program's at that point: no reassigned name, no unasserted enclosing guard,
+  and no earlier loop or exit. Otherwise the result is `Calor1124` ("unsupported") and the
+  runtime check stays. This does not track statements that throw before the obligation.
+  New facts: an `else`/`elseif` body knows that the earlier conditions were false, and a
+  parameter of a named refinement type (`§I{Pos:x}`) satisfies its predicate on entry.
 - **Interface contract checks no longer prove what can throw (#1413).** When a class implements
   an interface, Calor checks that the class's precondition accepts every input the interface
   accepts. That check treated `s.Length` as defined for a null string and `x % y` as defined

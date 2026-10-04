@@ -46,7 +46,82 @@ public sealed class FactCollector
     /// constraint), subject to no assignment kill.
     /// </summary>
     public void AddFunctionWideFact(ExpressionNode fact)
-        => ScopedFacts.Add(ScopedFact.FunctionWide(fact));
+    {
+        if (!IsStaleAfterEntry(fact))
+            ScopedFacts.Add(ScopedFact.FunctionWide(fact));
+    }
+
+    /// <summary>#1413: the names read by entry facts (parameter refinements) dropped as stale;
+    /// an obligation reading one of them has an incompletely modeled entry state.</summary>
+    public HashSet<string> DroppedFactNames { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>#1413 (S1 OBL-MUTATION-KILL): every name the body may rebind (assignments, bindings,
+    /// loop variables, `ref`/`out` arguments); an entry fact about one may be stale.</summary>
+    public IReadOnlySet<string> AssignedNames => _assignedNames;
+
+    /// <summary>#1413: the body contains code the collector cannot see into; no fact is usable.</summary>
+    public bool HasOpaqueCode { get; private set; }
+
+    /// <summary>#1413: an entry predicate (parameter refinement) contains raw C#, which runs
+    /// before the body and may rebind anything; no entry fact is then usable.</summary>
+    public bool HasOpaqueEntry { get; private set; }
+
+    /// <summary>#1413: the body may change heap state: a call (including a getter, indexer, or
+    /// enumerator a member read or foreach may run), a collection mutation, a heap store, or new.</summary>
+    public bool MutatesHeap { get; private set; }
+
+    // A member or element read anywhere, a §PROOF condition included, may run a getter, indexer, or
+    // enumerator.
+    private static bool MayChangeHeap(IReadOnlyList<StatementNode> body)
+        => body.SelectMany(DescendantsAndSelf).Any(node => IsHeapMutation(node) || IsHeapRead(node));
+
+    /// <summary>For a §PROOF counterexample only: whether a fact may be stale at <paramref name="span"/>
+    /// through code outside that span (the proof condition's own reads are its evaluation).</summary>
+    public bool IsStaleBefore(ExpressionNode fact, TextSpan span)
+        => HasOpaqueCode || ReferencedNames(fact).Overlaps(_assignedNames) || ReadsHeap(fact)
+            && (_heapWritten || _heapReads.Any(read => read.Start < span.Start || read.End > span.End));
+
+    private static bool IsHeapMutation(AstNode node)
+        => IsHeapStore(node) || node is CallExpressionNode or CallStatementNode or ExpressionCallNode
+            or EventSubscribeNode or EventUnsubscribeNode or UsingStatementNode or NewExpressionNode
+            or CollectionPushNode or DictionaryPutNode or CollectionRemoveNode or CollectionSetIndexNode
+            or CollectionClearNode or CollectionInsertNode or ForeachStatementNode or DictionaryForeachNode;
+
+    /// <summary>#1413: whether a fact true on entry or at a guard may be false later in the body.</summary>
+    public bool IsStaleAfterEntry(ExpressionNode fact)
+        => HasOpaqueCode
+           || ReferencedNames(fact).Overlaps(_assignedNames)
+           || (MutatesHeap && ReadsHeap(fact));
+
+    /// <summary>Whether an expression reads an array element, a field, or a dotted path.</summary>
+    public static bool ReadsHeap(ExpressionNode expression)
+        => DescendantsAndSelf(expression).Any(IsHeapRead);
+
+    private static bool IsHeapRead(AstNode node)
+        => node is ArrayAccessNode or MultiDimArrayAccessNode or FieldAccessNode
+            || node is ReferenceNode reference && reference.Name.Contains('.');
+
+    private HashSet<string> _assignedNames = new(StringComparer.Ordinal);
+    private bool _heapWritten;
+    private List<TextSpan> _heapReads = new();
+    private readonly HashSet<string> _aliasWritten = new(StringComparer.Ordinal);
+    private bool _bodyInitialized;
+    private bool _hasJumps;
+    private readonly List<(int Start, int End)> _exactStatements = new();
+
+    /// <summary>
+    /// Marks an additional name as possibly rebound (e.g. the size variable of an
+    /// indexed-type parameter that the body reassigns).
+    /// </summary>
+    public void MarkAssigned(string name) => _assignedNames.Add(name);
+
+    /// <summary>#1413 (S1 OBL-MUTATION-KILL, OBL-BRANCH-FACTS): the span is a simple statement reached
+    /// only through bodies whose guards are all asserted, after no statement that can exit or jump,
+    /// so a model reaches it. Residual: an earlier statement that throws is not tracked.</summary>
+    public bool IsExact(TextSpan span)
+        => !HasOpaqueCode
+           && _exactStatements.Any(statement =>
+               span.Start >= statement.Start && span.End <= statement.End);
 
     /// <summary>
     /// Collects facts from a function's body and parameter refinements that are relevant
@@ -54,35 +129,59 @@ public sealed class FactCollector
     /// Inline refinements are added as facts for non-RefinementEntry obligations
     /// (e.g., IndexBounds can use parameter refinements as assumptions).
     /// </summary>
-    public void CollectFromFunction(FunctionNode func)
-        => CollectFromCallable(func.Parameters, func.Body);
+    public void CollectFromFunction(
+        FunctionNode func,
+        IReadOnlyDictionary<string, ExpressionNode>? refinementPredicates = null)
+        => CollectFromCallable(func.Parameters, func.Body, refinementPredicates);
 
     /// <summary>
     /// Collects facts from a class method using the same rules as module functions.
     /// </summary>
-    public void CollectFromMethod(MethodNode method)
-        => CollectFromCallable(method.Parameters, method.Body);
+    public void CollectFromMethod(
+        MethodNode method,
+        IReadOnlyDictionary<string, ExpressionNode>? refinementPredicates = null)
+        => CollectFromCallable(method.Parameters, method.Body, refinementPredicates);
 
-    private void CollectFromCallable(
+    internal void CollectFromCallable(
         IReadOnlyList<ParameterNode> parameters,
-        IReadOnlyList<StatementNode> body)
+        IReadOnlyList<StatementNode> body,
+        IReadOnlyDictionary<string, ExpressionNode>? refinementPredicates)
     {
-        // Parameter inline refinements hold on entry for the whole function —
-        // unless the body rebinds the parameter name, in which case the
-        // refinement may no longer describe the current value.
-        var bodyAssigned = CollectAssignedNames(body);
-        foreach (var param in parameters)
+        InitializeBody(body);
+
+        // #1413: two ref/out parameters may alias one variable, so a write through either
+        // rebinds both.
+        var byReference = parameters
+            .Where(p => (p.Modifier & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In)) != 0)
+            .Select(p => p.Name)
+            .ToArray();
+        if (byReference.Length > 1 && byReference.Any(_assignedNames.Contains)
+            || byReference.Length > 0 && MutatesHeap)
         {
-            if (param.InlineRefinement != null && !bodyAssigned.Contains(param.Name))
-            {
-                ScopedFacts.Add(ScopedFact.FunctionWide(
-                    SubstituteSelfRefStatic(
-                        param.InlineRefinement.Predicate,
-                        param.Name)));
-            }
+            _assignedNames.UnionWith(byReference);
+            _aliasWritten.UnionWith(byReference);
         }
 
-        CollectFromStatements(body);
+        // Parameter refinements, inline or named (#1413 S1 OBL-SELFREF, OBL-SUBTYPE), hold on
+        // entry; dropped when the body may rebind them, and for out parameters.
+        foreach (var param in parameters)
+        {
+            if (param.Modifier == ParameterModifier.Out)
+                continue;
+            var predicate = param.InlineRefinement?.Predicate;
+            if (refinementPredicates != null && refinementPredicates.TryGetValue(param.TypeName, out var named))
+                predicate = predicate == null ? named : new BinaryOperationNode(named.Span, BinaryOperator.And, predicate, named);
+            if (predicate == null)
+                continue;
+            HasOpaqueEntry |= IsOpaque(predicate);
+            var fact = SubstituteSelfRefStatic(predicate, param.Name);
+            if (IsStaleAfterEntry(fact))
+                DroppedFactNames.UnionWith(ReferencedNames(fact));
+            else
+                ScopedFacts.Add(ScopedFact.FunctionWide(fact));
+        }
+
+        Walk(body, exact: true);
     }
 
     /// <summary>
@@ -90,59 +189,170 @@ public sealed class FactCollector
     /// </summary>
     public void CollectFromStatements(IReadOnlyList<StatementNode> statements)
     {
+        InitializeBody(statements);
+        Walk(statements, exact: true);
+    }
+
+    private void InitializeBody(IReadOnlyList<StatementNode> body)
+    {
+        if (_bodyInitialized)
+            return;
+        _bodyInitialized = true;
+        _assignedNames = CollectAssignedNames(body);
+        var nodes = body.SelectMany(DescendantsAndSelf).ToArray();
+        HasOpaqueCode = nodes.Any(node => IsOpaque(node));
+        MutatesHeap = MayChangeHeap(body);
+        _heapWritten = nodes.Any(IsHeapMutation);
+        _heapReads = nodes.Where(IsHeapRead).Select(node => node.Span).ToList();
+        _hasJumps = nodes.Any(node => node is GotoStatementNode or LabelStatementNode);
+    }
+
+    /// <summary>
+    /// Walks a statement list collecting scoped facts. <paramref name="exact"/> says
+    /// whether reaching this list is fully described by the facts collected so far.
+    /// </summary>
+    private void Walk(IReadOnlyList<StatementNode> statements, bool exact)
+    {
+        var diverted = false;
         foreach (var stmt in statements)
         {
-            CollectFromStatement(stmt);
+            var reachedExactly = exact && !diverted && !_hasJumps;
+            switch (stmt)
+            {
+                case ForStatementNode forStmt:
+                    var bounded = CollectFromForLoop(forStmt);
+                    Walk(forStmt.Body, reachedExactly && bounded);
+                    break;
+
+                case WhileStatementNode whileStmt:
+                    // The while condition holds on entry to each iteration, but a
+                    // body that reassigns its variables invalidates it mid-body.
+                    var guarded = AddGuardFact(whileStmt.Condition, whileStmt.Body);
+                    Walk(whileStmt.Body, reachedExactly && guarded);
+                    break;
+
+                case IfStatementNode ifStmt:
+                    CollectFromIf(ifStmt, reachedExactly);
+                    break;
+
+                case DoWhileStatementNode doWhile:
+                    // The first iteration runs unconditionally.
+                    Walk(doWhile.Body, reachedExactly);
+                    break;
+
+                case ForeachStatementNode foreach_:
+                    Walk(foreach_.Body, exact: false);
+                    break;
+
+                case TryStatementNode tryStmt:
+                    Walk(tryStmt.TryBody, exact: false);
+                    break;
+
+                default:
+                    if (reachedExactly && !ContainsNestedStatement(stmt))
+                        _exactStatements.Add((stmt.Span.Start, stmt.Span.End));
+                    break;
+            }
+
+            if (CanDivert(stmt))
+                diverted = true;
         }
     }
 
-    private void CollectFromStatement(StatementNode stmt)
+    /// <summary>Each condition is a fact only within the body it guards; #1413 (S1 OBL-BRANCH-FACTS):
+    /// elseif and else bodies also get the negations of the earlier conditions.</summary>
+    private void CollectFromIf(IfStatementNode ifStmt, bool exact)
     {
-        switch (stmt)
+        var conditions = new List<ExpressionNode> { ifStmt.Condition };
+        conditions.AddRange(ifStmt.ElseIfClauses.Select(clause => clause.Condition));
+        // A condition that itself changes state (an increment, a ref/out argument, or a call)
+        // is evaluated against a changing state: neither it nor its negation is a stable fact.
+        var negationsUsable = !conditions.Any(ChangesState);
+
+        var thenGuarded = negationsUsable && AddGuardFact(ifStmt.Condition, ifStmt.ThenBody);
+        Walk(ifStmt.ThenBody, exact && thenGuarded);
+        for (var index = 0; index < ifStmt.ElseIfClauses.Count; index++)
         {
-            case ForStatementNode forStmt:
-                CollectFromForLoop(forStmt);
-                break;
-
-            case WhileStatementNode whileStmt:
-                // The while condition holds on entry to each iteration, but a
-                // body that reassigns its variables invalidates it mid-body.
-                AddGuardFact(whileStmt.Condition, whileStmt.Body);
-                CollectFromStatements(whileStmt.Body);
-                break;
-
-            case IfStatementNode ifStmt:
-                // Each condition is a fact only within the body it guards.
-                AddGuardFact(ifStmt.Condition, ifStmt.ThenBody);
-                CollectFromStatements(ifStmt.ThenBody);
-                foreach (var elseIf in ifStmt.ElseIfClauses)
-                {
-                    AddGuardFact(elseIf.Condition, elseIf.Body);
-                    CollectFromStatements(elseIf.Body);
-                }
-                if (ifStmt.ElseBody != null)
-                    CollectFromStatements(ifStmt.ElseBody);
-                break;
-
-            case DoWhileStatementNode doWhile:
-                CollectFromStatements(doWhile.Body);
-                break;
-
-            case ForeachStatementNode foreach_:
-                CollectFromStatements(foreach_.Body);
-                break;
-
-            case TryStatementNode tryStmt:
-                CollectFromStatements(tryStmt.TryBody);
-                break;
+            var clause = ifStmt.ElseIfClauses[index];
+            var fact = negationsUsable
+                ? Conjoin(conditions.Take(index + 1).Select(Negate).Append(clause.Condition), clause.Condition.Span)
+                : clause.Condition;
+            var clauseGuarded = negationsUsable && AddGuardFact(fact, clause.Body);
+            Walk(clause.Body, exact && clauseGuarded);
+        }
+        if (ifStmt.ElseBody != null)
+        {
+            var added = negationsUsable && AddGuardFact(
+                Conjoin(conditions.Select(Negate), ifStmt.Span),
+                ifStmt.ElseBody);
+            Walk(ifStmt.ElseBody, exact && added);
         }
     }
+
+    private static ExpressionNode Negate(ExpressionNode condition)
+        => new UnaryOperationNode(condition.Span, UnaryOperator.Not, condition);
+
+    private static ExpressionNode Conjoin(IEnumerable<ExpressionNode> conjuncts, TextSpan span)
+        => conjuncts.Aggregate((left, right) =>
+            new BinaryOperationNode(span, BinaryOperator.And, left, right));
+
+    /// <summary>#1413 review: code the collector cannot follow: raw C# (statement or §CS
+    /// expression), unsafe/pointer code, and lambdas (deferred bodies). It makes the body opaque:
+    /// no entry or guard facts, no exact state.</summary>
+    internal static bool IsOpaque(AstNode root)
+        => DescendantsAndSelf(root).Any(node => node is RawCSharpNode or RawCSharpExpressionNode
+            or CompilerDirectiveNode or UnsafeBlockNode or FixedStatementNode or AddressOfNode
+            or PointerDereferenceNode or LambdaExpressionNode);
+
+    /// <summary>A store whose target is not a plain local or parameter (element, field, dotted path).</summary>
+    private static bool IsHeapStore(AstNode node)
+    {
+        var target = node switch
+        {
+            AssignmentStatementNode assignment => assignment.Target,
+            CompoundAssignmentStatementNode compound => compound.Target,
+            UnaryOperationNode unary when IsIncrement(unary) => unary.Operand,
+            _ => null
+        };
+        return target != null && (target is not ReferenceNode reference || reference.Name.Contains('.'));
+    }
+
+    private static bool ChangesState(ExpressionNode condition)
+        => DescendantsAndSelf(condition).Any(node => IsIncrement(node)
+            || node is CallExpressionNode or NewExpressionNode);
+
+    private static bool IsIncrement(AstNode node)
+        => node is UnaryOperationNode
+        {
+            Operator: UnaryOperator.PreIncrement
+                or UnaryOperator.PreDecrement
+                or UnaryOperator.PostIncrement
+                or UnaryOperator.PostDecrement
+        };
+
+    private static bool ContainsNestedStatement(StatementNode statement)
+        => DescendantsAndSelf(statement).Skip(1).Any(node => node is StatementNode);
+
+    /// <summary>Whether control may leave the statement other than by falling through.</summary>
+    private static bool CanDivert(StatementNode statement)
+        => DescendantsAndSelf(statement).Any(node => node
+            is ReturnStatementNode
+            or ThrowStatementNode
+            or RethrowStatementNode
+            or BreakStatementNode
+            or ContinueStatementNode
+            or GotoStatementNode
+            or YieldBreakStatementNode
+            // A statement after a loop runs only once the loop condition is false, a path
+            // condition the solver does not assert.
+            or WhileStatementNode or ForStatementNode or DoWhileStatementNode
+            or ForeachStatementNode or DictionaryForeachNode);
 
     /// <summary>
     /// Extracts loop bounds from a for-loop.
     /// §L{id:i:from:to:step} uses inclusive bounds, matching C# emission.
     /// </summary>
-    private void CollectFromForLoop(ForStatementNode forStmt)
+    private bool CollectFromForLoop(ForStatementNode forStmt)
     {
         var dummySpan = new TextSpan(0, 0, 1, 1);
         var loopVar = new ReferenceNode(dummySpan, forStmt.VariableName);
@@ -159,63 +369,78 @@ public sealed class FactCollector
                 Operator: UnaryOperator.Negate,
                 Operand: IntLiteralNode { Value: > 0 }
             };
+        // Both bounds must be facts for the body's state to be exact; the body
+        // itself is walked by the caller.
         if (isPositiveStep)
         {
-            AddGuardFact(
+            var lower = AddGuardFact(
                 new BinaryOperationNode(
                     dummySpan,
                     BinaryOperator.GreaterOrEqual,
                     loopVar,
                     forStmt.From),
                 forStmt.Body);
-            AddGuardFact(
+            var upper = AddGuardFact(
                 new BinaryOperationNode(
                     dummySpan,
                     BinaryOperator.LessOrEqual,
                     loopVar,
                     forStmt.To),
                 forStmt.Body);
+            return lower && upper;
         }
-        else if (isNegativeStep)
+        if (isNegativeStep)
         {
-            AddGuardFact(
+            var upper = AddGuardFact(
                 new BinaryOperationNode(
                     dummySpan,
                     BinaryOperator.LessOrEqual,
                     loopVar,
                     forStmt.From),
                 forStmt.Body);
-            AddGuardFact(
+            var lower = AddGuardFact(
                 new BinaryOperationNode(
                     dummySpan,
                     BinaryOperator.GreaterOrEqual,
                     loopVar,
                     forStmt.To),
                 forStmt.Body);
+            return lower && upper;
         }
-
-        CollectFromStatements(forStmt.Body);
+        return false;
     }
 
     /// <summary>
     /// Records a guard fact scoped to the body it governs, unless the body
     /// rebinds a variable the fact mentions (conservative assignment kill).
     /// </summary>
-    private void AddGuardFact(ExpressionNode fact, IReadOnlyList<StatementNode> body)
+    private bool AddGuardFact(ExpressionNode fact, IReadOnlyList<StatementNode> body)
     {
-        if (body.Count == 0)
-            return;
+        if (body.Count == 0 || HasOpaqueCode)
+            return false;
 
         var referenced = new HashSet<string>(StringComparer.Ordinal);
         CollectReferencedNames(fact, referenced);
 
         var assigned = CollectAssignedNames(body);
-        if (referenced.Overlaps(assigned))
-            return;
+        if (referenced.Overlaps(assigned) || referenced.Overlaps(_aliasWritten))
+            return false;
+        // #1413: a guard over heap state is stale once the body can change the heap.
+        if (ReadsHeap(fact) && MayChangeHeap(body))
+            return false;
 
         var scopeStart = body.Min(s => s.Span.Start);
         var scopeEnd = body.Max(s => s.Span.End);
         ScopedFacts.Add(new ScopedFact(fact, scopeStart, scopeEnd));
+        return true;
+    }
+
+    /// <summary>The names an expression reads.</summary>
+    public static HashSet<string> ReferencedNames(ExpressionNode expr)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        CollectReferencedNames(expr, names);
+        return names;
     }
 
     private static void CollectReferencedNames(ExpressionNode expr, HashSet<string> names)
@@ -249,19 +474,42 @@ public sealed class FactCollector
                     break;
                 case AssignmentStatementNode { Target: ReferenceNode target }:
                     names.Add(target.Name);
+                    names.Add(target.Name.Split('.')[0]);
                     break;
                 case CompoundAssignmentStatementNode { Target: ReferenceNode compoundTarget }:
                     names.Add(compoundTarget.Name);
                     break;
-                case UnaryOperationNode
-                {
-                    Operator: UnaryOperator.PreIncrement
-                        or UnaryOperator.PreDecrement
-                        or UnaryOperator.PostIncrement
-                        or UnaryOperator.PostDecrement,
-                    Operand: ReferenceNode unaryTarget
-                }:
-                    names.Add(unaryTarget.Name);
+                case AssignmentStatementNode assignment when RootName(assignment.Target) is { } root:
+                    names.Add(root);
+                    break;
+                case CompoundAssignmentStatementNode compound when RootName(compound.Target) is { } compoundRoot:
+                    names.Add(compoundRoot);
+                    break;
+                case CollectionPushNode push:
+                    names.Add(push.CollectionName);
+                    break;
+                case DictionaryPutNode put:
+                    names.Add(put.DictionaryName);
+                    break;
+                case CollectionRemoveNode remove:
+                    names.Add(remove.CollectionName);
+                    break;
+                case CollectionSetIndexNode setIndex:
+                    names.Add(setIndex.CollectionName);
+                    break;
+                case CollectionClearNode clear:
+                    names.Add(clear.CollectionName);
+                    break;
+                case CollectionInsertNode insert:
+                    names.Add(insert.CollectionName);
+                    break;
+                case UnaryOperationNode unary when IsIncrement(unary) && RootName(unary.Operand) is { } unaryRoot:
+                    names.Add(unaryRoot);
+                    break;
+                case VariablePatternNode or VarPatternNode or LambdaParameterNode or ArrayCreationNode
+                        or MultiDimArrayCreationNode or ListCreationNode or DictionaryCreationNode or SetCreationNode:
+                    if (node.GetType().GetProperty("Name")?.GetValue(node) is string declared)
+                        names.Add(declared);
                     break;
                 case ForStatementNode forStmt:
                     names.Add(forStmt.VariableName);
@@ -269,10 +517,51 @@ public sealed class FactCollector
                 case ForeachStatementNode foreachStmt:
                     names.Add(foreachStmt.VariableName);
                     break;
+                case CallExpressionNode call:
+                    AddByReferenceArguments(call.Arguments, call.ArgumentModifiers, names);
+                    break;
+                case CallStatementNode callStatement:
+                    AddByReferenceArguments(
+                        callStatement.Arguments, callStatement.ArgumentModifiers, names);
+                    break;
+            }
+            // Any other binder (catch variable, foreach key/value, using, is-pattern).
+            foreach (var binder in new[] { "VariableName", "KeyName", "ValueName", "BindingName", "IndexVariableName" })
+            {
+                if (node.GetType().GetProperty(binder)?.GetValue(node) is string bound)
+                    names.Add(bound);
             }
         }
 
         return names;
+    }
+
+    /// <summary>The variable at the root of an element or field store target (a[i], o.f).</summary>
+    private static string? RootName(ExpressionNode target) => target switch
+    {
+        ReferenceNode reference => reference.Name.Split('.')[0],
+        ArrayAccessNode access => RootName(access.Array),
+        MultiDimArrayAccessNode multi => RootName(multi.Array),
+        FieldAccessNode field => RootName(field.Target),
+        _ => null
+    };
+
+    /// <summary>#1413: a variable passed as `ref` or `out` may be rebound by the callee.</summary>
+    private static void AddByReferenceArguments(
+        IReadOnlyList<ExpressionNode> arguments,
+        IReadOnlyList<string?>? modifiers,
+        HashSet<string> names)
+    {
+        if (modifiers == null)
+            return;
+        for (var index = 0; index < arguments.Count && index < modifiers.Count; index++)
+        {
+            if (modifiers[index] is "ref" or "out"
+                && arguments[index] is ReferenceNode reference)
+            {
+                names.Add(reference.Name);
+            }
+        }
     }
 
     /// <summary>
