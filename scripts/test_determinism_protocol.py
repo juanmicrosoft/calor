@@ -105,7 +105,7 @@ class RegistrationTests(unittest.TestCase):
         self.assertTrue({ORACLE, STRING_ROW} <= names)
 
     def test_worst_case_fits_the_accepted_ceiling(self) -> None:
-        self.assertEqual((555, 115, 1895), dp.worst_case(PROTOCOL))
+        self.assertEqual((655, 115, 1965), dp.worst_case(PROTOCOL))  # amendment 1.3.0: Windows 75 min, no control run
 
 
 class NegativeRegistrationControls(unittest.TestCase):
@@ -429,7 +429,8 @@ class PlanGuards(unittest.TestCase):
 
     def test_first_execution_is_planned_from_the_protocol(self) -> None:
         self.assertEqual([], self.plan())
-        self.assertEqual([], self.plan(mode="control", execution_id="C1"))
+        # Amendment 1.3.0: maxDispatchedControlRuns 0, so a dispatched control run is refused.
+        self.assertEqual(["the limit of 0 control runs is reached (0 recorded)"], self.plan(mode="control", execution_id="C1"))
         include = dr.matrix(PROTOCOL, "execution")["include"]
         envs = dp.env_by_id(PROTOCOL)
         self.assertEqual(10, len(include))
@@ -481,7 +482,7 @@ class PlanGuards(unittest.TestCase):
         executions = [past(i, f"determinism execution E{i}", sha=str(i) * 40, minutes=1) for i in (1, 2, 3)]
         self.refused("limit of 3 execution", inventory=executions)
         cancelled = [past(i, f"determinism control C{i}", minutes=0, started=False, conclusion="cancelled") for i in (1, 2)]
-        self.refused("limit of 2 control", inventory=cancelled, mode="control", execution_id="C3")  # every dispatch counts
+        self.refused("limit of 0 control", inventory=cancelled, mode="control", execution_id="C3")  # every dispatch counts
         refusals = [past(i, f"determinism execution E{i}", minutes=1, started=False, conclusion="failure") for i in (1, 2, 3)]
         self.assertEqual([], self.plan(inventory=refusals))  # refused runs are charged but are not executions
         self.assertEqual([], self.plan(inventory=[past(1, "determinism execution E1", minutes=1900, event="pull_request")]))
@@ -769,6 +770,29 @@ class AttemptRunnerControls(unittest.TestCase):
         dr.fill_missing(PROTOCOL, env_id="linux-x64", job=1, mode="control", execution_id="C1", out=self.out, base=self.base)
         self.assertEqual([None, None], [self.problem(r) for r in self.records()])
         self.assertEqual([], self.lines())
+
+    def test_nothing_upload_artifact_rejects_is_left_for_the_upload(self) -> None:
+        # Amendment 1.3.0 (g3-exec-1 lost every Linux and macOS record to a NuGet cache file named with ':').
+        self.assertEqual(0, self.run_job())
+        self.assertEqual([], list(self.out.glob("raw/a*/*/home")))  # each isolated home is removed after it is recorded
+        self.assertEqual(self.out.parent / f"{self.out.name}-probe" / "home-probe", dr.probe_dir(self.out))  # probe beside, not in
+        left = self.out / "raw" / "a01" / "control" / "home" / "nuget-http" / "x$ps:_api.nuget.org_v3_index.json"
+        left.mkdir(parents=True)  # a home an interrupted invocation left behind is removed by fill-missing
+        (left / "service_index.dat").write_text("x", encoding="utf-8")
+        self.assertEqual(0, dr.fill_missing(PROTOCOL, env_id="linux-x64", job=1, mode="control", execution_id="C1", out=self.out, base=self.base))
+        self.assertFalse(left.exists())
+        for name in ('a:b', 'a"b', "a<b", "a>b", "a|b", "a*b", "a?b", "a\rb", "a\nb"):
+            if os.name == "nt" and name != "a:b":
+                continue  # Windows cannot create these names at all
+            bad = self.out / "raw" / name
+            try:
+                bad.write_text("x", encoding="utf-8")
+            except OSError:
+                continue
+            self.assertEqual([f"raw/{name}" if os.sep == "/" else f"raw\\{name}"], dr.upload_problems(self.out), name)
+            self.assertEqual(1, dr.fill_missing(PROTOCOL, env_id="linux-x64", job=1, mode="control", execution_id="C1", out=self.out, base=self.base))
+            bad.unlink()
+        self.assertEqual([], dr.upload_problems(self.out))
 
 if __name__ == "__main__":
     unittest.main()

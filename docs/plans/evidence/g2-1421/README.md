@@ -90,8 +90,8 @@ platform.
 | linux-x64 | `ubuntu-24.04` | Linux / X64 | 4 | 16 GiB | 70 min |
 | linux-arm64 | `ubuntu-24.04-arm` | Linux / ARM64 | 4 | 16 GiB | 50 min |
 | osx-arm64 | `macos-14` | macOS / ARM64 | 3 | 7 GiB | 50 min |
-| win-x64 | `windows-2025` | Windows / X64 | 4 | 16 GiB | 50 min |
-| win-arm64 | `windows-11-arm` | Windows / ARM64 | 4 | 16 GiB | 50 min |
+| win-x64 | `windows-2025` | Windows / X64 | 4 | 16 GiB | 75 min (1.3.0; was 50) |
+| win-arm64 | `windows-11-arm` | Windows / ARM64 | 4 | 16 GiB | 75 min (1.3.0; was 50) |
 
 A different processor count, or memory below 90% of the registered value, is an
 `environment-violation`. Hosted runners cannot cap a process tree's memory; a memory kill is a
@@ -161,9 +161,14 @@ Runner-minutes are each job's duration rounded up to a minute, with no OS multip
 
 | Item | Worst case (timeouts) | Expected |
 |---|---|---|
-| One execution: plan 5 + decide 10 + 2 × 70 (linux-x64) + 8 × 50 | 555 | about 340 |
+| One execution (1.3.0): plan 5 + decide 10 + 2 × (70 + 50 + 50 + 75 + 75) | 655 | 388 measured (g3-exec-1) |
 | One dispatched control run: plan 5 + decide 10 + 5 × 20 | 115 | 13 measured |
-| 3 executions + 2 dispatched control runs | **1,895 of 2,000** | about 1,050 |
+| 3 executions, no dispatched control run (1.3.0) | **1,965 of 2,000** | about 1,200 |
+
+Registration (1.0.0) had 555 per execution and 2 control runs (1,895). Amendment 1.3.0 raises the
+Windows job timeouts and sets `maxDispatchedControlRuns` to 0 so the worst case stays under the
+ceiling. Recorded after g3-exec-1: 13 + 388 = 401; worst case of the two executions left:
+401 + 2 × 655 = 1,711.
 
 Already spent: 13 runner-minutes (the dry run below). Every `workflow_dispatch` run is charged
 here, counted from the GitHub API run inventory, with the worst case of unfinished runs
@@ -235,6 +240,34 @@ the three Windows determinism rows.
 No case, environment, attempt, determinism row, gate, agreement rule, record format, or budget
 value changes. No decision-bearing protocol execution was run; the repair PR ran local and
 ordinary-CI tests.
+
+## Amendment 1.3.0: upload-safe records and Windows job time (#1135, after g3-exec-1)
+
+Made by the second #1135 PR after execution `g3-exec-1` (run 37177387101, commit `0142438f`,
+`NON-DETERMINISTIC`, `complete: false`), so a complete new execution on a new commit follows. Both
+defects are in the execution machinery; neither is a verifier finding.
+
+1. **Records lost to the upload.** The 6 Linux and macOS jobs ran every attempt, but NuGet wrote
+   HTTP-cache files whose names contain `:` into the probe's and the invocations' isolated homes,
+   inside the uploaded output directory. `actions/upload-artifact` rejects such a path and then
+   uploads nothing, so no record of those jobs exists. The 1.1.0 machinery already did this; no
+   execution had run before. Repair: `run-job` removes each isolated home after recording its
+   `.calor` state; `fill-missing` removes any home an interrupted invocation left and fails if a
+   path the upload rejects remains; the home probe builds beside the output directory. New control:
+   `test_nothing_upload_artifact_rejects_is_left_for_the_upload`.
+2. **Windows ran out of job time.** Setup takes about 6 minutes and an attempt about 3.1 (median
+   156 s `verification-full`, 29 s `oracle-isolated`), more than the 45 minutes the harness allows
+   under a 50-minute timeout. The cut invocations recorded `Timeout` values. Repair: win-x64 and
+   win-arm64 `jobTimeoutMinutes` 75; `maxDispatchedControlRuns` 0 (none was ever dispatched) keeps
+   the worst case at 1,965.
+3. **Known inconsistency, unchanged.** The stopping rule says a job that ends early makes an
+   execution `INCOMPLETE`, but an invocation the harness cuts at its own deadline records `Timeout`
+   for every unobserved case, and invalid attempts are compared, so the cut reads as `DISAGREE`
+   (`runPlan.harnessCutInconsistency`). All 1,580 `DISAGREE` cases of g3-exec-1 came from such
+   cuts. The decider is not changed; the timeouts are sized so a cut does not happen.
+
+No case, environment, attempt count, determinism row, gate, agreement rule, or record format
+changes.
 
 ## What G2 executed
 

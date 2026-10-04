@@ -7,7 +7,7 @@
     1135,
     1424
   ],
-  "protocolVersion": "1.2.0",
+  "protocolVersion": "1.3.0",
   "status": "FROZEN-AT-MERGE",
   "freeze": {
     "event": "The merge commit on main of the PR that adds this file. Every execution record names protocolVersion and the SHA-256 of this file; the decider rejects a record made under any other protocol bytes.",
@@ -224,7 +224,7 @@
         "oracle-isolated"
       ],
       "memoryGiB": 16,
-      "jobTimeoutMinutes": 50
+      "jobTimeoutMinutes": 75
     },
     {
       "id": "win-arm64",
@@ -238,7 +238,7 @@
         "oracle-isolated"
       ],
       "memoryGiB": 16,
-      "jobTimeoutMinutes": 50
+      "jobTimeoutMinutes": 75
     }
   ],
   "environmentRule": "Platform (OS and RID) is a determinism dimension (contract rules.platformDeterminism). Every supported RID in eng/z3-consumers.json is a registered environment. compiler-verifier runs on linux-x64 only, the only platform its release gates use; the protocol establishes nothing for it on another platform and says so in every result. Runner labels are pinned (no -latest label). The runner image version cannot be pinned on hosted runners; every attempt records ImageOS and ImageVersion, and a disagreement is never excused by an image change.",
@@ -248,7 +248,8 @@
     "attemptOrder": "Within an attempt, profiles run in the order listed in profiles[], filtered to the environment's profiles.",
     "earlyStop": false,
     "stoppingRule": "An execution runs every registered attempt in every environment. Nothing stops early, on agreement or on disagreement. A job that ends early (job timeout, runner loss, harness defect) leaves its remaining attempts recorded as infrastructure-failure or invalid; they are retained and make the execution INCOMPLETE.",
-    "statisticalBound": "With zero disagreement in an execution, the one-sided 95% upper bound on the per-attempt disagreement probability is about 1 - 0.05^(1/n): about 9.5% per environment (n = 30) and about 2.0% across the 150 attempts of a Calor.Verification.Tests case. compiler-verifier has n = 30 on linux-x64 only. The protocol bounds non-determinism; it does not prove its absence."
+    "statisticalBound": "With zero disagreement in an execution, the one-sided 95% upper bound on the per-attempt disagreement probability is about 1 - 0.05^(1/n): about 9.5% per environment (n = 30) and about 2.0% across the 150 attempts of a Calor.Verification.Tests case. compiler-verifier has n = 30 on linux-x64 only. The protocol bounds non-determinism; it does not prove its absence.",
+    "harnessCutInconsistency": "Known inconsistency, left unchanged by amendment 1.3.0: stoppingRule says a job that ends early makes the execution INCOMPLETE, but an invocation the harness itself cuts at the job deadline is recorded with the value Timeout for every unobserved case (attemptStatuses.timeout), and values of invalid attempts are compared, so such a cut makes those cases DISAGREE (NON-DETERMINISTIC). In g3-exec-1 every DISAGREE came from such cuts on Windows. Amendment 1.3.0 removes the cause (Windows job time) and keeps the decider unchanged."
   },
   "agreement": {
     "requiredAgreementRate": 1.0,
@@ -396,18 +397,19 @@
     "planJobTimeoutMinutes": 5,
     "decideJobTimeoutMinutes": 10,
     "maxExecutions": 3,
-    "maxDispatchedControlRuns": 2,
-    "worstCasePerExecution": 555,
+    "maxDispatchedControlRuns": 0,
+    "worstCasePerExecution": 655,
     "worstCasePerControlRun": 115,
-    "worstCaseTotal": 1895,
+    "worstCaseTotal": 1965,
     "expectedPerExecution": 340,
     "charges": {
       "determinism-compute": "Every workflow_dispatch run of the protocol workflow, in execution or control mode, by anyone. The execution machinery counts them from the GitHub API run inventory (not from a hand-written ledger) and reserves the worst case of every unfinished run before starting a new one.",
       "ordinary-ci": "Control-mode runs started by pull_request on the workflow or harness paths (they run no registered case).",
-      "openQuestion": "#1424's execution on the frozen candidate is charged to determinism-compute under this rule, and 3 executions plus 2 control runs leave 105 runner-minutes, less than one execution. Charging it to regeneration-compute needs an amendment that binds that charge to the #1423 candidate."
+      "openQuestion": "#1424's execution on the frozen candidate is charged to determinism-compute under this rule, and 3 executions plus 2 control runs leave 105 runner-minutes, less than one execution. Charging it to regeneration-compute needs an amendment that binds that charge to the #1423 candidate. Amendment 1.3.0: with the Windows job timeouts at 75 minutes and no dispatched control run, 3 executions reach 1,965 runner-minutes in the worst case; contract amendment 1.2.0 charges #1424's candidate-time execution to regeneration-compute."
     },
     "rule": "The execution machinery refuses to start a run when recorded minutes plus the worst case of every unfinished run plus this run's worst case exceed the ceiling, or when maxExecutions or maxDispatchedControlRuns is reached. Reaching a limit is contract stopping rule 1: stop, record the overrun, and either merge an amendment raising the ceiling or record the gate BLOCKED.",
-    "dryRunSpent": 13
+    "dryRunSpent": 13,
+    "amendment130": "Execution g3-exec-1 (run 37177387101) spent 388 runner-minutes, so 13 + 388 = 401 are recorded. Its Windows jobs took 46 minutes (about 6 minutes of setup and about 3.1 minutes per attempt) and the harness stopped them at 45 minutes (50 minus 5). Raising win-x64 and win-arm64 to 75 minutes makes the worst case per execution 5 + 10 + 2 x (70 + 50 + 50 + 75 + 75) = 655, and 3 x 655 = 1,965 <= 2,000 only with maxDispatchedControlRuns 0 (no control run was ever dispatched). Worst case of the two executions left: 401 + 2 x 655 = 1,711."
   },
   "executions": {
     "ledger": "docs/plans/evidence/g3-1135/ledger.json",
@@ -448,7 +450,8 @@
       "Stricter than retryPolicy: the API does not expose a prior verdict, so every execution run that did not conclude success is treated as possibly NON-DETERMINISTIC or FAILING, and the next execution needs a commit that changes a path outside docs/.",
       "Stricter than budget.charges: a dispatched run with a title the plan cannot read is charged and counted as an execution. A dispatched execution-mode run whose attempts never started (refused by plan, or replaced in the concurrency queue) is charged its minutes but is not an execution.",
       "Added checks: env-check builds and runs a probe app on the pinned runtime with an isolated HOME/USERPROFILE and records whether the root of the verifier's default user-level cache follows it; false is an environment-violation. Amendment 1.2.0: the probe compiles the verifier's own resolver, UserHome.Resolve in src/Calor.Compiler/Verification/Z3/Cache/VerificationCacheOptions.cs (used by VerificationCacheOptions and the user effect-manifest loader), from the checked-out tree, instead of printing SpecialFolder.UserProfile, which on Windows comes from the account's known folder and ignores USERPROFILE. The decider re-judges every attempt's observations (amendment 1.1.0 to _record_problem) and rejects an invocation whose home already held .calor, so an attestation cannot contradict its observations.",
-      "Contract amendment 1.2.0 (capacity.chargeRules c2-candidate-determinism-protocol, merged after protocol 1.0.0) charges #1424's candidate-time execution to regeneration-compute when its commit is the #1423 candidate and #1424's regeneration ledger records it. Neither the manifest nor that ledger exists yet, so plan cannot verify a qualifying run: it charges every dispatched run to determinism-compute (over-counting, fail closed). Excluding a qualifying run from that count needs a protocol amendment that names those files; until then reaching a limit is contract stopping rule 1."
+      "Contract amendment 1.2.0 (capacity.chargeRules c2-candidate-determinism-protocol, merged after protocol 1.0.0) charges #1424's candidate-time execution to regeneration-compute when its commit is the #1423 candidate and #1424's regeneration ledger records it. Neither the manifest nor that ledger exists yet, so plan cannot verify a qualifying run: it charges every dispatched run to determinism-compute (over-counting, fail closed). Excluding a qualifying run from that count needs a protocol amendment that names those files; until then reaching a limit is contract stopping rule 1.",
+      "Amendment 1.3.0: run-job removes each invocation's isolated home after recording it, fill-missing removes any home an interrupted invocation left and fails when a path that actions/upload-artifact rejects remains, and the home probe builds beside the job's output directory instead of inside it. In g3-exec-1 NuGet cache files named with ':' under those homes made upload-artifact reject the whole artifact of every Linux and macOS job, so their records were never uploaded."
     ],
     "residual": "Runner-minutes for a plan job are spent before plan can refuse, so dispatches after the ceiling still cost up to planJobTimeoutMinutes each; they are charged and visible in the inventory. A run deleted before #1135 records it in the ledger leaves no history. A dispatched ref whose workflow or runner bytes differ produces records whose harnessSha256 main's decider rejects; review and the ledger are the controls for anything else."
   },
@@ -517,6 +520,13 @@
         "pr": 1492,
         "afterDecisionBearingExecution": false,
         "justification": "#1135 repair, before any execution. On Windows, SpecialFolder.UserProfile comes from the account's known folder and ignores USERPROFILE, so the registered home probe would have recorded every win-x64 and win-arm64 attempt as an environment-violation, and no execution could resolve the three Windows determinism rows. The verifier now resolves its user-level root through UserHome.Resolve (USERPROFILE on Windows when set and fully qualified; SpecialFolder.UserProfile otherwise, unchanged on Linux and macOS), and env-check's probe compiles that resolver from the tree under test instead of asking the runtime. It also records that the registered seed constant is not applied (Z3 rejects random_seed as a context parameter; z3.randomSeed.applied false), which changes no behavior. Changes scripts/determinism_runner.py (the probe), scripts/test_determinism_protocol.py (a control that the probe compiles the tree's resolver), the deviation and limitation texts, and the README. No case, environment, attempt, determinism row, gate, agreement rule, record format, or budget value changes. No decision-bearing protocol execution was run; the repair PR ran local and ordinary-CI tests."
+      },
+      {
+        "version": "1.3.0",
+        "timestampUtc": "2026-10-04T06:10:00Z",
+        "pr": 0,
+        "afterDecisionBearingExecution": true,
+        "justification": "After execution g3-exec-1 (run 37177387101, commit 0142438f, NON-DETERMINISTIC, complete false). Two machinery defects, not verifier findings: (1) the Linux and macOS jobs (6 of 10) ran every attempt, but upload-artifact rejected their output directories because the home probe's and the invocations' NuGet HTTP caches hold file names with ':'; (2) the Windows jobs needed more than the 45 minutes the harness allows under a 50-minute job timeout, and the cut invocations' Timeout values made 1,580 cases DISAGREE. Every value a completed Windows invocation observed equals the pass value. Repairs: homes are removed before upload and checked by fill-missing; the probe builds beside the output directory; win-x64 and win-arm64 jobTimeoutMinutes 50 -> 75; maxDispatchedControlRuns 2 -> 0 so the worst case (3 x 655 = 1,965) stays under the 2,000 ceiling. The decider's treatment of harness-cut invocations is unchanged and recorded as a known inconsistency (runPlan.harnessCutInconsistency). No case, environment, attempt count, determinism row, gate, agreement rule, or record format changes. Per the amendments rule, a complete new execution on a new commit follows."
       }
     ]
   },
@@ -526,7 +536,8 @@
     "compiler-verifier is covered on linux-x64 only.",
     "Thirty attempts per environment bound, but cannot exclude, rare non-determinism (runPlan.statisticalBound).",
     "Theory rows whose display names are identical (truncated arguments) are compared as a multiset of outcomes per name. Any failure among them is detected, but which row failed is not identified.",
-    "The home probe checks the verifier's user-home resolver (UserHome.Resolve): USERPROFILE on Windows when set and fully qualified, otherwise SpecialFolder.UserProfile (which follows HOME on Linux and macOS). A user-level path read through any other lookup is not covered; at amendment 1.2.0 the verifier's default cache and the user effect manifests both use the resolver."
+    "The home probe checks the verifier's user-home resolver (UserHome.Resolve): USERPROFILE on Windows when set and fully qualified, otherwise SpecialFolder.UserProfile (which follows HOME on Linux and macOS). A user-level path read through any other lookup is not covered; at amendment 1.2.0 the verifier's default cache and the user effect manifests both use the resolver.",
+    "Amendment 1.3.0: an invocation cut by the harness's own job-deadline stop yields Timeout values that the decider compares (runPlan.harnessCutInconsistency); job timeouts are sized so this does not happen, but if it does, the execution reads NON-DETERMINISTIC rather than INCOMPLETE."
   ],
   "scope": {
     "covered": "The release-critical verifier test host (every Calor.Verification.Tests case), the F-4 oracle alone and its 1,170 cells and 2 reports, the translator fixture, and the Calor.Compiler.Tests classes that construct the verifier or Z3 directly (linux-x64).",
