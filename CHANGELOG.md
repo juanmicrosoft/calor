@@ -73,6 +73,31 @@ All notable changes to this project will be documented in this file.
     manifests (`~/.calor`) now honor `USERPROFILE` on Windows, as NuGet does. Linux and macOS
     are unchanged.
 
+- **Two more kinds of unreachable counterexample are withheld (#1413).** A failed obligation is
+  a compile error: `Calor1140` for a `§PROOF`, `Calor1121` for a refinement. It is no longer
+  reported in two cases where its counterexample may be an input that never reaches the
+  obligation.
+  - **Something evaluated before the obligation may throw on that input.** That includes any of
+    these:
+    - an earlier statement;
+    - another operand in the same statement;
+    - an enclosing `if`, `elseif`, or loop condition;
+    - a precondition, parameter refinement, or constructor initializer (`§BASE`/`§THIS`);
+    - a compiler-inserted refinement guard on a binding, rebinding, or assignment.
+
+    Forms that may throw include checked or dividing arithmetic, a call, a member read, a
+    substring, a length or string query on a local that may be null, and an earlier `§PROOF`
+    guard. When the module declares operator overloads, conversions, or raw C# members, every
+    non-literal form counts.
+  - **The obligation reads a property, whose getter the solver does not model.** This includes
+    a property that hides an inherited field, properties of nested types, a `Length` property read
+    by `§LEN`, and, when the module has raw C# members, any member read.
+
+  The result is `Calor1124` ("unsupported"), and the runtime check stays. This can withhold
+  counterexamples that were real. Properties are matched by name, so a field that shares a name
+  with any property in the module is also withheld. These checks never make an obligation proven
+  or discharged.
+
 - **Proof obligations no longer use facts that an assignment made stale (#1413).** With
   `§Q (> x -1)`, then `§ASSIGN x -5`, then `§PROOF (> x -1)`, the obligation solver still
   assumed the precondition, reported the obligation discharged, and removed its runtime check.

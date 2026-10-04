@@ -13,6 +13,8 @@ public sealed class ObligationSolver : IDisposable
 {
     private readonly Context _ctx;
     private readonly uint _timeoutMs;
+    private HashSet<string> _propertyNames = new(StringComparer.Ordinal);
+    private bool _opaqueMembers;
     private bool _checkIntegerOverflow = true;
     private bool _disposed;
 
@@ -30,6 +32,8 @@ public sealed class ObligationSolver : IDisposable
         ModuleNode module)
     {
         _checkIntegerOverflow = module.ShouldCheckIntegerOverflow();
+        _propertyNames = FactCollector.PropertyNames(module);
+        _opaqueMembers = FactCollector.HasOpaqueMembers(module);
         // Build a lookup of function info for parameter declarations
         var functionInfo = BuildFunctionInfo(module);
         var userTypeRegistry = ContractTranslator.BuildUserTypeRegistry(module);
@@ -322,7 +326,16 @@ public sealed class ObligationSolver : IDisposable
                         .Append(obligation.Condition)
                         .Any(e => FactCollector.ReferencedNames(e).Overlaps(info.Facts.DroppedFactNames)))
                     inexact.Add("a dropped entry refinement constrains a variable this query reads");
+                if (info.Facts.ThrowsElsewhereInStatement(obligation.Span))
+                    inexact.Add("another operand of the obligation's statement may throw");
+
             }
+            // #1413 (D-OBL-PROOF-GETTER, D-OBL-THROWING-PREDECESSOR): entry obligations included.
+            if (status == Status.SATISFIABLE && FactCollector.ReadsProperty(obligation.Condition, _propertyNames, _opaqueMembers))
+                inexact.Add("the obligation reads a property, whose getter is not modeled");
+            if (status == Status.SATISFIABLE
+                && (info.Preconditions.Any(pre => info.Facts.MayThrow(pre.Condition)) || info.Facts.EntryMayThrow))
+                inexact.Add("a precondition, constructor initializer, or entry guard may throw first");
             if (status == Status.SATISFIABLE && inexact.Count > 0)
             {
                 // Not a refutation: the model may describe a state the program never
@@ -354,6 +367,7 @@ public sealed class ObligationSolver : IDisposable
 
     private static Dictionary<string, FunctionInfo> BuildFunctionInfo(ModuleNode module)
     {
+        var overloads = FactCollector.OverloadsOperators(module);
         var result = new Dictionary<string, FunctionInfo>(StringComparer.Ordinal);
 
         // Build indexed type lookup for size parameter injection
@@ -381,7 +395,7 @@ public sealed class ObligationSolver : IDisposable
                 .ToList();
 
             // Collect flow-sensitive facts (loop bounds, etc.)
-            var factCollector = new FactCollector();
+            var factCollector = new FactCollector { OperatorsMayBeOverloaded = overloads };
             factCollector.CollectFromFunction(func, refinementPredicates);
 
             // Add size parameter variables for indexed-typed parameters
@@ -425,7 +439,7 @@ public sealed class ObligationSolver : IDisposable
                 var parameters = method.Parameters
                     .Select(p => (p.Name, p.TypeName))
                     .ToList();
-                var factCollector = new FactCollector();
+                var factCollector = new FactCollector { OperatorsMayBeOverloaded = overloads };
                 factCollector.CollectFromFunction(method, refinementPredicates);
                 var extraVars = new List<(string Name, string TypeName)>();
                 foreach (var param in method.Parameters)
@@ -467,8 +481,11 @@ public sealed class ObligationSolver : IDisposable
                 var parameters = constructor.Parameters
                     .Select(p => (p.Name, p.TypeName))
                     .ToList();
-                var factCollector = new FactCollector();
+                var factCollector = new FactCollector { OperatorsMayBeOverloaded = overloads };
                 factCollector.CollectFromCallable(constructor.Parameters, constructor.Body, refinementPredicates);
+                // #1413 (review round 3): a base/this initializer runs before the body and may throw.
+                if (constructor.Initializer != null)
+                    factCollector.EntryMayThrow = true;
                 result[constructor.Id] = new FunctionInfo(
                     parameters,
                     constructor.Preconditions,
@@ -483,7 +500,7 @@ public sealed class ObligationSolver : IDisposable
                 var parameters = method.Parameters
                     .Select(p => (p.Name, p.TypeName))
                     .ToList();
-                var factCollector = new FactCollector();
+                var factCollector = new FactCollector { OperatorsMayBeOverloaded = overloads };
                 factCollector.CollectFromMethod(method, refinementPredicates);
                 var extraVars = new List<(string Name, string TypeName)>();
                 foreach (var param in method.Parameters)
@@ -522,7 +539,7 @@ public sealed class ObligationSolver : IDisposable
                 var parameters = operatorOverload.Parameters
                     .Select(p => (p.Name, p.TypeName))
                     .ToList();
-                var factCollector = new FactCollector();
+                var factCollector = new FactCollector { OperatorsMayBeOverloaded = overloads };
                 factCollector.CollectFromCallable(operatorOverload.Parameters, operatorOverload.Body, refinementPredicates);
                 var extraVars = new List<(string Name, string TypeName)>();
                 foreach (var param in operatorOverload.Parameters)
