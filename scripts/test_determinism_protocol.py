@@ -682,6 +682,13 @@ class AttemptRunnerControls(unittest.TestCase):
 
     def test_the_home_probe_fails_closed(self) -> None:
         self.assertTrue(dr.home_probe(self.base, self.out / "ok", self.base["NUGET_PACKAGES"]))
+        # Amendment 1.2.0: the probe compiles the verifier's own resolver from this tree.
+        resolver = ROOT / dr.USER_HOME_SOURCE
+        self.assertTrue(resolver.is_file())
+        self.assertIn("public static class UserHome", resolver.read_text(encoding="utf-8"))
+        self.assertIn("public static string Resolve()", resolver.read_text(encoding="utf-8"))
+        self.assertIn(f'<Compile Include="{resolver}" />', (self.out / "ok" / "probe.csproj").read_text(encoding="utf-8"))
+        self.assertIn("UserHome.Resolve()", (self.out / "ok" / "Program.cs").read_text(encoding="utf-8"))
         for mode, runs in (("buildfail", 0), ("runfail", 1), ("empty", 1), ("foreign", 1)):
             Path(f"{self.log}.probe").unlink()
             self.assertFalse(dr.home_probe(dict(self.base, FAKE_PROBE=mode), self.out / mode, self.base["NUGET_PACKAGES"]), mode)

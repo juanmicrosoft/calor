@@ -73,9 +73,9 @@ public sealed class Z3Verifier : IDisposable
     private readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> _userTypeRegistry;
     private bool _disposed;
 
-    internal static bool ArithmeticSafetyEntailed(Context context, Solver solver, IEnumerable<BoolExpr> conditions)
+    internal static bool ArithmeticSafetyEntailed(Context context, IsolatedSolver solver, IEnumerable<BoolExpr> conditions)
     {
-        var safety = (BoolExpr)context.MkAnd(conditions.ToArray()).Simplify();
+        var safety = IsolatedSolver.Simplify(context, context.MkAnd(conditions.ToArray()));
         if (safety.IsTrue)
             return true;
         solver.Push();
@@ -159,8 +159,7 @@ public sealed class Z3Verifier : IDisposable
         // This is informational - preconditions are always kept as runtime checks
         try
         {
-            var solver = _ctx.MkSolver();
-            solver.Set("timeout", _timeoutMs);
+            using var solver = new IsolatedSolver(_ctx, _timeoutMs);
             solver.Assert(preconditionExpr);
 
             var status = solver.Check();
@@ -168,7 +167,7 @@ public sealed class Z3Verifier : IDisposable
 
             return ContractVerificationResult.FromOutcome(
                 ProofOutcome.Assign(ProofEvidence.SolverVerdict(
-                    status, solver, translator.Variables, SatPolarity.SatIsProof,
+                    status, solver.CheckedSolver, solver.TranslateVariables(translator.Variables), SatPolarity.SatIsProof,
                     unsatNote: "Precondition is never satisfiable - function can never be called correctly")),
                 warnings,
                 sw.Elapsed);
@@ -294,8 +293,7 @@ public sealed class Z3Verifier : IDisposable
         {
             try
             {
-                var preSolver = _ctx.MkSolver();
-                preSolver.Set("timeout", _timeoutMs);
+                using var preSolver = new IsolatedSolver(_ctx, _timeoutMs);
                 foreach (var preExpr in preconditionExprs)
                 {
                     preSolver.Assert(preExpr);
@@ -449,8 +447,7 @@ public sealed class Z3Verifier : IDisposable
         // Create solver and perform verification
         try
         {
-            var solver = _ctx.MkSolver();
-            solver.Set("timeout", _timeoutMs);
+            using var solver = new IsolatedSolver(_ctx, _timeoutMs);
 
             // Assert all preconditions
             foreach (var binding in translator.BindingConstraints)
@@ -579,7 +576,7 @@ public sealed class Z3Verifier : IDisposable
 
             return ContractVerificationResult.FromOutcome(
                 ProofOutcome.Assign(ProofEvidence.SolverVerdict(
-                    status, solver, translator.Variables, SatPolarity.SatIsRefutation)),
+                    status, solver.CheckedSolver, solver.TranslateVariables(translator.Variables), SatPolarity.SatIsRefutation)),
                 warnings,
                 sw.Elapsed);
         }
@@ -1521,4 +1518,185 @@ public static class FunctionBodyEncoder
             .Any(child => ReferencesNameInNode(child, name));
     }
 
+}
+
+/// <summary>
+/// A solver whose every <see cref="Check"/> runs in a fresh Z3 context, so that its verdict
+/// depends only on the asserted formulas and the context configuration, not on the history of the
+/// context that built them (#1135).
+/// </summary>
+/// <remarks>
+/// <para>
+/// Why: the .NET Z3 binding releases a native AST when the garbage collector finalizes its
+/// wrapper, and Z3 recycles the ids of released ASTs. In a long-lived context the ids of the
+/// terms a query creates, and so the order Z3's heuristics visit them in, therefore depend on
+/// when the GC ran. On the same tree the solver's work (rlimit count) for one query varied up to
+/// threefold between runs, and was identical when no GC ran. The F-4 oracle's one observed flip
+/// on an identical tree was such a query, a 64-bit array-element precondition, timing out at the
+/// 5 s per-check limit (#1135, run 33139062112, <c>case-000307</c>); its siblings take 30 to 65 ms.
+/// </para>
+/// <para>
+/// How: assertions are recorded in their push scopes. <see cref="Check"/> translates them into a
+/// new context with the building context's settings (<see cref="Z3ContextFactory.CreateLike"/>; a
+/// deterministic traversal, and nothing else lives there), creates a solver with the same timeout,
+/// and checks. Z3's default solver picks its engine by whether it has seen a push or an assertion
+/// after a check (its incremental mode); that choice is replayed, so each check runs the engine the
+/// shared-context solver ran. The query, the timeout, the settings, and the engine are unchanged.
+/// What is lost is the incremental solver's state from earlier checks of the same solver (learned
+/// clauses, phases): a satisfiable check can return a different, equally valid model (so a
+/// different counterexample), and a check near the timeout can finish differently. That state was
+/// itself GC-dependent.
+/// </para>
+/// <para>
+/// A context this factory did not create has unknown settings; then the check runs in that
+/// context itself, as before, without the isolation.
+/// </para>
+/// <para>
+/// With this class and <see cref="Simplify"/>, two runs of the oracle, one under GC stress, one
+/// with the server GC and no tiered compilation, issued byte-identical queries with identical
+/// rlimit counts (2,382 checks).
+/// </para>
+/// <para>
+/// The checked solver and its context stay alive until the next <see cref="Check"/> or
+/// <see cref="Dispose"/>, so the model and the unknown-reason can be read through
+/// <see cref="CheckedSolver"/> with variables mapped by <see cref="TranslateVariables"/>.
+/// </para>
+/// </remarks>
+public sealed class IsolatedSolver : IDisposable
+{
+    private readonly List<List<BoolExpr>> _scopes = [[]];
+    private readonly Context _source;
+    private readonly uint _timeoutMs;
+    private bool _incremental;
+    private bool _checked;
+    private Context? _checkContext;
+    private bool _ownsCheckContext;
+    private Solver? _checkSolver;
+
+    /// <param name="source">The context the asserted terms are built in.</param>
+    /// <param name="timeoutMs">The per-check timeout.</param>
+    public IsolatedSolver(Context source, uint timeoutMs)
+    {
+        _source = source ?? throw new ArgumentNullException(nameof(source));
+        _timeoutMs = timeoutMs;
+    }
+
+    /// <summary>Adds constraints to the current scope.</summary>
+    public void Assert(params BoolExpr[] constraints)
+    {
+        // Z3's default solver switches to incremental mode on an assertion after a check.
+        if (_checked)
+            _incremental = true;
+        _scopes[^1].AddRange(constraints);
+    }
+
+    /// <summary>Opens a scope. Like Z3's default solver, this switches to incremental mode.</summary>
+    public void Push()
+    {
+        _incremental = true;
+        _scopes.Add([]);
+    }
+
+    /// <summary>Discards the innermost scope and its constraints.</summary>
+    public void Pop()
+    {
+        if (_scopes.Count == 1)
+            throw new InvalidOperationException("Pop without a matching Push.");
+        _scopes.RemoveAt(_scopes.Count - 1);
+    }
+
+    /// <summary>
+    /// Checks the current constraints in a fresh context. Releases the previous check's
+    /// solver and context.
+    /// </summary>
+    public Status Check()
+    {
+        ReleaseCheck();
+        _checked = true;
+
+        var fresh = Z3ContextFactory.CreateLike(_source);
+        var context = fresh ?? _source;
+        _checkContext = context;
+        _ownsCheckContext = fresh != null;
+        var solver = context.MkSolver();
+        _checkSolver = solver;
+        solver.Set("timeout", _timeoutMs);
+        if (_incremental)
+        {
+            // A push switches Z3's default solver to incremental mode for good; popping it
+            // again keeps the base-level assertions at the base level, as in the source solver.
+            solver.Push();
+            solver.Pop();
+        }
+
+        for (var level = 0; level < _scopes.Count; level++)
+        {
+            if (level > 0)
+                solver.Push();
+            foreach (var constraint in _scopes[level])
+                solver.Assert(fresh == null ? constraint : (BoolExpr)constraint.Translate(fresh));
+        }
+
+        return solver.Check();
+    }
+
+    /// <summary>
+    /// <see cref="Expr.Simplify"/> run in a fresh context with <paramref name="context"/>'s
+    /// settings, with the result translated back into <paramref name="context"/>. Z3's rewriter
+    /// orders the arguments of commutative operators by term id, so simplifying in a long-lived
+    /// context gives an argument order that depends on when the GC released earlier terms
+    /// (#1135), and the order reaches the solver.
+    /// </summary>
+    public static BoolExpr Simplify(Context context, BoolExpr expr)
+    {
+        using var isolated = Z3ContextFactory.CreateLike(context);
+        if (isolated == null)
+            return (BoolExpr)expr.Simplify();
+        var simplified = (BoolExpr)expr.Translate(isolated).Simplify();
+        return (BoolExpr)simplified.Translate(context);
+    }
+
+    /// <summary>The solver of the last <see cref="Check"/>, for its model and unknown-reason.</summary>
+    public Solver CheckedSolver =>
+        _checkSolver ?? throw new InvalidOperationException("Check has not been called.");
+
+    /// <summary>
+    /// Maps translator variables into the last check's context, so the model of
+    /// <see cref="CheckedSolver"/> can evaluate them.
+    /// </summary>
+    public IReadOnlyDictionary<string, (Expr Expr, string Type)> TranslateVariables(
+        IReadOnlyDictionary<string, (Expr Expr, string Type)> variables)
+    {
+        var context = _checkContext
+            ?? throw new InvalidOperationException("Check has not been called.");
+        if (!_ownsCheckContext)
+            return variables;
+        var translated = new Dictionary<string, (Expr Expr, string Type)>(variables.Count);
+        foreach (var (name, (expr, type)) in variables)
+        {
+            try
+            {
+                translated[name] = (expr.Translate(context), type);
+            }
+            catch (Z3Exception)
+            {
+                // Keep the original: evaluating it fails, and Counterexample.FromModel records
+                // that binding as "<eval failed>" instead of losing the whole verdict.
+                translated[name] = (expr, type);
+            }
+        }
+        return translated;
+    }
+
+    public void Dispose() => ReleaseCheck();
+
+    private void ReleaseCheck()
+    {
+        _checkSolver?.Dispose();
+        _checkSolver = null;
+        if (_ownsCheckContext)
+            _checkContext?.Dispose();
+        _checkContext = null;
+        _ownsCheckContext = false;
+    }
 }

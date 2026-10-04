@@ -308,10 +308,6 @@ public static class Z3ContextFactory
         // merges them ON TOP of DefaultContextSettings so the test seed
         // still applies.
         var defaults = DefaultContextSettings;
-        if ((defaults == null || defaults.Count == 0)
-            && (extraSettings == null || extraSettings.Count == 0))
-            return new Microsoft.Z3.Context();
-
         var dict = new Dictionary<string, string>();
         if (defaults != null)
             foreach (var kvp in defaults)
@@ -319,7 +315,26 @@ public static class Z3ContextFactory
         if (extraSettings != null)
             foreach (var kvp in extraSettings)
                 dict[kvp.Key] = kvp.Value;   // caller wins on conflict
-        return new Microsoft.Z3.Context(dict);
+        var context = dict.Count == 0 ? new Microsoft.Z3.Context() : new Microsoft.Z3.Context(dict);
+        CreatedSettings.Add(context, dict);
+        return context;
+    }
+
+    // #1135: the exact settings of every context this factory made, so IsolatedSolver can give its
+    // fresh check context the same configuration.
+    private static readonly ConditionalWeakTable<Microsoft.Z3.Context, Dictionary<string, string>> CreatedSettings = new();
+
+    /// <summary>
+    /// A new context with the settings <paramref name="source"/> was created with, or null when
+    /// <paramref name="source"/> was not created by this factory (its settings are unknown).
+    /// </summary>
+    internal static Microsoft.Z3.Context? CreateLike(Microsoft.Z3.Context source)
+    {
+        if (!CreatedSettings.TryGetValue(source, out var settings))
+            return null;
+        var context = settings.Count == 0 ? new Microsoft.Z3.Context() : new Microsoft.Z3.Context(settings);
+        CreatedSettings.Add(context, settings);
+        return context;
     }
 
     /// <summary>

@@ -148,8 +148,7 @@ public sealed class Z3ImplicationProver : IDisposable
         try
         {
             // Create solver and add constraint: A AND NOT(C)
-            var solver = _ctx.MkSolver();
-            solver.Set("timeout", _timeoutMs);
+            using var solver = new IsolatedSolver(_ctx, _timeoutMs);
             solver.Assert(antecedentExpr);
             solver.Assert(_ctx.MkNot(consequentExpr));
 
@@ -158,7 +157,7 @@ public sealed class Z3ImplicationProver : IDisposable
 
             return ImplicationResult.FromOutcome(
                 ProofOutcome.Assign(ProofEvidence.SolverVerdict(
-                    status, solver, translator.Variables, SatPolarity.SatIsRefutation)),
+                    status, solver.CheckedSolver, solver.TranslateVariables(translator.Variables), SatPolarity.SatIsRefutation)),
                 Duration: sw.Elapsed);
         }
         catch (Z3Exception ex)
@@ -265,8 +264,7 @@ public sealed class Z3ImplicationProver : IDisposable
             // For LSP: implementer postcondition must imply interface postcondition
             // i.e., anything the implementer guarantees should also satisfy what the interface guarantees
             // This means the implementer can only guarantee MORE (stronger postcondition)
-            var solver = _ctx.MkSolver();
-            solver.Set("timeout", _timeoutMs);
+            using var solver = new IsolatedSolver(_ctx, _timeoutMs);
             solver.Assert(implementerExpr);
             solver.Assert(_ctx.MkNot(interfaceExpr));
 
@@ -274,7 +272,7 @@ public sealed class Z3ImplicationProver : IDisposable
 
             return ImplicationResult.FromOutcome(
                 ProofOutcome.Assign(ProofEvidence.SolverVerdict(
-                    status, solver, translator.Variables, SatPolarity.SatIsRefutation)),
+                    status, solver.CheckedSolver, solver.TranslateVariables(translator.Variables), SatPolarity.SatIsRefutation)),
                 Duration: sw.Elapsed);
         }
         catch (Z3Exception ex)

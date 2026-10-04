@@ -346,7 +346,12 @@ class Z3HermeticTests(unittest.TestCase):
         self.assertIn("--require Calor.Tasks.Tests.CompileCalorIntegrationTests.VerifyGate_NativeZ3_DeployedToTasksOutputRoot", job)
         self.assertIn(f"--check-trx artifacts/z3/verification.trx --project {entry['project']}", job)
         self.assertEqual("", divergence_filter("linux-arm64", entry["project"]))
-        self.assertEqual(3, divergence_filter("win-x64", entry["project"]).count("FullyQualifiedName!="))
+        # #1135 fixed the three G1 divergences; none is deselected, and each stays recorded.
+        self.assertEqual("", divergence_filter("win-x64", entry["project"]))
+        self.assertEqual(3, len(entry["resolved"]))
+        for test in entry["resolved"]:
+            self.assertIn(f"void {test['name'].rsplit('.', 1)[1]}(", source)
+            self.assertTrue(test["observed"] and test["cause"])
 
     def test_negative_controls_are_registered_steps(self) -> None:
         workflows = self.workflows()

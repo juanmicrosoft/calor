@@ -21,6 +21,29 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Three causes of run-to-run and platform-dependent verifier verdicts are fixed (#1135).**
+  Whether the verifier is now deterministic on every supported platform is decided by the
+  registered determinism protocol (#1421), which runs after this change.
+  - **Run to run.** The contract verifier, the obligation solver, and the implication prover now
+    check each query in a fresh Z3 context with the same settings. A Z3 context that Calor did
+    not create has unknown settings, so its queries are still checked in that context. Before,
+    Z3 reused the ids of terms that .NET's garbage collector had released, so the order Z3
+    searched in depended on when the GC ran. The same query took up to three times as much solver work from one run to
+    the next. Once in CI, a query of a kind that takes 30 to 65 ms hit the 5-second timeout and
+    failed the release-critical oracle on an unchanged tree. Each solver check now costs about
+    1.4 ms more. A check no longer reuses search state from earlier checks, so a refuted
+    contract can report a different, equally valid counterexample, and a query close to the
+    timeout can end differently than before.
+  - **Windows strings.** A string literal with a non-ASCII character reached Z3 in the Windows
+    code page instead of UTF-8. For example, `"é"` had length 1 on Windows but 2 on Linux and
+    macOS, so a postcondition about its length was refuted (`Calor0712`) on Windows only. All
+    platforms now use the UTF-8 byte model. A proof that depends on string semantics is still
+    reported as assumed and keeps its runtime check. The verification cache format moves to
+    1.19, so old cached verdicts are recomputed once.
+  - **User-level cache on Windows.** The default verification cache and the user effect
+    manifests (`~/.calor`) now honor `USERPROFILE` on Windows, as NuGet does. Linux and macOS
+    are unchanged.
+
 - **An empty clause body no longer swallows the next statement (#1485).** A
   clause such as `§CA` (catch) with no indented lines used to pull the next
   statement at the same column into its body. The program compiled with no

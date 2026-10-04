@@ -130,10 +130,10 @@ public sealed class ObligationSolver : IDisposable
             return;
         }
 
+        IsolatedSolver? solver = null;
         try
         {
-            var solver = _ctx.MkSolver();
-            solver.Set("timeout", _timeoutMs);
+            solver = new IsolatedSolver(_ctx, _timeoutMs);
 
             // ASSUME: Assert all translatable preconditions
             var preconditionExprs = new List<BoolExpr>();
@@ -173,8 +173,8 @@ public sealed class ObligationSolver : IDisposable
             // preconditions themselves are inconsistent, refuse to discharge.
             if (solver.Check() == Status.UNSATISFIABLE)
             {
-                solver = _ctx.MkSolver();
-                solver.Set("timeout", _timeoutMs);
+                solver.Dispose();
+                solver = new IsolatedSolver(_ctx, _timeoutMs);
                 foreach (var preExpr in preconditionExprs)
                 {
                     solver.Assert(preExpr);
@@ -256,7 +256,7 @@ public sealed class ObligationSolver : IDisposable
             }
 
             obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.SolverVerdict(
-                status, solver, translator.Variables, SatPolarity.SatIsRefutation)));
+                status, solver.CheckedSolver, solver.TranslateVariables(translator.Variables), SatPolarity.SatIsRefutation)));
         }
         catch (Z3Exception ex)
         {
@@ -265,6 +265,7 @@ public sealed class ObligationSolver : IDisposable
         }
         finally
         {
+            solver?.Dispose();
             if (obligation.Kind is ObligationKind.RefinementEntry or ObligationKind.RefinementReturn
                 && obligation.ParameterName != null)
                 translator.PopSelfVariable();
