@@ -140,6 +140,86 @@ public sealed class S2NumericRefusalTests
     }
 
     [Fact]
+    public void OversizeLiteralRemovedBySimplification_IsStillRefused()
+    {
+        // Review round 2: the simplifier folded the conditional to LONG:0 == LONG:0 before the
+        // translator saw the refused INT: literal.
+        const string source = """
+            §M{m1:R1Case}
+              §F{f1:Probe:pub} () -> i32
+                §E{}
+                §S (== (? BOOL:true LONG:0 INT:3000000000) LONG:0)
+                §R INT:0
+            """;
+        Assert.Equal(ContractVerificationStatus.Unsupported, VerifySinglePostcondition(source).Status);
+    }
+
+    [Fact]
+    public void OversizeLiteralInABodyBinding_IsRefusedNotThrown()
+    {
+        // Review round 2: the binding path passed a refused literal into an equality.
+        Assert.True(Z3ContextFactory.IsAvailable, "this witness needs Z3");
+        var span = Calor.Compiler.Parsing.TextSpan.Empty;
+        var attributes = new Calor.Compiler.Ast.AttributeCollection();
+        using var ctx = Z3ContextFactory.Create();
+        using var verifier = new Z3Verifier(ctx);
+        var result = verifier.VerifyPostcondition(
+            [], "i32", [],
+            new Calor.Compiler.Ast.EnsuresNode(span,
+                new Calor.Compiler.Ast.BinaryOperationNode(span, Calor.Compiler.Ast.BinaryOperator.Equal,
+                    new Calor.Compiler.Ast.ReferenceNode(span, "result"), new Calor.Compiler.Ast.IntLiteralNode(span, 0)),
+                null, attributes),
+            [
+                new Calor.Compiler.Ast.BindStatementNode(span, "n", "i32", false,
+                    new Calor.Compiler.Ast.IntLiteralNode(span, long.MaxValue) { IsLong = false }, attributes),
+                new Calor.Compiler.Ast.ReturnStatementNode(span, new Calor.Compiler.Ast.IntLiteralNode(span, 0)),
+            ]);
+        Assert.NotEqual(ContractVerificationStatus.Proven, result.Status);
+    }
+
+    [Fact]
+    public void WarmCache_DoesNotCarryAVerdictBetweenIntAndLongSpellings()
+    {
+        // Review round 2: warming one spelling must not change the other's verdict, in either order.
+        const string intSource = """
+            §M{m1:R1Case}
+              §F{f1:Probe:pub} (i64:x) -> i32
+                §E{}
+                §S (<= x INT:9223372036854775807)
+                §R INT:0
+            """;
+        var longSource = intSource.Replace("INT:9223372036854775807", "LONG:9223372036854775807");
+        foreach (var (first, second, expected) in new[]
+                 {
+                     (longSource, intSource, ContractVerificationStatus.Unsupported),
+                     (intSource, longSource, ContractVerificationStatus.Proven),
+                 })
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "calor-s2-num-cache-" + Guid.NewGuid().ToString("N")[..8]);
+            try
+            {
+                Calor.Compiler.Verification.Z3.ContractVerificationResult Compile(string source)
+                {
+                    var options = new CompilationOptions
+                    {
+                        VerifyContracts = true,
+                        VerificationCacheOptions = new VerificationCacheOptions { Enabled = true, CacheDirectory = directory },
+                    };
+                    var compiled = Program.Compile(source, "case.calr", options);
+                    Assert.False(compiled.HasErrors, string.Join("\n", compiled.Diagnostics.Select(d => d.Message)));
+                    return Assert.Single(Assert.Single(options.VerificationResults!.Functions).PostconditionResults);
+                }
+                Compile(first);
+                Assert.Equal(expected, Compile(second).Status);
+            }
+            finally
+            {
+                try { Directory.Delete(directory, recursive: true); } catch (IOException) { }
+            }
+        }
+    }
+
+    [Fact]
     public void InferredWidthLiteral_HasItsOwnCacheKey_AndTheFormatEvictsOlderEntries()
     {
         var span = Calor.Compiler.Parsing.TextSpan.Empty;

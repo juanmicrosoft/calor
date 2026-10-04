@@ -73,15 +73,25 @@ public sealed class ContractTranslator
 
     internal IReadOnlyList<BoolExpr> BindingConstraints => _bindingConstraints;
 
-    internal ReferenceNode BindInt32Constant(IntLiteralNode value)
+    internal ReferenceNode? BindInt32Constant(IntLiteralNode value)
     {
+        // #1413 (S2 R-NUM): a refused literal (D2) refuses the binding.
+        if (TranslateIntLiteral(value) is not { } literal)
+            return null;
         var ordinal = _bindingConstraints.Count;
         string name;
         do { name = $"__calor_bound_{ordinal++}"; } while (_variables.ContainsKey(name));
         DeclareVariable(name, "i32");
-        _bindingConstraints.Add(_ctx.MkEq(_variables[name].Expr, TranslateIntLiteral(value)));
+        _bindingConstraints.Add(_ctx.MkEq(_variables[name].Expr, literal));
         return new ReferenceNode(value.Span, name);
     }
+
+    /// <summary>#1413 (S2 R-NUM): whether an expression holds an INT: literal the verifier refuses (D2).</summary>
+    internal static bool ContainsRefusedLiteral(AstNode node)
+        => node is IntLiteralNode literal
+               && (literal.WidthInferred
+                   || !literal.IsUnsigned && !literal.IsLong && literal.Value is > int.MaxValue or < int.MinValue)
+           || Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node).Any(ContainsRefusedLiteral);
 
     /// <summary>
     /// Tracks metadata for bit-vector expressions (width and signedness).

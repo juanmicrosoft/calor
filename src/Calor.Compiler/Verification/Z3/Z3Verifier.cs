@@ -1283,9 +1283,11 @@ public static class FunctionBodyEncoder
 
                 // An int local is not a constant expression: uint + intVariable
                 // promotes to long, while uint + positiveIntLiteral promotes to uint.
-                var boundValue = substInit is IntLiteralNode { IsUnsigned: false, IsLong: false } literal
+                ExpressionNode? boundValue = substInit is IntLiteralNode { IsUnsigned: false, IsLong: false } literal
                     ? translator.BindInt32Constant(literal)
                     : substInit;
+                if (boundValue == null)
+                    return (null, "the binding initializer is an INT: literal outside the int32 range (D2)");
                 var extended = new Dictionary<string, ExpressionNode>(env, StringComparer.Ordinal)
                 {
                     [bind.Name] = boundValue

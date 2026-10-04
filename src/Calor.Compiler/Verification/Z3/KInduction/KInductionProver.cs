@@ -301,7 +301,10 @@ public sealed class KInductionProver : IDisposable
                 }
 
                 // Assert transition: i+1 = i + step
-                var stepValue = loop.Step != null ? GetIntValue(loop.Step) ?? 1 : 1;
+                // #1413 (S2 R-NUM): an explicit step that cannot be modeled is refused, not replaced by 1.
+                var explicitStep = loop.Step != null ? GetIntValue(loop.Step) : 1;
+                if (explicitStep is not { } stepValue)
+                    return new KInductionResult(KInductionStatus.Unsupported, k);
                 inductiveSolver.Assert(_ctx.MkEq(
                     iterations[i + 1],
                     _ctx.MkBVAdd(iterations[i], _ctx.MkBV(stepValue, 32))));
@@ -578,7 +581,8 @@ public sealed class KInductionProver : IDisposable
         return expr switch
         {
             // #1413 (S2 R-NUM, D2): the bounds are modeled as 32-bit; a value outside int32 is refused.
-            BoundIntLiteral intLit when intLit.Value is >= int.MinValue and <= int.MaxValue => intLit.Value,
+            BoundIntLiteral intLit when (intLit.IsUnsigned ? intLit.UnsignedValue <= int.MaxValue
+                : intLit.Value is >= int.MinValue and <= int.MaxValue) => intLit.Value,
             _ => null
         };
     }
