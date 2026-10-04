@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Benchmark publication refuses incomparable results (#1422).** The benchmark workflow now
+  proposes one headline file, built only from the B1 results packet (the 0.24 pair-equivalence
+  results). The workflow fails and opens no pull request when an included pair is not
+  `EQUIVALENT`, a registered pair changed, the method changed without an evidence-contract
+  amendment merged first, the regenerated packet differs, or the provenance commit is not a full
+  SHA on `main`. A failed run tries to close open benchmark-results pull requests. Across different
+  methods it prints no delta. The `allow_weaker_methodology` override is removed. Adjudication
+  of what is published is a separate gate (#1410).
+- **The agent refactoring job no longer commits to `main`.** It uploads its results and fails
+  when it cannot read a pass rate, instead of recording 0.
+- **Older website benchmark numbers are labeled historical.** They stay published, marked as not
+  comparable under the 0.24 method.
+
 ### Fixed
 
 - **Three causes of run-to-run and platform-dependent verifier verdicts are fixed (#1135).**
@@ -28,23 +43,6 @@ All notable changes to this project will be documented in this file.
   - **User-level cache on Windows.** The default verification cache and the user effect
     manifests (`~/.calor`) now honor `USERPROFILE` on Windows, as NuGet does. Linux and macOS
     are unchanged.
-
-### Changed
-
-- **Benchmark publication refuses incomparable results (#1422).** The benchmark workflow now
-  proposes one headline file, built only from the B1 results packet (the 0.24 pair-equivalence
-  results). The workflow fails and opens no pull request when an included pair is not
-  `EQUIVALENT`, a registered pair changed, the method changed without an evidence-contract
-  amendment merged first, the regenerated packet differs, or the provenance commit is not a full
-  SHA on `main`. A failed run tries to close open benchmark-results pull requests. Across different
-  methods it prints no delta. The `allow_weaker_methodology` override is removed. Adjudication
-  of what is published is a separate gate (#1410).
-- **The agent refactoring job no longer commits to `main`.** It uploads its results and fails
-  when it cannot read a pass rate, instead of recording 0.
-- **Older website benchmark numbers are labeled historical.** They stay published, marked as not
-  comparable under the 0.24 method.
-
-### Fixed
 
 - **An empty clause body no longer swallows the next statement (#1485).** A
   clause such as `§CA` (catch) with no indented lines used to pull the next
