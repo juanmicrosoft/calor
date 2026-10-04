@@ -492,7 +492,14 @@ public sealed class Z3Verifier : IDisposable
 
             if (bodyArithmeticSafety != null)
                 solver.Assert(bodyArithmeticSafety);
-            var checkedArithmeticAssumed = !ArithmeticSafetyEntailed(_ctx, solver, checkedArithmeticConditions);
+            // #1413 (S1 NUM-OVERFLOW-CHECKED, registered assumed): a contract whose checked
+            // arithmetic can overflow on SOME input of its types is an overflow-sensitive shape,
+            // and Assumed is the strongest outcome the registration allows for it — even when
+            // the preconditions rule the overflow out (the entailment the solver used to accept
+            // as an unconditional Proven). Only arithmetic that cannot overflow at all stays
+            // unconditional.
+            var checkedArithmeticAssumed = !IsolatedSolver.Simplify(
+                _ctx, _ctx.MkAnd(checkedArithmeticConditions.ToArray())).IsTrue;
             foreach (var condition in checkedArithmeticConditions)
                 solver.Assert(condition);
             if ((checkedArithmeticAssumed || bodyArithmeticSafety is { IsTrue: false })

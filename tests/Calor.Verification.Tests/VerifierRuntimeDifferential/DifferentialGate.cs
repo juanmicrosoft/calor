@@ -340,11 +340,12 @@ internal static class DifferentialGate
         if (outcome.Status == ProofStatus.Proven)
             return true;
 
+        // #1413 (S2 R-NUM): every named assumption must be explicitly allowed. A channel may need
+        // fewer of them: the obligation channel entails the guarded i64/u64 multiplications that the
+        // postcondition channel (frozen row NUM-OVERFLOW-CHECKED) reports as checked-arithmetic.
         return outcome.Status == ProofStatus.Assumed
-            && outcome.Assumptions.SequenceEqual(
-                testCase.AllowedAssumptions.OrderBy(
-                    assumption => assumption,
-                    StringComparer.Ordinal));
+            && outcome.Assumptions.Count > 0
+            && outcome.Assumptions.All(assumption => testCase.AllowedAssumptions.Contains(assumption, StringComparer.Ordinal));
     }
 
     private static ProofOutcome GetOutcome(

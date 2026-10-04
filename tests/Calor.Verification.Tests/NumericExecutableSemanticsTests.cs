@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
 using Microsoft.CSharp.RuntimeBinder;
 using Xunit;
@@ -101,6 +102,16 @@ public sealed class NumericExecutableSemanticsTests
                     Ensures(Equal(negation, Literal(runtimeResult ?? 0))));
                 var label = $"-{type}({value})";
 
+                if (IsNarrow(type))
+                {
+                    // #1413 (S2 R-NUM, frozen row NUM-NARROW-ARITH / divergence D1): negation of a
+                    // sub-32-bit operand is refused, whatever C# computes.
+                    Assert.True(
+                        result.Status == ContractVerificationStatus.Unsupported,
+                        $"{label}: narrow negation must be refused (D1), got {result.Status}");
+                    continue;
+                }
+
                 if (runtimeError is RuntimeBinderException)
                 {
                     Assert.True(
@@ -115,9 +126,7 @@ public sealed class NumericExecutableSemanticsTests
                 }
                 else
                 {
-                    Assert.True(
-                        result.Status == ContractVerificationStatus.Proven,
-                        $"{label}: expected Proven, got {result.Status}: {result.CounterexampleDescription}");
+                    AssertProvenOrCheckedArithmeticAssumed(result, label);
                     Assert.False(
                         result.EffectiveOutcome.IsVacuous,
                         $"{label}: operand constraints were unsatisfiable, so the proof tested no runtime value");
@@ -167,6 +176,18 @@ public sealed class NumericExecutableSemanticsTests
             Ensures(condition));
 
         var label = $"{leftType}({leftValue}) {op} {rightType}({rightValue})";
+        if (IsNarrow(leftType) && IsNarrow(rightType) && op is BinaryOperator.Add or BinaryOperator.Subtract
+                or BinaryOperator.Multiply or BinaryOperator.Divide or BinaryOperator.Modulo
+                or BinaryOperator.LeftShift or BinaryOperator.RightShift)
+        {
+            // #1413 (S2 R-NUM, frozen row NUM-NARROW-ARITH / divergence D1): arithmetic and shifts
+            // whose operands are both sub-32-bit are refused, whatever C# computes.
+            Assert.True(
+                result.Status == ContractVerificationStatus.Unsupported,
+                $"{label}: narrow arithmetic must be refused (D1), got {result.Status}");
+            return;
+        }
+
         if (runtimeError is RuntimeBinderException)
         {
             Assert.True(
@@ -183,12 +204,27 @@ public sealed class NumericExecutableSemanticsTests
             return;
         }
 
-        Assert.True(
-            result.Status == ContractVerificationStatus.Proven,
-            $"{label}: expected Proven, got {result.Status}: {result.CounterexampleDescription}");
+        AssertProvenOrCheckedArithmeticAssumed(result, label);
         Assert.False(
             result.EffectiveOutcome.IsVacuous,
             $"{label}: operand constraint was unsatisfiable, so the proof tested no runtime value");
+    }
+
+    private static bool IsNarrow(string type) => type is "i8" or "u8" or "i16" or "u16";
+
+    /// <summary>
+    /// #1413 (S2 R-NUM, frozen row NUM-OVERFLOW-CHECKED: "Assumed (checked-arithmetic)"): checked
+    /// arithmetic that could overflow for some value of its types is Assumed even when the
+    /// preconditions fix values that do not overflow; nothing else may be assumed.
+    /// </summary>
+    private static void AssertProvenOrCheckedArithmeticAssumed(Calor.Compiler.Verification.Z3.ContractVerificationResult result, string label)
+    {
+        var outcome = result.EffectiveOutcome;
+        Assert.True(
+            outcome.Status == ProofStatus.Proven
+            || outcome.Status == ProofStatus.Assumed
+               && outcome.Assumptions.SequenceEqual([Z3Verifier.CheckedArithmeticAssumption]),
+            $"{label}: expected Proven or Assumed (checked-arithmetic), got {outcome.Status}: {result.CounterexampleDescription}");
     }
 
     private static object EvaluateDynamic(object left, object right, BinaryOperator op)

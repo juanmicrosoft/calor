@@ -389,8 +389,8 @@ public class OverflowSoundnessBenchmark
         foreach (var (name, test) in mustBeProven)
         {
             var result = test();
-            var status = result.Status == ContractVerificationStatus.Proven ? "PASS" : "FAIL (MISSED PROOF)";
-            if (result.Status == ContractVerificationStatus.Proven) proven++;
+            var status = IsBoundedVerdict(result) ? "PASS" : "FAIL (MISSED PROOF)";
+            if (IsBoundedVerdict(result)) proven++;
             else missedProofs++;
             _output.WriteLine($"  [{status}] {name}");
         }
@@ -518,10 +518,22 @@ public class OverflowSoundnessBenchmark
         Assert.Contains(Z3Verifier.CheckedArithmeticAssumption, result.EffectiveOutcome.Assumptions);
     }
 
+    /// <summary>
+    /// #1413 (S2 R-NUM): the frozen row NUM-OVERFLOW-CHECKED classifies overflow-sensitive shapes
+    /// under the checked module as "Assumed (checked-arithmetic)"; a precondition that rules the
+    /// overflow out no longer upgrades the verdict to Proven. A bounded contract therefore holds as
+    /// Assumed with exactly the checked-arithmetic assumption, or Proven when no arithmetic can overflow.
+    /// </summary>
+    private static bool IsBoundedVerdict(ContractVerificationResult result)
+        => result.Status == ContractVerificationStatus.Proven
+           || result.EffectiveOutcome.Status == ProofStatus.Assumed
+              && result.EffectiveOutcome.Assumptions.SequenceEqual([Z3Verifier.CheckedArithmeticAssumption]);
+
     private void AssertProven(ContractVerificationResult result, string description)
     {
         _output.WriteLine($"[{result.Status}] {description}");
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        Assert.True(IsBoundedVerdict(result),
+            $"{description}: expected Assumed (checked-arithmetic), got {result.EffectiveOutcome.Status} [{string.Join("; ", result.EffectiveOutcome.Assumptions)}]");
     }
 
     // AST construction helpers

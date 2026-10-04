@@ -21,6 +21,22 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Three numeric forms are refused or demoted as the verification contract requires (#1413).**
+  The 0.24 soundness registration lists three numeric forms that must not be reported `Proven`.
+  The verifier proved all three. Each proof was true, but it was a claim the registered rules do
+  not allow. Now:
+  - Arithmetic, shifts, and negation whose operands are all narrower than 32 bits (`i8`, `u8`,
+    `i16`, `u16`) are `Unsupported`. This is divergence D1 in
+    `docs/verification-modeled-forms.md`. Comparisons on narrow values are still modeled.
+  - An `INT:` literal outside the 32-bit range, such as `INT:3000000000`, is `Unsupported`
+    (divergence D2). Spell it `LONG:` to have it modeled.
+  - In a checked module, a contract whose arithmetic can overflow for some value of its types
+    is now `Assumed` with the `checked-arithmetic` assumption. This holds even when the
+    preconditions rule the overflow out. Before, such contracts were `Proven`, and their
+    runtime checks were removed. They are now kept.
+
+  The verification cache format moves to 1.22, so older entries are invalidated.
+
 - **Three causes of run-to-run and platform-dependent verifier verdicts are fixed (#1135).**
   Whether the verifier is now deterministic on every supported platform is decided by the
   registered determinism protocol (#1421), which runs after this change.

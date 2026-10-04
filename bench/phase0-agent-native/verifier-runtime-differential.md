@@ -13,8 +13,8 @@
 
 | Outcome | Cases |
 |---|---:|
-| `assumed` | 150 |
-| `proven` | 435 |
+| `assumed` | 156 |
+| `proven` | 429 |
 | `refuted` | 585 |
 
 ## Coverage by category
@@ -45,15 +45,17 @@
 
 `Assumed` is accepted only for provable cells whose form lists the exact production assumption set below. Refutable cells must always be `Refuted`.
 
+- `scalar-type:i64` — checked-arithmetic
+- `scalar-type:u64` — checked-arithmetic
 - `scalar-type:str` — string-model
 - `array-element-type:i8` — reference-model
 - `array-element-type:i16` — reference-model
 - `array-element-type:i32` — reference-model
-- `array-element-type:i64` — reference-model
+- `array-element-type:i64` — reference-model; checked-arithmetic
 - `array-element-type:u8` — reference-model
 - `array-element-type:u16` — reference-model
 - `array-element-type:u32` — reference-model
-- `array-element-type:u64` — reference-model
+- `array-element-type:u64` — reference-model; checked-arithmetic
 - `expression-kind:StringLiteralNode` — string-model
 - `expression-kind:ArrayAccessNode` — reference-model
 - `expression-kind:ArrayLengthNode` — reference-model

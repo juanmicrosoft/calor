@@ -180,6 +180,11 @@ public sealed class ContractHasher
 
     private void AppendExpression(StringBuilder sb, ExpressionNode expr)
     {
+        // #1413: INT:-inferred 64-bit literals are refused by the verifier while the same
+        // value spelled LONG: is modeled; they must never share a cached verdict.
+        if (expr is IntLiteralNode { WidthInferred: true })
+            sb.Append("INFERRED-WIDTH:");
+
         switch (expr)
         {
             case IntLiteralNode intLit:

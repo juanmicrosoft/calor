@@ -490,8 +490,16 @@ public sealed class ContractTranslator
         return null;
     }
 
-    private BitVecExpr TranslateIntLiteral(IntLiteralNode literal)
+    private BitVecExpr? TranslateIntLiteral(IntLiteralNode literal)
     {
+        if (literal.WidthInferred)
+        {
+            // #1413 (S1 NUM-LITERAL-OVERSIZE, registered unsupported-refused): divergence D2 —
+            // an INT: literal outside the int32 range is refused. LONG:/UINT:/ULONG: spell an
+            // explicit width and stay modeled.
+            Refuse($"INT: literal {literal.Value} is outside the int32 range (D2); spell it LONG:");
+            return null;
+        }
         if (literal.IsUnsigned)
         {
             var width = literal.IsLong || literal.UnsignedValue > uint.MaxValue ? 64u : 32u;
@@ -680,6 +688,18 @@ public sealed class ContractTranslator
     /// </summary>
     private string? DiagnoseUnmodeledBitVecTyping(BinaryOperator op, BitVecExpr left, BitVecExpr right)
     {
+        // #1413 (S1 NUM-NARROW-ARITH, registered unsupported-refused): divergence D1 is closed
+        // by refusal in docs/verification-modeled-forms.md — arithmetic and shifts whose
+        // operands are BOTH narrower than 32 bits are Unsupported. The promotion model made
+        // them Proven, a claim the registered row does not allow.
+        if (op is BinaryOperator.Add or BinaryOperator.Subtract or BinaryOperator.Multiply
+                or BinaryOperator.Divide or BinaryOperator.Modulo
+                or BinaryOperator.LeftShift or BinaryOperator.RightShift
+            && left.SortSize < 32 && right.SortSize < 32)
+        {
+            return "arithmetic with both operands narrower than 32 bits is refused (D1)";
+        }
+
         // Shift counts wider than 32 bits have no C# typing (the count operand
         // must convert to int); refuse rather than guess (review #833 C3).
         if (op is BinaryOperator.LeftShift or BinaryOperator.RightShift
@@ -794,6 +814,12 @@ public sealed class ContractTranslator
 
     private Expr? TranslateUnaryNegation(BitVecExpr operand)
     {
+        if (operand.SortSize < 32)
+        {
+            // #1413: D1's unary form (docs/verification-modeled-forms.md: narrow negation refused).
+            return Refuse("negation of an operand narrower than 32 bits is refused (D1)");
+        }
+
         if (!IsSigned(operand) && operand.SortSize == 64)
         {
             return Refuse(

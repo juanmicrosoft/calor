@@ -4895,7 +4895,10 @@ public sealed class Parser
                 info.Sign,
                 info.Base,
                 info.Width,
-                info.Signedness);
+                info.Signedness)
+            {
+                WidthInferred = info.WidthInferred,
+            };
         }
         var value = token.Value switch
         {

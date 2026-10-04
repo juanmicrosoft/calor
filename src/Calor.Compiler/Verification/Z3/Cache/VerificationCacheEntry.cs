@@ -86,7 +86,11 @@ public sealed class VerificationCacheEntry
     // signedness. Older keys hashed only the value, so `x + INT:1` and `x + LONG:1`
     // shared one entry and a warm cache served the LONG proof for the INT text — a
     // false Proven that elides the guard. The bump evicts every entry written under the old keys.
-    public const string CurrentFormatVersion = "1.20";
+    // 1.22 (#1413, S2 R-NUM): sub-32-bit arithmetic/negation (D1) and INT: literals outside the
+    // int32 range (D2) are refused, and checked arithmetic that can overflow on some input is
+    // Assumed even when the preconditions rule it out. Older entries may hold Proven for them.
+    // (1.21 is taken by the S2 text-encoding repair, #1497.)
+    public const string CurrentFormatVersion = "1.22";
 
     /// <summary>#778: the compiler-semantics ledger version that produced this entry.
     /// A verdict computed under different compile semantics must not be served, even
