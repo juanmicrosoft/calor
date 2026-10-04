@@ -20,3 +20,17 @@ Also flagged: the G2 README's "Already spent: 13" is stale as a current total.
 README, and the PR body now say that a cut makes a case `DISAGREE` only where another attempt
 observed a different value, and otherwise only makes the execution `INCOMPLETE`. The G2 README
 now gives 13 as the registration-time charge and 401 as the amount recorded after g3-exec-1.
+
+## Pass 2
+
+**Verified commit:** `0231cbc1`, with the current PR body in the prompt. **Verdict: VERIFIED.**
+
+The reviewer found no remaining false or overstated claim:
+
+- Both pass-1 findings are fixed in the packet text and the PR body.
+- `result.json` reproduces byte for byte. The attempt counts, observations, disagreements, and
+  four `OPEN` rows match.
+- The runner's behavior and the budget arithmetic support the claims.
+- Both validators pass against `origin/main`. All nine `sha256.json` entries and both ledger
+  hashes match.
+- 40 read-only controls pass. The filesystem-writing controls were inspected, not run.
