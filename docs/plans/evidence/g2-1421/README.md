@@ -170,7 +170,7 @@ Windows job timeouts and sets `maxDispatchedControlRuns` to 0 so the worst case 
 ceiling. Recorded after g3-exec-1: 13 + 388 = 401; worst case of the two executions left:
 401 + 2 × 655 = 1,711.
 
-Already spent: 13 runner-minutes (the dry run below). Every `workflow_dispatch` run is charged
+At registration: 13 runner-minutes spent (the G2 dry run below). Recorded after g3-exec-1: 401. Every `workflow_dispatch` run is charged
 here, counted from the GitHub API run inventory, with the worst case of unfinished runs
 reserved. Pull-request control runs are ordinary CI.
 
@@ -267,8 +267,9 @@ defects are in the execution machinery; neither is a verifier finding.
    the worst case at 1,965.
 3. **Known inconsistency, unchanged.** The stopping rule says a job that ends early makes an
    execution `INCOMPLETE`, but an invocation the harness cuts at its own deadline records `Timeout`
-   for every unobserved case, and invalid attempts are compared, so the cut reads as `DISAGREE`
-   (`runPlan.harnessCutInconsistency`). All 1,580 `DISAGREE` cases of g3-exec-1 came from such
+   for every unobserved case, and invalid attempts are compared, so a case that another attempt
+   observed differently reads as `DISAGREE` (`runPlan.harnessCutInconsistency`); otherwise the cut
+   only makes the execution `INCOMPLETE`. All 1,580 `DISAGREE` cases of g3-exec-1 came from such
    cuts. The decider is not changed; the timeouts are sized so a cut does not happen.
 
 No case, environment, attempt count, determinism row, gate, agreement rule, or record format
