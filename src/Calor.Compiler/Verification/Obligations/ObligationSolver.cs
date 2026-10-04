@@ -293,7 +293,8 @@ public sealed class ObligationSolver : IDisposable
                     inexact.Add("the returned value is not modeled (the solver's `result` is unconstrained)");
                 if (!info.Facts.IsExact(obligation.Span))
                     inexact.Add("the path to the obligation is not fully modeled (an enclosing guard, loop, try, or earlier exit is not asserted)");
-                if (info.Facts.IsStaleAfterEntry(obligation.Condition))
+                if (info.Facts.IsStaleAfterEntry(obligation.Condition)
+                    || FactCollector.ReferencedNames(obligation.Condition).Overlaps(info.Facts.DroppedFactNames))
                     inexact.Add("the obligation reads a variable or heap state the body may change, whose current value is not modeled");
             }
             if (status == Status.SATISFIABLE && inexact.Count > 0)

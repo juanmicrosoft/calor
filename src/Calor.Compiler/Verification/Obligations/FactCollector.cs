@@ -46,7 +46,14 @@ public sealed class FactCollector
     /// constraint), subject to no assignment kill.
     /// </summary>
     public void AddFunctionWideFact(ExpressionNode fact)
-        => ScopedFacts.Add(ScopedFact.FunctionWide(fact));
+    {
+        if (!IsStaleAfterEntry(fact))
+            ScopedFacts.Add(ScopedFact.FunctionWide(fact));
+    }
+
+    /// <summary>#1413: the names read by entry facts (parameter refinements) dropped as stale;
+    /// an obligation reading one of them has an incompletely modeled entry state.</summary>
+    public HashSet<string> DroppedFactNames { get; } = new(StringComparer.Ordinal);
 
     /// <summary>
     /// #1413 (S1 OBL-MUTATION-KILL): every name the body may rebind — assignments,
@@ -146,7 +153,8 @@ public sealed class FactCollector
             .Where(p => (p.Modifier & (ParameterModifier.Ref | ParameterModifier.Out | ParameterModifier.In)) != 0)
             .Select(p => p.Name)
             .ToArray();
-        if (byReference.Length > 1 && byReference.Any(_assignedNames.Contains))
+        if (byReference.Length > 1 && byReference.Any(_assignedNames.Contains)
+            || byReference.Length > 0 && MutatesHeap)
         {
             _assignedNames.UnionWith(byReference);
             _aliasWritten.UnionWith(byReference);
@@ -161,25 +169,18 @@ public sealed class FactCollector
         // with models the entry guard rules out.
         foreach (var param in parameters)
         {
-            if (HasOpaqueCode
-                || param.Modifier == ParameterModifier.Out
-                || _assignedNames.Contains(param.Name))
-            {
+            if (param.Modifier == ParameterModifier.Out)
                 continue;
-            }
-            if (param.InlineRefinement != null)
-            {
-                var fact = SubstituteSelfRefStatic(param.InlineRefinement.Predicate, param.Name);
-                if (!IsStaleAfterEntry(fact))
-                    ScopedFacts.Add(ScopedFact.FunctionWide(fact));
-            }
-            if (refinementPredicates != null
-                && refinementPredicates.TryGetValue(param.TypeName, out var predicate))
-            {
-                var fact = SubstituteSelfRefStatic(predicate, param.Name);
-                if (!IsStaleAfterEntry(fact))
-                    ScopedFacts.Add(ScopedFact.FunctionWide(fact));
-            }
+            var predicate = param.InlineRefinement?.Predicate;
+            if (refinementPredicates != null && refinementPredicates.TryGetValue(param.TypeName, out var named))
+                predicate = predicate == null ? named : new BinaryOperationNode(named.Span, BinaryOperator.And, predicate, named);
+            if (predicate == null)
+                continue;
+            var fact = SubstituteSelfRefStatic(predicate, param.Name);
+            if (IsStaleAfterEntry(fact))
+                DroppedFactNames.UnionWith(ReferencedNames(fact));
+            else
+                ScopedFacts.Add(ScopedFact.FunctionWide(fact));
         }
 
         Walk(body, exact: true);
@@ -205,21 +206,23 @@ public sealed class FactCollector
         // expression), unsafe/pointer code (writes through addresses), and lambdas (deferred
         // bodies that may write captured variables or run after their guards stop holding) —
         // makes the body opaque: no entry or guard facts, no exact state.
-        HasOpaqueCode = nodes.Any(node => node is RawCSharpNode or RawCSharpExpressionNode
+        HasOpaqueCode = nodes.Any(node => node is RawCSharpNode or RawCSharpExpressionNode or CompilerDirectiveNode
             or UnsafeBlockNode or FixedStatementNode or AddressOfNode or PointerDereferenceNode
             or LambdaExpressionNode);
-        MutatesHeap = nodes.Any(node => node
-            is CallExpressionNode
+        MutatesHeap = nodes.Any(node => IsHeapStore(node)
+            || node is CallExpressionNode
             or CallStatementNode
+            or ExpressionCallNode
+            or EventSubscribeNode
+            or EventUnsubscribeNode
+            or UsingStatementNode
             or NewExpressionNode
             or CollectionPushNode
             or DictionaryPutNode
             or CollectionRemoveNode
             or CollectionSetIndexNode
             or CollectionClearNode
-            or CollectionInsertNode
-            or AssignmentStatementNode { Target: not ReferenceNode }
-            or CompoundAssignmentStatementNode { Target: not ReferenceNode });
+            or CollectionInsertNode);
         _hasJumps = nodes.Any(node => node is GotoStatementNode or LabelStatementNode);
     }
 
@@ -315,6 +318,19 @@ public sealed class FactCollector
     private static ExpressionNode Conjoin(IEnumerable<ExpressionNode> conjuncts, TextSpan span)
         => conjuncts.Aggregate((left, right) =>
             new BinaryOperationNode(span, BinaryOperator.And, left, right));
+
+    /// <summary>A store whose target is not a plain local or parameter (element, field, dotted path).</summary>
+    private static bool IsHeapStore(AstNode node)
+    {
+        var target = node switch
+        {
+            AssignmentStatementNode assignment => assignment.Target,
+            CompoundAssignmentStatementNode compound => compound.Target,
+            UnaryOperationNode unary when IsIncrement(unary) => unary.Operand,
+            _ => null
+        };
+        return target != null && (target is not ReferenceNode reference || reference.Name.Contains('.'));
+    }
 
     private static bool ChangesState(ExpressionNode condition)
         => DescendantsAndSelf(condition).Any(node => IsIncrement(node)
@@ -530,7 +546,7 @@ public sealed class FactCollector
                     break;
             }
             // Any other binder (catch variable, foreach key/value, using, is-pattern).
-            foreach (var binder in new[] { "VariableName", "KeyName", "ValueName", "BindingName" })
+            foreach (var binder in new[] { "VariableName", "KeyName", "ValueName", "BindingName", "IndexVariableName" })
             {
                 if (node.GetType().GetProperty(binder)?.GetValue(node) is string bound)
                     names.Add(bound);
@@ -545,6 +561,7 @@ public sealed class FactCollector
     {
         ReferenceNode reference => reference.Name.Split('.')[0],
         ArrayAccessNode access => RootName(access.Array),
+        MultiDimArrayAccessNode multi => RootName(multi.Array),
         FieldAccessNode field => RootName(field.Target),
         _ => null
     };

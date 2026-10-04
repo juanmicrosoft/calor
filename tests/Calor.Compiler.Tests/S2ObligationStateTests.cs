@@ -166,9 +166,53 @@ public sealed class S2ObligationStateTests
               §PROOF{p1:claim} (>= x INT:0)
             §R x
         """)]
+    // Review round 2 witnesses: a compiler-directive payload ("x = -5;") and a field the caller
+    // can pass by reference as x.
+    [InlineData("""
+        §M{m1:M}
+          §F{f1:Probe:priv} (i32:x) -> i32
+            §E{}
+            §Q (> x INT:0)
+            §CDIR{compiler-directive:eCA9IC01Ow}
+            §PROOF{p1:claim} (> x INT:0)
+            §R x
+        """)]
+    [InlineData("""
+        §M{m1:M}
+          §CL{c1:Box:pub}
+            §FLD{i32:Value:pub}
+            §MT{mt1:Probe:pub}
+              §I{i32:x:ref}
+              §O{i32}
+              §E{mut}
+              §Q (> x INT:0)
+              §ASSIGN this.Value INT:-5
+              §PROOF{p1:claim} (> x INT:0)
+              §R x
+        """)]
     public void IndirectWrite_KillsFacts(string source)
     {
         var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
+        Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
+    }
+
+    [Fact]
+    public void DroppedParameterRefinement_MakesTheStateInexact()
+    {
+        // Review round 2 witness: the entry guard enforces y > 0, but the refinement is dropped
+        // because x is reassigned, so a model y <= 0 must not become a Failed compile error.
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:pub}
+                §I{i32:x} | (&& (> # INT:0) (> y INT:0))
+                §I{i32:y}
+                §O{void}
+                §E{}
+                §ASSIGN x INT:1
+                §PROOF{p1:claim} (> y INT:0)
+            """;
+        var proof = Single(Solve(source).Obligations, ObligationKind.ProofObligation);
+        Assert.NotEqual(ObligationStatus.Failed, proof.Status);
         Assert.NotEqual(ObligationStatus.Discharged, proof.Status);
     }
 
