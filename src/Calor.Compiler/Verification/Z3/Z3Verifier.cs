@@ -73,9 +73,14 @@ public sealed class Z3Verifier : IDisposable
     private readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> _userTypeRegistry;
     private bool _disposed;
 
+    /// <summary>Test seam (#1413, amendment 1.3.1): replaces the overflow probe's solver answer.</summary>
+    internal Func<Status>? OverflowProbeStatusForTesting { get; init; }
+
     /// <summary>#1413 (S2 R-NUM): whether some value of the operands' types violates the
-    /// conditions, decided without any precondition (an unknown answer counts as yes).</summary>
-    private bool CanFailForSomeInput(IReadOnlyCollection<BoolExpr> conditions)
+    /// conditions, decided without any precondition. Null when the solver cannot decide
+    /// (amendment 1.3.1: the caller then reports Unsupported, so the verdict never depends on
+    /// solver time).</summary>
+    private bool? CanFailForSomeInput(IReadOnlyCollection<BoolExpr> conditions)
     {
         if (conditions.Count == 0)
             return false;
@@ -84,7 +89,12 @@ public sealed class Z3Verifier : IDisposable
             return false;
         using var probe = new IsolatedSolver(_ctx, _timeoutMs);
         probe.Assert(_ctx.MkNot(all));
-        return probe.Check() != Status.UNSATISFIABLE;
+        return (OverflowProbeStatusForTesting?.Invoke() ?? probe.Check()) switch
+        {
+            Status.UNSATISFIABLE => false,
+            Status.SATISFIABLE => true,
+            _ => null,
+        };
     }
 
     internal static bool ArithmeticSafetyEntailed(Context context, IsolatedSolver solver, IEnumerable<BoolExpr> conditions)
@@ -512,7 +522,11 @@ public sealed class Z3Verifier : IDisposable
             // the preconditions rule the overflow out (the entailment the solver used to accept
             // as an unconditional Proven). Only arithmetic that cannot overflow for any value of its
             // types (checked without the preconditions) stays unconditional.
-            var checkedArithmeticAssumed = CanFailForSomeInput(checkedArithmeticConditions);
+            if (CanFailForSomeInput(checkedArithmeticConditions) is not { } checkedArithmeticAssumed)
+                return ContractVerificationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(
+                        "Whether the checked arithmetic can overflow for some input could not be decided. Runtime check kept.")),
+                    Duration: sw.Elapsed);
             foreach (var condition in checkedArithmeticConditions)
                 solver.Assert(condition);
             if ((checkedArithmeticAssumed || bodyArithmeticSafety is { IsTrue: false })

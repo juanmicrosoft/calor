@@ -406,9 +406,7 @@ public static class WhileConditionAnalyzer
     {
         return expr switch
         {
-            // #1413 (S2 R-NUM, D2): bounds are modeled as 32-bit; a value outside int32 is refused.
-            BoundIntLiteral intLit when (intLit.IsUnsigned ? intLit.UnsignedValue <= int.MaxValue
-                : intLit.Value is >= int.MinValue and <= int.MaxValue) => intLit.Value,
+            BoundIntLiteral intLit => intLit.Value,
             _ => null
         };
     }

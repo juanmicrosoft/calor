@@ -890,6 +890,38 @@ public sealed class ContractTranslator
     /// require safety for every bound value, including for existential predicates:
     /// that is conservative about early termination, never an elision of a throw.
     /// </summary>
+    private bool StaticallyCannotOverflow(BinaryOperationNode binary, uint width, bool signed)
+    {
+        if (OperandRange(binary.Left) is not { } a || OperandRange(binary.Right) is not { } b)
+            return false;
+        System.Numerics.BigInteger[] results = binary.Operator switch
+        {
+            BinaryOperator.Add => [a.Min + b.Min, a.Max + b.Max],
+            BinaryOperator.Subtract => [a.Min - b.Max, a.Max - b.Min],
+            _ => [a.Min * b.Min, a.Min * b.Max, a.Max * b.Min, a.Max * b.Max],
+        };
+        var (low, high) = TypeRange((int)width, signed);
+        return results.All(value => value >= low && value <= high);
+    }
+
+    /// <summary>The values an operand can take: a literal's own value, otherwise its type's range.</summary>
+    private (System.Numerics.BigInteger Min, System.Numerics.BigInteger Max)? OperandRange(ExpressionNode operand)
+    {
+        if (operand is IntLiteralNode literal && !IsRefusedLiteral(literal))
+        {
+            System.Numerics.BigInteger value = literal.IsUnsigned ? literal.UnsignedValue : literal.Value;
+            return (value, value);
+        }
+        if (Translate(operand) is not BitVecExpr term)
+            return null;
+        return TypeRange((int)term.SortSize, IsSigned(term));
+    }
+
+    private static (System.Numerics.BigInteger Min, System.Numerics.BigInteger Max) TypeRange(int width, bool signed)
+        => signed
+            ? (-(System.Numerics.BigInteger.One << (width - 1)), (System.Numerics.BigInteger.One << (width - 1)) - 1)
+            : (System.Numerics.BigInteger.Zero, (System.Numerics.BigInteger.One << width) - 1);
+
     internal BoolExpr? GetCheckedArithmeticSafety(ExpressionNode node)
     {
         switch (node)
@@ -913,7 +945,9 @@ public sealed class ContractTranslator
                 if (operands == null)
                     return null;
                 var (l, r, signed) = operands.Value;
-                var operationSafe = binary.Operator switch
+                // #1413 (S2 R-NUM, amendment 1.3.1): decided by operand widths when the promoted
+                // result type always holds the result (e.g. i32 * u32 in 64 bits), with no solver.
+                var operationSafe = StaticallyCannotOverflow(binary, l.SortSize, signed) ? _ctx.MkTrue() : binary.Operator switch
                 {
                     BinaryOperator.Add => _ctx.MkAnd(_ctx.MkBVAddNoOverflow(l, r, signed),
                         signed ? _ctx.MkBVAddNoUnderflow(l, r) : _ctx.MkTrue()),

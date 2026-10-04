@@ -2480,11 +2480,14 @@ public class VerifierTests
         // budget expired) or Disproven (Z3 found the wraparound counterexample fast —
         // observed on fast CI runners). Proven is IMPOSSIBLE for this claim; the old
         // tolerance set {Proven, Unproven} excluded the correct verdict and included an
-        // unreachable one, making the test a machine-speed lottery.
+        // unreachable one, making the test a machine-speed lottery. #1413 (amendment 1.3.1):
+        // when the budget expires inside the checked-arithmetic overflow probe, the verdict is
+        // Unsupported, never Assumed or Proven.
         Assert.True(
             result.Status == ContractVerificationStatus.Unproven ||
-            result.Status == ContractVerificationStatus.Disproven,
-            $"Expected Unproven (timeout) or Disproven (wraparound counterexample) but got {result.Status}");
+            result.Status == ContractVerificationStatus.Disproven ||
+            result.Status == ContractVerificationStatus.Unsupported,
+            $"Expected Unproven (timeout), Disproven (wraparound counterexample) or Unsupported (undecided overflow probe) but got {result.Status}");
     }
 
     [SkippableFact]

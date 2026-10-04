@@ -538,7 +538,7 @@ public class KInductionTests
         foreach (var candidate in new[] { oversizedStep, wrappedBound })
         {
             var result = new KInductionProver(new KInductionOptions()).ProveInvariant(candidate, "i <= 11", func);
-            Assert.NotEqual(KInductionStatus.Proven, result.Status);
+            Assert.Equal(KInductionStatus.Unsupported, result.Status); // the whole loop is refused (amendment 1.3.1)
         }
     }
 

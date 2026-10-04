@@ -139,6 +139,28 @@ public sealed class S2NumericRefusalTests
         Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
     }
 
+    [Theory]
+    [InlineData("i32", "u32", "(* x y)", true)]      // linux-arm64 case: 64-bit product, decided by widths
+    [InlineData("u32", "i32", "(- x y)", true)]      // promoted to 64 bits: cannot overflow
+    [InlineData("i32", "i32", "(* x y)", false)]     // control: 32-bit product can overflow
+    public void OverflowSafety_IsDecidedFromOperandWidths(string leftType, string rightType, string arithmetic, bool staticallySafe)
+    {
+        // #1413 (S2 R-NUM, amendment 1.3.1): when the promoted result type always holds the
+        // result, no solver query decides it, so the verdict cannot depend on solver time.
+        var source = $$"""
+            §M{m1:R1Case}
+              §F{f1:Probe:pub} ({{leftType}}:x, {{rightType}}:y) -> i32
+                §E{}
+                §S (== {{arithmetic}} {{arithmetic}})
+                §R INT:0
+            """;
+        var outcome = VerifySinglePostcondition(source).EffectiveOutcome;
+        if (staticallySafe)
+            Assert.Equal(ProofStatus.Proven, outcome.Status);
+        else
+            Assert.Equal([Z3Verifier.CheckedArithmeticAssumption], outcome.Assumptions);
+    }
+
     [Fact]
     public void OversizeLiteralRemovedBySimplification_IsStillRefused()
     {

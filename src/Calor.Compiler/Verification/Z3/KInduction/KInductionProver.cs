@@ -112,6 +112,9 @@ public sealed class KInductionProver : IDisposable
         BoundFunction function)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
+        if (HasUnrepresentableLiteral(loop.From) || HasUnrepresentableLiteral(loop.To)
+            || loop.Step != null && HasUnrepresentableLiteral(loop.Step))
+            return new KInductionResult(KInductionStatus.Unsupported, 0, invariantExpression, duration: sw.Elapsed);
 
         // Extract loop context
         var context = ExtractLoopContext(loop);
@@ -157,6 +160,10 @@ public sealed class KInductionProver : IDisposable
         BoundFunction function)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
+        // #1413 (S2 R-NUM, amendment 1.3.1): bounds are modeled as 32-bit, so a literal outside
+        // int32 anywhere in the condition or the body makes the whole loop Unsupported.
+        if (HasUnrepresentableLiteral(loop.Condition) || loop.Body.Any(HasUnrepresentableLiteral))
+            return new KInductionResult(KInductionStatus.Unsupported, 0, invariantExpression, duration: sw.Elapsed);
 
         for (var k = 1; k <= _options.MaxK; k++)
         {
@@ -575,6 +582,11 @@ public sealed class KInductionProver : IDisposable
 
         return null;
     }
+
+    private static bool HasUnrepresentableLiteral(BoundNode node)
+        => node is BoundIntLiteral literal && !(literal.IsUnsigned ? literal.UnsignedValue <= int.MaxValue
+               : literal.Value is >= int.MinValue and <= int.MaxValue)
+           || node.ChildNodes.Any(HasUnrepresentableLiteral);
 
     private static long? GetIntValue(BoundExpression expr)
     {

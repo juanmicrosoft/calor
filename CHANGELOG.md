@@ -30,13 +30,17 @@ All notable changes to this project will be documented in this file.
     `docs/verification-modeled-forms.md`. Comparisons on narrow values are still modeled.
   - An `INT:` literal outside the 32-bit range, such as `INT:3000000000`, is `Unsupported`
     (divergence D2). Spell it `LONG:` to have it modeled. The verifier keeps the refusal even
-    when simplification would fold the literal away. Loop proofs by k-induction (`for` and
-    `while`) refuse a bound or step outside the 32-bit range instead of truncating or replacing it.
+    when simplification would fold the literal away. A k-induction loop proof (an inductive
+    proof of a loop invariant) is `Unsupported` for the whole loop when a `for` bound or step,
+    or any literal in a `while` condition or body, is outside the 32-bit range.
   - In a checked module, a postcondition (`§S`) whose arithmetic can overflow for some value of
     its operand types is now `Assumed` with the `checked-arithmetic` assumption. This holds even
     when the preconditions rule the overflow out. Before, such postconditions were `Proven`,
     and their runtime checks were removed; the checks are now kept. Arithmetic that cannot
-    overflow for any input, such as an `i32` plus `LONG:1`, is still `Proven`. Proof
+    overflow for any input, such as an `i32` plus `LONG:1`, is still `Proven`. When the operand
+    types alone show the result fits, such as `i32` times `u32` computed in 64 bits, the verifier
+    decides without the solver. If the solver cannot decide either way, the postcondition is
+    `Unsupported`, so the verdict no longer depends on the platform or on solver time. Proof
     obligations, preconditions, and interface checks are unchanged: the registered row covers
     postconditions only.
 
