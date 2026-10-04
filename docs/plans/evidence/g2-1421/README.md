@@ -252,12 +252,17 @@ defects are in the execution machinery; neither is a verifier finding.
    inside the uploaded output directory. `actions/upload-artifact` rejects such a path and then
    uploads nothing, so no record of those jobs exists. The 1.1.0 machinery already did this; no
    execution had run before. Repair: `run-job` removes each isolated home after recording its
-   `.calor` state; `fill-missing` removes any home an interrupted invocation left and fails if a
-   path the upload rejects remains; the home probe builds beside the output directory. New control:
-   `test_nothing_upload_artifact_rejects_is_left_for_the_upload`.
-2. **Windows ran out of job time.** Setup takes about 6 minutes and an attempt about 3.1 (median
-   156 s `verification-full`, 29 s `oracle-isolated`), more than the 45 minutes the harness allows
-   under a 50-minute timeout. The cut invocations recorded `Timeout` values. Repair: win-x64 and
+   `.calor` state; `fill-missing` removes any home an interrupted invocation left, then removes
+   every remaining path whose name the upload rejects (no record name can contain such a character;
+   the list goes to `upload-pruned.txt`) and fails only if one cannot be removed; the home probe
+   builds beside the output directory. New control, with an injected removal failure that leaves
+   the records intact: `test_nothing_upload_artifact_rejects_is_left_for_the_upload`. Residual: the
+   workflow still uploads the whole output directory as one artifact (main's validator fixes its
+   structure, `D013`), so a removal that fails would still lose that job's records.
+2. **Windows ran out of job time.** Setup took 1.2 to 3.0 minutes and an attempt about 3.1 (median
+   156 s `verification-full`, 29 s `oracle-isolated`); 15 attempts did not fit in the 45 minutes the
+   harness allows under a 50-minute timeout. The cut invocations recorded `Timeout` for the cases
+   they had not observed. Repair: win-x64 and
    win-arm64 `jobTimeoutMinutes` 75; `maxDispatchedControlRuns` 0 (none was ever dispatched) keeps
    the worst case at 1,965.
 3. **Known inconsistency, unchanged.** The stopping rule says a job that ends early makes an

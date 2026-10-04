@@ -789,9 +789,22 @@ class AttemptRunnerControls(unittest.TestCase):
                 bad.write_text("x", encoding="utf-8")
             except OSError:
                 continue
-            self.assertEqual([f"raw/{name}" if os.sep == "/" else f"raw\\{name}"], dr.upload_problems(self.out), name)
+            rel = f"raw/{name}" if os.sep == "/" else f"raw\\{name}"
+            self.assertEqual([rel], dr.upload_problems(self.out), name)
+            self.assertEqual(0, dr.fill_missing(PROTOCOL, env_id="linux-x64", job=1, mode="control", execution_id="C1", out=self.out, base=self.base))
+            self.assertFalse(bad.exists(), name)  # scratch with a rejected name is pruned, and the prune is listed
+            self.assertIn(repr(rel), (self.out / "upload-pruned.txt").read_text(encoding="utf-8"))
+        records = [p.read_bytes() for p in sorted(self.out.glob("attempt-*.json"))]
+        stuck = self.out / "raw" / "a:b"
+        stuck.write_text("x", encoding="utf-8")
+        real_unlink = Path.unlink
+        Path.unlink = lambda self, *a, **k: (_ for _ in ()).throw(OSError("locked"))  # a removal that fails
+        try:
             self.assertEqual(1, dr.fill_missing(PROTOCOL, env_id="linux-x64", job=1, mode="control", execution_id="C1", out=self.out, base=self.base))
-            bad.unlink()
+        finally:
+            Path.unlink = real_unlink
+        self.assertEqual(records, [p.read_bytes() for p in sorted(self.out.glob("attempt-*.json"))])  # records untouched
+        stuck.unlink()
         self.assertEqual([], dr.upload_problems(self.out))
 
 if __name__ == "__main__":

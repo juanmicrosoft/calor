@@ -41,12 +41,16 @@ per-invocation directories stay in the run's Actions artifacts (90 days) and are
    rejection uploads nothing, so the decider filled 90 attempts as missing. The 1.1.0 machinery
    already did this (reproduced locally with main's runner before #1492); no execution had run
    before.
-2. **Windows ran out of job time.** Each Windows job needed about 6 minutes of setup plus about
-   3.1 minutes per attempt, more than the 45 minutes the harness allows under a 50-minute
-   timeout. One to three late attempts per job were cut or not started. A cut invocation records
-   `Timeout` for its unobserved cases, and the decider compares invalid attempts, so every case
-   those invocations covered became `DISAGREE`. **All 1,580 `DISAGREE` cases come from these
-   harness-generated `Timeout` and `Missing` values.**
+2. **Windows ran out of job time.** Each Windows job spent 1.2 to 3.0 minutes before its first
+   attempt, then about 3.1 minutes per attempt (median 156 s `verification-full` plus 29 s
+   `oracle-isolated`; up to 201 s and 43 s). Fifteen attempts did not fit in the 45 minutes the
+   harness allows under a 50-minute timeout. One to three late attempts per job were cut or not
+   started. A cut invocation keeps what it observed (all four cut `verification-full` invocations
+   kept the passing translator-fixture value, and three kept passing cells and report hashes) and
+   records `Timeout` for the rest, and the decider compares invalid attempts. **All 1,580
+   `DISAGREE` cases come from those harness-generated `Timeout` and `Missing` values differing
+   from the retained observations**; `artifact:translator-fixture` is `INCOMPLETE`, not
+   `DISAGREE`.
 
 ### What Windows observed (not established; recorded)
 

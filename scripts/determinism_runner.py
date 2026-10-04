@@ -575,6 +575,18 @@ def fill_missing(protocol, *, env_id, job, mode, execution_id, out: Path, base) 
     # upload a path it would reject (that rejection loses the whole job's records).
     for home in out.glob("raw/a*/*/home"):
         shutil.rmtree(home, ignore_errors=True)
+    # No record name can hold such a character (attempt-*.json, env.json, <profile>.trx, cells.json, generated reports),
+    # so whatever still does is scratch: remove it, deepest first, and keep the list as a diagnostic.
+    pruned = []
+    for rel in sorted(upload_problems(out), key=len, reverse=True):
+        path = out / rel
+        try:
+            shutil.rmtree(path) if path.is_dir() and not path.is_symlink() else path.unlink()
+            pruned.append(rel)
+        except OSError as error:
+            print(f"could not remove {rel}: {error}")
+    if pruned:
+        (out / "upload-pruned.txt").write_text("".join(f"{p!r}\n" for p in pruned), encoding="utf-8")
     rejected = upload_problems(out)
     if rejected:
         print("paths upload-artifact rejects remain under the output directory:\n" + "\n".join(rejected[:20]))
