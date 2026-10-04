@@ -22,49 +22,56 @@
       "docs/plans/evidence/s1-1311/combined-row-status.json": "d8c7ad549f06f35c6a2d04950f9c291bde2261dd7c8e42c11ad137f671f9d93d"
     }
   },
+  "requiredDiscoveries": [
+    1493
+  ],
   "closure": {
     "status": "OPEN",
-    "note": "OPEN until every repair is merged (status \"merged\" with its merge commit) and R-NUM is decided. The validator rejects a CLOSED record with any unmerged or undecided repair."
+    "result": null,
+    "note": "OPEN until every repair is merged (status \"merged\" with its merge commit on main and its regression witnesses present) and R-NUM is decided. At closure, result is SUCCESS (no MILESTONE-FAILED anywhere) or MILESTONE-FAILED (required if any finding or discovery is MILESTONE-FAILED); only SUCCESS satisfies terminal predicates 4-5."
   },
   "capacity": {
     "ceiling": "s2-repairs",
     "maxRepairs": 6,
     "maxNonTestChangedLinesPerRepair": 600,
     "used": 6,
-    "note": "Six repairs counting the undecided R-NUM; no capacity remains for further repairs."
+    "openedRepairPRs": 5,
+    "reservedSlots": 1,
+    "note": "Five repair PRs are open and one slot is reserved for R-NUM (no PR, no acceptance decision). nonTestChangedLines excludes committed review records."
   },
   "repairs": [
     {
       "id": "R-CACHE",
-      "kind": "FIX-IN-0.24",
       "pr": 1494,
       "branch": "milestone-0.24/s2-1413-fix-cache-literal-width",
       "rootCause": "ContractHasher keyed an integer literal by value only, so x + INT:1 and x + LONG:1 shared a verification-cache entry; a warm cache served the LONG text's Proven to the INT text (false proof, guard elided) and the INT text's Refuted to the LONG text.",
       "change": "Literal keys carry width/signedness/base/sign/magnitude (and real-literal kind); output types are length-prefixed; inferred binding types hash distinctly; keys hash raw UTF-16 code units; cache format 1.20.",
-      "nonTestChangedLines": 176,
+      "nonTestChangedLines": 59,
       "regressionWitness": [
         "tests/Calor.Compiler.Tests/S2CacheLiteralWidthTests.cs"
       ],
       "rows": [
         "CACHE-LITERAL-WIDTH"
       ],
+      "reviews": "docs/plans/evidence/s2-1413/reviews/fix-cache-literal-width/",
       "status": "open",
       "mergeCommit": null,
       "discoveries": [],
+      "dependsOn": [],
       "owner": "Claude Code agent (S2 #1413 session); agents never merge",
       "reviewer": "@juanmicrosoft (review and merge), Codex adversarial review recorded per PR",
       "blocks": [
         1423
-      ]
+      ],
+      "kind": "FIX-IN-0.24"
     },
     {
       "id": "R-IMPL",
-      "kind": "DEMOTE-IN-0.24",
       "pr": 1495,
       "branch": "milestone-0.24/s2-1413-fix-implication-definedness",
-      "rootCause": "Z3ImplicationProver decided interface->implementer precondition implication over total solver terms (non-null strings, bvsrem defined at 0) and reported Calor0815 \"proven\" for implementer preconditions that throw or are false on interface-accepted inputs.",
-      "change": "An implication is proven only when the antecedent entails the consequent's divisor and checked-overflow side conditions and no string/array/user-type sort is touched; otherwise Assumed, reported as the new warning Calor0819 with no heuristic fallback and no Calor0814 \"valid\"; conditional-position divisors are Unsupported.",
-      "nonTestChangedLines": 213,
+      "rootCause": "Z3ImplicationProver decided interface/implementer contract implications over total solver terms (non-null strings, bvsrem defined at 0) and reported Calor0815 \"proven\" for implementer preconditions that throw or are false on interface-accepted inputs. No guard is elided on this channel; the false claim is the LSP acceptance.",
+      "change": "The prover decides A and D(A) and not (D(C) and C) with D = divisor and checked-overflow definedness: a contract that throws on an accepted input is a genuine LSP refutation with that input; a model that may rely on a throwing contract is Unsupported; any string/array/user-type sort makes a proof Assumed (new warning Calor0819); the syntactic heuristic never yields Calor0814 \"valid\" after the solver declined.",
+      "nonTestChangedLines": 301,
       "regressionWitness": [
         "tests/Calor.Compiler.Tests/S2ImplicationDefinednessTests.cs",
         "tests/Calor.Verification.Tests/S2ImplicationProverDefinednessTests.cs"
@@ -73,23 +80,25 @@
         "IMPL-ASSUMPTION-FORMS",
         "IMPL-DIVISION-TOTALIZED"
       ],
+      "reviews": "docs/plans/evidence/s2-1413/reviews/fix-implication-definedness/",
       "status": "open",
       "mergeCommit": null,
       "discoveries": [],
+      "dependsOn": [],
       "owner": "Claude Code agent (S2 #1413 session); agents never merge",
       "reviewer": "@juanmicrosoft (review and merge), Codex adversarial review recorded per PR",
       "blocks": [
         1423
-      ]
+      ],
+      "kind": "DEMOTE-IN-0.24"
     },
     {
       "id": "R-OBL",
-      "kind": "FIX-IN-0.24",
       "pr": 1496,
       "branch": "milestone-0.24/s2-1413-fix-obligation-state",
       "rootCause": "ObligationSolver asserted preconditions for every obligation even after the body reassigned their variables (false Discharged, guard elided), and reported SAT models as counterexamples although its state over-approximated the program state (reassignments, else bodies without negated guards, unbound refined return values, unassumed named-refinement parameters).",
-      "change": "Entry facts are dropped when the body may rebind a name they read (incl. ref/out arguments, raw C#); a SAT model is a refutation only when the state is exact, otherwise Unsupported (guard kept); else/elseif negation facts and named-refinement parameter facts are added.",
-      "nonTestChangedLines": 416,
+      "change": "Entry facts are dropped when the body may write a name they read (incl. ref/out/in aliasing, element/field stores, collection updates); raw C#, unsafe/pointer code, and lambdas make a body opaque; a SAT model is a refutation only when the state is exact, otherwise Unsupported (guard kept); else/elseif negation facts and named-refinement parameter facts (functions, methods, constructors, operators) are added.",
+      "nonTestChangedLines": 571,
       "regressionWitness": [
         "tests/Calor.Compiler.Tests/S2ObligationStateTests.cs"
       ],
@@ -100,23 +109,25 @@
         "OBL-SUBTYPE",
         "OBL-SELFREF"
       ],
+      "reviews": "docs/plans/evidence/s2-1413/reviews/fix-obligation-state/",
       "status": "open",
       "mergeCommit": null,
       "discoveries": [],
+      "dependsOn": [],
       "owner": "Claude Code agent (S2 #1413 session); agents never merge",
       "reviewer": "@juanmicrosoft (review and merge), Codex adversarial review recorded per PR",
       "blocks": [
         1423
-      ]
+      ],
+      "kind": "DEMOTE-IN-0.24"
     },
     {
       "id": "R-TEXT",
-      "kind": "FIX-IN-0.24",
       "pr": 1497,
       "branch": "milestone-0.24/s2-1413-fix-z3-text-encoding",
-      "rootCause": "String literals reached Z3 per UTF-8 byte (\"é\" has length 2), Substring/IndexOf-with-start were total in the solver, and (discovery #1493) Z3 symbol names took ANSI marshaling, so non-ASCII identifiers could collapse into one constant on Windows.",
-      "change": "Literals are escaped per UTF-16 code unit (and the backslash); indexed string operations carry range side conditions; every symbol is named through the injective ASCII encoding ContractTranslator.Z3Name; cache format 1.21.",
-      "nonTestChangedLines": 181,
+      "rootCause": "String literals reached Z3 per UTF-8 byte (\"é\" has length 2), Substring was total in the solver, and (discovery #1493) Z3 symbol names took ANSI marshaling, so non-ASCII identifiers could collapse into one constant on Windows.",
+      "change": "Literals are escaped per UTF-16 code unit (and the backslash); Substring carries range side conditions; IndexOf with a start index is refused (the emitter drops the start); every symbol is named through the injective ASCII encoding ContractTranslator.Z3Name; \"$\" names are reserved; cache format 1.21. Must merge after #1495 (implication-channel string demotion).",
+      "nonTestChangedLines": 199,
       "regressionWitness": [
         "tests/Calor.Verification.Tests/S2Z3TextEncodingTests.cs"
       ],
@@ -127,51 +138,58 @@
       "discoveries": [
         "D-1493"
       ],
+      "dependsOn": [
+        1495
+      ],
+      "reviews": "docs/plans/evidence/s2-1413/reviews/fix-z3-text-encoding/",
       "status": "open",
       "mergeCommit": null,
       "owner": "Claude Code agent (S2 #1413 session); agents never merge",
       "reviewer": "@juanmicrosoft (review and merge), Codex adversarial review recorded per PR",
       "blocks": [
         1423
-      ]
+      ],
+      "kind": "FIX-IN-0.24"
     },
     {
       "id": "R-QNT",
-      "kind": "DEMOTE-IN-0.24",
       "pr": 1498,
       "branch": "milestone-0.24/s2-1413-fix-nested-quantifier-claim",
-      "rootCause": "The verifier reported Proven for a nested bounded forall that the emitter cannot lower (Calor0326); the registered row requires refusal.",
-      "change": "Contract verifier, obligation solver, and implication prover return Unsupported for a quantifier nested in another; such cache keys are never stored or served.",
-      "nonTestChangedLines": 92,
+      "rootCause": "The verifier reported Proven for a nested bounded forall whose runtime lowering the emitter rejects (Calor0326); the registered row requires refusal.",
+      "change": "Contract verifier, obligation solver (condition and assumptions), implication prover, and guard validation refuse a quantifier nested in another (Unsupported); such cache keys are never stored or served; k-induction no longer drops unparsable invariant conjuncts.",
+      "nonTestChangedLines": 112,
       "regressionWitness": [
-        "tests/Calor.Verification.Tests/S2NestedQuantifierTests.cs"
+        "tests/Calor.Verification.Tests/S2NestedQuantifierTests.cs",
+        "tests/Calor.Compiler.Tests/S2NestedQuantifierChannelTests.cs"
       ],
       "rows": [
         "QNT-NESTED"
       ],
+      "reviews": "docs/plans/evidence/s2-1413/reviews/fix-nested-quantifier-claim/",
       "status": "open",
       "mergeCommit": null,
       "discoveries": [],
+      "dependsOn": [],
       "owner": "Claude Code agent (S2 #1413 session); agents never merge",
       "reviewer": "@juanmicrosoft (review and merge), Codex adversarial review recorded per PR",
       "blocks": [
         1423
-      ]
+      ],
+      "kind": "DEMOTE-IN-0.24"
     },
     {
       "id": "R-NUM",
-      "kind": "DEMOTE-IN-0.24",
       "pr": null,
       "branch": null,
       "status": "decision-required",
       "rootCause": "The registration classifies NUM-NARROW-ARITH and NUM-LITERAL-OVERSIZE as unsupported-refused (divergences D1/D2 of the frozen docs/verification-modeled-forms.md say \"refused\") and NUM-OVERFLOW-CHECKED as assumed, but the verifier deliberately models C# narrow promotion (W1 Slice 1), types INT: literals as C# does (#774), and proves checked-arithmetic contracts whose overflow the preconditions rule out. Each Proven agrees with the oracle; none is a false proof.",
-      "change": "Not opened. A draft that implements the registered refusals (narrow arithmetic and INT:-inferred 64-bit literals Unsupported, checked-arithmetic postconditions Assumed whenever overflow is possible for some input) is 77 non-test lines but breaks 19 existing tests that pin the deliberate semantics (W1Slice1SoundnessTests narrow promotion x3, NumericExecutableSemanticsTests x2, OverflowSoundnessBenchmark *_Bounded_MustBeProven x7, VerifierTests bounded proofs x3, ProductionOverflowRuntimeTests guarded arithmetic x3) and changes the committed #1135 differential oracle reports (VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle). That reverses accepted verifier semantics and invalidates a G3 artifact, so it needs a maintainer decision.",
+      "change": "Not opened. A draft implementing the registered refusals (docs/plans/evidence/s2-1413/r-num-draft.patch, against main 0142438f: 77 added and 4 removed non-test lines) breaks 19 existing tests that pin the deliberate semantics: Calor.Verification.Tests NumericExecutableSemanticsTests.{UnaryNegationMatchesExecutableCSharpSemantics, IntegralOperatorsMatchExecutableCSharpSemantics}; OverflowSoundnessBenchmark.{Addition_TwoVariables_Bounded, Subtraction_Bounded, Negation_Bounded, Multiplication_Bounded, Square_Bounded, Addition_Bounded}_MustBeProven and RunFullBenchmark; W1Slice1SoundnessTests.{NarrowUnsignedArithmetic_PromotesToSignedInt, NarrowIntNegation_UsesCSharpPromotion, NarrowIntArithmetic_UsesCSharpPromotion}; VerifierTests.{ProvesSquareNonNegative, ProvesSubtractionWithBounds, ProvesBoundedOverflow}; VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle (the committed #1135 differential reports); and Calor.Compiler.Tests ProductionOverflowRuntimeTests.GuardedArithmetic_ProvesWithoutEvaluatingUnselectedOverflow (3 rows). That reverses accepted verifier semantics and changes a G3 artifact, so it needs a maintainer decision.",
       "decisionOptions": [
-        "Accept the demotion: open R-NUM (the sixth and last repair PR within the s2-repairs ceiling), update the 19 tests, and regenerate the #1135 differential reports under G3.",
-        "Amend the contract (versioned, after decision-bearing inspection) to reclassify the three rows to the semantics the verifier deliberately implements; the 5 findings would then need re-dispositioning under the amended table.",
-        "Record MILESTONE-FAILED for the 5 findings (terminal success predicate 5 then fails)."
+        "Accept the demotion: open R-NUM as the sixth and last repair PR within the s2-repairs ceiling (the slot is reserved, not yet accepted), update the 19 tests, and regenerate the #1135 differential reports under G3.",
+        "Amend, after decision-bearing inspection and recorded as such: the contract (§8/§9 as needed) and the frozen #1419 registration classifications/classification table for the three rows, keeping the S1 findings and their last statuses on record; the 5 findings would then be re-dispositioned under the amended table.",
+        "Record MILESTONE-FAILED for the 5 findings per baseline (terminal success predicate 5 then fails)."
       ],
-      "nonTestChangedLines": 77,
+      "nonTestChangedLines": 81,
       "regressionWitness": [],
       "rows": [
         "NUM-NARROW-ARITH",
@@ -180,11 +198,13 @@
       ],
       "mergeCommit": null,
       "discoveries": [],
+      "dependsOn": [],
       "owner": "Claude Code agent (S2 #1413 session); agents never merge",
       "reviewer": "@juanmicrosoft (review and merge), Codex adversarial review recorded per PR",
       "blocks": [
         1423
-      ]
+      ],
+      "kind": "DEMOTE-IN-0.24"
     }
   ],
   "baselines": {
@@ -248,7 +268,7 @@
           "token": "Proven",
           "disposition": "DEMOTE-IN-0.24",
           "repair": "R-QNT",
-          "reason": "Required demotion absent: Proven for a nested bounded forall (oracle holds) on a row registered unsupported-refused. Demoted: nested quantifiers are refused (Unsupported) on every channel and never served from cache."
+          "reason": "Required demotion absent: Proven for a nested bounded forall (oracle holds) on a row registered unsupported-refused. Demoted: nested quantifiers are refused (Unsupported) on every verifier channel and never served from cache."
         },
         {
           "findingId": "F-B1-007",
@@ -258,7 +278,7 @@
           "token": "Proven",
           "disposition": "DEMOTE-IN-0.24",
           "repair": "R-QNT",
-          "reason": "Required demotion absent: Proven for a nested bounded forall (oracle holds) on a row registered unsupported-refused. Demoted: nested quantifiers are refused (Unsupported) on every channel and never served from cache."
+          "reason": "Required demotion absent: Proven for a nested bounded forall (oracle holds) on a row registered unsupported-refused. Demoted: nested quantifiers are refused (Unsupported) on every verifier channel and never served from cache."
         },
         {
           "findingId": "F-B1-008",
@@ -268,7 +288,7 @@
           "token": "Proven",
           "disposition": "DEMOTE-IN-0.24",
           "repair": "R-QNT",
-          "reason": "Required demotion absent: Proven for a nested bounded forall (oracle holds) on a row registered unsupported-refused. Demoted: nested quantifiers are refused (Unsupported) on every channel and never served from cache."
+          "reason": "Required demotion absent: Proven for a nested bounded forall (oracle holds) on a row registered unsupported-refused. Demoted: nested quantifiers are refused (Unsupported) on every verifier channel and never served from cache."
         },
         {
           "findingId": "F-B1-009",
@@ -288,7 +308,7 @@
           "token": "Failed",
           "disposition": "FIX-IN-0.24",
           "repair": "R-TEXT",
-          "reason": "Spurious refutation: \"é\" had length 2 in the solver (UTF-8 bytes) and 1 in .NET. Fixed: literals are sent per UTF-16 code unit; the postcondition is Assumed (string model) as the assumed row requires, with no refutation (oracle: holds)."
+          "reason": "Spurious refutation: \"é\" had length 2 in the solver (UTF-8 bytes) and 1 in .NET. Fixed: literals are sent per UTF-16 code unit; no refutation remains, and the postcondition stays Assumed under the existing string-model limitation, as the assumed row requires (oracle: holds)."
         },
         {
           "findingId": "F-B1-011",
@@ -298,7 +318,7 @@
           "token": "Failed",
           "disposition": "FIX-IN-0.24",
           "repair": "R-TEXT",
-          "reason": "Spurious refutation: \"é\" had length 2 in the solver (UTF-8 bytes) and 1 in .NET. Fixed: literals are sent per UTF-16 code unit; the postcondition is Assumed (string model) as the assumed row requires, with no refutation (oracle: holds)."
+          "reason": "Spurious refutation: \"é\" had length 2 in the solver (UTF-8 bytes) and 1 in .NET. Fixed: literals are sent per UTF-16 code unit; no refutation remains, and the postcondition stays Assumed under the existing string-model limitation, as the assumed row requires (oracle: holds)."
         },
         {
           "findingId": "F-B1-012",
@@ -326,9 +346,9 @@
           "caseId": "R1-OBL-MUTATION-KILL-001",
           "class": "false-unconditional-proof",
           "token": "Discharged",
-          "disposition": "FIX-IN-0.24",
+          "disposition": "DEMOTE-IN-0.24",
           "repair": "R-OBL",
-          "reason": "False unconditional proof: a §Q fact on x survived §ASSIGN x and discharged §PROOF on the new value (guard elided). Fixed: entry facts are dropped when the body rebinds their names; the obligation is no longer discharged (Unsupported, guard kept), which agrees with the oracle (violated)."
+          "reason": "False unconditional proof: a §Q fact on x survived §ASSIGN x and discharged §PROOF on the new value (guard elided). The stale fact is no longer used, and the obligation visibly becomes Unsupported (Calor1124, guard kept); the oracle says violated, and no claim is made."
         },
         {
           "findingId": "F-B1-015",
@@ -336,9 +356,9 @@
           "caseId": "R1-OBL-MUTATION-KILL-003",
           "class": "false-unconditional-proof",
           "token": "Discharged",
-          "disposition": "FIX-IN-0.24",
+          "disposition": "DEMOTE-IN-0.24",
           "repair": "R-OBL",
-          "reason": "False unconditional proof: a §Q fact on x survived §ASSIGN x and discharged §PROOF on the new value (guard elided). Fixed: entry facts are dropped when the body rebinds their names; the obligation is no longer discharged (Unsupported, guard kept), which agrees with the oracle (violated)."
+          "reason": "False unconditional proof: a §Q fact on x survived §ASSIGN x and discharged §PROOF on the new value (guard elided). The stale fact is no longer used, and the obligation visibly becomes Unsupported (Calor1124, guard kept); the oracle says violated, and no claim is made."
         },
         {
           "findingId": "F-B1-016",
@@ -348,7 +368,7 @@
           "token": "Failed",
           "disposition": "DEMOTE-IN-0.24",
           "repair": "R-OBL",
-          "reason": "Spurious refutation: the model ignored the reassignment inside the guarded body. Demoted: an obligation that reads a reassigned variable gets no counterexample claim; its outcome is Unsupported (Calor1124, guard kept) instead of a Failed compile error."
+          "reason": "Spurious refutation: the model ignored the reassignment inside the guarded body. Demoted: an obligation that reads a reassigned variable gets no counterexample claim; it is Unsupported (Calor1124, guard kept) instead of a Failed compile error."
         },
         {
           "findingId": "F-B1-017",
@@ -358,7 +378,7 @@
           "token": "Failed",
           "disposition": "DEMOTE-IN-0.24",
           "repair": "R-OBL",
-          "reason": "Spurious refutation: the model ignored the reassignment inside the guarded body. Demoted: an obligation that reads a reassigned variable gets no counterexample claim; its outcome is Unsupported (Calor1124, guard kept) instead of a Failed compile error."
+          "reason": "Spurious refutation: the model ignored the reassignment inside the guarded body. Demoted: an obligation that reads a reassigned variable gets no counterexample claim; it is Unsupported (Calor1124, guard kept) instead of a Failed compile error."
         },
         {
           "findingId": "F-B1-018",
@@ -368,7 +388,7 @@
           "token": "Failed",
           "disposition": "DEMOTE-IN-0.24",
           "repair": "R-OBL",
-          "reason": "Spurious refutation: the model ignored the reassignment inside the guarded body. Demoted: an obligation that reads a reassigned variable gets no counterexample claim; its outcome is Unsupported (Calor1124, guard kept) instead of a Failed compile error."
+          "reason": "Spurious refutation: the model ignored the reassignment inside the guarded body. Demoted: an obligation that reads a reassigned variable gets no counterexample claim; it is Unsupported (Calor1124, guard kept) instead of a Failed compile error."
         },
         {
           "findingId": "F-B1-019",
@@ -378,7 +398,7 @@
           "token": "Failed",
           "disposition": "DEMOTE-IN-0.24",
           "repair": "R-OBL",
-          "reason": "Spurious refutation: the model ignored the reassignment inside the guarded body. Demoted: an obligation that reads a reassigned variable gets no counterexample claim; its outcome is Unsupported (Calor1124, guard kept) instead of a Failed compile error."
+          "reason": "Spurious refutation: the model ignored the reassignment inside the guarded body. Demoted: an obligation that reads a reassigned variable gets no counterexample claim; it is Unsupported (Calor1124, guard kept) instead of a Failed compile error."
         },
         {
           "findingId": "F-B1-020",
@@ -406,9 +426,9 @@
           "caseId": "R1-OBL-SELFREF-001",
           "class": "spurious-refutation",
           "token": "Failed",
-          "disposition": "FIX-IN-0.24",
+          "disposition": "DEMOTE-IN-0.24",
           "repair": "R-OBL",
-          "reason": "Spurious refutation: the model violated the parameter's self-referential named refinement. Fixed: the refinement is an entry fact; no refutation remains (Discharged, Assumed for checked arithmetic, or Unsupported when no overflow-free state exists)."
+          "reason": "Spurious refutation (SELFREF-001): the model violated the parameter's named refinement. With the refinement as an entry fact there is no refutation; the obligation is Assumed (checked-arithmetic: the predicate's subtraction can overflow), guard kept."
         },
         {
           "findingId": "F-B1-023",
@@ -418,7 +438,7 @@
           "token": "Failed",
           "disposition": "FIX-IN-0.24",
           "repair": "R-OBL",
-          "reason": "Spurious refutation: the model violated the parameter's self-referential named refinement. Fixed: the refinement is an entry fact; no refutation remains (Discharged, Assumed for checked arithmetic, or Unsupported when no overflow-free state exists)."
+          "reason": "Spurious refutation (SELFREF-002). Fixed: with the named refinement as an entry fact the obligation is Discharged (oracle: holds)."
         },
         {
           "findingId": "F-B1-024",
@@ -426,9 +446,9 @@
           "caseId": "R1-OBL-SELFREF-003",
           "class": "spurious-refutation",
           "token": "Failed",
-          "disposition": "FIX-IN-0.24",
+          "disposition": "DEMOTE-IN-0.24",
           "repair": "R-OBL",
-          "reason": "Spurious refutation: the model violated the parameter's self-referential named refinement. Fixed: the refinement is an entry fact; no refutation remains (Discharged, Assumed for checked arithmetic, or Unsupported when no overflow-free state exists)."
+          "reason": "Spurious refutation (SELFREF-003). With the refinement as an entry fact there is no refutation; the obligation is Assumed (checked-arithmetic), guard kept."
         },
         {
           "findingId": "F-B1-025",
@@ -438,7 +458,7 @@
           "token": "Failed",
           "disposition": "FIX-IN-0.24",
           "repair": "R-OBL",
-          "reason": "Spurious refutation: the model violated the parameter's self-referential named refinement. Fixed: the refinement is an entry fact; no refutation remains (Discharged, Assumed for checked arithmetic, or Unsupported when no overflow-free state exists)."
+          "reason": "Spurious refutation (SELFREF-004). Fixed: with the named refinement as an entry fact the obligation is Discharged (oracle: holds)."
         },
         {
           "findingId": "F-B1-026",
@@ -446,9 +466,9 @@
           "caseId": "R1-OBL-SELFREF-005",
           "class": "spurious-refutation",
           "token": "Failed",
-          "disposition": "FIX-IN-0.24",
+          "disposition": "DEMOTE-IN-0.24",
           "repair": "R-OBL",
-          "reason": "Spurious refutation: the model violated the parameter's self-referential named refinement. Fixed: the refinement is an entry fact; no refutation remains (Discharged, Assumed for checked arithmetic, or Unsupported when no overflow-free state exists)."
+          "reason": "Spurious refutation (SELFREF-005, oracle vacuous-in-domain: no input reaches the binding). No refutation remains; the obligation is Unsupported (\"no overflow-free state satisfies the assumptions\"), guard kept. This withdraws the claim; it does not prove the property."
         },
         {
           "findingId": "F-B1-027",
@@ -458,7 +478,7 @@
           "token": "Proven",
           "disposition": "DEMOTE-IN-0.24",
           "repair": "R-IMPL",
-          "reason": "False unconditional proof: Calor0815 \"precondition weakening proven\" for (>= (len s) 0), which throws at s = null on an interface-accepted input. Demoted: the implication is Assumed (string-model), reported as Calor0819; no proof and no \"inheritance valid\" claim."
+          "reason": "False unconditional proof: Calor0815 for (>= (len s) 0), which throws at s = null on an interface-accepted input (no guard elided; the false claim is the LSP acceptance). Demoted: null strings cannot be modeled, so the implication is Assumed (string-model), Calor0819; no \"proven\" and no \"inheritance valid\"."
         },
         {
           "findingId": "F-B1-028",
@@ -478,7 +498,7 @@
           "token": "Proven",
           "disposition": "DEMOTE-IN-0.24",
           "repair": "R-IMPL",
-          "reason": "False unconditional proof: Calor0815 \"precondition weakening proven\" for (>= (len s) 0), which throws at s = null on an interface-accepted input. Demoted: the implication is Assumed (string-model), reported as Calor0819; no proof and no \"inheritance valid\" claim."
+          "reason": "False unconditional proof: Calor0815 for (>= (len s) 0), which throws at s = null on an interface-accepted input (no guard elided; the false claim is the LSP acceptance). Demoted: null strings cannot be modeled, so the implication is Assumed (string-model), Calor0819; no \"proven\" and no \"inheritance valid\"."
         },
         {
           "findingId": "F-B1-030",
@@ -486,9 +506,9 @@
           "caseId": "R1-IMPL-DIVISION-TOTALIZED-001",
           "class": "false-unconditional-proof",
           "token": "Proven",
-          "disposition": "DEMOTE-IN-0.24",
+          "disposition": "FIX-IN-0.24",
           "repair": "R-IMPL",
-          "reason": "False unconditional proof: Calor0815 for (> (% x y) -2), which throws at y = 0. Demoted: the divisor side condition is not entailed by the interface precondition, so the implication is Assumed (contract-division), Calor0819."
+          "reason": "False unconditional proof: Calor0815 for (> (% x y) -2), which throws at y = 0. Fixed: the implication is decided with explicit definedness and is refuted with the oracle's own witness (x = 3, y = 0) as a Calor0810 LSP error."
         },
         {
           "findingId": "F-B1-031",
@@ -498,7 +518,7 @@
           "token": "Proven",
           "disposition": "FIX-IN-0.24",
           "repair": "R-CACHE",
-          "reason": "False unconditional proof (warm cache served the LONG:1 Proven to the INT:1 text). Fixed: the key distinguishes literal width; the warm verdict now equals the cold Refuted, which the oracle confirms (int.MaxValue + 1 wraps)."
+          "reason": "False unconditional proof (a warm cache served the LONG:1 Proven to the INT:1 text). Fixed: the key distinguishes literal width; the warm verdict equals the cold Refuted, which the oracle confirms (int.MaxValue + 1 wraps)."
         },
         {
           "findingId": "F-B1-032",
@@ -518,7 +538,7 @@
           "token": "Failed",
           "disposition": "FIX-IN-0.24",
           "repair": "R-CACHE",
-          "reason": "Spurious refutation: the warm cache served the INT:1 Refuted to the LONG:1 text, which holds. Fixed: the warm verdict now equals the cold Proven."
+          "reason": "Spurious refutation: the warm cache served the INT:1 Refuted to the LONG:1 text, which holds. Fixed: the warm verdict equals the cold Proven."
         },
         {
           "findingId": "F-B1-034",
@@ -537,88 +557,88 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 3,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 3 validated-proof case(s)."
         },
         {
           "rowId": "NUM-ARITH-SUB",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 2,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 2 validated-proof case(s)."
         },
         {
           "rowId": "NUM-ARITH-MUL",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 2,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 2 validated-proof case(s)."
         },
         {
           "rowId": "NUM-DIVMOD-LITERAL",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 4,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 4 validated-proof case(s)."
         },
         {
           "rowId": "NUM-DIVMOD-VAR-ENTAILED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 2,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 2 validated-proof case(s)."
         },
         {
           "rowId": "NUM-DIVMOD-VAR-UNGUARDED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "NUM-SHIFT",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 1,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 1 validated-proof case(s)."
         },
         {
           "rowId": "NUM-BITWISE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 3,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 3 validated-proof case(s)."
         },
         {
           "rowId": "NUM-COMPARE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 4,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 4 validated-proof case(s)."
         },
         {
           "rowId": "NUM-EQUALITY",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 2,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 2 validated-proof case(s)."
         },
         {
           "rowId": "NUM-NEGATE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 4,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 4 validated-proof case(s)."
         },
         {
           "rowId": "NUM-NARROW-ARITH",
@@ -638,16 +658,16 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 5,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 5 validated-proof case(s)."
         },
         {
           "rowId": "NUM-LITERAL-TYPED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 1,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 1 validated-proof case(s)."
         },
         {
           "rowId": "NUM-LITERAL-OVERSIZE",
@@ -667,16 +687,16 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "NUM-UNWHITELISTED-OPS",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "NUM-OVERFLOW-CHECKED",
@@ -698,192 +718,192 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 9,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 9 validated-proof case(s)."
         },
         {
           "rowId": "BOOL-CONNECTIVES",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 3,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 3 validated-proof case(s)."
         },
         {
           "rowId": "BOOL-SHORTCIRCUIT",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "BOOL-CONDITIONAL",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 2,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 2 validated-proof case(s)."
         },
         {
           "rowId": "BOOL-IMPLICATION",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 3,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 3 validated-proof case(s)."
         },
         {
           "rowId": "BOOL-NESTING",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 1,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 1 validated-proof case(s)."
         },
         {
           "rowId": "BODY-RETURN-EXPR",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 1,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 1 validated-proof case(s)."
         },
         {
           "rowId": "BODY-IF-ELSE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 3,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 3 validated-proof case(s)."
         },
         {
           "rowId": "BODY-GUARD-CLAUSE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 4,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 4 validated-proof case(s)."
         },
         {
           "rowId": "BODY-NESTED-RETURN",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 1,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 1 validated-proof case(s)."
         },
         {
           "rowId": "BODY-IMMUTABLE-BIND",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 3,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 3 validated-proof case(s)."
         },
         {
           "rowId": "BODY-WIDTH-BIND",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "BODY-DIVISION",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "BODY-LOOP-CALL-MUTABLE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "BODY-ARRAY-RETURN",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "POST-PARAM-PRESERVED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 1,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 1 validated-proof case(s)."
         },
         {
           "rowId": "POST-PARAM-MUTATED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "POST-RESULT-PARAM-COLLISION",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "POST-ARRAY-ALIAS",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "POST-METHOD-RECEIVER",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "QNT-FORALL-BOUNDED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 4,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 4 validated-proof case(s)."
         },
         {
           "rowId": "QNT-EXISTS-BOUNDED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 2,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 2 validated-proof case(s)."
         },
         {
           "rowId": "QNT-UNBOUNDED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "QNT-BOUND-TYPES",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "QNT-NESTED",
@@ -905,40 +925,40 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "ARR-INDEX",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "ARR-ELEMENT-TYPES",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "ARR-COMPUTED-BASE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "STR-OPS-PREDICATE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "STR-OPS-COUNT-INDEX",
@@ -958,16 +978,16 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "STR-UNMODELED-OPS",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "STR-NULL-NONASCII",
@@ -988,72 +1008,72 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "FLD-INHERITED-NESTED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "FLD-IMPLICIT-RECEIVER",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "FLT-REFUSAL",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "CALL-IN-CONTRACT",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "GEN-REFUSAL",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "VAC-UNSAT-PRECONDITIONS",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "VAC-PRECONDITION-SAT-CLAIM",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 5,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 5 validated-proof case(s)."
         },
         {
           "rowId": "OBL-PROOF",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 3,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 3 validated-proof case(s)."
         },
         {
           "rowId": "OBL-BRANCH-FACTS",
@@ -1074,8 +1094,8 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "OBL-MUTATION-KILL",
@@ -1100,16 +1120,16 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "OBL-REFINEMENT-ENTRY",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 2,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 2 validated-proof case(s)."
         },
         {
           "rowId": "OBL-REFINEMENT-RETURN",
@@ -1142,14 +1162,14 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "OBL-SELFREF",
           "status": "FINDING",
           "releaseCritical": true,
-          "disposition": "FIX-IN-0.24",
+          "disposition": "DEMOTE-IN-0.24",
           "repairs": [
             "R-OBL"
           ],
@@ -1167,32 +1187,32 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "OBL-UNGATED-REFERENCE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "IMPL-PRECONDITION-WEAKENING",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 1,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 1 validated-proof case(s)."
         },
         {
           "rowId": "IMPL-POSTCONDITION-STRENGTHENING",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 3,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 3 validated-proof case(s)."
         },
         {
           "rowId": "IMPL-ASSUMPTION-FORMS",
@@ -1213,7 +1233,7 @@
           "rowId": "IMPL-DIVISION-TOTALIZED",
           "status": "FALSE-PROOF",
           "releaseCritical": true,
-          "disposition": "DEMOTE-IN-0.24",
+          "disposition": "FIX-IN-0.24",
           "repairs": [
             "R-IMPL"
           ],
@@ -1227,32 +1247,32 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "CACHE-BODY-CHANGE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "CACHE-PRECONDITION-CHANGE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "CACHE-DEPENDENCY-CHANGE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "CACHE-LITERAL-WIDTH",
@@ -1275,96 +1295,96 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "SIMP-CONSTANT-FOLDING",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 1,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 1 validated-proof case(s)."
         },
         {
           "rowId": "SIMP-H1-UNARY-FOLD",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "SIMP-H1-INVALID-TYPING",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "MIX-QNT-ARRAY",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "MIX-STR-COND",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "MIX-DIV-IMPL",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "CTRL-POSITIVE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": false,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 8,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 8 validated-proof case(s)."
         },
         {
           "rowId": "CTRL-NEGATIVE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": false,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "CTRL-MUTATION",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": false,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 4,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 4 validated-proof case(s)."
         },
         {
           "rowId": "CTRL-RETRO-845",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": false,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 3,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 3 validated-proof case(s)."
         },
         {
           "rowId": "CTRL-RETRO-FIXED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": false,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 1,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 1 validated-proof case(s)."
         },
         {
           "rowId": "XCL-KINDUCTION",
@@ -1482,7 +1502,7 @@
           "token": "Proven",
           "disposition": "DEMOTE-IN-0.24",
           "repair": "R-QNT",
-          "reason": "Required demotion absent: Proven for a nested bounded forall (oracle holds) on a row registered unsupported-refused. Demoted: nested quantifiers are refused (Unsupported) on every channel and never served from cache."
+          "reason": "Required demotion absent: Proven for a nested bounded forall (oracle holds) on a row registered unsupported-refused. Demoted: nested quantifiers are refused (Unsupported) on every verifier channel and never served from cache."
         },
         {
           "findingId": "F-N1-007",
@@ -1492,7 +1512,7 @@
           "token": "Proven",
           "disposition": "DEMOTE-IN-0.24",
           "repair": "R-QNT",
-          "reason": "Required demotion absent: Proven for a nested bounded forall (oracle holds) on a row registered unsupported-refused. Demoted: nested quantifiers are refused (Unsupported) on every channel and never served from cache."
+          "reason": "Required demotion absent: Proven for a nested bounded forall (oracle holds) on a row registered unsupported-refused. Demoted: nested quantifiers are refused (Unsupported) on every verifier channel and never served from cache."
         },
         {
           "findingId": "F-N1-008",
@@ -1502,7 +1522,7 @@
           "token": "Proven",
           "disposition": "DEMOTE-IN-0.24",
           "repair": "R-QNT",
-          "reason": "Required demotion absent: Proven for a nested bounded forall (oracle holds) on a row registered unsupported-refused. Demoted: nested quantifiers are refused (Unsupported) on every channel and never served from cache."
+          "reason": "Required demotion absent: Proven for a nested bounded forall (oracle holds) on a row registered unsupported-refused. Demoted: nested quantifiers are refused (Unsupported) on every verifier channel and never served from cache."
         },
         {
           "findingId": "F-N1-009",
@@ -1522,7 +1542,7 @@
           "token": "Failed",
           "disposition": "FIX-IN-0.24",
           "repair": "R-TEXT",
-          "reason": "Spurious refutation: \"é\" had length 2 in the solver (UTF-8 bytes) and 1 in .NET. Fixed: literals are sent per UTF-16 code unit; the postcondition is Assumed (string model) as the assumed row requires, with no refutation (oracle: holds)."
+          "reason": "Spurious refutation: \"é\" had length 2 in the solver (UTF-8 bytes) and 1 in .NET. Fixed: literals are sent per UTF-16 code unit; no refutation remains, and the postcondition stays Assumed under the existing string-model limitation, as the assumed row requires (oracle: holds)."
         },
         {
           "findingId": "F-N1-011",
@@ -1532,7 +1552,7 @@
           "token": "Failed",
           "disposition": "FIX-IN-0.24",
           "repair": "R-TEXT",
-          "reason": "Spurious refutation: \"é\" had length 2 in the solver (UTF-8 bytes) and 1 in .NET. Fixed: literals are sent per UTF-16 code unit; the postcondition is Assumed (string model) as the assumed row requires, with no refutation (oracle: holds)."
+          "reason": "Spurious refutation: \"é\" had length 2 in the solver (UTF-8 bytes) and 1 in .NET. Fixed: literals are sent per UTF-16 code unit; no refutation remains, and the postcondition stays Assumed under the existing string-model limitation, as the assumed row requires (oracle: holds)."
         },
         {
           "findingId": "F-N1-012",
@@ -1560,9 +1580,9 @@
           "caseId": "R1-OBL-MUTATION-KILL-001",
           "class": "false-unconditional-proof",
           "token": "Discharged",
-          "disposition": "FIX-IN-0.24",
+          "disposition": "DEMOTE-IN-0.24",
           "repair": "R-OBL",
-          "reason": "False unconditional proof: a §Q fact on x survived §ASSIGN x and discharged §PROOF on the new value (guard elided). Fixed: entry facts are dropped when the body rebinds their names; the obligation is no longer discharged (Unsupported, guard kept), which agrees with the oracle (violated)."
+          "reason": "False unconditional proof: a §Q fact on x survived §ASSIGN x and discharged §PROOF on the new value (guard elided). The stale fact is no longer used, and the obligation visibly becomes Unsupported (Calor1124, guard kept); the oracle says violated, and no claim is made."
         },
         {
           "findingId": "F-N1-015",
@@ -1570,9 +1590,9 @@
           "caseId": "R1-OBL-MUTATION-KILL-003",
           "class": "false-unconditional-proof",
           "token": "Discharged",
-          "disposition": "FIX-IN-0.24",
+          "disposition": "DEMOTE-IN-0.24",
           "repair": "R-OBL",
-          "reason": "False unconditional proof: a §Q fact on x survived §ASSIGN x and discharged §PROOF on the new value (guard elided). Fixed: entry facts are dropped when the body rebinds their names; the obligation is no longer discharged (Unsupported, guard kept), which agrees with the oracle (violated)."
+          "reason": "False unconditional proof: a §Q fact on x survived §ASSIGN x and discharged §PROOF on the new value (guard elided). The stale fact is no longer used, and the obligation visibly becomes Unsupported (Calor1124, guard kept); the oracle says violated, and no claim is made."
         },
         {
           "findingId": "F-N1-016",
@@ -1582,7 +1602,7 @@
           "token": "Failed",
           "disposition": "DEMOTE-IN-0.24",
           "repair": "R-OBL",
-          "reason": "Spurious refutation: the model ignored the reassignment inside the guarded body. Demoted: an obligation that reads a reassigned variable gets no counterexample claim; its outcome is Unsupported (Calor1124, guard kept) instead of a Failed compile error."
+          "reason": "Spurious refutation: the model ignored the reassignment inside the guarded body. Demoted: an obligation that reads a reassigned variable gets no counterexample claim; it is Unsupported (Calor1124, guard kept) instead of a Failed compile error."
         },
         {
           "findingId": "F-N1-017",
@@ -1592,7 +1612,7 @@
           "token": "Failed",
           "disposition": "DEMOTE-IN-0.24",
           "repair": "R-OBL",
-          "reason": "Spurious refutation: the model ignored the reassignment inside the guarded body. Demoted: an obligation that reads a reassigned variable gets no counterexample claim; its outcome is Unsupported (Calor1124, guard kept) instead of a Failed compile error."
+          "reason": "Spurious refutation: the model ignored the reassignment inside the guarded body. Demoted: an obligation that reads a reassigned variable gets no counterexample claim; it is Unsupported (Calor1124, guard kept) instead of a Failed compile error."
         },
         {
           "findingId": "F-N1-018",
@@ -1602,7 +1622,7 @@
           "token": "Failed",
           "disposition": "DEMOTE-IN-0.24",
           "repair": "R-OBL",
-          "reason": "Spurious refutation: the model ignored the reassignment inside the guarded body. Demoted: an obligation that reads a reassigned variable gets no counterexample claim; its outcome is Unsupported (Calor1124, guard kept) instead of a Failed compile error."
+          "reason": "Spurious refutation: the model ignored the reassignment inside the guarded body. Demoted: an obligation that reads a reassigned variable gets no counterexample claim; it is Unsupported (Calor1124, guard kept) instead of a Failed compile error."
         },
         {
           "findingId": "F-N1-019",
@@ -1612,7 +1632,7 @@
           "token": "Failed",
           "disposition": "DEMOTE-IN-0.24",
           "repair": "R-OBL",
-          "reason": "Spurious refutation: the model ignored the reassignment inside the guarded body. Demoted: an obligation that reads a reassigned variable gets no counterexample claim; its outcome is Unsupported (Calor1124, guard kept) instead of a Failed compile error."
+          "reason": "Spurious refutation: the model ignored the reassignment inside the guarded body. Demoted: an obligation that reads a reassigned variable gets no counterexample claim; it is Unsupported (Calor1124, guard kept) instead of a Failed compile error."
         },
         {
           "findingId": "F-N1-020",
@@ -1640,9 +1660,9 @@
           "caseId": "R1-OBL-SELFREF-001",
           "class": "spurious-refutation",
           "token": "Failed",
-          "disposition": "FIX-IN-0.24",
+          "disposition": "DEMOTE-IN-0.24",
           "repair": "R-OBL",
-          "reason": "Spurious refutation: the model violated the parameter's self-referential named refinement. Fixed: the refinement is an entry fact; no refutation remains (Discharged, Assumed for checked arithmetic, or Unsupported when no overflow-free state exists)."
+          "reason": "Spurious refutation (SELFREF-001): the model violated the parameter's named refinement. With the refinement as an entry fact there is no refutation; the obligation is Assumed (checked-arithmetic: the predicate's subtraction can overflow), guard kept."
         },
         {
           "findingId": "F-N1-023",
@@ -1652,7 +1672,7 @@
           "token": "Failed",
           "disposition": "FIX-IN-0.24",
           "repair": "R-OBL",
-          "reason": "Spurious refutation: the model violated the parameter's self-referential named refinement. Fixed: the refinement is an entry fact; no refutation remains (Discharged, Assumed for checked arithmetic, or Unsupported when no overflow-free state exists)."
+          "reason": "Spurious refutation (SELFREF-002). Fixed: with the named refinement as an entry fact the obligation is Discharged (oracle: holds)."
         },
         {
           "findingId": "F-N1-024",
@@ -1660,9 +1680,9 @@
           "caseId": "R1-OBL-SELFREF-003",
           "class": "spurious-refutation",
           "token": "Failed",
-          "disposition": "FIX-IN-0.24",
+          "disposition": "DEMOTE-IN-0.24",
           "repair": "R-OBL",
-          "reason": "Spurious refutation: the model violated the parameter's self-referential named refinement. Fixed: the refinement is an entry fact; no refutation remains (Discharged, Assumed for checked arithmetic, or Unsupported when no overflow-free state exists)."
+          "reason": "Spurious refutation (SELFREF-003). With the refinement as an entry fact there is no refutation; the obligation is Assumed (checked-arithmetic), guard kept."
         },
         {
           "findingId": "F-N1-025",
@@ -1672,7 +1692,7 @@
           "token": "Failed",
           "disposition": "FIX-IN-0.24",
           "repair": "R-OBL",
-          "reason": "Spurious refutation: the model violated the parameter's self-referential named refinement. Fixed: the refinement is an entry fact; no refutation remains (Discharged, Assumed for checked arithmetic, or Unsupported when no overflow-free state exists)."
+          "reason": "Spurious refutation (SELFREF-004). Fixed: with the named refinement as an entry fact the obligation is Discharged (oracle: holds)."
         },
         {
           "findingId": "F-N1-026",
@@ -1680,9 +1700,9 @@
           "caseId": "R1-OBL-SELFREF-005",
           "class": "spurious-refutation",
           "token": "Failed",
-          "disposition": "FIX-IN-0.24",
+          "disposition": "DEMOTE-IN-0.24",
           "repair": "R-OBL",
-          "reason": "Spurious refutation: the model violated the parameter's self-referential named refinement. Fixed: the refinement is an entry fact; no refutation remains (Discharged, Assumed for checked arithmetic, or Unsupported when no overflow-free state exists)."
+          "reason": "Spurious refutation (SELFREF-005, oracle vacuous-in-domain: no input reaches the binding). No refutation remains; the obligation is Unsupported (\"no overflow-free state satisfies the assumptions\"), guard kept. This withdraws the claim; it does not prove the property."
         },
         {
           "findingId": "F-N1-027",
@@ -1692,7 +1712,7 @@
           "token": "Proven",
           "disposition": "DEMOTE-IN-0.24",
           "repair": "R-IMPL",
-          "reason": "False unconditional proof: Calor0815 \"precondition weakening proven\" for (>= (len s) 0), which throws at s = null on an interface-accepted input. Demoted: the implication is Assumed (string-model), reported as Calor0819; no proof and no \"inheritance valid\" claim."
+          "reason": "False unconditional proof: Calor0815 for (>= (len s) 0), which throws at s = null on an interface-accepted input (no guard elided; the false claim is the LSP acceptance). Demoted: null strings cannot be modeled, so the implication is Assumed (string-model), Calor0819; no \"proven\" and no \"inheritance valid\"."
         },
         {
           "findingId": "F-N1-028",
@@ -1712,7 +1732,7 @@
           "token": "Proven",
           "disposition": "DEMOTE-IN-0.24",
           "repair": "R-IMPL",
-          "reason": "False unconditional proof: Calor0815 \"precondition weakening proven\" for (>= (len s) 0), which throws at s = null on an interface-accepted input. Demoted: the implication is Assumed (string-model), reported as Calor0819; no proof and no \"inheritance valid\" claim."
+          "reason": "False unconditional proof: Calor0815 for (>= (len s) 0), which throws at s = null on an interface-accepted input (no guard elided; the false claim is the LSP acceptance). Demoted: null strings cannot be modeled, so the implication is Assumed (string-model), Calor0819; no \"proven\" and no \"inheritance valid\"."
         },
         {
           "findingId": "F-N1-030",
@@ -1720,9 +1740,9 @@
           "caseId": "R1-IMPL-DIVISION-TOTALIZED-001",
           "class": "false-unconditional-proof",
           "token": "Proven",
-          "disposition": "DEMOTE-IN-0.24",
+          "disposition": "FIX-IN-0.24",
           "repair": "R-IMPL",
-          "reason": "False unconditional proof: Calor0815 for (> (% x y) -2), which throws at y = 0. Demoted: the divisor side condition is not entailed by the interface precondition, so the implication is Assumed (contract-division), Calor0819."
+          "reason": "False unconditional proof: Calor0815 for (> (% x y) -2), which throws at y = 0. Fixed: the implication is decided with explicit definedness and is refuted with the oracle's own witness (x = 3, y = 0) as a Calor0810 LSP error."
         },
         {
           "findingId": "F-N1-031",
@@ -1732,7 +1752,7 @@
           "token": "Proven",
           "disposition": "FIX-IN-0.24",
           "repair": "R-CACHE",
-          "reason": "False unconditional proof (warm cache served the LONG:1 Proven to the INT:1 text). Fixed: the key distinguishes literal width; the warm verdict now equals the cold Refuted, which the oracle confirms (int.MaxValue + 1 wraps)."
+          "reason": "False unconditional proof (a warm cache served the LONG:1 Proven to the INT:1 text). Fixed: the key distinguishes literal width; the warm verdict equals the cold Refuted, which the oracle confirms (int.MaxValue + 1 wraps)."
         },
         {
           "findingId": "F-N1-032",
@@ -1752,7 +1772,7 @@
           "token": "Failed",
           "disposition": "FIX-IN-0.24",
           "repair": "R-CACHE",
-          "reason": "Spurious refutation: the warm cache served the INT:1 Refuted to the LONG:1 text, which holds. Fixed: the warm verdict now equals the cold Proven."
+          "reason": "Spurious refutation: the warm cache served the INT:1 Refuted to the LONG:1 text, which holds. Fixed: the warm verdict equals the cold Proven."
         },
         {
           "findingId": "F-N1-034",
@@ -1771,88 +1791,88 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 3,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 3 validated-proof case(s)."
         },
         {
           "rowId": "NUM-ARITH-SUB",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 2,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 2 validated-proof case(s)."
         },
         {
           "rowId": "NUM-ARITH-MUL",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 2,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 2 validated-proof case(s)."
         },
         {
           "rowId": "NUM-DIVMOD-LITERAL",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 4,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 4 validated-proof case(s)."
         },
         {
           "rowId": "NUM-DIVMOD-VAR-ENTAILED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 2,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 2 validated-proof case(s)."
         },
         {
           "rowId": "NUM-DIVMOD-VAR-UNGUARDED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "NUM-SHIFT",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 1,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 1 validated-proof case(s)."
         },
         {
           "rowId": "NUM-BITWISE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 3,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 3 validated-proof case(s)."
         },
         {
           "rowId": "NUM-COMPARE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 4,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 4 validated-proof case(s)."
         },
         {
           "rowId": "NUM-EQUALITY",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 2,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 2 validated-proof case(s)."
         },
         {
           "rowId": "NUM-NEGATE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 4,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 4 validated-proof case(s)."
         },
         {
           "rowId": "NUM-NARROW-ARITH",
@@ -1872,16 +1892,16 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 5,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 5 validated-proof case(s)."
         },
         {
           "rowId": "NUM-LITERAL-TYPED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 1,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 1 validated-proof case(s)."
         },
         {
           "rowId": "NUM-LITERAL-OVERSIZE",
@@ -1901,16 +1921,16 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "NUM-UNWHITELISTED-OPS",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "NUM-OVERFLOW-CHECKED",
@@ -1932,192 +1952,192 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 9,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 9 validated-proof case(s)."
         },
         {
           "rowId": "BOOL-CONNECTIVES",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 3,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 3 validated-proof case(s)."
         },
         {
           "rowId": "BOOL-SHORTCIRCUIT",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "BOOL-CONDITIONAL",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 2,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 2 validated-proof case(s)."
         },
         {
           "rowId": "BOOL-IMPLICATION",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 3,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 3 validated-proof case(s)."
         },
         {
           "rowId": "BOOL-NESTING",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 1,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 1 validated-proof case(s)."
         },
         {
           "rowId": "BODY-RETURN-EXPR",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 1,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 1 validated-proof case(s)."
         },
         {
           "rowId": "BODY-IF-ELSE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 3,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 3 validated-proof case(s)."
         },
         {
           "rowId": "BODY-GUARD-CLAUSE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 4,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 4 validated-proof case(s)."
         },
         {
           "rowId": "BODY-NESTED-RETURN",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 1,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 1 validated-proof case(s)."
         },
         {
           "rowId": "BODY-IMMUTABLE-BIND",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 3,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 3 validated-proof case(s)."
         },
         {
           "rowId": "BODY-WIDTH-BIND",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "BODY-DIVISION",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "BODY-LOOP-CALL-MUTABLE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "BODY-ARRAY-RETURN",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "POST-PARAM-PRESERVED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 1,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 1 validated-proof case(s)."
         },
         {
           "rowId": "POST-PARAM-MUTATED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "POST-RESULT-PARAM-COLLISION",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "POST-ARRAY-ALIAS",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "POST-METHOD-RECEIVER",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "QNT-FORALL-BOUNDED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 4,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 4 validated-proof case(s)."
         },
         {
           "rowId": "QNT-EXISTS-BOUNDED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 2,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 2 validated-proof case(s)."
         },
         {
           "rowId": "QNT-UNBOUNDED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "QNT-BOUND-TYPES",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "QNT-NESTED",
@@ -2139,40 +2159,40 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "ARR-INDEX",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "ARR-ELEMENT-TYPES",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "ARR-COMPUTED-BASE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "STR-OPS-PREDICATE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "STR-OPS-COUNT-INDEX",
@@ -2192,16 +2212,16 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "STR-UNMODELED-OPS",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "STR-NULL-NONASCII",
@@ -2222,72 +2242,72 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "FLD-INHERITED-NESTED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "FLD-IMPLICIT-RECEIVER",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "FLT-REFUSAL",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "CALL-IN-CONTRACT",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "GEN-REFUSAL",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "VAC-UNSAT-PRECONDITIONS",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "VAC-PRECONDITION-SAT-CLAIM",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 5,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 5 validated-proof case(s)."
         },
         {
           "rowId": "OBL-PROOF",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 3,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 3 validated-proof case(s)."
         },
         {
           "rowId": "OBL-BRANCH-FACTS",
@@ -2308,8 +2328,8 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "OBL-MUTATION-KILL",
@@ -2334,16 +2354,16 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "OBL-REFINEMENT-ENTRY",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 2,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 2 validated-proof case(s)."
         },
         {
           "rowId": "OBL-REFINEMENT-RETURN",
@@ -2376,14 +2396,14 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "OBL-SELFREF",
           "status": "FINDING",
           "releaseCritical": true,
-          "disposition": "FIX-IN-0.24",
+          "disposition": "DEMOTE-IN-0.24",
           "repairs": [
             "R-OBL"
           ],
@@ -2401,32 +2421,32 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "OBL-UNGATED-REFERENCE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "IMPL-PRECONDITION-WEAKENING",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 1,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 1 validated-proof case(s)."
         },
         {
           "rowId": "IMPL-POSTCONDITION-STRENGTHENING",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 3,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 3 validated-proof case(s)."
         },
         {
           "rowId": "IMPL-ASSUMPTION-FORMS",
@@ -2447,7 +2467,7 @@
           "rowId": "IMPL-DIVISION-TOTALIZED",
           "status": "FALSE-PROOF",
           "releaseCritical": true,
-          "disposition": "DEMOTE-IN-0.24",
+          "disposition": "FIX-IN-0.24",
           "repairs": [
             "R-IMPL"
           ],
@@ -2461,32 +2481,32 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "CACHE-BODY-CHANGE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "CACHE-PRECONDITION-CHANGE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "CACHE-DEPENDENCY-CHANGE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "CACHE-LITERAL-WIDTH",
@@ -2509,96 +2529,96 @@
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "SIMP-CONSTANT-FOLDING",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 1,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 1 validated-proof case(s)."
         },
         {
           "rowId": "SIMP-H1-UNARY-FOLD",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "SIMP-H1-INVALID-TYPING",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "MIX-QNT-ARRAY",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "MIX-STR-COND",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "MIX-DIV-IMPL",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": true,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "CTRL-POSITIVE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": false,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 8,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 8 validated-proof case(s)."
         },
         {
           "rowId": "CTRL-NEGATIVE",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": false,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.",
-          "establishingOutcomeObserved": false
+          "validatedProofCases": 0,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). No validated-proof case: this supports no claim that relies on Proven/Discharged for the form."
         },
         {
           "rowId": "CTRL-MUTATION",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": false,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 4,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 4 validated-proof case(s)."
         },
         {
           "rowId": "CTRL-RETRO-845",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": false,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 3,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 3 validated-proof case(s)."
         },
         {
           "rowId": "CTRL-RETRO-FIXED",
           "status": "CLEAN-WITHIN-BUDGET",
           "releaseCritical": false,
           "disposition": "VALIDATED",
-          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).",
-          "establishingOutcomeObserved": true
+          "validatedProofCases": 1,
+          "reason": "Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). 1 validated-proof case(s)."
         },
         {
           "rowId": "XCL-KINDUCTION",
@@ -2653,8 +2673,8 @@
       "artifact": {
         "identity": "Calor 0.21.0 on nuget.org, packed from 88b5d38df97fd7e438882c956b9f9dcdc7a6cef5 (the binary users install)",
         "immutable": true,
-        "dispositionScope": "Candidate-side, as for B1. A fix in 0.24 source does not change the published 0.21.0 package: the false unconditional proofs (OBL-MUTATION-KILL, IMPL-ASSUMPTION-FORMS, IMPL-DIVISION-TOTALIZED, CACHE-LITERAL-WIDTH) remain in it, and so does the Windows symbol collision (#1493).",
-        "publishedArtifactObligation": "Proposed, needs a maintainer decision: the first release that carries these repairs names, in its release notes, the four false-proof forms and #1493 as affecting 0.21.0 (and the v0.22.0 prerelease), says that runtime guards for those forms may have been removed, and advises upgrading; a GitHub security advisory is optional. Contract §8 History keeps 0.21.0 as a historical record; nothing claims it is fixed."
+        "dispositionScope": "Candidate-side, as for B1. A fix in 0.24 source does not change the published 0.21.0 package; its false unconditional proofs remain in it.",
+        "publishedArtifactObligation": "Proposed, needs a maintainer decision: the first release that carries these repairs says in its release notes that 0.21.0 (and the v0.22.0 prerelease) are affected, distinguishing the mechanisms: (1) proof obligations after a reassignment (OBL-MUTATION-KILL) and warm-cache literal-width proofs (CACHE-LITERAL-WIDTH) could remove a runtime guard that the program then needed; (2) interface contract checks (IMPL-ASSUMPTION-FORMS, IMPL-DIVISION-TOTALIZED) could accept an implementer precondition that throws on inputs the interface allows (no guard is removed; the acceptance is wrong); (3) #1493 is a potential, not observed, Windows-only collision of non-ASCII identifiers. Nothing claims the published package is fixed (contract §8 History)."
       }
     }
   },
@@ -2683,7 +2703,7 @@
     },
     {
       "id": "Q2-O2-GEN-REFUSAL",
-      "question": "S1 condition 10: O2 ran only partially on GEN-REFUSAL-002/-004 (the frozen input new object() cannot be passed to the compiled double[] parameter). Proposed: keep GEN-REFUSAL VALIDATED on both baselines. Both cases are Unsupported (refusal-validated): there is no claim and no elided guard for O2 to corroborate, O1 agrees, and O2 is corroboration, not the adjudicating oracle. The partial replay is recorded as an O2 coverage limitation of the frozen generator, not a finding."
+      "question": "S1 condition 10: O2 ran only partially on GEN-REFUSAL-002/-004 (the frozen input new object() cannot be passed to the compiled double[] parameter), so the registered O2 coverage for those cases is incomplete. The registered row status does not use O2 completeness, both cases are Unsupported (refusal-validated) with guards retained, O1 agrees, and the partial replay shows no divergence; proposed: keep GEN-REFUSAL VALIDATED and record the O2 gap as a coverage limitation of the frozen generator. Condition 10 itself stays the maintainer's decision."
     },
     {
       "id": "Q3-N1-ADVISORY",
@@ -2692,6 +2712,10 @@
     {
       "id": "Q4-ISSUE-LINKS",
       "question": "Issue acceptance: each repair PR must be attached to #1409 and encoded as blocking #1423. Agents do not edit issues; the maintainer links PRs #1494-#1498 (and R-NUM if opened)."
+    },
+    {
+      "id": "Q5-MERGE-ORDER",
+      "question": "#1497 (R-TEXT) must merge after #1495 (R-IMPL); the cache-format constant (1.20/1.21) and eng/test-manifest.json/CHANGELOG.md need the usual merge resolution across the S2 PRs."
     }
   ]
 }

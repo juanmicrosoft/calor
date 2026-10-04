@@ -21,66 +21,73 @@ for b in ('B1', 'N1'):
 
 OWNER = 'Claude Code agent (S2 #1413 session); agents never merge'
 REVIEWER = '@juanmicrosoft (review and merge), Codex adversarial review recorded per PR'
+REVIEWS = 'docs/plans/evidence/s2-1413/reviews/'
 
 repairs = [
     {
-        'id': 'R-CACHE', 'kind': 'FIX-IN-0.24', 'pr': 1494,
+        'id': 'R-CACHE', 'pr': 1494,
         'branch': 'milestone-0.24/s2-1413-fix-cache-literal-width',
         'rootCause': 'ContractHasher keyed an integer literal by value only, so x + INT:1 and x + LONG:1 shared a verification-cache entry; a warm cache served the LONG text\'s Proven to the INT text (false proof, guard elided) and the INT text\'s Refuted to the LONG text.',
         'change': 'Literal keys carry width/signedness/base/sign/magnitude (and real-literal kind); output types are length-prefixed; inferred binding types hash distinctly; keys hash raw UTF-16 code units; cache format 1.20.',
-        'nonTestChangedLines': 176,
+        'nonTestChangedLines': 59,
         'regressionWitness': ['tests/Calor.Compiler.Tests/S2CacheLiteralWidthTests.cs'],
         'rows': ['CACHE-LITERAL-WIDTH'],
+        'reviews': REVIEWS + 'fix-cache-literal-width/',
     },
     {
-        'id': 'R-IMPL', 'kind': 'DEMOTE-IN-0.24', 'pr': 1495,
+        'id': 'R-IMPL', 'pr': 1495,
         'branch': 'milestone-0.24/s2-1413-fix-implication-definedness',
-        'rootCause': 'Z3ImplicationProver decided interface->implementer precondition implication over total solver terms (non-null strings, bvsrem defined at 0) and reported Calor0815 "proven" for implementer preconditions that throw or are false on interface-accepted inputs.',
-        'change': 'An implication is proven only when the antecedent entails the consequent\'s divisor and checked-overflow side conditions and no string/array/user-type sort is touched; otherwise Assumed, reported as the new warning Calor0819 with no heuristic fallback and no Calor0814 "valid"; conditional-position divisors are Unsupported.',
-        'nonTestChangedLines': 213,
+        'rootCause': 'Z3ImplicationProver decided interface/implementer contract implications over total solver terms (non-null strings, bvsrem defined at 0) and reported Calor0815 "proven" for implementer preconditions that throw or are false on interface-accepted inputs. No guard is elided on this channel; the false claim is the LSP acceptance.',
+        'change': 'The prover decides A and D(A) and not (D(C) and C) with D = divisor and checked-overflow definedness: a contract that throws on an accepted input is a genuine LSP refutation with that input; a model that may rely on a throwing contract is Unsupported; any string/array/user-type sort makes a proof Assumed (new warning Calor0819); the syntactic heuristic never yields Calor0814 "valid" after the solver declined.',
+        'nonTestChangedLines': 301,
         'regressionWitness': ['tests/Calor.Compiler.Tests/S2ImplicationDefinednessTests.cs', 'tests/Calor.Verification.Tests/S2ImplicationProverDefinednessTests.cs'],
         'rows': ['IMPL-ASSUMPTION-FORMS', 'IMPL-DIVISION-TOTALIZED'],
+        'reviews': REVIEWS + 'fix-implication-definedness/',
     },
     {
-        'id': 'R-OBL', 'kind': 'FIX-IN-0.24', 'pr': 1496,
+        'id': 'R-OBL', 'pr': 1496,
         'branch': 'milestone-0.24/s2-1413-fix-obligation-state',
         'rootCause': 'ObligationSolver asserted preconditions for every obligation even after the body reassigned their variables (false Discharged, guard elided), and reported SAT models as counterexamples although its state over-approximated the program state (reassignments, else bodies without negated guards, unbound refined return values, unassumed named-refinement parameters).',
-        'change': 'Entry facts are dropped when the body may rebind a name they read (incl. ref/out arguments, raw C#); a SAT model is a refutation only when the state is exact, otherwise Unsupported (guard kept); else/elseif negation facts and named-refinement parameter facts are added.',
-        'nonTestChangedLines': 416,
+        'change': 'Entry facts are dropped when the body may write a name they read (incl. ref/out/in aliasing, element/field stores, collection updates); raw C#, unsafe/pointer code, and lambdas make a body opaque; a SAT model is a refutation only when the state is exact, otherwise Unsupported (guard kept); else/elseif negation facts and named-refinement parameter facts (functions, methods, constructors, operators) are added.',
+        'nonTestChangedLines': 571,
         'regressionWitness': ['tests/Calor.Compiler.Tests/S2ObligationStateTests.cs'],
         'rows': ['OBL-MUTATION-KILL', 'OBL-BRANCH-FACTS', 'OBL-REFINEMENT-RETURN', 'OBL-SUBTYPE', 'OBL-SELFREF'],
+        'reviews': REVIEWS + 'fix-obligation-state/',
     },
     {
-        'id': 'R-TEXT', 'kind': 'FIX-IN-0.24', 'pr': 1497,
+        'id': 'R-TEXT', 'pr': 1497,
         'branch': 'milestone-0.24/s2-1413-fix-z3-text-encoding',
-        'rootCause': 'String literals reached Z3 per UTF-8 byte ("é" has length 2), Substring/IndexOf-with-start were total in the solver, and (discovery #1493) Z3 symbol names took ANSI marshaling, so non-ASCII identifiers could collapse into one constant on Windows.',
-        'change': 'Literals are escaped per UTF-16 code unit (and the backslash); indexed string operations carry range side conditions; every symbol is named through the injective ASCII encoding ContractTranslator.Z3Name; cache format 1.21.',
-        'nonTestChangedLines': 181,
+        'rootCause': 'String literals reached Z3 per UTF-8 byte ("é" has length 2), Substring was total in the solver, and (discovery #1493) Z3 symbol names took ANSI marshaling, so non-ASCII identifiers could collapse into one constant on Windows.',
+        'change': 'Literals are escaped per UTF-16 code unit (and the backslash); Substring carries range side conditions; IndexOf with a start index is refused (the emitter drops the start); every symbol is named through the injective ASCII encoding ContractTranslator.Z3Name; "$" names are reserved; cache format 1.21. Must merge after #1495 (implication-channel string demotion).',
+        'nonTestChangedLines': 199,
         'regressionWitness': ['tests/Calor.Verification.Tests/S2Z3TextEncodingTests.cs'],
         'rows': ['STR-NULL-NONASCII', 'STR-OPS-COUNT-INDEX'],
         'discoveries': ['D-1493'],
+        'dependsOn': [1495],
+        'reviews': REVIEWS + 'fix-z3-text-encoding/',
     },
     {
-        'id': 'R-QNT', 'kind': 'DEMOTE-IN-0.24', 'pr': 1498,
+        'id': 'R-QNT', 'pr': 1498,
         'branch': 'milestone-0.24/s2-1413-fix-nested-quantifier-claim',
-        'rootCause': 'The verifier reported Proven for a nested bounded forall that the emitter cannot lower (Calor0326); the registered row requires refusal.',
-        'change': 'Contract verifier, obligation solver, and implication prover return Unsupported for a quantifier nested in another; such cache keys are never stored or served.',
-        'nonTestChangedLines': 92,
-        'regressionWitness': ['tests/Calor.Verification.Tests/S2NestedQuantifierTests.cs'],
+        'rootCause': 'The verifier reported Proven for a nested bounded forall whose runtime lowering the emitter rejects (Calor0326); the registered row requires refusal.',
+        'change': 'Contract verifier, obligation solver (condition and assumptions), implication prover, and guard validation refuse a quantifier nested in another (Unsupported); such cache keys are never stored or served; k-induction no longer drops unparsable invariant conjuncts.',
+        'nonTestChangedLines': 112,
+        'regressionWitness': ['tests/Calor.Verification.Tests/S2NestedQuantifierTests.cs', 'tests/Calor.Compiler.Tests/S2NestedQuantifierChannelTests.cs'],
         'rows': ['QNT-NESTED'],
+        'reviews': REVIEWS + 'fix-nested-quantifier-claim/',
     },
     {
-        'id': 'R-NUM', 'kind': 'DEMOTE-IN-0.24', 'pr': None,
+        'id': 'R-NUM', 'pr': None,
         'branch': None,
         'status': 'decision-required',
         'rootCause': 'The registration classifies NUM-NARROW-ARITH and NUM-LITERAL-OVERSIZE as unsupported-refused (divergences D1/D2 of the frozen docs/verification-modeled-forms.md say "refused") and NUM-OVERFLOW-CHECKED as assumed, but the verifier deliberately models C# narrow promotion (W1 Slice 1), types INT: literals as C# does (#774), and proves checked-arithmetic contracts whose overflow the preconditions rule out. Each Proven agrees with the oracle; none is a false proof.',
-        'change': 'Not opened. A draft that implements the registered refusals (narrow arithmetic and INT:-inferred 64-bit literals Unsupported, checked-arithmetic postconditions Assumed whenever overflow is possible for some input) is 77 non-test lines but breaks 19 existing tests that pin the deliberate semantics (W1Slice1SoundnessTests narrow promotion x3, NumericExecutableSemanticsTests x2, OverflowSoundnessBenchmark *_Bounded_MustBeProven x7, VerifierTests bounded proofs x3, ProductionOverflowRuntimeTests guarded arithmetic x3) and changes the committed #1135 differential oracle reports (VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle). That reverses accepted verifier semantics and invalidates a G3 artifact, so it needs a maintainer decision.',
+        'change': 'Not opened. A draft implementing the registered refusals (docs/plans/evidence/s2-1413/r-num-draft.patch, against main 0142438f: 77 added and 4 removed non-test lines) breaks 19 existing tests that pin the deliberate semantics: Calor.Verification.Tests NumericExecutableSemanticsTests.{UnaryNegationMatchesExecutableCSharpSemantics, IntegralOperatorsMatchExecutableCSharpSemantics}; OverflowSoundnessBenchmark.{Addition_TwoVariables_Bounded, Subtraction_Bounded, Negation_Bounded, Multiplication_Bounded, Square_Bounded, Addition_Bounded}_MustBeProven and RunFullBenchmark; W1Slice1SoundnessTests.{NarrowUnsignedArithmetic_PromotesToSignedInt, NarrowIntNegation_UsesCSharpPromotion, NarrowIntArithmetic_UsesCSharpPromotion}; VerifierTests.{ProvesSquareNonNegative, ProvesSubtractionWithBounds, ProvesBoundedOverflow}; VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle (the committed #1135 differential reports); and Calor.Compiler.Tests ProductionOverflowRuntimeTests.GuardedArithmetic_ProvesWithoutEvaluatingUnselectedOverflow (3 rows). That reverses accepted verifier semantics and changes a G3 artifact, so it needs a maintainer decision.',
         'decisionOptions': [
-            'Accept the demotion: open R-NUM (the sixth and last repair PR within the s2-repairs ceiling), update the 19 tests, and regenerate the #1135 differential reports under G3.',
-            'Amend the contract (versioned, after decision-bearing inspection) to reclassify the three rows to the semantics the verifier deliberately implements; the 5 findings would then need re-dispositioning under the amended table.',
-            'Record MILESTONE-FAILED for the 5 findings (terminal success predicate 5 then fails).',
+            'Accept the demotion: open R-NUM as the sixth and last repair PR within the s2-repairs ceiling (the slot is reserved, not yet accepted), update the 19 tests, and regenerate the #1135 differential reports under G3.',
+            'Amend, after decision-bearing inspection and recorded as such: the contract (§8/§9 as needed) and the frozen #1419 registration classifications/classification table for the three rows, keeping the S1 findings and their last statuses on record; the 5 findings would then be re-dispositioned under the amended table.',
+            'Record MILESTONE-FAILED for the 5 findings per baseline (terminal success predicate 5 then fails).',
         ],
-        'nonTestChangedLines': 77,
+        'nonTestChangedLines': 81,
         'regressionWitness': [],
         'rows': ['NUM-NARROW-ARITH', 'NUM-LITERAL-OVERSIZE', 'NUM-OVERFLOW-CHECKED'],
     },
@@ -89,44 +96,50 @@ for r in repairs:
     r.setdefault('status', 'open')
     r.setdefault('mergeCommit', None)
     r.setdefault('discoveries', [])
+    r.setdefault('dependsOn', [])
     r['owner'] = OWNER
     r['reviewer'] = REVIEWER
     r['blocks'] = [1423]
 
-# finding number -> (disposition, repair, reason)
-def F(nums, disp, rep, reason):
-    return {n: (disp, rep, reason) for n in nums}
-
+FIX, DEMOTE = 'FIX-IN-0.24', 'DEMOTE-IN-0.24'
 plan = {}
-plan.update(F([31], 'FIX-IN-0.24', 'R-CACHE', 'False unconditional proof (warm cache served the LONG:1 Proven to the INT:1 text). Fixed: the key distinguishes literal width; the warm verdict now equals the cold Refuted, which the oracle confirms (int.MaxValue + 1 wraps).'))
-plan.update(F([32], 'FIX-IN-0.24', 'R-CACHE', 'Stale-cache proof, same case and cause as the false proof above. Fixed by the same key change.'))
-plan.update(F([33], 'FIX-IN-0.24', 'R-CACHE', 'Spurious refutation: the warm cache served the INT:1 Refuted to the LONG:1 text, which holds. Fixed: the warm verdict now equals the cold Proven.'))
-plan.update(F([34], 'FIX-IN-0.24', 'R-CACHE', 'Stale-cache proof for the same case. Fixed by the same key change.'))
-plan.update(F([27, 29], 'DEMOTE-IN-0.24', 'R-IMPL', 'False unconditional proof: Calor0815 "precondition weakening proven" for (>= (len s) 0), which throws at s = null on an interface-accepted input. Demoted: the implication is Assumed (string-model), reported as Calor0819; no proof and no "inheritance valid" claim.'))
-plan.update(F([28], 'DEMOTE-IN-0.24', 'R-IMPL', 'False unconditional proof: Calor0815 for (|| (! (isempty s)) (== s "")), false at s = null. Demoted to Assumed (string-model), Calor0819.'))
-plan.update(F([30], 'DEMOTE-IN-0.24', 'R-IMPL', 'False unconditional proof: Calor0815 for (> (% x y) -2), which throws at y = 0. Demoted: the divisor side condition is not entailed by the interface precondition, so the implication is Assumed (contract-division), Calor0819.'))
-plan.update(F([14, 15], 'FIX-IN-0.24', 'R-OBL', 'False unconditional proof: a §Q fact on x survived §ASSIGN x and discharged §PROOF on the new value (guard elided). Fixed: entry facts are dropped when the body rebinds their names; the obligation is no longer discharged (Unsupported, guard kept), which agrees with the oracle (violated).'))
-plan.update(F([16, 17, 18, 19], 'DEMOTE-IN-0.24', 'R-OBL', 'Spurious refutation: the model ignored the reassignment inside the guarded body. Demoted: an obligation that reads a reassigned variable gets no counterexample claim; its outcome is Unsupported (Calor1124, guard kept) instead of a Failed compile error.'))
-plan.update(F([12], 'FIX-IN-0.24', 'R-OBL', 'Spurious refutation (the model x = 2 does not reach the else body). Fixed: else bodies assume the negated condition; the obligation is Failed with the reaching model x = 548596110, which violates the claim as the oracle says.'))
-plan.update(F([13], 'FIX-IN-0.24', 'R-OBL', 'Spurious refutation in an else body. Fixed by the else-negation fact: the obligation is Discharged, which agrees with the oracle (holds).'))
-plan.update(F([20], 'DEMOTE-IN-0.24', 'R-OBL', 'Spurious refutation: the refined-return obligation ran with `result` unbound, so result = 2 was no execution. Demoted: a refined return gets no counterexample claim (Unsupported, guard kept).'))
-plan.update(F([21], 'FIX-IN-0.24', 'R-OBL', 'Spurious refutation: the model violated the parameter\'s named refinement type, which the entry guard enforces. Fixed: named-refinement parameters are entry facts; the obligation is Discharged (oracle: holds).'))
-plan.update(F([22, 23, 24, 25, 26], 'FIX-IN-0.24', 'R-OBL', 'Spurious refutation: the model violated the parameter\'s self-referential named refinement. Fixed: the refinement is an entry fact; no refutation remains (Discharged, Assumed for checked arithmetic, or Unsupported when no overflow-free state exists).'))
-plan.update(F([10, 11], 'FIX-IN-0.24', 'R-TEXT', 'Spurious refutation: "é" had length 2 in the solver (UTF-8 bytes) and 1 in .NET. Fixed: literals are sent per UTF-16 code unit; the postcondition is Assumed (string model) as the assumed row requires, with no refutation (oracle: holds).'))
-plan.update(F([9], 'FIX-IN-0.24', 'R-TEXT', 'Spurious refutation: the model s = "" makes s.Substring(1, 1) throw. Fixed: Substring carries its range side condition; the refutation now has the reaching model s = "AB" (result 1, oracle: violated).'))
-plan.update(F([6, 7, 8], 'DEMOTE-IN-0.24', 'R-QNT', 'Required demotion absent: Proven for a nested bounded forall (oracle holds) on a row registered unsupported-refused. Demoted: nested quantifiers are refused (Unsupported) on every channel and never served from cache.'))
-plan.update(F([1], 'DEMOTE-IN-0.24', 'R-NUM', 'Required demotion absent: Proven for i8 * i8 (oracle: holds) on a row registered unsupported-refused (D1). Pending maintainer decision; see repair R-NUM.'))
-plan.update(F([2], 'DEMOTE-IN-0.24', 'R-NUM', 'Required demotion absent: Proven for an INT: literal outside int32 (oracle: holds) on a row registered unsupported-refused (D2). Pending maintainer decision; see repair R-NUM.'))
-plan.update(F([3, 4, 5], 'DEMOTE-IN-0.24', 'R-NUM', 'Required demotion absent: Proven for (< (- x 1) x) where §Q rules out the overflow (oracle: holds) on a row registered assumed. The row title says "unless entailed", but the frozen classification table makes any Proven on an assumed row a finding. Pending maintainer decision; see repair R-NUM.'))
+def F(nums, disp, rep, reason):
+    for n in nums:
+        plan[n] = (disp, rep, reason)
+
+F([31], FIX, 'R-CACHE', 'False unconditional proof (a warm cache served the LONG:1 Proven to the INT:1 text). Fixed: the key distinguishes literal width; the warm verdict equals the cold Refuted, which the oracle confirms (int.MaxValue + 1 wraps).')
+F([32], FIX, 'R-CACHE', 'Stale-cache proof, same case and cause as the false proof above. Fixed by the same key change.')
+F([33], FIX, 'R-CACHE', 'Spurious refutation: the warm cache served the INT:1 Refuted to the LONG:1 text, which holds. Fixed: the warm verdict equals the cold Proven.')
+F([34], FIX, 'R-CACHE', 'Stale-cache proof for the same case. Fixed by the same key change.')
+F([27, 29], DEMOTE, 'R-IMPL', 'False unconditional proof: Calor0815 for (>= (len s) 0), which throws at s = null on an interface-accepted input (no guard elided; the false claim is the LSP acceptance). Demoted: null strings cannot be modeled, so the implication is Assumed (string-model), Calor0819; no "proven" and no "inheritance valid".')
+F([28], DEMOTE, 'R-IMPL', 'False unconditional proof: Calor0815 for (|| (! (isempty s)) (== s "")), false at s = null. Demoted to Assumed (string-model), Calor0819.')
+F([30], FIX, 'R-IMPL', 'False unconditional proof: Calor0815 for (> (% x y) -2), which throws at y = 0. Fixed: the implication is decided with explicit definedness and is refuted with the oracle\'s own witness (x = 3, y = 0) as a Calor0810 LSP error.')
+F([14, 15], DEMOTE, 'R-OBL', 'False unconditional proof: a §Q fact on x survived §ASSIGN x and discharged §PROOF on the new value (guard elided). The stale fact is no longer used, and the obligation visibly becomes Unsupported (Calor1124, guard kept); the oracle says violated, and no claim is made.')
+F([16, 17, 18, 19], DEMOTE, 'R-OBL', 'Spurious refutation: the model ignored the reassignment inside the guarded body. Demoted: an obligation that reads a reassigned variable gets no counterexample claim; it is Unsupported (Calor1124, guard kept) instead of a Failed compile error.')
+F([12], FIX, 'R-OBL', 'Spurious refutation (the model x = 2 does not reach the else body). Fixed: else bodies assume the negated condition; the obligation is Failed with the reaching model x = 548596110, which violates the claim as the oracle says.')
+F([13], FIX, 'R-OBL', 'Spurious refutation in an else body. Fixed by the else-negation fact: the obligation is Discharged, which agrees with the oracle (holds).')
+F([20], DEMOTE, 'R-OBL', 'Spurious refutation: the refined-return obligation ran with `result` unbound, so result = 2 was no execution. Demoted: a refined return gets no counterexample claim (Unsupported, guard kept).')
+F([21], FIX, 'R-OBL', 'Spurious refutation: the model violated the parameter\'s named refinement type, which the entry guard enforces. Fixed: named-refinement parameters are entry facts; the obligation is Discharged (oracle: holds).')
+F([22], DEMOTE, 'R-OBL', 'Spurious refutation (SELFREF-001): the model violated the parameter\'s named refinement. With the refinement as an entry fact there is no refutation; the obligation is Assumed (checked-arithmetic: the predicate\'s subtraction can overflow), guard kept.')
+F([23], FIX, 'R-OBL', 'Spurious refutation (SELFREF-002). Fixed: with the named refinement as an entry fact the obligation is Discharged (oracle: holds).')
+F([24], DEMOTE, 'R-OBL', 'Spurious refutation (SELFREF-003). With the refinement as an entry fact there is no refutation; the obligation is Assumed (checked-arithmetic), guard kept.')
+F([25], FIX, 'R-OBL', 'Spurious refutation (SELFREF-004). Fixed: with the named refinement as an entry fact the obligation is Discharged (oracle: holds).')
+F([26], DEMOTE, 'R-OBL', 'Spurious refutation (SELFREF-005, oracle vacuous-in-domain: no input reaches the binding). No refutation remains; the obligation is Unsupported ("no overflow-free state satisfies the assumptions"), guard kept. This withdraws the claim; it does not prove the property.')
+F([10, 11], FIX, 'R-TEXT', 'Spurious refutation: "é" had length 2 in the solver (UTF-8 bytes) and 1 in .NET. Fixed: literals are sent per UTF-16 code unit; no refutation remains, and the postcondition stays Assumed under the existing string-model limitation, as the assumed row requires (oracle: holds).')
+F([9], FIX, 'R-TEXT', 'Spurious refutation: the model s = "" makes s.Substring(1, 1) throw. Fixed: Substring carries its range side condition; the refutation now has the reaching model s = "AB" (result 1, oracle: violated).')
+F([6, 7, 8], DEMOTE, 'R-QNT', 'Required demotion absent: Proven for a nested bounded forall (oracle holds) on a row registered unsupported-refused. Demoted: nested quantifiers are refused (Unsupported) on every verifier channel and never served from cache.')
+F([1], DEMOTE, 'R-NUM', 'Required demotion absent: Proven for i8 * i8 (oracle: holds) on a row registered unsupported-refused (D1). Pending maintainer decision; see repair R-NUM.')
+F([2], DEMOTE, 'R-NUM', 'Required demotion absent: Proven for an INT: literal outside int32 (oracle: holds) on a row registered unsupported-refused (D2). Pending maintainer decision; see repair R-NUM.')
+F([3, 4, 5], DEMOTE, 'R-NUM', 'Required demotion absent: Proven for (< (- x 1) x) where §Q rules out the overflow (oracle: holds) on a row registered assumed. The row title says "unless entailed", but the frozen classification table makes any Proven on an assumed row a finding. Pending maintainer decision; see repair R-NUM.')
 assert sorted(plan) == list(range(1, 35))
 
-def row_disposition(row_findings):
-    disps = {f['disposition'] for f in row_findings}
-    if 'MILESTONE-FAILED' in disps:
+def most_conservative(dispositions):
+    if 'MILESTONE-FAILED' in dispositions:
         return 'MILESTONE-FAILED'
-    if 'DEMOTE-IN-0.24' in disps:
-        return 'DEMOTE-IN-0.24'
-    return 'FIX-IN-0.24'
+    return DEMOTE if DEMOTE in dispositions else FIX
+
+for r in repairs:
+    r['kind'] = most_conservative({d for d, rep, _ in plan.values() if rep == r['id']})
 
 baselines = {}
 for b in ('B1', 'N1'):
@@ -145,17 +158,17 @@ for b in ('B1', 'N1'):
         rf = [f for f in flist if f['rowId'] == rid]
         entry = {'rowId': rid, 'status': status, 'releaseCritical': r['releaseCritical']}
         if status == 'CLEAN-WITHIN-BUDGET':
+            proofs = classes[(b, rid)].count('validated-proof')
             entry['disposition'] = 'VALIDATED'
-            noproof = regrows[rid]['classification'] == 'modeled' and 'validated-proof' not in classes[(b, rid)]
-            entry['reason'] = ('Clean within the registered matrix and budget in both runs; no establishing outcome was observed (zero validated-proof cases), so this supports no claim that relies on Proven/Discharged for the form.'
-                               if noproof else
-                               'Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee).')
-            entry['establishingOutcomeObserved'] = not noproof
+            entry['validatedProofCases'] = proofs
+            entry['reason'] = ('Clean within the registered matrix and budget in both runs (no counterexample found; not a soundness guarantee). '
+                               + (f'{proofs} validated-proof case(s).' if proofs else
+                                  'No validated-proof case: this supports no claim that relies on Proven/Discharged for the form.'))
         elif status == 'NOT-INVESTIGATED':
             entry['disposition'] = 'NOT-INVESTIGATED'
             entry['reason'] = 'Excluded by the frozen #1419 scope before execution (zero cases, not release-critical).'
         else:
-            entry['disposition'] = row_disposition(rf)
+            entry['disposition'] = most_conservative({f['disposition'] for f in rf})
             entry['repairs'] = sorted({f['repair'] for f in rf})
             entry['findings'] = [f['findingId'] for f in rf]
             entry['reason'] = f'{len(rf)} finding(s); the row takes the most conservative finding disposition (DEMOTE if any finding is demoted).'
@@ -170,8 +183,8 @@ baselines['B1']['artifact'] = {
 baselines['N1']['artifact'] = {
     'identity': 'Calor 0.21.0 on nuget.org, packed from 88b5d38df97fd7e438882c956b9f9dcdc7a6cef5 (the binary users install)',
     'immutable': True,
-    'dispositionScope': 'Candidate-side, as for B1. A fix in 0.24 source does not change the published 0.21.0 package: the false unconditional proofs (OBL-MUTATION-KILL, IMPL-ASSUMPTION-FORMS, IMPL-DIVISION-TOTALIZED, CACHE-LITERAL-WIDTH) remain in it, and so does the Windows symbol collision (#1493).',
-    'publishedArtifactObligation': 'Proposed, needs a maintainer decision: the first release that carries these repairs names, in its release notes, the four false-proof forms and #1493 as affecting 0.21.0 (and the v0.22.0 prerelease), says that runtime guards for those forms may have been removed, and advises upgrading; a GitHub security advisory is optional. Contract §8 History keeps 0.21.0 as a historical record; nothing claims it is fixed.',
+    'dispositionScope': 'Candidate-side, as for B1. A fix in 0.24 source does not change the published 0.21.0 package; its false unconditional proofs remain in it.',
+    'publishedArtifactObligation': 'Proposed, needs a maintainer decision: the first release that carries these repairs says in its release notes that 0.21.0 (and the v0.22.0 prerelease) are affected, distinguishing the mechanisms: (1) proof obligations after a reassignment (OBL-MUTATION-KILL) and warm-cache literal-width proofs (CACHE-LITERAL-WIDTH) could remove a runtime guard that the program then needed; (2) interface contract checks (IMPL-ASSUMPTION-FORMS, IMPL-DIVISION-TOTALIZED) could accept an implementer precondition that throws on inputs the interface allows (no guard is removed; the acceptance is wrong); (3) #1493 is a potential, not observed, Windows-only collision of non-ASCII identifiers. Nothing claims the published package is fixed (contract §8 History).',
 }
 
 discoveries = [{
@@ -180,7 +193,7 @@ discoveries = [{
     'finding': 'Z3 symbol names take the .NET binding\'s ANSI marshaling; on Windows two non-ASCII identifiers outside the code page can become one Z3 constant, a possible false proof (Windows only).',
     'affects': ['B1', 'N1', 'main at 0142438f'],
     'observed': False,
-    'disposition': 'FIX-IN-0.24', 'repair': 'R-TEXT',
+    'disposition': FIX, 'repair': 'R-TEXT',
     'reason': 'Fixed by the injective ASCII symbol encoding in R-TEXT; the end-to-end witness runs on Windows in the z3-consumer-matrix job.',
 }]
 
@@ -195,20 +208,24 @@ record = {
         'rowStatus': S1 + 'combined-row-status.json',
         'sha256': {p: sha(p) for p in (S1 + 'run2/findings.json', S1 + 'findings.json', S1 + 'combined-row-status.json')},
     },
+    'requiredDiscoveries': [1493],
     'closure': {
         'status': 'OPEN',
-        'note': 'OPEN until every repair is merged (status "merged" with its merge commit) and R-NUM is decided. The validator rejects a CLOSED record with any unmerged or undecided repair.',
+        'result': None,
+        'note': 'OPEN until every repair is merged (status "merged" with its merge commit on main and its regression witnesses present) and R-NUM is decided. At closure, result is SUCCESS (no MILESTONE-FAILED anywhere) or MILESTONE-FAILED (required if any finding or discovery is MILESTONE-FAILED); only SUCCESS satisfies terminal predicates 4-5.',
     },
     'capacity': {'ceiling': 's2-repairs', 'maxRepairs': 6, 'maxNonTestChangedLinesPerRepair': 600,
-                 'used': len(repairs), 'note': 'Six repairs counting the undecided R-NUM; no capacity remains for further repairs.'},
+                 'used': len(repairs), 'openedRepairPRs': 5, 'reservedSlots': 1,
+                 'note': 'Five repair PRs are open and one slot is reserved for R-NUM (no PR, no acceptance decision). nonTestChangedLines excludes committed review records.'},
     'repairs': repairs,
     'baselines': baselines,
     'discoveryFindings': discoveries,
     'openQuestions': [
         {'id': 'Q1-R-NUM', 'question': 'Disposition path for NUM-NARROW-ARITH, NUM-LITERAL-OVERSIZE, NUM-OVERFLOW-CHECKED (5 findings per baseline); see repair R-NUM decisionOptions.'},
-        {'id': 'Q2-O2-GEN-REFUSAL', 'question': 'S1 condition 10: O2 ran only partially on GEN-REFUSAL-002/-004 (the frozen input new object() cannot be passed to the compiled double[] parameter). Proposed: keep GEN-REFUSAL VALIDATED on both baselines. Both cases are Unsupported (refusal-validated): there is no claim and no elided guard for O2 to corroborate, O1 agrees, and O2 is corroboration, not the adjudicating oracle. The partial replay is recorded as an O2 coverage limitation of the frozen generator, not a finding.'},
+        {'id': 'Q2-O2-GEN-REFUSAL', 'question': 'S1 condition 10: O2 ran only partially on GEN-REFUSAL-002/-004 (the frozen input new object() cannot be passed to the compiled double[] parameter), so the registered O2 coverage for those cases is incomplete. The registered row status does not use O2 completeness, both cases are Unsupported (refusal-validated) with guards retained, O1 agrees, and the partial replay shows no divergence; proposed: keep GEN-REFUSAL VALIDATED and record the O2 gap as a coverage limitation of the frozen generator. Condition 10 itself stays the maintainer\'s decision.'},
         {'id': 'Q3-N1-ADVISORY', 'question': 'Whether to adopt the N1 publishedArtifactObligation (release-notes advisory for 0.21.0 / v0.22.0).'},
         {'id': 'Q4-ISSUE-LINKS', 'question': 'Issue acceptance: each repair PR must be attached to #1409 and encoded as blocking #1423. Agents do not edit issues; the maintainer links PRs #1494-#1498 (and R-NUM if opened).'},
+        {'id': 'Q5-MERGE-ORDER', 'question': '#1497 (R-TEXT) must merge after #1495 (R-IMPL); the cache-format constant (1.20/1.21) and eng/test-manifest.json/CHANGELOG.md need the usual merge resolution across the S2 PRs.'},
     ],
 }
 open('docs/plans/evidence/s2-1413/dispositions.json', 'w').write(json.dumps(record, indent=2, ensure_ascii=False) + '\n')

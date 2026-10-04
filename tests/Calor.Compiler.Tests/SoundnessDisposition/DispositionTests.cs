@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Xunit;
 
@@ -24,14 +25,44 @@ public sealed class DispositionTests
 
     private static JsonNode Record() => Load(RecordPath);
 
-    private static IReadOnlyList<DispositionValidator.Violation> Validate(JsonNode record, bool closing = false)
+    private static string? FindString(JsonNode? node, string key) => node switch
+    {
+        JsonObject o => o.TryGetPropertyValue(key, out var value) && value is JsonValue s && s.TryGetValue<string>(out var text)
+            ? text
+            : o.Select(p => FindString(p.Value, key)).FirstOrDefault(x => x != null),
+        JsonArray a => a.Select(x => FindString(x, key)).FirstOrDefault(x => x != null),
+        _ => null
+    };
+
+    /// <summary>Real closure evidence: the commit is an ancestor of HEAD; the file exists.</summary>
+    private static readonly DispositionValidator.ClosureEvidence RepositoryEvidence = new(
+        sha =>
+        {
+            var start = new ProcessStartInfo("git", $"merge-base --is-ancestor {sha} HEAD")
+            {
+                WorkingDirectory = RepoRoot(),
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+            };
+            using var process = Process.Start(start)!;
+            process.WaitForExit();
+            return process.ExitCode == 0;
+        },
+        path => File.Exists(Path.Combine(RepoRoot(), path)));
+
+    private static readonly DispositionValidator.ClosureEvidence AcceptAll = new(_ => true, _ => true);
+
+    private static IReadOnlyList<DispositionValidator.Violation> Validate(
+        JsonNode record, bool closing = false, DispositionValidator.ClosureEvidence? evidence = null)
         => DispositionValidator.Validate(
             record,
             Load("docs/plans/evidence/evidence-contract-1407/contract.json"),
             Load("docs/plans/evidence/s1-1311/run2/findings.json"),
             Load("docs/plans/evidence/s1-1311/findings.json"),
             Load("docs/plans/evidence/s1-1311/combined-row-status.json"),
-            closing);
+            FindString(Load("docs/plans/evidence/s1-1311/run2/pins.json"), "registrationCommit")!,
+            closing,
+            evidence ?? RepositoryEvidence);
 
     private static void AssertCodes(IReadOnlyList<DispositionValidator.Violation> violations, params string[] codes)
         => Assert.Equal(
@@ -47,6 +78,24 @@ public sealed class DispositionTests
     private static JsonObject Repair(JsonNode record, string id)
         => record["repairs"]!.AsArray().Single(r => r!["id"]!.GetValue<string>() == id)!.AsObject();
 
+    /// <summary>A variant where every repair merged with full closure evidence fields.</summary>
+    private static JsonNode MergedRecord()
+    {
+        var record = Record();
+        foreach (var repair in record["repairs"]!.AsArray())
+        {
+            repair!["status"] = "merged";
+            repair["mergeCommit"] = new string('a', 40);
+            repair["pr"] ??= 9999;
+            repair["branch"] ??= "milestone-0.24/s2-1413-fix-example";
+            if (repair["regressionWitness"]!.AsArray().Count == 0)
+                repair["regressionWitness"]!.AsArray().Add("tests/example.cs");
+        }
+        record["closure"]!["status"] = "CLOSED";
+        record["closure"]!["result"] = "SUCCESS";
+        return record;
+    }
+
     // ------------------------------------------------------------------ positive
 
     [Fact]
@@ -56,9 +105,9 @@ public sealed class DispositionTests
     [Fact]
     public void CommittedRecord_IsNotYetClosable()
     {
-        // Unmerged repairs and the undecided R-NUM keep S2 open.
+        // Unmerged repairs and the undecided R-NUM keep S2 open; there is no closure result yet.
         var violations = Validate(Record(), closing: true);
-        AssertCodes(violations, "D010");
+        AssertCodes(violations, "D010", "D016");
         Assert.Contains(violations, v => v.Message.Contains("R-NUM: undecided at closure"));
         Assert.Contains(violations, v => v.Message.Contains("R-CACHE: not merged at closure"));
     }
@@ -92,19 +141,18 @@ public sealed class DispositionTests
 
     [Fact]
     public void FullyMergedRecord_Closes()
+        => AssertCodes(Validate(MergedRecord(), closing: true, AcceptAll));
+
+    [Fact]
+    public void FailedRecord_ClosesOnlyAsMilestoneFailed()
     {
-        var record = Record();
-        foreach (var repair in record["repairs"]!.AsArray())
-        {
-            repair!["status"] = "merged";
-            repair["mergeCommit"] = new string('a', 40);
-            repair["pr"] ??= 9999;
-            repair["branch"] ??= "milestone-0.24/s2-1413-fix-example";
-            if (repair["regressionWitness"]!.AsArray().Count == 0)
-                repair["regressionWitness"]!.AsArray().Add("tests/example.cs");
-        }
-        record["closure"]!["status"] = "CLOSED";
-        AssertCodes(Validate(record, closing: true));
+        var record = MergedRecord();
+        Finding(record, "B1", "F-B1-001")["disposition"] = "MILESTONE-FAILED";
+        Row(record, "B1", "NUM-NARROW-ARITH")["disposition"] = "MILESTONE-FAILED";
+        AssertCodes(Validate(record, closing: true, AcceptAll), "D016");
+
+        record["closure"]!["result"] = "MILESTONE-FAILED";
+        AssertCodes(Validate(record, closing: true, AcceptAll));
     }
 
     // ------------------------------------------------------------- negative controls
@@ -122,8 +170,8 @@ public sealed class DispositionTests
     {
         var record = Record();
         Finding(record, "B1", "F-B1-033")["disposition"] = "KNOWN-INCOMPLETENESS";
-        // The row's finding set loses one entry but its other findings keep it consistent.
-        AssertCodes(Validate(record), "D001");
+        // The rejected finding no longer counts toward its row's finding list (D015).
+        AssertCodes(Validate(record), "D001", "D015");
     }
 
     [Fact]
@@ -132,7 +180,7 @@ public sealed class DispositionTests
         var record = Record();
         var findings = record["baselines"]!["N1"]!["findings"]!.AsArray();
         findings.Remove(findings.Single(f => f!["findingId"]!.GetValue<string>() == "F-N1-030"));
-        // IMPL-DIVISION-TOTALIZED then has no dispositioned finding: D012 co-fires.
+        // IMPL-DIVISION-TOTALIZED then has no dispositioned finding (D012).
         AssertCodes(Validate(record), "D002", "D012");
     }
 
@@ -140,8 +188,7 @@ public sealed class DispositionTests
     public void D002_DuplicateFinding()
     {
         var record = Record();
-        var findings = record["baselines"]!["B1"]!["findings"]!.AsArray();
-        findings.Add(Finding(record, "B1", "F-B1-001").DeepClone());
+        record["baselines"]!["B1"]!["findings"]!.AsArray().Add(Finding(record, "B1", "F-B1-001").DeepClone());
         AssertCodes(Validate(record), "D002");
     }
 
@@ -154,11 +201,27 @@ public sealed class DispositionTests
     }
 
     [Fact]
+    public void D002_TokenChanged()
+    {
+        var record = Record();
+        Finding(record, "N1", "F-N1-014")["token"] = "Failed";
+        AssertCodes(Validate(record), "D002");
+    }
+
+    [Fact]
     public void D003_MissingRow()
     {
         var record = Record();
         var rows = record["baselines"]!["N1"]!["rows"]!.AsArray();
         rows.Remove(rows.Single(r => r!["rowId"]!.GetValue<string>() == "NUM-ARITH-ADD"));
+        AssertCodes(Validate(record), "D003");
+    }
+
+    [Fact]
+    public void D003_ReleaseCriticalMarkChanged()
+    {
+        var record = Record();
+        Row(record, "B1", "NUM-ARITH-ADD")["releaseCritical"] = false;
         AssertCodes(Validate(record), "D003");
     }
 
@@ -175,7 +238,7 @@ public sealed class DispositionTests
     {
         var record = Record();
         Row(record, "N1", "CACHE-LITERAL-WIDTH")["disposition"] = "VALIDATED";
-        // The row no longer matches its findings' disposition either.
+        // The row no longer matches its findings' disposition either (D012).
         AssertCodes(Validate(record), "D004", "D012");
     }
 
@@ -199,7 +262,7 @@ public sealed class DispositionTests
     public void D006_FalseProofNotInvestigated()
     {
         var record = Record();
-        Finding(record, "N1", "F-N1-014")["disposition"] = "NOT-INVESTIGATED";
+        Finding(record, "N1", "F-N1-031")["disposition"] = "NOT-INVESTIGATED";
         // NOT-INVESTIGATED is also never valid for a finding (D005).
         AssertCodes(Validate(record), "D005", "D006");
     }
@@ -209,7 +272,8 @@ public sealed class DispositionTests
     {
         var record = Record();
         Finding(record, "B1", "F-B1-031")["repair"] = "R-NOPE";
-        AssertCodes(Validate(record), "D007");
+        // The row's repairs list no longer matches its findings (D015).
+        AssertCodes(Validate(record), "D007", "D015");
     }
 
     [Fact]
@@ -217,7 +281,7 @@ public sealed class DispositionTests
     {
         var record = Record();
         Finding(record, "B1", "F-B1-031")["repair"] = "R-IMPL";
-        AssertCodes(Validate(record), "D007");
+        AssertCodes(Validate(record), "D007", "D015");
     }
 
     [Fact]
@@ -247,13 +311,22 @@ public sealed class DispositionTests
     }
 
     [Fact]
+    public void D008_RepairKindLessConservativeThanItsFindings()
+    {
+        var record = Record();
+        Repair(record, "R-OBL")["kind"] = "FIX-IN-0.24";
+        AssertCodes(Validate(record), "D008");
+    }
+
+    [Fact]
     public void D009_OverCapacityRepairs()
     {
         var record = Record();
         var extra = Repair(record, "R-QNT").DeepClone();
         extra["id"] = "R-EXTRA";
         record["repairs"]!.AsArray().Add(extra);
-        AssertCodes(Validate(record), "D009");
+        // The extra repair is referenced by nothing (D015).
+        AssertCodes(Validate(record), "D009", "D015");
     }
 
     [Fact]
@@ -265,11 +338,28 @@ public sealed class DispositionTests
     }
 
     [Fact]
+    public void D009_CapacityUsedMisstated()
+    {
+        var record = Record();
+        record["capacity"]!["used"] = 5;
+        AssertCodes(Validate(record), "D009");
+    }
+
+    [Fact]
     public void D010_ClosedButNotClosing()
     {
         var record = Record();
         record["closure"]!["status"] = "CLOSED";
         AssertCodes(Validate(record), "D010");
+    }
+
+    [Fact]
+    public void D010_InventedMergeEvidence_DoesNotClose()
+    {
+        // A syntactically valid but absent merge commit and a nonexistent witness file.
+        var violations = Validate(MergedRecord(), closing: true, RepositoryEvidence);
+        AssertCodes(violations, "D010");
+        Assert.Contains(violations, v => v.Message.Contains("merge commit not on the checked-out history"));
     }
 
     [Fact]
@@ -314,10 +404,34 @@ public sealed class DispositionTests
     }
 
     [Fact]
+    public void D014_RequiredDiscoveryRemoved()
+    {
+        var record = Record();
+        record["discoveryFindings"] = new JsonArray();
+        AssertCodes(Validate(record), "D014");
+    }
+
+    [Fact]
     public void D014_DiscoveryNotListedByItsRepair()
     {
         var record = Record();
         Repair(record, "R-TEXT")["discoveries"] = new JsonArray();
         AssertCodes(Validate(record), "D014");
+    }
+
+    [Fact]
+    public void D015_RowFindingListTampered()
+    {
+        var record = Record();
+        Row(record, "B1", "OBL-SELFREF")["findings"]!.AsArray().RemoveAt(0);
+        AssertCodes(Validate(record), "D015");
+    }
+
+    [Fact]
+    public void D017_ContractVersionChanged()
+    {
+        var record = Record();
+        record["contractVersion"] = "1.0.0";
+        AssertCodes(Validate(record), "D017");
     }
 }
