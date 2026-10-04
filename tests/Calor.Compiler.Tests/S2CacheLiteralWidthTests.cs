@@ -177,12 +177,12 @@ public sealed class S2CacheLiteralWidthTests : IDisposable
     [Fact]
     public void CacheKey_UnpairedSurrogateDoesNotCollideWithReplacementCharacter()
     {
-        // Review round 2 witness (SDK-built AST): UTF-8 hashing mapped "p\uD800" and
-        // "p�" to the same bytes, so a warm cache served the first name's Proven to
-        // the second (an unknown variable, Unsupported when verified cold).
+        // Review round 2 witness (SDK-built AST): UTF-8 hashing mapped "p\uFFFD" and
+        // "p\uD800" to the same bytes, so a warm cache primed with the first name's Proven
+        // served it to the second (an unknown variable, Unsupported when verified cold).
         var span = new TextSpan(0, 0, 1, 1);
         var attributes = new AttributeCollection();
-        const string replacement = "p�";
+        const string replacement = "p\uFFFD";
         const string surrogate = "p\uD800";
         var parameters = new List<(string Name, string TypeName)> { (replacement, "bool") };
         var pre = new List<RequiresNode> { new(span, new ReferenceNode(span, replacement), null, attributes) };
@@ -207,7 +207,7 @@ public sealed class S2CacheLiteralWidthTests : IDisposable
             Assert.True(cache.TryGetPostconditionResult(parameters, "i32", pre, primePost, body, out _));
             Assert.False(cache.TryGetPostconditionResult(parameters, "i32", pre, finalPost, body, out _));
         }
-        using (var cache = new VerificationCache(options, keyScope: "scope�"))
+        using (var cache = new VerificationCache(options, keyScope: "scope\uFFFD"))
         {
             // The key scope is hashed losslessly too.
             Assert.False(cache.TryGetPostconditionResult(parameters, "i32", pre, primePost, body, out _));
