@@ -1,0 +1,26 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §U{System}
+
+  §NS{ns_global:_global:global}
+    §CL{s001:Point:pub:struct}
+      §FLD{i32:X:pub}
+
+
+    §CL{c002:Probe:pub:stat}
+      §MT{m003:Bump:pub:stat} (i32:x:ref)
+        §ASSIGN x (+ x 1)
+
+      §MT{m004:Run:pub:stat} () -> str
+        §E{alloc,mut}
+        §B{~_hoist000} §NEW{Point}
+          X = 1
+        §/NEW
+        §ARR{pts:Point}
+          _hoist000
+        §B{~_hoist001} §IDX{pts} 0
+        §C{Bump} §A{ref} _hoist001.X §/C
+        §B{~_hoist002} §IDX{pts} 0
+        §R (str _hoist002.X)
+
+
+

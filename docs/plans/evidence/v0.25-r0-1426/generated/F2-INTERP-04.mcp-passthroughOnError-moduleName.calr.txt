@@ -1,0 +1,12 @@
+§M{m001:Custom:overflow=unchecked}
+  §U{System}
+
+  §CL{c001:Probe:pub:stat}
+    §MT{m002:Run:pub:stat} () -> str
+      §B{i32:x} 9
+      §B{str:dollar} "\${x}"
+      §B{str:braces} "{x}"
+      §B{str:real} "${x}"
+      §R (+ (+ (+ (+ dollar "|") braces) "|") real)
+
+
