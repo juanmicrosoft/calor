@@ -346,7 +346,13 @@ def observe(env_vars, dotnet_root: str, rid_entry: dict, out: Path) -> dict:
             "autocrlf": stdout("git", "-C", str(ROOT), "config", "--get", "core.autocrlf").strip(),
             "dirty": status.stdout.strip() if status.returncode == 0 else f"<git status exit {status.returncode}>",
             "runAttempt": env_vars.get("GITHUB_RUN_ATTEMPT"),
-            "userProfileFollowsIsolatedHome": home_probe(env_vars, out / "home-probe", env_vars.get("NUGET_PACKAGES", ""))}
+            # Amendment 1.3.0: the probe builds beside the output directory, not in it, so its NuGet cache is never uploaded.
+            "userProfileFollowsIsolatedHome": home_probe(env_vars, probe_dir(out), env_vars.get("NUGET_PACKAGES", ""))}
+
+
+def probe_dir(out: Path) -> Path:
+    """The home probe's directory: a sibling of the job's output directory (under the runner temp directory)."""
+    return out.with_name(out.name + "-probe") / "home-probe"
 
 
 def cmd_env_check(args, env_vars=os.environ) -> int:
@@ -459,6 +465,10 @@ def run_profile(protocol, cases, profile, env, invocation_dir: Path, base, nuget
         "invalid" if outcomes is None else "completed"
     result = {"profile": profile["id"], "status": status, "exitCode": code, "seconds": round(time.monotonic() - started, 1),
               "calorCacheExisted": existed, **values}
+    # Amendment 1.3.0: the isolated home is scratch (its .calor state is recorded above). NuGet writes cache
+    # files there whose names upload-artifact rejects (':'), which lost every Linux and macOS record of
+    # execution g3-exec-1, so it is removed before the job's output directory is uploaded.
+    shutil.rmtree(child["HOME"], ignore_errors=True)
     return result
 
 
@@ -561,7 +571,35 @@ def fill_missing(protocol, *, env_id, job, mode, execution_id, out: Path, base) 
         else:
             record.update(status="infrastructure-failure", reason="a setup step failed before any test ran")
         write_json(record_path(out, env_id, job, attempt), record)
-    return 0
+    # Amendment 1.3.0: remove isolated homes an interrupted invocation left behind, then refuse to hand the
+    # upload a path it would reject (that rejection loses the whole job's records).
+    for home in out.glob("raw/a*/*/home"):
+        shutil.rmtree(home, ignore_errors=True)
+    # No record name can hold such a character (attempt-*.json, env.json, <profile>.trx, cells.json, generated reports),
+    # so whatever still does is scratch: remove it, deepest first, and keep the list as a diagnostic.
+    pruned = []
+    for rel in sorted(upload_problems(out), key=len, reverse=True):
+        path = out / rel
+        try:
+            shutil.rmtree(path) if path.is_dir() and not path.is_symlink() else path.unlink()
+            pruned.append(rel)
+        except OSError as error:
+            print(f"could not remove {rel}: {error}")
+    if pruned:
+        (out / "upload-pruned.txt").write_text("".join(f"{p!r}\n" for p in pruned), encoding="utf-8")
+    rejected = upload_problems(out)
+    if rejected:
+        print("paths upload-artifact rejects remain under the output directory:\n" + "\n".join(rejected[:20]))
+    return 1 if rejected else 0
+
+
+# Characters actions/upload-artifact@v4 refuses in any uploaded path (it then uploads nothing).
+UPLOAD_FORBIDDEN = frozenset('":<>|*?\r\n')
+
+
+def upload_problems(out: Path) -> list[str]:
+    """Paths under the output directory that upload-artifact would reject."""
+    return sorted(str(p.relative_to(out)) for p in out.rglob("*") if UPLOAD_FORBIDDEN & set(p.name))
 
 
 # ---------------------------------------------------------------- decide and ledger
