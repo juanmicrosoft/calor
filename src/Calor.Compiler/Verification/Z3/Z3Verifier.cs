@@ -549,12 +549,12 @@ public sealed class Z3Verifier : IDisposable
                 if (pathConditions.Count > 0)
                 {
                     assumptions.Add(ExceptionalPathDivisionAssumption);
-                    reasons.Add("the body divides, and paths with a zero divisor throw before the postcondition is evaluated");
+                    reasons.Add("the body divides or takes a substring, and paths where that throws never reach the postcondition");
                 }
                 if (contractDivisionAssumed)
                 {
                     assumptions.Add(ContractExpressionDivisionAssumption);
-                    reasons.Add("the contract expressions divide, and a zero divisor (or MinValue ÷ -1 overflow) would make the runtime contract check itself throw (W1 Slice 1, D8)");
+                    reasons.Add("the contract expressions divide or take a substring, and a zero divisor (or MinValue ÷ -1 overflow, or an out-of-range substring) would make the runtime contract check itself throw (W1 Slice 1, D8)");
                 }
                 if (stringModelAssumed)
                 {
@@ -1189,9 +1189,10 @@ public static class FunctionBodyEncoder
                 // divisor: an unconditional range condition is a side condition; one in a
                 // conditionally-evaluated position is not modeled.
                 var range = translator.GetStringRangeCondition(sop);
-                if (range == null)
-                    return "a string operation's index range could not be modeled";
-                if (range.IsTrue)
+                // A range over a body-local name cannot be translated here (the encoder
+                // substitutes bindings later): no side condition, which only weakens a
+                // refutation's guarantee, never a proof's.
+                if (range == null || range.IsTrue)
                     return null;
                 if (conditional)
                 {

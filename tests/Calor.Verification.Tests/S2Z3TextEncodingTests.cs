@@ -107,6 +107,62 @@ public sealed class S2Z3TextEncodingTests
     }
 
     [Fact]
+    public void SubstringFromCounterexample_IsOneWhereTheBodyReturns()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => "a".Substring(2));
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:pub} (str:s) -> i32
+                §E{}
+                §S (== result INT:5)
+                §R (len (substr s INT:2))
+            """;
+        var outcome = VerifySinglePostcondition(source).EffectiveOutcome;
+        Assert.Equal(ProofStatus.Refuted, outcome.Status);
+        // The model's s has at least two characters (with its quotes, at least 4).
+        var s = Assert.Single(outcome.Counterexample!.Bindings, binding => binding.Name == "s");
+        Assert.True(s.Value.Length >= 4, s.Value);
+    }
+
+    [Fact]
+    public void IndexOfWithStart_IsUnsupported()
+    {
+        // The emitted call ignores the start index, so the solver must not model one.
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:pub} () -> i32
+                §E{}
+                §S (== result INT:4)
+                §R (indexof STR:"abcabc" STR:"b" INT:3 :ordinal)
+            """;
+        Assert.Equal(ProofStatus.Unsupported, VerifySinglePostcondition(source).EffectiveOutcome.Status);
+    }
+
+    [Fact]
+    public void SubstringOverALocal_StaysAssumed()
+    {
+        const string source = """
+            §M{m1:M}
+              §F{f1:Probe:pub} (str:s) -> i32
+                §E{}
+                §Q (== s STR:"ab")
+                §S (== result INT:1)
+                §B{i:i32} INT:1
+                §R (len (substr s i INT:1))
+            """;
+        Assert.Equal(ProofStatus.Assumed, VerifySinglePostcondition(source).EffectiveOutcome.Status);
+    }
+
+    [Fact]
+    public void DollarNames_AreReservedForSyntheticVariables()
+    {
+        using var ctx = Z3ContextFactory.Create();
+        var translator = new ContractTranslator(ctx);
+        Assert.True(translator.DeclareVariable("a", "i32[]"));
+        Assert.False(translator.DeclareVariable("a$length", "u32"));
+    }
+
+    [Fact]
     public void SubstringInConditionalPosition_IsUnsupported()
     {
         const string source = """

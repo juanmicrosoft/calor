@@ -393,6 +393,10 @@ public sealed class ContractTranslator
     /// <returns>True if the type is supported and variable was declared.</returns>
     public bool DeclareVariable(string name, string typeName)
     {
+        // #1413 review: '$' names are reserved for synthetic solver variables (an array's
+        // `a$length`); a caller-supplied `a$length` would otherwise be the same variable.
+        if (name.Contains('$'))
+            return false;
         var expr = CreateVariableForType(name, typeName);
         if (expr == null)
             return false;
@@ -1363,14 +1367,13 @@ public sealed class ContractTranslator
         {
             StringOp.Substring => node.Arguments.Count >= 3,
             StringOp.SubstringFrom => node.Arguments.Count >= 2,
-            StringOp.IndexOf => node.Arguments.Count >= 3,
             _ => false
         };
         if (!isIndexed)
             return _ctx.MkTrue();
         if (Translate(node.Arguments[0]) is not SeqExpr str)
             return null;
-        var start = ConvertToIntExpr(Translate(node.Arguments[node.Operation == StringOp.IndexOf ? 2 : 1]));
+        var start = ConvertToIntExpr(Translate(node.Arguments[1]));
         if (start == null)
             return null;
         var length = _ctx.MkLength(str);
@@ -1799,6 +1802,12 @@ public sealed class ContractTranslator
     {
         if (node.Arguments.Count < 2)
             return null;
+        if (node.Arguments.Count >= 3)
+        {
+            // #1413 review: the emitter drops the start index (it emits s.IndexOf(t, mode)), so
+            // the solver's indexof-from-start would describe a different call.
+            return Refuse("IndexOf with a start index is not modeled: the emitted call ignores the start");
+        }
 
         var str = Translate(node.Arguments[0]);
         var search = Translate(node.Arguments[1]);
@@ -2067,6 +2076,8 @@ public sealed class ContractTranslator
     /// <returns>True if the array was declared successfully.</returns>
     public bool DeclareArrayVariable(string name, string elementType)
     {
+        if (name.Contains('$'))
+            return false;
         var (elementWidth, elementSigned) = GetTypeWidthAndSignedness(elementType);
         if (elementWidth == 0)
             return false;
