@@ -295,6 +295,35 @@
           "tests/E2E/agent-tasks/run-agent-tests.sh": "794efb953b96ca7680ee49dc4e41e01ab85055f024c7433acd7e7e1125785ac4"
         }
       }
+    },
+    {
+      "path": "website/public/data/benchmark-headline.json",
+      "stampPointer": "/provenance/commit",
+      "measuredCommit": "7d94d095729a4e8ba74a4a50574c24f844dec9f1",
+      "basis": "identical-src-tree",
+      "measuredTreeHashes": {
+        "src": "799d23f078e6bd8b84ef70c46d3d386a6dd9b936"
+      },
+      "note": "#1422: written by scripts/benchmark_publication_gate.py from the B1 results packet at this commit, which is on main; the headline is a projection of results.json, not a new measurement.",
+      "durableIdentity": {
+        "status": "complete",
+        "commit": "7d94d095729a4e8ba74a4a50574c24f844dec9f1",
+        "resolvedVia": "refs/remotes/origin/main",
+        "treeHashes": {
+          "/": "45168906d92211ae5c7401ca614068c848730f61",
+          "src": "799d23f078e6bd8b84ef70c46d3d386a6dd9b936",
+          "tests/Calor.Evaluation": "7e15772646a20dc55e564e5bfc728c1969f72b44",
+          "tests/TestData/Benchmarks": "3d29b2176c7b6da5556285befd2060edd3e017f0",
+          "docs/plans/evidence/b1-1276": "370c4616263c28e1bb67c3791ee3cdc3c871a0e9",
+          "scripts/benchmark_publication_gate.py": "ba43f38250bfcdea3d22c2c2407253e4cb6bd0d6"
+        },
+        "inputContentHashes": {
+          "docs/plans/evidence/b1-1276/results/results.json": "ed10ba1bff736dba936f112d557296f7c8ffb9f49db3c2ee8925e096fab2ed1f",
+          "docs/plans/evidence/b1-1276/results/pair-manifest.json": "eec09eab95c60c18b650bd70ee7ad4f807d649cf2f2800665a4f9589a6fe1813",
+          "docs/plans/evidence/b1-1276/registration/pairs.json": "0f0d760a3f247dc6c952c39d5499656ecd0b08b99e8c4148a809302e62a93a7f",
+          "docs/plans/evidence/evidence-contract-1407/contract.json": "2b87def646d572e6656cb96157f78dafd040fbb1b46b2cf45e0571cb3290cf12"
+        }
+      }
     }
   ]
 }
