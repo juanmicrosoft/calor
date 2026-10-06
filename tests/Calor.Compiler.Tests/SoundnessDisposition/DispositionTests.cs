@@ -64,7 +64,7 @@ public sealed class DispositionTests
             .FirstOrDefault());
 
     /// <summary>Discoveries the record must keep (by id), pinned outside the record.</summary>
-    private static readonly string[] PinnedDiscoveries = ["D-1493", "D-OBL-PROOF-GETTER", "D-OBL-THROWING-PREDECESSOR"];
+    private static readonly string[] PinnedDiscoveries = ["D-1493", "D-NUM-WHILE-BOUND", "D-OBL-PROOF-GETTER", "D-OBL-THROWING-PREDECESSOR"];
 
     /// <summary>The opened repair PRs, pinned outside the record (an accepted R-NUM PR is added here).</summary>
     private static readonly Dictionary<string, int> PinnedRepairPrs = new()
@@ -143,9 +143,9 @@ public sealed class DispositionTests
             if (repair["regressionWitness"]!.AsArray().Count == 0)
                 repair["regressionWitness"]!.AsArray().Add("tests/example.cs");
         }
-        // Closing assumes amendments 1.3.0 (capacity allowance, R-OBL overrun) and 1.3.1 (R-NUM and
-        // R-OBL-RESIDUALS overruns) have merged.
-        record["contractVersion"] = "1.3.1";
+        // Closing assumes amendments 1.3.0 (capacity allowance, R-OBL overrun), 1.3.1
+        // (R-OBL-RESIDUALS overrun) and 1.3.2 (R-NUM overrun) have merged.
+        record["contractVersion"] = "1.3.2";
         record["closure"]!["status"] = "CLOSED";
         record["closure"]!["result"] = "SUCCESS";
         return record;
