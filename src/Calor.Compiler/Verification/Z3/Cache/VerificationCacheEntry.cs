@@ -86,6 +86,11 @@ public sealed class VerificationCacheEntry
     // signedness. Older keys hashed only the value, so `x + INT:1` and `x + LONG:1`
     // shared one entry and a warm cache served the LONG proof for the INT text — a
     // false Proven that elides the guard. The bump evicts every entry written under the old keys.
+    // 1.21 (#1413, S1 STR-NULL-NONASCII; #1493): string literals reach Z3 per UTF-16 code unit
+    // (not per UTF-8 byte) and non-ASCII identifiers get injective ASCII symbol names, on every
+    // platform, so verdicts over non-ASCII text change. SemanticsVersion stays (the translator
+    // fixture output is unchanged); the bump evicts every entry instead. (1.20 is the
+    // #1413 cache-literal-width repair, merged first.)
     // 1.22 (#1413, S2 R-NUM): sub-32-bit arithmetic/negation (D1) and INT: literals outside the
     // int32 range (D2) are refused, and checked arithmetic that can overflow on some input is
     // Assumed even when the preconditions rule it out. Older entries may hold Proven for them.

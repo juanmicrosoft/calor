@@ -184,6 +184,14 @@ public sealed class ContractHasher
         // value spelled LONG: is modeled; they must never share a cached verdict.
         if (expr is IntLiteralNode { WidthInferred: true })
             sb.Append("INFERRED-WIDTH:");
+        // #1413 (S1 QNT-NESTED): nested quantifiers are refused by every verifier channel,
+        // but a cache written before that refusal may hold a Proven for one. Never read or
+        // write such a key, so no stale claim can be served.
+        if (expr is ForallExpressionNode or ExistsExpressionNode
+            && QuantifierNesting.ContainsNestedQuantifier(expr))
+        {
+            SawUnhashedKind = true;
+        }
 
         switch (expr)
         {

@@ -59,7 +59,9 @@ public sealed class Z3Verifier : IDisposable
     /// produced genuine false <c>Proven</c>s that ELIDED a failing runtime check on the shipped
     /// <c>calor run --verify</c> path: <c>len(s)=0 ⟺ s=""</c> is a Z3 tautology while in C#
     /// <c>null</c> satisfies <c>IsNullOrEmpty</c> and <c>null == ""</c> is false; and
-    /// <c>"é".Length</c> is 1 in .NET, 2 under the byte model.
+    /// <c>"é".Length</c> is 1 in .NET, 2 under the byte model. Since #1413 literals are encoded
+    /// one code unit per character (\u{h}), so the length gap is closed; the null gap remains,
+    /// and this content-stable text is kept unchanged because assumption sets hash on it.
     /// <para>Unlike D4 and D9 these are <b>not closable by refusing an operation</b> — every total
     /// axiom of the sort is affected — so the proof is <b>demoted</b> rather than suppressed, and
     /// <c>Assumed</c> never elides. Lifting it is tracked by #875.</para>
@@ -81,6 +83,10 @@ public sealed class Z3Verifier : IDisposable
     internal static bool IsOverflowSensitive(Context context, IReadOnlyCollection<BoolExpr> conditions)
         => conditions.Count > 0
            && !IsolatedSolver.Simplify(context, context.MkAnd(conditions.ToArray())).IsTrue;
+    /// <summary>#1413 review: an unsatisfiable precondition set containing a null-tolerant string,
+    /// array, or user-type form may be satisfiable by a null the solver cannot represent.</summary>
+    private const string NonNullModelUnsat =
+        "The precondition set is unsatisfiable only in the solver's non-null string/reference model (a null may satisfy it); no vacuity or unsatisfiability is claimed. Runtime check kept.";
 
     internal static bool ArithmeticSafetyEntailed(Context context, IsolatedSolver solver, IEnumerable<BoolExpr> conditions)
     {
@@ -122,6 +128,13 @@ public sealed class Z3Verifier : IDisposable
         RequiresNode precondition)
     {
         var sw = Stopwatch.StartNew();
+
+        if (QuantifierNesting.ContainsNestedQuantifier(precondition.Condition))
+        {
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(QuantifierNesting.Refusal)),
+                Duration: sw.Elapsed);
+        }
 
         var translator = CreateTranslator();
 
@@ -173,6 +186,9 @@ public sealed class Z3Verifier : IDisposable
 
             var status = solver.Check();
             var warnings = translator.Warnings.Count > 0 ? translator.Warnings.ToList() : null;
+            if (status == Status.UNSATISFIABLE && (translator.TouchedStringTheory || translator.TouchedNullableReferenceSort) && translator.TouchedNullTolerantReferenceForm)
+                return ContractVerificationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(NonNullModelUnsat)), warnings, sw.Elapsed);
 
             return ContractVerificationResult.FromOutcome(
                 ProofOutcome.Assign(ProofEvidence.SolverVerdict(
@@ -217,6 +233,14 @@ public sealed class Z3Verifier : IDisposable
             outputType = null;
 
         var translator = CreateTranslator();
+
+        if (preconditions.Select(p => p.Condition).Append(postcondition.Condition)
+            .Any(QuantifierNesting.ContainsNestedQuantifier))
+        {
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(QuantifierNesting.Refusal)),
+                Duration: sw.Elapsed);
+        }
 
         // A parameter named `result` collides with the postcondition result variable:
         // DeclareVariable("result") would silently overwrite it, aliasing the two into one
@@ -309,6 +333,9 @@ public sealed class Z3Verifier : IDisposable
                 }
                 if (preSolver.Check() == Status.UNSATISFIABLE)
                 {
+                    if ((translator.TouchedStringTheory || translator.TouchedNullableReferenceSort) && translator.TouchedNullTolerantReferenceForm)
+                        return ContractVerificationResult.FromOutcome(
+                            ProofOutcome.Assign(ProofEvidence.Unsupported(NonNullModelUnsat)), Duration: sw.Elapsed);
                     return ContractVerificationResult.FromOutcome(
                         ProofOutcome.Assign(ProofEvidence.VacuousProof(
                             "Precondition set is unsatisfiable: the postcondition holds vacuously because no valid call exists. Runtime check kept.")),
@@ -563,17 +590,17 @@ public sealed class Z3Verifier : IDisposable
                 if (pathConditions.Count > 0)
                 {
                     assumptions.Add(ExceptionalPathDivisionAssumption);
-                    reasons.Add("the body divides, and paths with a zero divisor throw before the postcondition is evaluated");
+                    reasons.Add("the body divides or takes a substring, and paths where that throws never reach the postcondition");
                 }
                 if (contractDivisionAssumed)
                 {
                     assumptions.Add(ContractExpressionDivisionAssumption);
-                    reasons.Add("the contract expressions divide, and a zero divisor (or MinValue ÷ -1 overflow) would make the runtime contract check itself throw (W1 Slice 1, D8)");
+                    reasons.Add("the contract expressions divide or take a substring, and a zero divisor (or MinValue ÷ -1 overflow, or an out-of-range substring) would make the runtime contract check itself throw (W1 Slice 1, D8)");
                 }
                 if (stringModelAssumed)
                 {
                     assumptions.Add(StringModelAssumption);
-                    reasons.Add("the obligation is carried by the solver's string theory, whose strings are non-null and byte-counted while .NET's are nullable and UTF-16-code-unit-counted (v0.12, D3/D12)");
+                    reasons.Add("the obligation is carried by the solver's string theory, whose strings are non-null while .NET's are nullable (v0.12, D3/D12); literals are encoded per UTF-16 code unit since #1413, and the canonical assumption text is kept for hash stability");
                 }
                 if (referenceModelAssumed)
                 {
@@ -1030,6 +1057,10 @@ public static class FunctionBodyEncoder
         List<BoolExpr> constraints,
         bool conditional)
     {
+        // #1413 review round 3: a side condition over a body local is not substituted (that would
+        // re-evaluate the initializer at each use and change its integer promotion); the
+        // translator cannot see the local, so the condition fails to model and the result is
+        // Unsupported.
         foreach (var stmt in statements)
         {
             switch (stmt)
@@ -1198,6 +1229,21 @@ public static class FunctionBodyEncoder
                     if (failure != null)
                         return failure;
                 }
+                // #1413 (S1 STR-OPS-COUNT-INDEX): Substring and IndexOf-with-start throw
+                // outside their range while the solver's versions are total. Same rule as a
+                // divisor: an unconditional range condition is a side condition; one in a
+                // conditionally-evaluated position is not modeled.
+                var range = translator.GetStringRangeCondition(sop);
+                if (range == null)
+                    return "a string operation's index range could not be modeled";
+                if (range.IsTrue)
+                    return null;
+                if (conditional)
+                {
+                    return "the body contains an indexed string operation (Substring/IndexOf with a start) "
+                        + "in a conditionally-evaluated position, which is not yet modeled for exception-path soundness";
+                }
+                constraints.Add(range);
                 return null;
             }
             default:
@@ -1714,5 +1760,38 @@ public sealed class IsolatedSolver : IDisposable
             _checkContext?.Dispose();
         _checkContext = null;
         _ownsCheckContext = false;
+    }
+}
+
+/// <summary>
+/// #1413 (S1 row QNT-NESTED, registered unsupported-refused): for the registered nested bounded
+/// forall the emitter rejects the runtime lowering (<c>Calor0326</c>), yet the verifier reported
+/// it <c>Proven</c>. As a conservative restriction, the verifier channels (contracts,
+/// obligations and their assumptions, implications, guard validation) refuse any quantifier
+/// inside another — including forms the emitter can lower, such as a bounded inner quantifier
+/// under <c>(cast bool …)</c>. It applies to the expression the verifier sees, after
+/// simplification.
+/// </summary>
+internal static class QuantifierNesting
+{
+    public const string Refusal =
+        "nested quantifiers are not verified (the runtime lowering of a quantifier inside another is generally rejected, Calor0326). Runtime check kept.";
+
+    public static bool ContainsNestedQuantifier(ExpressionNode expression)
+        => DescendantsAndSelf(expression)
+            .Where(IsQuantifier)
+            .Any(quantifier => DescendantsAndSelf(quantifier).Skip(1).Any(IsQuantifier));
+
+    private static bool IsQuantifier(AstNode node)
+        => node is ForallExpressionNode or ExistsExpressionNode;
+
+    private static IEnumerable<AstNode> DescendantsAndSelf(AstNode node)
+    {
+        yield return node;
+        foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(node))
+        {
+            foreach (var descendant in DescendantsAndSelf(child))
+                yield return descendant;
+        }
     }
 }

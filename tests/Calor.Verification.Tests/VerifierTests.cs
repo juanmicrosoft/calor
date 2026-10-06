@@ -1708,7 +1708,8 @@ public class VerifierTests
         using var verifier = new Z3Verifier(ctx);
 
         // Postcondition: (>= (indexof "abcabc" "b" 3) 3)
-        // Should be PROVEN because searching from index 3 finds "b" at index 4, which is >= 3
+        // #1413 review: the emitter drops the start index ("abcabc".IndexOf("b", Ordinal) is 1),
+        // so the solver's indexof-from-3 (4) describes a different call. The form is refused.
         var parameters = new List<(string Name, string Type)>();
 
         var postcondition = new EnsuresNode(
@@ -1736,7 +1737,8 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        AssertStringProofAssumed(result);
+        Assert.Equal(ProofStatus.Unsupported, result.EffectiveOutcome.Status);
+        Assert.Equal(1, "abcabc".IndexOf("b", StringComparison.Ordinal));
     }
 
     // ===========================================
