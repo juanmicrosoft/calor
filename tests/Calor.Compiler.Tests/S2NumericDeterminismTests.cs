@@ -5,15 +5,14 @@ using Calor.Compiler.Parsing;
 using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
 using Calor.Compiler.Verification.Z3.KInduction;
-using Microsoft.Z3;
 using Xunit;
 
 namespace Calor.Compiler.Tests;
 
 /// <summary>
-/// #1413 (S2 R-NUM, amendment 1.3.1): overflow sensitivity is decided by operand widths when the
-/// promoted result type always holds the result, so the verdict does not depend on solver time
-/// (the linux-arm64 z3-consumer-matrix failure on i32 * u32); and k-induction refuses a whole
+/// #1413 (S2 R-NUM, amendments 1.3.1 and 1.3.2): overflow sensitivity is decided by rule from operand
+/// widths, with no solver, so the verdict does not depend on solver time (the linux-arm64
+/// z3-consumer-matrix failure on i32 * u32); and k-induction refuses a whole
 /// loop whose bounds hold a literal outside int32. The tests need Z3 and fail, not skip, without it.
 /// </summary>
 public sealed class S2NumericDeterminismTests
@@ -37,39 +36,42 @@ public sealed class S2NumericDeterminismTests
     }
 
     [Theory]
-    [InlineData("i32", "u32", "(* x y)", true)]      // linux-arm64 case: i32 * u32 in 64 bits
-    [InlineData("u32", "i32", "(- x y)", true)]
-    [InlineData("i32", "i32", "(* x y)", false)]     // control: a 32-bit product can overflow
-    public void OverflowSafety_IsDecidedFromOperandWidths_WithoutTheSolver(
-        string leftType, string rightType, string arithmetic, bool staticallySafe)
+    [InlineData("i32", "u32", "(* x y)", false)]     // linux-arm64 case: i32 * u32 in 64 bits
+    [InlineData("u32", "i32", "(- x y)", false)]
+    [InlineData("i32", "i32", "(* x y)", true)]      // a 32-bit product can overflow
+    [InlineData("i32", "i32", "(+ x y)", true)]
+    [InlineData("i64", "i64", "(* x y)", true)]      // 64-bit nonlinear: once a solver-timeout shape
+    public void OverflowSensitivity_IsDecidedByRule_WithoutTheSolver(
+        string leftType, string rightType, string arithmetic, bool sensitive)
     {
+        // Amendment 1.3.2: the width rule decides; no solver is created or consulted, so the
+        // answer cannot depend on solver time, timeouts, or platform.
         Assert.True(Z3ContextFactory.IsAvailable, "this witness needs Z3");
         var (parameters, expression) = Parse(leftType, rightType, arithmetic);
         using var ctx = Z3ContextFactory.Create();
         var translator = new ContractTranslator(ctx);
         foreach (var (name, type) in parameters)
             translator.DeclareVariable(name, type);
-        // The width rule yields `true` terms; Z3Verifier.CanFailForSomeInput simplifies the same way
-        // and returns before creating the probe solver when the result is `true`.
         var safety = translator.GetCheckedArithmeticSafety(expression);
         Assert.NotNull(safety);
-        Assert.Equal(staticallySafe, IsolatedSolver.Simplify(ctx, safety).IsTrue);
+        Assert.Equal(sensitive, Z3Verifier.IsOverflowSensitive(ctx, [safety]));
     }
 
     [Theory]
-    [InlineData(Status.UNKNOWN, ProofStatus.Unsupported)]
-    [InlineData(Status.SATISFIABLE, ProofStatus.Assumed)]
-    public void UndecidedOverflowProbe_IsUnsupported(Status probeAnswer, ProofStatus expected)
+    [InlineData("i32", "(+ x y)")]
+    [InlineData("i64", "(* x y)")]
+    public void OverflowSensitivePostcondition_IsAssumedByRule(string type, string arithmetic)
     {
         Assert.True(Z3ContextFactory.IsAvailable, "this witness needs Z3");
-        var (parameters, expression) = Parse("i32", "i32", "(+ x y)");
+        var (parameters, expression) = Parse(type, type, arithmetic);
         using var ctx = Z3ContextFactory.Create();
-        using var verifier = new Z3Verifier(ctx) { OverflowProbeStatusForTesting = () => probeAnswer };
+        using var verifier = new Z3Verifier(ctx);
         var ensures = new EnsuresNode(TextSpan.Empty,
             new BinaryOperationNode(TextSpan.Empty, BinaryOperator.Equal, expression, expression),
             null, new AttributeCollection());
-        var result = verifier.VerifyPostcondition(parameters, "i32", Array.Empty<RequiresNode>(), ensures);
-        Assert.Equal(expected, result.EffectiveOutcome.Status);
+        var outcome = verifier.VerifyPostcondition(parameters, "i32", Array.Empty<RequiresNode>(), ensures).EffectiveOutcome;
+        Assert.Equal(ProofStatus.Assumed, outcome.Status);
+        Assert.Equal([Z3Verifier.CheckedArithmeticAssumption], outcome.Assumptions);
     }
 
     [Theory]

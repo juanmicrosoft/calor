@@ -33,14 +33,20 @@ All notable changes to this project will be documented in this file.
     when simplification would fold the literal away. A k-induction loop proof (an inductive
     proof of a loop invariant) is `Unsupported` for the whole loop when a `for` bound or step,
     or any literal in a `while` condition or body, is outside the 32-bit range.
-  - In a checked module, a postcondition (`§S`) whose arithmetic can overflow for some value of
-    its operand types is now `Assumed` with the `checked-arithmetic` assumption. This holds even
-    when the preconditions rule the overflow out. Before, such postconditions were `Proven`,
-    and their runtime checks were removed; the checks are now kept. Arithmetic that cannot
-    overflow for any input, such as an `i32` plus `LONG:1`, is still `Proven`. When the operand
-    types alone show the result fits, such as `i32` times `u32` computed in 64 bits, the verifier
-    decides without the solver. If the solver cannot decide either way, the postcondition is
-    `Unsupported`, so the verdict no longer depends on the platform or on solver time. Proof
+  - In a checked module, a postcondition (`§S`) with checked arithmetic is now `Assumed` with the
+    `checked-arithmetic` assumption, unless the operand types and literal values show that no
+    operation can overflow. This holds even when the preconditions rule the overflow out. Before,
+    such postconditions were `Proven`, and their runtime checks were removed; the checks are now
+    kept. The overflow decision is a fixed rule, not a solver query. Each operand's range comes
+    from its type, or from its value if it is a literal. The rule asks whether every result fits
+    the promoted result type. For example, `i32` plus `LONG:1` and `i32` times `u32` (computed in
+    64 bits) cannot overflow, so they stay `Proven`. `i32` plus `i32` can overflow, so it is
+    `Assumed`. Because no solver is consulted, the verdict does not depend on the platform or on
+    solver time. A guard inside the postcondition does not count either. So `(-> (< value
+    Int32.MaxValue) (== (- (+ value 1) 1) value))` is `Assumed`, and the unselected branch is still
+    never evaluated. In the verifier-runtime differential report (#1135), 6 of the 1,170 cases
+    move from `Proven` to `Assumed`: the provable `i64` and `u64` postconditions, which guard a
+    64-bit product. The totals are now 429 `Proven`, 156 `Assumed`, and 585 refuted. Proof
     obligations, preconditions, and interface checks are unchanged: the registered row covers
     postconditions only.
 
