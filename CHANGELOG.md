@@ -38,6 +38,17 @@ All notable changes to this project will be documented in this file.
   null-free model is no longer reported as vacuous or unsatisfiable when a null could satisfy
   it (through `==`, `Equals`, or `IsNullOrEmpty` on a parameter); the result is `Unsupported`.
   The verification cache format moves to 1.21, so older entries are invalidated.
+- **No proof is claimed for a nested quantifier (#1413).** A postcondition with a bounded
+  `forall` inside another `forall` was reported `Proven`, although the compiler then rejected
+  its runtime check (`Calor0326`). As a conservative restriction, the verifier now does not
+  verify any quantifier nested inside another. This covers contracts, proof obligations and
+  the preconditions and facts they assume, interface contract checks, and guard validation.
+  The result is `Unsupported` and the runtime check is kept, even for nested forms the
+  compiler can check at run time. The rule applies to the contract after simplification (a
+  nested quantifier that simplifies to `true` is still proven). For interface contract checks,
+  the refusal is reported once #1495 merges. The verification cache never stores or serves such a
+  result. A k-induction invariant with a conjunct the prover cannot parse is no longer
+  reported proven from the conjuncts it could parse.
 
 - **Three causes of run-to-run and platform-dependent verifier verdicts are fixed (#1135).**
   Whether the verifier is now deterministic on every supported platform is decided by the
@@ -61,6 +72,31 @@ All notable changes to this project will be documented in this file.
   - **User-level cache on Windows.** The default verification cache and the user effect
     manifests (`~/.calor`) now honor `USERPROFILE` on Windows, as NuGet does. Linux and macOS
     are unchanged.
+
+- **Two more kinds of unreachable counterexample are withheld (#1413).** A failed obligation is
+  a compile error: `Calor1140` for a `§PROOF`, `Calor1121` for a refinement. It is no longer
+  reported in two cases where its counterexample may be an input that never reaches the
+  obligation.
+  - **Something evaluated before the obligation may throw on that input.** That includes any of
+    these:
+    - an earlier statement;
+    - another operand in the same statement;
+    - an enclosing `if`, `elseif`, or loop condition;
+    - a precondition, parameter refinement, or constructor initializer (`§BASE`/`§THIS`);
+    - a compiler-inserted refinement guard on a binding, rebinding, or assignment.
+
+    Forms that may throw include checked or dividing arithmetic, a call, a member read, a
+    substring, a length or string query on a local that may be null, and an earlier `§PROOF`
+    guard. When the module declares operator overloads, conversions, or raw C# members, every
+    non-literal form counts.
+  - **The obligation reads a property, whose getter the solver does not model.** This includes
+    a property that hides an inherited field, properties of nested types, a `Length` property read
+    by `§LEN`, and, when the module has raw C# members, any member read.
+
+  The result is `Calor1124` ("unsupported"), and the runtime check stays. This can withhold
+  counterexamples that were real. Properties are matched by name, so a field that shares a name
+  with any property in the module is also withheld. These checks never make an obligation proven
+  or discharged.
 
 - **Proof obligations no longer use facts that an assignment made stale (#1413).** With
   `§Q (> x -1)`, then `§ASSIGN x -5`, then `§PROOF (> x -1)`, the obligation solver still

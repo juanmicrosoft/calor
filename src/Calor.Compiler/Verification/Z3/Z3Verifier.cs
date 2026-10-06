@@ -121,6 +121,13 @@ public sealed class Z3Verifier : IDisposable
     {
         var sw = Stopwatch.StartNew();
 
+        if (QuantifierNesting.ContainsNestedQuantifier(precondition.Condition))
+        {
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(QuantifierNesting.Refusal)),
+                Duration: sw.Elapsed);
+        }
+
         var translator = CreateTranslator();
 
         // Declare all parameters
@@ -218,6 +225,14 @@ public sealed class Z3Verifier : IDisposable
             outputType = null;
 
         var translator = CreateTranslator();
+
+        if (preconditions.Select(p => p.Condition).Append(postcondition.Condition)
+            .Any(QuantifierNesting.ContainsNestedQuantifier))
+        {
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(QuantifierNesting.Refusal)),
+                Duration: sw.Elapsed);
+        }
 
         // A parameter named `result` collides with the postcondition result variable:
         // DeclareVariable("result") would silently overwrite it, aliasing the two into one
@@ -1730,5 +1745,38 @@ public sealed class IsolatedSolver : IDisposable
             _checkContext?.Dispose();
         _checkContext = null;
         _ownsCheckContext = false;
+    }
+}
+
+/// <summary>
+/// #1413 (S1 row QNT-NESTED, registered unsupported-refused): for the registered nested bounded
+/// forall the emitter rejects the runtime lowering (<c>Calor0326</c>), yet the verifier reported
+/// it <c>Proven</c>. As a conservative restriction, the verifier channels (contracts,
+/// obligations and their assumptions, implications, guard validation) refuse any quantifier
+/// inside another — including forms the emitter can lower, such as a bounded inner quantifier
+/// under <c>(cast bool …)</c>. It applies to the expression the verifier sees, after
+/// simplification.
+/// </summary>
+internal static class QuantifierNesting
+{
+    public const string Refusal =
+        "nested quantifiers are not verified (the runtime lowering of a quantifier inside another is generally rejected, Calor0326). Runtime check kept.";
+
+    public static bool ContainsNestedQuantifier(ExpressionNode expression)
+        => DescendantsAndSelf(expression)
+            .Where(IsQuantifier)
+            .Any(quantifier => DescendantsAndSelf(quantifier).Skip(1).Any(IsQuantifier));
+
+    private static bool IsQuantifier(AstNode node)
+        => node is ForallExpressionNode or ExistsExpressionNode;
+
+    private static IEnumerable<AstNode> DescendantsAndSelf(AstNode node)
+    {
+        yield return node;
+        foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(node))
+        {
+            foreach (var descendant in DescendantsAndSelf(child))
+                yield return descendant;
+        }
     }
 }
