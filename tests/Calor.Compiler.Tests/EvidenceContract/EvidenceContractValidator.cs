@@ -143,7 +143,7 @@ internal static partial class EvidenceContractValidator
                 e.Ceiling == ceilingId && e.Value == raised && e.Amendment == recordedIn
                 && (e.Pr is { } registeredPr ? hasPr && pr == registeredPr && issue == e.Issue : !hasPr && issue == e.Issue));
             if (match is null || recordedIn is null || !amendmentVersions.Contains(recordedIn))
-                v.Add(new("C011", subject, "ceiling exception is not one registered by a logged amendment (1.1.0: pr-size, #1473, 1520; 1.2.0: s1-generated-cases, issue #1311, 3008; 1.3.0: s2-repairs, issue #1413, 7, and review-rounds-per-pr, #1496, 5; 1.3.1: review-rounds-per-pr, #1502 (three registered changes) and #1503 (revert-only), 5)"));
+                v.Add(new("C011", subject, "ceiling exception is not one registered by a logged amendment (1.1.0: pr-size, #1473, 1520; 1.2.0: s1-generated-cases, issue #1311, 3008; 1.3.0: s2-repairs, issue #1413, 7, and review-rounds-per-pr, #1496, 5; 1.3.1: review-rounds-per-pr, #1503 (revert-only), 5, and #1502, re-registered by 1.3.2 with value 6 (one change: the no-solver overflow rule))"));
             // A later amendment that changed the registered text must itself be logged (1.2.1
             // amended condition 4 of the #1311 exception).
             if (match?.TextAmendment is { } textAmendment && !amendmentVersions.Contains(textAmendment))
@@ -305,7 +305,10 @@ internal static partial class EvidenceContractValidator
     /// required final verification pass (decision B). Amendment 1.3.1 registers one change after the ceiling
     /// (#1502: exactly three registered changes, owning discovery D-NUM-WHILE-BOUND; #1503: revert-only)
     /// and one verification-only pass that must APPROVE for each of PRs #1502 and #1503, each bound
-    /// to its base commit (the PR head when the amendment was drafted).
+    /// to its base commit (the PR head when the amendment was drafted). Amendment 1.3.2 re-registers
+    /// #1502's exception (value 6, base bdb430db, scope condition "One change only."): the 1.3.1 text
+    /// of part (b) contradicted its own determinism condition, so the no-overflow decision becomes a
+    /// rule with no solver; the 1.3.1 text of #1502 no longer validates.
     /// </summary>
     private static readonly RegisteredException[] RegisteredCeilingExceptions =
     [
@@ -314,8 +317,8 @@ internal static partial class EvidenceContractValidator
         new("s2-repairs", null, 1413, 7, "1.3.0", "addedPrs", 1, "1.3.0", "2254c411e46b2f8aa9cc0c262328bd68dc491a8a84855ed3fa92be80ab656fab",
             ["D-OBL-PROOF-GETTER", "D-OBL-THROWING-PREDECESSOR"]),
         new("review-rounds-per-pr", 1496, 1413, 5, "1.3.0", null, null, "1.3.0", "755c4c7d3da8630de5f9648f017c00d0c44485531c6f646fa9f4d902e4c89fa8"),
-        new("review-rounds-per-pr", 1502, 1413, 5, "1.3.1", null, null, "1.3.1", "ebeaa53a51160fa57ae4664afb4b5cf984ac6340458d277604611543e62199e8",
-            ["D-NUM-WHILE-BOUND"], BaseCommit: "3f3016d2297491fca1734e931946747833def32d", RevertOnly: false, ScopeCondition: "Three changes only."),
+        new("review-rounds-per-pr", 1502, 1413, 6, "1.3.1", null, null, "1.3.2", "cb311f2aa08a4c7fec003064a4dbd400ba32767670cf2bad13506e20b6b0f21e",
+            ["D-NUM-WHILE-BOUND"], BaseCommit: "bdb430db1c1dfdbcd578c5b1b74110841be95a2d", RevertOnly: false, ScopeCondition: "One change only."),
         new("review-rounds-per-pr", 1503, 1413, 5, "1.3.1", null, null, "1.3.1", "fd4a1147a5ebdf12ec319f87b3ac3e074d9a82c82e95509b52c127901b118bf7",
             BaseCommit: "9b54c9c3d8d7fb178c5594ddc757d871fbb34ab4", RevertOnly: true, ScopeCondition: "Revert only."),
     ];
