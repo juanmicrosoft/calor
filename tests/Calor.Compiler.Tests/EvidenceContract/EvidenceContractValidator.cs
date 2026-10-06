@@ -317,7 +317,7 @@ internal static partial class EvidenceContractValidator
         new("s2-repairs", null, 1413, 7, "1.3.0", "addedPrs", 1, "1.3.0", "2254c411e46b2f8aa9cc0c262328bd68dc491a8a84855ed3fa92be80ab656fab",
             ["D-OBL-PROOF-GETTER", "D-OBL-THROWING-PREDECESSOR"]),
         new("review-rounds-per-pr", 1496, 1413, 5, "1.3.0", null, null, "1.3.0", "755c4c7d3da8630de5f9648f017c00d0c44485531c6f646fa9f4d902e4c89fa8"),
-        new("review-rounds-per-pr", 1502, 1413, 6, "1.3.1", null, null, "1.3.2", "bb1f5e489e19d34161905a2c126b249aa08e7566089d9056b5a822f8ae76dd1d",
+        new("review-rounds-per-pr", 1502, 1413, 6, "1.3.1", null, null, "1.3.2", "c59b2c95f5e5c37541dcf3d9a38b157ea5eee45ab996d227470ff7ce9f538d17",
             ["D-NUM-WHILE-BOUND"], BaseCommit: "bdb430db1c1dfdbcd578c5b1b74110841be95a2d", RevertOnly: false, ScopeCondition: "One change only."),
         new("review-rounds-per-pr", 1503, 1413, 5, "1.3.1", null, null, "1.3.1", "fd4a1147a5ebdf12ec319f87b3ac3e074d9a82c82e95509b52c127901b118bf7",
             BaseCommit: "9b54c9c3d8d7fb178c5594ddc757d871fbb34ab4", RevertOnly: true, ScopeCondition: "Revert only."),
