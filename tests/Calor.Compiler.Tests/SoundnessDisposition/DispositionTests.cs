@@ -143,8 +143,9 @@ public sealed class DispositionTests
             if (repair["regressionWitness"]!.AsArray().Count == 0)
                 repair["regressionWitness"]!.AsArray().Add("tests/example.cs");
         }
-        // Closing assumes amendment 1.3.0 has merged (capacity allowance and the R-OBL overrun).
-        record["contractVersion"] = "1.3.0";
+        // Closing assumes amendments 1.3.0 (capacity allowance, R-OBL overrun) and 1.3.1 (R-NUM and
+        // R-OBL-RESIDUALS overruns) have merged.
+        record["contractVersion"] = "1.3.1";
         record["closure"]!["status"] = "CLOSED";
         record["closure"]!["result"] = "SUCCESS";
         return record;
@@ -159,14 +160,16 @@ public sealed class DispositionTests
     [Fact]
     public void CommittedRecord_IsNotYetClosable()
     {
-        // Unmerged repairs keep S2 open; there is no closure result yet. Amendment 1.3.0 is merged
-        // (contract 1.3.0). R-CACHE (#1494) is merged: its real merge commit passes the real git checks.
+        // Unmerged repairs keep S2 open; there is no closure result yet. Amendments 1.3.0 and 1.3.1
+        // are merged (contract 1.3.1). Six repairs are merged: their real merge commits pass the real
+        // git checks; R-NUM (#1502) is still open.
         var violations = Validate(Record(), closing: true);
         AssertCodes(violations, "D010", "D016");
-        Assert.Contains(violations, v => v.Message.Contains("R-OBL: not merged at closure"));
+        Assert.Contains(violations, v => v.Message.Contains("R-NUM: not merged at closure"));
         Assert.DoesNotContain(violations, v => v.Message.Contains("capacity amendment"));
         if (Git("rev-parse --verify --quiet origin/main").ExitCode == 0) // the real check needs the main ref
-            Assert.DoesNotContain(violations, v => v.Message.StartsWith("R-CACHE:", StringComparison.Ordinal));
+            foreach (var merged in new[] { "R-CACHE", "R-IMPL", "R-OBL", "R-TEXT", "R-QNT", "R-OBL-RESIDUALS" })
+                Assert.DoesNotContain(violations, v => v.Message.StartsWith(merged + ":", StringComparison.Ordinal));
     }
 
     [Fact]

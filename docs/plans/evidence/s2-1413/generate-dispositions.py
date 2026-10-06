@@ -36,7 +36,7 @@ repairs = [
         'reviewVerdict': 'Rounds 1-2 REQUEST-CHANGES (fixed), round 3 APPROVE, verification pass APPROVE.',
     },
     {
-        'id': 'R-IMPL', 'pr': 1495,
+        'id': 'R-IMPL', 'pr': 1495, 'status': 'merged', 'mergeCommit': 'eb12fef4122b88a22f3ec62f374de341dc7f4e06',
         'branch': 'milestone-0.24/s2-1413-fix-implication-definedness',
         'rootCause': 'Z3ImplicationProver decided interface/implementer contract implications over total solver terms (non-null strings, bvsrem defined at 0) and reported Calor0815 "proven" for implementer preconditions that throw or are false on interface-accepted inputs. No guard is elided on this channel; the false claim is the LSP acceptance.',
         'change': 'The prover decides A and D(A) and not (D(C) and C) with D = divisor and checked-overflow definedness: a contract that throws on an accepted input is a genuine LSP refutation with that input; a model that may rely on a throwing contract is Unsupported; any string/array/user-type sort makes a proof Assumed (new warning Calor0819) and a model over such a sort Unsupported (index, substring, and null failures are not modeled); identical contracts are decided by structural identity before the solver; every undecided check, including the inherited-conflict check, reports Calor0816 and never yields Calor0814 "valid".',
@@ -47,7 +47,7 @@ repairs = [
         'reviewVerdict': 'Rounds 1-3 REQUEST-CHANGES (fixed), verification pass APPROVE (one MINOR: the conflict test does not assert the Unestablished status directly).',
     },
     {
-        'id': 'R-OBL', 'pr': 1496,
+        'id': 'R-OBL', 'pr': 1496, 'status': 'merged', 'mergeCommit': 'ba2e31cb6373bcc10aeaa04e3f94e9067d0b8c06',
         'branch': 'milestone-0.24/s2-1413-fix-obligation-state',
         'rootCause': 'ObligationSolver asserted preconditions for every obligation even after the body reassigned their variables (false Discharged, guard elided), and reported SAT models as counterexamples although its state over-approximated the program state (reassignments, else bodies without negated guards, unbound refined return values, unassumed named-refinement parameters).',
         'change': 'Entry facts are dropped when the body may write a name they read (incl. ref/out/in aliasing, element/field stores, collection updates); raw C#, unsafe/pointer code, and lambdas make a body opaque, and raw C# in an entry predicate makes every obligation Unsupported; every member/element read (a proof condition included) and foreach counts as a possible heap write (getters, indexers, enumerators), and only the exactness of a §PROOF counterexample ignores reads inside its own condition; a SAT model is a refutation only when the state is exact, otherwise Unsupported (guard kept), including when a dropped entry refinement constrains any name the query reads; else/elseif negation facts and named-refinement parameter facts (functions, methods, constructors, operators) are added.',
@@ -61,7 +61,7 @@ repairs = [
         'reviewVerdict': 'Rounds 1-3 REQUEST-CHANGES (fixed); verification pass 1 found one BLOCKING in the round-3 fix (fixed), verification pass 2 found one MAJOR (fixed); a final verification-only pass authorized by the maintainer (decision Q8, amendment 1.3.0) on that last fix: APPROVE.',
     },
     {
-        'id': 'R-TEXT', 'pr': 1497,
+        'id': 'R-TEXT', 'pr': 1497, 'status': 'merged', 'mergeCommit': 'af5482016a2abaec2ac60309f94a863819eb572b',
         'branch': 'milestone-0.24/s2-1413-fix-z3-text-encoding',
         'rootCause': 'String literals reached Z3 per UTF-8 byte ("é" has length 2), Substring was total in the solver, and (discovery #1493) Z3 symbol names took ANSI marshaling, so non-ASCII identifiers could collapse into one constant on Windows.',
         'change': 'Literals are escaped per UTF-16 code unit (and the backslash); Substring carries range side conditions; IndexOf with a start index is refused (the emitter drops the start); every symbol is named through the injective ASCII encoding ContractTranslator.Z3Name; "$" names are reserved; a side condition over a body local is not modeled (Unsupported); unsatisfiability and vacuity are Unsupported when a null-tolerant form (==, Equals, IsNullOrEmpty) over a possibly null term is present; cache format 1.21. Stacked on #1495 (GitHub base; nonTestChangedLines is measured against it). Its cache-key collision class for unpaired surrogates is closed by #1494 (lossless key hashing), which must merge first. Residual: the canonical string-model and contract-division assumption strings (pinned by docs/verification-modeled-forms.md and the G3 oracle) still describe byte counting and division only; the reason texts are corrected.',
@@ -74,7 +74,7 @@ repairs = [
         'reviewVerdict': 'Rounds 1-3 REQUEST-CHANGES (fixed), verification pass APPROVE.',
     },
     {
-        'id': 'R-QNT', 'pr': 1498,
+        'id': 'R-QNT', 'pr': 1498, 'status': 'merged', 'mergeCommit': '275902c3c597d049eb74f319ca0ab68805e2cccc',
         'branch': 'milestone-0.24/s2-1413-fix-nested-quantifier-claim',
         'rootCause': 'The verifier reported Proven for a nested bounded forall whose runtime lowering the emitter rejects (Calor0326); the registered row requires refusal.',
         'change': 'Contract verifier, obligation solver (condition and assumptions), implication prover, and guard validation refuse a quantifier nested in another (Unsupported); such cache keys are never stored or served; k-induction no longer drops unparsable invariant conjuncts. The interface channel reports the refusal (Calor0816, no Calor0814) only with #1495, which must merge first.',
@@ -99,19 +99,21 @@ repairs = [
     },
 ]
 repairs.append({
-    'id': 'R-OBL-RESIDUALS', 'pr': 1503,
+    'id': 'R-OBL-RESIDUALS', 'pr': 1503, 'status': 'merged', 'mergeCommit': '9f5dfd763f90aebe16e4e4783f4c1703e464c8d3',
     'branch': 'milestone-0.24/s2-1413-fix-obligation-residuals',
     'rootCause': 'Review-found residuals of the obligation solver (discoveries D-OBL-THROWING-PREDECESSOR and D-OBL-PROOF-GETTER): exactness did not track an earlier statement or enclosing condition that throws implicitly, and a proof reading a property (getter, or a property hiding an inherited field) could be refuted with an unreachable model. Spurious refutations, never false proofs.',
-    'change': 'Visible demotion: after a statement that may throw (checked or dividing arithmetic, calls, member/element reads, casts, a retained proof guard), or under a guard condition that may throw, the state is not exact; an obligation reading a member named like a declared property is not exact. A SAT result is Unsupported (Calor1124, guard kept); UNSAT handling is unchanged. Stacked on #1496.',
+    'change': 'Visible demotion: after a statement that may throw (checked or dividing arithmetic, calls, member/element reads, casts, a retained proof guard), or under a guard condition that may throw, the state is not exact; an obligation reading a member named like a declared property is not exact. A SAT result is Unsupported (Calor1124, guard kept); UNSAT handling is unchanged. Was stacked on #1496 (merged); retargeted to main under amendment 1.3.1.',
     'decision': 'Q7 (2026-10-04): contract amendment 1.3.0 (merged, ffa75e8b) raises the S2 repair cap 6 -> 7 for these two discoveries only (capacity.exceptions[ceiling=s2-repairs]); at most 3 review rounds.',
     'dependsOnAmendment': '1.3.0',
-    'dependsOn': [1496],
+    'dependsOn': [],
     'discoveries': ['D-OBL-PROOF-GETTER', 'D-OBL-THROWING-PREDECESSOR'],
-    'nonTestChangedLines': 190,
+    'nonTestChangedLines': 179,
     'regressionWitness': ['tests/Calor.Compiler.Tests/S2ObligationResidualTests.cs'],
     'rows': [],
     'reviews': REVIEWS + 'fix-obligation-residuals/',
-    'reviewVerdict': 'Rounds 1-3 REQUEST-CHANGES (fixed); verification pass REQUEST-CHANGES: MAJOR, exception A requires that the PR make no outcome stronger, but ordering the if/elseif state-change check (round-2 finding 6) restores a then-body guard fact and turns one previously Unsupported obligation into a (correct) Discharged; MINOR, two fixtures do not check emitted code or diagnostics. The review ceiling (3, exception A) is reached: no further change was made (stopping rule 1). Decision needed: revert the ordered state-change hunk under an amendment allowing one more change, or rescope.',
+    'reviewVerdict': 'Rounds 1-3 REQUEST-CHANGES (fixed); verification pass 1 REQUEST-CHANGES (MAJOR: the round-2 ordered state-change check restored a then-body guard fact, so one obligation became Discharged that is Unsupported without the PR, against exception A; MINOR: two fixtures checked neither emitted code nor diagnostics); no change under the 1.3.0 ceiling (stopping rule 1). Under amendment 1.3.1: one revert-only change (35291041; CollectFromIf back to round-1 commit b0f532b3, fixture assertions added) and one verification-only pass: APPROVE, no findings (reviews/fix-obligation-residuals/verification-2-codex.md).',
+    'overrunAmendment': '1.3.1',
+    'reviewRoundOverrun': 'After rounds 1-3 the verification pass requested changes (MAJOR: the round-2 ordered state-change check restored a then-body guard fact, making one obligation Discharged that is Unsupported without the PR; MINOR: two fixtures asserted neither generated C# nor diagnostics). Amendment 1.3.1 (#1504, merged f552e38b; maintainer decision Q9) allows exactly one revert-only change on base 9b54c9c3 and exactly one verification-only pass that must APPROVE; the pass approved.',
 })
 for r in repairs:
     r.setdefault('status', 'open')
@@ -254,7 +256,7 @@ record = {
     'closure': {
         'status': 'OPEN',
         'result': None,
-        'note': 'OPEN until every repair is merged (status "merged" with its merge commit on main, being the GitHub merge of its PR from its S2 branch, and containing its regression witnesses), amendment 1.3.0 (capacity allowance and the R-OBL review overrun) is in the contract (merged as ffa75e8b; contract version 1.3.0). The discovery ids are pinned by the validator tests, so a discovery is resolved by a repair or amendment, never deleted. At closure, result is SUCCESS (no MILESTONE-FAILED anywhere) or MILESTONE-FAILED (required if any finding or discovery is MILESTONE-FAILED); only SUCCESS satisfies terminal predicates 4-5.',
+        'note': 'OPEN until every repair is merged (status "merged" with its merge commit on main, being the GitHub merge of its PR from its S2 branch, and containing its regression witnesses), amendment 1.3.0 (capacity allowance and the R-OBL review overrun) is in the contract (merged as ffa75e8b; contract version 1.3.0), and amendment 1.3.1 (the R-NUM and R-OBL-RESIDUALS review overruns) is in the contract (merged as f552e38b; contract version 1.3.1). The discovery ids are pinned by the validator tests, so a discovery is resolved by a repair or amendment, never deleted. At closure, result is SUCCESS (no MILESTONE-FAILED anywhere) or MILESTONE-FAILED (required if any finding or discovery is MILESTONE-FAILED); only SUCCESS satisfies terminal predicates 4-5.',
     },
     'capacity': {'ceiling': 's2-repairs', 'maxRepairs': 6, 'maxNonTestChangedLinesPerRepair': 600,
                  'amendmentAllowance': {'amendment': '1.3.0', 'extraRepairs': 1, 'repair': 'R-OBL-RESIDUALS',
@@ -277,6 +279,7 @@ record = {
         {'id': 'Q5-MERGE-ORDER', 'date': '2026-10-04', 'decision': 'As proposed: #1494 and #1495 first, then #1497 (retargeted to main after #1495) and #1498; #1496, then #1503 after amendment 1.3.0; #1502 independent. Cache-format numbers and manifest/CHANGELOG resolve at merge.'},
         {'id': 'Q6-TERMINAL-BINDING', 'date': '2026-10-04', 'decision': 'Noted: closure.result is carried into the terminal adjudication by hand.'},
         {'id': 'Q7-REVIEW-DISCOVERIES', 'date': '2026-10-04', 'decision': 'Amendment 1.3.0 raises the S2 repair cap 6 -> 7 for D-OBL-PROOF-GETTER and D-OBL-THROWING-PREDECESSOR only; both are demoted visibly in R-OBL-RESIDUALS (#1503), which merges after the amendment.'},
+        {'id': 'Q9-AMENDMENT-1.3.1', 'date': '2026-10-04', 'decision': 'Amendment 1.3.1 (#1504, merged f552e38b): one further change and one verification-only pass (must APPROVE) each for #1502 (three parts on base 3f3016d2) and #1503 (revert only, on base 9b54c9c3; its pass approved and it merged as 9f5dfd76). #1503 was retargeted to main.'},
         {'id': 'Q8-R-OBL-REVIEW-OVERRUN', 'date': '2026-10-04', 'decision': 'Amendment 1.3.0 records the overrun; one final verification-only pass on the last fix (APPROVE, reviews/fix-obligation-state/verification-3-codex.md); #1496 merges only after the amendment.'},
     ],
 }
