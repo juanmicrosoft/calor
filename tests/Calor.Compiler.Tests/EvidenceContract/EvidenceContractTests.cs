@@ -1527,17 +1527,18 @@ public class EvidenceContractTests
     // Amendment 1.3.1: one registered change each for #1502 (three parts) and #1503 (revert-only) (C011)
     // ------------------------------------------------------------------
 
-    private const string Base1502 = "3f3016d2297491fca1734e931946747833def32d";
+    private const string Base1502 = "bdb430db1c1dfdbcd578c5b1b74110841be95a2d"; // 1.3.2 re-registration (1.3.1: 3f3016d2)
     private const string Base1503 = "9b54c9c3d8d7fb178c5594ddc757d871fbb34ab4";
     private const string WhileBoundFinding = "D-NUM-WHILE-BOUND";
 
     [Theory]
-    [InlineData(1502, Base1502, "Three changes only.", "WhileConditionAnalyzer.GetIntValue", false)]
-    [InlineData(1503, Base1503, "Revert only.", "FactCollector.CollectFromIf", true)]
-    public void CommittedContractRegistersAmendment131Exceptions(int pr, string baseCommit, string scopeCondition, string hunk, bool revertOnly)
+    [InlineData(1502, Base1502, "One change only.", "Z3Verifier.CanFailForSomeInput", false, 6)]
+    [InlineData(1503, Base1503, "Revert only.", "FactCollector.CollectFromIf", true, 5)]
+    public void CommittedContractRegistersAmendment131Exceptions(int pr, string baseCommit, string scopeCondition, string hunk, bool revertOnly, int value)
     {
         // Each PR gets exactly one registered change on its base, then one verification pass that must
-        // APPROVE: 3 rounds + 2 passes = 5. No ceiling value changes.
+        // APPROVE: 3 rounds + 2 passes = 5 (#1502: + the 1.3.1 pass and the 1.3.2 pass = 6, amendment
+        // 1.3.2). No ceiling value changes.
         var contract = Contract();
         var capacity = contract["authorityCapacity"]!["capacity"]!;
         var ceilings = capacity["ceilings"]!.AsArray().ToDictionary(c => c!["id"]!.GetValue<string>(), c => c!["value"]!.GetValue<int>());
@@ -1546,7 +1547,7 @@ public class EvidenceContractTests
         Assert.Equal(600, ceilings["s2-repair-size"]);
 
         var exception = ChangeException(contract, pr);
-        Assert.Equal(5, exception["value"]!.GetValue<int>());
+        Assert.Equal(value, exception["value"]!.GetValue<int>());
         Assert.Equal(1413, exception["issue"]!.GetValue<int>());
         Assert.Equal("1.3.1", exception["amendment"]!.GetValue<string>());
         Assert.Equal(revertOnly, exception["revertOnly"]!.GetValue<bool>());
@@ -1562,14 +1563,11 @@ public class EvidenceContractTests
         Assert.Contains(conditions, c => c.StartsWith("Frozen at the", StringComparison.Ordinal)
             && c.Contains("before and after the pass", StringComparison.Ordinal));
 
-        var entry = contract["amendmentLog"]!.AsArray().Last()!;
-        Assert.Equal("1.3.1", entry["version"]!.GetValue<string>());
-        Assert.Equal("1.3.1", contract["contractVersion"]!.GetValue<string>());
+        var entry = contract["amendmentLog"]!.AsArray().Single(a => a!["version"]!.GetValue<string>() == "1.3.1")!;
         Assert.True(entry["afterDecisionBearingInspection"]!.GetValue<bool>());
         Assert.True(entry["reviewedInPr"]!.GetValue<int>() > 1503);
         Assert.Equal(2, entry["weakens"]!.AsArray().Count);
         Assert.Empty(entry["removedRows"]!.AsArray());
-        Assert.Equal("1.3.1", Inventory()["contractVersion"]!.GetValue<string>());
 
         // Review-round overruns exist for exactly #1496, #1502, and #1503.
         Assert.Equal([1496, 1502, 1503], capacity["exceptions"]!.AsArray()
@@ -1577,35 +1575,111 @@ public class EvidenceContractTests
             .Select(e => e!["pr"]!.GetValue<int>()).Order());
     }
 
+    // ------------------------------------------------------------------
+    // Amendment 1.3.2: #1502's part (b) becomes a rule with no solver (C011)
+    // ------------------------------------------------------------------
+
     [Fact]
-    public void Pr1502ChangeIsExactlyTheThreeRegisteredParts()
+    public void Pr1502ChangeIsTheNoSolverRule()
     {
-        // Maintainer decision 2026-10-04 ("Decide by operand widths") plus the whole-loop demotion of
-        // the reopened while-bound false proof, which #1502 owns as a discovery finding.
-        var exception = ChangeException(Contract(), 1502);
+        // Maintainer decision 2026-10-06 ("Amend: no solver, rule-based"): the 1.3.1 text of part (b)
+        // consulted the solver and contradicted its own determinism condition.
+        var contract = Contract();
+        var exception = ChangeException(contract, 1502);
+        Assert.Equal("1.3.1", exception["amendment"]!.GetValue<string>());
+        Assert.Equal(6, exception["value"]!.GetValue<int>());
         Assert.Equal([WhileBoundFinding], exception["findings"]!.AsArray().Select(f => f!.GetValue<string>()));
         var conditions = exception["conditions"]!.AsArray().Select(c => c!.GetValue<string>()).ToList();
         var scope = conditions[0];
-        Assert.Contains("(a) It reverts the round-3 hunk of WhileConditionAnalyzer.GetIntValue", scope, StringComparison.Ordinal);
-        Assert.Contains("(b) The no-overflow check of checked arithmetic (Z3Verifier.CanFailForSomeInput and its caller) decides statically from operand bit widths and signedness", scope, StringComparison.Ordinal);
-        Assert.Contains("never Assumed and never Proven", scope, StringComparison.Ordinal);
-        Assert.Contains("(c) When a k-induction loop bound or loop-condition operand is not representable", scope, StringComparison.Ordinal);
-        Assert.Contains("the k-induction result for that whole loop is Unsupported", scope, StringComparison.Ordinal);
-        Assert.DoesNotContain("(d)", scope, StringComparison.Ordinal);
-        Assert.Contains(conditions, c => c.StartsWith("Tests pin (b) and (c).", StringComparison.Ordinal)
-            && c.Contains("i32(-2147483648) Multiply u32(0)", StringComparison.Ordinal)
-            && c.Contains("a while loop with a bound outside int32 giving Unsupported", StringComparison.Ordinal));
+        Assert.StartsWith("One change only. Exactly one commit on top of commit " + Base1502, scope, StringComparison.Ordinal);
+        Assert.Contains("makes no solver call: no satisfiability check and no timeout", scope, StringComparison.Ordinal);
+        Assert.Contains("at most Assumed (checked-arithmetic)", scope, StringComparison.Ordinal);
+        Assert.Contains("Z3Verifier.OverflowProbeStatusForTesting) are removed", scope, StringComparison.Ordinal);
+        Assert.Contains("Changes (a) and (c), and every other change in the PR, stay exactly as at commit " + Base1502, scope, StringComparison.Ordinal);
+        Assert.DoesNotContain("consult the solver", scope, StringComparison.Ordinal);
+        Assert.Contains(conditions, c => c.StartsWith("Tests and text only as the rule requires.", StringComparison.Ordinal)
+            && c.Contains("UndecidedOverflowProbe_IsUnsupported", StringComparison.Ordinal)
+            && c.Contains("only from Proven to Assumed, never stronger", StringComparison.Ordinal));
         Assert.Contains(conditions, c => c.StartsWith("No false proof, and deterministic.", StringComparison.Ordinal)
-            && c.Contains("not on solver time, timeouts, or platform", StringComparison.Ordinal)
+            && c.Contains("never on a solver answer, solver time, timeouts, or platform", StringComparison.Ordinal)
             && c.Contains("at most 600 changed non-test lines", StringComparison.Ordinal));
-        Assert.Contains(conditions, c => c.StartsWith("Discovery finding on record.", StringComparison.Ordinal)
-            && c.Contains(WhileBoundFinding + " (", StringComparison.Ordinal)
-            && c.Contains("is MILESTONE-FAILED unless", StringComparison.Ordinal));
-        Assert.Contains("run 37220572221", exception["scope"]!.GetValue<string>(), StringComparison.Ordinal);
-        var weakens = Contract()["amendmentLog"]!.AsArray().Last()!["weakens"]!.AsArray().Select(w => w!.GetValue<string>()).ToList();
-        Assert.Contains(weakens, w => w.Contains("PR #1502", StringComparison.Ordinal) && w.Contains("new logic", StringComparison.Ordinal)
-            && w.Contains(WhileBoundFinding, StringComparison.Ordinal));
-        Assert.Contains(weakens, w => w.Contains("PR #1503", StringComparison.Ordinal));
+        Assert.Contains(conditions, c => c.StartsWith("Verification pass must APPROVE.", StringComparison.Ordinal)
+            && c.Contains(WhileBoundFinding + " is MILESTONE-FAILED", StringComparison.Ordinal));
+        Assert.Contains("REQUEST-CHANGES with one MAJOR", exception["scope"]!.GetValue<string>(), StringComparison.Ordinal);
+
+        var entry = contract["amendmentLog"]!.AsArray().Last()!;
+        Assert.Equal("1.3.2", entry["version"]!.GetValue<string>());
+        Assert.Equal("1.3.2", contract["contractVersion"]!.GetValue<string>());
+        Assert.Equal("1.3.2", Inventory()["contractVersion"]!.GetValue<string>());
+        Assert.True(entry["afterDecisionBearingInspection"]!.GetValue<bool>());
+        Assert.True(entry["reviewedInPr"]!.GetValue<int>() > 1504);
+        Assert.Empty(entry["removedRows"]!.AsArray());
+        var weakens = entry["weakens"]!.AsArray().Select(w => w!.GetValue<string>()).ToList();
+        Assert.Equal(2, weakens.Count);
+        Assert.Contains(weakens, w => w.Contains("from 5 (amendment 1.3.1) to 6", StringComparison.Ordinal));
+        Assert.Contains(weakens, w => w.Contains("self-contradictory", StringComparison.Ordinal));
+        // #1503's 1.3.1 exception is untouched.
+        Assert.Equal(5, ChangeException(contract, 1503)["value"]!.GetValue<int>());
+    }
+
+    [Theory]
+    [InlineData("value-5")]
+    [InlineData("1.3.1-base")]
+    [InlineData("solver-consulted")]
+    [InlineData("unknown-unsupported")]
+    [InlineData("seam-kept")]
+    [InlineData("stronger-test-change")]
+    [InlineData("three-changes-scope-condition")]
+    public void Pr1502ExceptionOtherThanThe132TextFails(string mutation)
+    {
+        var contract = Contract();
+        var exception = ChangeException(contract, 1502);
+        var conditions = exception["conditions"]!.AsArray();
+        string Edit(int index, string from, string to)
+        {
+            var text = conditions[index]!.GetValue<string>();
+            Assert.Contains(from, text, StringComparison.Ordinal);
+            return text.Replace(from, to, StringComparison.Ordinal);
+        }
+        switch (mutation)
+        {
+            case "value-5": exception["value"] = 5; break;
+            case "1.3.1-base": exception["baseCommit"] = "3f3016d2297491fca1734e931946747833def32d"; break;
+            case "solver-consulted":
+                conditions[0] = Edit(0, "makes no solver call: no satisfiability check and no timeout", "consults the solver when the width rule cannot decide");
+                break;
+            case "unknown-unsupported":
+                conditions[0] = Edit(0, "and the postcondition is at most Assumed (checked-arithmetic)", "and a solver unknown makes the postcondition Unsupported");
+                break;
+            case "seam-kept":
+                conditions[0] = Edit(0, "are removed", "are kept");
+                break;
+            case "stronger-test-change":
+                conditions[1] = Edit(1, "only from Proven to Assumed, never stronger", "in either direction");
+                break;
+            case "three-changes-scope-condition":
+                conditions[0] = "Three changes only." + conditions[0]!.GetValue<string>()["One change only.".Length..];
+                break;
+        }
+        Assert.Empty(EvidenceContractValidator.ValidateContract(Contract()));
+        var violations = EvidenceContractValidator.ValidateContract(contract);
+        AssertViolation(violations, "C011");
+        Assert.Contains(violations, v => v.Code == "C011" && v.Subject == "exception review-rounds-per-pr #1502");
+    }
+
+    [Fact]
+    public void Amendment132TextWithoutAmendment132InTheLogFails()
+    {
+        // #1502's re-registered text was set by 1.3.2; dropping 1.3.2 leaves it unregistered, #1503's stays valid.
+        var contract = Contract();
+        var log = contract["amendmentLog"]!.AsArray();
+        log.Remove(log.Single(a => a!["version"]!.GetValue<string>() == "1.3.2"));
+        contract["contractVersion"] = "1.3.1";
+        var violations = EvidenceContractValidator.ValidateContract(contract);
+        AssertViolation(violations, "C011");
+        Assert.Contains(violations, v => v.Subject == "exception review-rounds-per-pr #1502"
+            && v.Message.Contains("amendment 1.3.2", StringComparison.Ordinal));
+        Assert.DoesNotContain(violations, v => v.Subject == "exception review-rounds-per-pr #1503");
     }
 
     [Theory]
@@ -1621,7 +1695,7 @@ public class EvidenceContractTests
     [InlineData(1503, "broadened-scope")]
     [InlineData(1503, "non-revert-condition")]
     [InlineData(1502, "fourth-change")]
-    [InlineData(1502, "unknown-becomes-assumed")]
+    [InlineData(1502, "solver-allowed")]
     [InlineData(1502, "dropped-determinism")]
     [InlineData(1502, "dropped-finding")]
     [InlineData(1502, "other-finding")]
@@ -1655,7 +1729,7 @@ public class EvidenceContractTests
                 exception["pr"] = 1503;
                 other["pr"] = 1502;
                 break;
-            case "value-plus-one": exception["value"] = 6; break;
+            case "value-plus-one": exception["value"] = exception["value"]!.GetValue<int>() + 1; break;
             case "missing-approve-condition": conditions.RemoveAt(approveIndex); break;
             case "weakened-approve-condition":
                 conditions[approveIndex] = conditions[approveIndex]!.GetValue<string>()
@@ -1663,7 +1737,7 @@ public class EvidenceContractTests
                 break;
             case "broadened-scope":
                 exception["scope"] = exception["scope"]!.GetValue<string>()
-                    .Replace(pr == 1502 ? "exactly one further change, limited to three parts" : "exactly one revert-only change",
+                    .Replace(pr == 1502 ? "allows exactly one further commit and then" : "exactly one revert-only change",
                         "exactly one further fix", StringComparison.Ordinal);
                 break;
             case "non-revert-condition":
@@ -1672,11 +1746,11 @@ public class EvidenceContractTests
                 break;
             case "fourth-change":
                 conditions[0] = conditions[0]!.GetValue<string>()
-                    .Replace("Every other change in the PR stays", "(d) It may fix anything else the pass reports. Every other change in the PR stays", StringComparison.Ordinal);
+                    .Replace("Changes (a) and (c), and every other change", "It may also fix anything else the pass reports. Changes (a) and (c), and every other change", StringComparison.Ordinal);
                 break;
-            case "unknown-becomes-assumed":
+            case "solver-allowed":
                 conditions[0] = conditions[0]!.GetValue<string>()
-                    .Replace("never Assumed and never Proven", "or Assumed", StringComparison.Ordinal);
+                    .Replace("makes no solver call", "may make a solver call", StringComparison.Ordinal);
                 break;
             case "dropped-determinism": conditions.RemoveAt(IndexOf("No false proof, and deterministic.")); break;
             case "dropped-finding": exception.AsObject().Remove("findings"); break;
@@ -1692,7 +1766,7 @@ public class EvidenceContractTests
                 conditions.Add(first);
                 break;
             case "other-issue": exception["issue"] = 1311; break;
-            case "unlogged-amendment": exception["amendment"] = "1.3.2"; break;
+            case "unlogged-amendment": exception["amendment"] = "1.3.9"; break;
             case "names-findings": exception["findings"] = new JsonArray("D-OBL-PROOF-GETTER"); break;
             case "duplicated": exceptions.Add(exception.DeepClone()); break;
             case "added-for-another-pr":
@@ -1722,7 +1796,7 @@ public class EvidenceContractTests
     [InlineData(1502, "revert-only-flipped", "this exception must record revertOnly false")]
     [InlineData(1503, "revert-only-flipped", "this exception must record revertOnly true")]
     [InlineData(1502, "other-base-commit", "this exception must record baseCommit " + Base1502)]
-    [InlineData(1502, "reordered-conditions", "the first condition must be the 'Three changes only.' condition naming the base commit")]
+    [InlineData(1502, "reordered-conditions", "the first condition must be the 'One change only.' condition naming the base commit")]
     [InlineData(1503, "reordered-conditions", "the first condition must be the 'Revert only.' condition naming the base commit")]
     [InlineData(1502, "dropped-finding", "exception must name exactly the findings " + WhileBoundFinding)]
     public void Amendment131StructuralChecksReportTheirOwnViolation(int pr, string mutation, string message)
