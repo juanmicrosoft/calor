@@ -98,30 +98,29 @@ A transfer function where:
 - Balances must be non-negative
 - After a transfer, the balance must remain non-negative
 
+This example writes the refinements inline. Named refinement types (`§RTYPE`) are not
+yet accepted as arithmetic operands: `(- balance amount)` on two `§RTYPE`-typed
+parameters is rejected with `Calor0202` (type mismatch).
+
 ```calor
 §M{m001:Banking}
+  §F{f001:Transfer:pub}
+    §I{i32:balance} | (>= # INT:0)
+    §I{i32:amount} | (> # INT:0)
+    §O{i32}
+    §Q (>= balance amount)                  // sufficient funds
 
-  §RTYPE{r1:PositiveAmount:i32} (> # INT:0)
-    §RTYPE{r2:NonNegBalance:i32} (>= # INT:0)
+    §B{newBalance:i32} (- balance amount)
+    §PROOF{p1:balance-safe} (>= newBalance INT:0)
 
-      §F{f001:Transfer:pub}
-        §I{NonNegBalance:balance}
-        §I{PositiveAmount:amount}
-        §O{i32}
-        §Q (>= balance amount)                  // sufficient funds
-
-        §B{newBalance:i32} (- balance amount)
-        §PROOF{p1:balance-safe} (>= newBalance INT:0)
-
-        §R newBalance
-
+    §R newBalance
 ```
 
 ### Z3 Proves the Obligation
 
 The obligation engine runs this verification:
 
-1. **Assume**: `balance >= 0` (from `NonNegBalance`), `amount > 0` (from `PositiveAmount`), `balance >= amount` (precondition)
+1. **Assume**: `balance >= 0` and `amount > 0` (from the parameter refinements), `balance >= amount` (precondition)
 2. **Compute**: `newBalance = balance - amount`
 3. **Check**: Is `newBalance >= 0`?
 
@@ -133,8 +132,8 @@ Remove the precondition:
 
 ```calor
 §F{f002:UnsafeTransfer:pub}
-  §I{NonNegBalance:balance}
-  §I{PositiveAmount:amount}
+  §I{i32:balance} | (>= # INT:0)
+  §I{i32:amount} | (> # INT:0)
   §O{i32}
   // No §Q — missing sufficient funds check!
 

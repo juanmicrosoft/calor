@@ -229,24 +229,22 @@ Failed obligations emit warnings and guards instead of errors. Use during develo
 
 ## Complete Example
 
+This example writes the refinements inline. Named refinement types (`§RTYPE`) are not
+yet accepted as arithmetic operands: `(- balance amount)` on two `§RTYPE`-typed
+parameters is rejected with `Calor0202` (type mismatch).
+
 ```calor
 §M{m001:Banking}
+  §F{f001:Transfer:pub}
+    §I{i32:balance} | (>= # INT:0)
+    §I{i32:amount} | (> # INT:0)
+    §O{i32}
+    §Q (>= balance amount)                  // sufficient funds
 
-// Named refinement types
-  §RTYPE{r1:PositiveAmount:i32} (> # INT:0)
-    §RTYPE{r2:NonNegBalance:i32} (>= # INT:0)
+    §B{result:i32} (- balance amount)
+    §PROOF{p1:balance-safe} (>= result INT:0)
 
-      §F{f001:Transfer:pub}
-        §I{NonNegBalance:balance}
-        §I{PositiveAmount:amount}
-        §O{i32}
-        §Q (>= balance amount)                  // sufficient funds
-
-        §B{result:i32} (- balance amount)
-        §PROOF{p1:balance-safe} (>= result INT:0)
-
-        §R result
-
+    §R result
 ```
 
 The obligation engine:

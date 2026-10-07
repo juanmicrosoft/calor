@@ -104,7 +104,7 @@ below. It always means the same thing: this declaration's effects.
 calor query callers Log
 ```
 
-```
+```text illustrative
   app.calr:11:11 function Leaky
   app.calr:17:11 function Fan
 query: 2 caller(s) of app.calr:8:11 function Log
@@ -118,7 +118,7 @@ query: 2 caller(s) of app.calr:8:11 function Log
 calor query impact Log
 ```
 
-```
+```text illustrative
   app.calr:11:11 function Leaky
   app.calr:17:11 function Fan
   app.calr:23:11 function Main
@@ -130,7 +130,7 @@ here because it calls `Fan`, which calls `Log`. To ask about a
 whole file instead, name the file and add `--file`; the answer then covers
 everything that reaches anything in it, and says so:
 
-```
+```text illustrative
 impact: file-grained — a change to ANY declaration in this file implicates all of these. Ask about a declaration for a precise answer.
 ```
 
@@ -140,7 +140,7 @@ impact: file-grained — a change to ANY declaration in this file implicates all
 calor query effects Leaky
 ```
 
-```
+```text illustrative
   app.calr:11:11 function Leaky
     declared: [pure]
     inferred: cw
@@ -160,7 +160,7 @@ assumed and why.
 calor query impact Log --effects --row fs:w
 ```
 
-```
+```text illustrative
   app.calr:11:11 function Leaky — declares [pure]: does-not-fit
   app.calr:17:11 function Fan — declares cw: does-not-fit
   app.calr:23:11 function Main — declares (no row recorded): cannot-tell
@@ -220,7 +220,7 @@ Calor binds one file at a time, so a call can be matched to a declaration only
 when exactly one declaration bears that name. When the index could not place
 something, the answer says so rather than dropping it:
 
-```
+```text illustrative
 query: PARTIAL — this answer may be incomplete. Calor binds one file at a time, so a call resolves only when exactly one declaration bears the name:
   unreadable file: broken.calr (nothing in it is indexed)
   unresolved call: app.calr: Helper

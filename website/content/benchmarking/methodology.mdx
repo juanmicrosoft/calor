@@ -196,7 +196,7 @@ source-pattern heuristics; it does not execute an agent or apply the edits:
 - Brace nesting creates ambiguity
 - Cascading changes needed for renames
 
-**Scoring:** 40% structural analysis + 60% heuristic simulated-task score.
+**Scoring:** 40% structural analysis + 60% heuristic simulated-task score. {/* drift:ignore */}
 The current implementation still contains legacy `§V`/`§LOOP` detectors, so
 current `§B`/`§L` syntax does not receive those particular bonuses. Treat this
 as a static representation metric, not observed editing accuracy.
@@ -209,7 +209,7 @@ as a static representation metric, not observed editing accuracy.
 
 **Calor factors:**
 - Preconditions (`§Q`) - +0.25
-- Postconditions (`§S`) - +0.20
+- Postconditions (`§S`) - +0.20 {/* drift:ignore */}
 - Invariants - the current calculator still detects legacy `§INV`, not current `§IV`; this is a known measurement limitation
 - Effect declarations - +0.10
 

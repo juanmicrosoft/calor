@@ -51,6 +51,9 @@ public static class SelfCheckCommand
             "(8) every complete program in the agent syntax exemplar compiles to valid C# (Roslyn-semantic-checked) and no copyable line binds an array-returning call to a generic collection (the E1a trap). " +
             "(9) normative semantics-version claims match the implemented language version; (10) the AST inventory matches eng/ast-schema.json. " +
             "(11) all complete examples in the actual agent-task CALOR_REFERENCE heredoc compile to valid C#. " +
+            "(12) website/content/**/*.mdx (historical changelog excluded): checks 1, 2, 5 and forward-only effect tables apply; " +
+            "complete ```calor programs compile as `calor --input` does, `expect=CalorNNNN` negatives report exactly those codes, " +
+            "`group=` fences compile together, and `output` fences match the real diagnostics (Calor1332-1334). " +
             "Suppress an intentional-meta-notation finding by putting <!-- drift:ignore --> on the " +
             "preceding line (see docs/cli/self-check.md). Exits 1 when drift is found")
         {

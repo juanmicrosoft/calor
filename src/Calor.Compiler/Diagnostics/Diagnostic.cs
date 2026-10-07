@@ -1266,6 +1266,29 @@ public static class DiagnosticCode
     /// </summary>
     public const string DocDriftArrayBindingTrap = "Calor1331";
 
+    /// <summary>
+    /// Error (docs drift, website): a complete ```calor program in
+    /// <c>website/content/**/*.mdx</c> does not behave as the page declares. An
+    /// unannotated program must compile with the CLI defaults; a program annotated
+    /// <c>expect=CalorNNNN</c> must report exactly that set of error and warning codes.
+    /// </summary>
+    public const string DocDriftWebsiteExampleMismatch = "Calor1332";
+
+    /// <summary>
+    /// Error (docs drift, website): a fence labelled <c>output</c> does not match the
+    /// diagnostics the preceding example actually produces, or a fence that looks like
+    /// tool output (cites <c>CalorNNNN:</c>, a <c>file.calr:line:col</c> location, or a
+    /// report banner) is labelled neither <c>output</c> (checked) nor <c>illustrative</c>.
+    /// </summary>
+    public const string DocDriftWebsiteOutputMismatch = "Calor1333";
+
+    /// <summary>
+    /// Error (docs drift, website): a fence annotation is malformed or unknown, sits on a
+    /// fence it cannot apply to, or a negative example's expected code or claimed
+    /// line/column is not what the adjacent prose states.
+    /// </summary>
+    public const string DocDriftWebsiteAnnotation = "Calor1334";
+
     // `calor format` / `calor convert` command diagnostics (Calor1340-1349) —
     // envelope adoption for the two remaining data-carrying E-class commands
     // (loop plan D1.3). These flow through `--format json` so agents never
