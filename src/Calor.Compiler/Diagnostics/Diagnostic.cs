@@ -159,6 +159,14 @@ public static class DiagnosticCode
     /// </summary>
     public const string YieldRequiresValue = "Calor0210";
 
+    /// <summary>
+    /// Error (0.25 F3, #847): a local function (a nested <c>§F</c>) outside the
+    /// supported shape: not directly in a <c>§F</c>/<c>§MT</c> body, or declaring
+    /// effects, contracts, effect rows, type parameters, refinement types,
+    /// <c>§PROOF</c>, or yields. Its effects are charged to the enclosing callable.
+    /// </summary>
+    public const string UnsupportedLocalFunction = "Calor0211";
+
     // Bind inference diagnostics (Calor0250-0260) — RFC v0.6 bind-inference-formalization
 
     /// <summary>

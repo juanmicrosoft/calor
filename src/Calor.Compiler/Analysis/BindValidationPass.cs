@@ -145,6 +145,7 @@ public sealed class BindValidationPass
         foreach (var func in module.Functions)
         {
             CheckBody(func.Body, func.Output?.TypeName, func.Parameters, fields: null, className: null);
+            CheckLocalFunctions(func.Body, fields: null, className: null);
         }
 
         foreach (var cls in module.Classes)
@@ -159,6 +160,7 @@ public sealed class BindValidationPass
             foreach (var method in cls.Methods)
             {
                 CheckBody(method.Body, method.Output?.TypeName, method.Parameters, fields, cls.Name);
+                CheckLocalFunctions(method.Body, fields, cls.Name);
             }
 
             foreach (var prop in cls.Properties)
@@ -511,6 +513,19 @@ public sealed class BindValidationPass
 
         type = "";
         return false;
+    }
+
+    /// <summary>0.25 F3 (#847): each local function body is checked as its own body.</summary>
+    private void CheckLocalFunctions(
+        IReadOnlyList<StatementNode> body,
+        IReadOnlyDictionary<string, string>? fields,
+        string? className)
+    {
+        foreach (var local in body.OfType<LocalFunctionStatementNode>())
+        {
+            var function = local.Function;
+            CheckBody(function.Body, function.Output?.TypeName, function.Parameters, fields, className);
+        }
     }
 
     private void CheckStatement(StatementNode stmt)

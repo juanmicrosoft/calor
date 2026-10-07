@@ -96,7 +96,7 @@ public static class RecursiveAstWalker
     /// in a deterministic order.
     /// </summary>
     public static PropertyInfo[] GetChildProperties(Type type) =>
-        NonExpressionCache.GetOrAdd(type, static t =>
+        NonExpressionCache.GetOrAdd(type, static t => IsSeparateCallable(t) ? [] :
             t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => p.GetIndexParameters().Length == 0 && CanHoldChildAstNode(p.PropertyType))
                 .OrderBy(p => p.MetadataToken)
@@ -191,12 +191,21 @@ public static class RecursiveAstWalker
     }
 
     public static PropertyInfo[] GetAllChildProperties(Type type) =>
-        AllChildrenCache.GetOrAdd(type, static t =>
+        AllChildrenCache.GetOrAdd(type, static t => IsSeparateCallable(t) ? [] :
             t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => p.GetIndexParameters().Length == 0 && CanHoldAnyAstNode(p.PropertyType))
                 .OrderBy(p => p.MetadataToken)
                 .ThenBy(p => p.Name, StringComparer.Ordinal)
                 .ToArray());
+
+    /// <summary>
+    /// 0.25 F3 (#847): a <see cref="LocalFunctionStatementNode"/> is a leaf. Its body
+    /// is another callable that cannot capture the enclosing one, so returns, yields,
+    /// bindings and facts inside it never belong to the enclosing body. Passes that
+    /// must analyze the body visit <see cref="LocalFunctionStatementNode.Function"/>
+    /// explicitly.
+    /// </summary>
+    public static bool IsSeparateCallable(Type type) => type == typeof(LocalFunctionStatementNode);
 
     private static bool CanHoldChildAstNode(Type propertyType)
     {

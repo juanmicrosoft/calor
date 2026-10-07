@@ -49,6 +49,9 @@ public class StructuralControlFlowTests
             .Where(type =>
                 !type.IsAbstract
                 && typeof(StatementNode).IsAssignableFrom(type)
+                // 0.25 F3 (#847): a local function is legal only directly in a
+                // §F/§MT body, never in a lambda (Calor0211).
+                && type != typeof(LocalFunctionStatementNode)
                 && HasStatementBody(type, new HashSet<Type>()))
             .OrderBy(type => type.FullName, StringComparer.Ordinal)
             .ToArray();

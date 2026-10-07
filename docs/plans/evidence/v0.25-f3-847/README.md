@@ -1,0 +1,41 @@
+# 0.25 F3 (#847) — native non-capturing local functions in place
+
+**Status:** IN_PROGRESS (draft PR; main frozen for 0.24 A1 #1408). **Scope:** v0.25 R0 1.0.0,
+family F3. **Independence:** reduced (Codex reviews only; see `reviews/`). Not independently
+reviewed or verified.
+
+## Design
+
+| Layer | Change |
+|---|---|
+| Syntax | A `§F{id:Name} (T:x) -> R` nested directly in a `§F`/`§MT` body is a `LocalFunctionStatementNode` (new AST node wrapping a `FunctionNode`). No new token. |
+| C# emission | Emitted in place as a C# `static` local function. `static` makes any capture of enclosing locals, parameters or `this` a C# compile error (`CS8421`), so a missed capture can never rebind silently. Emitter state is saved and restored around the body. |
+| Binding | Local functions of a body are declared in a scope between the host (class/module) scope and the body scope: visible before their declaration, to each other and recursively. Their bodies are bound as separate `BoundFunction`s (`BoundMemberKind.LocalFunction`) in a static context whose scope chain skips the enclosing locals and parameters. A bare call resolves to a visible local function before any `{Class}.Name` / module candidate (`GetCallLookupNames`), and stays attributed to it even when overload checking fails. |
+| Effects | A local body is charged to the enclosing callable at its declaration, called or not (sound over-approximation). A call the binder resolved to a local function charges nothing more; without binder data, a bare call naming a local function is `Unknown` (fail closed), never resolved by name to a same-named member. As an escaping value, a local function's row is the union of all local bodies of that callable (Calor0424 if it does not fit). Local bodies get their own row-site checks. Local functions cannot declare `§E` or rows (Calor0211). |
+| Verification | Local functions cannot declare `§Q`/`§S`, refinement types or `§PROOF` (Calor0211). The Z3 body encoder refuses a body containing a local function declaration (unmodeled statement), and calls are untranslatable, so no outer contract is proven through a local body; runtime guards stay. The reflection walker treats the node as a leaf, so no fact, obligation, assignment or return in a local body is attributed to the enclosing callable. |
+| Validation | `ReturnValidationPass` walks local bodies as their own owners and reports `Calor0211` for misplaced/nested local functions and for `§E`, contracts, rows, generics, refinement types, yields, `§PROOF`. `BindValidationPass`, `ValidateMatchExpressions` and the type checker visit local bodies explicitly; the type checker scopes local functions so they shadow module functions. |
+| Converter | `RoslynSyntaxVisitor.IsNativeLocalFunction`: directly in a method body; no attributes, type parameters, constraints, non-`static` modifiers (async/unsafe/extern), ref return, yield or nested local function; plain by-value parameters without defaults; no capture (semantic model: enclosing locals/parameters, `this`/`base`, unqualified instance members; no semantic model = capturing). A member with any other local function is preserved whole as `§CSHARP` (`local-function` issue), as before. `FeatureSupport["local-function"]` is `Partial` with the slice in its description. |
+
+## Per-row results
+
+`reproduce/reproduce.py` reuses the R0 driver and `ProbeRunner` unchanged and writes
+`results.json` and `generated/`. See the table in the PR body and `results.json`.
+
+| Case | Expected | Result |
+|---|---|---|
+| F3-LOCAL-01 | native | see `results.json` |
+| F3-LOCAL-02 (C-1) | native | see `results.json` |
+| F3-LOCAL-03 (C-2, C-3, forward call, delegate) | native | see `results.json` |
+| F3-LOCAL-04 (capturing, generic, iterator) | preserved | see `results.json` |
+| F3-LOCAL-05 (async; fixture `fixtures/F3-LOCAL-05.cs.txt`) | preserved | see `results.json` |
+| F3-LOCAL-A1 (analysis) | native-or-rejected | executable tests only (`LocalFunctionConversionTests`), no per-case evidence record |
+
+## Tests
+
+`tests/Calor.Compiler.Tests/Migration/LocalFunctionConversionTests.cs`: every native row on 8
+surfaces (library, CLI default/passthrough options, MCP default/passthroughOnError/moduleName,
+`ProjectMigrator` with/without passthrough) converted, compiled with default options and run
+against the original; preserved rows on the same surfaces; `--no-fallback`; capture and shape
+negative controls; non-capturing look-alikes; native Calor name resolution, effect charging,
+escaping delegates, Calor0211, capture rejection, verification (no proof, runtime guard kept)
+and a Calor-emitter round trip.

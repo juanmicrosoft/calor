@@ -54,6 +54,7 @@ public abstract class AstPositionVisitor<T> : IAstVisitor<T> where T : class?
     // Control flow
     public virtual T Visit(ForStatementNode node) => DefaultVisit(node)!;
     public virtual T Visit(WhileStatementNode node) => DefaultVisit(node)!;
+    public virtual T Visit(LocalFunctionStatementNode node) => DefaultVisit(node)!;
     public virtual T Visit(DoWhileStatementNode node) => DefaultVisit(node)!;
     public virtual T Visit(IfStatementNode node) => DefaultVisit(node)!;
     public virtual T Visit(ElseIfClauseNode node) => DefaultVisit(node)!;

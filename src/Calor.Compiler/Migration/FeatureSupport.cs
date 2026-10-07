@@ -743,18 +743,17 @@ public static class FeatureSupport
             Workaround = "Review the recorded namespace-topology interop loss or explicitly choose lossy native §NS conversion"
         },
 
-        // #777 (WS-W4 D4): any member containing a local function escalates to
-        // §CSHARP interop. The hoist-to-module-level lowering is never sound — its
-        // own happy path build-breaks (the call site is orphaned from the hoisted
-        // function), and when a same-named member exists the orphaned call silently
-        // rebinds to it (a silent substitution). So local functions are refused
-        // wholesale (a counted loss) rather than converted.
+        // #777 (WS-W4 D4): local functions are never hoisted to module level — the
+        // call site build-breaks or silently rebinds to a same-named member.
+        // 0.25 F3 (#847): the bounded slice converts natively IN PLACE as a nested
+        // §F (a C# static local function). Every other local function preserves its
+        // whole member as §CSHARP interop (a counted loss), as before.
         ["local-function"] = new FeatureInfo
         {
             Name = "local-function",
-            Support = SupportLevel.NotSupported,
-            Description = "A member containing a local function is preserved verbatim as a §CSHARP interop block; hoisting to a module-level §F function is unsound (orphaned call site build-breaks or silently rebinds)",
-            Workaround = "Lift the local function to a method with explicit parameters before migration, or keep the member as a §CSHARP interop block"
+            Support = SupportLevel.Partial,
+            Description = "A non-capturing local function declared directly in a method body, without attributes, type parameters, async/unsafe/extern, yield, nested local functions, or ref/out/in/params/default parameters, converts in place to a nested §F (a C# static local function). A member with any other local function is preserved verbatim as a §CSHARP interop block",
+            Workaround = "Make the local function static (pass captured values as parameters) and non-generic, or keep the member as a §CSHARP interop block"
         },
 
         // Phase 4 features (C# 11-13)

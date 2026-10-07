@@ -10,6 +10,31 @@ All notable changes to Calor, organized by release.
 
 ## [Unreleased]
 
+### Added
+
+- **Native local functions (#847).** A `§F` written inside a `§F` or `§MT` body is a local
+  function. Calor emits it in place as a C# `static` local function. Its name is visible in
+  the whole body, before the declaration too, and a bare call such as `§C{Add}` names it
+  even when the class has a method `Add`. It cannot capture the enclosing locals,
+  parameters or `this`; a capture is a compile error (`CS8421`). Its body's effects are
+  charged to the enclosing callable. Other placements and shapes (nested in a block,
+  `§E`, contracts, type parameters, refinement types, `§PROOF`, `§YIELD`) are rejected
+  with the new diagnostic `Calor0211`. See
+  [Local Functions](/syntax-reference/structure-tags#local-functions).
+
+### Changed
+
+- **C# local functions convert natively when they are non-capturing (#847).** Before,
+  every member with a local function was preserved as a `§CSHARP` block, and its callers
+  needed `--permissive-effects` to compile. Now a local function declared directly in a
+  method body, without capture, attributes, type parameters, `async`/`unsafe`/`extern`,
+  `yield`, nested local functions or `ref`/`out`/`in`/`params`/default parameters,
+  becomes a nested `§F` in the same method. The three R0 witnesses (F3-LOCAL-01 to 03)
+  convert natively on all 8 measured surfaces, compile with default options and print
+  the same result as the original. Capturing, generic, async and iterator local
+  functions are still preserved as `§CSHARP` and reported as `local-function`. The
+  `local-function` feature is now `Partial` instead of `NotSupported`.
+
 ## [0.24.0] - 2026-10-07
 
 Calor 0.24 is a soundness release. It repairs verifier defects found by a registered soundness

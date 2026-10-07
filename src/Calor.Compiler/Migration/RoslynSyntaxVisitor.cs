@@ -3214,9 +3214,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         List<OperatorOverloadNode> operatorOverloads,
         List<IndexerNode>? indexers = null)
     {
+        // A non-native local function is reported as local-function by ConvertBlock.
         if (!member.DescendantNodes()
                 .OfType<LocalFunctionStatementSyntax>()
-                .Any())
+                .Any(local => !IsNativeLocalFunction(local)))
         {
             var unsupported = SyntaxCapabilityClassifier.FindFirst(member);
             if (unsupported != null)
@@ -4544,6 +4545,101 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return Array.Empty<StatementNode>();
     }
 
+    /// <summary>
+    /// 0.25 F3 (#847): the native local-function slice. A local function declared
+    /// directly in a method body, with no attributes, type parameters, async,
+    /// unsafe or extern modifier, no yield, no nested local function, plain
+    /// by-value parameters without defaults, and no capture of the enclosing
+    /// locals, parameters or <c>this</c>. Anything else is preserved as interop.
+    /// </summary>
+    private bool IsNativeLocalFunction(LocalFunctionStatementSyntax local)
+    {
+        if (local.Parent is not BlockSyntax { Parent: MethodDeclarationSyntax }
+            || local.AttributeLists.Count > 0
+            || local.TypeParameterList != null
+            || local.ConstraintClauses.Count > 0
+            || local.Modifiers.Any(modifier => !modifier.IsKind(SyntaxKind.StaticKeyword))
+            || local.ReturnType is RefTypeSyntax
+            || local.ParameterList.Parameters.Any(parameter =>
+                parameter.Modifiers.Count > 0 || parameter.Default != null
+                || parameter.AttributeLists.Count > 0 || parameter.Type == null)
+            || local.DescendantNodes().Any(node =>
+                node is YieldStatementSyntax or LocalFunctionStatementSyntax))
+            return false;
+        return !CapturesEnclosingState(local);
+    }
+
+    /// <summary>
+    /// Whether a local function reads or writes an enclosing local or parameter,
+    /// or uses <c>this</c>/<c>base</c> (explicitly, or implicitly through an
+    /// unqualified instance member). Answers true (capturing) when the semantic
+    /// model is unavailable: unknown is never native.
+    /// </summary>
+    private bool CapturesEnclosingState(LocalFunctionStatementSyntax local)
+    {
+        if (local.Modifiers.Any(SyntaxKind.StaticKeyword))
+            return false; // C# already rejects any capture by a static local function
+        if (_semanticModel == null || !ReferenceEquals(local.SyntaxTree, _semanticModel.SyntaxTree)
+            || _semanticModel.GetDeclaredSymbol(local) is not { } self)
+            return true;
+        foreach (var node in local.DescendantNodes())
+        {
+            if (node is ThisExpressionSyntax or BaseExpressionSyntax)
+                return true;
+            if (node is not SimpleNameSyntax name || name.Parent is NameColonSyntax)
+                continue;
+            var symbol = _semanticModel.GetSymbolInfo(name).Symbol;
+            if (symbol is ILocalSymbol or IParameterSymbol)
+            {
+                var owner = symbol.ContainingSymbol;
+                while (owner != null && !SymbolEqualityComparer.Default.Equals(owner, self))
+                    owner = owner.ContainingSymbol as IMethodSymbol;
+                if (owner == null)
+                    return true;
+            }
+            else if (symbol is IFieldSymbol or IPropertySymbol or IEventSymbol
+                         or IMethodSymbol { MethodKind: MethodKind.Ordinary }
+                     && !symbol.IsStatic
+                     && !IsQualifiedMemberName(name))
+            {
+                return true; // an implicit `this.` member access
+            }
+        }
+        return false;
+    }
+
+    private static bool IsQualifiedMemberName(SimpleNameSyntax identifier) =>
+        identifier.Parent switch
+        {
+            MemberAccessExpressionSyntax access => access.Name == identifier,
+            MemberBindingExpressionSyntax => true,
+            AssignmentExpressionSyntax { Parent: InitializerExpressionSyntax } assignment
+                => assignment.Left == identifier,
+            _ => false,
+        };
+
+    /// <summary>0.25 F3 (#847): converts a native-slice local function in place.</summary>
+    private LocalFunctionStatementNode ConvertLocalFunction(LocalFunctionStatementSyntax local)
+    {
+        var savedReassigned = _reassignedVariables;
+        _reassignedVariables = CollectReassignedVariables(local);
+        try
+        {
+            var id = _context.GenerateId("f");
+            var parameters = ConvertParameters(local.ParameterList);
+            var returnType = MapDeclarationType(local.ReturnType);
+            var output = returnType != "void" ? new OutputNode(GetTextSpan(local.ReturnType), returnType) : null;
+            var body = ConvertMethodBody(local.Body, local.ExpressionBody);
+            var function = new FunctionNode(GetTextSpan(local), id, local.Identifier.ValueText,
+                Visibility.Private, parameters, output, effects: null, body, new AttributeCollection());
+            return new LocalFunctionStatementNode(GetTextSpan(local), function);
+        }
+        finally
+        {
+            _reassignedVariables = savedReassigned;
+        }
+    }
+
     private IReadOnlyList<StatementNode> ConvertMethodBody(BlockSyntax? body, ArrowExpressionClauseSyntax? expressionBody)
     {
         if (body != null)
@@ -4561,7 +4657,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 {
                     if (expressionBody.Parent is OperatorDeclarationSyntax or ConversionOperatorDeclarationSyntax
                         || expressionBody.Parent is MethodDeclarationSyntax method
-                            && method.ReturnType.ToString() != "void")
+                            && method.ReturnType.ToString() != "void"
+                        || expressionBody.Parent is LocalFunctionStatementSyntax localFunction
+                            && localFunction.ReturnType.ToString() != "void")
                         throw EscalateExpression(exprAssign, "tuple-deconstruction");
                     return [ConvertTupleAssignmentStatement(exprAssign, GetTextSpan(expressionBody))];
                 }
@@ -6474,21 +6572,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         var statements = new List<StatementNode>();
 
-        // #777 (WS-W4 D4): at each member-body boundary, refuse ANY member that
-        // contains a local function — escalate the whole member to §CSHARP interop.
-        // The hoist-to-module-level lowering is never sound: its own happy path
-        // (a plain `int Add(...)` with no collision) build-breaks (CS0103) because
-        // the call site is left in the class while the function moves to the module
-        // static class; and when a same-named member DOES exist, the orphaned call
-        // silently rebinds to it and compiles clean (LossCount==0, wrong behaviour) —
-        // the exact §1 predicate-trust blocker. Escalating all local functions turns
-        // both outcomes into honest interop; no correct native coverage is lost.
-        // Done before any statement is processed so no sibling is half-hoisted.
+        // #777 (WS-W4 D4): local functions are never hoisted to module level (the
+        // call site would build-break or silently rebind to a same-named member).
+        // 0.25 F3 (#847): a member whose local functions are ALL in the native
+        // slice (IsNativeLocalFunction) converts them in place to a nested §F,
+        // emitted as a C# static local function. Any other local function escalates
+        // the whole member to §CSHARP interop, as before. Decided before any
+        // statement is processed so no member is half-converted.
         if (block.Parent is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax)
         {
             var localFn = block.DescendantNodes()
                 .OfType<LocalFunctionStatementSyntax>()
-                .FirstOrDefault();
+                .FirstOrDefault(local => !IsNativeLocalFunction(local));
             if (localFn != null)
                 throw EscalateExpression(localFn, "local-function");
         }
@@ -6624,7 +6719,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // VisitGlobalStatement).
             if (statement is LocalFunctionStatementSyntax localFunc)
             {
-                throw EscalateExpression(localFunc, "local-function");
+                if (!IsNativeLocalFunction(localFunc))
+                    throw EscalateExpression(localFunc, "local-function");
+                statements.Add(ConvertLocalFunction(localFunc));
+                continue;
             }
 
             // Handle lock statements: comment before body (correct semantic order)

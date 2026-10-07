@@ -95,6 +95,55 @@ validation passed.
 | `for` loop | `§L{id:var:from:to:step}` |
 | `while` loop | `§WH{id}` |
 
+### Local Functions
+
+Since 0.25 (#847), a C# local function converts natively when it is in this slice:
+
+- declared directly in a method body (not in a block, lambda, constructor, accessor
+  or operator);
+- no capture of the enclosing locals, parameters or `this` (a `static` local function
+  always qualifies);
+- no attributes, type parameters, `async`, `unsafe` or `extern`, no `yield`, no nested
+  local function, and plain by-value parameters without default values.
+
+It becomes a nested `§F` in the same method, and the compiler emits it back as a C#
+`static` local function in the same place. So a call keeps naming the local function,
+even when the class has a method with the same name. Converted output compiles with
+default options; `--permissive-effects` is not needed for these members.
+
+```csharp
+public static class Probe
+{
+    public static int Add(int x) => x + 1000;
+
+    public static int UseShadow()
+    {
+        int Add(int x) => x + 1;
+        return Add(2);   // 3, not 1002
+    }
+}
+```
+
+converts to:
+
+```calor
+§M{m001:Probe}
+  §CL{c001:Probe:pub:stat}
+    §MT{m002:Add:pub:stat} (i32:x) -> i32
+      §R (+ x 1000)
+
+    §MT{m003:UseShadow:pub:stat} () -> i32
+      §F{f001:Add} (i32:x) -> i32
+        §R (+ x 1)
+      §R §C{Add} 2
+```
+
+If a member has any local function outside the slice (capturing, generic, async,
+iterator, and so on), the whole member is preserved as a `§CSHARP` block, reported as
+a `local-function` issue and counted as a loss, exactly as before. `--no-fallback`
+refuses it by name. The language rules are in
+[Local Functions](/syntax-reference/structure-tags#local-functions).
+
 ### What Changed in 0.17
 
 0.16 got all 364 modules to **parse**. 0.17 is about what happens next: a module

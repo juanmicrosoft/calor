@@ -142,7 +142,10 @@
       ],
       "provisionalSize": "L",
       "readiness": {
-        "status": "NOT_STARTED"
+        "status": "IN_PROGRESS",
+        "branch": "milestone-0.25/f3-847-local-functions",
+        "evidence": "docs/plans/evidence/v0.25-f3-847/README.md",
+        "note": "Non-capturing local functions convert in place to a nested §F (a C# static local function). F3-LOCAL-01/02/03 are native and source-equivalent with a default compile on every CLI, MCP and migrate surface; F3-LOCAL-04/05 stay preserved. F3-LOCAL-A1 (binding, effects, verification) is covered by executable tests, not yet by a per-case evidence record. READY is left to the maintainer: needs candidate commit, per-case evidence with requirementSha256, approver, and #1423/#1426 blocker references."
       }
     },
     {

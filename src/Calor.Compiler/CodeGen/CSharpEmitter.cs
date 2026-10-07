@@ -2942,6 +2942,84 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return "";
     }
 
+    /// <summary>
+    /// 0.25 F3 (#847): a local function is emitted in place as a C# <c>static</c>
+    /// local function. <c>static</c> makes the C# compiler reject any capture of the
+    /// enclosing locals, parameters or <c>this</c>. The enclosing callable's emission
+    /// state is saved and restored around the body.
+    /// </summary>
+    public string Visit(LocalFunctionStatementNode node)
+    {
+        var function = node.Function;
+        var savedFunctionId = _currentFunctionId;
+        var savedPostconditionIndex = _currentPostconditionIndex;
+        var savedInlineReturnRefinement = _currentInlineReturnRefinement;
+        var savedYieldRefinement = _currentYieldRefinement;
+        var savedInlineReturnGuardCounter = _inlineReturnGuardCounter;
+        var savedReturnLowering = _currentReturnLowering;
+        var savedParameterTypes = _parameterTypes;
+        var savedCaptured = _capturedParameterNames.ToArray();
+        var savedDeclScopes = _declScopes;
+        var savedRefinementScopes = _refinementDeclScopes;
+        var savedIndexedScopes = _indexedBoundScopes;
+        var savedOutParameters = _outParameterNames;
+        var savedIndexGuardCounter = _indexGuardCounter;
+        var savedMutationGuardCounter = _mutationGuardCounter;
+        var savedStatementDepth = _statementDepth;
+        var savedResultShadowDepth = _postconditionResultShadowDepth;
+        try
+        {
+            _currentFunctionId = function.Id;
+            _currentPostconditionIndex = 0;
+            _currentInlineReturnRefinement = null;
+            _currentReturnLowering = null;
+            _parameterTypes = new Dictionary<string, string>(StringComparer.Ordinal);
+            _declScopes = [];
+            _refinementDeclScopes = [];
+            _indexedBoundScopes = [];
+            _outParameterNames = new HashSet<string>(StringComparer.Ordinal);
+            _statementDepth = 0;
+            _postconditionResultShadowDepth = 0;
+            ResetDeclScopes(function.Parameters, function);
+
+            var returnType = function.Output?.TypeName ?? "void";
+            var returnShape = GetCallableReturnShape(returnType, isAsync: false, isIterator: false);
+            _currentYieldRefinement = null;
+            _inlineReturnGuardCounter = 0;
+            var parameters = string.Join(", ", function.Parameters.Select(p => Visit(p)));
+            AppendLine($"static {returnShape.DeclarationType} {SanitizeIdentifier(function.Name)}({parameters})");
+            AppendLine("{");
+            Indent();
+            EmitRefinementParameterGuards(function.Parameters);
+            EmitCallableBody(function.Body, function.Parameters, function.TypeParameters,
+                Array.Empty<PostconditionEmission>(), function.Name, function.Span,
+                returnShape, returnType, isIterator: false);
+            Dedent();
+            AppendLine("}");
+            return "";
+        }
+        finally
+        {
+            _currentFunctionId = savedFunctionId;
+            _currentPostconditionIndex = savedPostconditionIndex;
+            _currentInlineReturnRefinement = savedInlineReturnRefinement;
+            _currentYieldRefinement = savedYieldRefinement;
+            _inlineReturnGuardCounter = savedInlineReturnGuardCounter;
+            _currentReturnLowering = savedReturnLowering;
+            _parameterTypes = savedParameterTypes;
+            _capturedParameterNames.Clear();
+            _capturedParameterNames.UnionWith(savedCaptured);
+            _declScopes = savedDeclScopes;
+            _refinementDeclScopes = savedRefinementScopes;
+            _indexedBoundScopes = savedIndexedScopes;
+            _outParameterNames = savedOutParameters;
+            _indexGuardCounter = savedIndexGuardCounter;
+            _mutationGuardCounter = savedMutationGuardCounter;
+            _statementDepth = savedStatementDepth;
+            _postconditionResultShadowDepth = savedResultShadowDepth;
+        }
+    }
+
     public string Visit(OutputNode node) => MapTypeName(node.TypeName);
 
     public string Visit(EffectsNode node) => "";
@@ -4778,6 +4856,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         if (node is MatchExpressionNode match)
             foreach (var arm in match.Cases.Where(arm => !IsSupportedMatchExpressionArm(arm)))
                 ReportUnsupportedMatchExpressionArm(arm, diagnostics);
+        if (node is LocalFunctionStatementNode local) // a leaf for the walker (#847)
+            ValidateMatchExpressions(local.Function, diagnostics);
         foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(node))
             ValidateMatchExpressions(child, diagnostics);
     }
