@@ -12961,7 +12961,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// </summary>
     private ExpressionNode ConvertInPlace(ExpressionSyntax expression, bool always = false)
     {
-        if (!always && !expression.DescendantNodesAndSelf().OfType<AssignmentExpressionSyntax>().Any())
+        // A lambda element evaluates nothing when the array is built; its body keeps
+        // its own statement context.
+        if (expression is AnonymousFunctionExpressionSyntax
+            || !always && !expression.DescendantNodesAndSelf().OfType<AssignmentExpressionSyntax>().Any())
             return ConvertExpression(expression);
         _conditionalRegionDepth++;
         try
