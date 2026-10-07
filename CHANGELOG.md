@@ -39,10 +39,12 @@ input violates. The published 0.21.0 package is not changed; the defects remain 
 2. **Wrong interface acceptance (4 cases).** No runtime check was removed, but the verdict was
    wrong. When a class implements an interface, Calor checks that the class's precondition
    accepts every input the interface accepts. 0.21.0 reported that check as proven
-   (`Calor0815`) for preconditions that throw on an input the interface allows.
-   - *Preconditions that read a string that may be null (3 cases),* such as `(>= (len s) 0)`,
-     which throws at `s = null`. In 0.24.0 these are `Assumed`, not proven, with the new warning
-     `Calor0819`. This is a demotion.
+   (`Calor0815`) for class preconditions that throw on, or reject, an input the interface
+   allows.
+   - *Preconditions that read a string that may be null (3 cases).* In 2 cases,
+     `(>= (len s) 0)` throws at `s = null`. In 1 case, `(|| (! (isempty s)) (== s ""))` is false
+     at `s = null`. In 0.24.0 all 3 are `Assumed`, not proven, with the new warning `Calor0819`.
+     This is a demotion.
    - *A remainder that may divide by zero (1 case),* `(> (% x y) -2)`, which throws at `y = 0`.
      In 0.24.0 the check is refuted with the input `x = 3, y = 0`, reported as an error
      (`Calor0810`). This is a fix.
@@ -51,14 +53,16 @@ A related defect was found outside the sweep (#1493). On Windows, two different 
 identifiers could in principle become one solver variable and so prove a false contract. It was
 not observed in practice. 0.24.0 fixes it.
 
-**What to do.** Upgrade to 0.24.0 and recompile. C# that 0.21.0 generated keeps any runtime
-check it removed until you regenerate it with 0.24.0. The verification cache format changed, so
-cached verdicts from older versions are recomputed automatically.
+**What to do.** Upgrade to 0.24.0 and regenerate your C#. C# that 0.21.0 generated still lacks
+any runtime check that 0.21.0 removed; the upgrade alone does not change it. The verification
+cache format changed, so cached verdicts from older versions are recomputed automatically.
 
 **What the sweep does not show.** The sweep samples registered forms. It is not a proof that the
 verifier is sound.
 
-- It ran 710 cases per build, on one platform (macOS arm64), twice, with identical results.
+- It ran 710 cases per build, on one platform (macOS arm64), twice. Both runs gave the same
+  verdicts and the same findings. One counterexample differed between runs; both violated the
+  property.
 - Of its 100 registered rows (groups of related cases), 79 found no counterexample within the
   sweep's budget. That means only that none was found. 44 of those 79 rows contain no proven
   case at all, so they support no claim about `Proven` results. 7 rows were outside the
@@ -87,10 +91,13 @@ give the details.
 
 - **Benchmark publication refuses incomparable results (#1422).** The benchmark workflow now
   proposes one headline file, built only from the B1 results packet (the 0.24 pair-equivalence
-  results). The workflow fails and opens no pull request when an included pair is not
-  `EQUIVALENT`, a registered pair changed, the method changed without an evidence-contract
-  amendment merged first, the regenerated packet differs, or the provenance commit is not a full
-  SHA on `main`. A failed run tries to close open benchmark-results pull requests. Across different
+  results). The workflow fails and opens no pull request in any of these cases:
+  - an included pair is not `EQUIVALENT`, or a registered pair changed;
+  - the method changed without an evidence-contract amendment merged first;
+  - the regenerated packet differs;
+  - the provenance commit is not a full SHA on `main`.
+
+  A failed run tries to close open benchmark-results pull requests. Across different
   methods it prints no delta. The `allow_weaker_methodology` override is removed. Adjudication
   of what is published is a separate gate (#1410).
 - **The agent refactoring job no longer commits to `main`.** It uploads its results and fails
@@ -139,7 +146,8 @@ give the details.
     obligations, preconditions, and interface checks are unchanged: the registered row covers
     postconditions only.
 
-  The verification cache format moves to 1.22, so older entries are invalidated.
+  The verification cache format changes (0.24.0 uses format 1.22), so older entries are
+  invalidated.
 - **Text reaches the solver with .NET's meaning (#1413, #1493).** A string literal is now sent to
   Z3 one UTF-16 code unit at a time, so `"é"` has length 1 there, as `"é".Length` does in .NET.
   Before, it had length 2 (one per UTF-8 byte), and a true postcondition such as
@@ -151,12 +159,14 @@ give the details.
   `Unsupported`. `IndexOf` with a start index is now
   `Unsupported`: the generated C# ignores the start index, so the solver must not model one.
   Separately, Z3 symbol names for non-ASCII identifiers are now escaped to ASCII. On Windows,
-  two different identifiers outside the code page (say `ж` and `щ`) used to become one solver
-  variable, which could prove a false contract. Proofs that touch strings stay `Assumed` and
+  two different identifiers outside the code page (say `ж` and `щ`) could become one solver
+  variable, which could in principle prove a false contract. This was not observed in
+  practice. Proofs that touch strings stay `Assumed` and
   keep their runtime checks. A precondition set that is unsatisfiable only in the solver's
   null-free model is no longer reported as vacuous or unsatisfiable when a null could satisfy
   it (through `==`, `Equals`, or `IsNullOrEmpty` on a parameter); the result is `Unsupported`.
-  The verification cache format moves to 1.21, so older entries are invalidated.
+  The verification cache format changes (0.24.0 uses format 1.22), so older entries are
+  invalidated.
 - **No proof is claimed for a nested quantifier (#1413).** A postcondition with a bounded
   `forall` inside another `forall` was reported `Proven`, although the compiler then rejected
   its runtime check (`Calor0326`). As a conservative restriction, the verifier now does not
@@ -175,10 +185,10 @@ give the details.
     check each query in a fresh Z3 context with the same settings. A Z3 context that Calor did
     not create has unknown settings, so its queries are still checked in that context. Before,
     Z3 reused the ids of terms that .NET's garbage collector had released, so the order Z3
-    searched in depended on when the GC ran. The same query took up to three times as much solver work from one run to
-    the next. Once in CI, a query of a kind that takes 30 to 65 ms hit the 5-second timeout and
-    failed the release-critical oracle on an unchanged tree. Each solver check now costs about
-    1.4 ms more. A check no longer reuses search state from earlier checks, so a refuted
+    searched in depended on when the GC ran. The same query could take a different amount of
+    solver work from one run to the next. Once in CI, a normally fast query hit the 5-second
+    timeout and failed the release-critical oracle on an unchanged tree. Each solver check now
+    costs slightly more time. A check no longer reuses search state from earlier checks, so a refuted
     contract can report a different, equally valid counterexample, and a query close to the
     timeout can end differently than before.
   - **Windows strings.** A string literal with a non-ASCII character reached Z3 in the Windows
@@ -187,7 +197,7 @@ give the details.
     platforms now send the same encoding: first the UTF-8 byte model, and in the final 0.24.0
     the UTF-16 code units described in the "Text reaches the solver" entry above. A proof that
     depends on string semantics is still reported as assumed and keeps its runtime check. The
-    verification cache format changed again later in 0.24 (now 1.22), so old cached verdicts
+    verification cache format changes (0.24.0 uses format 1.22), so old cached verdicts
     are recomputed once.
   - **User-level cache on Windows.** The default verification cache and the user effect
     manifests (`~/.calor`) now honor `USERPROFILE` on Windows, as NuGet does. Linux and macOS
@@ -231,7 +241,8 @@ give the details.
   (`Calor1121`/`Calor1140`, a compile error) is now reported only when the solver's state
   matches the program's at that point: no reassigned name, no unasserted enclosing guard,
   and no earlier loop or exit. Otherwise the result is `Calor1124` ("unsupported") and the
-  runtime check stays. This does not track statements that throw before the obligation.
+  runtime check stays. Statements that throw before the obligation are covered by the entry
+  "Two more kinds of unreachable counterexample are withheld" above.
   New facts: an `else`/`elseif` body knows that the earlier conditions were false, and a
   parameter of a named refinement type (`§I{Pos:x}`) satisfies its predicate on entry.
 - **Interface contract checks no longer prove what can throw (#1413).** When a class implements
@@ -257,7 +268,7 @@ give the details.
   hashed an integer literal by its value only. After compiling `x + LONG:1`, a later compile
   of `x + INT:1` reused the cached `Proven`, although `int.MaxValue + 1` overflows; the
   runtime check was then removed. Keys now include each literal's width, signedness, and
-  (for real literals) float/double/decimal kind. The cache format moves to 1.20, so every
+  (for real literals) float/double/decimal kind. The cache format changes (0.24.0 uses format 1.22), so every
   older entry is invalidated.
 
 - **An empty clause body no longer swallows the next statement (#1485).** A
