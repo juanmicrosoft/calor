@@ -245,6 +245,29 @@ public class NamedRefinementArithmeticTests
     // ---- The result type is the BASE type, not the refinement ----
 
     /// <summary>
+    /// Inc/dec of a collection element has no mutation guard (the emitter and the obligation
+    /// generator only guard a plain variable), so its result must NOT keep the refinement.
+    /// Found by the review verification pass: `(dec §IDX a INT:0)` on a `Dictionary&lt;i32,Nat&gt;`
+    /// yielded -1 typed as `Nat`.
+    /// </summary>
+    [Fact]
+    public void IncrementDecrement_OfUnguardedElement_GetsTheBaseType()
+    {
+        var result = Check("""
+            §M{m:R}
+              §U{Nat:System.Int32}
+              §RTYPE{r1:Nat:i32} (>= # INT:0)
+              §F{f1:Bad:pub} (Dictionary<i32,Nat>:a) -> Option<Nat>
+                §B{x} (dec §IDX a INT:0)
+                §B{boxed:Option<Nat>} §SM x
+                §R boxed
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors, d => d.Code == DiagnosticCode.TypeMismatch
+            && d.Message.Contains("Option<i32{#i32}>"));
+    }
+
+    /// <summary>
     /// The exception: inc/dec. They mutate the refined variable, and that mutation is itself
     /// guarded (Subtype obligation + runtime check) before it commits, so the value they yield
     /// satisfies the refinement. Before #1515 they typed as the error type, which let this

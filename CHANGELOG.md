@@ -13,8 +13,9 @@ All notable changes to this project will be documented in this file.
   see a named refinement as its base type: `+ - * / %`, unary minus, comparisons, bitwise and
   shift operators, logical operators on a `bool` refinement, and loop bounds. The result has the
   **base** type, not the refinement, because `NatInt - NatInt` can be negative. The exception is
-  increment and decrement (`inc`, `dec`, `post-inc`, `post-dec`): they keep the refined type,
-  because the write back into the variable is itself checked. Writing a result
+  increment and decrement (`inc`, `dec`, `post-inc`, `post-dec`) of a variable: they keep the
+  refined type, because the write back into the variable is itself checked. Incrementing a
+  collection element or field gives the base type. Writing a result
   back into a refined variable or return is still checked: you get the same verification
   obligation and runtime guard as with an inline refinement. Binding a plain base value with
   `§B{x:NatInt}` is still rejected by the type checker, as before.

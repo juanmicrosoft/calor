@@ -1449,12 +1449,16 @@ public sealed class TypeChecker
         // refinement does (an inline-refined parameter is typed as its base). `-` and `~` yield
         // the BASE type: a refinement does not survive arithmetic. #1515.
         //
-        // Increment/decrement are the exception and keep the operand's declared type. They write
-        // back into the refined variable, and that write is guarded (Subtype obligation + runtime
-        // check) before it commits, so the value they yield satisfies the refinement. Before
-        // #1515 they typed as the error type, so `§B{x:Nat} (inc a)` compiled; it still does.
+        // Increment/decrement of a plain VARIABLE are the exception and keep its declared type.
+        // They write back into the refined variable, and that write is guarded (Subtype
+        // obligation + runtime check) before it commits, so the value they yield satisfies the
+        // refinement. Before #1515 they typed as the error type, so `§B{x:Nat} (inc a)` compiled;
+        // it still does. Any other operand (`§IDX` element, field, ...) has no mutation guard —
+        // both the emitter and ObligationGenerator only guard a ReferenceNode — so its result
+        // gets the base type like any other arithmetic.
         var declaredOperandType = InferExpressionType(unary.Operand);
         var operandType = EraseRefinement(declaredOperandType);
+        var incDecResultType = unary.Operand is ReferenceNode ? declaredOperandType : operandType;
         return unary.Operator switch
         {
             UnaryOperator.Not => PrimitiveType.Bool,
@@ -1462,7 +1466,7 @@ public sealed class TypeChecker
             UnaryOperator.BitwiseNot => operandType.Equals(PrimitiveType.Int) ? PrimitiveType.Int : ErrorType.Instance,
             UnaryOperator.PreIncrement or UnaryOperator.PreDecrement
                 or UnaryOperator.PostIncrement or UnaryOperator.PostDecrement
-                => IsNumericType(operandType) ? declaredOperandType : ErrorType.Instance,
+                => IsNumericType(operandType) ? incDecResultType : ErrorType.Instance,
             _ => ErrorType.Instance
         };
     }
