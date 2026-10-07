@@ -26,46 +26,46 @@ Version: 4.15.7
 Verified Z3 managed and native assets against committed size/hash pins.
 
 Z3 libraries ready.
-  Managed: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/scripts/../z3/Microsoft.Z3.dll
-  Natives: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/scripts/../runtimes/*/native/
+  Managed: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/scripts/../z3/Microsoft.Z3.dll
+  Natives: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/scripts/../runtimes/*/native/
 Verified Z3 managed and native assets against committed size/hash pins.
-  Determining projects to restore...
-  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Runtime/Calor.Runtime.csproj (in 37 ms).
-  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/Calor.Compiler.csproj (in 2.25 sec).
-  Calor.Runtime -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
+  Geri yüklenecek projeler belirleniyor...
+  /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/second-build/nested/elsewhere/calor-clone/src/Calor.Runtime/Calor.Runtime.csproj geri yüklendi (39 ms içinde).
+  /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/Calor.Compiler.csproj geri yüklendi (1,66 sn içinde).
+  Calor.Runtime -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/second-build/nested/elsewhere/calor-clone/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
   Verified Z3 managed and native assets against committed size/hash pins.
-  Calor.Compiler -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/bin/Release/net10.0/calor.dll
+  Calor.Compiler -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/bin/Release/net10.0/calor.dll
 
-Build succeeded.
-    0 Warning(s)
-    0 Error(s)
+Oluşturma başarılı oldu.
+    0 Uyarı
+    0 Hata
 
-Time Elapsed 00:00:01.83
+Geçen Süre 00:00:02.18
   Verified Z3 managed and native assets against committed size/hash pins.
-  Calor.Compiler -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/bin/Release/net10.0/publish/
+  Calor.Compiler -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/bin/Release/net10.0/publish/
   Verified Z3 managed and native assets against committed size/hash pins.
-  Successfully created package '/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/build-2/out/nupkg/calor.0.24.0.nupkg'.
-  Determining projects to restore...
-  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Sdk/Calor.Sdk.csproj (in 37 ms).
-  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Tasks/Calor.Tasks.csproj (in 613 ms).
-  2 of 4 projects are up-to-date for restore.
-  Calor.Runtime -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
+  '/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/build-2/out/nupkg/calor.0.24.0.nupkg' paketi başarıyla oluşturuldu.
+  Geri yüklenecek projeler belirleniyor...
+  /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/second-build/nested/elsewhere/calor-clone/src/Calor.Sdk/Calor.Sdk.csproj geri yüklendi (38 ms içinde).
+  /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/second-build/nested/elsewhere/calor-clone/src/Calor.Tasks/Calor.Tasks.csproj geri yüklendi (689 ms içinde).
+  Geri yükleme için 4 proje içinden 2 tanesi güncel.
+  Calor.Runtime -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/second-build/nested/elsewhere/calor-clone/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
   Verified Z3 managed and native assets against committed size/hash pins.
-  Calor.Compiler -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/bin/Release/net10.0/calor.dll
-  Calor.Tasks -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll
-  Calor.Sdk -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Sdk/bin/Release/net10.0/Calor.Sdk.dll
-  Calor.Runtime -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
+  Calor.Compiler -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/bin/Release/net10.0/calor.dll
+  Calor.Tasks -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/second-build/nested/elsewhere/calor-clone/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll
+  Calor.Sdk -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/second-build/nested/elsewhere/calor-clone/src/Calor.Sdk/bin/Release/net10.0/Calor.Sdk.dll
+  Calor.Runtime -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/second-build/nested/elsewhere/calor-clone/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
   Verified Z3 managed and native assets against committed size/hash pins.
-  Calor.Compiler -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/bin/Release/net10.0/calor.dll
-  Calor.Tasks -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll
-  Calor.Tasks -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Sdk/obj/sdk-tasks-publish/
+  Calor.Compiler -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/bin/Release/net10.0/calor.dll
+  Calor.Tasks -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/second-build/nested/elsewhere/calor-clone/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll
+  Calor.Tasks -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/second-build/nested/elsewhere/calor-clone/src/Calor.Sdk/obj/sdk-tasks-publish/
   Calor.Sdk pack: staged 25 files into tasks/net10.0
-  Successfully created package '/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/build-2/out/nupkg/Calor.Sdk.0.24.0.nupkg'.
+  '/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final2/build-2/out/nupkg/Calor.Sdk.0.24.0.nupkg' paketi başarıyla oluşturuldu.
 OK: Z3 assets in calor.0.24.0.nupkg match the committed pins.
 OK: Z3 assets in Calor.Sdk.0.24.0.nupkg match the committed pins.
 Generated release metadata for 2 artifact(s) and 380 package(s).
 
-added 285 packages in 2s
+added 285 packages in 3s
 npm warn install-scripts 1 package has install scripts not yet covered by allowScripts:
 npm warn install-scripts   fsevents@2.3.3 (install: (install scripts present))
 npm warn install-scripts
