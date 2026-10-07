@@ -207,6 +207,23 @@
   "reviews": [
     "docs/plans/evidence/v0.25-f6-1144/reviews/round-1.md",
     "docs/plans/evidence/v0.25-f6-1144/reviews/round-2.md",
-    "docs/plans/evidence/v0.25-f6-1144/reviews/round-3.md"
-  ]
+    "docs/plans/evidence/v0.25-f6-1144/reviews/round-3.md",
+    "docs/plans/evidence/v0.25-f6-1144/reviews/verification.md"
+  ],
+  "reviewVerdict": "VERIFIED-WITH-RESIDUALS (Codex, 3 rounds + verification; reduced independence)",
+  "testRun": {
+    "commit": "d15101fd",
+    "Calor.Compiler.Tests": {
+      "total": 13069,
+      "passed": 13060,
+      "skipped": 9,
+      "failed": 0
+    },
+    "Calor.Conversion.Tests": {
+      "total": 476,
+      "passed": 476,
+      "failed": 0
+    },
+    "platform": "macOS arm64"
+  }
 }
