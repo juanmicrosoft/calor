@@ -92,11 +92,16 @@ public sealed class DispositionTests
     /// <summary>
     /// At closure, a record stating a later contract version than the committed contract.json is
     /// validated against that contract as amended (the version is the only field the closure rules
-    /// read); open-state validation always uses the committed contract.
+    /// read); open-state validation always uses the committed contract. Without an explicit
+    /// <paramref name="closing"/>, a record is validated in its own state (S2 is closed, so the
+    /// negative controls validate closed records), with evidence that accepts the record's own
+    /// merge commits; <see cref="CommittedRecord_ValidatesClosed"/> checks them against real git.
     /// </summary>
     private static IReadOnlyList<DispositionValidator.Violation> Validate(
-        JsonNode record, bool closing = false, DispositionValidator.ClosureEvidence? evidence = null)
+        JsonNode record, bool? closingOverride = null, DispositionValidator.ClosureEvidence? evidence = null)
     {
+        var closing = closingOverride ?? record["closure"]?["status"]?.GetValue<string>() == "CLOSED";
+        evidence ??= closingOverride is null && closing ? AcceptAll(record) : RepositoryEvidence;
         var contract = Load("docs/plans/evidence/evidence-contract-1407/contract.json");
         if (closing && record["contractVersion"]?.GetValue<string>() is { } stated && stated != contract["contractVersion"]!.GetValue<string>())
             contract["contractVersion"] = stated;
@@ -154,22 +159,37 @@ public sealed class DispositionTests
     // ------------------------------------------------------------------ positive
 
     [Fact]
-    public void CommittedRecord_ValidatesOpen()
-        => AssertCodes(Validate(Record()));
+    public void CommittedRecord_ValidatesClosed()
+    {
+        // S2 is closed: all seven repairs are merged, and their real merge commits pass the real git
+        // checks (reachable from origin/main, GitHub's merge of the PR from its S2 branch, regression
+        // witnesses present). The check needs the fetched main ref; without it this fails, never skips.
+        Assert.True(Git("rev-parse --verify --quiet origin/main").ExitCode == 0,
+            "closure validation needs a fetched origin/main (full-history checkout)");
+        var record = Record();
+        Assert.Equal("CLOSED", record["closure"]!["status"]!.GetValue<string>());
+        Assert.Equal("SUCCESS", record["closure"]!["result"]!.GetValue<string>());
+        AssertCodes(Validate(record, closingOverride: true));
+    }
 
     [Fact]
-    public void CommittedRecord_IsNotYetClosable()
+    public void CommittedRecord_IsNotAnOpenRecord()
     {
-        // Unmerged repairs keep S2 open; there is no closure result yet. Amendments 1.3.0 and 1.3.1
-        // are merged (contract 1.3.1). Six repairs are merged: their real merge commits pass the real
-        // git checks; R-NUM (#1502) is still open.
-        var violations = Validate(Record(), closing: true);
-        AssertCodes(violations, "D010", "D016");
+        // A closed record cannot pass as open: open validation requires status OPEN with no result.
+        var violations = Validate(Record(), closingOverride: false);
+        AssertCodes(violations, "D010");
+        Assert.Contains(violations, v => v.Message.Contains("must say closure.status OPEN"));
+    }
+
+    [Fact]
+    public void D010_UnmergedRepair_DoesNotClose()
+    {
+        var record = Record();
+        Repair(record, "R-NUM")["status"] = "open";
+        Repair(record, "R-NUM")["mergeCommit"] = null;
+        var violations = Validate(record, closingOverride: true, AcceptAll(record));
+        AssertCodes(violations, "D010");
         Assert.Contains(violations, v => v.Message.Contains("R-NUM: not merged at closure"));
-        Assert.DoesNotContain(violations, v => v.Message.Contains("capacity amendment"));
-        if (Git("rev-parse --verify --quiet origin/main").ExitCode == 0) // the real check needs the main ref
-            foreach (var merged in new[] { "R-CACHE", "R-IMPL", "R-OBL", "R-TEXT", "R-QNT", "R-OBL-RESIDUALS" })
-                Assert.DoesNotContain(violations, v => v.Message.StartsWith(merged + ":", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -203,7 +223,7 @@ public sealed class DispositionTests
     public void FullyMergedRecord_Closes()
     {
         var record = MergedRecord();
-        AssertCodes(Validate(record, closing: true, AcceptAll(record)));
+        AssertCodes(Validate(record, closingOverride: true, AcceptAll(record)));
     }
 
     [Fact]
@@ -213,7 +233,7 @@ public sealed class DispositionTests
         // review overrun can close.
         var record = MergedRecord();
         record["contractVersion"] = "1.2.0";
-        var violations = Validate(record, closing: true, AcceptAll(record));
+        var violations = Validate(record, closingOverride: true, AcceptAll(record));
         AssertCodes(violations, "D010");
         Assert.Contains(violations, v => v.Message.Contains("capacity amendment 1.3.0 is not in the contract"));
         Assert.Contains(violations, v => v.Message.Contains("R-OBL: review-round overrun without a merged amendment"));
@@ -252,7 +272,7 @@ public sealed class DispositionTests
     {
         var record = MergedRecord();
         Repair(record, "R-OBL").Remove("overrunAmendment");
-        var violations = Validate(record, closing: true, AcceptAll(record));
+        var violations = Validate(record, closingOverride: true, AcceptAll(record));
         AssertCodes(violations, "D010");
         Assert.Contains(violations, v => v.Message.Contains("R-OBL: review-round overrun without a merged amendment"));
     }
@@ -263,10 +283,10 @@ public sealed class DispositionTests
         var record = MergedRecord();
         Finding(record, "B1", "F-B1-001")["disposition"] = "MILESTONE-FAILED";
         Row(record, "B1", "NUM-NARROW-ARITH")["disposition"] = "MILESTONE-FAILED";
-        AssertCodes(Validate(record, closing: true, AcceptAll(record)), "D016");
+        AssertCodes(Validate(record, closingOverride: true, AcceptAll(record)), "D016");
 
         record["closure"]!["result"] = "MILESTONE-FAILED";
-        AssertCodes(Validate(record, closing: true, AcceptAll(record)));
+        AssertCodes(Validate(record, closingOverride: true, AcceptAll(record)));
     }
 
     // ------------------------------------------------------------- negative controls
@@ -464,14 +484,14 @@ public sealed class DispositionTests
     {
         var record = Record();
         record["closure"]!["status"] = "CLOSED";
-        AssertCodes(Validate(record), "D010");
+        AssertCodes(Validate(record, closingOverride: false), "D010");
     }
 
     [Fact]
     public void D010_InventedMergeEvidence_DoesNotClose()
     {
         // A syntactically valid but absent merge commit and a nonexistent witness file.
-        var violations = Validate(MergedRecord(), closing: true, RepositoryEvidence);
+        var violations = Validate(MergedRecord(), closingOverride: true, RepositoryEvidence);
         AssertCodes(violations, "D010");
         Assert.Contains(violations, v => v.Message.Contains("merge commit is not on main"));
     }
@@ -480,7 +500,7 @@ public sealed class DispositionTests
     public void D010_CommitReachableOnlyFromABranch_DoesNotClose()
     {
         var record = MergedRecord();
-        var violations = Validate(record, closing: true,
+        var violations = Validate(record, closingOverride: true,
             AcceptAll(record) with { CommitIsOnMain = _ => false });
         AssertCodes(violations, "D010");
         Assert.Contains(violations, v => v.Message.Contains("R-OBL: merge commit is not on main"));
@@ -490,7 +510,7 @@ public sealed class DispositionTests
     public void D010_WitnessAbsentFromTheMergeCommit_DoesNotClose()
     {
         var record = MergedRecord();
-        var violations = Validate(record, closing: true,
+        var violations = Validate(record, closingOverride: true,
             AcceptAll(record) with { FileExistsAtCommit = (_, path) => !path.Contains("S2ObligationStateTests") });
         AssertCodes(violations, "D010");
         Assert.Contains(violations, v => v.Message.Contains("R-OBL: a regression witness is missing from the merge commit"));
@@ -502,7 +522,7 @@ public sealed class DispositionTests
         // An unrelated main merge (round-3 witness: PR #1483, which also mentions #1426) is not the
         // merge of the repair's PR from its S2 branch.
         var record = MergedRecord();
-        var violations = Validate(record, closing: true, AcceptAll(record) with
+        var violations = Validate(record, closingOverride: true, AcceptAll(record) with
         {
             CommitMessage = _ => "Merge pull request #1483 from juanmicrosoft/milestone-0.25/r0-1426-scope-baseline\n\n#1426",
         });
@@ -629,7 +649,10 @@ public sealed class DispositionTests
     [Fact]
     public void D017_ContractVersionChanged()
     {
+        // An open-state rule (at closure the stated version selects the amended contract).
         var record = Record();
+        record["closure"]!["status"] = "OPEN";
+        record["closure"]!["result"] = null;
         record["contractVersion"] = "1.0.0";
         AssertCodes(Validate(record), "D017");
     }

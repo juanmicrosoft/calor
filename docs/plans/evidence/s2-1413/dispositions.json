@@ -26,9 +26,10 @@
     1493
   ],
   "closure": {
-    "status": "OPEN",
-    "result": null,
-    "note": "OPEN until every repair is merged (status \"merged\" with its merge commit on main, being the GitHub merge of its PR from its S2 branch, and containing its regression witnesses), amendment 1.3.0 (capacity allowance and the R-OBL review overrun) is in the contract (merged as ffa75e8b; contract version 1.3.0), and amendment 1.3.1 (the R-NUM and R-OBL-RESIDUALS review overruns) is in the contract (merged as f552e38b; contract version 1.3.1), and amendment 1.3.2 (the R-NUM re-registration) is in the contract (merged via #1507; contract version 1.3.2). The discovery ids are pinned by the validator tests, so a discovery is resolved by a repair or amendment, never deleted. At closure, result is SUCCESS (no MILESTONE-FAILED anywhere) or MILESTONE-FAILED (required if any finding or discovery is MILESTONE-FAILED); only SUCCESS satisfies terminal predicates 4-5."
+    "status": "CLOSED",
+    "result": "SUCCESS",
+    "date": "2026-10-06",
+    "note": "CLOSED on 2026-10-06. All seven repairs are merged, each as the GitHub merge of its PR from its S2 branch with its regression witnesses: R-CACHE #1494 (ef89c027), R-IMPL #1495 (eb12fef4), R-OBL #1496 (ba2e31cb), R-TEXT #1497 (af548201), R-QNT #1498 (275902c3), R-OBL-RESIDUALS #1503 (9f5dfd76), R-NUM #1502 (aa23d589). Every amendment the record relies on is in the contract (1.3.0 capacity allowance and R-OBL overrun; 1.3.1 R-OBL-RESIDUALS overrun; 1.3.2 R-NUM overrun; contract version 1.3.2). Every S1 finding and registered row on B1 and N1, and every discovery, has a disposition, and none is MILESTONE-FAILED, so the result is SUCCESS. The R0 terminal validator does not read this record (Q6): the result is carried into the terminal adjudication by hand."
   },
   "capacity": {
     "ceiling": "s2-repairs",
@@ -205,6 +206,8 @@
     {
       "id": "R-NUM",
       "pr": 1502,
+      "status": "merged",
+      "mergeCommit": "aa23d58915b1f591a82852391633b5609c9bb2f9",
       "branch": "milestone-0.24/s2-1413-fix-num-refusal",
       "rootCause": "The registration classifies NUM-NARROW-ARITH and NUM-LITERAL-OVERSIZE as unsupported-refused (divergences D1/D2 of the frozen docs/verification-modeled-forms.md say \"refused\") and NUM-OVERFLOW-CHECKED as assumed, but the verifier modeled C# narrow promotion (W1 Slice 1), typed out-of-range INT: literals as 64-bit (#774), and proved checked-arithmetic contracts whose overflow the preconditions rule out. Each Proven agreed with the oracle; none was a false proof.",
       "change": "Opened by maintainer decision Q1 (2026-10-04): demote per the frozen table exactly. Sub-32-bit arithmetic/shifts/negation are refused (D1); an INT: literal outside int32 is refused (D2; lexer marks the inferred width, the cache key distinguishes it); checked arithmetic that can overflow for some value of its types is Assumed (checked-arithmetic) even when entailed. Overflow sensitivity is decided without preconditions (some value of the operand types overflows), so arithmetic that cannot overflow stays Proven. The 15 Calor.Verification.Tests cases that pinned the old behavior are updated (each justified by the frozen table); cache format 1.22. Amendment 1.3.1 change (bdb430db): the round-3 while-analyzer hunk is reverted; a k-induction loop with a for bound/step or any while-condition/body literal outside int32 is Unsupported as a whole (demotes discovery D-NUM-WHILE-BOUND). Amendment 1.3.2 change (c04b97b3): overflow sensitivity is decided by rule with no solver call (safe only when operand widths and literal values show every result fits), so an overflow-sensitive postcondition is Assumed (checked-arithmetic) regardless of solver time or platform; this demotes 3 guarded ProductionOverflowRuntimeTests rows and 6 scalar-type i64/u64 differential cells (12-cell allowance), and the #1135 reports are regenerated (435/150 to 429/156 Proven/Assumed; json aa1f86f9, md 24901f21).",
@@ -226,8 +229,6 @@
         "NUM-LITERAL-OVERSIZE",
         "NUM-OVERFLOW-CHECKED"
       ],
-      "status": "open",
-      "mergeCommit": null,
       "dependsOn": [],
       "owner": "Claude Code agent (S2 #1413 session); agents never merge",
       "reviewer": "@juanmicrosoft (review and merge), Codex adversarial review recorded per PR",
