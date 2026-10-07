@@ -670,6 +670,7 @@ public sealed class ProjectMigrator
             Duration = DateTime.UtcNow - startTime,
             Issues = issues,
             Losses = result.Losses,
+            ConversionPaths = result.Paths,
             Metadata = result.Metadata,
             Metrics = metrics,
             Analysis = analysisResult,

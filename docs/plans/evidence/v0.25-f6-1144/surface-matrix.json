@@ -1,0 +1,229 @@
+{
+  "schema": "calor.v0.25.f6-surface-matrix/1",
+  "issue": 1144,
+  "epic": 1425,
+  "scopeVersion": "1.0.0",
+  "branch": "milestone-0.25/f6-1144-conversion-reporting",
+  "status": "IN_PROGRESS",
+  "independence": "reduced",
+  "note": "Per-surface observations after the F6 change, measured by executable tests on this branch. 'before' quotes the R0 baseline (docs/plans/v0.25-interop-scope-and-baseline.md section 3, F6) or, for not-measured rows, what this branch measured on origin/main behavior before the change. Not a READY record: no #1423 candidate commit is named and no approver has reviewed it.",
+  "vocabulary": {
+    "path": [
+      "interop",
+      "rescue",
+      "passthrough",
+      "lossy",
+      "dropped"
+    ],
+    "trigger": [
+      "parse-failure",
+      "round-trip-failure",
+      "unsupported-construct"
+    ],
+    "enabledBy": [
+      "lossless-fidelity",
+      "interop-mode",
+      "rescueUnusableMembers",
+      "passthroughOnError"
+    ],
+    "outcome": [
+      "native",
+      "preserved",
+      "lossy",
+      "refused"
+    ],
+    "precedence": "A #717 rescue is path=rescue only when both of its gates are open without PassthroughOnError: C# preservation (lossless fidelity -> enabledBy=lossless-fidelity, or interop mode) and, for a round-trip failure, RescueUnusableMembers (enabledBy=rescueUnusableMembers). Otherwise it is path=passthrough, enabledBy=passthroughOnError. So with both options on, lossless reports rescue and lossy standard mode reports passthrough."
+  },
+  "decisions": [
+    {
+      "id": "D1-cli-vs-mcp-default",
+      "decision": "documented difference, not changed",
+      "detail": "calor convert sets RescueUnusableMembers=true; MCP calor_convert and the library keep false (the library contract keeps the native AST on failure). The governing 0.25 scope forbids making APIs more permissive to force parity. Every report now carries rescueUnusableMembers and passthroughOnError, and a refusal says which were off. Documented on website/content/cli/mcp.mdx."
+    },
+    {
+      "id": "D2-moduleName-disables-rescue",
+      "decision": "bug, fixed",
+      "detail": "The visitor gives a global-namespace type the caller's ModuleName as its namespace identity; the rescue's source map did not, so TryTakeSource never matched. CollectTopLevelTypeSources now uses the same fallback. Affected MCP calor_convert moduleName and inputPath (which derives a module name), calor_batch moduleNameOverride, and library ModuleName."
+    },
+    {
+      "id": "D3-project-migration-no-round-trip-rescue",
+      "decision": "documented difference, not changed",
+      "detail": "Project migration converts with ValidateRoundTripCSharp=false and validates the generated C# once for the project, so the per-file round-trip rescue never runs, with or without passthroughOnError. Such a file fails, and lossless project migration then writes nothing (every file reports outcome=refused with its conversion counts). Changing this would change migrate defaults; left for a scoped follow-up."
+    },
+    {
+      "id": "D5-lossy-passthrough-member-gates",
+      "decision": "fixed after Codex round 1",
+      "detail": "Under lossy fidelity in standard mode, ShouldPreserveCSharp is true only because of PassthroughOnError. The context now records when that getter opened the gate only through PassthroughOnError, and the next interop loss is labelled path=passthrough, trigger=unsupported-construct, enabledBy=passthroughOnError. Catch filters test MemberInteropEscalationException before the gate, so an escalation (preserved in every mode) never marks passthrough. Rescue precedence also accounts for the preservation gate: with both options on, lossless reports rescue, lossy reports passthrough. Escalations are evaluated with the attribution-free PreservesCSharp at every catch, any recorded loss consumes the flag, and attribution re-checks the live options. Residual: a library caller that reads ShouldPreserveCSharp itself under lossy+passthrough and then records an unrelated interop loss with nothing in between would see passthrough."
+    },
+    {
+      "id": "D4-sdk-surface",
+      "decision": "library is the SDK surface",
+      "detail": "src/Calor.Sdk contains only MSBuild Sdk.props/Sdk.targets and has no conversion entry point; Calor.Tasks and Calor.LanguageServer do not call the converter. The SDK cells are measured on the public CSharpToCalorConverter library."
+    }
+  ],
+  "cases": [
+    {
+      "id": "F6-REPORT-01",
+      "surface": "cli convert",
+      "before": "No-flag run prints '(2 via --passthrough fallback)'",
+      "after": "No 'via --passthrough'; prints 'Preservation paths: 2 by automatic rescue (round-trip-failure: 2; no passthrough request needed)' and '[rescue: round-trip-failure]' per loss",
+      "tests": [
+        "F6_REPORT_01_CliNoFlags_NamesAutomaticRescue_NotPassthrough",
+        "F6_REPORT_12_CliWebsiteExample_MatchesTheDocumentedOutput"
+      ]
+    },
+    {
+      "id": "F6-REPORT-02",
+      "surface": "cli convert --format json",
+      "before": "No-flag and --passthrough runs identical; no field names the trigger",
+      "after": "losses[].path/trigger/enabledBy and data.conversionPaths; both runs report rescue/round-trip-failure/rescueUnusableMembers, and conversionPaths.passthroughOnError tells them apart",
+      "tests": [
+        "F6_REPORT_02_CliJson_RecordsTheTrigger_ForNoFlagAndPassthroughRuns"
+      ]
+    },
+    {
+      "id": "F6-REPORT-03",
+      "surface": "mcp calor_convert",
+      "before": "Default isError with no path information; passthroughOnError rescues with no attribution",
+      "after": "Default isError with lossSummary.paths.outcome=refused, rescueUnusableMembers=false; passthroughOnError reports path=passthrough, trigger=round-trip-failure",
+      "tests": [
+        "F6_REPORT_03_McpDefault_RefusesAndSaysRescueWasOff_PassthroughRescues"
+      ]
+    },
+    {
+      "id": "F6-REPORT-04",
+      "surface": "cli migrate",
+      "before": "not-measured; measured on this branch: parse-failure rescue happens, round-trip failure fails the file, no path reported",
+      "after": "Console line 'Preservation paths: 1 by automatic rescue (parse-failure: 1; ...)'; JSON report carries losses[].path and conversionPaths; round-trip failure still fails (D3); Markdown report prints the Preservation paths line and per-loss path/trigger for partial files",
+      "tests": [
+        "F6_REPORT_04_CliMigrate_ReportsParseFailureRescue_AndRefusesRoundTripFailure",
+        "F6_REPORT_04_CliMigrateReports_MarkdownAndJsonCarryPaths",
+        "F6_REPORT_04_CliMigrateMarkdown_NamesEachFilesPaths_EvenWhenRefused"
+      ]
+    },
+    {
+      "id": "F6-REPORT-05",
+      "surface": "mcp calor_migrate",
+      "before": "not-measured; losses had no path or trigger",
+      "after": "perFile[].losses[] carry path/trigger/enabledBy; perFile[].conversionPaths (refused when the file or project fails, kept through compile/fix phases)",
+      "tests": [
+        "F6_REPORT_05_McpMigrate_ReportsPerFilePaths_IncludingRefusal"
+      ]
+    },
+    {
+      "id": "F6-REPORT-06",
+      "surface": "mcp calor_batch",
+      "before": "not-measured; only csharpBlockCount per file",
+      "after": "files[].conversionPaths; partial batch failure reports refused per file; passthroughOnError does not rescue round-trip failures (D3); summary mode adds failedFiles[].conversionPaths and a preservationPaths line; skipOnError=false abort returns JSON with error, preservationPaths and files[].conversionPaths",
+      "tests": [
+        "F6_REPORT_06_McpBatch_PartialFailure_ReportsEachFilesPath_WithAndWithoutPassthrough",
+        "F6_REPORT_06_McpBatch_SuccessfulProject_ReportsRescueAndNative",
+        "F6_REPORT_06_McpBatchSummaryMode_ReportsPaths",
+        "F6_REPORT_06_McpBatchAbort_KeepsPreservationPaths"
+      ]
+    },
+    {
+      "id": "F6-REPORT-07",
+      "surface": "library (SDK)",
+      "before": "not-measured",
+      "after": "Default refuses F4-ITER-01 with Paths.Outcome=refused and RescueUnusableMembers=false",
+      "tests": [
+        "F6_REPORT_07_LibraryDefault_RefusesRoundTripFailure_AndSaysRescueWasOff",
+        "F6_REPORT_07_LibraryMissingFile_ReportsTheConfiguredOptions"
+      ]
+    },
+    {
+      "id": "F6-REPORT-08",
+      "surface": "library, cli",
+      "before": "control-passes",
+      "after": "control still passes: no losses, outcome=native, no path line",
+      "tests": [
+        "F6_REPORT_08_NativeConversion_HasNoPathAttribution",
+        "F6_REPORT_08_CliNative_PrintsNoPathLine"
+      ]
+    },
+    {
+      "id": "F6-REPORT-09",
+      "surface": "library",
+      "before": "control-passes",
+      "after": "control still passes: path=interop, no trigger, no enabledBy, with every option set",
+      "tests": [
+        "F6_REPORT_09_ConverterInterop_HasNoRescueOrPassthroughAttribution"
+      ]
+    },
+    {
+      "id": "F6-REPORT-10",
+      "surface": "cli, mcp",
+      "before": "not-measured",
+      "after": "CLI refusal exits 1 and prints 'Conversion refused; no output written (automatic rescue: on, --passthrough: off).' with conversionPaths.outcome=refused; MCP refusal isError=true with outcome=refused; preserved outcomes exit 0 / isError=false; --lossy (with or without --passthrough) skips the round trip, so no rescue fires and the report shows no rescue, passthrough or trigger",
+      "tests": [
+        "F6_REPORT_10_CliRefusal_ExitsOne_AndReportsRefused",
+        "F6_REPORT_03_McpDefault_RefusesAndSaysRescueWasOff_PassthroughRescues",
+        "F6_REPORT_10_CliLossy_RoundTripIsNotChecked_SoNoRescueFires",
+        "F6_REPORT_10_CliWriteFailure_KeepsLossesAndReportsRefused"
+      ]
+    },
+    {
+      "id": "F6-REPORT-11",
+      "surface": "mcp calor_convert, calor_batch, library",
+      "before": "passthroughOnError plus moduleName 'Custom' returns isError",
+      "after": "rescues (D2); also inputPath-derived module names and calor_batch moduleNameOverride",
+      "tests": [
+        "F6_REPORT_11_CustomModuleName_NoLongerDisablesRescue",
+        "F6_REPORT_11_McpPassthroughWithCustomModuleName_Rescues",
+        "F6_REPORT_11_McpInputPath_DerivedModuleName_Rescues",
+        "F6_REPORT_11_McpBatch_ModuleNameOverride_KeepsParseFailureRescue",
+        "F6_REPORT_11_ModuleNameAlias_RefusesAmbiguousGlobalAndNamespaceTypes"
+      ]
+    },
+    {
+      "id": "F6-REPORT-12",
+      "surface": "14 cells",
+      "before": "not-measured",
+      "after": "library: default refused / rescue-only rescue / passthrough-only passthrough / both rescue (precedence); parse failure rescued under every option; cli: no-flag and --passthrough both rescue; mcp: default refused, passthroughOnError passthrough; cli migrate, mcp migrate, batch: parse-failure rescue only (D3)",
+      "tests": [
+        "F6_REPORT_12_Library_RescueOnly_PassthroughOnly_Both_AreDistinguished",
+        "F6_REPORT_12_Library_ParseFailureRescue_IsAutomaticUnderLosslessWhateverTheFlags",
+        "Library_TrailingLabel_DiscriminatesRefusedPassthroughAndRescue",
+        "F6_REPORT_12_LossyStandard_PreservationOnlyThroughPassthrough_IsPassthrough",
+        "F6_REPORT_12_Precedence_SelectedBranchLossy_BothOptions_IsPassthrough",
+        "F6_REPORT_12_InterfaceMemberEscalation_UnderLossyPassthrough_StaysInterop"
+      ]
+    },
+    {
+      "id": "F6-REPORT-13",
+      "surface": "DTO/envelope schema",
+      "before": "not-measured; no provenance field",
+      "after": "Additive fields: losses[].path (always), trigger and enabledBy (when applicable); conversionPaths object with schemaVersion 1. Existing fields and counts unchanged; MCP validate and roundtrip modes carry lossSummary.paths (roundtrip now honours passthroughOnError); trigger/enabledBy omitted when null on every surface",
+      "tests": [
+        "F6_REPORT_13_McpInteropLocation_HasPathButNoTrigger",
+        "F6_REPORT_13_McpWebsiteExample_MatchesTheDocumentedPayload",
+        "F6_REPORT_13_McpValidateAndRoundtripModes_CarryPaths",
+        "F6_REPORT_13_WithSuccess_RecomputesTheOutcomeFromCounts",
+        "F6_REPORT_13_StaleGateRead_DoesNotLabelALaterLoss"
+      ]
+    }
+  ],
+  "reviews": [
+    "docs/plans/evidence/v0.25-f6-1144/reviews/round-1.md",
+    "docs/plans/evidence/v0.25-f6-1144/reviews/round-2.md",
+    "docs/plans/evidence/v0.25-f6-1144/reviews/round-3.md",
+    "docs/plans/evidence/v0.25-f6-1144/reviews/verification.md"
+  ],
+  "reviewVerdict": "VERIFIED-WITH-RESIDUALS (Codex, 3 rounds + verification; reduced independence)",
+  "testRun": {
+    "commit": "d15101fd",
+    "Calor.Compiler.Tests": {
+      "total": 13069,
+      "passed": 13060,
+      "skipped": 9,
+      "failed": 0
+    },
+    "Calor.Conversion.Tests": {
+      "total": 476,
+      "passed": 476,
+      "failed": 0
+    },
+    "platform": "macOS arm64"
+  }
+}

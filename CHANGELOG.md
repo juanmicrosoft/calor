@@ -4,6 +4,40 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Conversion reports name the path that kept each member as C# (#1144)
+
+When the C# → Calor converter cannot produce working Calor for a member, it keeps the
+original C# in a `§CSHARP` block. Reports now say which mechanism did that, on every
+conversion surface: `calor convert`, `calor migrate`, the MCP tools `calor_convert`,
+`calor_migrate` and `calor_batch`, and the `CSharpToCalorConverter` library.
+
+- **Fixed: a wrong label.** `calor convert` printed "(N via --passthrough fallback)" for every
+  rescued member, even when you had not passed `--passthrough`. The rescue is on by default
+  on the command line. The line now reads, for example,
+  `Preservation paths: 2 by automatic rescue (round-trip-failure: 2; no passthrough request needed)`.
+- **New: path and trigger fields.** Each recorded loss now has `path` (`interop`, `rescue`,
+  `passthrough`, `lossy` or `dropped`). Rescues and passthroughs also have `trigger`
+  (`parse-failure`, `round-trip-failure` or `unsupported-construct`) and `enabledBy` (the
+  default or option that allowed it). A new per-file `conversionPaths` object (schema
+  version 1) gives the outcome (`native`, `preserved`, `lossy` or `refused`), a count per
+  path, the triggers, and whether rescue and passthrough were on. All fields are additive;
+  existing fields and counts are unchanged.
+- **Fixed: a custom module name disabled the rescue.** With MCP `calor_convert`, a
+  `moduleName` (or an `inputPath`, which derives one) stopped the rescue from finding a
+  global-namespace type's original C#, so the call failed. `calor_batch` with
+  `moduleNameOverride` had the same problem. These now rescue like other calls.
+- **Fixed: `calor_convert` with `mode: "roundtrip"` ignored `passthroughOnError`.** It now
+  honours it, like the `convert` and `validate` modes, and its result gains a `lossSummary`.
+- **Changed: a `calor_batch` abort is now JSON.** With `skipOnError: false`, the abort used to
+  return only an error sentence. It now returns JSON with that sentence in `error`, plus
+  `preservationPaths` and each file's `conversionPaths`; `isError` is still `true`.
+- **Unchanged, now documented: defaults differ by surface.** `calor convert` rescues members
+  that fail the C# round trip by default; `calor_convert` and the library do not, and say
+  so in their reports (`rescueUnusableMembers: false`). `calor migrate`, `calor_migrate` and
+  `calor_batch` rescue only members whose Calor does not parse. `calor_batch` does so even
+  with `passthroughOnError`; the other two have no passthrough option. No default changed
+  in this release.
+
 ## [0.24.0] - 2026-10-07
 
 Calor 0.24 is a soundness release. It repairs verifier defects found by a registered soundness

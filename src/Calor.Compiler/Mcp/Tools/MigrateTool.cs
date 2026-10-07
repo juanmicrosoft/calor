@@ -193,6 +193,7 @@ public sealed class MigrateTool : McpToolBase
                 _ => "failed"
             },
             Losses = f.Losses.Count > 0 ? f.Losses : null,
+            ConversionPaths = f.ConversionPaths,
             Errors = f.Issues
                 .Where(i => i.Severity == ConversionIssueSeverity.Error)
                 .Select(i => ConversionIssueEnvelope.Build(i, f.SourcePath))
@@ -426,6 +427,7 @@ public sealed class MigrateTool : McpToolBase
                 },
                 Score = existing?.Score,
                 Losses = f.Losses.Count > 0 ? f.Losses : null,
+                ConversionPaths = f.ConversionPaths,
                 Errors = errors.Count > 0 ? errors : null,
                 Warnings = warnings.Count > 0 ? warnings : null
             };
@@ -474,7 +476,8 @@ public sealed class MigrateTool : McpToolBase
                         Score = existing?.Score,
                         Errors = compileErrors,
                         Warnings = existing?.Warnings,
-                        Losses = existing?.Losses
+                        Losses = existing?.Losses,
+                        ConversionPaths = existing?.ConversionPaths?.WithSuccess(false)
                     };
                 }
                 else if (sourceKey != null)
@@ -489,7 +492,8 @@ public sealed class MigrateTool : McpToolBase
                             Score = existing.Score,
                             Errors = existing.Errors,
                             Warnings = existing.Warnings,
-                            Losses = existing.Losses
+                            Losses = existing.Losses,
+                            ConversionPaths = existing.ConversionPaths
                         };
                     }
                 }
@@ -504,6 +508,7 @@ public sealed class MigrateTool : McpToolBase
                     Status = "compile_error",
                     Score = existing?.Score,
                     Losses = existing?.Losses,
+                    ConversionPaths = existing?.ConversionPaths?.WithSuccess(false),
                     Errors = [ConversionIssueEnvelope.Message(
                         DiagnosticCode.CliInternalError, "error", ex.Message, path)]
                 };
@@ -566,6 +571,7 @@ public sealed class MigrateTool : McpToolBase
                             Status = recompile.HasErrors ? "fix_incomplete" : "fixed",
                             Score = existing?.Score,
                             Losses = existing?.Losses,
+                            ConversionPaths = existing?.ConversionPaths?.WithSuccess(!recompile.HasErrors),
                             Errors = recompile.HasErrors
                                 ? BuildCompileEnvelope(recompile, path, fixedFinal)
                                     .Where(e => e.Severity == "error")
@@ -739,6 +745,11 @@ public sealed class MigrateTool : McpToolBase
         [JsonPropertyName("losses")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public IReadOnlyList<ConversionLoss>? Losses { get; init; }
+
+        /// <summary>#1144: per-file path summary (outcome, per-path counts, triggers, options that applied).</summary>
+        [JsonPropertyName("conversionPaths")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public ConversionPathSummary? ConversionPaths { get; init; }
 
         /// <summary>Number of auto-fixes applied (fix / full phases); replaces the old pseudo-warning string.</summary>
         [JsonPropertyName("fixesApplied")]

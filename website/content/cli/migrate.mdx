@@ -112,6 +112,24 @@ calor migrate ./src --report migration-report.md
 calor migrate ./src --report migration-report.json
 ```
 
+Each file result in the JSON report carries `losses[]`, where every entry
+names its `path` (`interop`, `rescue`, `passthrough`, `lossy`, or `dropped`)
+and, for rescues, the `trigger` and `enabledBy` that applied. It also carries
+`conversionPaths`, the same per-file summary `calor convert --format json`
+writes (see [Which Path Preserved Each Member](/docs/cli/convert/#which-path-preserved-each-member)).
+The console summary adds one line when any member was preserved:
+
+```text
+  Preservation paths: 1 by automatic rescue (parse-failure: 1; no passthrough request needed)
+```
+
+`migrate` rescues fewer members than `convert`. It rescues a member whose Calor
+does not parse, but not one whose Calor parses and then fails the C# round
+trip: `migrate` checks the round trip once for the whole project, not file by
+file. Such a file fails. In the default lossless mode one failed file means no
+file is written, so every file then reports `outcome: "refused"`. Its counts
+still show what conversion did. `calor migrate` has no `--passthrough` option.
+
 ---
 
 ## Exit Codes

@@ -61,6 +61,20 @@ public sealed class FileMigrationResult
     public TimeSpan Duration { get; init; }
     public List<ConversionIssue> Issues { get; init; } = new();
     public IReadOnlyList<ConversionLoss> Losses { get; init; } = Array.Empty<ConversionLoss>();
+
+    /// <summary>
+    /// #1144: the paths this file's conversion took; null when the file was not
+    /// converted. A file that later fails project validation reports <c>refused</c>.
+    /// </summary>
+    public ConversionPathSummary? ConversionPaths
+    {
+        get => _conversionPaths is { Outcome: not "refused" } paths
+               && Status is FileMigrationStatus.Failed or FileMigrationStatus.TimedOut
+            ? paths.WithSuccess(false)
+            : _conversionPaths;
+        set => _conversionPaths = value;
+    }
+    private ConversionPathSummary? _conversionPaths;
     public ConversionMetadata? Metadata { get; init; }
     public FileMetrics? Metrics { get; init; }
     public FileAnalysisResult? Analysis { get; init; }

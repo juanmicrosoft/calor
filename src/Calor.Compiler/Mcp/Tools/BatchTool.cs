@@ -255,8 +255,19 @@ public sealed class BatchTool : McpToolBase
                 if (firstFailure != null)
                 {
                     var errorMsg = firstFailure.Issues.FirstOrDefault()?.Message ?? "Unknown error";
-                    return McpToolResult.Error(
-                        $"Batch aborted (skipOnError=false): {Path.GetFileName(firstFailure.SourcePath)} — {errorMsg}");
+                    // #1144: keep each file's conversion paths for the work done before the abort.
+                    return McpToolResult.Json(new
+                    {
+                        error = $"Batch aborted (skipOnError=false): {Path.GetFileName(firstFailure.SourcePath)} — {errorMsg}",
+                        preservationPaths = ConversionPathSummary.Describe(
+                            report.FileResults.SelectMany(f => f.Losses), "passthroughOnError"),
+                        files = report.FileResults.Select(f => new
+                        {
+                            sourcePath = f.SourcePath,
+                            status = f.Status.ToString().ToLowerInvariant(),
+                            conversionPaths = f.ConversionPaths
+                        }).ToList()
+                    }, isError: true);
                 }
             }
 
@@ -271,6 +282,7 @@ public sealed class BatchTool : McpToolBase
                 ErrorCount = f.Issues.Count(i => i.Severity == ConversionIssueSeverity.Error),
                 WarningCount = f.Issues.Count(i => i.Severity == ConversionIssueSeverity.Warning),
                 CsharpBlockCount = CountCsharpBlocks(f.OutputPath),
+                ConversionPaths = f.ConversionPaths,
                 Issues = f.Issues
                     .Where(i => i.Severity is ConversionIssueSeverity.Error or ConversionIssueSeverity.Warning)
                     .Select(i => ConversionIssueEnvelope.Build(i, f.SourcePath))
@@ -306,6 +318,7 @@ public sealed class BatchTool : McpToolBase
                     .Select(f => new
                     {
                         file = f.SourcePath,
+                        conversionPaths = f.ConversionPaths,
                         errorCount = f.Issues.Count(i => i.Severity == ConversionIssueSeverity.Error),
                         topErrors = f.Issues
                             .Where(i => i.Severity is ConversionIssueSeverity.Error or ConversionIssueSeverity.Warning)
@@ -325,6 +338,9 @@ public sealed class BatchTool : McpToolBase
                     timedOutCount = report.Summary.TimedOutFiles,
                     successRate = report.Summary.SuccessRate,
                     totalCsharpBlocks,
+                    // #1144: aggregate preservation paths over every converted file.
+                    preservationPaths = ConversionPathSummary.Describe(
+                        report.FileResults.SelectMany(f => f.Losses), "passthroughOnError"),
                     totalDurationMs = (int)report.Summary.TotalDuration.TotalMilliseconds,
                     errorCategories,
                     failedFiles,
@@ -788,6 +804,11 @@ public sealed class BatchTool : McpToolBase
 
         [JsonPropertyName("csharpBlockCount")]
         public int CsharpBlockCount { get; init; }
+
+        /// <summary>#1144: per-file path summary (outcome, per-path counts, triggers, options that applied).</summary>
+        [JsonPropertyName("conversionPaths")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public ConversionPathSummary? ConversionPaths { get; init; }
 
         /// <summary>Envelope schema v1.1 diagnostic entries (shared EnvelopeDiagnostic shape).</summary>
         [JsonPropertyName("issues")]

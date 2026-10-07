@@ -54,6 +54,53 @@ Diagnostic-producing tools use the shared [schema 2.0 envelope](/docs/cli/envelo
 inside their result DTOs. In particular, verification uses `proven`, `refuted`,
 `assumed`, `unknown`, `timeout`, `unsupported`, and `unavailable`.
 
+## Conversion Paths in calor_convert, calor_migrate, and calor_batch
+
+The conversion tools report which path kept each member as C#. They use the
+same vocabulary as [`calor convert`](/docs/cli/convert/#which-path-preserved-each-member):
+`interop`, `rescue`, `passthrough`, `lossy`, and `dropped`, with a `trigger`
+(`parse-failure`, `round-trip-failure`, `unsupported-construct`) and an
+`enabledBy` when one applies.
+
+| Tool | Where the paths appear |
+|:-----|:-----------------------|
+| `calor_convert` (`convert`, `validate`, `roundtrip` modes) | `lossSummary.locations[]` (`path`, `trigger`, `enabledBy`) and `lossSummary.paths` |
+| `calor_migrate` | `perFile[].losses[]` and `perFile[].conversionPaths` |
+| `calor_batch` (`action: "convert"`) | `files[].conversionPaths`; with `summary: true`, `failedFiles[].conversionPaths` and a `preservationPaths` line; with `skipOnError: false`, an abort returns `error`, `preservationPaths` and `files[].conversionPaths` |
+
+The defaults differ from the command line, on purpose:
+
+- **`calor_convert` rescues less by default.** The CLI turns on automatic rescue
+  of members that fail the C# round trip. `calor_convert` does not; it returns
+  `isError: true` with `lossSummary.paths.outcome: "refused"` and
+  `rescueUnusableMembers: false`. Pass `passthroughOnError: true` to have those
+  members kept as `§CSHARP`. The report then says `passthrough`, because you
+  asked for it. In the default lossless mode, members whose Calor does not parse are rescued
+  on every surface.
+- **`calor_migrate` and `calor_batch` never rescue round-trip failures**,
+  because project migration checks the round trip once for the whole project.
+  `calor_migrate` has no passthrough option, and `calor_batch` does not rescue
+  them even with `passthroughOnError: true`. Such a file fails, and in lossless
+  mode the whole project is refused.
+
+For example, converting a class whose iterator property cannot be expressed in
+Calor:
+
+```json
+{ "name": "calor_convert",
+  "arguments": { "source": "public class Bag { public System.Collections.Generic.IEnumerable<int> Items { get { yield return 1; } } }",
+                 "passthroughOnError": true } }
+```
+
+returns `"lossSummary": { …, "paths": { "outcome": "preserved", "passthrough": 1,
+"triggers": { "round-trip-failure": 1 }, "rescueUnusableMembers": false,
+"passthroughOnError": true, … } }`. Without `passthroughOnError` the same call
+returns `isError: true` and `"outcome": "refused"`.
+
+Before 0.25, a custom `moduleName` (or an `inputPath`, from which the module
+name is derived) stopped the rescue from finding a global-namespace type's
+original C#, so these calls failed. They now rescue like the others.
+
 ## The calor_query Tool
 
 New in 0.16. This tool answers questions about how your code fits together by
