@@ -757,6 +757,17 @@ public static class FeatureSupport
             Workaround = "Lift the local function to a method with explicit parameters before migration, or keep the member as a §CSHARP interop block"
         },
 
+        // #1139: a property or indexer accessor that yields is a C# iterator.
+        // Calor rejects §YIELD in accessors (Calor0209), so the whole member is
+        // preserved verbatim; C# keeps its laziness, finally and exception timing.
+        ["iterator-accessor"] = new FeatureInfo
+        {
+            Name = "iterator-accessor",
+            Support = SupportLevel.NotSupported,
+            Description = "A property or indexer whose accessor uses yield return/yield break is preserved verbatim as a §CSHARP interop block; Calor has no iterator accessors (Calor0209)",
+            Workaround = "Move the iterator body into a method (§MT with §YIELD) and have the accessor return its result, or keep the member as a §CSHARP interop block"
+        },
+
         // Phase 4 features (C# 11-13)
         ["default-lambda-parameter"] = new FeatureInfo
         {

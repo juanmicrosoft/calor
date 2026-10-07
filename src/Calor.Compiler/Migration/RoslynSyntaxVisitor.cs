@@ -4251,6 +4251,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private PropertyNode ConvertProperty(PropertyDeclarationSyntax node)
     {
+        RefuseIteratorAccessor(node);
         _context.RecordFeatureUsage("property");
 
         var name = node.Identifier.Text;
@@ -4397,6 +4398,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
     private IndexerNode ConvertIndexer(IndexerDeclarationSyntax node)
     {
+        RefuseIteratorAccessor(node);
         _context.RecordFeatureUsage("indexer");
 
         var typeName = MapDeclarationType(node.Type);
@@ -5801,9 +5803,31 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             _ => InteropMemberKind.Other
         };
 
+    /// <summary>
+    /// #1139: Calor has no iterator accessor (<c>§YIELD</c> in a <c>§GET</c> is
+    /// <c>Calor0209</c>), so a property or indexer whose accessor body yields is
+    /// preserved whole as §CSHARP interop. C# then lowers it as before, which keeps
+    /// deferred execution, <c>finally</c>-on-Dispose and exception timing exactly.
+    /// This happens in the converter, on every surface, independent of rescue.
+    /// Yields inside nested local functions belong to those functions, not to the
+    /// accessor (lambdas cannot yield in C#).
+    /// </summary>
+    private void RefuseIteratorAccessor(BasePropertyDeclarationSyntax node)
+    {
+        var yieldStatement = node.AccessorList?.Accessors
+            .Where(accessor => accessor.Body != null)
+            .SelectMany(accessor => accessor.Body!.DescendantNodes(
+                descendant => descendant is not LocalFunctionStatementSyntax
+                    and not AnonymousFunctionExpressionSyntax))
+            .OfType<YieldStatementSyntax>()
+            .FirstOrDefault();
+        if (yieldStatement != null)
+            throw EscalateExpression(node, "iterator-accessor", preserveMember: true);
+    }
+
     private static string? GetRequiredCapabilityFeature(Exception exception)
         => exception is MemberInteropEscalationException escalation
-            && (escalation.FeatureName == "tuple-deconstruction"
+            && (escalation.FeatureName is "tuple-deconstruction" or "iterator-accessor"
                 || SyntaxCapabilityClassifier.RequiredUnsupportedFeatures.Contains(
                     escalation.FeatureName))
                 ? escalation.FeatureName
