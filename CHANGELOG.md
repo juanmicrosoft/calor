@@ -12,7 +12,9 @@ All notable changes to this project will be documented in this file.
   base type `i32`. Inline refinements (`§I{i32:x} | (>= # INT:0)`) already worked. Now operators
   see a named refinement as its base type: `+ - * / %`, unary minus, comparisons, bitwise and
   shift operators, logical operators on a `bool` refinement, and loop bounds. The result has the
-  **base** type, not the refinement, because `NatInt - NatInt` can be negative. Writing a result
+  **base** type, not the refinement, because `NatInt - NatInt` can be negative. The exception is
+  increment and decrement (`inc`, `dec`, `post-inc`, `post-dec`): they keep the refined type,
+  because the write back into the variable is itself checked. Writing a result
   back into a refined variable or return is still checked: you get the same verification
   obligation and runtime guard as with an inline refinement. Binding a plain base value with
   `§B{x:NatInt}` is still rejected by the type checker, as before.
@@ -20,6 +22,8 @@ All notable changes to this project will be documented in this file.
   now types it as `decimal`, as C# does. So `§B{x:i32} (+ a b)` with `decimal` operands is now a
   type error (`Calor0202`) instead of a failure in the generated C#. A nested mix such as
   `(+ (+ a b) f)` with an `f64` operand is now rejected like the direct `decimal + f64` case.
+  When the other operand is a type the checker does not model, such as a class with its own `+`
+  operator, the checker still leaves the result to the C# compiler.
 
 ## [0.24.0] - 2026-10-07
 

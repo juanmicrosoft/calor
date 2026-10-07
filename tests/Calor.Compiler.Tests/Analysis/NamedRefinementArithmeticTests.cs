@@ -244,6 +244,28 @@ public class NamedRefinementArithmeticTests
 
     // ---- The result type is the BASE type, not the refinement ----
 
+    /// <summary>
+    /// The exception: inc/dec. They mutate the refined variable, and that mutation is itself
+    /// guarded (Subtype obligation + runtime check) before it commits, so the value they yield
+    /// satisfies the refinement. Before #1515 they typed as the error type, which let this
+    /// program compile; it must keep compiling.
+    /// </summary>
+    [Theory]
+    [InlineData("inc")]
+    [InlineData("dec")]
+    [InlineData("post-inc")]
+    [InlineData("post-dec")]
+    public void IncrementDecrement_OfNamedRefinement_KeepsTheRefinedType(string op)
+    {
+        AssertNoErrors($"""
+            §M{"{"}m:R{"}"}
+              §RTYPE{"{"}r1:Nat:i32{"}"} (>= # INT:0)
+              §F{"{"}f1:Step:pub{"}"} (Nat:a) -> i32
+                §B{"{"}x:Nat{"}"} ({op} a)
+                §R (+ x INT:1)
+            """);
+    }
+
     [Fact]
     public void ArithmeticResult_IsTheBaseType_SoAnExplicitRefinedBindIsStillRejected()
     {
@@ -323,6 +345,31 @@ public class NamedRefinementArithmeticTests
             """);
         Assert.Contains(nested.Diagnostics.Errors,
             d => d.Message.Contains("Cannot mix decimal and f64 in arithmetic"));
+    }
+
+    /// <summary>
+    /// The decimal rule must not fire against an operand the checker does not model: C# may bind
+    /// a user-defined operator with a different result type. This program compiled before the
+    /// decimal rule existed and must still compile (found in review round 2).
+    /// </summary>
+    [Fact]
+    public void DecimalWithUnmodeledOperand_DefersToUserDefinedOperator()
+    {
+        AssertNoErrors("""
+            §M{m:R}
+              §CL{c1:Box:pub}
+                §PROP{p1:Value:Box:pub}
+                  §GET
+                    §R this
+                §OP{op1:+:pub}
+                  §I{decimal:d}
+                  §I{Box:b}
+                  §O{f64}
+                  §R FLOAT:2.0
+              §F{f1:Good:pub} (decimal:d,Box:b) -> f64
+                §B{x:f64} (+ (+ d b.Value) FLOAT:1.0)
+                §R x
+            """);
     }
 
     [Fact]
@@ -457,12 +504,14 @@ public class NamedRefinementArithmeticTests
             §M{m:G}
               §RTYPE{r1:Nat:i32} (>= # INT:0)
               §F{f1:Named:pub} (Nat:a) -> i32
-                §ASSIGN a (- a INT:5)
+                §B{d:i32} (- a INT:5)
+                §ASSIGN a d
                 §R a
               §F{f2:Inline:pub}
                 §I{i32:a} | (>= # INT:0)
                 §O{i32}
-                §ASSIGN a (- a INT:5)
+                §B{d:i32} (- a INT:5)
+                §ASSIGN a d
                 §R a
             """, "guard.calr", new CompilationOptions { EnableTypeChecking = true });
 
@@ -471,7 +520,9 @@ public class NamedRefinementArithmeticTests
         var code = result.GeneratedCode;
         Assert.Contains("Value violates refinement type 'Nat'", code);
         Assert.Contains("Value violates inline refinement for parameter 'a'", code);
-        Assert.Equal(2, CountOccurrences(code, "int __refinementCandidate0 = checked(a - 5);"));
+        // The typed bind `§B{d:i32} (- a INT:5)` is what reaches the checker's operator typing
+        // (assignment right-hand sides are not type-checked), so this test fails pre-fix.
+        Assert.Equal(2, CountOccurrences(code, "int __refinementCandidate0 = d;"));
     }
 
     private static int CountOccurrences(string text, string needle)
@@ -490,30 +541,35 @@ public class NamedRefinementArithmeticTests
     /// back into a refined parameter is generated and solved the same way for a named refinement
     /// as for the equivalent inline one, and one that can fail is never discharged.
     /// </summary>
-    [SkippableFact]
+    [Fact]
     public void Verify_AssignmentObligationOnArithmeticResult_MatchesInlineRefinement()
     {
-        Skip.IfNot(Verification.Z3.Z3ContextFactory.IsAvailable, "Z3 not available");
+        // No Z3 skip: without a solver every obligation stays unsolved, which still satisfies
+        // every assertion below (never Discharged, guards emitted, named == inline).
 
         var options = new CompilationOptions { VerifyRefinements = true, EnableTypeChecking = true };
         var result = Program.Compile("""
             §M{m:V}
               §RTYPE{r1:Nat:i32} (>= # INT:0)
               §F{n1:NamedDown:priv} (Nat:a) -> i32
-                §ASSIGN a (- a INT:5)
+                §B{d:i32} (- a INT:5)
+                §ASSIGN a d
                 §R a
               §F{n2:NamedUp:priv} (Nat:a) -> i32
-                §ASSIGN a (+ a INT:1)
+                §B{u:i32} (+ a INT:1)
+                §ASSIGN a u
                 §R a
               §F{i1:InlineDown:priv}
                 §I{i32:a} | (>= # INT:0)
                 §O{i32}
-                §ASSIGN a (- a INT:5)
+                §B{d:i32} (- a INT:5)
+                §ASSIGN a d
                 §R a
               §F{i2:InlineUp:priv}
                 §I{i32:a} | (>= # INT:0)
                 §O{i32}
-                §ASSIGN a (+ a INT:1)
+                §B{u:i32} (+ a INT:1)
+                §ASSIGN a u
                 §R a
             """, "verify.calr", options);
 

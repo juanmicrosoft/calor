@@ -1446,10 +1446,15 @@ public sealed class TypeChecker
     private CalorType InferUnaryOperationType(UnaryOperationNode unary)
     {
         // A named refinement (§RTYPE) erases to its base type for operators, exactly as an inline
-        // refinement does (an inline-refined parameter is typed as its base). The result is the
-        // BASE type: a refinement does not survive arithmetic. Writing the result back into a
-        // refined variable is checked by the obligation engine (Subtype obligation + guard). #1515.
-        var operandType = EraseRefinement(InferExpressionType(unary.Operand));
+        // refinement does (an inline-refined parameter is typed as its base). `-` and `~` yield
+        // the BASE type: a refinement does not survive arithmetic. #1515.
+        //
+        // Increment/decrement are the exception and keep the operand's declared type. They write
+        // back into the refined variable, and that write is guarded (Subtype obligation + runtime
+        // check) before it commits, so the value they yield satisfies the refinement. Before
+        // #1515 they typed as the error type, so `§B{x:Nat} (inc a)` compiled; it still does.
+        var declaredOperandType = InferExpressionType(unary.Operand);
+        var operandType = EraseRefinement(declaredOperandType);
         return unary.Operator switch
         {
             UnaryOperator.Not => PrimitiveType.Bool,
@@ -1457,7 +1462,7 @@ public sealed class TypeChecker
             UnaryOperator.BitwiseNot => operandType.Equals(PrimitiveType.Int) ? PrimitiveType.Int : ErrorType.Instance,
             UnaryOperator.PreIncrement or UnaryOperator.PreDecrement
                 or UnaryOperator.PostIncrement or UnaryOperator.PostDecrement
-                => IsNumericType(operandType) ? operandType : ErrorType.Instance,
+                => IsNumericType(operandType) ? declaredOperandType : ErrorType.Instance,
             _ => ErrorType.Instance
         };
     }
@@ -4093,7 +4098,12 @@ public sealed class TypeChecker
         // Reached far more often once named decimal refinements stopped being rejected (#1515).
         if (leftType.Equals(PrimitiveType.Decimal) || rightType.Equals(PrimitiveType.Decimal))
         {
-            return PrimitiveType.Decimal;
+            // Only when BOTH sides are modeled. Against an unmodeled operand (ErrorType) C# may
+            // pick a user-defined operator with any result type (`decimal + Box -> double`), so
+            // claiming decimal would invent a decimal/float conflict. Yield to Roslyn instead.
+            return leftType is ErrorType || rightType is ErrorType
+                ? ErrorType.Instance
+                : PrimitiveType.Decimal;
         }
 
         return PrimitiveType.Int;
