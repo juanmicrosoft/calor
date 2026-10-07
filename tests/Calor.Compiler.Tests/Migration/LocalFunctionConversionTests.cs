@@ -96,6 +96,57 @@ public class LocalFunctionConversionTests
         }
         """;
 
+    // Enclosing callables of other kinds: a void expression-bodied local with a
+    // compound assignment (once silently lowered to `=`), a local in an async method,
+    // a static local after the yields of an iterator, and a local using the
+    // enclosing method's type parameter.
+    private const string EdgeShapes = """
+        using System;
+        using System.Collections.Generic;
+        using System.Threading.Tasks;
+
+        public static class Probe
+        {
+            public static string Log = "";
+
+            public static void Note()
+            {
+                void Write(string s) => Log += s;
+                Write("a");
+                Write("b");
+            }
+
+            public static async Task<int> Later()
+            {
+                int Twice(int x) => x * 2;
+                await Task.Yield();
+                return Twice(21);
+            }
+
+            public static IEnumerable<int> Seq(int n)
+            {
+                for (int i = 0; i < n; i++)
+                    yield return Sq(i);
+
+                static int Sq(int x) => x * x;
+            }
+
+            public static T Pick<T>(T a, T b)
+            {
+                T First(T x, T y) => x;
+                return First(a, b);
+            }
+
+            public static string Run()
+            {
+                Note();
+                int sum = 0;
+                foreach (var v in Seq(4)) sum += v;
+                return Log + "|" + Later().Result + "|" + sum + "|" + Pick("p", "q");
+            }
+        }
+        """;
+
     // F3-LOCAL-05 (not fixtured at R0): an async local function stays preserved.
     private const string AsyncLocal = """
         using System.Threading.Tasks;
@@ -145,6 +196,7 @@ public class LocalFunctionConversionTests
             data.Add("F3-LOCAL-02", "3|1002", surface);
             data.Add("F3-LOCAL-03", "6|5|60|3000|502", surface);
             data.Add("more-shapes", "11|False|xy6|16", surface);
+            data.Add("edge-shapes", "ab|42|14|p", surface);
         }
         return data;
     }
@@ -154,7 +206,12 @@ public class LocalFunctionConversionTests
     public async Task NativeRows_ConvertInPlace_CompileByDefault_AndRunTheSame(
         string row, string expected, Surface surface)
     {
-        var source = row == "more-shapes" ? MoreShapes : R0Fixture(row);
+        var source = row switch
+        {
+            "more-shapes" => MoreShapes,
+            "edge-shapes" => EdgeShapes,
+            _ => R0Fixture(row)
+        };
         Assert.Equal(expected, Run(source));
 
         var (calor, losses) = await ConvertAsync(source, surface);
@@ -288,6 +345,32 @@ public class LocalFunctionConversionTests
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors,
             string.Join("\n", compilation.Diagnostics.Errors) + "\n" + result.CalorSource);
+    }
+
+    [Fact]
+    public void ExpressionBodiedCompoundAssignment_KeepsItsOperator()
+    {
+        // Found while testing F3: `=> Log += s` on a method was converted to `Log = s`.
+        var source = """
+            public static class Probe
+            {
+                public static string Log = "";
+                public static void Write(string s) => Log += s;
+                public static string Run()
+                {
+                    Write("a");
+                    Write("b");
+                    return Log;
+                }
+            }
+            """;
+        Assert.Equal("ab", Run(source));
+        var result = new CSharpToCalorConverter().Convert(source);
+        Assert.True(result.Success, string.Join("\n", result.Issues));
+        var compilation = Program.Compile(result.CalorSource!, "compound.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
+        Assert.Equal("ab", Run(compilation.GeneratedCode));
     }
 
     [Fact]

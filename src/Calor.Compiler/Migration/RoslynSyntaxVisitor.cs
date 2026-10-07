@@ -4663,6 +4663,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         throw EscalateExpression(exprAssign, "tuple-deconstruction");
                     return [ConvertTupleAssignmentStatement(exprAssign, GetTextSpan(expressionBody))];
                 }
+                if (!exprAssign.IsKind(SyntaxKind.SimpleAssignmentExpression))
+                {
+                    // `void M() => Log += s;` keeps its compound operator. It was
+                    // lowered to a plain assignment (`Log = s`), a silent change
+                    // that native local functions would also inherit (#847).
+                    var compound = ConvertExpressionToStatement(exprAssign, GetTextSpan(expressionBody));
+                    FlushPendingStatements(result);
+                    if (compound != null)
+                        result.Add(compound);
+                    return result;
+                }
                 var target = ConvertExpression(exprAssign.Left);
                 var value = ConvertExpression(exprAssign.Right);
                 FlushPendingStatements(result);
