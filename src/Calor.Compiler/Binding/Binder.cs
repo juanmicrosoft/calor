@@ -105,7 +105,15 @@ public sealed class Binder
     private readonly Dictionary<string, HashSet<string>> _topLevelFunctionLookupNames = new(StringComparer.Ordinal);
     private readonly Dictionary<CSharpInteropBlockNode, IReadOnlySet<string>> _interopMethodNames = new();
     private readonly Dictionary<SymbolId, Symbol> _symbolsById = new();
+    // Insertion order of _symbolsById. Loop discovery removes the symbols it
+    // added; rebuilding the module's map from this list keeps the published
+    // enumeration order equal to declaration order without copying the whole
+    // map at every loop.
+    private readonly List<SymbolId> _symbolOrder = new();
     private readonly Dictionary<string, int> _declarationIdOccurrences = new(StringComparer.Ordinal);
+    // While a loop body is bound for discovery, each declaration-id counter
+    // change is journaled (previous value, 0 = absent) so it can be undone.
+    private List<(string Key, int Previous)>? _declarationOccurrenceJournal;
     private IReadOnlySet<string> _declaredReferenceTypes = new HashSet<string>(StringComparer.Ordinal);
     private SymbolId _moduleSymbolId;
     private SymbolId _declarationContext;
@@ -659,6 +667,7 @@ public sealed class Binder
         _flowNarrowingSources.Clear();
         _topLevelFunctionLookupNames.Clear();
         _symbolsById.Clear();
+        _symbolOrder.Clear();
         _declarationIdOccurrences.Clear();
         _delegateTypeNames.Clear();
         _misplacedRowsReported.Clear();
@@ -692,7 +701,7 @@ public sealed class Binder
             module.Span,
             module.Name,
             functions,
-            new Dictionary<SymbolId, Symbol>(_symbolsById));
+            _symbolOrder.ToDictionary(id => id, id => _symbolsById[id]));
     }
 
     private void RegisterTopLevelFunctions(ModuleNode module)
@@ -1287,10 +1296,12 @@ public sealed class Binder
         var key = baseId.Value;
         if (!_declarationIdOccurrences.TryGetValue(key, out var occurrence))
         {
+            _declarationOccurrenceJournal?.Add((key, 0));
             _declarationIdOccurrences.Add(key, 1);
             return baseId;
         }
 
+        _declarationOccurrenceJournal?.Add((key, occurrence));
         _declarationIdOccurrences[key] = occurrence + 1;
         return baseId.Append($"duplicate:{occurrence}");
     }
@@ -1310,7 +1321,10 @@ public sealed class Binder
     private void TrackSymbol(Symbol symbol)
     {
         if (!symbol.Id.IsNone)
+        {
             _symbolsById.Add(symbol.Id, symbol);
+            _symbolOrder.Add(symbol.Id);
+        }
     }
 
     private void ReportDuplicateSignature(
@@ -1728,8 +1742,13 @@ public sealed class Binder
         var bindings = _scope.CaptureVisibleVariableBindings();
         var flow = CaptureFlowNarrowingState();
         var diagnostics = _diagnostics.CreateCheckpoint();
-        var symbols = _symbolsById.ToArray();
-        var declarationOccurrences = _declarationIdOccurrences.ToArray();
+        // Discovery only adds symbols and bumps declaration counters, so it is
+        // undone from the symbols appended after this mark and from a journal.
+        // Copying both module-wide maps here made binding quadratic in module
+        // size (one full copy per loop).
+        var symbolCount = _symbolOrder.Count;
+        var declarationJournal = new List<(string Key, int Previous)>();
+        _declarationOccurrenceJournal = declarationJournal;
         var expressionsBound = ExpressionsBound;
         var misplacedRows = _misplacedRowsReported.ToArray();
         var unsupportedNodeTypes = _unsupportedNodeTypes.ToArray();
@@ -1759,12 +1778,18 @@ public sealed class Binder
             Scope.RestoreVisibleVariableBindings(bindings);
             RestoreFlowNarrowingState(flow);
             _diagnostics.RestoreCheckpoint(diagnostics);
-            _symbolsById.Clear();
-            foreach (var (id, symbol) in symbols)
-                _symbolsById.Add(id, symbol);
-            _declarationIdOccurrences.Clear();
-            foreach (var (key, count) in declarationOccurrences)
-                _declarationIdOccurrences.Add(key, count);
+            for (var index = _symbolOrder.Count - 1; index >= symbolCount; index--)
+                _symbolsById.Remove(_symbolOrder[index]);
+            _symbolOrder.RemoveRange(symbolCount, _symbolOrder.Count - symbolCount);
+            _declarationOccurrenceJournal = null;
+            for (var index = declarationJournal.Count - 1; index >= 0; index--)
+            {
+                var (key, previous) = declarationJournal[index];
+                if (previous == 0)
+                    _declarationIdOccurrences.Remove(key);
+                else
+                    _declarationIdOccurrences[key] = previous;
+            }
             ExpressionsBound = expressionsBound;
             _misplacedRowsReported.Clear();
             _misplacedRowsReported.UnionWith(misplacedRows);
@@ -1783,7 +1808,7 @@ public sealed class Binder
     private void JoinCallableState(IReadOnlyDictionary<VariableSymbol, CallableMutationSummary> other)
     {
         foreach (var (storage, effects) in other)
-            _callableState[storage] = UnionCallableEffects(GetCallableState(storage), effects);
+            StoreCallableState(storage, UnionCallableEffects(GetCallableState(storage), effects));
     }
 
     private BoundIfStatement BindIfStatement(IfStatementNode ifStmt)
@@ -4652,7 +4677,7 @@ public sealed class Binder
                 var updated = UnionCallableEffects(previous, value);
                 if (ReferenceEquals(previous, updated))
                     continue;
-                _callableState[storage] = updated;
+                StoreCallableState(storage, updated);
                 changed = true;
                 if (dependencies.Contains(storage))
                     pending.Enqueue(updated);
@@ -4673,6 +4698,20 @@ public sealed class Binder
     private CallableMutationSummary GetCallableState(VariableSymbol storage) =>
         _callableState.GetValueOrDefault(storage.StorageIdentity, CallableMutationSummary.Empty);
 
+    // An absent entry and CallableMutationSummary.Empty are the same state:
+    // every read goes through GetCallableState, which defaults to Empty, and
+    // UnionCallableEffects treats Empty as its identity. Not storing Empty keeps
+    // the map proportional to callable-valued storage rather than to every
+    // initialized local bound so far in the module, which CaptureCallableState
+    // copies at each branch, loop, and lambda.
+    private void StoreCallableState(VariableSymbol storage, CallableMutationSummary effects)
+    {
+        if (ReferenceEquals(effects, CallableMutationSummary.Empty))
+            _callableState.Remove(storage);
+        else
+            _callableState[storage] = effects;
+    }
+
     private Dictionary<VariableSymbol, CallableMutationSummary> CaptureCallableState() =>
         new(_callableState, ReferenceEqualityComparer.Instance);
 
@@ -4686,7 +4725,7 @@ public sealed class Binder
     private void SetCallableState(VariableSymbol variable, BoundExpression value)
     {
         var effects = GetCallableEffects(value);
-        _callableState[variable.StorageIdentity] = effects;
+        StoreCallableState(variable.StorageIdentity, effects);
         _deferredCallableWrites?.Add(new(
             variable.StorageIdentity, effects, GetCallableValueSources(value).ToArray()));
     }
