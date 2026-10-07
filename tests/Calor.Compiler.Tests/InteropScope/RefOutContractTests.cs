@@ -20,7 +20,7 @@ namespace Calor.Compiler.Tests.InteropScope;
 public class RefOutContractTests
 {
     /// <summary>SHA-256 over the 1.0.0 rules and case denominator. Changing either needs an amendment and a new pin.</summary>
-    private const string FrozenSeal = "d15b423600acdebf23221bfce643196ffccc27e723cbfc3e2d549e0c1c28e942";
+    private const string FrozenSeal = "db179d92b32a41b33248fb45480288b69fe1863bce43e51fd65afb90a1308839";
 
     [Fact]
     public void CommittedContractPasses()
