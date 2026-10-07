@@ -2282,8 +2282,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                             InteropMemberKind.Method);
                     }
                     return ConvertMethodSignature(methodSyntax);
-                case BasePropertyDeclarationSyntax accessorMember
-                    when GetAccessorInteropFeature(accessorMember) is { } accessorFeature:
+                case PropertyDeclarationSyntax or IndexerDeclarationSyntax
+                    when GetAccessorInteropFeature((BasePropertyDeclarationSyntax)member) is { } accessorFeature:
                     return CreateInteropBlock(
                         member,
                         accessorFeature,
@@ -3220,8 +3220,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         List<OperatorOverloadNode> operatorOverloads,
         List<IndexerNode>? indexers = null)
     {
-        if (member is BasePropertyDeclarationSyntax accessorMember)
-            RefuseIteratorAccessor(accessorMember);
+        if (member is PropertyDeclarationSyntax or IndexerDeclarationSyntax)
+            RefuseIteratorAccessor((BasePropertyDeclarationSyntax)member);
         if (!member.DescendantNodes()
                 .OfType<LocalFunctionStatementSyntax>()
                 .Any())
@@ -5839,6 +5839,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         var key = PartialMemberKey(node);
         var partners = node.SyntaxTree.GetRoot().DescendantNodes()
             .OfType<BasePropertyDeclarationSyntax>()
+            .Where(other => other is PropertyDeclarationSyntax or IndexerDeclarationSyntax)
             .Where(other => other.Modifiers.Any(SyntaxKind.PartialKeyword)
                 && PartialMemberKey(other) == key);
         return partners.Any(IsIteratorAccessor) ? "iterator-accessor" : "partial-property";
@@ -5853,21 +5854,22 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             .OfType<YieldStatementSyntax>()
             .Any() == true;
 
-    // Containing type chain plus member identity (indexers by parameter types).
+    // Containing type chain plus member identity. Syntax only, so identifiers use their
+    // value text (`@P` is `P`) and indexers match by parameter count (type spellings such
+    // as `int`/`System.Int32` differ). A mismatch only changes the label: every partial
+    // declaration is preserved either way.
     private static string PartialMemberKey(BasePropertyDeclarationSyntax node)
         => string.Join(".", node.Ancestors().Select(ancestor => ancestor switch
             {
                 BaseNamespaceDeclarationSyntax ns => ns.Name.ToString(),
-                TypeDeclarationSyntax type => type.Identifier.Text + "`"
+                TypeDeclarationSyntax type => type.Identifier.ValueText + "`"
                     + (type.TypeParameterList?.Parameters.Count ?? 0),
                 _ => null
             }).Where(part => part != null).Reverse())
             + "::" + (node switch
             {
-                PropertyDeclarationSyntax property => property.Identifier.Text,
-                IndexerDeclarationSyntax indexer => "this["
-                    + string.Join(",", indexer.ParameterList.Parameters
-                        .Select(parameter => parameter.Type?.ToString())) + "]",
+                PropertyDeclarationSyntax property => property.Identifier.ValueText,
+                IndexerDeclarationSyntax indexer => "this[" + indexer.ParameterList.Parameters.Count + "]",
                 _ => node.Kind().ToString()
             });
 

@@ -321,6 +321,7 @@ public class IteratorAccessorConversionTests
 
     [Theory]
     [InlineData("public partial class C { public partial int Q { get; } public partial int Q { get => 1; } }", "partial-property", 2)]
+    [InlineData("public partial class @C { public partial IEnumerable<int> @P { get; } public partial IEnumerable<int> this[int n] { get; } } public partial class C { public partial IEnumerable<int> P { get { yield return 1; } } public partial IEnumerable<int> this[System.Int32 n] { get { yield return n; } } }", "iterator-accessor", 4)]
     [InlineData("public class C { public IEnumerable<int> P { get { using var d = new System.IO.MemoryStream(); yield return 1; } } }", "iterator-accessor", 1)]
     public void OverlappingShapes_AreLabelledAndCompileWithoutRescue(string types, string feature, int count)
     {
@@ -334,6 +335,55 @@ public class IteratorAccessorConversionTests
         var compilation = Program.Compile(result.CalorSource!, "overlap.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PartialIteratorParts_InSeparateFiles_MigrateWithoutRescue(bool mergePartialClasses)
+    {
+        // Codex round 2, finding 3: the defining declarations live in one file and the
+        // iterator implementations in another. Each part is preserved where it is.
+        var split = PartialParts.IndexOf("public partial class Bag", 40, StringComparison.Ordinal);
+        var probe = PartialParts.IndexOf("public static class Probe", StringComparison.Ordinal);
+        var defining = PartialParts[..split] + PartialParts[probe..];
+        var implementing = "using System.Collections.Generic;\n\n" + PartialParts[split..probe];
+        var dir = Path.Combine(Path.GetTempPath(), "calor-f4-1139-split-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "BagDefining.cs"), defining);
+            File.WriteAllText(Path.Combine(dir, "BagIterators.cs"), implementing);
+            var migrator = new ProjectMigrator(new MigrationPlanOptions
+            {
+                Parallel = false,
+                SkipAnalyze = true,
+                SkipVerify = true,
+                MergePartialClasses = mergePartialClasses
+            });
+            var plan = await migrator.CreatePlanAsync(dir, MigrationDirection.CSharpToCalor);
+            var report = await migrator.ExecuteAsync(plan);
+            var generated = new List<string>();
+            foreach (var file in report.FileResults.Where(file => file.OutputPath != null))
+            {
+                Assert.DoesNotContain(file.Losses, loss => loss.Feature == "post-validation-fallback");
+                var calor = File.ReadAllText(file.OutputPath!);
+                Assert.DoesNotMatch(@"§Y(IELD|BRK)", calor);
+                // Each file alone references the other's partial members, so the
+                // generated C# is validated once, together, by Run below.
+                var compilation = Program.Compile(calor, Path.GetFileName(file.OutputPath!),
+                    new CompilationOptions { StatusWriter = TextWriter.Null, DeferGeneratedOutputValidation = true });
+                Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors) + "\n" + calor);
+                generated.Add(compilation.GeneratedCode);
+            }
+            var losses = report.FileResults.SelectMany(file => file.Losses).Select(loss => loss.Feature).ToList();
+            Assert.Equal(4, losses.Count(feature => feature is "iterator-accessor" or "partial-property"));
+            Assert.Equal(Run(PartialParts), Run(generated.ToArray()));
+        }
+        finally
+        {
+            try { Directory.Delete(dir, recursive: true); } catch (IOException) { }
+        }
     }
 
     private static string R0Fixture(string id) => File.ReadAllText(Path.Combine(
@@ -400,15 +450,15 @@ public class IteratorAccessorConversionTests
         }
     }
 
-    private static string Run(string csharp)
+    private static string Run(params string[] csharp)
     {
         var compilation = CSharpCompilation.Create("F4_" + Guid.NewGuid().ToString("N"),
-            [CSharpSyntaxTree.ParseText(csharp)],
+            csharp.Select(source => CSharpSyntaxTree.ParseText(source)),
             GeneratedCSharpCompiler.References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         using var stream = new MemoryStream();
         var emission = compilation.Emit(stream);
-        Assert.True(emission.Success, string.Join(Environment.NewLine, emission.Diagnostics) + "\n" + csharp);
+        Assert.True(emission.Success, string.Join(Environment.NewLine, emission.Diagnostics) + "\n" + string.Join("\n", csharp));
         stream.Position = 0;
         var context = new AssemblyLoadContext(compilation.AssemblyName!, isCollectible: true);
         try

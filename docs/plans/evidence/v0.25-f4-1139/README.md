@@ -15,7 +15,10 @@ property/indexer declaration is also preserved (`partial-property`, or `iterator
 same-file part yields), because a native defining declaration became a second auto-property that
 only the rescue could hide; the iterator check also runs before the capability classifier and in
 the interface member path. A larger preserved declaration keeps its own label (interfaces with
-default bodies: `interface-property-semantics`; records: `record`). Native conversion was not attempted:
+default bodies: `interface-property-semantics`; records: `record`). After Codex round 2, the check
+is limited to properties and indexers (not partial events), partners match by identifier value text
+and indexer parameter count, and a two-file partial migration (with and without
+`MergePartialClasses`) is compiled together and run against the original. Native conversion was not attempted:
 Calor has no iterator accessor, and a synthesized helper method would add a member and name
 collisions for a capacity of 400 non-test lines.
 
