@@ -125,10 +125,12 @@ calor convert Counter.cs -o Counter.calr
 ```text
 Conversion completed with 1 interop preservation(s), 0 lossy substitution(s), and 0 drop(s) — output is not fully native Calor:
   InteropPreserved: 1
-    Counter.cs:? [post-validation-fallback] [rescue: round-trip-failure] Converted Calor for 'global::Counter' did not parse or did not survive the C# round trip; original C# preserved (#717).
+    /home/you/demo/Counter.cs:? [post-validation-fallback] [rescue: round-trip-failure] Converted Calor for 'global::Counter' did not parse or did not survive the C# round trip; original C# preserved (#717).
   ⓘ 1 member preserved as §CSHARP interop block(s) — the output parses, but this C# still needs migrating.
   Preservation paths: 1 by automatic rescue (round-trip-failure: 1; no passthrough request needed)
 ```
+
+The CLI prints the input's full path; `/home/you/demo` stands in for yours.
 
 With `--format json`, every `data.losses[]` entry carries `path`, and `trigger`
 and `enabledBy` when they apply. `data.conversionPaths` summarizes the file:

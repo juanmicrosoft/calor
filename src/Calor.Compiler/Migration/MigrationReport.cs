@@ -70,7 +70,7 @@ public sealed class FileMigrationResult
     {
         get => _conversionPaths is { Outcome: not "refused" } paths
                && Status is FileMigrationStatus.Failed or FileMigrationStatus.TimedOut
-            ? paths with { Outcome = "refused" }
+            ? paths.WithSuccess(false)
             : _conversionPaths;
         set => _conversionPaths = value;
     }

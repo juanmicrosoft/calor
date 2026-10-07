@@ -307,6 +307,7 @@ public sealed class BatchTool : McpToolBase
                     .Select(f => new
                     {
                         file = f.SourcePath,
+                        conversionPaths = f.ConversionPaths,
                         errorCount = f.Issues.Count(i => i.Severity == ConversionIssueSeverity.Error),
                         topErrors = f.Issues
                             .Where(i => i.Severity is ConversionIssueSeverity.Error or ConversionIssueSeverity.Warning)
@@ -326,6 +327,9 @@ public sealed class BatchTool : McpToolBase
                     timedOutCount = report.Summary.TimedOutFiles,
                     successRate = report.Summary.SuccessRate,
                     totalCsharpBlocks,
+                    // #1144: aggregate preservation paths over every converted file.
+                    preservationPaths = ConversionPathSummary.Describe(
+                        report.FileResults.SelectMany(f => f.Losses), "passthroughOnError"),
                     totalDurationMs = (int)report.Summary.TotalDuration.TotalMilliseconds,
                     errorCategories,
                     failedFiles,

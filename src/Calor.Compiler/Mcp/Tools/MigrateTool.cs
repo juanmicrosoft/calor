@@ -477,7 +477,7 @@ public sealed class MigrateTool : McpToolBase
                         Errors = compileErrors,
                         Warnings = existing?.Warnings,
                         Losses = existing?.Losses,
-                        ConversionPaths = existing?.ConversionPaths is { } cp ? cp with { Outcome = "refused" } : null
+                        ConversionPaths = existing?.ConversionPaths?.WithSuccess(false)
                     };
                 }
                 else if (sourceKey != null)
@@ -508,7 +508,7 @@ public sealed class MigrateTool : McpToolBase
                     Status = "compile_error",
                     Score = existing?.Score,
                     Losses = existing?.Losses,
-                    ConversionPaths = existing?.ConversionPaths is { } cp ? cp with { Outcome = "refused" } : null,
+                    ConversionPaths = existing?.ConversionPaths?.WithSuccess(false),
                     Errors = [ConversionIssueEnvelope.Message(
                         DiagnosticCode.CliInternalError, "error", ex.Message, path)]
                 };
@@ -571,9 +571,7 @@ public sealed class MigrateTool : McpToolBase
                             Status = recompile.HasErrors ? "fix_incomplete" : "fixed",
                             Score = existing?.Score,
                             Losses = existing?.Losses,
-                            ConversionPaths = recompile.HasErrors
-                                ? existing?.ConversionPaths is { } fp ? fp with { Outcome = "refused" } : null
-                                : existing?.ConversionPaths,
+                            ConversionPaths = existing?.ConversionPaths?.WithSuccess(!recompile.HasErrors),
                             Errors = recompile.HasErrors
                                 ? BuildCompileEnvelope(recompile, path, fixedFinal)
                                     .Where(e => e.Severity == "error")

@@ -761,7 +761,7 @@ public sealed class CSharpToCalorConverter
     {
         if (!File.Exists(csharpFilePath))
         {
-            var context = new ConversionContext { SourceFile = csharpFilePath };
+            var context = CreateContext(csharpFilePath);
             context.AddError($"Source file not found: {csharpFilePath}");
             return new ConversionResult { Success = false, Context = context };
         }
@@ -1334,21 +1334,25 @@ public sealed class CSharpToCalorConverter
 
     /// <summary>
     /// #1144: which option made a #717 rescue reachable, and so whether it counts as
-    /// automatic rescue or as requested passthrough. Precedence when both
-    /// RescueUnusableMembers and PassthroughOnError are on: automatic rescue, because
-    /// it would have fired without the passthrough request.
+    /// automatic rescue or as requested passthrough. The rescue needs two gates: C#
+    /// preservation (lossless fidelity, interop mode, or PassthroughOnError) and, for
+    /// a round-trip failure, RescueUnusableMembers or PassthroughOnError. It is an
+    /// automatic rescue only when both gates are open without PassthroughOnError;
+    /// so with both options on, lossless reports rescue (it would have fired without
+    /// the request) while lossy standard mode reports passthrough.
     /// </summary>
     private static (string Path, string EnabledBy) RescueProvenance(string trigger, ConversionContext context)
     {
+        var preserveGate = context.Fidelity == ConversionFidelity.Lossless
+            ? ConversionEnabledBy.LosslessFidelity
+            : context.Mode == ConversionMode.Interop ? ConversionEnabledBy.InteropMode : null;
+        if (preserveGate == null)
+            return (ConversionPath.Passthrough, ConversionEnabledBy.PassthroughOnError);
         if (trigger == ConversionTrigger.RoundTripFailure)
             return context.RescueUnusableMembers
                 ? (ConversionPath.Rescue, ConversionEnabledBy.RescueUnusableMembers)
                 : (ConversionPath.Passthrough, ConversionEnabledBy.PassthroughOnError);
-        if (context.Fidelity == ConversionFidelity.Lossless)
-            return (ConversionPath.Rescue, ConversionEnabledBy.LosslessFidelity);
-        return context.Mode == ConversionMode.Interop
-            ? (ConversionPath.Rescue, ConversionEnabledBy.InteropMode)
-            : (ConversionPath.Passthrough, ConversionEnabledBy.PassthroughOnError);
+        return (ConversionPath.Rescue, preserveGate);
     }
 
     /// <summary>Emits a module containing only the given member(s) and reports whether
@@ -1485,7 +1489,8 @@ public sealed class CSharpToCalorConverter
             featureName: "post-validation-fallback",
             reason: $"Converted Calor for '{member.FullyQualifiedSymbolIdentity ?? member.Name}' did not parse or did not survive the C# round trip; original C# preserved (#717)."));
 
-    private sealed record TypeSource(bool IsPartial, string Text);
+    /// <param name="Aliased">#1144: a global-namespace declaration keyed under the caller's ModuleName.</param>
+    private sealed record TypeSource(bool IsPartial, string Text, bool Aliased = false);
 
     /// <summary>
     /// Collects top-level type declarations by kind and fully-qualified symbol
@@ -1519,9 +1524,11 @@ public sealed class CSharpToCalorConverter
 
             var isPartial = member.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword));
             var identity = GetSyntaxTypeIdentity(member, name, globalNamespaceIdentity);
+            var aliased = globalNamespaceIdentity != null
+                && !member.Ancestors().OfType<BaseNamespaceDeclarationSyntax>().Any();
             var key = $"{kind}/{identity}";
             (map.TryGetValue(key, out var list) ? list : map[key] = new List<TypeSource>())
-                .Add(new TypeSource(isPartial, DeclarationSourceText(member)));
+                .Add(new TypeSource(isPartial, DeclarationSourceText(member), aliased));
         }
 
         return map;
@@ -1559,6 +1566,11 @@ public sealed class CSharpToCalorConverter
         if (!sources.TryGetValue(key, out var list) || list.Count == 0)
         {
             return false;
+        }
+
+        if (list.Select(s => s.Aliased).Distinct().Count() > 1)
+        {
+            return false; // a global type and a real namespace share the ModuleName identity
         }
 
         if (list.Count == 1)

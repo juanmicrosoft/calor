@@ -754,6 +754,7 @@ public sealed class ConvertTool : McpToolBase
         string? roundTrippedCSharp = null;
         var conversionSuccess = false;
         var compilationSuccess = false;
+        ConversionResult? conversionResult = null;
 
         // Step 1: Convert C# → Calor
         cancellationToken.ThrowIfCancellationRequested();
@@ -787,11 +788,14 @@ public sealed class ConvertTool : McpToolBase
                 TargetFramework = GetString(arguments, "targetFramework"),
                 ParseOptions = ResolveParseOptions(arguments),
                 References = GetConversionReferences(arguments),
+                // #1144: honour the documented passthroughOnError argument here too.
+                PassthroughOnError = GetBool(arguments, "passthroughOnError", defaultValue: false),
                 UseImplicitCallCloser = !GetBool(arguments, "explicitCallClosers", defaultValue: false)
             };
 
             var converter = new CSharpToCalorConverter(options);
             var result = converter.Convert(source, null, cancellationToken);
+            conversionResult = result;
 
             if (result.Success && !string.IsNullOrWhiteSpace(result.CalorSource))
             {
@@ -887,7 +891,10 @@ public sealed class ConvertTool : McpToolBase
             RoundTrippedCSharp = roundTrippedCSharp,
             Differences = differences.Count > 0 ? differences : null,
             ConversionErrors = conversionErrors.Count > 0 ? conversionErrors : null,
-            CompilationErrors = compilationErrors.Count > 0 ? compilationErrors : null
+            CompilationErrors = compilationErrors.Count > 0 ? compilationErrors : null,
+            LossSummary = conversionResult == null
+                ? null
+                : ConversionLossSummaryOutput.From(conversionResult, conversionSuccess)
         };
 
         return Task.FromResult(McpToolResult.Json(output, isError: !roundTripMatch));
@@ -1436,6 +1443,11 @@ public sealed class ConvertTool : McpToolBase
         [JsonPropertyName("compilationErrors")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<EnvelopeDiagnostic>? CompilationErrors { get; init; }
+
+        /// <summary>#1144: losses and conversion paths of the C# → Calor step.</summary>
+        [JsonPropertyName("lossSummary")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public ConversionLossSummaryOutput? LossSummary { get; init; }
     }
 
     private sealed class LineDifference

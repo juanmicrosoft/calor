@@ -174,9 +174,11 @@ public sealed class ConversionLoss
     private readonly string? _path;
 
     /// <summary>#1144: the failure that fired a rescue or passthrough (<see cref="ConversionTrigger"/>); null otherwise.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public string? Trigger { get; init; }
 
     /// <summary>#1144: the option or default that made the rescue or passthrough reachable (<see cref="ConversionEnabledBy"/>); null otherwise.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public string? EnabledBy { get; init; }
 
     public bool IsSemanticLoss => Kind is ConversionLossKind.FallbackTodo
@@ -363,10 +365,20 @@ public sealed class ConversionContext
     /// Whether unsupported constructs should be preserved as C# passthrough blocks.
     /// True when Mode is Interop or PassthroughOnError is enabled.
     /// </summary>
-    public bool ShouldPreserveCSharp =>
-        Fidelity == ConversionFidelity.Lossless ||
-        Mode == ConversionMode.Interop ||
-        PassthroughOnError;
+    public bool ShouldPreserveCSharp
+    {
+        get
+        {
+            if (Fidelity == ConversionFidelity.Lossless || Mode == ConversionMode.Interop)
+                return true;
+            // #1144: only PassthroughOnError opened this gate, so the preservation
+            // it leads to is a requested passthrough. The next interop loss consumes it.
+            _passthroughGateOpened = PassthroughOnError;
+            return PassthroughOnError;
+        }
+    }
+
+    private bool _passthroughGateOpened;
 
     /// <summary>
     /// Current namespace being processed.
@@ -423,6 +435,17 @@ public sealed class ConversionContext
         ConversionLossKind kind, string feature, string description, int? line,
         string? path, string? trigger, string? enabledBy)
     {
+        if (kind == ConversionLossKind.InteropPreserved)
+        {
+            if (path == null && _passthroughGateOpened)
+            {
+                path = ConversionPath.Passthrough;
+                trigger = ConversionTrigger.UnsupportedConstruct;
+                enabledBy = ConversionEnabledBy.PassthroughOnError;
+            }
+            _passthroughGateOpened = false;
+        }
+
         _losses.Add(new ConversionLoss
         {
             Kind = kind,

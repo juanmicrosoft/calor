@@ -115,13 +115,9 @@ public sealed record ConversionPathSummary
         int Count(string path) => list.Count(l => l.Path == path);
         var lossy = Count(ConversionPath.Lossy);
         var dropped = Count(ConversionPath.Dropped);
-        var preserved = list.Count - lossy - dropped;
         return new ConversionPathSummary
         {
-            Outcome = !success ? "refused"
-                : lossy + dropped > 0 ? "lossy"
-                : preserved > 0 ? "preserved"
-                : "native",
+            Outcome = "native",
             Interop = Count(ConversionPath.Interop),
             Rescue = Count(ConversionPath.Rescue),
             Passthrough = Count(ConversionPath.Passthrough),
@@ -133,8 +129,17 @@ public sealed record ConversionPathSummary
                 .ToDictionary(g => g.Key, g => g.Count()),
             RescueUnusableMembers = rescueUnusableMembers,
             PassthroughOnError = passthroughOnError
-        };
+        }.WithSuccess(success);
     }
+
+    /// <summary>The same counts with the outcome recomputed for whether the file was written.</summary>
+    public ConversionPathSummary WithSuccess(bool success) => this with
+    {
+        Outcome = !success ? "refused"
+            : Lossy + Dropped > 0 ? "lossy"
+            : Interop + Rescue + Passthrough > 0 ? "preserved"
+            : "native"
+    };
 
     /// <summary>Summary of <paramref name="result"/>; <paramref name="success"/> overrides when a surface refuses after conversion.</summary>
     public static ConversionPathSummary From(ConversionResult result, bool? success = null)

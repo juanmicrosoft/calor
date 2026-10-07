@@ -45,6 +45,12 @@ public sealed class MigrationReportGenerator
         sb.AppendLine($"| Total Warnings | {_report.Summary.TotalWarnings} |");
         sb.AppendLine($"| Duration | {FormatDuration(_report.Summary.TotalDuration)} |");
         sb.AppendLine();
+        // #1144: which path kept members as C#, with the trigger that fired.
+        if (ConversionPathSummary.Describe(_report.FileResults.SelectMany(f => f.Losses), "PassthroughOnError") is { } paths)
+        {
+            sb.AppendLine($"**{paths}**");
+            sb.AppendLine();
+        }
 
         // Analysis summary
         if (_report.Analysis != null)
@@ -146,6 +152,10 @@ public sealed class MigrationReportGenerator
                 foreach (var file in partialFiles)
                 {
                     sb.AppendLine($"- `{Path.GetFileName(file.SourcePath)}`");
+                    foreach (var loss in file.Losses.Where(l => l.Trigger != null))
+                    {
+                        sb.AppendLine($"  - {loss.Path} ({loss.Trigger}, enabled by {loss.EnabledBy}): {loss.Description}");
+                    }
                     foreach (var issue in file.Issues.Where(i => i.Severity == ConversionIssueSeverity.Warning))
                     {
                         sb.AppendLine($"  - ⚠️ {issue.Message}");

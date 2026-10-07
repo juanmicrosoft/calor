@@ -287,6 +287,7 @@ public static class ConvertCommand
         catch (Exception ex)
         {
             envelope?.AddCommandError($"Unhandled error: {ex.Message}", input.FullName);
+            envelope?.MarkRefused();
             Console.Error.WriteLine($"Error: {ex.Message}");
             telemetry?.TrackException(ex);
             exitCode = 1;
@@ -532,6 +533,7 @@ public static class ConvertCommand
                 }
             }
             // #1144: name the path taken (refused) and the defaults that applied.
+            envelope?.SetConversionSummary(result);
             Console.Error.WriteLine(
                 $"  Conversion refused; no output written (automatic rescue: {(result.Context.RescueUnusableMembers ? "on" : "off")}, " +
                 $"--passthrough: {(result.Context.PassthroughOnError ? "on" : "off")}).");
@@ -563,7 +565,8 @@ public static class ConvertCommand
         if (validationErrors.Count > 0)
         {
             envelope?.Data.Success = false;
-            envelope?.Data.ConversionPaths = ConversionPathSummary.From(result, success: false);
+            envelope?.SetConversionSummary(result);
+            envelope?.MarkRefused();
             Console.Error.WriteLine($"Validation failed ({validationErrors.Count} error{(validationErrors.Count == 1 ? "" : "s")}):");
             foreach (var err in validationErrors.Take(5))
                 Console.Error.WriteLine($"  {err}");
@@ -586,7 +589,8 @@ public static class ConvertCommand
         {
             envelope?.AddCommandError($"Conversion timed out after {timeoutSeconds}s", inputPath);
             envelope?.Data.Success = false;
-            envelope?.Data.ConversionPaths = ConversionPathSummary.From(result, success: false);
+            envelope?.SetConversionSummary(result);
+            envelope?.MarkRefused();
             Console.Error.WriteLine($"Error: Conversion timed out after {timeoutSeconds}s");
             Console.Error.WriteLine("Destination was not modified.");
             return (1, result);
@@ -842,6 +846,13 @@ public static class ConvertCommand
                 }).ToList()
                 : null;
             Data.ConversionPaths = result.Paths;
+        }
+
+        /// <summary>#1144: nothing was written, so the file's outcome is refused.</summary>
+        public void MarkRefused()
+        {
+            Data.Success = false;
+            Data.ConversionPaths = Data.ConversionPaths?.WithSuccess(false);
         }
 
         public void SetBenchmark(FileMetrics metrics)

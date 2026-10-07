@@ -146,13 +146,73 @@ public class ConversionPathReportingTests : IDisposable
             ConversionPath.Rescue, ConversionTrigger.RoundTripFailure, ConversionEnabledBy.RescueUnusableMembers, 1);
     }
 
+    private const string Destructor = "public class D { public int V = 1; ~D() { V = 0; } }";
+
+    [Fact]
+    public void F6_REPORT_12_LossyStandard_PreservationOnlyThroughPassthrough_IsPassthrough()
+    {
+        // Lossless keeps the destructor as converter interop; lossy drops it; lossy plus
+        // passthrough keeps it only because passthrough opened the preservation gate.
+        var lossless = Convert(Destructor, new ConversionOptions());
+        Assert.Contains(lossless.Losses, l => l.Path == ConversionPath.Interop && l.Trigger == null);
+
+        var lossy = Convert(Destructor, new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
+        Assert.DoesNotContain(lossy.Losses, l => l.Path is ConversionPath.Interop or ConversionPath.Passthrough);
+
+        var lossyPassthrough = Convert(Destructor, new ConversionOptions { Fidelity = ConversionFidelity.Lossy, PassthroughOnError = true });
+        var kept = Assert.Single(lossyPassthrough.Losses, l => l.Kind == ConversionLossKind.InteropPreserved);
+        Assert.Equal(ConversionPath.Passthrough, kept.Path);
+        Assert.Equal(ConversionTrigger.UnsupportedConstruct, kept.Trigger);
+        Assert.Equal(ConversionEnabledBy.PassthroughOnError, kept.EnabledBy);
+
+        // A preservation that happens without passthrough stays interop under lossy plus passthrough.
+        var usingDecl = Convert("public class S { public int M() { using var d = new System.IO.MemoryStream(); return 1; } }",
+            new ConversionOptions { Fidelity = ConversionFidelity.Lossy, PassthroughOnError = true });
+        Assert.All(usingDecl.Losses.Where(l => l.Kind == ConversionLossKind.InteropPreserved),
+            l => Assert.Equal(ConversionPath.Interop, l.Path));
+    }
+
+    [Fact]
+    public void F6_REPORT_12_Precedence_SelectedBranchLossy_BothOptions_IsPassthrough()
+    {
+        // Under lossy fidelity only passthrough opens the preservation gate, so even with
+        // RescueUnusableMembers on the rescue could not have fired without the request.
+        ConversionOptions Options(bool rescue, bool passthrough) => new()
+        {
+            Fidelity = ConversionFidelity.Lossy,
+            PreprocessorMode = PreprocessorConversionMode.SelectActiveBranchLossy,
+            RescueUnusableMembers = rescue,
+            PassthroughOnError = passthrough
+        };
+
+        Assert.Equal("refused", Convert(TrailingLabel, Options(rescue: true, passthrough: false)).Paths.Outcome);
+        AssertPaths(Convert(TrailingLabel, Options(rescue: true, passthrough: true)),
+            ConversionPath.Passthrough, ConversionTrigger.RoundTripFailure, ConversionEnabledBy.PassthroughOnError, 1);
+    }
+
+    [Fact]
+    public async Task F6_REPORT_07_LibraryMissingFile_ReportsTheConfiguredOptions()
+    {
+        var result = await new CSharpToCalorConverter(new ConversionOptions { RescueUnusableMembers = true, PassthroughOnError = true })
+            .ConvertFileAsync(Path.Combine(_tempDir, "missing.cs"));
+
+        Assert.Equal("refused", result.Paths.Outcome);
+        Assert.True(result.Paths.RescueUnusableMembers);
+        Assert.True(result.Paths.PassthroughOnError);
+    }
+
     // ── CLI convert (F6-REPORT-01, -02, -03, -10, -12 CLI cells) ──────────
 
     private (int Exit, string Out, string Err) Cli(string source, params string[] flags)
+        => CliNamed($"In{Guid.NewGuid():N}.cs", source, flags);
+
+    /// <summary>Runs <c>calor convert</c> on a file given by its relative name, as a user would type it.</summary>
+    private (int Exit, string Out, string Err) CliNamed(string fileName, string source, params string[] flags)
     {
-        var input = Path.Combine(_tempDir, $"In{Guid.NewGuid():N}.cs");
-        File.WriteAllText(input, source);
-        return CliTestHarness.RunCli(_tempDir, ["convert", input, "-o", Path.ChangeExtension(input, ".calr"), .. flags]);
+        var dir = Path.Combine(_tempDir, "cli" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, fileName), source);
+        return CliTestHarness.RunCli(dir, ["convert", fileName, "-o", Path.ChangeExtension(fileName, ".calr"), .. flags]);
     }
 
     private static JsonElement Data(string stdout) => JsonDocument.Parse(stdout).RootElement.GetProperty("data");
@@ -198,9 +258,10 @@ public class ConversionPathReportingTests : IDisposable
     {
         const string counter = "public class Counter\n{\n    public int Next(int x)\n    {\n        done:\n        return x + 1;\n    }\n}\n";
 
-        var (exit, stdout, stderr) = Cli(counter);
+        var (exit, stdout, stderr) = CliNamed("Counter.cs", counter);
         Assert.True(exit == 0, stderr);
-        Assert.Contains("[post-validation-fallback] [rescue: round-trip-failure] Converted Calor for 'global::Counter'", stdout);
+        // The CLI prints the input's full path before "Counter.cs".
+        Assert.Contains("/Counter.cs:? [post-validation-fallback] [rescue: round-trip-failure] Converted Calor for 'global::Counter' did not parse or did not survive the C# round trip; original C# preserved (#717).", stdout);
         Assert.Contains("  Preservation paths: 1 by automatic rescue (round-trip-failure: 1; no passthrough request needed)", stdout);
 
         var (_, json, _) = Cli(counter, "--format", "json");
@@ -218,6 +279,21 @@ public class ConversionPathReportingTests : IDisposable
         Assert.Equal(1, exit);
         Assert.Contains("Conversion refused; no output written (automatic rescue: on, --passthrough: off)", stderr);
         Assert.Equal("refused", Data(stdout).GetProperty("conversionPaths").GetProperty("outcome").GetString());
+    }
+
+    [Fact]
+    public void F6_REPORT_10_CliLossy_RoundTripIsNotChecked_SoNoRescueFires()
+    {
+        // --lossy skips the generated-C# round trip, so the rescue never fires and the
+        // report says so: no rescue, no trigger. (The lossy contract allows this.)
+        foreach (var flags in new[] { new[] { "--lossy", "--format", "json" }, new[] { "--lossy", "--passthrough", "--format", "json" } })
+        {
+            var (exit, stdout, stderr) = Cli(TrailingLabel, flags);
+            Assert.True(exit == 0, stderr);
+            var paths = Data(stdout).GetProperty("conversionPaths");
+            Assert.Equal(0, paths.GetProperty("rescue").GetInt32() + paths.GetProperty("passthrough").GetInt32());
+            Assert.Empty(paths.GetProperty("triggers").EnumerateObject());
+        }
     }
 
     [Fact]
@@ -310,6 +386,19 @@ public class ConversionPathReportingTests : IDisposable
     }
 
     [Fact]
+    public async Task F6_REPORT_13_McpValidateAndRoundtripModes_CarryPaths()
+    {
+        var (_, validate) = await Mcp("calor_convert", new { source = Fixture("F5-ARRAY-02"), mode = "validate" });
+        var validatePaths = validate.GetProperty("lossSummary").GetProperty("paths");
+        Assert.Equal(1, validatePaths.GetProperty("rescue").GetInt32());
+
+        var (_, roundtrip) = await Mcp("calor_convert", new { source = TrailingLabel, mode = "roundtrip", passthroughOnError = true });
+        var location = Assert.Single(roundtrip.GetProperty("lossSummary").GetProperty("locations").EnumerateArray());
+        Assert.Equal("passthrough", location.GetProperty("path").GetString());
+        Assert.Equal("round-trip-failure", location.GetProperty("trigger").GetString());
+    }
+
+    [Fact]
     public async Task F6_REPORT_13_McpInteropLocation_HasPathButNoTrigger()
     {
         var (isError, payload) = await Mcp("calor_convert", new { source = Fixture("F3-LOCAL-01") });
@@ -328,8 +417,16 @@ public class ConversionPathReportingTests : IDisposable
     {
         var dir = Path.Combine(_tempDir, "proj" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
+        // Each fixture declares Probe (and some share helper type names); suffix every
+        // identifier that could collide so a failure comes only from the fixture itself.
         foreach (var id in fixtureIds)
-            File.WriteAllText(Path.Combine(dir, id.Replace("-", "") + ".cs"), Fixture(id));
+        {
+            var suffix = id.Replace("-", "");
+            var text = Fixture(id);
+            foreach (var name in new[] { "Probe", "Bag", "Grid" })
+                text = System.Text.RegularExpressions.Regex.Replace(text, $@"\b{name}\b", name + suffix);
+            File.WriteAllText(Path.Combine(dir, suffix + ".cs"), text);
+        }
         return dir;
     }
 
@@ -382,6 +479,37 @@ public class ConversionPathReportingTests : IDisposable
         var paths = FileEntry(payload.GetProperty("files"), "F5-ARRAY-02").GetProperty("conversionPaths");
         Assert.Equal("preserved", paths.GetProperty("outcome").GetString());
         Assert.Equal(1, paths.GetProperty("rescue").GetInt32());
+    }
+
+    [Fact]
+    public async Task F6_REPORT_06_McpBatchSummaryMode_ReportsPaths()
+    {
+        var dir = Project("F5-ARRAY-02", "F4-ITER-01");
+
+        var (_, payload) = await Mcp("calor_batch", new { action = "convert", projectPath = dir, dryRun = true, summary = true });
+
+        Assert.Equal("Preservation paths: 1 by automatic rescue (parse-failure: 1; no passthrough request needed)",
+            payload.GetProperty("preservationPaths").GetString());
+        Assert.All(payload.GetProperty("failedFiles").EnumerateArray(), f =>
+            Assert.Equal("refused", f.GetProperty("conversionPaths").GetProperty("outcome").GetString()));
+    }
+
+    [Fact]
+    public void F6_REPORT_04_CliMigrateReports_MarkdownAndJsonCarryPaths()
+    {
+        var dir = Project("F5-ARRAY-02");
+        var md = Path.Combine(_tempDir, $"r{Guid.NewGuid():N}.md");
+        var json = Path.Combine(_tempDir, $"r{Guid.NewGuid():N}.json");
+
+        Assert.Equal(0, CliTestHarness.RunCli(dir, "migrate", dir, "--skip-verify", "--skip-analyze", "--report", md).ExitCode);
+        Assert.Contains("Preservation paths: 1 by automatic rescue (parse-failure: 1", File.ReadAllText(md));
+
+        Assert.Equal(0, CliTestHarness.RunCli(dir, "migrate", dir, "--skip-verify", "--skip-analyze", "--report", json).ExitCode);
+        var file = JsonDocument.Parse(File.ReadAllText(json)).RootElement.GetProperty("data").GetProperty("fileResults")[0];
+        Assert.Equal("preserved", file.GetProperty("conversionPaths").GetProperty("outcome").GetString());
+        var loss = file.GetProperty("losses")[0];
+        Assert.Equal("rescue", loss.GetProperty("path").GetString());
+        Assert.Equal("parse-failure", loss.GetProperty("trigger").GetString());
     }
 
     [Fact]

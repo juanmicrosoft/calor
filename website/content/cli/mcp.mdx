@@ -64,9 +64,9 @@ same vocabulary as [`calor convert`](/docs/cli/convert/#which-path-preserved-eac
 
 | Tool | Where the paths appear |
 |:-----|:-----------------------|
-| `calor_convert` | `lossSummary.locations[]` (`path`, `trigger`, `enabledBy`) and `lossSummary.paths` |
+| `calor_convert` (`convert`, `validate`, `roundtrip` modes) | `lossSummary.locations[]` (`path`, `trigger`, `enabledBy`) and `lossSummary.paths` |
 | `calor_migrate` | `perFile[].losses[]` and `perFile[].conversionPaths` |
-| `calor_batch` (`action: "convert"`) | `files[].conversionPaths` |
+| `calor_batch` (`action: "convert"`) | `files[].conversionPaths`; with `summary: true`, `failedFiles[].conversionPaths` and a `preservationPaths` line |
 
 The defaults differ from the command line, on purpose:
 
@@ -76,10 +76,11 @@ The defaults differ from the command line, on purpose:
   `rescueUnusableMembers: false`. Pass `passthroughOnError: true` to have those
   members kept as `§CSHARP`. The report then says `passthrough`, because you
   asked for it. Members whose Calor does not parse are rescued on every surface.
-- **`calor_migrate` and `calor_batch` never rescue round-trip failures**, even
-  with `passthroughOnError: true`, because project migration checks the round
-  trip once for the whole project. Such a file fails, and in lossless mode the
-  whole project is refused.
+- **`calor_migrate` and `calor_batch` never rescue round-trip failures**,
+  because project migration checks the round trip once for the whole project.
+  `calor_migrate` has no passthrough option, and `calor_batch` does not rescue
+  them even with `passthroughOnError: true`. Such a file fails, and in lossless
+  mode the whole project is refused.
 
 For example, converting a class whose iterator property cannot be expressed in
 Calor:
