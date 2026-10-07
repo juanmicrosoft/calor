@@ -113,22 +113,22 @@
     },
     {
       "ledger": "effect-resolver-key-ledger.json",
-      "measuredCommit": "31b21e951568348ecc19967cf5ede67ccd49c8b7",
+      "measuredCommit": "50e7fc94ae20ea64c0fea543b15c8f76b0e6dd2d",
       "basis": "post-merge-write-back",
-      "note": "#1132 (0.25 F5): regenerated on 31b21e95 (the F5 branch head, clean src). String-origin keys 826->825 (tests 137->136): a member access on an array element, or on a local bound from an in-module call that returns an array, now resolves to the element's in-module class instead of asking the resolver with an unresolved receiver. Bound-origin 265, file counts, the 200 floor, scope and all notMeasured identities are unchanged. Pending until the PR lands; the previous identity b2c43561 remains in git history.",
+      "note": "#1132 (0.25 F5): regenerated on 50e7fc94 (the F5 branch head, clean src). String-origin keys 826->825 (tests 137->136): a member access on an array element, or on a local bound from an in-module call that returns an array, now resolves to the element's in-module class instead of asking the resolver with an unresolved receiver. Bound-origin 265, file counts, the 200 floor, scope and all notMeasured identities are unchanged. Pending until the PR lands; the previous identity b2c43561 remains in git history.",
       "durableIdentity": {
         "status": "pending",
         "phase1": {
-          "headCommit": "31b21e951568348ecc19967cf5ede67ccd49c8b7",
+          "headCommit": "50e7fc94ae20ea64c0fea543b15c8f76b0e6dd2d",
           "pr": 1521,
           "treeHashes": {
-            "src": "53525d46dd192180250b5dc72fdc413cc01e11c5"
+            "src": "48e2cf606ac36234bbe6233720841b7b7da99568"
           },
           "inputContentHashes": {
             ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
             "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
           },
-          "artifactSha256": "a082f4e3dc87f0cb92e7499b30caeeeee8db27c6105b3bed34d3842432d2b676"
+          "artifactSha256": "08e68107ef4f1722dfa45123286daa50aa2049c01adb78327fc8a99b9f9e200c"
         }
       }
     },
