@@ -19,9 +19,11 @@ All notable changes to this project will be documented in this file.
 - **Edge targets are kept as C# instead of miscompiled.** `FormattableString.Invariant($"text")`
   (a `FormattableString` target with no holes) and `Log($"a{x}" + $"b{y}")` (a concatenation
   passed to a handler) keep their enclosing statement or member as C# interop.
-- **Holes outside the native subset are marked as C#.** Holes made of names, literals, dotted
-  member access, operators, `nameof`, `typeof`, and calls with a dotted target and positional
-  arguments convert natively. Other holes, such as `{items[i]}`, `{x?.Name}` or
+- **Holes outside the native subset are marked as C#.** Holes made of names, string, character,
+  `bool` and `int` literals, `double` literals with a fractional part, dotted member access,
+  operators, `nameof`, `typeof`, and calls with a dotted target and positional arguments convert
+  natively. A digit-only hole such as `{1}` is written `${INT:1}`, because `${1}` reads back as
+  literal text. Other holes, such as `{items[i]}`, `{x?.Name}` or
   `{obj.GetType().Name}`, now keep their original C# text as `§CS{...}` inside the hole and are
   counted as interop. Before, the converter mixed C# and Calor syntax in such holes, which could
   produce C# that did not compile.
@@ -37,9 +39,10 @@ All notable changes to this project will be documented in this file.
 - **Diagnostics point at the hole.** An error inside a hole, such as an undefined name, is now
   reported at the hole's line and column instead of line 1, column 1.
 - **`string-interpolation` is now `Partial`** in `calor feature-check`, because handler targets
-  are not converted natively. The new `string-interpolation-to-string` and
-  `string-interpolation-formattable` entries are `Full`; `string-interpolation-handler` is
-  `NotSupported`.
+  are not converted natively. New entries: `string-interpolation-to-string` (`Full`),
+  `string-interpolation-formattable` and `string-interpolation-hole` (`Partial`), and
+  `string-interpolation-handler` and `string-interpolation-formattable-constant`
+  (`NotSupported`).
 
 These are checked by convert, compile and run tests that compare the converted program's output
 with the original C# on the CLI and MCP conversion settings, including `de-DE` and `fr-FR`

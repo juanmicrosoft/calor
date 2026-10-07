@@ -189,8 +189,9 @@ public static class FeatureSupport
         ["string-interpolation-formattable"] = new FeatureInfo
         {
             Name = "string-interpolation-formattable",
-            Support = SupportLevel.Full,
-            Description = "An interpolated string targeting FormattableString or IFormattable converts natively with an explicit cast to that type, so the same overload is selected"
+            Support = SupportLevel.Partial,
+            Description = "An interpolated string with at least one hole targeting FormattableString or IFormattable converts natively with an explicit cast to that type, so the same overload is selected. Hole-free targets are preserved (string-interpolation-formattable-constant), and holes outside the native subset keep their C# text (string-interpolation-hole)",
+            Workaround = "Review preserved hole-free FormattableString calls; they stay C# interop"
         },
         ["string-interpolation-handler"] = new FeatureInfo
         {
@@ -210,7 +211,7 @@ public static class FeatureSupport
         {
             Name = "string-interpolation-hole",
             Support = SupportLevel.Partial,
-            Description = "Holes made of names, literals, dotted member access, operators, nameof, typeof, and calls with a dotted target and positional arguments convert natively. Other holes (object creation, indexing, ?., ?:, lambdas, named or ref arguments, generic calls) keep their original C# text as §CS{...} inside the hole, with assumed effects",
+            Description = "Holes made of names, string/char/bool/int literals, doubles with a fractional part, dotted member access, operators, nameof, typeof, and calls with a dotted target and positional arguments convert natively. Other holes (object creation, indexing, ?., ?:, lambdas, named or ref arguments, generic calls) keep their original C# text as §CS{...} inside the hole, with assumed effects",
             Workaround = "Move the expression into a local before the interpolated string to convert it natively"
         },
         ["null-coalescing"] = new FeatureInfo

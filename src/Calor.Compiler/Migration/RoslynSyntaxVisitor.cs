@@ -13260,9 +13260,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // nameof(x) converts to a NameOfExpressionNode, a compile-time string.
         InvocationExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.Text: "nameof" } } nameOf =>
             nameOf.ArgumentList.Arguments.Count == 1,
-        LiteralExpressionSyntax literal => literal.Token.Kind() is SyntaxKind.NumericLiteralToken
-            or SyntaxKind.CharacterLiteralToken or SyntaxKind.TrueKeyword or SyntaxKind.FalseKeyword
-            or SyntaxKind.NullKeyword
+        // Numeric literals only as int or a double with a fractional part: the Calor emitter writes other numeric types as
+        // typed literals (DEC:1.5, LONG:1), which read as named arguments inside a C#-form call,
+        // and writes an integral double (2.0) as "2".
+        LiteralExpressionSyntax literal => literal.Token.Value is int
+            || literal.Token.Value is double number
+                && System.Text.RegularExpressions.Regex.IsMatch(
+                    number.ToString(System.Globalization.CultureInfo.InvariantCulture), @"^\d+\.\d+$")
+            || literal.Token.Kind() is SyntaxKind.CharacterLiteralToken or SyntaxKind.TrueKeyword
+                or SyntaxKind.FalseKeyword or SyntaxKind.NullKeyword
             || literal.Token.IsKind(SyntaxKind.StringLiteralToken) && !literal.Token.Text.StartsWith('@'),
         ParenthesizedExpressionSyntax parenthesized => IsNativeHoleOperand(parenthesized.Expression),
         BinaryExpressionSyntax binary => binary.Kind() is not (SyntaxKind.AsExpression or SyntaxKind.IsExpression

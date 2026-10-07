@@ -5131,8 +5131,28 @@ public sealed class Parser
             || string.IsNullOrWhiteSpace(text[Math.Clamp(parser.Current.Span.Start - span.Start, 0, text.Length)..]);
         // A string argument with its own ${...} holes stays raw: inside a raw C# call it was
         // always literal text, and lifting would reinterpret it as a nested interpolation.
-        return scratch.HasErrors || !consumed || expression is InterpolatedStringNode ? null : expression;
+        if (scratch.HasErrors || !consumed || expression is InterpolatedStringNode)
+            return null;
+        // A literal is lifted only when Calor and C# read the same value (escapes such as
+        // "\x41" differ; numeric suffixes differ in type).
+        if (syntax is LiteralExpressionSyntax literal && !SameLiteralValue(literal, expression))
+            return null;
+        if (syntax is PrefixUnaryExpressionSyntax unary
+            && unary.Operand is not (IdentifierNameSyntax or LiteralExpressionSyntax { Token.Value: int }))
+            return null;
+        return expression;
     }
+
+    private static bool SameLiteralValue(LiteralExpressionSyntax literal, ExpressionNode expression) =>
+        (literal.Token.Value, expression) switch
+        {
+            (string text, StringLiteralNode calor) => calor.Value == text && !calor.IsUtf8,
+            (char ch, CharOperationNode { Operation: CharOp.CharLiteral, Arguments: [StringLiteralNode one] }) =>
+                one.Value == ch.ToString(),
+            (int number, IntLiteralNode calor) => calor.Value == number && !calor.IsLong && !calor.IsUnsigned,
+            (bool flag, BoolLiteralNode calor) => calor.Value == flag,
+            _ => false
+        };
 
     private BoolLiteralNode ParseBoolLiteral()
     {

@@ -301,6 +301,14 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
             // Native subset: calls with operator and member-access arguments, prefix minus.
             ("int x = 3; string s = \"abc\"; return $\"{Pad(\"q\", x + 1)}|{Math.Max(-1, s.Length)}|{-x}|{!(x > 2)}|{nameof(s)}|{typeof(Holder).Name}|{Tag(nameof(x))}\";", false),
         };
+        shapes =
+        [
+            .. shapes,
+            // Review round 2: a digit-only hole must not read back as {0}-style literal text.
+            ("int n = 2; FormattableString f = $\"{1}|{n}|{3,4}\"; string s = $\"{1}|{7:D3}\"; return f.Format + \":\" + f.ArgumentCount + \":\" + s;", false),
+            // Review round 2: typed literal arguments (decimal, long) and integral doubles stay C#.
+            ("return $\"{Num(1.5m)}|{Num(2.0)}|{Num(3L)}|{4.0}|{x2(2.0)}\";", true),
+        ];
         var data = new TheoryData<string, Surface, bool>();
         foreach (var surface in new[] { Surface.Cli, Surface.Mcp })
             foreach (var (body, preserved) in shapes)
@@ -330,6 +338,11 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
                 public static string Tag(string s) { return "<" + s + ">"; }
                 public static string Pad(string s, int width) { return s.PadLeft(width, '.'); }
                 public static T Same<T>(T value) { return value; }
+                public static string Num(decimal value) { return "decimal"; }
+                public static string Num(double value) { return "double"; }
+                public static string Num(long value) { return "long"; }
+                public static string Num(int value) { return "int"; }
+                public static double x2(double value) { return value / 4; }
                 public static string Run()
                 {
                     BODY
@@ -345,6 +358,21 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
         Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
         output.WriteLine(compilation.GeneratedCode);
         Assert.Equal(expected, Execute(compilation.GeneratedCode));
+    }
+
+    [Fact]
+    public void NativeHole_StringArgumentWithACSharpOnlyEscape_StaysRaw()
+    {
+        // Review round 2: Calor keeps "\x41" as four characters; C# reads "A". Not lifted.
+        const string calor = """
+            §M{m001:InterpEscape}
+              §F{f001:Show:pub} () -> str
+                §R "${String.Concat("\x41")}"
+            """;
+        var result = Program.Compile(calor, "f2-escape-arg.calr",
+            new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        Assert.Contains("String.Concat(\"\\x41\")", result.GeneratedCode);
     }
 
     [Fact]
