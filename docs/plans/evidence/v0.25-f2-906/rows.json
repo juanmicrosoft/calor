@@ -121,22 +121,36 @@
         0
       ]
     },
-    "binderAttempts": {
-      "FluentValidation/src/FluentValidation/ValidationException.cs": [
-        47,
-        48
-      ],
-      "FluentValidation/src/FluentValidation.Tests/MessageFormatterTests.cs": [
-        77,
-        76
-      ]
-    },
-    "bindingErrorIdentitiesChangedLocationOnly": 17,
     "bindingErrorCountsChanged": 0,
     "files": [
       "bench/phase0-agent-native/binder-incomplete-baseline.json",
       "bench/phase0-agent-native/binder-source-coverage.json"
     ],
-    "status": "measured on the branch; must be re-measured on the #1423 candidate for READY"
+    "status": "measured on the branch; must be re-measured on the #1423 candidate for READY",
+    "conversionVisits": {
+      "before": 35159,
+      "after": 35160
+    },
+    "opaqueBoundaries": {
+      "before": 129,
+      "after": 137,
+      "note": "holes outside the native subset are now explicit §CS{...} hole interop; before, they were C#-syntax text that reparsed as raw C# but were not counted as opaque"
+    },
+    "opaqueExpressions": {
+      "before": 6944,
+      "after": 6994
+    },
+    "changedSourceRecords": 22,
+    "bindingErrorIdentityChanges": "location only; binding-error counts unchanged"
+  },
+  "reviewRound1Witnesses": {
+    "tests": "HoleAndTargetShapes_KeepTheirCSharpMeaning (10 cases), NativeHole_StringArgumentWithDollarBrace_StaysLiteral, BclHandlerTargets_ArePreservedAndMatch (2 cases)",
+    "shapes": [
+      "FormattableString.Invariant($\"hello\") (no holes): preserved",
+      "Log($\"a{x}\" + $\"b{x}\") handler chain: preserved",
+      "$\"{Tag(\"${x}\")}\" literal ${ in a hole argument: native, literal kept",
+      "indexing, ?., named and generic calls, ?:, nested FormattableString inside a hole: §CS hole interop",
+      "StringBuilder.Append($\"...\") and string.Create(provider, $\"...\"): preserved"
+    ]
   }
 }

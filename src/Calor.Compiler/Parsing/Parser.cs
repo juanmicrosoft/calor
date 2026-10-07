@@ -5114,7 +5114,8 @@ public sealed class Parser
     {
         // Only shapes whose Calor reading is the same as their C# reading: literals, names,
         // dotted names, and Calor prefix operators such as `(+ a b)` (which are not C#).
-        if (syntax is not (LiteralExpressionSyntax or IdentifierNameSyntax or ParenthesizedExpressionSyntax)
+        if (syntax is not (LiteralExpressionSyntax or IdentifierNameSyntax or ParenthesizedExpressionSyntax
+                or PrefixUnaryExpressionSyntax)
             && DottedName(syntax) == null)
         {
             return null;
@@ -5128,7 +5129,9 @@ public sealed class Parser
         var expression = parser.ParseExpression();
         var consumed = parser.Current.Kind == TokenKind.Eof
             || string.IsNullOrWhiteSpace(text[Math.Clamp(parser.Current.Span.Start - span.Start, 0, text.Length)..]);
-        return scratch.HasErrors || !consumed ? null : expression;
+        // A string argument with its own ${...} holes stays raw: inside a raw C# call it was
+        // always literal text, and lifting would reinterpret it as a nested interpolation.
+        return scratch.HasErrors || !consumed || expression is InterpolatedStringNode ? null : expression;
     }
 
     private BoolLiteralNode ParseBoolLiteral()

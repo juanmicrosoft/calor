@@ -255,6 +255,112 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
         Assert.DoesNotContain("\"a${x}b\"", calor);
     }
 
+    [Theory]
+    [InlineData(Surface.Cli)]
+    [InlineData(Surface.Mcp)]
+    public async Task BclHandlerTargets_ArePreservedAndMatch(Surface surface)
+    {
+        // StringBuilder.Append and string.Create(IFormatProvider, ...) select BCL handler
+        // overloads. They are handlers too, so they are kept as C#, not flattened to a string.
+        var source = Usings + """
+            public static class Probe
+            {
+                public static string Run()
+                {
+                    double d = 1234.5;
+                    var sb = new StringBuilder();
+                    sb.Append($"a={d:N1};");
+                    string inv = string.Create(CultureInfo.InvariantCulture, $"{d:N1}");
+                    return sb.ToString() + "|" + inv;
+                }
+            }
+            """;
+        var expected = Execute(source);
+        var (calor, preserved) = await Convert(source, surface);
+        Assert.True(preserved, calor);
+        Assert.DoesNotContain("\"a=${d:N1};\"", calor);
+        var compilation = Program.Compile(calor, "f2-bcl-handlers.calr",
+            new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
+        Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
+        Assert.Equal(expected, Execute(compilation.GeneratedCode));
+    }
+
+    // Review round 1 witnesses: shapes that must keep their C# meaning even when not native.
+    public static TheoryData<string, Surface, bool> HoleShapes()
+    {
+        var shapes = new (string Body, bool Preserved)[]
+        {
+            // No holes: FormattableString.Invariant("hello") would not compile.
+            ("return FormattableString.Invariant($\"hello\") + \"|\" + Kind($\"{{x}}\");", true),
+            // A concatenation of interpolated strings converts to the handler as one operand.
+            ("int x = 1; return Log($\"a{x}\" + $\"b{x}\");", true),
+            // A literal ${ inside a hole argument stays literal.
+            ("int x = 1; return $\"{Tag(\"${x}\")}|{Tag(\"q\")}\";", false),
+            // Nested FormattableString target and holes outside the native subset.
+            ("int x = 2; int[] a = { 5, 6 }; Holder h = null; return $\"{Kind($\"{x}\")}|{a[x - 1]}|{h?.Name}|{Pad(width: x, s: \"z\")}|{Same<int>(x + 1)}|{(x > 1 ? \"big\" : \"small\")}\";", true),
+            // Native subset: calls with operator and member-access arguments, prefix minus.
+            ("int x = 3; string s = \"abc\"; return $\"{Pad(\"q\", x + 1)}|{Math.Max(-1, s.Length)}|{-x}|{!(x > 2)}|{nameof(s)}|{typeof(Holder).Name}|{Tag(nameof(x))}\";", false),
+        };
+        var data = new TheoryData<string, Surface, bool>();
+        foreach (var surface in new[] { Surface.Cli, Surface.Mcp })
+            foreach (var (body, preserved) in shapes)
+                data.Add(body, surface, preserved);
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(HoleShapes))]
+    public async Task HoleAndTargetShapes_KeepTheirCSharpMeaning(string body, Surface surface, bool preserved)
+    {
+        // The handler type is itself kept as C# interop, so it is only declared when used.
+        var usesHandler = body.Contains("Log(", StringComparison.Ordinal);
+        var handler = usesHandler ? Row03[..Row03.IndexOf("public static class Probe", StringComparison.Ordinal)] : "";
+        var logs = usesHandler
+            ? "public static string Log(RecordingHandler handler) { return \"handler:\" + handler.Result(); }\n"
+              + "public static string Log(object o) { return \"object:\" + o; }\n"
+            : "";
+        var source = Usings + handler
+            + """
+            public sealed class Holder { public string Name = "n"; }
+            public static class Probe
+            {
+                LOGS
+                public static string Kind(FormattableString f) { return "fs:" + f.Format + ":" + f.ArgumentCount; }
+                public static string Kind(object o) { return "object:" + o; }
+                public static string Tag(string s) { return "<" + s + ">"; }
+                public static string Pad(string s, int width) { return s.PadLeft(width, '.'); }
+                public static T Same<T>(T value) { return value; }
+                public static string Run()
+                {
+                    BODY
+                }
+            }
+            """.Replace("BODY", body).Replace("LOGS", logs);
+        var expected = Execute(source);
+        var (calor, wasPreserved) = await Convert(source, surface);
+        output.WriteLine(calor);
+        Assert.Equal(preserved, wasPreserved);
+        var compilation = Program.Compile(calor, "f2-hole-shapes.calr",
+            new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
+        Assert.False(compilation.HasErrors, string.Join(Environment.NewLine, compilation.Diagnostics.Errors));
+        output.WriteLine(compilation.GeneratedCode);
+        Assert.Equal(expected, Execute(compilation.GeneratedCode));
+    }
+
+    [Fact]
+    public void NativeHole_StringArgumentWithDollarBrace_StaysLiteral()
+    {
+        const string calor = """
+            §M{m001:InterpLiteralArg}
+              §F{f001:Show:pub} (i32:x) -> str
+                §R "${String.Concat("${x}")}"
+            """;
+        var result = Program.Compile(calor, "f2-literal-arg.calr",
+            new CompilationOptions { EnforceEffects = false, StatusWriter = TextWriter.Null });
+        Assert.False(result.HasErrors, string.Join(Environment.NewLine, result.Diagnostics.Errors));
+        Assert.Contains("String.Concat(\"${x}\")", result.GeneratedCode);
+    }
+
     [Fact]
     public void HandlerTarget_WithoutGracefulFallback_IsRefusedAtConversion()
     {

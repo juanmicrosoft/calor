@@ -177,7 +177,7 @@ public static class FeatureSupport
         {
             Name = "string-interpolation",
             Support = SupportLevel.Partial,
-            Description = "Interpolated strings assigned, returned or passed as string or object convert natively, keeping format specifiers, alignment, culture and hole order. FormattableString and IFormattable targets convert natively with an explicit cast that keeps the selected overload. Custom [InterpolatedStringHandler] targets are preserved as C# interop",
+            Description = "Interpolated strings assigned, returned or passed as string or object convert natively, keeping format specifiers, alignment, culture and hole order. FormattableString and IFormattable targets with at least one hole convert natively with an explicit cast that keeps the selected overload. [InterpolatedStringHandler] targets (custom and .NET handler overloads such as StringBuilder.Append) and hole-free FormattableString targets keep their statement as C# interop; holes outside the native subset keep their C# text",
             Workaround = "Keep handler-based calls (logging, assertion and builder APIs) as C# interop, or pass a formatted string to a string overload"
         },
         ["string-interpolation-to-string"] = new FeatureInfo
@@ -196,8 +196,22 @@ public static class FeatureSupport
         {
             Name = "string-interpolation-handler",
             Support = SupportLevel.NotSupported,
-            Description = "An interpolated string passed to a custom [InterpolatedStringHandler] parameter cannot be represented in Calor; the enclosing statement or member is preserved as C# interop, or the conversion fails when preservation is off",
+            Description = "An interpolated string (or a + chain of them) passed to an [InterpolatedStringHandler] parameter cannot be represented in Calor; the enclosing statement or member is preserved as C# interop, or the conversion fails when preservation is off",
             Workaround = "Keep the call as C# interop, or call a string overload with an already formatted string"
+        },
+        ["string-interpolation-formattable-constant"] = new FeatureInfo
+        {
+            Name = "string-interpolation-formattable-constant",
+            Support = SupportLevel.NotSupported,
+            Description = "An interpolated string with no holes targeting FormattableString or IFormattable (for example FormattableString.Invariant($\"text\")) has no Calor form; the enclosing statement or member is preserved as C# interop",
+            Workaround = "Keep the call as C# interop, or pass a plain string"
+        },
+        ["string-interpolation-hole"] = new FeatureInfo
+        {
+            Name = "string-interpolation-hole",
+            Support = SupportLevel.Partial,
+            Description = "Holes made of names, literals, dotted member access, operators, nameof, typeof, and calls with a dotted target and positional arguments convert natively. Other holes (object creation, indexing, ?., ?:, lambdas, named or ref arguments, generic calls) keep their original C# text as §CS{...} inside the hole, with assumed effects",
+            Workaround = "Move the expression into a local before the interpolated string to convert it natively"
         },
         ["null-coalescing"] = new FeatureInfo
         {

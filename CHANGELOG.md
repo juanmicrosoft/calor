@@ -16,6 +16,15 @@ All notable changes to this project will be documented in this file.
   `Log($"a{x}b")`, where `Log` takes an `[InterpolatedStringHandler]` type, keeps its enclosing
   statement or member as C# interop on every surface. Before, MCP `calor_convert` produced a
   Calor string argument that the compiler then rejected (`Calor0208`).
+- **Edge targets are kept as C# instead of miscompiled.** `FormattableString.Invariant($"text")`
+  (a `FormattableString` target with no holes) and `Log($"a{x}" + $"b{y}")` (a concatenation
+  passed to a handler) keep their enclosing statement or member as C# interop.
+- **Holes outside the native subset are marked as C#.** Holes made of names, literals, dotted
+  member access, operators, `nameof`, `typeof`, and calls with a dotted target and positional
+  arguments convert natively. Other holes, such as `{items[i]}`, `{x?.Name}` or
+  `{obj.GetType().Name}`, now keep their original C# text as `§CS{...}` inside the hole and are
+  counted as interop. Before, the converter mixed C# and Calor syntax in such holes, which could
+  produce C# that did not compile.
 - **Hole evaluation order is kept.** A hole containing a string literal, such as
   `$"q={Tag("t")}"`, is no longer moved into a temporary ahead of the statement. That move ran
   `Tag` before earlier arguments and even when an enclosing `?:` skipped the string.

@@ -13130,12 +13130,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// </summary>
     private ExpressionNode ConvertTargetTypedInterpolatedString(InterpolatedStringExpressionSyntax interpolated)
     {
-        var target = InterpolationTargetType(interpolated);
+        // `$"a{x}" + $"b{y}"` converts to a handler as ONE operand: check the whole chain.
+        var root = InterpolationConversionRoot(interpolated);
+        var target = InterpolationTargetType(root);
         if (target is { } handler && IsInterpolatedStringHandler(handler))
-            throw EscalateExpression(interpolated, "string-interpolation-handler");
+            throw EscalateExpression(root, "string-interpolation-handler");
+
+        var isFormattable = target is { } candidate && IsFormattableTarget(candidate);
+        // A FormattableString target with no holes cannot be written natively: the Calor string
+        // has no holes, so the generated C# is a plain "..." literal, which does not convert.
+        if (isFormattable && !interpolated.Contents.OfType<InterpolationSyntax>().Any())
+            throw EscalateExpression(interpolated, "string-interpolation-formattable-constant");
 
         var converted = ConvertInterpolatedString(interpolated);
-        if (target is not { } formattable || !IsFormattableTarget(formattable))
+        if (!isFormattable || target is not { } formattable)
             _context.RecordFeatureUsage("string-interpolation-to-string");
         else
         {
@@ -13147,7 +13155,28 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return converted;
     }
 
-    private ITypeSymbol? InterpolationTargetType(InterpolatedStringExpressionSyntax interpolated)
+    private static ExpressionSyntax InterpolationConversionRoot(ExpressionSyntax expression)
+    {
+        while (expression.Parent is ParenthesizedExpressionSyntax or BinaryExpressionSyntax
+               {
+                   RawKind: (int)SyntaxKind.AddExpression
+               } && IsInterpolationChain((ExpressionSyntax)expression.Parent))
+        {
+            expression = (ExpressionSyntax)expression.Parent;
+        }
+        return expression;
+    }
+
+    private static bool IsInterpolationChain(ExpressionSyntax expression) => expression switch
+    {
+        InterpolatedStringExpressionSyntax => true,
+        ParenthesizedExpressionSyntax parenthesized => IsInterpolationChain(parenthesized.Expression),
+        BinaryExpressionSyntax { RawKind: (int)SyntaxKind.AddExpression } add =>
+            IsInterpolationChain(add.Left) && IsInterpolationChain(add.Right),
+        _ => false
+    };
+
+    private ITypeSymbol? InterpolationTargetType(ExpressionSyntax interpolated)
     {
         if (_semanticModel == null || interpolated.SyntaxTree != _semanticModel.SyntaxTree)
             return null;
@@ -13186,7 +13215,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     // string literal into a temporary (the pre-0.25 workaround for nested quotes,
                     // which the lexer now scans) evaluated it before every earlier operand of the
                     // enclosing statement and outside any enclosing conditional.
-                    var interpExpr = ConvertExpression(interp.Expression);
+                    // A hole outside the native subset is kept as its original C# text (§CS{...}),
+                    // reported as interop, rather than mixing C# and Calor syntax in one hole.
+                    var interpExpr = IsNativeHole(interp.Expression)
+                        ? ConvertExpression(interp.Expression)
+                        : PreserveInterpolationHole(interp.Expression);
                     parts.Add(new InterpolatedStringExpressionNode(
                         GetTextSpan(interp),
                         interpExpr,
@@ -13197,6 +13230,77 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
 
         return new InterpolatedStringNode(GetTextSpan(interpolated), parts);
+    }
+
+    /// <summary>
+    /// 0.25 F2 (#906): the hole shapes that convert to Calor and reparse with the same meaning.
+    /// The Calor emitter writes calls inside holes in C# call form (<c>Tag(x)</c>) and the parser
+    /// lifts them back to calls, so a call must have a dotted-name target and positional
+    /// arguments; operators are written in Calor prefix form, so their operands must not be calls.
+    /// </summary>
+    private static bool IsNativeHole(ExpressionSyntax expression) =>
+        IsNativeHoleOperand(expression)
+        || expression is InvocationExpressionSyntax call && IsNativeHoleCall(call);
+
+    private static bool IsNativeHoleCall(InvocationExpressionSyntax call) =>
+        IsDottedName(call.Expression)
+        && call.Expression.ToString() != "nameof"
+        && call.ArgumentList.Arguments.All(argument =>
+            argument.NameColon == null
+            && argument.RefKindKeyword.IsKind(SyntaxKind.None)
+            && (IsNativeHoleOperand(argument.Expression)
+                || argument.Expression is InvocationExpressionSyntax nested && IsNativeHoleCall(nested)));
+
+    private static bool IsNativeHoleOperand(ExpressionSyntax expression) => expression switch
+    {
+        IdentifierNameSyntax => true,
+        MemberAccessExpressionSyntax member => IsDottedName(member)
+            || member is { RawKind: (int)SyntaxKind.SimpleMemberAccessExpression, Expression: TypeOfExpressionSyntax },
+        TypeOfExpressionSyntax => true,
+        // nameof(x) converts to a NameOfExpressionNode, a compile-time string.
+        InvocationExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.Text: "nameof" } } nameOf =>
+            nameOf.ArgumentList.Arguments.Count == 1,
+        LiteralExpressionSyntax literal => literal.Token.Kind() is SyntaxKind.NumericLiteralToken
+            or SyntaxKind.CharacterLiteralToken or SyntaxKind.TrueKeyword or SyntaxKind.FalseKeyword
+            or SyntaxKind.NullKeyword
+            || literal.Token.IsKind(SyntaxKind.StringLiteralToken) && !literal.Token.Text.StartsWith('@'),
+        ParenthesizedExpressionSyntax parenthesized => IsNativeHoleOperand(parenthesized.Expression),
+        BinaryExpressionSyntax binary => binary.Kind() is not (SyntaxKind.AsExpression or SyntaxKind.IsExpression
+                or SyntaxKind.CoalesceExpression)
+            && IsNativeHoleOperand(binary.Left) && IsNativeHoleOperand(binary.Right),
+        PrefixUnaryExpressionSyntax unary => unary.Kind() is SyntaxKind.UnaryMinusExpression
+                or SyntaxKind.UnaryPlusExpression or SyntaxKind.LogicalNotExpression
+                or SyntaxKind.BitwiseNotExpression
+            && IsNativeHoleOperand(unary.Operand),
+        _ => false
+    };
+
+    private static bool IsDottedName(ExpressionSyntax expression) => expression switch
+    {
+        IdentifierNameSyntax => true,
+        MemberAccessExpressionSyntax
+        {
+            RawKind: (int)SyntaxKind.SimpleMemberAccessExpression,
+            Name: IdentifierNameSyntax
+        } member => IsDottedName(member.Expression),
+        _ => false
+    };
+
+    private ExpressionNode PreserveInterpolationHole(ExpressionSyntax expression)
+    {
+        var code = expression.WithoutTrivia().ToString();
+        var line = expression.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
+        if (code.Contains('\n') || code.Contains('\r')
+            || expression.DescendantTrivia().Any(trivia =>
+                trivia.IsKind(SyntaxKind.SingleLineCommentTrivia) || trivia.IsKind(SyntaxKind.MultiLineCommentTrivia)))
+        {
+            // Multi-line holes and holes with comments cannot sit inside a one-line Calor string.
+            throw EscalateExpression(expression, "string-interpolation-hole");
+        }
+
+        _context.RecordLoss(ConversionLossKind.InteropPreserved, "string-interpolation-hole",
+            $"Interpolation hole preserved as C#: {TruncateForMessage(code)}", line);
+        return new RawCSharpExpressionNode(GetTextSpan(expression), code);
     }
 
     private static string NormalizeInterpolatedText(string text, string startToken)

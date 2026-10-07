@@ -118,7 +118,16 @@ runs. `calor convert` keeps that choice:
 |:----------|:-----------|
 | `string`, `object`, or a return of either | Native Calor string with `${...}` holes. Format specifiers, alignment, culture and left-to-right hole order are kept. |
 | `FormattableString` or `IFormattable` | Native, wrapped in an explicit cast such as `(cast global::System.FormattableString "x=${x}")`. The cast keeps the overload C# selected, for example `Kind(FormattableString)` over `Kind(object)`. |
-| A custom `[InterpolatedStringHandler]` parameter (logging and assertion APIs) | Not representable. The enclosing statement or member is kept as C# interop (`§CSHARP`), so the call still builds its handler. With fallback disabled (`--no-fallback`) the conversion reports `string-interpolation-handler` instead. |
+| An `[InterpolatedStringHandler]` parameter: custom logging and assertion APIs, and .NET overloads such as `StringBuilder.Append($"...")` and `string.Create(provider, $"...")` | Not representable. The enclosing statement or member is kept as C# interop (`§CSHARP`), so the call still builds its handler. With fallback disabled (`--no-fallback`) the conversion reports `string-interpolation-handler` instead. |
+
+A `FormattableString` target with no holes, such as `FormattableString.Invariant($"text")`, has
+no Calor form either, so its statement is kept as C#.
+
+Holes convert natively when they are names, literals, dotted member access (`order.Total`),
+operators, `nameof`, `typeof`, or calls with a dotted target and positional arguments
+(`Math.Max(a, b)`). Any other hole, for example `{items[i]}`, `{customer?.Name}` or
+`{value.GetType().Name}`, keeps its original C# text as `§CS{...}` inside the hole. The conversion
+report counts it as interop, and its effects are assumed (`Calor0419`).
 
 For example, this C# selects `Kind(FormattableString)`, and so does the converted program:
 
