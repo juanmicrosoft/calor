@@ -422,10 +422,7 @@ public sealed class ConversionContext
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<
         Microsoft.CodeAnalysis.SyntaxTree, HashSet<string>> TreeNames = new();
 
-    /// <summary>
-    /// #1132: other files whose names generated names must also avoid (the rest of a
-    /// project conversion: a base-class field is in scope here too).
-    /// </summary>
+    /// <summary>#1132: other trees whose names generated names avoid (project files, the converted tree).</summary>
     public void ReserveNamesFrom(IEnumerable<Microsoft.CodeAnalysis.SyntaxTree> trees)
     {
         _reservedSources.AddRange(trees);
@@ -451,12 +448,8 @@ public sealed class ConversionContext
     }
 
     /// <summary>
-    /// #1132: true when <paramref name="name"/> is spelled anywhere in the original
-    /// source or a <see cref="ReserveNamesFrom"/> source: every identifier token of the
-    /// parsed tree (escapes decoded, interpolation holes included) plus every
-    /// identifier-shaped run of text (strings, comments). Generated names
-    /// (<see cref="GenerateId"/>, the emitter's hoisted temps) skip these, so a
-    /// generated local can never capture, shadow or rebind a user name.
+    /// #1132: true when <paramref name="name"/> is an identifier (escapes decoded) or identifier-shaped
+    /// text in the source or a reserved tree; generated names skip these.
     /// </summary>
     public bool IsReservedName(string name)
     {
