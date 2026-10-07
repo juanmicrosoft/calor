@@ -94,19 +94,28 @@ Corroborating runs on the same toolchain, in other directories and at other time
 package hashes: two earlier two-clone runs (commits `62b7bab4` and `296c618e`, same package
 sources) and a plain pack in the developer worktree (non-isolated `HOME` and NuGet cache).
 
-Toolchain: macOS arm64, .NET SDK 10.0.401, Node v26.10.0, npm 11.19.1.
+Toolchain: macOS arm64, .NET SDK 10.0.401 (Homebrew, source-built), Node v26.10.0, npm 11.19.1.
+
+The review-round-2 code (module-id normalization, stricter inventory) was proven again by the
+same two-clone run at `d6ba6909` (this PR merged into `main`, head `4600d900`) with Microsoft's
+SDK build: 0 differences, and identical to this PR's Linux CI build of that commit
+(`ci-comparison.md`, `cross-toolchain/`).
 
 ## What this does not prove
 
-- **Cross-toolchain identity.** Bytes are a function of the toolchain: the .NET SDK (Roslyn,
-  NuGet), Node, and the npm lockfile. The publish workflows use `ubuntu-latest`,
-  `dotnet-version: 10.0.x` (resolved to 10.0.401 in CI on 2026-10-07) and Node 20 (v20.20.2).
-  Hashes adjudicated on one toolchain match the gate's rebuild only if the gate's toolchain
-  produces the same bytes. Every hash set now records its toolchain, and `compare` prints any
-  toolchain difference. `ci-comparison.md` records whether this PR's Linux CI hashes equal the
-  macOS hashes above. Pinning the SDK for good needs `global.json` `rollForward: disable` (a
-  `setup-dotnet` pin alone loses to a newer preinstalled SDK under `latestMinor`); that changes
-  every developer's and CI job's SDK and is left to the maintainer.
+- **Every toolchain.** Bytes are a function of the toolchain. `ci-comparison.md` shows that, at
+  one commit, macOS arm64 with Microsoft's SDK 10.0.401 and Node 26 produces **the same bytes**
+  as this PR's Linux x64 CI (SDK 10.0.401, Node 20) for both packages, both metadata files and
+  all 253 website files. It also shows that Homebrew's source-built SDK, which reports the same
+  `10.0.401`, produces different package bytes (the proof above used it, so its package hashes
+  are Homebrew's). Adjudicated hashes must therefore come from the publish job's SDK build; every
+  hash set records its toolchain and `compare` prints toolchain differences. `setup-dotnet
+  10.0.x` and `global.json` `latestMinor` still float to new SDK patches; pinning needs
+  `rollForward: disable` (a `setup-dotnet` pin alone loses to a newer preinstalled SDK), which
+  changes every developer's and CI job's SDK and is left to the maintainer.
+- **Google Fonts.** The site downloads its four fonts at build time (`next/font/google`). Stable
+  across every run here, but a font update between adjudication and publication would change
+  the site. Self-hosting them would remove the network input; reported, not changed here.
 - Windows builds were not tested (the publish jobs do not pack on Windows).
 
 ## Guards

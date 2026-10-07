@@ -166,9 +166,13 @@ def hash_build(out: Path, toolchain: dict | None = None) -> dict:
 
 # ------------------------------------------------------------------------- compare
 
-def flatten(hashes: dict) -> dict[str, str]:
-    """Every compared value under a stable key. Zip timestamps count: they are bytes."""
+def flatten(hashes: dict, target: str = "all") -> dict[str, str]:
+    """Every compared value of the target under a stable key. Zip timestamps count: they are bytes."""
     flat: dict[str, str] = {}
+    if target == "website":
+        hashes = {"website": hashes.get("website")}
+    elif target == "packages":
+        hashes = {k: v for k, v in hashes.items() if k != "website"}
     for name, pkg in hashes.get("packages", {}).items():
         flat[f"nupkg/{name}"] = pkg["sha256"]
         for entry, info in pkg["entries"].items():
@@ -227,7 +231,7 @@ def toolchain_notes(a: dict, b: dict) -> list[str]:
 
 def compare(a: dict, b: dict, target: str = "all") -> list[str]:
     problems = inventory_problems(a, target, "A") + inventory_problems(b, target, "B")
-    fa, fb = flatten(a), flatten(b)
+    fa, fb = flatten(a, target), flatten(b, target)
     for key in sorted(set(fa) | set(fb)):
         if key not in fa:
             problems.append(f"only in B: {key}")
@@ -238,7 +242,7 @@ def compare(a: dict, b: dict, target: str = "all") -> list[str]:
     return problems
 
 
-def markdown(a: dict, b: dict, labels: tuple[str, str], problems: list[str]) -> str:
+def markdown(a: dict, b: dict, labels: tuple[str, str], problems: list[str], target: str = "all") -> str:
     lines = [
         f"| Published file | {labels[0]} SHA-256 | {labels[1]} SHA-256 | Same |",
         "|---|---|---|---|",
@@ -247,14 +251,15 @@ def markdown(a: dict, b: dict, labels: tuple[str, str], problems: list[str]) -> 
     def row(name: str, x: str | None, y: str | None) -> None:
         lines.append(f"| `{name}` | `{x or 'missing'}` | `{y or 'missing'}` | {'yes' if x and x == y else '**no**'} |")
 
-    for name in sorted(set(a["packages"]) | set(b["packages"])):
-        row(name, a["packages"].get(name, {}).get("sha256"), b["packages"].get(name, {}).get("sha256"))
-    for name in sorted(set(a["releaseMetadata"]) | set(b["releaseMetadata"])):
-        row(name, a["releaseMetadata"].get(name), b["releaseMetadata"].get(name))
-    if a.get("website") or b.get("website"):
+    if target != "website":
+        for name in sorted(set(a["packages"]) | set(b["packages"])):
+            row(name, a["packages"].get(name, {}).get("sha256"), b["packages"].get(name, {}).get("sha256"))
+        for name in sorted(set(a["releaseMetadata"]) | set(b["releaseMetadata"])):
+            row(name, a["releaseMetadata"].get(name), b["releaseMetadata"].get(name))
+    if target != "packages" and (a.get("website") or b.get("website")):
         sa, sb = a.get("website") or {}, b.get("website") or {}
         row(f"website tree ({sa.get('fileCount')} / {sb.get('fileCount')} files)", sa.get("treeSha256"), sb.get("treeSha256"))
-    entries = sum(len(p["entries"]) for p in a["packages"].values())
+    entries = 0 if target == "website" else sum(len(p["entries"]) for p in a["packages"].values())
     lines += [
         "",
         f"Package entries compared (content hash and zip timestamp): {entries}.",
@@ -318,7 +323,7 @@ def run_proof(args: argparse.Namespace) -> int:
         results[build["name"]] = hashes
     a, b = results["build-1"], results["build-2"]
     problems = compare(a, b, args.targets)
-    (evidence / "comparison.md").write_text(markdown(a, b, ("build-1", "build-2"), problems), encoding="utf-8")
+    (evidence / "comparison.md").write_text(markdown(a, b, ("build-1", "build-2"), problems, args.targets), encoding="utf-8")
     print(f"{len(problems)} differences; see {evidence / 'comparison.md'}")
     return 1 if problems else 0
 
@@ -361,7 +366,7 @@ def main() -> int:
         for note in toolchain_notes(a, b):
             print(f"note: {note}")
         if args.markdown:
-            Path(args.markdown).write_text(markdown(a, b, ("A", "B"), problems), encoding="utf-8")
+            Path(args.markdown).write_text(markdown(a, b, ("A", "B"), problems, args.targets), encoding="utf-8")
         for problem in problems[:200]:
             print(problem)
         print(f"{len(problems)} differences")

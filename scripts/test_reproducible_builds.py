@@ -282,6 +282,15 @@ class CompareToolTests(unittest.TestCase):
         for needle in ("Calor.Sdk.*.nupkg", "*.provenance.json", "no sitemap.xml"):
             self.assertTrue(any(needle in p for p in problems), (needle, problems))
 
+    def test_a_target_compares_only_its_own_surface(self) -> None:
+        both = self.hashes()
+        packages_only = {k: v for k, v in both.items() if k != "website"}
+        packages_only["website"] = None
+        site_only = {"packages": {}, "releaseMetadata": {}, "website": both["website"]}
+        self.assertEqual([], rb.compare(both, packages_only, "packages"))
+        self.assertEqual([], rb.compare(both, site_only, "website"))
+        self.assertTrue(rb.compare(both, packages_only, "all"))
+
     def test_toolchain_differences_are_reported_not_hidden(self) -> None:
         a = {"toolchain": {"dotnet": "10.0.401", "node": "v20.20.2"}}
         b = {"toolchain": {"dotnet": "10.0.402", "node": "v20.20.2"}}
