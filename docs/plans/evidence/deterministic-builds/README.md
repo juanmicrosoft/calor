@@ -101,6 +101,13 @@ same two-clone run at `d6ba6909` (this PR merged into `main`, head `4600d900`) w
 SDK build: 0 differences, and identical to this PR's Linux CI build of that commit
 (`ci-comparison.md`, `cross-toolchain/`).
 
+**Final code** (`5e86da0e`, after review round 3), same two-clone run with Microsoft's SDK
+10.0.401 (`dotnetSdkBuild` `sha256:52a28f74…` recorded in `proof-final/build-*.hashes.json`):
+0 differences. `Calor.Sdk.0.24.0.nupkg` `3e0123cbcf326d3b53604289678f5a464e6c04f727db250af3464dacf4e5eb02`
+and `calor.0.24.0.nupkg` `84d1c1ab6a1d206b274ee8ed8d42f020f44dd0935a7a7641a860648c85f16ad3`, the
+same bytes this PR's Linux CI produces; website tree `4161db37…3032` (per commit, through the
+build id).
+
 ## What this does not prove
 
 - **Every toolchain.** Bytes are a function of the toolchain. `ci-comparison.md` shows that, at
@@ -117,6 +124,9 @@ SDK build: 0 differences, and identical to this PR's Linux CI build of that comm
   across every run here, but a font update between adjudication and publication would change
   the site. Self-hosting them would remove the network input; reported, not changed here.
 - Windows builds were not tested (the publish jobs do not pack on Windows).
+- A checkout path containing `%XX`: the module-id plugin handles it (unit test), but a full
+  two-clone run under such a path could not be done — `dotnet restore` crashed (segmentation
+  fault) there, as MSBuild treats `%XX` as an escape.
 
 ## Guards
 
