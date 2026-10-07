@@ -1124,7 +1124,9 @@ public static class WebsiteExampleChecker
 
     private static bool IsCloser(string line, string marker)
     {
-        var trimmed = line.Trim();
+        // Only spaces and tabs may surround a closer: CommonMark treats any other
+        // whitespace (e.g. U+00A0) as content, so the fence stays open.
+        var trimmed = line.Trim(' ', '\t');
         return trimmed.Length >= marker.Length && trimmed.All(c => c == marker[0]);
     }
 

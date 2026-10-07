@@ -279,6 +279,15 @@ public sealed class WebsiteExampleCheckerTests
     }
 
     [Fact]
+    public void NonBreakingSpaceAfterAMarkerDoesNotCloseAFence()
+    {
+        // Verification pass: "```\u00A0" is content in CommonMark, so the next "```" closes the
+        // first fence and the following calor block is a real, checked program.
+        var page = "```text illustrative\n```\u00A0\n```\n" + Fence("calor", UndefinedVariable);
+        Assert.Contains(Check(page), f => f.Code == DiagnosticCode.DocDriftWebsiteExampleMismatch);
+    }
+
+    [Fact]
     public void TildeFenceWithBackticksInItsInfoStringIsChecked()
     {
         Assert.Contains(Check("~~~calor `title`\n" + UndefinedVariable + "\n~~~\n"),
