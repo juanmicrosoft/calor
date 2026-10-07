@@ -768,6 +768,16 @@ public static class FeatureSupport
             Workaround = "Move the iterator body into a method (§MT with §YIELD) and have the accessor return its result, or keep the member as a §CSHARP interop block"
         },
 
+        // #1139: Calor has no partial property or indexer. A native defining
+        // declaration would become a second, auto-implemented member (CS0102).
+        ["partial-property"] = new FeatureInfo
+        {
+            Name = "partial-property",
+            Support = SupportLevel.NotSupported,
+            Description = "Each declaration of a partial property or indexer (C# 13) is preserved verbatim as a §CSHARP interop block; Calor has no partial members",
+            Workaround = "Merge the defining and implementing declarations into one ordinary property before migration, or keep both as §CSHARP interop blocks"
+        },
+
         // Phase 4 features (C# 11-13)
         ["default-lambda-parameter"] = new FeatureInfo
         {

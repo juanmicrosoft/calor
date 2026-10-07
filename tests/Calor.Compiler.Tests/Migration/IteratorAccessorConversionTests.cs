@@ -126,6 +126,65 @@ public class IteratorAccessorConversionTests
         }
         """;
 
+    // C# 13 partial iterator property and indexer, split across two type parts. Calor has
+    // no partial members, so the defining declarations must be preserved with the
+    // implementing ones (Codex round 1, finding 1).
+    private const string PartialParts = """
+        using System.Collections.Generic;
+
+        public partial class Bag
+        {
+            public static int started = 0;
+            public partial IEnumerable<int> Items { get; }
+            public partial IEnumerable<int> this[int n] { get; }
+        }
+
+        public partial class Bag
+        {
+            public partial IEnumerable<int> Items
+            {
+                get
+                {
+                    started = started + 1;
+                    yield return 1;
+                    yield return 2;
+                }
+            }
+
+            public partial IEnumerable<int> this[int n]
+            {
+                get
+                {
+                    for (int i = 0; i < n; i++)
+                    {
+                        yield return i;
+                    }
+                }
+            }
+        }
+
+        public static class Probe
+        {
+            public static string Run()
+            {
+                var bag = new Bag();
+                var items = bag.Items;
+                int before = Bag.started;
+                int sum = 0;
+                foreach (var i in items)
+                {
+                    sum = sum + i;
+                }
+                int count = 0;
+                foreach (var j in bag[3])
+                {
+                    count = count + 1;
+                }
+                return before + "|" + Bag.started + "|" + sum + "|" + count;
+            }
+        }
+        """;
+
     public static TheoryData<string, string, Surface> Rows()
     {
         var data = new TheoryData<string, string, Surface>();
@@ -134,6 +193,7 @@ public class IteratorAccessorConversionTests
             data.Add("F4-ITER-01", "0|1|3|3", surface);
             data.Add("F4-ITER-02", "sf|7:late", surface);
             data.Add("interleaving", "ag0tc1g1c2f|d!i0c0i1c1", surface);
+            data.Add("partial", "0|1|3|3", surface);
         }
         return data;
     }
@@ -143,7 +203,14 @@ public class IteratorAccessorConversionTests
     public async Task IteratorAccessors_ArePreservedLegallyOnEverySurface(
         string row, string expected, Surface surface)
     {
-        var source = row == "interleaving" ? Interleaving : R0Fixture(row);
+        var source = row switch
+        {
+            "interleaving" => Interleaving,
+            "partial" => PartialParts,
+            _ => R0Fixture(row)
+        };
+        // Partial members: both the defining and the implementing declaration are kept.
+        var preserved = row == "partial" ? 4 : 2;
         Assert.Equal(expected, Run(source));
 
         var (calor, losses) = await ConvertAsync(source, surface);
@@ -152,9 +219,9 @@ public class IteratorAccessorConversionTests
         Assert.DoesNotMatch(@"§Y(IELD|BRK)", calor);
         // Honest report: both accessors are named as iterator-accessor preservations,
         // and nothing was rescued after the fact.
-        Assert.Equal(2, losses.Count(loss => loss == "iterator-accessor"));
+        Assert.Equal(preserved, losses.Count(loss => loss == "iterator-accessor"));
         Assert.DoesNotContain("post-validation-fallback", losses);
-        Assert.Equal(2, Regex.Matches(calor, @"§CSHARP\{").Count);
+        Assert.Equal(preserved, Regex.Matches(calor, @"§CSHARP\{").Count);
 
         // Default compile (effects enforced), then run: same observable behavior.
         var compilation = Program.Compile(calor, row + ".calr",
@@ -248,6 +315,23 @@ public class IteratorAccessorConversionTests
         Assert.Contains(result.Losses, loss => loss.Feature == "iterator-accessor"
             && loss.Kind == ConversionLossKind.InteropPreserved);
         var compilation = Program.Compile(result.CalorSource!, "shape.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
+    }
+
+    [Theory]
+    [InlineData("public partial class C { public partial int Q { get; } public partial int Q { get => 1; } }", "partial-property", 2)]
+    [InlineData("public class C { public IEnumerable<int> P { get { using var d = new System.IO.MemoryStream(); yield return 1; } } }", "iterator-accessor", 1)]
+    public void OverlappingShapes_AreLabelledAndCompileWithoutRescue(string types, string feature, int count)
+    {
+        // A non-iterator partial property is preserved as partial-property (both parts);
+        // an iterator getter that also has a using declaration is still labelled
+        // iterator-accessor (Codex round 1, finding 2). Neither needs the rescue.
+        var result = new CSharpToCalorConverter().Convert("using System.Collections.Generic;\n" + types + "\n");
+        Assert.True(result.Success, string.Join("\n", result.Issues));
+        Assert.Equal(count, result.Losses.Count(loss => loss.Feature == feature));
+        Assert.DoesNotContain(result.Losses, loss => loss.Feature == "post-validation-fallback");
+        var compilation = Program.Compile(result.CalorSource!, "overlap.calr",
             new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
     }

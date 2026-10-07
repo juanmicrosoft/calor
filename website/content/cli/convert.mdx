@@ -169,10 +169,20 @@ the timing is the same:
         §YIELD i
 ```
 
-**Limits.** Every yielding accessor is preserved, never converted to native
-Calor. Only the yields of the accessor itself count: a member whose yields sit in
-a nested local function is preserved for the local function instead. Iterators in
-ordinary methods still convert natively to `§YIELD`.
+Calor has no partial members either. Every declaration of a C# 13 `partial`
+property or indexer is kept as `§CSHARP`, so the defining declaration (`{ get; }`)
+does not turn into a second, auto-implemented property. It is reported as
+`partial-property`, or as `iterator-accessor` when any part in the same file yields.
+
+**Limits.**
+
+- Every yielding accessor is preserved; none is converted to native Calor.
+- Only the yields of the accessor itself count. A member whose yields sit in a
+  nested local function is preserved for the local function instead.
+- When a larger declaration is already preserved for another reason, the loss
+  names that reason. An interface whose iterator getter has a default body is kept
+  whole as `interface-property-semantics`, and a record as `record`.
+- Iterators in ordinary methods still convert natively to `§YIELD`.
 
 ### What Changed in 0.17
 

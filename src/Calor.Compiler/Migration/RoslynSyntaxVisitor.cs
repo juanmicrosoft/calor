@@ -2282,6 +2282,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                             InteropMemberKind.Method);
                     }
                     return ConvertMethodSignature(methodSyntax);
+                case BasePropertyDeclarationSyntax accessorMember
+                    when GetAccessorInteropFeature(accessorMember) is { } accessorFeature:
+                    return CreateInteropBlock(
+                        member,
+                        accessorFeature,
+                        InteropMemberKind.Property);
                 case PropertyDeclarationSyntax propertySyntax:
                 {
                     if (!IsRepresentableInterfaceProperty(propertySyntax))
@@ -3214,6 +3220,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         List<OperatorOverloadNode> operatorOverloads,
         List<IndexerNode>? indexers = null)
     {
+        if (member is BasePropertyDeclarationSyntax accessorMember)
+            RefuseIteratorAccessor(accessorMember);
         if (!member.DescendantNodes()
                 .OfType<LocalFunctionStatementSyntax>()
                 .Any())
@@ -5810,24 +5818,62 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// deferred execution, <c>finally</c>-on-Dispose and exception timing exactly.
     /// This happens in the converter, on every surface, independent of rescue.
     /// Yields inside nested local functions belong to those functions, not to the
-    /// accessor (lambdas cannot yield in C#).
+    /// accessor (lambdas cannot yield in C#). Calor also has no partial property or
+    /// indexer, so every <c>partial</c> declaration is preserved too: a native
+    /// defining declaration would become a second, auto-implemented member. It is
+    /// labelled <c>iterator-accessor</c> when any part in this file yields.
     /// </summary>
     private void RefuseIteratorAccessor(BasePropertyDeclarationSyntax node)
     {
-        var yieldStatement = node.AccessorList?.Accessors
+        var feature = GetAccessorInteropFeature(node);
+        if (feature != null)
+            throw EscalateExpression(node, feature, preserveMember: true);
+    }
+
+    private static string? GetAccessorInteropFeature(BasePropertyDeclarationSyntax node)
+    {
+        if (IsIteratorAccessor(node))
+            return "iterator-accessor";
+        if (!node.Modifiers.Any(SyntaxKind.PartialKeyword))
+            return null;
+        var key = PartialMemberKey(node);
+        var partners = node.SyntaxTree.GetRoot().DescendantNodes()
+            .OfType<BasePropertyDeclarationSyntax>()
+            .Where(other => other.Modifiers.Any(SyntaxKind.PartialKeyword)
+                && PartialMemberKey(other) == key);
+        return partners.Any(IsIteratorAccessor) ? "iterator-accessor" : "partial-property";
+    }
+
+    private static bool IsIteratorAccessor(BasePropertyDeclarationSyntax node)
+        => node.AccessorList?.Accessors
             .Where(accessor => accessor.Body != null)
             .SelectMany(accessor => accessor.Body!.DescendantNodes(
                 descendant => descendant is not LocalFunctionStatementSyntax
                     and not AnonymousFunctionExpressionSyntax))
             .OfType<YieldStatementSyntax>()
-            .FirstOrDefault();
-        if (yieldStatement != null)
-            throw EscalateExpression(node, "iterator-accessor", preserveMember: true);
-    }
+            .Any() == true;
+
+    // Containing type chain plus member identity (indexers by parameter types).
+    private static string PartialMemberKey(BasePropertyDeclarationSyntax node)
+        => string.Join(".", node.Ancestors().Select(ancestor => ancestor switch
+            {
+                BaseNamespaceDeclarationSyntax ns => ns.Name.ToString(),
+                TypeDeclarationSyntax type => type.Identifier.Text + "`"
+                    + (type.TypeParameterList?.Parameters.Count ?? 0),
+                _ => null
+            }).Where(part => part != null).Reverse())
+            + "::" + (node switch
+            {
+                PropertyDeclarationSyntax property => property.Identifier.Text,
+                IndexerDeclarationSyntax indexer => "this["
+                    + string.Join(",", indexer.ParameterList.Parameters
+                        .Select(parameter => parameter.Type?.ToString())) + "]",
+                _ => node.Kind().ToString()
+            });
 
     private static string? GetRequiredCapabilityFeature(Exception exception)
         => exception is MemberInteropEscalationException escalation
-            && (escalation.FeatureName is "tuple-deconstruction" or "iterator-accessor"
+            && (escalation.FeatureName is "tuple-deconstruction" or "iterator-accessor" or "partial-property"
                 || SyntaxCapabilityClassifier.RequiredUnsupportedFeatures.Contains(
                     escalation.FeatureName))
                 ? escalation.FeatureName
