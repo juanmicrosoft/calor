@@ -27,9 +27,11 @@ between them: `cross-toolchain/macos-ms-sdk-two-clone-comparison.md`).
 
 All 97 package entries (bytes and zip timestamps) and all 253 website files: **0 differences**
 (`cross-toolchain/macos-vs-linux-{packages,website}.md`; full hash sets in
-`cross-toolchain/*.hashes.json`). The package hashes also match a macOS run at this branch's
-`1be1a95d` (`cross-toolchain/macos-ms-sdk-1be1a95d-packages.hashes.json`) and CI's run at
-`e66f27bc`: package bytes do not depend on the commit when `src/` is unchanged.
+`cross-toolchain/*.hashes.json`). The same two package hashes also come from a macOS two-clone
+run at this branch's `4600d900` (`cross-toolchain/macos-ms-sdk-4600d900-packages.hashes.json`)
+and from CI's run at `e66f27bc`: package bytes do not depend on the commit id itself, only on
+the package inputs (`src/`, root `README.md`, `docs/assets/calor-icon.png`, embedded resources
+under `bench/` and `tests/`, the props, the Z3 assets), which are the same at these commits.
 
 ## The same version number is not always the same toolchain
 
@@ -44,8 +46,12 @@ but differ from Microsoft's 10.0.401 build in:
   other toolchain inputs, not isolated further).
 
 So: **adjudicated hashes must be produced with the same SDK build as the publish job**
-(Microsoft's, as `setup-dotnet` installs), and each hash set's `toolchain` field shows which was
-used. Node did not matter here (v20 vs v26, identical site).
+(Microsoft's, as `setup-dotnet` installs). The version number cannot tell the two apart, so since
+review round 3 each hash set's `toolchain` also records `dotnetSdkBuild`, a sha256 over the SDK's
+`Microsoft.CodeAnalysis.CSharp.dll` and `NuGet.Packaging.dll` (on this Mac: Homebrew
+`sha256:930306df…`, Microsoft `sha256:52a28f74…`), and `compare` reports a difference in it. The
+hash sets recorded before that (everything in `proof/` and `cross-toolchain/`) carry only the
+version; their SDK build is stated here. Node did not matter here (v20 vs v26, identical site).
 
 ## Not covered
 

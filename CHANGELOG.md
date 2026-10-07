@@ -6,12 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- **The NuGet packages and the website now build byte-for-byte the same every time.** The
-  release gate rebuilds both at publication and compares SHA-256 hashes with the recorded ones,
-  so before this fix no release could pass it. Two builds of one commit, in fresh clones at
-  different paths, now give identical hashes for both packages, every package entry, the
-  release metadata, and every website file. The files each package contains are the same as
-  before; only timestamps and embedded paths change. Six causes were fixed:
+- **The NuGet packages and the website now build byte-for-byte the same from the same
+  commit.** The release gate rebuilds both at publication and compares SHA-256 hashes with the
+  recorded ones, so before this fix no release could pass it. Two builds of one commit, in
+  fresh clones at different paths, now give identical hashes for both packages, every package
+  entry, the release metadata, and every website file. One macOS and one Linux build also
+  matched. This holds when both builds use the same .NET SDK build: Homebrew's source-built SDK
+  10.0.401 gives different package bytes than Microsoft's 10.0.401. The site also still
+  downloads its fonts from Google Fonts at build time, so a font update there would change it.
+  The files each package contains are the same as before; only timestamps and embedded paths
+  change. Six causes were fixed:
   - Each `.nupkg` zip entry carried the time of packing. Packing now uses a fixed timestamp
     (NuGet's `DeterministicTimestamp`).
   - Release builds of the shipped projects embedded the absolute checkout path in DLLs and

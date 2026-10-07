@@ -282,8 +282,32 @@ def tool_versions(env: dict, cwd: Path | None = None) -> dict:
             return subprocess.check_output(cmd, env=env, cwd=cwd, text=True, stderr=subprocess.STDOUT).strip()
         except (OSError, subprocess.CalledProcessError) as error:
             return f"unavailable: {error}"
-    return {"os": f"{platform.system()} {platform.machine()}", "dotnet": out(["dotnet", "--version"]),
+    dotnet = out(["dotnet", "--version"])
+    return {"os": f"{platform.system()} {platform.machine()}", "dotnet": dotnet,
+            "dotnetSdkBuild": sdk_fingerprint(out(["dotnet", "--list-sdks"]), dotnet),
             "node": out(["node", "--version"]), "npm": out(["npm", "--version"])}
+
+
+# The version number does not identify the SDK build: Homebrew's source-built 10.0.401
+# and Microsoft's 10.0.401 produce different package bytes (ci-comparison.md). These
+# files carry that difference (the compiler and NuGet's packer).
+SDK_FINGERPRINT_FILES = ("Roslyn/bincore/Microsoft.CodeAnalysis.CSharp.dll", "NuGet.Packaging.dll")
+
+
+def sdk_fingerprint(list_sdks: str, version: str) -> str:
+    """sha256 over the SDK's compiler and NuGet packer assemblies, or why it is unknown."""
+    for line in list_sdks.splitlines():
+        parts = line.strip().split(" [", 1)
+        if len(parts) == 2 and parts[0] == version:
+            sdk = Path(parts[1].rstrip("]")) / version
+            digest = hashlib.sha256()
+            for rel in SDK_FINGERPRINT_FILES:
+                path = sdk / rel
+                if not path.is_file():
+                    return f"unknown: {path} missing"
+                digest.update(f"{rel}\0{sha256_file(path)}\n".encode())
+            return f"sha256:{digest.hexdigest()}"
+    return f"unknown: SDK {version} not listed"
 
 
 def run_proof(args: argparse.Namespace) -> int:

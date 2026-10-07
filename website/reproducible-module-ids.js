@@ -20,21 +20,33 @@ const fs = require('fs');
 
 const NAME = 'CalorPathIndependentModuleIds';
 
-// Decode every run of %XX escapes (URL-encoded loader queries), then fold JSON-escaped
-// and native Windows separators to '/'. Lossy on purpose: only a hash input.
-function canonical(text) {
-  const decoded = text.replace(/(?:%[0-9A-Fa-f]{2})+/g, run => {
+// Decode every run of %XX escapes once.
+function decodeRuns(text) {
+  return text.replace(/(?:%[0-9A-Fa-f]{2})+/g, run => {
     try {
       return decodeURIComponent(run);
     } catch {
       return run;
     }
   });
-  // JSON escapes first ("\\" separator, \" quote), then native backslashes.
-  return decoded.replace(/\\\\/g, '/').replace(/\\"/g, '"').replace(/\\/g, '/');
 }
 
-// The checkout root as given and as its realpath, in canonical form, longest first.
+// Fold JSON-escaped and native Windows separators to '/': JSON escapes first ("\\"
+// separator, \" quote), then native backslashes.
+function foldSeparators(text) {
+  return text.replace(/\\\\/g, '/').replace(/\\"/g, '"').replace(/\\/g, '/');
+}
+
+// Canonical identifier: URL-encoded loader queries decoded once, separators folded.
+// Lossy on purpose: only a hash input.
+function canonical(text) {
+  return foldSeparators(decodeRuns(text));
+}
+
+// The checkout root as given and as its realpath, longest first. Each root appears in
+// two forms: literal (how it reads inside a decoded loader query) and decoded once (how
+// a raw, unencoded resource path reads after canonical()). They differ only when the
+// path itself contains %XX sequences, e.g. /tmp/calor%20x.
 function rootForms(dir) {
   const roots = new Set([dir]);
   try {
@@ -42,10 +54,14 @@ function rootForms(dir) {
   } catch {
     // Keep the given path only.
   }
-  return [...roots]
-    .map(root => canonical(root).replace(/\/+$/, ''))
-    .filter(Boolean)
-    .sort((a, b) => b.length - a.length);
+  const forms = new Set();
+  for (const root of roots) {
+    for (const form of [foldSeparators(root), foldSeparators(decodeRuns(root))]) {
+      const trimmed = form.replace(/\/+$/, '');
+      if (trimmed) forms.add(trimmed);
+    }
+  }
+  return [...forms].sort((a, b) => b.length - a.length);
 }
 
 const PATH_CHAR = 'A-Za-z0-9._~\\-';

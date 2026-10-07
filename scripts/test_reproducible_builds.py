@@ -139,10 +139,15 @@ function ids(root, sep) {
 }
 process.stdout.write(JSON.stringify([ids('/tmp/check"out/calor', '/'),
   ids('/tmp/other/deeper/calor', '/'), ids('/app', '/'), ids('/website', '/'), ids('/src', '/'),
+  ids('/tmp/calor%20x', '/'), ids('/tmp/a%2Fb/calor', '/'),
   ids('C:\\work\\calor', '\\'), ids('D:\\a\\b c\\calor', '\\')]));
 """
-        a, b, app, website, src, win_a, win_b = run_node(script)
+        a, b, app, website, src, pct20, pct2f, win_a, win_b = run_node(script)
         self.assertEqual(a, b)
+        # Literal %XX sequences in the checkout path (raw resource paths are decoded once,
+        # loader queries hold the literal text).
+        self.assertEqual(a, pct20)
+        self.assertEqual(a, pct2f)
         # Roots that also occur inside repository-relative paths (src/app, /website/...).
         self.assertEqual(a, app)
         self.assertEqual(a, website)
@@ -295,6 +300,20 @@ class CompareToolTests(unittest.TestCase):
         a = {"toolchain": {"dotnet": "10.0.401", "node": "v20.20.2"}}
         b = {"toolchain": {"dotnet": "10.0.402", "node": "v20.20.2"}}
         self.assertEqual(["toolchain differs: dotnet: 10.0.401 != 10.0.402"], rb.toolchain_notes(a, b))
+
+    def test_sdk_build_fingerprint_tells_same_version_builds_apart(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            prints = []
+            for build in ("microsoft", "source-built"):
+                sdk = Path(tmp) / build / "sdk" / "10.0.401"
+                for rel in rb.SDK_FINGERPRINT_FILES:
+                    (sdk / rel).parent.mkdir(parents=True, exist_ok=True)
+                    (sdk / rel).write_bytes(build.encode() + rel.encode())
+                listing = f"9.0.100 [{Path(tmp) / 'other'}]\n10.0.401 [{Path(tmp) / build / 'sdk'}]\n"
+                prints.append(rb.sdk_fingerprint(listing, "10.0.401"))
+            self.assertTrue(all(p.startswith("sha256:") for p in prints), prints)
+            self.assertNotEqual(prints[0], prints[1])
+            self.assertTrue(rb.sdk_fingerprint("", "10.0.401").startswith("unknown:"))
 
     def test_tree_digest_is_the_release_gate_digest(self) -> None:
         import verify_release_adjudication as gate
