@@ -50,6 +50,29 @@ public sealed class EffectResolver
         _initialized = true;
     }
 
+    // #1132: System.Array's instance members, for an array receiver. GetValue and SetValue
+    // box through object; Clone, GetEnumerator and ToString allocate. Initialize is absent
+    // on purpose: it runs element constructors, so it stays unknown.
+    private static readonly Dictionary<(EffectMemberKind, string), string[]> ArrayInstanceMembers = new()
+    {
+        [(EffectMemberKind.Method, "GetLength")] = [],
+        [(EffectMemberKind.Method, "GetLongLength")] = [],
+        [(EffectMemberKind.Method, "GetLowerBound")] = [],
+        [(EffectMemberKind.Method, "GetUpperBound")] = [],
+        [(EffectMemberKind.Method, "GetHashCode")] = [],
+        [(EffectMemberKind.Method, "GetType")] = [],
+        [(EffectMemberKind.Method, "Equals")] = [],
+        [(EffectMemberKind.Method, "GetValue")] = ["alloc"],
+        [(EffectMemberKind.Method, "SetValue")] = ["mut", "alloc"],
+        [(EffectMemberKind.Method, "CopyTo")] = ["mut"],
+        [(EffectMemberKind.Method, "Clone")] = ["alloc"],
+        [(EffectMemberKind.Method, "GetEnumerator")] = ["alloc"],
+        [(EffectMemberKind.Method, "ToString")] = ["alloc"],
+        [(EffectMemberKind.Getter, "Length")] = [],
+        [(EffectMemberKind.Getter, "LongLength")] = [],
+        [(EffectMemberKind.Getter, "Rank")] = [],
+    };
+
     /// <summary>
     /// v0.15 E1 slice 2c — THE resolution entry point. One method, one
     /// argument, and that argument is a symbol identity
@@ -80,11 +103,14 @@ public sealed class EffectResolver
         else
             _keysFromBoundReceiver++;
 
-        // #1132: Array.Initialize runs each element's parameterless value-type
-        // constructor, which can do anything; System.Array's pure default must not
-        // answer for it.
-        if (key.DeclaringType == "System.Array" && key.MemberName == "Initialize")
-            return new EffectResolution(EffectResolutionStatus.Unknown, EffectSet.Unknown, "unknown");
+        // #1132: an array receiver ("i32[,]", "Cell[]"). Only System.Array's own instance
+        // members answer here; anything else (an extension such as LINQ or a user's
+        // `this int[]` method, Initialize which runs element constructors) stays
+        // unknown so extension resolution and unknown-call charging still apply.
+        if (key.Kind is EffectMemberKind.Method or EffectMemberKind.Getter
+            && System.Text.RegularExpressions.Regex.IsMatch(key.DeclaringType, @"^([^\[\]]+(\[,*\])+|\[[^\[\]]+\])$")
+            && ArrayInstanceMembers.TryGetValue((key.Kind, key.MemberName), out var arrayEffects))
+            return new EffectResolution(EffectResolutionStatus.Resolved, EffectSet.From(arrayEffects), "System.Array");
 
         // Extension resolution is deliberately UNCACHED, as it was before this
         // slice. Its answer depends on ReceiverInterfaces, which is outside key
@@ -934,17 +960,10 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
     /// user manifest declaring <c>"type": "global::Foo"</c> otherwise became
     /// unreachable the moment lookups started normalizing).
     /// </summary>
-    internal static string NormalizeDeclaringType(string declaringType)
-    {
-        if (string.IsNullOrWhiteSpace(declaringType))
-            return string.Empty;
-        var normalized = declaringType.Trim().Replace("global::", "", StringComparison.Ordinal);
-        // #1132: an array receiver ("i32[,]", "Cell[]") declares its instance
-        // members on System.Array (`g.GetLength(0)`, `c.Rank`).
-        return System.Text.RegularExpressions.Regex.IsMatch(normalized, @"^[^\[\]]+(\[,*\])+$")
-            ? "System.Array"
-            : normalized;
-    }
+    internal static string NormalizeDeclaringType(string declaringType) =>
+        string.IsNullOrWhiteSpace(declaringType)
+            ? string.Empty
+            : declaringType.Trim().Replace("global::", "", StringComparison.Ordinal);
 
     private static IReadOnlyList<string> NormalizeParameters(IReadOnlyList<string> parameterTypes) =>
         parameterTypes.Count == 0
@@ -983,11 +1002,6 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
             return Binding.TypeIdentity.MapShortTypeNameToFullName(
                 WithArity(generic.Definition.QualifiedName, generic.TypeArguments.Length));
         }
-
-        // #1132: instance members of any array (`g.GetLength(0)`, `c.Rank`) are
-        // declared on System.Array; "i32[,]" named no manifest type (Calor0410).
-        if (type is Binding.BoundTypes.ArrayBoundType)
-            return "System.Array";
 
         return Binding.TypeIdentity.MapShortTypeNameToFullName(type.DisplayString);
     }

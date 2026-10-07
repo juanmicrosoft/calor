@@ -384,6 +384,125 @@ public class ArrayExpressionConversionTests
         }
         """;
 
+    // Codex round 3 reproductions that must stay native: an implicit conversion inside
+    // each element stays with its element (no hoisting), `g[n, n++]` reads its indices in
+    // order, a 1-D array of rectangular arrays, written sizes behind an empty level that
+    // are constant expressions, and an implicitly typed rectangular array.
+    private const string Round3 = """
+        using System;
+
+        public struct X
+        {
+            public int V;
+
+            public static implicit operator int(X x)
+            {
+                L.log = L.log + "c";
+                return x.V;
+            }
+        }
+
+        public static class L
+        {
+            public static string log = "";
+
+            public static X S(int v)
+            {
+                log = log + "s";
+                return new X { V = v };
+            }
+
+        }
+
+        public static class Probe
+        {
+            public static string Run()
+            {
+                int[] a = { L.S(1), L.S(2) };
+                L.log = L.log + "|";
+                int[,] g = { { 10, 20 }, { 30, 40 } };
+                int n = 0;
+                int picked = g[n, n++];
+                var mr = new int[][,] { new int[,] { { 1 } } };
+                var cs = new int[1, 1 + 1, 0] { { { }, { } } };
+                var imp = new[,] { { 1, 2 }, { 3, 4 } };
+                return a[0] + a[1] + "," + picked + "," + mr[0][0, 0] + cs.GetLength(1) + imp[1, 0] + "|" + L.log;
+            }
+        }
+        """;
+
+    // Codex round 3: an `in` argument whose address calls a method cannot run after a
+    // hoisted later argument, so the member is preserved; a method-group element keeps
+    // its target type.
+    private const string Round3Preserved = """
+        using System;
+
+        public struct X
+        {
+            public int V;
+
+            public static implicit operator int(X x)
+            {
+                L.log = L.log + "c";
+                return x.V;
+            }
+        }
+
+        public class Cell
+        {
+        }
+
+        public static class L
+        {
+            public static string log = "";
+
+            public static X S(int v)
+            {
+                log = log + "s";
+                return new X { V = v };
+            }
+
+            public static int I()
+            {
+                log = log + "1";
+                return 0;
+            }
+
+            public static int T(int v)
+            {
+                log = log + "2";
+                return v;
+            }
+
+            public static int Id(int x) => x;
+
+            public static string Id(string x) => x;
+
+            public static Func<int, int> Make() => Id;
+
+            public static int Use(in int a, int[] b, Cell c) => a + b.Length;
+        }
+
+        public static class Probe
+        {
+            public static string Run()
+            {
+                int[] a = { L.S(1), L.S(2) };
+                L.log = L.log + "|";
+                Func<int, int>[] fs = { L.Id, L.Make() };
+                int[,] g = { { 10, 20 }, { 30, 40 } };
+                int n = 0;
+                int picked = g[n, n++];
+                int[] xs = { 5 };
+                int used = L.Use(in xs[L.I()], new int[] { L.T(3) }, new Cell());
+                var mr = new int[][,] { new int[,] { { 1 } } };
+                var cs = new int[1, 1 + 1, 0] { { { }, { } } };
+                var imp = new[,] { { 1, 2 }, { 3, 4 } };
+                return a[0] + a[1] + "," + fs[0](4) + fs[1](5) + "," + picked + "," + used + "," + mr[0][0, 0] + cs.GetLength(1) + imp[1, 0] + "|" + L.log;
+            }
+        }
+        """;
+
     public static TheoryData<string, string, Surface> Rows()
     {
         var data = new TheoryData<string, string, Surface>();
@@ -398,6 +517,7 @@ public class ArrayExpressionConversionTests
             data.Add("placement", "3,11,36,357|123456", surface);
             data.Add("shapes", "3|001|1236|1|33|True|27|False02|12346", surface);
             data.Add("round2", "2,0,42|112|True|1002,3", surface);
+            data.Add("round3", "3,10,123|scsc|", surface);
         }
         return data;
     }
@@ -454,6 +574,8 @@ public class ArrayExpressionConversionTests
         // Codex round 1: a name spelled only with an escape inside an interpolation hole,
         // or only in another file of the project (a base-class field), is reserved too.
         const string probe = """
+            public class Box { public Box(int a, int b) { } }
+
             public class Probe2 : Base
             {
                 static int S() { return 1; }
@@ -461,8 +583,10 @@ public class ArrayExpressionConversionTests
                 public string Go()
                 {
                     int[] a = { S(), 2 };
+                    // A §NEW argument with a call is hoisted: the temp needs a fresh name.
+                    var box = new Box(a[0], S());
                     int[] b = { a[0], S() };
-                    return $"{_hoist001}" + a[0] + b.Length + _hoist002;
+                    return $"{\u005fhoist001}" + a[0] + b.Length + _hoist002;
                 }
             }
             """;
@@ -557,6 +681,36 @@ public class ArrayExpressionConversionTests
     }
 
     [Fact]
+    public void ArrayExtensionCall_IsNotCertifiedPure()
+    {
+        // Codex round 3: only System.Array's own members answer for an array receiver;
+        // a user extension on int[] stays an unknown call.
+        const string calor = """
+            §M{m1:T}
+              §CSHARP{public static class Extensions { public static int Touch(this int[] xs) { System.Console.WriteLine("side"); return xs.Length; } }}§/CSHARP
+              §CL{c1:G:pub:stat}
+                §MT{m2:Go:pub:stat} (i32[]:xs) -> i32
+                  §E{}
+                  §R §C{xs.Touch} §/C
+            """;
+        var compilation = Program.Compile(calor, "extension.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(compilation.Diagnostics.Errors, d => d.Code == "Calor0410");
+    }
+
+    [Fact]
+    public void InAddressBeforeAHoistedArgument_IsPreserved_AndRunsLikeTheOriginal()
+    {
+        var result = new CSharpToCalorConverter().Convert(Round3Preserved);
+        Assert.True(result.Success, string.Join("\n", result.Issues));
+        Assert.Single(result.Losses, loss => loss.Feature == "conditional-expression-hoisting");
+        var compilation = Program.Compile(result.CalorSource!, "round3.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
+        Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
+        Assert.Equal("3,45,10,6,123|scsc|12", Run(Round3Preserved));
+        Assert.Equal(Run(Round3Preserved), Run(compilation.GeneratedCode));
+    }
+
+    [Fact]
     public void ElementAccessMember_ParsesAsAGroup()
     {
         // `(§IDX2D g 0 1).V` is g[0, 1].V; written bare, `.V` belonged to the last index.
@@ -598,6 +752,7 @@ public class ArrayExpressionConversionTests
     [InlineData("§B{x} §ARR2D{a:a:str} §ROW §C{Console.ReadLine} §/C §/ARR2D{a}", "alloc", true)]
     [InlineData("§B{x} §C{g.GetValue} §A 0 §A 0 §/C", "", true)]
     [InlineData("§C{g.Initialize} §/C", "mut", true)]
+    [InlineData("§C{g.SetValue} §A 1 §A 0 §A 0 §/C", "mut", true)]
     public void ArrayMembersAndRowElements_AreCharged(string statement, string declared, bool undeclaredEffect)
     {
         // Array members resolve on System.Array (they were unknown, Calor0410), a
@@ -618,6 +773,7 @@ public class ArrayExpressionConversionTests
         "placement" => Placement,
         "shapes" => Shapes,
         "round2" => Round2,
+        "round3" => Round3,
         _ => R0Fixture(row)
     };
 

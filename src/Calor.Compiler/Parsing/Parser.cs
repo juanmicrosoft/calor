@@ -7893,7 +7893,8 @@ public sealed class Parser
         return new BindStatementNode(
             arrNode.Span,
             arrNode.Name,
-            $"{arrNode.ElementType}[]",
+            // #1132: the created rank comes first: an array of i32[,] is i32[][,].
+            System.Text.RegularExpressions.Regex.Replace(arrNode.ElementType, @"^(.+?)((?:\[,*\])*)$", "$1[]$2"),
             isMutable: false,
             arrNode,
             new AttributeCollection());

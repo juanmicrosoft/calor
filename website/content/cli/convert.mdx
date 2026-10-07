@@ -215,8 +215,8 @@ A local you named `_hoist000` is never rebound.
 Before, they became the shared `Array.Empty<T>()`, so `new int[0] == new int[0]`
 changed from `false` to `true`.
 
-**Supported natively:** one-dimensional, implicitly typed (`new[]`), jagged (also a
-rectangular array of arrays, `new int[,][]`), and rectangular arrays of rank 2 or
+**Supported natively:** one-dimensional, implicitly typed (`new[]`, `new[,]`), jagged
+(also `new int[,][]` and `new int[][,]`), and rectangular arrays of rank 2 or
 more. This covers initializers with or without written sizes, bare `{ … }`
 initializers of a declared array, and sized arrays without an initializer. They work
 as a return value, argument, binding, field or property initializer,
@@ -228,8 +228,9 @@ member-access target, and `?:` branch. Elements can be object initializers, call
 - An assignment used as an element, an index, or a size (`{ x = Next() }`,
   `a[i = 0]`, `new int[n = 3]`), and, inside a `?:`, `&&`, `||`, or `??` operand, a
   sized array whose size is anything but a name or an integer literal
-  (`flag ? new int[n + 1] : …`). They are reported as
-  `conditional-expression-hoisting`.
+  (`flag ? new int[n + 1] : …`), and a `ref`/`out`/`in` argument whose address
+  calls a method (`F(in xs[I()], new Cell())`) when a later argument must be moved.
+  They are reported as `conditional-expression-hoisting`.
 - If an expression-position array still produces Calor that does not parse, the
   member is kept as C# by the rescue and reported as `post-validation-fallback`.
 - `stackalloc` arrays are unchanged by this work.

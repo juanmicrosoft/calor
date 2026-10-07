@@ -70,6 +70,20 @@ After Codex round 2 (REQUEST-CHANGES, `reviews/round-2.md`):
   their target type).
 - `GetValue` is `alloc`; `Array.Initialize` is an unknown call (element constructors).
 
+After Codex round 3 (REQUEST-CHANGES, `reviews/round-3.md`, the last review round):
+
+- Array receivers answer only `System.Array`'s own instance members, from a table in
+  `EffectResolver` (`SetValue` `mut`+`alloc`); anything else (extensions, `Initialize`) falls
+  through to extension resolution and unknown-call charging. The manifest is unchanged from main.
+- Statement-position array elements are no longer hoisted for carrying a call: an element keeps its
+  implicit conversion and its target type (method groups) on its own line.
+- Multi-dimensional indices convert in place (`g[n, n++]`).
+- A `ref`/`out`/`in` argument whose address evaluates a call, before a hoisted argument, preserves
+  the member (`conditional-expression-hoisting`).
+- `new T[][,]` binds as `T[][,]` (parser), and a declared `int[][,]` keeps its element rank.
+- An empty level leaves no elements: the creation is its sizes (constant expressions included).
+- `new[,] { … }` converts as a rectangular array (created type from Roslyn; preserved if unknown).
+
 Statement-position output (F5-ARRAY-03) is byte-identical to the R0 baseline.
 
 ## F5-ARRAY-06: declared boundary
@@ -78,6 +92,7 @@ Statement-position output (F5-ARRAY-03) is byte-identical to the R0 baseline.
 |---|---|---|
 | 1-D (`new T[] {…}`, `new[] {…}`, `T[] x = {…}`) | native | native |
 | jagged (`T[][]`, `T[,][]`, `T[][,]`) | native | native |
+| implicitly typed rectangular (`new[,] { … }`) | native | native |
 | rectangular rank 2 with initializer (with or without written sizes, bare `{…}`) | native | native |
 | rectangular rank 3+ with initializer | native (sized `§ARR2D` + `§ROW`) | native |
 | sized, no initializer, literal/name sizes | native | native |
