@@ -3713,8 +3713,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
                 var savedInterpolation = _inInterpolation;
                 _inInterpolation = true;
-                parts.Append(exprPart.Expression.Accept(this));
+                var holeText = exprPart.Expression.Accept(this);
                 _inInterpolation = savedInterpolation;
+                // 0.25 F2 (#906): `${1}` reads back as literal placeholder text, so a digit-only
+                // int hole is written as the typed literal `${INT:1}`.
+                if (exprPart.Expression is IntLiteralNode && holeText.Length > 0 && holeText.All(char.IsAsciiDigit))
+                    holeText = "INT:" + holeText;
+                parts.Append(holeText);
                 if (!string.IsNullOrEmpty(exprPart.AlignmentClause))
                 {
                     parts.Append(",");

@@ -129,7 +129,11 @@
       ],
       "provisionalSize": "L",
       "readiness": {
-        "status": "NOT_STARTED"
+        "status": "IN_PROGRESS",
+        "branch": "milestone-0.25/f2-906-interpolation",
+        "evidence": "docs/plans/evidence/v0.25-f2-906/rows.json",
+        "tests": "tests/Calor.Compiler.Tests/Interpolation/InterpolationTargetTypingTests.cs",
+        "note": "Implementation evidence only. Not READY: needs a #1423 candidate, approver review, F2-INTERP-09 corpus counts on that candidate, and passed evidence per registered F2 case."
       }
     },
     {

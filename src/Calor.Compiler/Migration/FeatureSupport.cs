@@ -170,11 +170,49 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "Basic pattern matching (type, constant, var) is supported"
         },
+        // 0.25 F2 (#906): the umbrella claim is Partial. Interpolated strings whose C# target
+        // receives the formatted string, and FormattableString/IFormattable targets, convert
+        // natively; custom interpolated-string handlers do not.
         ["string-interpolation"] = new FeatureInfo
         {
             Name = "string-interpolation",
+            Support = SupportLevel.Partial,
+            Description = "Interpolated strings assigned, returned or passed as string or object convert natively, keeping format specifiers, alignment, culture and hole order. FormattableString and IFormattable targets with at least one hole convert natively with an explicit cast that keeps the selected overload. [InterpolatedStringHandler] targets (custom and .NET handler overloads such as StringBuilder.Append) and hole-free FormattableString targets keep their statement as C# interop; holes outside the native subset keep their C# text",
+            Workaround = "Keep handler-based calls (logging, assertion and builder APIs) as C# interop, or pass a formatted string to a string overload"
+        },
+        ["string-interpolation-to-string"] = new FeatureInfo
+        {
+            Name = "string-interpolation-to-string",
             Support = SupportLevel.Full,
-            Description = "String interpolation is converted to Calor format"
+            Description = "An interpolated string whose target receives the formatted string (string, object) converts to a native Calor string with ${...} holes"
+        },
+        ["string-interpolation-formattable"] = new FeatureInfo
+        {
+            Name = "string-interpolation-formattable",
+            Support = SupportLevel.Partial,
+            Description = "An interpolated string with at least one hole targeting FormattableString or IFormattable converts natively with an explicit cast to that type, so the same overload is selected. Hole-free targets are preserved (string-interpolation-formattable-constant), and holes outside the native subset keep their C# text (string-interpolation-hole)",
+            Workaround = "Review preserved hole-free FormattableString calls; they stay C# interop"
+        },
+        ["string-interpolation-handler"] = new FeatureInfo
+        {
+            Name = "string-interpolation-handler",
+            Support = SupportLevel.NotSupported,
+            Description = "An interpolated string (or a + chain of them) passed to an [InterpolatedStringHandler] parameter cannot be represented in Calor; the enclosing statement or member is preserved as C# interop, or the conversion fails when preservation is off",
+            Workaround = "Keep the call as C# interop, or call a string overload with an already formatted string"
+        },
+        ["string-interpolation-formattable-constant"] = new FeatureInfo
+        {
+            Name = "string-interpolation-formattable-constant",
+            Support = SupportLevel.NotSupported,
+            Description = "An interpolated string with no holes targeting FormattableString or IFormattable (for example FormattableString.Invariant($\"text\")) has no Calor form; the enclosing statement or member is preserved as C# interop",
+            Workaround = "Keep the call as C# interop, or pass a plain string"
+        },
+        ["string-interpolation-hole"] = new FeatureInfo
+        {
+            Name = "string-interpolation-hole",
+            Support = SupportLevel.Partial,
+            Description = "Holes made of names, string/char/bool/int literals, doubles with a fractional part, dotted member access, operators, nameof, typeof, and calls with a dotted target and positional arguments convert natively. Other holes (object creation, indexing, ?., ?:, lambdas, named or ref arguments, generic calls) keep their original C# text as §CS{...} inside the hole, with assumed effects",
+            Workaround = "Move the expression into a local before the interpolated string to convert it natively"
         },
         ["null-coalescing"] = new FeatureInfo
         {

@@ -99,7 +99,16 @@ public class BinderIncompleteRatchetTests
         + "than treated as a coverage improvement. #1386 preserves C# null-forgiving expressions "
         + "as explicit interop and keeps calls opaque when a same-name overload is preserved in a "
         + "member interop block. This moves 35163 -> 35153 visits and 114 -> 129 opaque boundaries; "
-        + "binder-source-coverage.json records every changed source identity";
+        + "binder-source-coverage.json records every changed source identity. "
+        + "#906 (0.25 F2) parses C#-form call holes such as ${Console.ReadLine()} as calls, reports "
+        + "hole diagnostics at the hole, and converts holes outside the native subset (indexing, calls "
+        + "on call results, ?., ?:, named/ref/generic calls) as explicit \u00A7CS{...} hole interop "
+        + "instead of C#-syntax text that reparsed as raw C# anyway: in-repo bound expressions "
+        + "4820 -> 4827; conversion visits 35159 -> 35160; opaque boundaries 129 -> 137 and opaque "
+        + "expressions 6944 -> 6994 (newly counted holes, not new preservation); serialized opaque "
+        + "boundaries in serilog Debugging/SelfLog.cs 3 -> 1 and FluentValidation ValidationException.cs "
+        + "1 -> 0 (lifted call holes); 22 source records change, binding-error identities by location "
+        + "only, with binding-error counts and incomplete diagnostics unchanged";
 
     private static string SourceCoveragePath() => Path.Combine(RepoRoot(),
         "bench", "phase0-agent-native", "binder-source-coverage.json");

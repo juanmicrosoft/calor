@@ -475,9 +475,18 @@ public enum InterpolationPartIntent
     LiteralPlaceholder
 }
 
+/// <summary>
+/// A <c>${...}</c> hole inside a Calor string literal. <paramref name="Start"/>,
+/// <paramref name="Line"/> and <paramref name="Column"/> locate the first character of
+/// the hole's expression text in the enclosing source (0.25 F2, #906), so diagnostics
+/// raised while the hole is reparsed point at the hole rather than at line 1.
+/// </summary>
 internal sealed record InterpolatedStringExpressionTokenPart(
     string ExpressionText,
-    InterpolationPartIntent Intent)
+    InterpolationPartIntent Intent,
+    int Start = 0,
+    int Line = 1,
+    int Column = 1)
     : InterpolatedStringTokenPart;
 
 internal sealed record StringLiteralInfo(

@@ -4930,10 +4930,7 @@ public sealed class Parser
                         parts.Add(new InterpolatedStringTextNode(token.Span, text.Text));
                         break;
                     case InterpolatedStringExpressionTokenPart expression:
-                        parts.Add(ParseInlineInterpolationPart(
-                            expression.ExpressionText,
-                            expression.Intent,
-                            token.Span));
+                        parts.Add(ParseInlineInterpolationPart(expression, token.Span));
                         break;
                 }
             }
@@ -4960,17 +4957,21 @@ public sealed class Parser
     }
 
     private InterpolatedStringExpressionNode ParseInlineInterpolationPart(
-        string source,
-        InterpolationPartIntent intent,
+        InterpolatedStringExpressionTokenPart part,
         TextSpan fallbackSpan)
     {
-        var lexer = new Lexer(source, _diagnostics);
+        var source = part.ExpressionText;
+        // 0.25 F2 (#906): lex the hole at its real position, so a diagnostic inside it (an
+        // undefined name, a type error) points at the hole instead of line 1, column 1.
+        var holeSpan = new TextSpan(part.Start, source.Length, part.Line, part.Column);
+        var lexer = new Lexer(source, _diagnostics, part.Start, part.Line, part.Column);
         var parser = new Parser(lexer.TokenizeAllForParser(), _diagnostics);
         var expression = parser.ParseExpression();
+        var intent = part.Intent;
 
         var suffixStart = parser.Current.Kind == TokenKind.Eof
             ? source.Length
-            : Math.Clamp(parser.Current.Span.Start, 0, source.Length);
+            : Math.Clamp(parser.Current.Span.Start - part.Start, 0, source.Length);
         var suffix = source[suffixStart..].Trim();
         string? alignment = null;
         string? format = null;
@@ -4979,7 +4980,7 @@ public sealed class Parser
             && !suffix.StartsWith(",", StringComparison.Ordinal)
             && !suffix.StartsWith(":", StringComparison.Ordinal))
         {
-            return ParseRawCSharpInterpolationPart(source, fallbackSpan);
+            return ParseRawCSharpInterpolationPart(part, holeSpan);
         }
 
         if (suffix.StartsWith(",", StringComparison.Ordinal))
@@ -5009,7 +5010,7 @@ public sealed class Parser
         }
 
         return new InterpolatedStringExpressionNode(
-            fallbackSpan,
+            holeSpan,
             expression,
             string.IsNullOrEmpty(format) ? null : format,
             string.IsNullOrEmpty(alignment) ? null : alignment,
@@ -5017,25 +5018,142 @@ public sealed class Parser
             source);
     }
 
-    private static InterpolatedStringExpressionNode ParseRawCSharpInterpolationPart(
-        string source,
-        TextSpan fallbackSpan)
+    private InterpolatedStringExpressionNode ParseRawCSharpInterpolationPart(
+        InterpolatedStringExpressionTokenPart part,
+        TextSpan holeSpan)
     {
+        var source = part.ExpressionText;
+        const int prefix = 3; // the `$"{` added below
         var parsed = SyntaxFactory.ParseExpression($"$\"{{{source}}}\"");
         if (parsed is InterpolatedStringExpressionSyntax interpolated
             && interpolated.Contents.SingleOrDefault() is InterpolationSyntax interpolation)
         {
+            var expressionSpan = HoleSpan(part, interpolation.Expression.SpanStart - prefix,
+                interpolation.Expression.Span.Length);
+            // 0.25 F2 (#906): a call written in C# form inside a hole (`${Console.ReadLine()}`,
+            // what the converter emits) becomes an ordinary call node when its target is a plain
+            // dotted name and every argument parses as a Calor expression. The binder and the
+            // effect checker then see the real callee instead of an opaque C# fragment whose
+            // effects are only assumed (Calor0419). Other shapes stay raw C#.
+            var expression = TryLiftInterpolationCall(interpolation.Expression, part, prefix)
+                ?? (ExpressionNode)new RawCSharpExpressionNode(expressionSpan, interpolation.Expression.ToString());
             return new InterpolatedStringExpressionNode(
-                fallbackSpan,
-                new RawCSharpExpressionNode(fallbackSpan, interpolation.Expression.ToString()),
+                holeSpan,
+                expression,
                 interpolation.FormatClause?.FormatStringToken.Text,
                 interpolation.AlignmentClause?.Value.ToString());
         }
 
         return new InterpolatedStringExpressionNode(
-            fallbackSpan,
-            new RawCSharpExpressionNode(fallbackSpan, source));
+            holeSpan,
+            new RawCSharpExpressionNode(holeSpan, source));
     }
+
+    private static TextSpan HoleSpan(InterpolatedStringExpressionTokenPart part, int offset, int length)
+    {
+        var source = part.ExpressionText;
+        offset = Math.Clamp(offset, 0, source.Length);
+        var (line, column) = (part.Line, part.Column);
+        for (var i = 0; i < offset; i++)
+        {
+            if (source[i] == '\n')
+                (line, column) = (line + 1, 1);
+            else if (source[i] != '\r')
+                column++;
+        }
+        return new TextSpan(part.Start + offset, Math.Min(length, source.Length - offset), line, column);
+    }
+
+    private ExpressionNode? TryLiftInterpolationCall(
+        ExpressionSyntax syntax,
+        InterpolatedStringExpressionTokenPart part,
+        int prefix)
+    {
+        if (syntax is not InvocationExpressionSyntax invocation
+            || DottedName(invocation.Expression) is not { } target
+            || target == "nameof" // a compile-time operator, not a call
+            || invocation.ArgumentList.Arguments.Any(argument =>
+                argument.NameColon != null || argument.RefKindKeyword.RawKind != (int)SyntaxKind.None))
+        {
+            return null;
+        }
+
+        var arguments = new List<ExpressionNode>();
+        foreach (var argument in invocation.ArgumentList.Arguments)
+        {
+            var argumentNode = TryParseCompleteHoleExpression(argument.Expression, part, prefix)
+                ?? TryLiftInterpolationCall(argument.Expression, part, prefix);
+            if (argumentNode == null)
+                return null;
+            arguments.Add(argumentNode);
+        }
+
+        return new CallExpressionNode(
+            HoleSpan(part, invocation.SpanStart - prefix, invocation.Span.Length), target, arguments);
+    }
+
+    private static string? DottedName(ExpressionSyntax expression) => expression switch
+    {
+        IdentifierNameSyntax identifier => identifier.Identifier.Text,
+        MemberAccessExpressionSyntax
+        {
+            RawKind: (int)SyntaxKind.SimpleMemberAccessExpression,
+            Name: IdentifierNameSyntax name
+        } member when DottedName(member.Expression) is { } receiver => receiver + "." + name.Identifier.Text,
+        _ => null
+    };
+
+    /// <summary>
+    /// Parses an argument of a lifted hole call as a Calor expression. The argument must
+    /// parse completely and without errors; otherwise the caller keeps the hole raw.
+    /// </summary>
+    private ExpressionNode? TryParseCompleteHoleExpression(
+        ExpressionSyntax syntax,
+        InterpolatedStringExpressionTokenPart part,
+        int prefix)
+    {
+        // Only shapes whose Calor reading is the same as their C# reading: literals, names,
+        // dotted names, and Calor prefix operators such as `(+ a b)` (which are not C#).
+        if (syntax is not (LiteralExpressionSyntax or IdentifierNameSyntax or ParenthesizedExpressionSyntax
+                or PrefixUnaryExpressionSyntax)
+            && DottedName(syntax) == null)
+        {
+            return null;
+        }
+
+        var span = HoleSpan(part, syntax.SpanStart - prefix, syntax.Span.Length);
+        var text = part.ExpressionText.Substring(span.Start - part.Start, span.Length);
+        var scratch = new DiagnosticBag();
+        var parser = new Parser(
+            new Lexer(text, scratch, span.Start, span.Line, span.Column).TokenizeAllForParser(), scratch);
+        var expression = parser.ParseExpression();
+        var consumed = parser.Current.Kind == TokenKind.Eof
+            || string.IsNullOrWhiteSpace(text[Math.Clamp(parser.Current.Span.Start - span.Start, 0, text.Length)..]);
+        // A string argument with its own ${...} holes stays raw: inside a raw C# call it was
+        // always literal text, and lifting would reinterpret it as a nested interpolation.
+        if (scratch.HasErrors || !consumed || expression is InterpolatedStringNode)
+            return null;
+        // A literal is lifted only when Calor and C# read the same value (escapes such as
+        // "\x41" differ; numeric suffixes differ in type).
+        if (syntax is LiteralExpressionSyntax literal && !SameLiteralValue(literal, expression))
+            return null;
+        if (syntax is PrefixUnaryExpressionSyntax unary
+            && unary.Operand is not (IdentifierNameSyntax or LiteralExpressionSyntax { Token.Value: int }))
+            return null;
+        return expression;
+    }
+
+    private static bool SameLiteralValue(LiteralExpressionSyntax literal, ExpressionNode expression) =>
+        (literal.Token.Value, expression) switch
+        {
+            (string text, StringLiteralNode calor) => calor.Value == text && !calor.IsUtf8,
+            (char ch, CharOperationNode { Operation: CharOp.CharLiteral, Arguments: [StringLiteralNode one] }) =>
+                one.Value == ch.ToString(),
+            (int number, IntLiteralNode calor) => calor.Value == number && !calor.IsLong && !calor.IsUnsigned,
+            (double number, FloatLiteralNode calor) => calor.Value.Equals(number) && !calor.IsDecimal && !calor.IsSingle,
+            (bool flag, BoolLiteralNode calor) => calor.Value == flag,
+            _ => false
+        };
 
     private BoolLiteralNode ParseBoolLiteral()
     {

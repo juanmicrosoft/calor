@@ -4,6 +4,50 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Interpolated strings keep their C# target type (#906)
+
+- **Overload selection is kept.** In C#, `Kind($"k={x}")` can call `Kind(FormattableString)`
+  instead of `Kind(object)`, depending on the interpolated string's target type. `calor convert`
+  now wraps `FormattableString` and `IFormattable` targets in an explicit cast, so the converted
+  program calls the same overload. Before, a method whose only overload took a
+  `FormattableString` made the converted Calor fail to compile, and the CLI fell back to keeping
+  the whole class as C#.
+- **Custom interpolated-string handlers are kept as C# at conversion time.** A call such as
+  `Log($"a{x}b")`, where `Log` takes an `[InterpolatedStringHandler]` type, keeps its enclosing
+  statement or member as C# interop on every surface. Before, MCP `calor_convert` produced a
+  Calor string argument that the compiler then rejected (`Calor0208`).
+- **Edge targets are kept as C# instead of miscompiled.** `FormattableString.Invariant($"text")`
+  (a `FormattableString` target with no holes) and `Log($"a{x}" + $"b{y}")` (a concatenation
+  passed to a handler) keep their enclosing statement or member as C# interop.
+- **Holes outside the native subset are marked as C#.** Holes made of names, string, character,
+  `bool` and `int` literals, `double` literals with a fractional part, dotted member access,
+  operators, `nameof`, `typeof`, and calls with a dotted target and positional arguments convert
+  natively. A digit-only hole such as `{1}` is written `${INT:1}`, because `${1}` reads back as
+  literal text. Other holes, such as `{items[i]}`, `{x?.Name}` or
+  `{obj.GetType().Name}`, now keep their original C# text as `§CS{...}` inside the hole and are
+  counted as interop. Before, the converter mixed C# and Calor syntax in such holes, which could
+  produce C# that did not compile.
+- **Hole evaluation order is kept.** A hole containing a string literal, such as
+  `$"q={Tag("t")}"`, is no longer moved into a temporary ahead of the statement. That move ran
+  `Tag` before earlier arguments and even when an enclosing `?:` skipped the string.
+- **Holes are analyzed.** A call written in C# form inside a hole, such as
+  `"${Console.ReadLine()}"`, is now an ordinary call, so effect checking sees it. A pure (`§E{}`)
+  function containing it now fails with `Calor0410` (undeclared effect). Before, it compiled with
+  only the `Calor0419` warning that its effects were assumed. Holes in other forms still get
+  that warning. This can turn existing code that compiled with a warning into an error; declare
+  the effect to fix it.
+- **Diagnostics point at the hole.** An error inside a hole, such as an undefined name, is now
+  reported at the hole's line and column instead of line 1, column 1.
+- **`string-interpolation` is now `Partial`** in `calor feature-check`, because handler targets
+  are not converted natively. New entries: `string-interpolation-to-string` (`Full`),
+  `string-interpolation-formattable` and `string-interpolation-hole` (`Partial`), and
+  `string-interpolation-handler` and `string-interpolation-formattable-constant`
+  (`NotSupported`).
+
+These are checked by convert, compile and run tests that compare the converted program's output
+with the original C# on the CLI and MCP conversion settings, including `de-DE` and `fr-FR`
+formatting. The 0.25 scope packet records this family as in progress, not ready.
+
 ## [0.24.0] - 2026-10-07
 
 Calor 0.24 is a soundness release. It repairs verifier defects found by a registered soundness
