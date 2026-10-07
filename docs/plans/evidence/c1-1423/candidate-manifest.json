@@ -1,0 +1,1228 @@
+{
+  "schemaVersion": 1,
+  "issue": 1423,
+  "gate": "C1",
+  "epic": 1409,
+  "contractVersion": "1.3.2",
+  "status": "FROZEN-AT-MERGE",
+  "statusNote": "The candidate is the commit below. This manifest lands after it, in the C1 pull request; the invalidation classifier (tests/Calor.Compiler.Tests/EvidenceContract/CandidateInvalidation.cs) decides whether any later commit invalidates it. Freezing is recorded, not authorized publication: nothing here publishes or releases.",
+  "candidate": {
+    "commit": "696ab82470626164979a07792ed74932ab88d9e6",
+    "committedUtc": "2026-10-07T12:51:38Z",
+    "mergeOf": "PR #1509 (release preparation for 0.24.0: version bump and notes with the N1 advisory), merged on top of #1475 (R2, the last child gate). Re-freeze of PR #1508 after maintainer decision RELEASE-VERSION-0.24.0.",
+    "durableIdentity": {
+      "status": "complete",
+      "commit": "696ab82470626164979a07792ed74932ab88d9e6",
+      "resolvedVia": "refs/remotes/origin/main",
+      "treeHashes": {
+        "/": "5c10403402566b474d5202caf9c0d51e4e2321cf",
+        "src": "bb50f35e08a93aca984f4b0a53a6f11d5b1da693",
+        "tests": "afb35c4e554aae7cdb871f1b97fc9e986afd2488",
+        "tools": "bada36343814a4f660e14e15dac3d53e22c9b063",
+        "bench": "baba5ad9744c2ef9f7f1f7775605653f225221c6",
+        "eng": "71aafdcac84af0e0575e431fbda735915644b057",
+        "scripts": "ca0126d8fefff95277ca1c87681310075a07b5ba",
+        ".github": "f54ff996672f9d7292a970c82f220827455528da",
+        ".claude": "52dd3dd9cf6eaf18533a143fa9023a713242757e",
+        "website": "b7e228af30643bd020125cc0465bc41e4b8a02fc",
+        "samples": "a0d11f5e4f8b2f7403db9e510be3bb895a221eb4",
+        "docs": "068886d9535205ba56890befeef198901a16f15e"
+      },
+      "inputContentHashes": {
+        "global.json": "227cbaa2d0d270b2046476fb1a021c49f8ae144a67843a727e34bcdb8e527d97",
+        "Directory.Build.props": "9662b9c68ca9f91e7304161f4c2c014ff3107ef7bb14dbfbe62fb653d578bf0e",
+        "Directory.Build.targets": "1d77db3cd86330218ef26ab04c7640cb2a907eda505295aea9e44122cedabc46",
+        "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a",
+        ".github/z3-binaries-4.15.7.sha256": "51849255fe9a63dc8f606c1762964c028f493c90f0d98ab61a0ab141b2af23e2",
+        "src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256": "31dff6fce97fb568abb7ea3f691321df1e6312a3ea5a61dfb9258ce051a1e749",
+        "eng/z3-consumers.json": "f79a69336939e1183398bdfbfc4147ceee9067b0070dcb60736c2efd8608ade2",
+        "eng/test-manifest.json": "ff98d88a54125f24aae2f64abdcc79a6f23fb38a79c40d0a217579caf7d8817a",
+        "eng/tier2-fixture-expectations.json": "af631574b775030ec34ab568118a919260c195a6e8f1a63ae25f0b9b4ca88e8b",
+        ".github/actions/bootstrap-z3/action.yml": "0c6a297b22a2a2fdb15291fd94e811974117f4bca4e405f632ba9468a859d207",
+        "src/Calor.Compiler/scripts/download-z3.sh": "217e48e279736e4244a48e0df0d5d25433499735851c6aaafb1aecfa32813f23",
+        "src/Calor.Compiler/scripts/download-z3.ps1": "2a661b4f48b21484375ed822108198641f3b1a84e692912b0cd4f10f47db1024",
+        "scripts/verify-z3-assets.py": "33a06f97f633574052661d284556889c34b08b310de22f5cfa343233c0f72d32",
+        "website/package.json": "4bc486eef49a8c8c8585b2cc55c17f792ec9942e5af9493436cad53d978c187b",
+        "website/package-lock.json": "65a819ce8b57f012fc6c37fcdec1cdba474043f8e16ff8e3ad55580bf807b4a5",
+        ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
+        ".gitattributes": "5310083823a2929f9eeb27cefb0f98b0d4d8bb66d2326855558dca673cad0d64",
+        "bench/phase0-agent-native/commit-stamp-index.json": "b7b26f2f3d181e31d0ef591895bcb05c99491975820f826e08206ef8a02cdc48"
+      }
+    },
+    "reachability": {
+      "rule": "Contract §6 / P1 DurableProvenance: full 40-hex SHA, ancestor of explicitly fetched refs/remotes/origin/main; shallow clone fails. Re-checked by CandidateManifestTests through DurableProvenance.Verify.",
+      "originMainAtFreeze": "696ab82470626164979a07792ed74932ab88d9e6",
+      "freezeObservedUtc": "2026-10-07T12:55:16Z",
+      "freezeObservation": "git fetch origin; git rev-parse refs/remotes/origin/main returned the candidate when C1 started."
+    }
+  },
+  "submodules": {
+    "source": "git ls-tree <candidate> (every gitlink; .gitmodules URLs in inputContentHashes)",
+    "entries": [
+      {
+        "path": "bench/corpus/FluentValidation",
+        "commit": "71b3c60cb5a16e02cb7957e478ec3fb6b983a73c"
+      },
+      {
+        "path": "bench/corpus/MediatR",
+        "commit": "fb309026775ef953a64fb5339d074426c1ad2c37"
+      },
+      {
+        "path": "bench/corpus/serilog",
+        "commit": "0597ddfbd4ec594d9c42edd745fe728a2198bad9"
+      }
+    ]
+  },
+  "dependencies": {
+    "lockfiles": {
+      "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a",
+      "bench/ILAnalysisBench/packages.lock.json": "5bcc5dab9e89d6447f701656ff4f16664623a4bcd01da2d608d0a99f7c997839",
+      "bench/IncrementalBuildBench/packages.lock.json": "425f78b5c2e2257a77b3b658c4c258c30cb5f85fb2576d8feaee214f2f4ab9f7",
+      "bench/corpus/Directory.Packages.props": "5f1c9792be6259e241f1f20c1412cb2e2cc0363e99380055f591fd0d743e4c8c",
+      "bench/mcp/harness/packages.lock.json": "5bcc5dab9e89d6447f701656ff4f16664623a4bcd01da2d608d0a99f7c997839",
+      "bench/phase0-agent-native/Directory.Packages.props": "70904657415f88b02b7430c6370cdfd443279918cf3c71f445a13793453123e9",
+      "bench/phase0-agent-native/buildability/1255/runtime/NuGet.Config": "aec93b5637ab6d62470979a008990a4a336a287ab83a3f2541849ae735674055",
+      "docs/plans/evidence/nominal-policy-1400/historical/pre-t1/reproduce/packages.lock.json": "61b885b18445fb7fc06e68b77c6e141ee19b8295840f7738d86f359dc044d836",
+      "samples/Contracts/packages.lock.json": "d40139f8495a659d02837c2aed2d1fa4b391d77bc9d330e0e833f56861f916ff",
+      "samples/FizzBuzz/packages.lock.json": "d40139f8495a659d02837c2aed2d1fa4b391d77bc9d330e0e833f56861f916ff",
+      "samples/Generics/packages.lock.json": "d40139f8495a659d02837c2aed2d1fa4b391d77bc9d330e0e833f56861f916ff",
+      "samples/HelloWorld/packages.lock.json": "d40139f8495a659d02837c2aed2d1fa4b391d77bc9d330e0e833f56861f916ff",
+      "samples/PatternMatching/packages.lock.json": "d40139f8495a659d02837c2aed2d1fa4b391d77bc9d330e0e833f56861f916ff",
+      "samples/SdkSample/packages.lock.json": "d40139f8495a659d02837c2aed2d1fa4b391d77bc9d330e0e833f56861f916ff",
+      "samples/TypeSystem/packages.lock.json": "d40139f8495a659d02837c2aed2d1fa4b391d77bc9d330e0e833f56861f916ff",
+      "src/Calor.Compiler/packages.lock.json": "fa4d68cfacfa02420734a9f1c85547dcd3768397e80ad54cf6248ec504019231",
+      "src/Calor.LanguageServer/packages.lock.json": "1ca77977a9c2cda3806a29848854f50cbdeb8c44ea660453530f3ce3b83a6b4f",
+      "src/Calor.Runtime/packages.lock.json": "03eeadc5ef377c17f787ab65f41fb4c8a9c936bb7f7f4171111fdeec8a81cb46",
+      "src/Calor.Sdk/packages.lock.json": "03eeadc5ef377c17f787ab65f41fb4c8a9c936bb7f7f4171111fdeec8a81cb46",
+      "src/Calor.Tasks/packages.lock.json": "8e5edd7f2d5f1abd971ed56d09a7b5cd920a518b103ae4714badfc105685b165",
+      "tests/Calor.Compiler.Tests/packages.lock.json": "694fac2700f0e1a42a2fbfd15bb3991dc4fd3418dbdf1b98119f2c3825d9f5eb",
+      "tests/Calor.Conversion.Tests/packages.lock.json": "b555535ee028008897ca1a87250b8975ad1f673ef8a373b1022816fd27b77b63",
+      "tests/Calor.Enforcement.Tests/packages.lock.json": "51b576f9b13caa11038c5634358a3c423c7e950953daa040a7fc66015673e79d",
+      "tests/Calor.Evaluation/Analyzers/packages.lock.json": "eb1c8c3a7b815daa0b8dca7364f8d869f142232e79b48d69038c1e6c7f8db24b",
+      "tests/Calor.Evaluation/packages.lock.json": "c75feb61f93d810d5bf701e62895a15bb4b9f3bee74f5c4a7fbca64a95cac14c",
+      "tests/Calor.Experimental.Tests/packages.lock.json": "cfebae63f4f93efee00f31a9707e33137750e2de2d0efbd974f1fa0885f9e04b",
+      "tests/Calor.ILAnalysis.Tests/TestAssemblies/TestAssembly.DataAccess/packages.lock.json": "03eeadc5ef377c17f787ab65f41fb4c8a9c936bb7f7f4171111fdeec8a81cb46",
+      "tests/Calor.ILAnalysis.Tests/TestAssemblies/TestAssembly.Scenarios/packages.lock.json": "03eeadc5ef377c17f787ab65f41fb4c8a9c936bb7f7f4171111fdeec8a81cb46",
+      "tests/Calor.ILAnalysis.Tests/packages.lock.json": "fd9cc825689014d33f58b1714b2dd0366cd3166907943987eecb19769d454e4e",
+      "tests/Calor.Ids.Tests/packages.lock.json": "fd9cc825689014d33f58b1714b2dd0366cd3166907943987eecb19769d454e4e",
+      "tests/Calor.LanguageServer.Tests/packages.lock.json": "aaecbe8483773e7c4d505346fe89cbe46ae336650a200ff9941724f8405b177c",
+      "tests/Calor.Performance.Tests/packages.lock.json": "ef0ca33293b8a80674ff9b1c1a260e9d50a6b1022bb63bb92c9e09e0f33b2940",
+      "tests/Calor.RoundTrip.Harness.Tests/packages.lock.json": "fa29d5a173739514ce7f850baf5221afa03653e108fadab5631d208922e5b232",
+      "tests/Calor.RoundTrip.Synthetic/SyntheticLib.Tests/packages.lock.json": "8f2db54e5f2980f13f2c9355964c1fe498bdfff29290a13f3ef32cb1950a8a91",
+      "tests/Calor.RoundTrip.Synthetic/SyntheticLib/packages.lock.json": "03eeadc5ef377c17f787ab65f41fb4c8a9c936bb7f7f4171111fdeec8a81cb46",
+      "tests/Calor.RoundTrip.Synthetic2/GeoLib.Tests/packages.lock.json": "bd98024fa11718c0abfd366d8d5fd170ec6298d079198530ce7c0f32428f1d04",
+      "tests/Calor.RoundTrip.Synthetic2/GeoLib/packages.lock.json": "03eeadc5ef377c17f787ab65f41fb4c8a9c936bb7f7f4171111fdeec8a81cb46",
+      "tests/Calor.Semantics.Tests/packages.lock.json": "b555535ee028008897ca1a87250b8975ad1f673ef8a373b1022816fd27b77b63",
+      "tests/Calor.Tasks.Tests/packages.lock.json": "45378a918cd9eae988177bd29a1cbb63925a0e0a944a00cae7d848f395b48c14",
+      "tests/Calor.Verification.Tests/packages.lock.json": "ef0ca33293b8a80674ff9b1c1a260e9d50a6b1022bb63bb92c9e09e0f33b2940",
+      "tests/DebugRT/Directory.Packages.props": "a49515ca7e27e69c597e36fe4c55c2e6c79ced668e1ba3200f1759542d83c9ea",
+      "tests/E2E/Directory.Packages.props": "14fad8962f978b1dee14f5f141217bfd00b4eb0d75182f56c841010cf83d11c6",
+      "tests/SdkConsumer/nuget.config": "a8bd41bfa6d4011fc7e6e6beacf19f92be7ed80c0d43b8a8ae7aa03734b44cb6",
+      "tools/Calor.RoundTrip.Harness/packages.lock.json": "4507e2795d290437740e9ca28885f07049231642122e0a1e4643d66581205146",
+      "tools/calor-allowlist-audit/packages.lock.json": "d40139f8495a659d02837c2aed2d1fa4b391d77bc9d330e0e833f56861f916ff"
+    },
+    "toolManifests": {
+      "dotnetTools": "none: no .config/dotnet-tools.json exists at the candidate",
+      "node": {
+        "website/package.json": "4bc486eef49a8c8c8585b2cc55c17f792ec9942e5af9493436cad53d978c187b",
+        "website/package-lock.json": "65a819ce8b57f012fc6c37fcdec1cdba474043f8e16ff8e3ad55580bf807b4a5"
+      }
+    },
+    "centralPackageVersions": "Directory.Packages.props (hash in lockfiles and inputContentHashes)"
+  },
+  "toolchain": {
+    "globalJson": {
+      "version": "10.0.100",
+      "rollForward": "latestMinor",
+      "allowPrerelease": false
+    },
+    "determinismProtocol": {
+      "sdk": "10.0.401",
+      "runtime": "10.0.12",
+      "globalJson": {
+        "version": "10.0.100",
+        "rollForward": "latestMinor"
+      },
+      "configuration": "Release"
+    },
+    "ciSetupDotnet": "setup-dotnet requests '10.0.x' in ordinary CI and publish workflows (toolchain-pins open defect at the cutoff; not repaired by any gate). Only the determinism protocol pins an exact SDK and runtime.",
+    "productVersion": "0.24.0 (Directory.Build.props <Version>; checked by the generator, see releasability)",
+    "translatorSemanticsVersion": "z3-executable-semantics-v2 (ContractTranslator.SemanticsVersion)",
+    "verificationCacheFormat": "1.22 (VerificationCacheEntry.CurrentFormatVersion)"
+  },
+  "z3": {
+    "version": "4.15.7",
+    "assetPins": {
+      "file": ".github/z3-binaries-4.15.7.sha256",
+      "assets": [
+        {
+          "name": "Microsoft.Z3.dll",
+          "sha256": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175",
+          "bytes": 260608
+        },
+        {
+          "name": "libz3-linux-arm64.so",
+          "sha256": "7227ad08ae28b731be27a26f68680f627a4e513e2a134b2cbe1fc223a76ce3b5",
+          "bytes": 30884960
+        },
+        {
+          "name": "libz3-linux-x64.so",
+          "sha256": "3e70217bc6b05b6204912698becf9f853a7a2f07bb5338dad84aef79aee9bec8",
+          "bytes": 34714776
+        },
+        {
+          "name": "libz3-osx-arm64.dylib",
+          "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+          "bytes": 25891768
+        },
+        {
+          "name": "libz3-win-arm64.dll",
+          "sha256": "f28f1f6f4795ef82d6dc0fa856145b7ce6dcfee542c236110197ce5f535a7562",
+          "bytes": 17616896
+        },
+        {
+          "name": "libz3-win-x64.dll",
+          "sha256": "d301fc1ba4c317d3293fccd784c2c3c0ba06139d21b9fc3a7cae37a244e85a56",
+          "bytes": 17730560
+        },
+        {
+          "name": "libz3-win-x86.dll",
+          "sha256": "89d584e1e792961a5e5a9a8385f1416cf38251c48446bab8ba64f9a17000ebc9",
+          "bytes": 14245376
+        }
+      ]
+    },
+    "upstreamArchivePins": {
+      "file": "src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256",
+      "archives": [
+        {
+          "name": "z3-4.15.7-arm64-glibc-2.38.zip",
+          "sha256": "dabee41164abf080ae3bc312d80d1d8700ef49fbfc593c8d8fa4f3cdaf7d6551",
+          "bytes": 49082602
+        },
+        {
+          "name": "z3-4.15.7-arm64-osx-15.7.3.zip",
+          "sha256": "1f4aefb345bded8b6cd6a5a92b6bb2e34110b373779bfb38145200ceeb4fa626",
+          "bytes": 37715389
+        },
+        {
+          "name": "z3-4.15.7-arm64-win.zip",
+          "sha256": "e6ef5a4f8749c0b3214a1ad72e6c5655bbda2eeebe9177277514df1fa7eed571",
+          "bytes": 61750798
+        },
+        {
+          "name": "z3-4.15.7-x64-glibc-2.39.zip",
+          "sha256": "4436ab6381f0b9c68075a267ab13a5f3ad25f7c25f7626dec959c76805c9f2cb",
+          "bytes": 52404177
+        },
+        {
+          "name": "z3-4.15.7-x64-win.zip",
+          "sha256": "7b01f3987bcdab0d0622c417212ad37e7a486ea233e091a59f646e0118316187",
+          "bytes": 66949332
+        },
+        {
+          "name": "z3-4.15.7-x86-win.zip",
+          "sha256": "40f7cc9e69b51dd77e9131eeea62cf039b560629b76a2e87f27b15f3009f9d9c",
+          "bytes": 60053983
+        }
+      ]
+    },
+    "bootstrap": {
+      "action": ".github/actions/bootstrap-z3/action.yml",
+      "scripts": [
+        "src/Calor.Compiler/scripts/download-z3.sh",
+        "src/Calor.Compiler/scripts/download-z3.ps1"
+      ],
+      "verifier": "scripts/verify-z3-assets.py",
+      "source": "Checksum-pinned upstream Z3Prover/z3 4.15.7 archives; every extracted output is then verified against the asset pins. This is the only acquisition path for builds, tests, and packing. Builds never download: ValidateZ3Assets fails when an asset is missing or wrong."
+    }
+  },
+  "platforms": {
+    "supportedRids": [
+      "linux-x64",
+      "linux-arm64",
+      "osx-arm64",
+      "win-x64",
+      "win-arm64"
+    ],
+    "unsupportedRids": [
+      {
+        "rid": "osx-x64",
+        "reason": "Upstream's x64-osx archive contains an arm64 binary; Intel macOS is unsupported for verification. A test host on this RID fails Z3ConsumerGuardTests instead of skipping."
+      },
+      {
+        "rid": "win-x86",
+        "reason": ".NET 10 has no x86 SDK. The asset stays pinned in the asset manifest but is never copied to build output or packed."
+      }
+    ],
+    "determinismEnvironments": [
+      {
+        "id": "linux-x64",
+        "rid": "linux-x64",
+        "runner": "ubuntu-24.04",
+        "runnerOs": "Linux",
+        "runnerArch": "X64",
+        "logicalProcessors": 4,
+        "profiles": [
+          "verification-full",
+          "oracle-isolated",
+          "compiler-verifier"
+        ],
+        "memoryGiB": 16,
+        "jobTimeoutMinutes": 70
+      },
+      {
+        "id": "linux-arm64",
+        "rid": "linux-arm64",
+        "runner": "ubuntu-24.04-arm",
+        "runnerOs": "Linux",
+        "runnerArch": "ARM64",
+        "logicalProcessors": 4,
+        "profiles": [
+          "verification-full",
+          "oracle-isolated"
+        ],
+        "memoryGiB": 16,
+        "jobTimeoutMinutes": 50
+      },
+      {
+        "id": "osx-arm64",
+        "rid": "osx-arm64",
+        "runner": "macos-14",
+        "runnerOs": "macOS",
+        "runnerArch": "ARM64",
+        "logicalProcessors": 3,
+        "profiles": [
+          "verification-full",
+          "oracle-isolated"
+        ],
+        "memoryGiB": 7,
+        "jobTimeoutMinutes": 50
+      },
+      {
+        "id": "win-x64",
+        "rid": "win-x64",
+        "runner": "windows-2025",
+        "runnerOs": "Windows",
+        "runnerArch": "X64",
+        "logicalProcessors": 4,
+        "profiles": [
+          "verification-full",
+          "oracle-isolated"
+        ],
+        "memoryGiB": 16,
+        "jobTimeoutMinutes": 75
+      },
+      {
+        "id": "win-arm64",
+        "rid": "win-arm64",
+        "runner": "windows-11-arm",
+        "runnerOs": "Windows",
+        "runnerArch": "ARM64",
+        "logicalProcessors": 4,
+        "profiles": [
+          "verification-full",
+          "oracle-isolated"
+        ],
+        "memoryGiB": 16,
+        "jobTimeoutMinutes": 75
+      }
+    ],
+    "runnerImages": {
+      "determinismProtocol": [
+        "macos-14",
+        "ubuntu-24.04",
+        "ubuntu-24.04-arm",
+        "windows-11-arm",
+        "windows-2025"
+      ],
+      "rule": "Platform (OS and RID) is a determinism dimension (contract rules.platformDeterminism). Every supported RID in eng/z3-consumers.json is a registered environment. compiler-verifier runs on linux-x64 only, the only platform its release gates use; the protocol establishes nothing for it on another platform and says so in every result. Runner labels are pinned (no -latest label). The runner image version cannot be pinned on hosted runners; every attempt records ImageOS and ImageVersion, and a disagreement is never excused by an image change.",
+      "ordinaryCi": "test.yml and other workflows also use the floating labels ubuntu-latest and windows-latest; hosted images are not pinnable. The images observed at the freeze are in observedAtFreeze.",
+      "observedAtFreeze": {
+        "status": "OBSERVED, NOT PINNED (maintainer decision ENVIRONMENT-OBSERVED-NOT-PINNED, 2026-10-07)",
+        "source": "Tests workflow run 37624076834 (push of the candidate 696ab824 to main); \"Set up job\" and \"Setup .NET\" log lines read with gh run view --job <id> --log at the re-freeze",
+        "dotnet": {
+          "sdk": "10.0.401",
+          "runtime": "10.0.12",
+          "jobs": "all six jobs below report the same SDK and runtime"
+        },
+        "images": [
+          {
+            "label": "ubuntu-latest",
+            "image": "ubuntu-24.04",
+            "version": "20260927.320.1",
+            "provisioner": "20260901.588",
+            "job": "test 112801277007"
+          },
+          {
+            "label": "ubuntu-latest",
+            "image": "ubuntu-24.04",
+            "version": "20261004.327.1",
+            "provisioner": "20261002.596",
+            "job": "tests (compiler) 112801277346"
+          },
+          {
+            "label": "windows-latest",
+            "image": "windows-2025-vs2026",
+            "version": "20260925.250.1",
+            "provisioner": "20260901.588",
+            "job": "z3-consumer-matrix (win-x64) 112801277042"
+          },
+          {
+            "label": "windows-11-arm",
+            "image": "windows-11-vs2026-arm64",
+            "version": "20261004.176.1",
+            "provisioner": "20261002.596",
+            "job": "z3-consumer-matrix (win-arm64) 112801277160"
+          },
+          {
+            "label": "macos-14",
+            "image": "macos-14-arm64",
+            "version": "20260831.0302.1",
+            "provisioner": "20260828.587",
+            "job": "z3-consumer-matrix (osx-arm64) 112801276943"
+          },
+          {
+            "label": "ubuntu-24.04-arm",
+            "image": "ubuntu-24.04-arm",
+            "version": "20261004.142.1",
+            "provisioner": "20261002.596",
+            "job": "z3-consumer-matrix (linux-arm64) 112801277417"
+          }
+        ],
+        "binding": "Accepted as observed, not pinned (maintainer decision ENVIRONMENT-OBSERVED-NOT-PINNED, 2026-10-07; no amendment). The git-based classifier cannot see environment drift. C2 records the SDK, runtime, ImageOS, and ImageVersion each regeneration used.",
+        "note": "The same label (ubuntu-latest) resolved to two image versions within this one run, which is why exact image equality is not a usable requirement."
+      }
+    }
+  },
+  "configuration": {
+    "build": "Release",
+    "checkout": {
+      "coreAutocrlf": false,
+      "fetchDepth": 1,
+      "submodules": false,
+      "rule": "Every environment checks out the committed bytes (git config --global core.autocrlf false before checkout). Inputs are byte-identical on every platform, so any platform difference comes from the code under test. This is an input pin, not a normalization: no output is ever converted. Tracked files must be unmodified before the first attempt and after every invocation (git status --porcelain --untracked-files=no is empty); otherwise that invocation and every later attempt in the job are invalid."
+    },
+    "treatWarningsAsErrors": true,
+    "cultureForOracles": "en-US (R1-O1, B1 oracle)"
+  },
+  "seeds": [
+    {
+      "id": "r1-master-seed",
+      "value": "1419002401",
+      "source": "docs/plans/evidence/r1-1419/registration.json generation.masterSeed",
+      "usedBy": "R1 case generation; S1 runs 1 and 2"
+    },
+    {
+      "id": "b1-bootstrap",
+      "value": "1276",
+      "source": "docs/plans/evidence/b1-1276/registration/registration.json comparability.aggregationMethod",
+      "usedBy": "B1 percentile bootstrap, SplitMix64, 10000 resamples, 95%"
+    },
+    {
+      "id": "z3-random-seed",
+      "value": "42",
+      "source": "tests/Shared/Z3TestSeeding.cs",
+      "applied": false,
+      "note": "G2 protocol 1.2.0: Z3 4.15.7 ignores random_seed as a context parameter, so the constant never reaches the solver."
+    },
+    {
+      "id": "r1-z3-seed",
+      "value": null,
+      "note": "R1 injects no seed into the baseline compiler (registration oracle.z3Seed)."
+    }
+  ],
+  "producers": [
+    {
+      "id": "soundness-sweep",
+      "title": "S1 sweep tool (#1311)",
+      "version": "ExecutionCeiling 1508 (amendment 1.2.1); registration 1.0.0",
+      "files": {
+        "bench/Calor.Soundness.Sweep/BaselineHost.cs": "111b8d597189f985c4865ca18fecf7dd33cf2cbd19aafb063a670e4a706853eb",
+        "bench/Calor.Soundness.Sweep/Calor.Soundness.Sweep.csproj": "b7bd026cd61089c57f63037588aaf9e792dcd8157b41533dfd8dbdb0fed8f879",
+        "bench/Calor.Soundness.Sweep/CaseExecutor.cs": "afa2ce43f83d6a706ee9ff1cb543ecdf68a7d37d13c8ff32052d0c7a8512cacf",
+        "bench/Calor.Soundness.Sweep/LoadedImageCapture.cs": "ef703a2ac332ed7b3626b642c15ab644ea1acbd7cfcedc5b9b8bd1248c164f2c",
+        "bench/Calor.Soundness.Sweep/OracleRuntime.cs": "86cc1d392ed4cd84149b8227c58f802d554a8f86cdd84596002c77dda10ae40e",
+        "bench/Calor.Soundness.Sweep/Program.cs": "c865e6b0d4d3da1afcaa6b11612187cfdc61582ec311bba732c31a3146d855e9",
+        "bench/Calor.Soundness.Sweep/Report.cs": "19a7488ea76c8658ebc02bd306e50b34ab9b5abb84440885aa73889f9d5b3b33"
+      }
+    },
+    {
+      "id": "r1-case-generator",
+      "title": "R1 case generator and independent oracle R1-O1 (#1419)",
+      "version": "registration 1.0.0",
+      "files": {
+        "tests/Calor.Compiler.Tests/SoundnessRegistration/IndependentOracle.cs": "7e74f305453a44a39ab9427eb6a99dc95b2677c86d9d69ed5558c82a500147b6",
+        "tests/Calor.Compiler.Tests/SoundnessRegistration/SoundnessRegistrationTests.cs": "ea6c45aefadd598d90e9a887621f483b91847fff111f3a04d7a5ae3b10887053",
+        "tests/Calor.Compiler.Tests/SoundnessRegistration/SoundnessRegistrationValidator.cs": "4772d89eb3dd6b41eb183e41b572ccee38479dbb27db7a4516934d27d7bc80cd",
+        "tests/Calor.Compiler.Tests/SoundnessRegistration/SweepCaseGenerator.cs": "13e83d228096488912eae873d116da2edec87a59bda82d8169973d9f316ea623"
+      }
+    },
+    {
+      "id": "b1-pair-oracle",
+      "title": "B1 pair oracle b1-1276-pair-oracle (#1276)",
+      "version": "oracle version 1; generator b1-1276-results-generator-v1; inputs b1-1276-signature-inputs-v1",
+      "files": {
+        "tests/Calor.Evaluation/Equivalence/InputGenerator.cs": "d461e4b20bb254d75b60ad800a51908916d690ff2a9cd3012a4b519efce9b7bc",
+        "tests/Calor.Evaluation/Equivalence/PairDifferentialOracle.cs": "d50ead4e5aba7a4d1709ad850eea32e5abccc2cacb3a9b3e0c7fa40630fa98e9",
+        "tests/Calor.Evaluation/Equivalence/PairOracleCommand.cs": "a3fe191b66edc417007ac0df0d94dd9d02b0faa6b1259e3568a30742573b9629",
+        "tests/Calor.Evaluation/Equivalence/PairResultsCommand.cs": "0e3d87d1d84ea39e596c081e7c2d9c47931fe6145ea4ba21afca98afea84fdc1"
+      }
+    },
+    {
+      "id": "determinism-runner",
+      "title": "G2 determinism protocol runner and decider (#1421)",
+      "version": "protocolVersion 1.3.0",
+      "files": {
+        ".github/workflows/determinism-protocol.yml": "5720d942bc0ff57d3e7e66f2470856177aceb6ae8c45ad05d76ff52dcbce9cf3",
+        "scripts/determinism_protocol.py": "3e743d9de4d937f9c7ece6b7b42bc76126e62f3a158a5594a3a065a045a97851",
+        "scripts/determinism_runner.py": "38688b19a99a851a9a840de7433b6f9f0ddc07b374ffb4abb342d1df5a817ba0",
+        "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DeterminismRecord.cs": "843ca71153522985c90010fe71ff3a2e6d94ff1d2bb48535c3cfd7de9d3a9498",
+        "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DifferentialModels.cs": "d1d74423a8b28d4b2d2ae35b38a65cad4994797646ff3509a497d9b6e5ec53dc"
+      }
+    },
+    {
+      "id": "r2-release-verifier",
+      "title": "R2 adjudication-identity verifier (#1410)",
+      "version": "identity calor-adjudication:v1",
+      "files": {
+        "scripts/verify_release_adjudication.py": "9ac5b9322b1e4464de471491579ce30573996535249fa551c650775d0dc8cf10"
+      }
+    },
+    {
+      "id": "b2-publication-gate",
+      "title": "B2 benchmark publication gate (#1422)",
+      "version": "no override option",
+      "files": {
+        ".github/workflows/benchmark.yml": "4de37869a952d982f172e542d88738f9a5388f34fd4768b9e783263fd31d1094",
+        "scripts/benchmark_publication_gate.py": "0cbe64a73a3119d230b616244f51964f5d7f6ebcd16733b01d8d455ee5d6afee"
+      }
+    },
+    {
+      "id": "z3-asset-verifier",
+      "title": "G1 Z3 asset verifier (#1420)",
+      "version": "z3 4.15.7",
+      "files": {
+        "scripts/check-packaged-z3.py": "5bcf3ca773d44ce26fd57cd64b0d2bcfef44584816bd5a8e10d4af9f0c8befb8",
+        "scripts/verify-z3-assets.py": "33a06f97f633574052661d284556889c34b08b310de22f5cfa343233c0f72d32"
+      }
+    },
+    {
+      "id": "evidence-contract-validator",
+      "title": "R0 validator (#1407)",
+      "version": "contract 1.3.2",
+      "files": {
+        "tests/Calor.Compiler.Tests/EvidenceContract/BenchmarkRegistrationTests.cs": "b7368ebf71c9740b60c3d8cd70f86c8733a5630137046f765fce97507dca0bdc",
+        "tests/Calor.Compiler.Tests/EvidenceContract/BenchmarkRegistrationValidator.cs": "f7c952797c03e3ea36b8d879c1e6019a767583fc3690f377638c17f9e5bdd536",
+        "tests/Calor.Compiler.Tests/EvidenceContract/BenchmarkResultsTests.cs": "d84825d8928a575e3f6e7b21df11df922466d24fe70adaa87dc7fbbe5400ddca",
+        "tests/Calor.Compiler.Tests/EvidenceContract/BenchmarkResultsValidator.cs": "39bdb6b45bec71683a4d34087341b7179334e858bb260bc3fbbe90c3d328c0cf",
+        "tests/Calor.Compiler.Tests/EvidenceContract/EvidenceContractTests.cs": "959b80b9cb41cffe5b49701f7dad4c38f967ebc969d89d7b1cd1b7cebf04b49b",
+        "tests/Calor.Compiler.Tests/EvidenceContract/EvidenceContractValidator.cs": "2d458fe18dba3876d86dfad3674b90b47a013ccef66c6da537546eaebbf94f84"
+      }
+    },
+    {
+      "id": "durable-provenance",
+      "title": "P1 durable provenance verifier (#1417)",
+      "version": "index schema 2",
+      "files": {
+        "tests/Calor.Compiler.Tests/Provenance/DurableProvenance.cs": "beb5371d4621f1e0c29f471930652c554acda6ffd633142d1307b9f3e3baa6ec",
+        "tests/Calor.Compiler.Tests/Provenance/DurableProvenanceTests.cs": "c72c40ee8e187cab24d0416dd8e6b87e76656d510ad9f1200204596dcebd744a"
+      }
+    }
+  ],
+  "contractPacket": {
+    "sha256Json": {
+      "path": "docs/plans/evidence/evidence-contract-1407/sha256.json",
+      "sha256": "8f67450b5188cecc7fafa3774bd3de86e46dbab031c4b8393c9844d72cdf9513",
+      "files": {
+        "docs/plans/v0.24-evidence-contract.md": "3a2dd229ace2c9531007027ca36caf90040959ba96cff835a888717fb5da49e9",
+        "docs/plans/evidence/evidence-contract-1407/contract.json": "2b87def646d572e6656cb96157f78dafd040fbb1b46b2cf45e0571cb3290cf12",
+        "docs/plans/evidence/evidence-contract-1407/artifact-inventory.json": "9eaf83a684a5537bb27cea08bf9020f36a5706bf1515d88e379900be4a5b0b6e"
+      }
+    },
+    "contractVersion": "1.3.2",
+    "status": "FROZEN",
+    "gateStatus": "MET",
+    "acceptance": {
+      "mergeCommit": "669e535c8a9dac967a73c70b28f9f2d0bcf84c80",
+      "mergedAtUtc": "2026-10-02T13:10:12Z",
+      "pr": 1466
+    },
+    "amendmentLog": [
+      {
+        "version": "1.0.1",
+        "timestampUtc": "2026-10-02T13:10:12Z",
+        "reviewedInPr": 1470,
+        "mergeCommit": "585b45d683eb19c1ab7caa413361d5ae890a0144",
+        "afterDecisionBearingInspection": false
+      },
+      {
+        "version": "1.1.0",
+        "timestampUtc": "2026-10-02T23:11:32Z",
+        "reviewedInPr": 1477,
+        "mergeCommit": "91fa778093be03850d809cc591e24c37906b5190",
+        "afterDecisionBearingInspection": false
+      },
+      {
+        "version": "1.1.1",
+        "timestampUtc": "2026-10-03T17:19:34Z",
+        "reviewedInPr": 1478,
+        "mergeCommit": "bf584fb71db140ca19e5c956a241a0da7dd02f60",
+        "afterDecisionBearingInspection": false
+      },
+      {
+        "version": "1.2.0",
+        "timestampUtc": "2026-10-03T21:14:20Z",
+        "reviewedInPr": 1484,
+        "mergeCommit": "2019a8a87913520b7774ee729afeef252911766d",
+        "afterDecisionBearingInspection": true
+      },
+      {
+        "version": "1.2.1",
+        "timestampUtc": "2026-10-03T23:29:07Z",
+        "reviewedInPr": 1488,
+        "mergeCommit": "2d8ee096ea7146c52fb7fb022f2e387327922780",
+        "afterDecisionBearingInspection": true
+      },
+      {
+        "version": "1.3.0",
+        "timestampUtc": "2026-10-04T15:30:54Z",
+        "reviewedInPr": 1501,
+        "mergeCommit": "ffa75e8bf2e899826a2cfa9c524835d735d9b1c5",
+        "afterDecisionBearingInspection": true
+      },
+      {
+        "version": "1.3.1",
+        "timestampUtc": "2026-10-04T19:23:20Z",
+        "reviewedInPr": 1504,
+        "mergeCommit": "f552e38be6124f91ba0887c669e59aaaae968046",
+        "afterDecisionBearingInspection": true
+      },
+      {
+        "version": "1.3.2",
+        "timestampUtc": "2026-10-06T13:38:17Z",
+        "reviewedInPr": 1507,
+        "mergeCommit": "7d94d095729a4e8ba74a4a50574c24f844dec9f1",
+        "afterDecisionBearingInspection": true
+      }
+    ],
+    "amendmentLogSha256": "e802ecb0806a19ed5b8ecbacfc2aaa0758714a57f6c245dad29ce98c0723a569",
+    "amendmentLogHashRule": "SHA-256 over one UTF-8 line per entry, \"version|timestampUtc|reviewedInPr|afterDecisionBearingInspection|mergeCommit\\n\". The full log text (justifications, inspection statements) is bound by the contract.json hash in sha256Json.files."
+  },
+  "registeredManifests": {
+    "packets": [
+      {
+        "path": "docs/plans/evidence/evidence-contract-1407/sha256.json",
+        "sha256": "8f67450b5188cecc7fafa3774bd3de86e46dbab031c4b8393c9844d72cdf9513",
+        "sha256LF": "8f67450b5188cecc7fafa3774bd3de86e46dbab031c4b8393c9844d72cdf9513",
+        "normalization": "LF",
+        "fileCount": 3,
+        "verifiedAtCandidate": true
+      },
+      {
+        "path": "docs/plans/evidence/r1-1419/sha256.json",
+        "sha256": "8ea1a8451d98b5a476a5a01ce364a8f7919638b17cd76bafec2e904eb652b1f9",
+        "sha256LF": "8ea1a8451d98b5a476a5a01ce364a8f7919638b17cd76bafec2e904eb652b1f9",
+        "normalization": "LF",
+        "fileCount": 7,
+        "verifiedAtCandidate": true
+      },
+      {
+        "path": "docs/plans/evidence/s1-1311/sha256.json",
+        "sha256": "092b8c7da45b3e985da967f4a8d857e4628df0895ce84811ba35e9b6c2923bfe",
+        "sha256LF": "092b8c7da45b3e985da967f4a8d857e4628df0895ce84811ba35e9b6c2923bfe",
+        "normalization": "LF",
+        "fileCount": 3617,
+        "verifiedAtCandidate": true
+      },
+      {
+        "path": "docs/plans/evidence/g2-1421/sha256.json",
+        "sha256": "7658147172c8525010c17c0e975079a55286b663ef1d68c74769bde06ca274e1",
+        "sha256LF": "7658147172c8525010c17c0e975079a55286b663ef1d68c74769bde06ca274e1",
+        "normalization": "LF",
+        "fileCount": 9,
+        "verifiedAtCandidate": true
+      },
+      {
+        "path": "docs/plans/evidence/b1-1276/registration/sha256.json",
+        "sha256": "ad81f033b4f090438560d55d1786ce179b6e73300f5c99117efbb1853b478e43",
+        "sha256LF": "ad81f033b4f090438560d55d1786ce179b6e73300f5c99117efbb1853b478e43",
+        "normalization": "LF",
+        "fileCount": 6,
+        "verifiedAtCandidate": true
+      },
+      {
+        "path": "docs/plans/evidence/b1-1276/results/sha256.json",
+        "sha256": "bc2c6f173b1327da3b4989d06a04749fe9456d31613accf3ea1934c9b7ada575",
+        "sha256LF": "bc2c6f173b1327da3b4989d06a04749fe9456d31613accf3ea1934c9b7ada575",
+        "normalization": "raw",
+        "fileCount": 11,
+        "verifiedAtCandidate": true
+      }
+    ],
+    "files": {
+      "docs/plans/evidence/g2-1421/protocol.json": "a4a7d974962d58a450d94cb533a70260a3ad00e48f7878122782a6d8025c8dbe",
+      "docs/plans/evidence/g2-1421/cases.json": "253f591fed185ddfd66865f6e0f81502dc62085555a2cb2dff32ee22be023317",
+      "docs/plans/evidence/r1-1419/registration.json": "e77db9643cbefa02169b854be31cbd6595764eb162cbae824a366518ea34c9f9",
+      "docs/plans/evidence/r1-1419/manifest-B1.json": "eef324d77f1980670e3ad7c9b09ecd28166febbdd39596ccbf3a880fe5ea749f",
+      "docs/plans/evidence/r1-1419/manifest-N1.json": "81a7fa8bbcf87ec561f6b8ec528f72b5bb753c7c3d368957f40c07f67a8f6399",
+      "docs/plans/evidence/b1-1276/registration/pairs.json": "0f0d760a3f247dc6c952c39d5499656ecd0b08b99e8c4148a809302e62a93a7f",
+      "docs/plans/evidence/b1-1276/results/pair-manifest.json": "eec09eab95c60c18b650bd70ee7ad4f807d649cf2f2800665a4f9589a6fe1813",
+      "docs/plans/evidence/s2-1413/dispositions.json": "d87c881a00c4bb3d3450f6a8c6fdd2b313423c0835670c83a857d43fbbdf10cb",
+      "docs/plans/evidence/g3-1135/ledger.json": "0239b926aaa49288dcd4e96d25f6c7debfb16be40732b346069214d8abcbc574",
+      "docs/plans/evidence/evidence-contract-1407/artifact-inventory.json": "9eaf83a684a5537bb27cea08bf9020f36a5706bf1515d88e379900be4a5b0b6e"
+    },
+    "g2ProtocolVersion": "1.3.0"
+  },
+  "acceptedChildren": [
+    {
+      "gate": "R0",
+      "issue": 1407,
+      "mergedPrs": [
+        {
+          "pr": 1466,
+          "mergeCommit": "669e535c8a9dac967a73c70b28f9f2d0bcf84c80",
+          "mergedAtUtc": "2026-10-02T13:10:12Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1470,
+          "mergeCommit": "585b45d683eb19c1ab7caa413361d5ae890a0144",
+          "mergedAtUtc": "2026-10-02T13:58:47Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1477,
+          "mergeCommit": "91fa778093be03850d809cc591e24c37906b5190",
+          "mergedAtUtc": "2026-10-03T16:32:37Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1478,
+          "mergeCommit": "bf584fb71db140ca19e5c956a241a0da7dd02f60",
+          "mergedAtUtc": "2026-10-03T18:04:25Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1484,
+          "mergeCommit": "2019a8a87913520b7774ee729afeef252911766d",
+          "mergedAtUtc": "2026-10-03T23:02:33Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1488,
+          "mergeCommit": "2d8ee096ea7146c52fb7fb022f2e387327922780",
+          "mergedAtUtc": "2026-10-04T02:02:18Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1501,
+          "mergeCommit": "ffa75e8bf2e899826a2cfa9c524835d735d9b1c5",
+          "mergedAtUtc": "2026-10-04T16:48:02Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1504,
+          "mergeCommit": "f552e38be6124f91ba0887c669e59aaaae968046",
+          "mergedAtUtc": "2026-10-04T20:55:13Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1507,
+          "mergeCommit": "7d94d095729a4e8ba74a4a50574c24f844dec9f1",
+          "mergedAtUtc": "2026-10-06T15:01:41Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/evidence-contract-1407/",
+      "issueStateAtFreeze": "OPEN",
+      "closureStatus": "FROZEN, gate MET (contract.json gateStatus); contract 1.3.2."
+    },
+    {
+      "gate": "R1",
+      "issue": 1419,
+      "mergedPrs": [
+        {
+          "pr": 1476,
+          "mergeCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67",
+          "mergedAtUtc": "2026-10-03T00:36:51Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/r1-1419/",
+      "issueStateAtFreeze": "OPEN",
+      "closureStatus": "Registration merged before any sweep result."
+    },
+    {
+      "gate": "S1",
+      "issue": 1311,
+      "mergedPrs": [
+        {
+          "pr": 1480,
+          "mergeCommit": "0a68bee223dcb49a4d8dc74e37e97518cf2da8e8",
+          "mergedAtUtc": "2026-10-04T03:10:04Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/s1-1311/",
+      "issueStateAtFreeze": "OPEN",
+      "closureStatus": "Run 1 and the conforming run 2 committed."
+    },
+    {
+      "gate": "S2",
+      "issue": 1413,
+      "mergedPrs": [
+        {
+          "pr": 1494,
+          "mergeCommit": "ef89c027dd933f4991fd3a85db4b1d1fd707c8db",
+          "mergedAtUtc": "2026-10-04T15:21:24Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1495,
+          "mergeCommit": "eb12fef4122b88a22f3ec62f374de341dc7f4e06",
+          "mergedAtUtc": "2026-10-04T19:18:10Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1496,
+          "mergeCommit": "ba2e31cb6373bcc10aeaa04e3f94e9067d0b8c06",
+          "mergedAtUtc": "2026-10-04T18:06:38Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1497,
+          "mergeCommit": "af5482016a2abaec2ac60309f94a863819eb572b",
+          "mergedAtUtc": "2026-10-04T20:03:25Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1498,
+          "mergeCommit": "275902c3c597d049eb74f319ca0ab68805e2cccc",
+          "mergedAtUtc": "2026-10-04T21:48:12Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1502,
+          "mergeCommit": "aa23d58915b1f591a82852391633b5609c9bb2f9",
+          "mergedAtUtc": "2026-10-07T00:30:53Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1503,
+          "mergeCommit": "9f5dfd763f90aebe16e4e4783f4c1703e464c8d3",
+          "mergedAtUtc": "2026-10-04T22:33:53Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1499,
+          "mergeCommit": "dfc581d4c3ffb108b0d08da3b3a1039cfe8e02d7",
+          "mergedAtUtc": "2026-10-07T01:25:11Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/s2-1413/",
+      "issueStateAtFreeze": "OPEN",
+      "closureStatus": "dispositions.json closure CLOSED / SUCCESS (carried below in s2Closure)."
+    },
+    {
+      "gate": "G1",
+      "issue": 1420,
+      "mergedPrs": [
+        {
+          "pr": 1471,
+          "mergeCommit": "24a9b0bad4749d723814d7b320a5f7c8d2f38f77",
+          "mergedAtUtc": "2026-10-03T17:16:38Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/g1-1420/",
+      "issueStateAtFreeze": "OPEN",
+      "closureStatus": "Consumer/RID inventory eng/z3-consumers.json."
+    },
+    {
+      "gate": "G2",
+      "issue": 1421,
+      "mergedPrs": [
+        {
+          "pr": 1479,
+          "mergeCommit": "7d37bf8d84662a79eb41efcf241b264a55d1e82d",
+          "mergedAtUtc": "2026-10-03T22:44:19Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1486,
+          "mergeCommit": "f5e9ffee0535f098d7f830ae2ed9dcdcd7e677dc",
+          "mergedAtUtc": "2026-10-04T02:26:44Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/g2-1421/",
+      "issueStateAtFreeze": "OPEN",
+      "closureStatus": "Protocol 1.3.0 FROZEN-AT-MERGE."
+    },
+    {
+      "gate": "G3",
+      "issue": 1135,
+      "mergedPrs": [
+        {
+          "pr": 1492,
+          "mergeCommit": "0142438f42278021d95c6169dfe397a7f63eea3c",
+          "mergedAtUtc": "2026-10-04T04:33:45Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1500,
+          "mergeCommit": "d42d031352f2d8d5c1df56fffc19d901186bb94d",
+          "mergedAtUtc": "2026-10-04T15:31:25Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/g3-1135/",
+      "issueStateAtFreeze": "OPEN",
+      "closureStatus": "NOT CLOSED on the candidate: README says \"Status: not closed\"; execution 1 NON-DETERMINISTIC; execution 2 (DETERMINISTIC, commit d42d0313) is parked on branch evidence/g3-1135-exec-2 for C2 to commit."
+    },
+    {
+      "gate": "G4",
+      "issue": 1241,
+      "mergedPrs": [
+        {
+          "pr": 1481,
+          "mergeCommit": "31e834cc84eaf3fe32b82b1df366bfa999eaaf48",
+          "mergedAtUtc": "2026-10-03T22:18:08Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/g4-1241/",
+      "issueStateAtFreeze": "OPEN",
+      "closureStatus": "Tier 2 expectations eng/tier2-fixture-expectations.json."
+    },
+    {
+      "gate": "P1",
+      "issue": 1417,
+      "mergedPrs": [
+        {
+          "pr": 1472,
+          "mergeCommit": "39b5edecc505bdefcd8811c8a8c073fbf1241361",
+          "mergedAtUtc": "2026-10-03T00:01:21Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/p1-1417/",
+      "issueStateAtFreeze": "OPEN",
+      "closureStatus": "DurableProvenance verifier and fresh-clone log."
+    },
+    {
+      "gate": "B1",
+      "issue": 1276,
+      "mergedPrs": [
+        {
+          "pr": 1473,
+          "mergeCommit": "f0e0eb682a8658364170ad49aff2d2c433d570f8",
+          "mergedAtUtc": "2026-10-03T18:03:52Z",
+          "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1482,
+          "mergeCommit": "f621d5518d8ac19dee2d20422f94e9edcc1cb7b8",
+          "mergedAtUtc": "2026-10-03T21:08:04Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/b1-1276/",
+      "issueStateAtFreeze": "CLOSED (COMPLETED, 2026-10-03T16:32:38Z)",
+      "closureStatus": "Registration and oracle results with dispositions."
+    },
+    {
+      "gate": "B2",
+      "issue": 1422,
+      "mergedPrs": [
+        {
+          "pr": 1487,
+          "mergeCommit": "40708acaabbc4995d0c8d5ca27b3f09273eb8f25",
+          "mergedAtUtc": "2026-10-03T23:41:48Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/b2-1422/",
+      "issueStateAtFreeze": "OPEN",
+      "closureStatus": "Refusal gate scripts/benchmark_publication_gate.py."
+    },
+    {
+      "gate": "R2",
+      "issue": 1410,
+      "mergedPrs": [
+        {
+          "pr": 1474,
+          "mergeCommit": "9ca52196baf0faedb91a947659c5e6a4c4966e30",
+          "mergedAtUtc": "2026-10-07T02:12:35Z",
+          "ancestorOfCandidate": true,
+          "mergedViaPr": 1475,
+          "mergedVia": "Stacked PR: GitHub recorded 9ca52196 (the merge of its head into #1475's branch) when #1475 merged. Its identity rests on the GitHub API record; git checks only ancestry."
+        },
+        {
+          "pr": 1475,
+          "mergeCommit": "5ebdbee2fee7fc87d0db187ea81024c3aadcbc54",
+          "mergedAtUtc": "2026-10-07T02:12:33Z",
+          "ancestorOfCandidate": true
+        }
+      ],
+      "evidence": "docs/plans/evidence/r2-1410/",
+      "issueStateAtFreeze": "OPEN",
+      "closureStatus": "Release gate; merged last, immediately before C1 (amendment 1.1.0)."
+    }
+  ],
+  "issueStatesObservedVia": "gh issue list -R juanmicrosoft/calor --milestone 0.24 --state all, run by the C1 agent at the freeze (2026-10-07)",
+  "additionalMerged": [
+    {
+      "issue": 1485,
+      "pr": 1491,
+      "title": "Parser: an empty clause body no longer swallows the next statement",
+      "mergeCommit": "e967aba840d80897c4ae4e18b94d909605bb1d5b",
+      "mergedAtUtc": "2026-10-04T03:23:29Z",
+      "ancestorOfCandidate": true,
+      "evidence": "docs/plans/evidence/fix-1485/"
+    },
+    {
+      "issue": null,
+      "pr": 1506,
+      "title": "Fix flaky MarkdownReportGenerator test (process-wide current directory race)",
+      "mergeCommit": "9af3aeb0dbc1de2387f1f5433c7f956a5eb664d7",
+      "mergedAtUtc": "2026-10-04T21:48:22Z",
+      "ancestorOfCandidate": true,
+      "evidence": null
+    },
+    {
+      "issue": null,
+      "pr": 1509,
+      "title": "Release prep: Calor 0.24.0 (version bump and release notes; no release cut)",
+      "mergeCommit": "696ab82470626164979a07792ed74932ab88d9e6",
+      "mergedAtUtc": "2026-10-07T12:51:39Z",
+      "ancestorOfCandidate": true,
+      "evidence": "docs/plans/evidence/release-0.24.0/"
+    }
+  ],
+  "s2Closure": {
+    "source": "docs/plans/evidence/s2-1413/dispositions.json closure",
+    "closure": {
+      "status": "CLOSED",
+      "result": "SUCCESS",
+      "date": "2026-10-06",
+      "note": "CLOSED on 2026-10-06. All seven repairs are merged, each as the GitHub merge of its PR from its S2 branch with its regression witnesses: R-CACHE #1494 (ef89c027), R-IMPL #1495 (eb12fef4), R-OBL #1496 (ba2e31cb), R-TEXT #1497 (af548201), R-QNT #1498 (275902c3), R-OBL-RESIDUALS #1503 (9f5dfd76), R-NUM #1502 (aa23d589). Every amendment the record relies on is in the contract (1.3.0 capacity allowance and R-OBL overrun; 1.3.1 R-OBL-RESIDUALS overrun; 1.3.2 R-NUM overrun; contract version 1.3.2). Every S1 finding and registered row on B1 and N1, and every discovery, has a disposition, and none is MILESTONE-FAILED, so the result is SUCCESS. The R0 terminal validator does not read this record (Q6): the result is carried into the terminal adjudication by hand."
+    },
+    "repairs": [
+      {
+        "id": "R-CACHE",
+        "pr": 1494,
+        "kind": "FIX-IN-0.24",
+        "mergeCommit": "ef89c027dd933f4991fd3a85db4b1d1fd707c8db",
+        "regressionWitness": [
+          "tests/Calor.Compiler.Tests/S2CacheLiteralWidthTests.cs"
+        ],
+        "presentAtCandidate": true
+      },
+      {
+        "id": "R-IMPL",
+        "pr": 1495,
+        "kind": "DEMOTE-IN-0.24",
+        "mergeCommit": "eb12fef4122b88a22f3ec62f374de341dc7f4e06",
+        "regressionWitness": [
+          "tests/Calor.Compiler.Tests/S2ImplicationDefinednessTests.cs",
+          "tests/Calor.Verification.Tests/S2ImplicationProverDefinednessTests.cs"
+        ],
+        "presentAtCandidate": true
+      },
+      {
+        "id": "R-OBL",
+        "pr": 1496,
+        "kind": "DEMOTE-IN-0.24",
+        "mergeCommit": "ba2e31cb6373bcc10aeaa04e3f94e9067d0b8c06",
+        "regressionWitness": [
+          "tests/Calor.Compiler.Tests/S2ObligationStateTests.cs"
+        ],
+        "presentAtCandidate": true
+      },
+      {
+        "id": "R-TEXT",
+        "pr": 1497,
+        "kind": "FIX-IN-0.24",
+        "mergeCommit": "af5482016a2abaec2ac60309f94a863819eb572b",
+        "regressionWitness": [
+          "tests/Calor.Verification.Tests/S2Z3TextEncodingTests.cs"
+        ],
+        "presentAtCandidate": true
+      },
+      {
+        "id": "R-QNT",
+        "pr": 1498,
+        "kind": "DEMOTE-IN-0.24",
+        "mergeCommit": "275902c3c597d049eb74f319ca0ab68805e2cccc",
+        "regressionWitness": [
+          "tests/Calor.Verification.Tests/S2NestedQuantifierTests.cs",
+          "tests/Calor.Compiler.Tests/S2NestedQuantifierChannelTests.cs"
+        ],
+        "presentAtCandidate": true
+      },
+      {
+        "id": "R-NUM",
+        "pr": 1502,
+        "kind": "DEMOTE-IN-0.24",
+        "mergeCommit": "aa23d58915b1f591a82852391633b5609c9bb2f9",
+        "regressionWitness": [
+          "tests/Calor.Verification.Tests/S2NumericRefusalTests.cs",
+          "tests/Calor.Compiler.Tests/S2NumericDeterminismTests.cs"
+        ],
+        "presentAtCandidate": true
+      },
+      {
+        "id": "R-OBL-RESIDUALS",
+        "pr": 1503,
+        "kind": "DEMOTE-IN-0.24",
+        "mergeCommit": "9f5dfd763f90aebe16e4e4783f4c1703e464c8d3",
+        "regressionWitness": [
+          "tests/Calor.Compiler.Tests/S2ObligationResidualTests.cs"
+        ],
+        "presentAtCandidate": true
+      }
+    ],
+    "findingsWithoutAcceptedDisposition": [],
+    "note": "Q6: the R0 terminal validator does not read the S2 record, so closure.result is carried here and must be carried into the #1408 terminal record explicitly."
+  },
+  "g3Execution2": {
+    "runId": 37213336898,
+    "executionId": "g3-exec-2",
+    "commit": "d42d031352f2d8d5c1df56fffc19d901186bb94d",
+    "protocolVersion": "1.3.0",
+    "verdict": "DETERMINISTIC",
+    "complete": true,
+    "classCounts": {
+      "AGREE-FAIL": 0,
+      "AGREE-PASS": 2137,
+      "DISAGREE": 0,
+      "INCOMPLETE": 0
+    },
+    "resultSha256": "06460f2959e278219b0c71b4c0d000c11b938c2dc50d936667db92a9e2e3fba9",
+    "attemptRecordsSha256": "6ccd38c9d8934a06f832b2f0dcc619fe3134b9b4c16e4666c84482519167c1d1",
+    "branch": "evidence/g3-1135-exec-2",
+    "branchTip": "f2d02af6a238d4a9a4159151b45f5b60027d472e",
+    "recordsVerifiedAgainstLedgerEntry": true,
+    "commitIsAncestorOfCandidate": true
+  },
+  "releasability": {
+    "status": "RELEASABLE VERSION (no conflicting tag at the freeze)",
+    "history": "The first freeze (5ebdbee2, PR #1508 as first pushed) declared 0.22.0, already tagged at 72a0a855, so the R2 gate would fail G009. Maintainer decision RELEASE-VERSION-0.24.0: release prep PR #1509 merged first; this re-freeze names its merge commit.",
+    "rule": "The generator fails unless the candidate declares the decided version and tag v<version> is absent or points at the candidate. A tag created later at another commit, or any version or notes change, invalidates the freeze.",
+    "versionAtCandidate": "0.24.0",
+    "tagAtFreeze": null
+  },
+  "maintainerDecisions": [
+    {
+      "id": "RELEASE-VERSION-0.24.0",
+      "date": "2026-10-07",
+      "by": "@juanmicrosoft (relayed to the C1 agent by the coordinating agent)",
+      "decision": "The release version is 0.24.0. A separate release-preparation PR (version bump and a CHANGELOG 0.24.0 section with the N1 advisory) merges to main before the freeze; C1 then re-freezes in PR #1508 on that merge commit."
+    },
+    {
+      "id": "ENVIRONMENT-OBSERVED-NOT-PINNED",
+      "date": "2026-10-07",
+      "by": "@juanmicrosoft (relayed to the C1 agent by the coordinating agent)",
+      "decision": "Environment binding is accepted as observed, not pinned. No #1407 amendment. C2 records the SDK, runtime, ImageOS, and ImageVersion each regeneration used."
+    }
+  ],
+  "knownOpenItems": [
+    {
+      "id": "R2-NO-MAINTENANCE-RELEASE",
+      "source": "docs/plans/evidence/r2-1410/release-gate.md §7",
+      "owner": "maintainer / A1",
+      "item": "The contract defines no maintenance or non-0.24 release path; every surface is blocked until #1408 records MILESTONE-SUCCEEDED. A maintenance path needs a #1407 amendment first."
+    },
+    {
+      "id": "R2-RELEASE-PR-CONDITION-7",
+      "source": "release-gate.md §6",
+      "owner": "maintainer / A1",
+      "item": "The release PR precedes #1423 and cannot consume an adjudication identity. Whether checking its products (version, rendered notes) against the record satisfies §8 condition 7, or the row needs an amendment, is undecided."
+    },
+    {
+      "id": "R2-BYTE-REPRODUCIBILITY",
+      "source": "release-gate.md §8; reviews/refresh-codex.md",
+      "owner": "C2",
+      "item": "The release gate compares rebuilt bytes with C2-recorded hashes and fails closed where a build is not byte-reproducible (the benchmark generator stamps the run time). C2 must make these builds reproducible or retain the candidate bytes durably. B2's headline embeds its comparison with the headline on main, so its adjudicated hash must be computed against main as it will be at publication. Bot PR #1505 (benchmark headline) was closed unmerged (coordinator, 2026-10-07)."
+    },
+    {
+      "id": "R2-BRANCH-PROTECTION",
+      "source": "release-gate.md §5",
+      "owner": "maintainer",
+      "item": "Recommended settings not enforceable by a workflow: environment-scoped NUGET_API_KEY with a main-only policy; branch protection without admin bypass and with tests (verification) required; a v* tag ruleset; github-pages deployments restricted to main; a red release-audit run treated as a gate bypass."
+    },
+    {
+      "id": "G3-NOT-CLOSED",
+      "source": "docs/plans/evidence/g3-1135/README.md",
+      "owner": "C2",
+      "item": "G3 is not closed on the candidate. Execution 2 (DETERMINISTIC, 2,137 AGREE-PASS) ran on d42d0313, before the S2 repairs changed the verifier and the committed oracle reports, so it establishes nothing for this candidate. C2 commits the parked records (branch evidence/g3-1135-exec-2, verified here against their ledger entry) and runs the protocol on the candidate, charged to regeneration-compute (amendment 1.2.0)."
+    },
+    {
+      "id": "CHILD-ISSUES-OPEN",
+      "source": "GitHub issue states at the freeze",
+      "owner": "maintainer / A1",
+      "item": "Every child issue except #1276 is OPEN at the freeze, although its gate PRs merged; #1493 (fixed by R-TEXT #1497) is also OPEN. Terminal condition 1 needs every child other than #1408 closed with its closure evidence."
+    },
+    {
+      "id": "TOOLCHAIN-AND-IMAGES",
+      "source": "artifact-inventory toolchain-pins open defect",
+      "owner": "C2",
+      "item": "Ordinary CI and publish workflows request SDK '10.0.x' and use runner labels; hosted runner images cannot be pinned. The manifest records the SDK, runtime, and images observed in the candidate's own push run (platforms.runnerImages.observedAtFreeze), not a pin, and image or SDK drift produces no git change for the classifier to see. Only the G2 protocol pins SDK 10.0.401 / runtime 10.0.12. C2 records the realized SDK, runtime, ImageOS, and ImageVersion of every job.",
+      "status": "DECIDED 2026-10-07 (ENVIRONMENT-OBSERVED-NOT-PINNED): accepted as observed, not pinned; no amendment; C2 records what each regeneration used."
+    },
+    {
+      "id": "C1-TEST-COUNT-DELTA",
+      "source": "this manifest invalidation.c1OwnedPaths",
+      "owner": "C2",
+      "item": "C1 adds 86 tests to Calor.Compiler.Tests (eng/test-manifest.json expectedTotal 12,947 -> 13,033). The release-test-suites artifact for the candidate is the candidate's own suite (12,947 tests, 3 skipped); a run at a later commit includes the C1 tests and must say so."
+    },
+    {
+      "id": "CLASSIFIER-NOT-A-TRIPWIRE",
+      "source": "docs/plans/v0.24-c1-candidate.md",
+      "owner": "maintainer / C2 / A1",
+      "item": "No CI check blocks a later invalidating merge to main. C2 and A1 must run the classifier on <candidate>..<their commit> from a checkout of the C1 landing commit (the trust anchor; running it from the commit being judged lets that commit change the classifier), and record the verdict. Making it a required check is a maintainer decision."
+    }
+  ],
+  "resolvedOpenItems": [
+    {
+      "id": "CANDIDATE-NOT-RELEASABLE",
+      "resolvedBy": "Re-freeze on 696ab824 (PR #1509, version 0.24.0, no v0.24.0 tag at the freeze)."
+    },
+    {
+      "id": "N1-ADVISORY-NOT-IN-CANDIDATE",
+      "resolvedBy": "CHANGELOG.md [0.24.0] section of the candidate carries the advisory (\"Advisory: false proofs in 0.21.0 (and the unpublished 0.22.0)\")."
+    }
+  ],
+  "invalidation": {
+    "classifier": "tests/Calor.Compiler.Tests/EvidenceContract/CandidateInvalidation.cs",
+    "tests": [
+      "tests/Calor.Compiler.Tests/EvidenceContract/CandidateInvalidationTests.cs",
+      "tests/Calor.Compiler.Tests/EvidenceContract/CandidateManifestTests.cs"
+    ],
+    "rangeCommand": "From a checkout of the C1 landing commit (the trust anchor): CALOR_C1_CLASSIFY_TARGET=<full SHA> dotnet test tests/Calor.Compiler.Tests --filter FullyQualifiedName~CandidateManifestTests.RangeFromTheCandidateIsNotInvalidated (full clone with refs/remotes/origin/main fetched; without the variable the target is the newest commit that changes a C1 file)",
+    "rule": "Default deny. Every commit in <candidate>..<target> is diffed against each of its parents with renames off; one non-exempt path makes the verdict INVALID. See docs/plans/v0.24-c1-candidate.md.",
+    "c1OwnedPaths": {
+      "exemptBeforeLanding": [
+        "docs/plans/evidence/c1-1423/",
+        "docs/plans/v0.24-c1-candidate.md",
+        "tests/Calor.Compiler.Tests/EvidenceContract/CandidateInvalidation.cs",
+        "tests/Calor.Compiler.Tests/EvidenceContract/CandidateInvalidationTests.cs",
+        "tests/Calor.Compiler.Tests/EvidenceContract/CandidateManifestTests.cs"
+      ],
+      "exemptAfterLanding": [
+        "docs/plans/evidence/c1-1423/reviews/ (newly added data and text files only)"
+      ],
+      "contentChecked": [
+        "eng/test-manifest.json: before the landing only; regular file; only Calor.Compiler.Tests expectedTotal (increase) and an appended note"
+      ],
+      "downstreamEvidence": [
+        "docs/plans/evidence/c2-1424/ (newly added data and text files only)",
+        "docs/plans/evidence/adjudication-1408/ (newly added data and text files only)"
+      ]
+    }
+  },
+  "review": "Reduced independence (contract §9 deviation): Codex adversarial review (at most 3 rounds plus a verification pass) and maintainer review and merge. This is not independent review."
+}
