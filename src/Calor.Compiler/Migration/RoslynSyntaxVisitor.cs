@@ -6773,8 +6773,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 _ => HandleUnsupportedStatement(statement)
             };
         }
-        catch (Exception ex) when (ex is not MemberInteropEscalationException { PreserveMember: true }
-            && _context.ShouldPreserveCSharp)
+        // #1144: an escalation is preserved in every C#-preserving mode (at the member
+        // boundary if not here), so it does not attribute passthrough; a gate-caused
+        // escalation (ConvertExpression's crash containment) already did.
+        catch (Exception ex) when (ex is MemberInteropEscalationException escalation
+            ? !escalation.PreserveMember && _context.PreservesCSharp
+            : _context.ShouldPreserveCSharp)
         {
             // In C#-preserving modes an escalated (or crashed) expression is
             // contained at the nearest statement boundary: the statement is

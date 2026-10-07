@@ -576,6 +576,8 @@ public static class ConvertCommand
             return (1, result);
         }
 
+        // #1144: record losses before writing, so a write failure still reports them.
+        envelope?.SetConversionSummary(result);
         var writeEncoding = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
         try
         {

@@ -168,8 +168,29 @@ public class ConversionPathReportingTests : IDisposable
         // A preservation that happens without passthrough stays interop under lossy plus passthrough.
         var usingDecl = Convert("public class S { public int M() { using var d = new System.IO.MemoryStream(); return 1; } }",
             new ConversionOptions { Fidelity = ConversionFidelity.Lossy, PassthroughOnError = true });
-        Assert.All(usingDecl.Losses.Where(l => l.Kind == ConversionLossKind.InteropPreserved),
-            l => Assert.Equal(ConversionPath.Interop, l.Path));
+        var usingKept = usingDecl.Losses.Where(l => l.Kind == ConversionLossKind.InteropPreserved).ToList();
+        Assert.NotEmpty(usingKept);
+        Assert.All(usingKept, l => Assert.Equal(ConversionPath.Interop, l.Path));
+
+        // An escalated expression is preserved without passthrough too (at the member
+        // boundary), so passthrough moving it to the statement boundary is not passthrough.
+        const string escalating = "public class P { public int M(int x) { x >>>= 1; return x; } }";
+        var lossyEscalation = Convert(escalating, new ConversionOptions { Fidelity = ConversionFidelity.Lossy });
+        Assert.Contains(lossyEscalation.Losses, l => l.Path == ConversionPath.Interop);
+        var ptEscalation = Convert(escalating, new ConversionOptions { Fidelity = ConversionFidelity.Lossy, PassthroughOnError = true });
+        var escalated = ptEscalation.Losses.Where(l => l.Kind == ConversionLossKind.InteropPreserved).ToList();
+        Assert.NotEmpty(escalated);
+        Assert.All(escalated, l => Assert.Equal(ConversionPath.Interop, l.Path));
+    }
+
+    [Fact]
+    public void F6_REPORT_13_WithSuccess_RecomputesTheOutcomeFromCounts()
+    {
+        var preserved = Convert(Fixture("F5-ARRAY-02"), new ConversionOptions()).Paths;
+        Assert.Equal("preserved", preserved.Outcome);
+        Assert.Equal("refused", preserved.WithSuccess(false).Outcome);
+        Assert.Equal("preserved", preserved.WithSuccess(false).WithSuccess(true).Outcome);
+        Assert.Equal("native", Convert(Fixture("F1-REFOUT-01"), new ConversionOptions()).Paths.WithSuccess(false).WithSuccess(true).Outcome);
     }
 
     [Fact]
@@ -297,6 +318,23 @@ public class ConversionPathReportingTests : IDisposable
     }
 
     [Fact]
+    public void F6_REPORT_10_CliWriteFailure_KeepsLossesAndReportsRefused()
+    {
+        // The output path is an existing directory, so the write fails after conversion.
+        var dir = Path.Combine(_tempDir, "w" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(dir, "Out.calr"));
+        File.WriteAllText(Path.Combine(dir, "In.cs"), TrailingLabel);
+
+        var (exit, stdout, _) = CliTestHarness.RunCli(dir, "convert", "In.cs", "-o", "Out.calr", "--format", "json");
+
+        Assert.Equal(1, exit);
+        var data = Data(stdout);
+        Assert.False(data.GetProperty("success").GetBoolean());
+        Assert.Equal("refused", data.GetProperty("conversionPaths").GetProperty("outcome").GetString());
+        Assert.Equal("rescue", data.GetProperty("losses")[0].GetProperty("path").GetString());
+    }
+
+    [Fact]
     public void F6_REPORT_08_CliNative_PrintsNoPathLine()
     {
         var (exit, stdout, stderr) = Cli(Fixture("F1-REFOUT-01"));
@@ -309,6 +347,12 @@ public class ConversionPathReportingTests : IDisposable
 
     private static async Task<(bool IsError, JsonElement Payload)> Mcp(string tool, object arguments)
     {
+        var (isError, text) = await McpText(tool, arguments);
+        return (isError, JsonDocument.Parse(text).RootElement);
+    }
+
+    private static async Task<(bool IsError, string Text)> McpText(string tool, object arguments)
+    {
         var request = new JsonRpcRequest
         {
             Id = JsonDocument.Parse("1").RootElement,
@@ -319,7 +363,7 @@ public class ConversionPathReportingTests : IDisposable
         var result = JsonSerializer.SerializeToElement(response!.Result, McpJsonOptions.Default);
         var text = result.GetProperty("content")[0].GetProperty("text").GetString()!;
         var isError = result.TryGetProperty("isError", out var e) && e.GetBoolean();
-        return (isError, JsonDocument.Parse(text).RootElement);
+        return (isError, text);
     }
 
     [Fact]
@@ -492,6 +536,31 @@ public class ConversionPathReportingTests : IDisposable
             payload.GetProperty("preservationPaths").GetString());
         Assert.All(payload.GetProperty("failedFiles").EnumerateArray(), f =>
             Assert.Equal("refused", f.GetProperty("conversionPaths").GetProperty("outcome").GetString()));
+    }
+
+    [Fact]
+    public async Task F6_REPORT_06_McpBatchAbort_KeepsPreservationPaths()
+    {
+        var dir = Project("F5-ARRAY-02", "F4-ITER-01");
+
+        var (isError, payload) = await McpText("calor_batch", new { action = "convert", projectPath = dir, dryRun = true, skipOnError = false });
+
+        Assert.True(isError);
+        Assert.Contains("Batch aborted (skipOnError=false)", payload);
+        Assert.Contains("Preservation paths: 1 by automatic rescue (parse-failure: 1; no passthrough request needed).", payload);
+    }
+
+    [Fact]
+    public void F6_REPORT_04_CliMigrateMarkdown_NamesEachFilesPaths_EvenWhenRefused()
+    {
+        var dir = Project("F5-ARRAY-02", "F4-ITER-01");
+        var md = Path.Combine(_tempDir, $"r{Guid.NewGuid():N}.md");
+
+        Assert.Equal(1, CliTestHarness.RunCli(dir, "migrate", dir, "--skip-verify", "--skip-analyze", "--report", md).ExitCode);
+
+        var report = File.ReadAllText(md);
+        Assert.Contains("### Failed", report);
+        Assert.Contains("  - rescue (parse-failure, enabled by lossless-fidelity): Converted Calor for 'global::ProbeF5ARRAY02'", report);
     }
 
     [Fact]

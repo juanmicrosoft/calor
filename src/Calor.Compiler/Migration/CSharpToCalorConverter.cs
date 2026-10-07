@@ -608,10 +608,10 @@ public sealed class CSharpToCalorConverter
                 // but the contract now holds without relying on that pairing.
                 && (_options.RescueUnusableMembers || _options.PassthroughOnError)
                 && !context.HasErrors
-                && context.ShouldPreserveCSharp
+                && context.PreservesCSharp
                 && roundTripGate
                 && !RoundTripCompiles(calorSource, context, parseOptions, effectiveOutputKind, cancellationToken);
-            if (context.ShouldPreserveCSharp && (parseFailed || roundTripFailed))
+            if (context.PreservesCSharp && (parseFailed || roundTripFailed))
             {
                 var rewrapped = TryRewrapUnparseableMembers(
                     calorAst, root, context,

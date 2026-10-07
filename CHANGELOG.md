@@ -31,8 +31,9 @@ conversion surface: `calor convert`, `calor migrate`, the MCP tools `calor_conve
 - **Unchanged, now documented: defaults differ by surface.** `calor convert` rescues members
   that fail the C# round trip by default; `calor_convert` and the library do not, and say
   so in their reports (`rescueUnusableMembers: false`). `calor migrate`, `calor_migrate` and
-  `calor_batch` rescue only members whose Calor does not parse, even with
-  `passthroughOnError`. No default changed in this release.
+  `calor_batch` rescue only members whose Calor does not parse. `calor_batch` does so even
+  with `passthroughOnError`; the other two have no passthrough option. No default changed
+  in this release.
 
 ## [0.24.0] - 2026-10-07
 

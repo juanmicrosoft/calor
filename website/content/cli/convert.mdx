@@ -98,11 +98,14 @@ fired when a rescue or passthrough did the work:
 
 `enabledBy` names the default or option that made a rescue possible:
 `lossless-fidelity` (parse failures are always rescued in the default lossless
-mode), `rescueUnusableMembers` (on by default in `calor convert`), or
+mode), `interop-mode` (the library's and MCP's interop conversion mode),
+`rescueUnusableMembers` (on by default in `calor convert`), or
 `passthroughOnError`. When both rescue and passthrough could have fired, the
 report says `rescue`, because the member would have been rescued without the
-flag. So on the command line `--passthrough` rarely changes the report; it
-matters mostly together with `--lossy`.
+flag. Under `--lossy`, C# kept only because you passed `--passthrough` is
+reported as `passthrough`; C# the converter keeps in every mode stays `interop`.
+So on the command line `--passthrough` rarely changes the report unless you also
+pass `--lossy`.
 
 Try it on a method whose last statement carries a label:
 

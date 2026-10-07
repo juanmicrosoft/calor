@@ -365,18 +365,27 @@ public sealed class ConversionContext
     /// Whether unsupported constructs should be preserved as C# passthrough blocks.
     /// True when Mode is Interop or PassthroughOnError is enabled.
     /// </summary>
+    /// <remarks>
+    /// #1144: read this only where a true result leads to a preservation. When only
+    /// PassthroughOnError opens the gate, the next interop loss is attributed to
+    /// passthrough. Use <see cref="PreservesCSharp"/> for a read with no attribution.
+    /// </remarks>
     public bool ShouldPreserveCSharp
     {
         get
         {
-            if (Fidelity == ConversionFidelity.Lossless || Mode == ConversionMode.Interop)
-                return true;
-            // #1144: only PassthroughOnError opened this gate, so the preservation
-            // it leads to is a requested passthrough. The next interop loss consumes it.
-            _passthroughGateOpened = PassthroughOnError;
-            return PassthroughOnError;
+            var preserves = PreservesCSharp;
+            _passthroughGateOpened = preserves
+                && Fidelity != ConversionFidelity.Lossless && Mode != ConversionMode.Interop;
+            return preserves;
         }
     }
+
+    /// <summary>The <see cref="ShouldPreserveCSharp"/> value without passthrough attribution.</summary>
+    public bool PreservesCSharp =>
+        Fidelity == ConversionFidelity.Lossless ||
+        Mode == ConversionMode.Interop ||
+        PassthroughOnError;
 
     private bool _passthroughGateOpened;
 

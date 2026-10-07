@@ -97,7 +97,8 @@
       "after": "Console line 'Preservation paths: 1 by automatic rescue (parse-failure: 1; ...)'; JSON report carries losses[].path and conversionPaths; round-trip failure still fails (D3); Markdown report prints the Preservation paths line and per-loss path/trigger for partial files",
       "tests": [
         "F6_REPORT_04_CliMigrate_ReportsParseFailureRescue_AndRefusesRoundTripFailure",
-        "F6_REPORT_04_CliMigrateReports_MarkdownAndJsonCarryPaths"
+        "F6_REPORT_04_CliMigrateReports_MarkdownAndJsonCarryPaths",
+        "F6_REPORT_04_CliMigrateMarkdown_NamesEachFilesPaths_EvenWhenRefused"
       ]
     },
     {
@@ -117,7 +118,8 @@
       "tests": [
         "F6_REPORT_06_McpBatch_PartialFailure_ReportsEachFilesPath_WithAndWithoutPassthrough",
         "F6_REPORT_06_McpBatch_SuccessfulProject_ReportsRescueAndNative",
-        "F6_REPORT_06_McpBatchSummaryMode_ReportsPaths"
+        "F6_REPORT_06_McpBatchSummaryMode_ReportsPaths",
+        "F6_REPORT_06_McpBatchAbort_KeepsPreservationPaths"
       ]
     },
     {
@@ -157,7 +159,8 @@
       "tests": [
         "F6_REPORT_10_CliRefusal_ExitsOne_AndReportsRefused",
         "F6_REPORT_03_McpDefault_RefusesAndSaysRescueWasOff_PassthroughRescues",
-        "F6_REPORT_10_CliLossy_RoundTripIsNotChecked_SoNoRescueFires"
+        "F6_REPORT_10_CliLossy_RoundTripIsNotChecked_SoNoRescueFires",
+        "F6_REPORT_10_CliWriteFailure_KeepsLossesAndReportsRefused"
       ]
     },
     {
@@ -193,11 +196,13 @@
       "tests": [
         "F6_REPORT_13_McpInteropLocation_HasPathButNoTrigger",
         "F6_REPORT_13_McpWebsiteExample_MatchesTheDocumentedPayload",
-        "F6_REPORT_13_McpValidateAndRoundtripModes_CarryPaths"
+        "F6_REPORT_13_McpValidateAndRoundtripModes_CarryPaths",
+        "F6_REPORT_13_WithSuccess_RecomputesTheOutcomeFromCounts"
       ]
     }
   ],
   "reviews": [
-    "docs/plans/evidence/v0.25-f6-1144/reviews/round-1.md"
+    "docs/plans/evidence/v0.25-f6-1144/reviews/round-1.md",
+    "docs/plans/evidence/v0.25-f6-1144/reviews/round-2.md"
   ]
 }
