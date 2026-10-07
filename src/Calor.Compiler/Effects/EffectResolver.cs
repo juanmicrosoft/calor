@@ -928,10 +928,17 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
     /// user manifest declaring <c>"type": "global::Foo"</c> otherwise became
     /// unreachable the moment lookups started normalizing).
     /// </summary>
-    internal static string NormalizeDeclaringType(string declaringType) =>
-        string.IsNullOrWhiteSpace(declaringType)
-            ? string.Empty
-            : declaringType.Trim().Replace("global::", "", StringComparison.Ordinal);
+    internal static string NormalizeDeclaringType(string declaringType)
+    {
+        if (string.IsNullOrWhiteSpace(declaringType))
+            return string.Empty;
+        var normalized = declaringType.Trim().Replace("global::", "", StringComparison.Ordinal);
+        // #1132: an array receiver ("i32[,]", "Cell[]") declares its instance
+        // members on System.Array (`g.GetLength(0)`, `c.Rank`).
+        return System.Text.RegularExpressions.Regex.IsMatch(normalized, @"^[^\[\]]+(\[,*\])+$")
+            ? "System.Array"
+            : normalized;
+    }
 
     private static IReadOnlyList<string> NormalizeParameters(IReadOnlyList<string> parameterTypes) =>
         parameterTypes.Count == 0
@@ -970,6 +977,11 @@ public sealed class EffectResolverKey : IEquatable<EffectResolverKey>
             return Binding.TypeIdentity.MapShortTypeNameToFullName(
                 WithArity(generic.Definition.QualifiedName, generic.TypeArguments.Length));
         }
+
+        // #1132: instance members of any array (`g.GetLength(0)`, `c.Rank`) are
+        // declared on System.Array; "i32[,]" named no manifest type (Calor0410).
+        if (type is Binding.BoundTypes.ArrayBoundType)
+            return "System.Array";
 
         return Binding.TypeIdentity.MapShortTypeNameToFullName(type.DisplayString);
     }

@@ -102,7 +102,20 @@
         "Find": [],
         "FindAll": [],
         "Exists": [],
-        "TrueForAll": []
+        "TrueForAll": [],
+        "GetLength": [],
+        "GetLongLength": [],
+        "GetLowerBound": [],
+        "GetUpperBound": [],
+        "GetValue": [],
+        "SetValue": ["mut"],
+        "CopyTo": ["mut"],
+        "Initialize": ["mut"]
+      },
+      "getters": {
+        "Length": [],
+        "LongLength": [],
+        "Rank": []
       }
     },
     {
