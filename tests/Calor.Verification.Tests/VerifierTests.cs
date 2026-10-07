@@ -76,7 +76,10 @@ public class VerifierTests
             new[] { preconditionLowerBound, preconditionUpperBound },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        // #1413 (S2 R-NUM): frozen row NUM-OVERFLOW-CHECKED ("Assumed (checked-arithmetic)"): the
+        // precondition rules the overflow out, but the shape is overflow-sensitive, so it is Assumed.
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Equal([Z3Verifier.CheckedArithmeticAssumption], result.EffectiveOutcome.Assumptions);
     }
 
     [SkippableFact]
@@ -490,7 +493,10 @@ public class VerifierTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        // #1413 (S2 R-NUM): frozen row NUM-OVERFLOW-CHECKED ("Assumed (checked-arithmetic)"): the
+        // precondition rules the overflow out, but the shape is overflow-sensitive, so it is Assumed.
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Equal([Z3Verifier.CheckedArithmeticAssumption], result.EffectiveOutcome.Assumptions);
     }
 
     // ===========================================
@@ -773,7 +779,10 @@ public class VerifierTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        // #1413 (S2 R-NUM): frozen row NUM-OVERFLOW-CHECKED ("Assumed (checked-arithmetic)"): the
+        // precondition rules the overflow out, but the shape is overflow-sensitive, so it is Assumed.
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Equal([Z3Verifier.CheckedArithmeticAssumption], result.EffectiveOutcome.Assumptions);
     }
 
     [SkippableFact]

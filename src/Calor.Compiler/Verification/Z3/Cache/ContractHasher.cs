@@ -180,6 +180,10 @@ public sealed class ContractHasher
 
     private void AppendExpression(StringBuilder sb, ExpressionNode expr)
     {
+        // #1413: INT:-inferred 64-bit literals are refused by the verifier while the same
+        // value spelled LONG: is modeled; they must never share a cached verdict.
+        if (expr is IntLiteralNode { WidthInferred: true })
+            sb.Append("INFERRED-WIDTH:");
         // #1413 (S1 QNT-NESTED): nested quantifiers are refused by every verifier channel,
         // but a cache written before that refusal may hold a Proven for one. Never read or
         // write such a key, so no stale claim can be served.

@@ -91,7 +91,11 @@ public sealed class VerificationCacheEntry
     // platform, so verdicts over non-ASCII text change. SemanticsVersion stays (the translator
     // fixture output is unchanged); the bump evicts every entry instead. (1.20 is the
     // #1413 cache-literal-width repair, merged first.)
-    public const string CurrentFormatVersion = "1.21";
+    // 1.22 (#1413, S2 R-NUM): sub-32-bit arithmetic/negation (D1) and INT: literals outside the
+    // int32 range (D2) are refused, and checked arithmetic that can overflow on some input is
+    // Assumed even when the preconditions rule it out. Older entries may hold Proven for them.
+    // (1.21 is taken by the S2 text-encoding repair, #1497.)
+    public const string CurrentFormatVersion = "1.22";
 
     /// <summary>#778: the compiler-semantics ledger version that produced this entry.
     /// A verdict computed under different compile semantics must not be served, even
