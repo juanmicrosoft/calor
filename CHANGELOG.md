@@ -4,6 +4,85 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-10-07
+
+Calor 0.24 is a soundness release. It repairs verifier defects found by a registered soundness
+sweep, and it adds machinery that makes the release evidence reproducible. It adds no new syntax.
+
+This is the first release on NuGet since 0.21.0. The v0.22.0 tag and GitHub pre-release exist,
+but the NuGet publish for 0.22.0 was skipped after its performance tests failed, so 0.22.0 never
+reached NuGet. Milestone 0.23 was planning-only and shipped no code. If you upgrade from 0.21.0,
+read the 0.22.0 entry below as well: its changes are part of this release.
+
+The 0.24 evidence is adjudicated by the maintainer who directed and merged the repairs. It is not
+independently adjudicated or independently verified, so every 0.24 evidence claim is at most
+*bounded*. No benchmark results are published with this release.
+
+### Advisory: false proofs in 0.21.0 (and the unpublished 0.22.0)
+
+The 0.24 soundness sweep (a fixed, registered set of generated verifier test cases) checked two
+builds: the 0.21.0 NuGet package and the v0.22.0 source. In each build it found **7 false
+proofs in 4 areas**. A false proof is a "proven" or "valid" verdict for a claim that a concrete
+input violates. The published 0.21.0 package is not changed; the defects remain in it.
+
+1. **Runtime checks removed (3 cases).** In these two areas, 0.21.0 could report a proof and
+   delete a runtime check that the program then needed.
+   - *Proof obligations after reassignment (2 cases).* With `§Q (> x -1)`, then `§ASSIGN x -5`,
+     then `§PROOF (> x -1)`, the obligation solver still used the precondition, reported the
+     obligation discharged, and removed its runtime check. In 0.24.0 the stale fact is not used.
+     The obligation is `Unsupported` (`Calor1124`), and the runtime check stays. This is a
+     demotion: 0.24.0 withdraws the claim; it does not prove anything new.
+   - *The verification cache confused `INT:1` with `LONG:1` (1 case).* After compiling
+     `x + LONG:1`, a later compile of `x + INT:1` reused the cached `Proven`, although
+     `int.MaxValue + 1` overflows, and the runtime check was removed. In 0.24.0 the cache key
+     includes each literal's width, and the case is refuted as it should be. This is a fix.
+2. **Wrong interface acceptance (4 cases).** No runtime check was removed, but the verdict was
+   wrong. When a class implements an interface, Calor checks that the class's precondition
+   accepts every input the interface accepts. 0.21.0 reported that check as proven
+   (`Calor0815`) for preconditions that throw on an input the interface allows.
+   - *Preconditions that read a string that may be null (3 cases),* such as `(>= (len s) 0)`,
+     which throws at `s = null`. In 0.24.0 these are `Assumed`, not proven, with the new warning
+     `Calor0819`. This is a demotion.
+   - *A remainder that may divide by zero (1 case),* `(> (% x y) -2)`, which throws at `y = 0`.
+     In 0.24.0 the check is refuted with the input `x = 3, y = 0`, reported as an error
+     (`Calor0810`). This is a fix.
+
+A related defect was found outside the sweep (#1493). On Windows, two different non-ASCII
+identifiers could in principle become one solver variable and so prove a false contract. It was
+not observed in practice. 0.24.0 fixes it.
+
+**What to do.** Upgrade to 0.24.0 and recompile. C# that 0.21.0 generated keeps any runtime
+check it removed until you regenerate it with 0.24.0. The verification cache format changed, so
+cached verdicts from older versions are recomputed automatically.
+
+**What the sweep does not show.** The sweep samples registered forms. It is not a proof that the
+verifier is sound.
+
+- It ran 710 cases per build, on one platform (macOS arm64), twice, with identical results.
+- Of its 100 registered rows (groups of related cases), 79 found no counterexample within the
+  sweep's budget. That means only that none was found. 44 of those 79 rows contain no proven
+  case at all, so they support no claim about `Proven` results. 7 rows were outside the
+  registered scope and were not run.
+- Whole-compiler soundness is not established. Other false proofs may exist in forms the sweep
+  did not sample.
+
+The sweep's other 27 findings per build were not false proofs. 8 were true proofs of forms that
+the registration says must not be reported `Proven`. 17 were spurious refutations: reported
+counterexamples that the program cannot produce. 2 were further stale cache verdicts with the
+same cause as the cache case above. 0.24.0 fixes or visibly demotes all 34 findings. A demoted
+form becomes `Assumed` or `Unsupported` and keeps its runtime check. The entries under **Fixed**
+give the details.
+
+### Added
+
+- **Warning `Calor0819` ("Assumed, not proven") for interface contract checks (#1413).** It
+  marks a check that holds only under an assumption the solver cannot model, such as a string,
+  array, or user-type value that may be null. See the interface entry under **Fixed**.
+- **Reproducible release evidence.** The repository now records, under `docs/plans/`, the 0.24
+  evidence contract, the registered soundness sweep and its results (#1311), a disposition for
+  every finding (#1413), and a registered verifier determinism protocol (#1421). A release can
+  be published only through a gate that checks one adjudication record (#1410).
+
 ### Changed
 
 - **Benchmark publication refuses incomparable results (#1422).** The benchmark workflow now
@@ -18,6 +97,16 @@ All notable changes to this project will be documented in this file.
   when it cannot read a pass rate, instead of recording 0.
 - **Older website benchmark numbers are labeled historical.** They stay published, marked as not
   comparable under the 0.24 method.
+- **Z3 native libraries reach every consumer through one verified build step (#1420).** The
+  compiler build validates the bootstrapped Z3 files, then hands the same set to test projects,
+  `Calor.Tasks`, the `calor` tool package, and the SDK package. Packages carry natives for
+  linux-x64, linux-arm64, osx-arm64, win-x64, and win-arm64. Before, a build could pass
+  validation yet ship no native library, and the Z3 tests in that consumer then skipped silently.
+- **CI fixture checks report what they actually do (#1241).** A script that claimed an AST round
+  trip (parse, emit, parse) compiled each fixture once and compared nothing. It is replaced by one
+  that says it compiles each fixture once. An explicit list now gives the expected outcome for all
+  509 tracked `.calr` fixtures: 428 compile, 51 must be rejected, and 30 are known failures that
+  never count as passes.
 
 ### Fixed
 
@@ -75,8 +164,7 @@ All notable changes to this project will be documented in this file.
   the preconditions and facts they assume, interface contract checks, and guard validation.
   The result is `Unsupported` and the runtime check is kept, even for nested forms the
   compiler can check at run time. The rule applies to the contract after simplification (a
-  nested quantifier that simplifies to `true` is still proven). For interface contract checks,
-  the refusal is reported once #1495 merges. The verification cache never stores or serves such a
+  nested quantifier that simplifies to `true` is still proven). The verification cache never stores or serves such a
   result. A k-induction invariant with a conjunct the prover cannot parse is no longer
   reported proven from the conjuncts it could parse.
 
@@ -96,9 +184,11 @@ All notable changes to this project will be documented in this file.
   - **Windows strings.** A string literal with a non-ASCII character reached Z3 in the Windows
     code page instead of UTF-8. For example, `"é"` had length 1 on Windows but 2 on Linux and
     macOS, so a postcondition about its length was refuted (`Calor0712`) on Windows only. All
-    platforms now use the UTF-8 byte model. A proof that depends on string semantics is still
-    reported as assumed and keeps its runtime check. The verification cache format moves to
-    1.19, so old cached verdicts are recomputed once.
+    platforms now send the same encoding: first the UTF-8 byte model, and in the final 0.24.0
+    the UTF-16 code units described in the "Text reaches the solver" entry above. A proof that
+    depends on string semantics is still reported as assumed and keeps its runtime check. The
+    verification cache format changed again later in 0.24 (now 1.22), so old cached verdicts
+    are recomputed once.
   - **User-level cache on Windows.** The default verification cache and the user effect
     manifests (`~/.calor`) now honor `USERPROFILE` on Windows, as NuGet does. Linux and macOS
     are unchanged.
