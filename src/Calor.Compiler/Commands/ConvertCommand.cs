@@ -598,6 +598,9 @@ public static class ConvertCommand
             return (1, result);
         }
 
+        if (envelope != null)
+            envelope.OutputWritten = true;
+
         // #770: structured loss accounting. The unconditional "✓ Conversion
         // successful" line was a false-success vector — it is now printed ONLY
         // when the conversion is fully native (zero recorded losses) and any
@@ -850,11 +853,15 @@ public static class ConvertCommand
             Data.ConversionPaths = result.Paths;
         }
 
-        /// <summary>#1144: nothing was written, so the file's outcome is refused.</summary>
+        /// <summary>#1144: set once the converted output is on disk.</summary>
+        public bool OutputWritten { get; set; }
+
+        /// <summary>#1144: the command failed; the file's outcome is refused unless its output was already written.</summary>
         public void MarkRefused()
         {
             Data.Success = false;
-            Data.ConversionPaths = Data.ConversionPaths?.WithSuccess(false);
+            if (!OutputWritten)
+                Data.ConversionPaths = Data.ConversionPaths?.WithSuccess(false);
         }
 
         public void SetBenchmark(FileMetrics metrics)

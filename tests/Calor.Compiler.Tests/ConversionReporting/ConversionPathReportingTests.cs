@@ -184,6 +184,58 @@ public class ConversionPathReportingTests : IDisposable
     }
 
     [Fact]
+    public void F6_REPORT_12_InterfaceMemberEscalation_UnderLossyPassthrough_StaysInterop()
+    {
+        const string source = "public interface I { void M(int x = 8 >>> 1); }";
+        foreach (var passthrough in new[] { false, true })
+        {
+            var result = Convert(source, new ConversionOptions { Fidelity = ConversionFidelity.Lossy, PassthroughOnError = passthrough });
+            var kept = result.Losses.Where(l => l.Kind == ConversionLossKind.InteropPreserved).ToList();
+            Assert.NotEmpty(kept);
+            Assert.All(kept, l => Assert.Equal(ConversionPath.Interop, l.Path));
+        }
+    }
+
+    [Fact]
+    public void F6_REPORT_13_StaleGateRead_DoesNotLabelALaterLoss()
+    {
+        var context = new ConversionContext { Fidelity = ConversionFidelity.Lossy, PassthroughOnError = true };
+        Assert.True(context.ShouldPreserveCSharp);
+        context.Fidelity = ConversionFidelity.Lossless;
+        context.RecordLoss(ConversionLossKind.InteropPreserved, "record", "kept");
+        Assert.Equal(ConversionPath.Interop, context.Losses[^1].Path);
+
+        context.Fidelity = ConversionFidelity.Lossy;
+        Assert.True(context.ShouldPreserveCSharp);
+        context.RecordLoss(ConversionLossKind.Dropped, "x", "dropped");
+        context.RecordLoss(ConversionLossKind.InteropPreserved, "record", "kept");
+        Assert.Equal(ConversionPath.Interop, context.Losses[^1].Path);
+    }
+
+    [Fact]
+    public void F6_REPORT_11_ModuleNameAlias_RefusesAmbiguousGlobalAndNamespaceTypes()
+    {
+        // Global Probe would be keyed as Custom.Probe; a real Custom.Probe makes that ambiguous.
+        var source = Fixture("F5-ARRAY-02").Replace("public static class Probe", "public static partial class Probe")
+            + "\nnamespace Custom { public static partial class Probe { public static int Other() => 1; } }\n";
+        Assert.Contains("partial class Probe", source);
+
+        var result = Convert(source, new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy, PassthroughOnError = true, ModuleName = "Custom"
+        });
+
+        Assert.DoesNotContain(result.Losses, l => l.Feature == "post-validation-fallback" && l.Description.Contains("Custom.Probe"));
+
+        // Control: without the real Custom.Probe the aliased global Probe is rescued.
+        var control = Convert(Fixture("F5-ARRAY-02"), new ConversionOptions
+        {
+            Fidelity = ConversionFidelity.Lossy, PassthroughOnError = true, ModuleName = "Custom"
+        });
+        Assert.Contains(control.Losses, l => l.Feature == "post-validation-fallback" && l.Description.Contains("Custom.Probe"));
+    }
+
+    [Fact]
     public void F6_REPORT_13_WithSuccess_RecomputesTheOutcomeFromCounts()
     {
         var preserved = Convert(Fixture("F5-ARRAY-02"), new ConversionOptions()).Paths;
@@ -543,11 +595,15 @@ public class ConversionPathReportingTests : IDisposable
     {
         var dir = Project("F5-ARRAY-02", "F4-ITER-01");
 
-        var (isError, payload) = await McpText("calor_batch", new { action = "convert", projectPath = dir, dryRun = true, skipOnError = false });
+        var (isError, payload) = await Mcp("calor_batch", new { action = "convert", projectPath = dir, dryRun = true, skipOnError = false });
 
         Assert.True(isError);
-        Assert.Contains("Batch aborted (skipOnError=false)", payload);
-        Assert.Contains("Preservation paths: 1 by automatic rescue (parse-failure: 1; no passthrough request needed).", payload);
+        Assert.StartsWith("Batch aborted (skipOnError=false)", payload.GetProperty("error").GetString());
+        Assert.Equal("Preservation paths: 1 by automatic rescue (parse-failure: 1; no passthrough request needed)",
+            payload.GetProperty("preservationPaths").GetString());
+        var rescued = FileEntry(payload.GetProperty("files"), "F5-ARRAY-02").GetProperty("conversionPaths");
+        Assert.Equal(1, rescued.GetProperty("rescue").GetInt32());
+        Assert.Equal("refused", rescued.GetProperty("outcome").GetString());
     }
 
     [Fact]

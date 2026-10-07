@@ -255,12 +255,19 @@ public sealed class BatchTool : McpToolBase
                 if (firstFailure != null)
                 {
                     var errorMsg = firstFailure.Issues.FirstOrDefault()?.Message ?? "Unknown error";
-                    // #1144: keep the preservation paths of the work done before the abort.
-                    var paths = ConversionPathSummary.Describe(
-                        report.FileResults.SelectMany(f => f.Losses), "passthroughOnError");
-                    return McpToolResult.Error(
-                        $"Batch aborted (skipOnError=false): {Path.GetFileName(firstFailure.SourcePath)} — {errorMsg}"
-                        + (paths != null ? $" {paths}." : ""));
+                    // #1144: keep each file's conversion paths for the work done before the abort.
+                    return McpToolResult.Json(new
+                    {
+                        error = $"Batch aborted (skipOnError=false): {Path.GetFileName(firstFailure.SourcePath)} — {errorMsg}",
+                        preservationPaths = ConversionPathSummary.Describe(
+                            report.FileResults.SelectMany(f => f.Losses), "passthroughOnError"),
+                        files = report.FileResults.Select(f => new
+                        {
+                            sourcePath = f.SourcePath,
+                            status = f.Status.ToString().ToLowerInvariant(),
+                            conversionPaths = f.ConversionPaths
+                        }).ToList()
+                    }, isError: true);
                 }
             }
 

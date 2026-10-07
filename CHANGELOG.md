@@ -28,6 +28,9 @@ conversion surface: `calor convert`, `calor migrate`, the MCP tools `calor_conve
   `moduleNameOverride` had the same problem. These now rescue like other calls.
 - **Fixed: `calor_convert` with `mode: "roundtrip"` ignored `passthroughOnError`.** It now
   honours it, like the `convert` and `validate` modes, and its result gains a `lossSummary`.
+- **Changed: a `calor_batch` abort is now JSON.** With `skipOnError: false`, the abort used to
+  return only an error sentence. It now returns JSON with that sentence in `error`, plus
+  `preservationPaths` and each file's `conversionPaths`; `isError` is still `true`.
 - **Unchanged, now documented: defaults differ by surface.** `calor convert` rescues members
   that fail the C# round trip by default; `calor_convert` and the library do not, and say
   so in their reports (`rescueUnusableMembers: false`). `calor migrate`, `calor_migrate` and

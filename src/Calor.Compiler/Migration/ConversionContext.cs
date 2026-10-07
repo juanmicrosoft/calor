@@ -444,16 +444,16 @@ public sealed class ConversionContext
         ConversionLossKind kind, string feature, string description, int? line,
         string? path, string? trigger, string? enabledBy)
     {
-        if (kind == ConversionLossKind.InteropPreserved)
+        // #1144: the gate read is consumed by the next loss of any kind, and re-checked
+        // against the current options, so a stale read cannot label an unrelated loss.
+        if (kind == ConversionLossKind.InteropPreserved && path == null && _passthroughGateOpened
+            && PassthroughOnError && Fidelity != ConversionFidelity.Lossless && Mode != ConversionMode.Interop)
         {
-            if (path == null && _passthroughGateOpened)
-            {
-                path = ConversionPath.Passthrough;
-                trigger = ConversionTrigger.UnsupportedConstruct;
-                enabledBy = ConversionEnabledBy.PassthroughOnError;
-            }
-            _passthroughGateOpened = false;
+            path = ConversionPath.Passthrough;
+            trigger = ConversionTrigger.UnsupportedConstruct;
+            enabledBy = ConversionEnabledBy.PassthroughOnError;
         }
+        _passthroughGateOpened = false;
 
         _losses.Add(new ConversionLoss
         {

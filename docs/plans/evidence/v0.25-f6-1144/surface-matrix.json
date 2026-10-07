@@ -53,7 +53,7 @@
     {
       "id": "D5-lossy-passthrough-member-gates",
       "decision": "fixed after Codex round 1",
-      "detail": "Under lossy fidelity in standard mode, ShouldPreserveCSharp is true only because of PassthroughOnError. The context now records when that getter opened the gate only through PassthroughOnError, and the next interop loss is labelled path=passthrough, trigger=unsupported-construct, enabledBy=passthroughOnError. Catch filters test MemberInteropEscalationException before the gate, so an escalation (preserved in every mode) never marks passthrough. Rescue precedence also accounts for the preservation gate: with both options on, lossless reports rescue, lossy reports passthrough."
+      "detail": "Under lossy fidelity in standard mode, ShouldPreserveCSharp is true only because of PassthroughOnError. The context now records when that getter opened the gate only through PassthroughOnError, and the next interop loss is labelled path=passthrough, trigger=unsupported-construct, enabledBy=passthroughOnError. Catch filters test MemberInteropEscalationException before the gate, so an escalation (preserved in every mode) never marks passthrough. Rescue precedence also accounts for the preservation gate: with both options on, lossless reports rescue, lossy reports passthrough. Escalations are evaluated with the attribution-free PreservesCSharp at every catch, any recorded loss consumes the flag, and attribution re-checks the live options. Residual: a library caller that reads ShouldPreserveCSharp itself under lossy+passthrough and then records an unrelated interop loss with nothing in between would see passthrough."
     },
     {
       "id": "D4-sdk-surface",
@@ -114,7 +114,7 @@
       "id": "F6-REPORT-06",
       "surface": "mcp calor_batch",
       "before": "not-measured; only csharpBlockCount per file",
-      "after": "files[].conversionPaths; partial batch failure reports refused per file; passthroughOnError does not rescue round-trip failures (D3); summary mode adds failedFiles[].conversionPaths and a preservationPaths line",
+      "after": "files[].conversionPaths; partial batch failure reports refused per file; passthroughOnError does not rescue round-trip failures (D3); summary mode adds failedFiles[].conversionPaths and a preservationPaths line; skipOnError=false abort returns JSON with error, preservationPaths and files[].conversionPaths",
       "tests": [
         "F6_REPORT_06_McpBatch_PartialFailure_ReportsEachFilesPath_WithAndWithoutPassthrough",
         "F6_REPORT_06_McpBatch_SuccessfulProject_ReportsRescueAndNative",
@@ -172,7 +172,8 @@
         "F6_REPORT_11_CustomModuleName_NoLongerDisablesRescue",
         "F6_REPORT_11_McpPassthroughWithCustomModuleName_Rescues",
         "F6_REPORT_11_McpInputPath_DerivedModuleName_Rescues",
-        "F6_REPORT_11_McpBatch_ModuleNameOverride_KeepsParseFailureRescue"
+        "F6_REPORT_11_McpBatch_ModuleNameOverride_KeepsParseFailureRescue",
+        "F6_REPORT_11_ModuleNameAlias_RefusesAmbiguousGlobalAndNamespaceTypes"
       ]
     },
     {
@@ -185,7 +186,8 @@
         "F6_REPORT_12_Library_ParseFailureRescue_IsAutomaticUnderLosslessWhateverTheFlags",
         "Library_TrailingLabel_DiscriminatesRefusedPassthroughAndRescue",
         "F6_REPORT_12_LossyStandard_PreservationOnlyThroughPassthrough_IsPassthrough",
-        "F6_REPORT_12_Precedence_SelectedBranchLossy_BothOptions_IsPassthrough"
+        "F6_REPORT_12_Precedence_SelectedBranchLossy_BothOptions_IsPassthrough",
+        "F6_REPORT_12_InterfaceMemberEscalation_UnderLossyPassthrough_StaysInterop"
       ]
     },
     {
@@ -197,12 +199,14 @@
         "F6_REPORT_13_McpInteropLocation_HasPathButNoTrigger",
         "F6_REPORT_13_McpWebsiteExample_MatchesTheDocumentedPayload",
         "F6_REPORT_13_McpValidateAndRoundtripModes_CarryPaths",
-        "F6_REPORT_13_WithSuccess_RecomputesTheOutcomeFromCounts"
+        "F6_REPORT_13_WithSuccess_RecomputesTheOutcomeFromCounts",
+        "F6_REPORT_13_StaleGateRead_DoesNotLabelALaterLoss"
       ]
     }
   ],
   "reviews": [
     "docs/plans/evidence/v0.25-f6-1144/reviews/round-1.md",
-    "docs/plans/evidence/v0.25-f6-1144/reviews/round-2.md"
+    "docs/plans/evidence/v0.25-f6-1144/reviews/round-2.md",
+    "docs/plans/evidence/v0.25-f6-1144/reviews/round-3.md"
   ]
 }

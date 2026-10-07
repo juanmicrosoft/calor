@@ -2333,7 +2333,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        catch (Exception) when (_context.ShouldPreserveCSharp)
+        // #1144: an escalation reaches the member boundary in every C#-preserving mode,
+        // so evaluating it here must not attribute passthrough.
+        catch (Exception ex) when (ex is MemberInteropEscalationException
+            ? _context.PreservesCSharp
+            : _context.ShouldPreserveCSharp)
         {
             return CreateInteropBlock(
                 member,
