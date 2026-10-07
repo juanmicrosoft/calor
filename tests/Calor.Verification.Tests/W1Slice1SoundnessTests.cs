@@ -63,7 +63,9 @@ public class W1Slice1SoundnessTests
                 BinOp(BinaryOperator.Add, Ref("x"), Ref("y")),
                 Int(128))));
 
-        Assert.Equal(ContractVerificationStatus.Disproven, result.Status);
+        // #1413 (S2 R-NUM): the frozen row NUM-NARROW-ARITH (divergence D1, "refused") requires
+        // refusal of sub-32-bit arithmetic and negation; promotion modeling is no longer claimed.
+        Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
     }
 
     [SkippableFact]
@@ -112,8 +114,10 @@ public class W1Slice1SoundnessTests
                 new UnaryOperationNode(TextSpan.Empty, UnaryOperator.Negate, Ref("x")),
                 Int(-128))));
 
+        // #1413 (S2 R-NUM): the frozen row NUM-NARROW-ARITH (divergence D1, "refused") requires
+        // refusal of sub-32-bit arithmetic and negation; promotion modeling is no longer claimed.
         Assert.True(
-            result.Status == ContractVerificationStatus.Proven,
+            result.Status == ContractVerificationStatus.Unsupported,
             $"{result.Status}: {result.CounterexampleDescription}");
     }
 
@@ -140,7 +144,9 @@ public class W1Slice1SoundnessTests
                 BinOp(BinaryOperator.Add, Ref("x"), Ref("y")),
                 Int(510))));
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        // #1413 (S2 R-NUM): the frozen row NUM-NARROW-ARITH (divergence D1, "refused") requires
+        // refusal of sub-32-bit arithmetic and negation; promotion modeling is no longer claimed.
+        Assert.Equal(ContractVerificationStatus.Unsupported, result.Status);
     }
 
     [SkippableFact]

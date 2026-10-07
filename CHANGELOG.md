@@ -21,6 +21,36 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Three numeric forms are refused or demoted as the verification contract requires (#1413).**
+  The 0.24 soundness registration lists three numeric forms that must not be reported `Proven`.
+  The verifier proved all three. Each proof was true, but it was a claim the registered rules do
+  not allow. Now:
+  - Arithmetic, shifts, and negation whose operands are all narrower than 32 bits (`i8`, `u8`,
+    `i16`, `u16`) are `Unsupported`. This is divergence D1 in
+    `docs/verification-modeled-forms.md`. Comparisons on narrow values are still modeled.
+  - An `INT:` literal outside the 32-bit range, such as `INT:3000000000`, is `Unsupported`
+    (divergence D2). Spell it `LONG:` to have it modeled. The verifier keeps the refusal even
+    when simplification would fold the literal away. A k-induction loop proof (an inductive
+    proof of a loop invariant) is `Unsupported` for the whole loop when a `for` bound or step,
+    or any literal in a `while` condition or body, is outside the 32-bit range.
+  - In a checked module, a postcondition (`§S`) with checked arithmetic is now `Assumed` with the
+    `checked-arithmetic` assumption, unless the operand types and literal values show that no
+    operation can overflow. This holds even when the preconditions rule the overflow out. Before,
+    such postconditions were `Proven`, and their runtime checks were removed; the checks are now
+    kept. The overflow decision is a fixed rule, not a solver query. Each operand's range comes
+    from its type, or from its value if it is a literal. The rule asks whether every result fits
+    the promoted result type. For example, `i32` plus `LONG:1` and `i32` times `u32` (computed in
+    64 bits) cannot overflow, so they stay `Proven`. `i32` plus `i32` can overflow, so it is
+    `Assumed`. Because no solver is consulted, the verdict does not depend on the platform or on
+    solver time. A guard inside the postcondition does not count either. So `(-> (< value
+    Int32.MaxValue) (== (- (+ value 1) 1) value))` is `Assumed`, and the unselected branch is still
+    never evaluated. In the verifier-runtime differential report (#1135), 6 of the 1,170 cases
+    move from `Proven` to `Assumed`: the provable `i64` and `u64` postconditions, which guard a
+    64-bit product. The totals are now 429 `Proven`, 156 `Assumed`, and 585 refuted. Proof
+    obligations, preconditions, and interface checks are unchanged: the registered row covers
+    postconditions only.
+
+  The verification cache format moves to 1.22, so older entries are invalidated.
 - **Text reaches the solver with .NET's meaning (#1413, #1493).** A string literal is now sent to
   Z3 one UTF-16 code unit at a time, so `"é"` has length 1 there, as `"é".Length` does in .NET.
   Before, it had length 2 (one per UTF-8 byte), and a true postcondition such as

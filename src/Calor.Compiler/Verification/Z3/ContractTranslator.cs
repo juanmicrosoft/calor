@@ -73,14 +73,37 @@ public sealed class ContractTranslator
 
     internal IReadOnlyList<BoolExpr> BindingConstraints => _bindingConstraints;
 
-    internal ReferenceNode BindInt32Constant(IntLiteralNode value)
+    internal ReferenceNode? BindInt32Constant(IntLiteralNode value)
     {
+        // #1413 (S2 R-NUM): a refused literal (D2) refuses the binding.
+        if (TranslateIntLiteral(value) is not { } literal)
+            return null;
         var ordinal = _bindingConstraints.Count;
         string name;
         do { name = $"__calor_bound_{ordinal++}"; } while (_variables.ContainsKey(name));
         DeclareVariable(name, "i32");
-        _bindingConstraints.Add(_ctx.MkEq(_variables[name].Expr, TranslateIntLiteral(value)));
+        _bindingConstraints.Add(_ctx.MkEq(_variables[name].Expr, literal));
         return new ReferenceNode(value.Span, name);
+    }
+
+    /// <summary>#1413 (S2 R-NUM): whether an expression holds an INT: literal the verifier refuses (D2).</summary>
+    internal static bool ContainsRefusedLiteral(AstNode node)
+        => node is IntLiteralNode literal && IsRefusedLiteral(literal)
+           || Calor.Compiler.Analysis.RecursiveAstWalker.GetAllChildren(node).Any(ContainsRefusedLiteral);
+
+    /// <summary>
+    /// D2 (#1413 S2 R-NUM): an inferred-width INT: literal, or a signed literal whose sign and
+    /// magnitude do not fit its declared width (checked on the magnitude, not on the possibly
+    /// wrapped Value).
+    /// </summary>
+    internal static bool IsRefusedLiteral(IntLiteralNode literal)
+    {
+        if (literal.WidthInferred)
+            return true;
+        if (literal.IsUnsigned)
+            return false;
+        var limit = literal.IsLong ? (ulong)long.MaxValue : int.MaxValue;
+        return literal.Sign == Calor.Compiler.Parsing.IntegerLiteralSign.Negative ? literal.Magnitude > limit + 1 : literal.Magnitude > limit;
     }
 
     /// <summary>
@@ -494,8 +517,18 @@ public sealed class ContractTranslator
         return null;
     }
 
-    private BitVecExpr TranslateIntLiteral(IntLiteralNode literal)
+    private BitVecExpr? TranslateIntLiteral(IntLiteralNode literal)
     {
+        // A 32-bit signed literal whose value does not fit (an AST built without the lexer) is the
+        // same D2 form; LONG:/UINT:/ULONG: and 64-bit literals stay modeled.
+        if (IsRefusedLiteral(literal))
+        {
+            // #1413 (S1 NUM-LITERAL-OVERSIZE, registered unsupported-refused): divergence D2 —
+            // an INT: literal outside the int32 range is refused. LONG:/UINT:/ULONG: spell an
+            // explicit width and stay modeled.
+            Refuse($"INT: literal {literal.Value} is outside the int32 range (D2); spell it LONG:");
+            return null;
+        }
         if (literal.IsUnsigned)
         {
             var width = literal.IsLong || literal.UnsignedValue > uint.MaxValue ? 64u : 32u;
@@ -684,6 +717,18 @@ public sealed class ContractTranslator
     /// </summary>
     private string? DiagnoseUnmodeledBitVecTyping(BinaryOperator op, BitVecExpr left, BitVecExpr right)
     {
+        // #1413 (S1 NUM-NARROW-ARITH, registered unsupported-refused): divergence D1 is closed
+        // by refusal in docs/verification-modeled-forms.md — arithmetic and shifts whose
+        // operands are BOTH narrower than 32 bits are Unsupported. The promotion model made
+        // them Proven, a claim the registered row does not allow.
+        if (op is BinaryOperator.Add or BinaryOperator.Subtract or BinaryOperator.Multiply
+                or BinaryOperator.Divide or BinaryOperator.Modulo
+                or BinaryOperator.LeftShift or BinaryOperator.RightShift
+            && left.SortSize < 32 && right.SortSize < 32)
+        {
+            return "arithmetic with both operands narrower than 32 bits is refused (D1)";
+        }
+
         // Shift counts wider than 32 bits have no C# typing (the count operand
         // must convert to int); refuse rather than guess (review #833 C3).
         if (op is BinaryOperator.LeftShift or BinaryOperator.RightShift
@@ -798,6 +843,12 @@ public sealed class ContractTranslator
 
     private Expr? TranslateUnaryNegation(BitVecExpr operand)
     {
+        if (operand.SortSize < 32)
+        {
+            // #1413: D1's unary form (docs/verification-modeled-forms.md: narrow negation refused).
+            return Refuse("negation of an operand narrower than 32 bits is refused (D1)");
+        }
+
         if (!IsSigned(operand) && operand.SortSize == 64)
         {
             return Refuse(
@@ -843,6 +894,38 @@ public sealed class ContractTranslator
     /// require safety for every bound value, including for existential predicates:
     /// that is conservative about early termination, never an elision of a throw.
     /// </summary>
+    private bool StaticallyCannotOverflow(BinaryOperationNode binary, uint width, bool signed)
+    {
+        if (OperandRange(binary.Left) is not { } a || OperandRange(binary.Right) is not { } b)
+            return false;
+        System.Numerics.BigInteger[] results = binary.Operator switch
+        {
+            BinaryOperator.Add => [a.Min + b.Min, a.Max + b.Max],
+            BinaryOperator.Subtract => [a.Min - b.Max, a.Max - b.Min],
+            _ => [a.Min * b.Min, a.Min * b.Max, a.Max * b.Min, a.Max * b.Max],
+        };
+        var (low, high) = TypeRange((int)width, signed);
+        return results.All(value => value >= low && value <= high);
+    }
+
+    /// <summary>The values an operand can take: a literal's own value, otherwise its type's range.</summary>
+    private (System.Numerics.BigInteger Min, System.Numerics.BigInteger Max)? OperandRange(ExpressionNode operand)
+    {
+        if (operand is IntLiteralNode literal && !IsRefusedLiteral(literal))
+        {
+            System.Numerics.BigInteger value = literal.IsUnsigned ? literal.UnsignedValue : literal.Value;
+            return (value, value);
+        }
+        if (Translate(operand) is not BitVecExpr term)
+            return null;
+        return TypeRange((int)term.SortSize, IsSigned(term));
+    }
+
+    private static (System.Numerics.BigInteger Min, System.Numerics.BigInteger Max) TypeRange(int width, bool signed)
+        => signed
+            ? (-(System.Numerics.BigInteger.One << (width - 1)), (System.Numerics.BigInteger.One << (width - 1)) - 1)
+            : (System.Numerics.BigInteger.Zero, (System.Numerics.BigInteger.One << width) - 1);
+
     internal BoolExpr? GetCheckedArithmeticSafety(ExpressionNode node)
     {
         switch (node)
@@ -866,7 +949,9 @@ public sealed class ContractTranslator
                 if (operands == null)
                     return null;
                 var (l, r, signed) = operands.Value;
-                var operationSafe = binary.Operator switch
+                // #1413 (S2 R-NUM, amendment 1.3.1): decided by operand widths when the promoted
+                // result type always holds the result (e.g. i32 * u32 in 64 bits), with no solver.
+                var operationSafe = StaticallyCannotOverflow(binary, l.SortSize, signed) ? _ctx.MkTrue() : binary.Operator switch
                 {
                     BinaryOperator.Add => _ctx.MkAnd(_ctx.MkBVAddNoOverflow(l, r, signed),
                         signed ? _ctx.MkBVAddNoUnderflow(l, r) : _ctx.MkTrue()),

@@ -75,6 +75,14 @@ public sealed class Z3Verifier : IDisposable
     private readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> _userTypeRegistry;
     private bool _disposed;
 
+    /// <summary>#1413 (S2 R-NUM, amendments 1.3.1 and 1.3.2): whether the checked arithmetic is
+    /// overflow-sensitive, decided by rule with no solver call. It is not sensitive only when the
+    /// operand-width rule (ContractTranslator.StaticallyCannotOverflow) proves every operation's
+    /// result fits, which leaves the conditions simplifying to <c>true</c>; otherwise it is, so the
+    /// verdict depends only on operand types and literal values, never on solver time.</summary>
+    internal static bool IsOverflowSensitive(Context context, IReadOnlyCollection<BoolExpr> conditions)
+        => conditions.Count > 0
+           && !IsolatedSolver.Simplify(context, context.MkAnd(conditions.ToArray())).IsTrue;
     /// <summary>#1413 review: an unsatisfiable precondition set containing a null-tolerant string,
     /// array, or user-type form may be satisfiable by a null the solver cannot represent.</summary>
     private const string NonNullModelUnsat =
@@ -520,7 +528,12 @@ public sealed class Z3Verifier : IDisposable
 
             if (bodyArithmeticSafety != null)
                 solver.Assert(bodyArithmeticSafety);
-            var checkedArithmeticAssumed = !ArithmeticSafetyEntailed(_ctx, solver, checkedArithmeticConditions);
+            // #1413 (S1 NUM-OVERFLOW-CHECKED, registered assumed): a contract whose checked
+            // arithmetic is overflow-sensitive gets Assumed, the strongest outcome the registration
+            // allows for it — even when the preconditions rule the overflow out (the entailment the
+            // solver used to accept as an unconditional Proven). Only arithmetic the operand-width
+            // rule proves cannot overflow stays unconditional (amendment 1.3.2: by rule, no solver).
+            var checkedArithmeticAssumed = IsOverflowSensitive(_ctx, checkedArithmeticConditions);
             foreach (var condition in checkedArithmeticConditions)
                 solver.Assert(condition);
             if ((checkedArithmeticAssumed || bodyArithmeticSafety is { IsTrue: false })
@@ -1310,9 +1323,11 @@ public static class FunctionBodyEncoder
 
                 // An int local is not a constant expression: uint + intVariable
                 // promotes to long, while uint + positiveIntLiteral promotes to uint.
-                var boundValue = substInit is IntLiteralNode { IsUnsigned: false, IsLong: false } literal
+                ExpressionNode? boundValue = substInit is IntLiteralNode { IsUnsigned: false, IsLong: false } literal
                     ? translator.BindInt32Constant(literal)
                     : substInit;
+                if (boundValue == null)
+                    return (null, "the binding initializer is an INT: literal outside the int32 range (D2)");
                 var extended = new Dictionary<string, ExpressionNode>(env, StringComparer.Ordinal)
                 {
                     [bind.Name] = boundValue

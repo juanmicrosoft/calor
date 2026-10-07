@@ -313,7 +313,7 @@ public class ProductionOverflowRuntimeTests
     [InlineData("(-> (< value 2147483647) (== (- (+ value 1) 1) value))")]
     [InlineData("(|| (== value 2147483647) (== (- (+ value 1) 1) value))")]
     [InlineData("(== (? (< value 2147483647) (== (- (+ value 1) 1) value) true) true)")]
-    public void GuardedArithmetic_ProvesWithoutEvaluatingUnselectedOverflow(string predicate)
+    public void GuardedArithmetic_IsAssumedWithoutEvaluatingUnselectedOverflow(string predicate)
     {
         var source = $$"""
             §M{m1:Overflow}
@@ -325,8 +325,14 @@ public class ProductionOverflowRuntimeTests
         var options = VerifiedOptions();
         var compiled = Program.Compile(source, "overflow.calr", options);
         Assert.False(compiled.HasErrors, string.Join("; ", compiled.Diagnostics.Errors));
+        // #1413 (amendment 1.3.2): `value + 1` can overflow for some i32 and overflow sensitivity is
+        // decided by rule, without the guard, so the postcondition is Assumed [checked-arithmetic]
+        // (the runtime check is kept); the unselected branch is still never evaluated.
         Assert.Contains(compiled.Diagnostics, diagnostic =>
-            diagnostic.Verification is { Status: ProofStatus.Proven, IsVacuous: false });
+            diagnostic.Verification is { Status: ProofStatus.Assumed, IsVacuous: false } verification
+            && verification.Assumptions.SequenceEqual([Z3Verifier.CheckedArithmeticAssumption]));
+        Assert.DoesNotContain(compiled.Diagnostics, diagnostic =>
+            diagnostic.Verification is { Status: ProofStatus.Proven });
         var execution = TestHarness.Execute(source, "Probe", [int.MaxValue], options);
         Assert.Null(execution.Exception);
         Assert.Equal(int.MaxValue, execution.ReturnValue);

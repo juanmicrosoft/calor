@@ -23,6 +23,17 @@
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
 
+  <!-- Reference the same Z3 assembly as Calor.Compiler (#1413: internal Z3 seams in tests) -->
+  <PropertyGroup>
+    <Z3Dir>$(MSBuildThisFileDirectory)..\..\src\Calor.Compiler\z3</Z3Dir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.Z3">
+      <HintPath>$(Z3Dir)\Microsoft.Z3.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\Calor.Compiler\Calor.Compiler.csproj" />
     <ProjectReference Include="..\Calor.Evaluation\Calor.Evaluation.csproj" />
