@@ -33,13 +33,13 @@ All notable changes to Calor, organized by release.
   `_hoist000` is no longer rebound (`Calor0260`).
 - Effect checking: the elements of `§ARR2D` rows are now charged (they were not
   inferred, so a row could hide an effect). Array members such as `GetLength` and
-  `Rank` resolve on `System.Array` instead of reporting `Calor0410`; `SetValue`,
-  `CopyTo` and `Initialize` are charged `mut`, and `Clone`, `GetEnumerator` and
-  `ToString` are charged `alloc`.
+  `Rank` resolve on `System.Array` instead of reporting `Calor0410`. `SetValue` and
+  `CopyTo` are charged `mut`; `Clone`, `GetEnumerator`, `GetValue` and `ToString` are
+  charged `alloc`; `Initialize` stays an unknown call, because it runs element constructors.
 - Shapes that cannot be written in place stay C# and are reported as
-  `conditional-expression-hoisting`: an assignment used as an array element or an index
-  (it was evaluated twice), and a size that calls a method inside a `?:`, `&&`, `||` or
-  `??` operand.
+  `conditional-expression-hoisting`: an assignment used as an array element, index or size
+  (it was evaluated twice), and a sized array whose size is not a name or integer literal
+  when the array is itself a `?:`, `&&`, `||` or `??` operand.
 
 ## [0.24.0] - 2026-10-07
 

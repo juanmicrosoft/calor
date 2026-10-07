@@ -58,6 +58,18 @@ After Codex round 1 (REQUEST-CHANGES, `reviews/round-1.md`):
   emit the created rank before the element's ranks (C# emitter and binding types); `new T[0]` and
   `{ }` stay fresh arrays (were the shared `Array.Empty<T>()`).
 
+After Codex round 2 (REQUEST-CHANGES, `reviews/round-2.md`):
+
+- Expression-position sized `§ARR2D` ends with `§/ARR2D{id}` (a sized 2-D element took its parent's
+  next `§ROW` as an initializer: `new object[,] { { new int[1, 1] }, { 42 } }`).
+- Sizes convert in place like elements (`new int[n, n++]` read `n` after the increment;
+  `new int[x = Bump()]` evaluated `Bump()` twice and is now preserved).
+- The tree actually converted (its preprocessor symbols) also reserves names.
+- `new[]` uses Roslyn's created element type before the receiving declaration's.
+- `null` and `default` arguments stay in place before a hoisted argument (an untyped temp lost
+  their target type).
+- `GetValue` is `alloc`; `Array.Initialize` is an unknown call (element constructors).
+
 Statement-position output (F5-ARRAY-03) is byte-identical to the R0 baseline.
 
 ## F5-ARRAY-06: declared boundary
@@ -69,7 +81,8 @@ Statement-position output (F5-ARRAY-03) is byte-identical to the R0 baseline.
 | rectangular rank 2 with initializer (with or without written sizes, bare `{…}`) | native | native |
 | rectangular rank 3+ with initializer | native (sized `§ARR2D` + `§ROW`) | native |
 | sized, no initializer, literal/name sizes | native | native |
-| sized, no initializer, computed sizes | native (quoted embedded size), except inside a `?:`/`&&`/`\|\|`/`??` operand when the size calls a method: preserved, `conditional-expression-hoisting` | native (sizes hoisted in order) |
+| sized, no initializer, computed sizes | native (quoted embedded size, converted in place); preserved (`conditional-expression-hoisting`) when the array is itself a `?:`/`&&`/`\|\|`/`??` operand and a size is not a name or integer literal | native (quoted in place) |
+| size is an assignment | preserved, `conditional-expression-hoisting` | preserved, same |
 | element is an object initializer | native, inline | native |
 | element (or index) is an assignment | preserved, `conditional-expression-hoisting` | preserved, same |
 | element is `x++` / `x--` | native | native |

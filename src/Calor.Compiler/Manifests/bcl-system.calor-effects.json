@@ -107,10 +107,9 @@
         "GetLongLength": [],
         "GetLowerBound": [],
         "GetUpperBound": [],
-        "GetValue": [],
+        "GetValue": ["alloc"],
         "SetValue": ["mut"],
         "CopyTo": ["mut"],
-        "Initialize": ["mut"],
         "Clone": ["alloc"],
         "GetEnumerator": ["alloc"],
         "ToString": ["alloc"]

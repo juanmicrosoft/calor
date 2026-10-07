@@ -11046,7 +11046,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 return true;
             if (syntax is not { } list || i >= list.Count)
                 return args[i] is ReferenceNode or FieldAccessNode or ArrayAccessNode or MultiDimArrayAccessNode;
+            // `null` / `default` take their type from the parameter, so they cannot be bound
+            // to an untyped temp (Codex round 2); they evaluate nothing either.
             return !list[i].RefKindKeyword.IsKind(SyntaxKind.None)
+                || list[i].Expression is LiteralExpressionSyntax or DefaultExpressionSyntax
                 || _semanticModel != null && list[i].SyntaxTree == _semanticModel.SyntaxTree
                     && _semanticModel.GetSymbolInfo(list[i].Expression).Symbol is ILocalSymbol or IParameterSymbol;
         }
@@ -12645,7 +12648,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (rank.Sizes.Count > 0 && rank.Sizes[0] is ExpressionSyntax sizeExpr
                 && sizeExpr is not OmittedArraySizeExpressionSyntax)
             {
-                size = ConvertExpression(sizeExpr);
+                size = ConvertInPlace(sizeExpr, always: true);
             }
         }
 
@@ -12674,13 +12677,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Try declared type first, fall back to inferring from first element
         // #1132: Roslyn's best common type first; guessing from the first element made
         // `new[] { S(1), S(2) }` an object[].
-        var elementType = TryGetDeclaredArrayElementType(implicitArray)
-            ?? (_semanticModel != null && implicitArray.SyntaxTree == _semanticModel.SyntaxTree
+        // The created type, not the receiving one: `object[] a = new[] { "a" }` is a string[].
+        var elementType = (_semanticModel != null && implicitArray.SyntaxTree == _semanticModel.SyntaxTree
                 && _semanticModel.GetTypeInfo(implicitArray).Type is IArrayTypeSymbol { ElementType.TypeKind: not TypeKind.Error } inferred
                     // Nullability stays with the binder's per-element view.
                     ? TypeMapper.CSharpToCalor(inferred.ElementType
                         .WithNullableAnnotation(Microsoft.CodeAnalysis.NullableAnnotation.None).ToDisplayString())
                     : null)
+            ?? TryGetDeclaredArrayElementType(implicitArray)
             ?? InferElementType(initializer);
 
         return new ArrayCreationNode(GetTextSpan(implicitArray), id, id, elementType, null, initializer, new AttributeCollection());
@@ -12953,7 +12957,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     }
 
     /// <summary>
-    /// #1132: converts an array element (always) or an index containing an assignment
+    /// #1132: converts an array element or size (always) or an index containing an assignment
     /// as a conditional operand: a statement it would need ahead of it (an assignment,
     /// <c>x++</c>, a decomposed chain) is captured in place or preserved as C#, so the
     /// expression is not run early, out of order with its siblings, or twice (an
@@ -13596,7 +13600,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             foreach (var sizeExpr in rankSpec.Sizes)
             {
                 if (sizeExpr is not OmittedArraySizeExpressionSyntax)
-                    dimensionSizes.Add(ConvertExpression(sizeExpr));
+                    dimensionSizes.Add(ConvertInPlace(sizeExpr, always: true));
             }
         }
 

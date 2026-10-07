@@ -80,6 +80,12 @@ public sealed class EffectResolver
         else
             _keysFromBoundReceiver++;
 
+        // #1132: Array.Initialize runs each element's parameterless value-type
+        // constructor, which can do anything; System.Array's pure default must not
+        // answer for it.
+        if (key.DeclaringType == "System.Array" && key.MemberName == "Initialize")
+            return new EffectResolution(EffectResolutionStatus.Unknown, EffectSet.Unknown, "unknown");
+
         // Extension resolution is deliberately UNCACHED, as it was before this
         // slice. Its answer depends on ReceiverInterfaces, which is outside key
         // equality: caching it would let one receiver's interface set decide
