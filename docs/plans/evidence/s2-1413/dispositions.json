@@ -2806,6 +2806,18 @@
       "reason": "Fixed by the injective ASCII symbol encoding in R-TEXT; the end-to-end witness runs on Windows in the z3-consumer-matrix job."
     }
   ],
+  "deviations": [
+    {
+      "id": "DEV-R-NUM-MERGE-MECHANICS",
+      "repair": "R-NUM",
+      "pr": 1502,
+      "date": "2026-10-06",
+      "mergeCommit": "52a77bfa7e9f9a7d36df9df5af494d4c1d25f204",
+      "deviation": "maintainer-accepted merge-mechanics deviation from 1.3.2 condition 6: 3 adjacency conflicts in src resolved keep-both + cache format 1.22",
+      "detail": "Merging origin/main into #1502 after its approved 1.3.2 pass conflicted in three src files by adjacency only: ContractHasher.cs (the INFERRED-WIDTH literal prefix next to the nested-quantifier SawUnhashedKind check), VerificationCacheEntry.cs (CurrentFormatVersion 1.22 vs 1.21; both comments kept, 1.22 chosen), and Z3Verifier.cs (IsOverflowSensitive next to NonNullModelUnsat). Each was resolved as the union of both parents with no logic change; CHANGELOG keep-both; manifest via the resolver script. Decision Q11.",
+      "check": "docs/plans/evidence/s2-1413/reviews/fix-num-refusal/merge-mechanics-codex.md"
+    }
+  ],
   "maintainerDecisions": [
     {
       "id": "Q1-R-NUM",
@@ -2851,6 +2863,11 @@
       "id": "Q10-AMENDMENT-1.3.2",
       "date": "2026-10-06",
       "decision": "Amend: no solver, rule-based. Amendment 1.3.2 (#1507) re-registers #1502 (value 6, base bdb430db): one change that decides overflow sensitivity by rule with no solver call; option A authorizes the resulting demotions (3 ProductionOverflowRuntimeTests rows, a 12-cell checked-arithmetic allowance in the #1135 differential gate, regenerated #1135 reports at 429/156/585); then one verification-only pass that must APPROVE."
+    },
+    {
+      "id": "Q11-R-NUM-MERGE-MECHANICS",
+      "date": "2026-10-06",
+      "decision": "Allow as merge mechanics: merge origin/main into #1502 and resolve exactly the three adjacency conflicts in src keep-both (cache format 1.22), plus CHANGELOG/manifest; no other edits; one Codex check (not a review round) that the resolutions are the union of both parents and the c04b97b3 repair is otherwise unchanged. Recorded in deviations."
     },
     {
       "id": "Q8-R-OBL-REVIEW-OVERRUN",

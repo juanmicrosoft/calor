@@ -283,6 +283,13 @@ record = {
     'repairs': repairs,
     'baselines': baselines,
     'discoveryFindings': discoveries,
+    'deviations': [
+        {'id': 'DEV-R-NUM-MERGE-MECHANICS', 'repair': 'R-NUM', 'pr': 1502, 'date': '2026-10-06',
+         'mergeCommit': '52a77bfa7e9f9a7d36df9df5af494d4c1d25f204',
+         'deviation': 'maintainer-accepted merge-mechanics deviation from 1.3.2 condition 6: 3 adjacency conflicts in src resolved keep-both + cache format 1.22',
+         'detail': 'Merging origin/main into #1502 after its approved 1.3.2 pass conflicted in three src files by adjacency only: ContractHasher.cs (the INFERRED-WIDTH literal prefix next to the nested-quantifier SawUnhashedKind check), VerificationCacheEntry.cs (CurrentFormatVersion 1.22 vs 1.21; both comments kept, 1.22 chosen), and Z3Verifier.cs (IsOverflowSensitive next to NonNullModelUnsat). Each was resolved as the union of both parents with no logic change; CHANGELOG keep-both; manifest via the resolver script. Decision Q11.',
+         'check': REVIEWS + 'fix-num-refusal/merge-mechanics-codex.md'},
+    ],
     'maintainerDecisions': [
         {'id': 'Q1-R-NUM', 'date': '2026-10-04', 'decision': 'Open the sixth repair PR (R-NUM, #1502): demote per the frozen table exactly, update the 19 tests, regenerate the #1135 reports.'},
         {'id': 'Q2-O2-GEN-REFUSAL', 'date': '2026-10-04', 'decision': 'Keep GEN-REFUSAL VALIDATED; the partial O2 replay of GEN-REFUSAL-002/-004 is recorded as a coverage limitation of the frozen generator.'},
@@ -293,6 +300,7 @@ record = {
         {'id': 'Q7-REVIEW-DISCOVERIES', 'date': '2026-10-04', 'decision': 'Amendment 1.3.0 raises the S2 repair cap 6 -> 7 for D-OBL-PROOF-GETTER and D-OBL-THROWING-PREDECESSOR only; both are demoted visibly in R-OBL-RESIDUALS (#1503), which merges after the amendment.'},
         {'id': 'Q9-AMENDMENT-1.3.1', 'date': '2026-10-04', 'decision': 'Amendment 1.3.1 (#1504, merged f552e38b): one further change and one verification-only pass (must APPROVE) each for #1502 (three parts on base 3f3016d2) and #1503 (revert only, on base 9b54c9c3; its pass approved and it merged as 9f5dfd76). #1503 was retargeted to main.'},
         {'id': 'Q10-AMENDMENT-1.3.2', 'date': '2026-10-06', 'decision': 'Amend: no solver, rule-based. Amendment 1.3.2 (#1507) re-registers #1502 (value 6, base bdb430db): one change that decides overflow sensitivity by rule with no solver call; option A authorizes the resulting demotions (3 ProductionOverflowRuntimeTests rows, a 12-cell checked-arithmetic allowance in the #1135 differential gate, regenerated #1135 reports at 429/156/585); then one verification-only pass that must APPROVE.'},
+        {'id': 'Q11-R-NUM-MERGE-MECHANICS', 'date': '2026-10-06', 'decision': 'Allow as merge mechanics: merge origin/main into #1502 and resolve exactly the three adjacency conflicts in src keep-both (cache format 1.22), plus CHANGELOG/manifest; no other edits; one Codex check (not a review round) that the resolutions are the union of both parents and the c04b97b3 repair is otherwise unchanged. Recorded in deviations.'},
         {'id': 'Q8-R-OBL-REVIEW-OVERRUN', 'date': '2026-10-04', 'decision': 'Amendment 1.3.0 records the overrun; one final verification-only pass on the last fix (APPROVE, reviews/fix-obligation-state/verification-3-codex.md); #1496 merges only after the amendment.'},
     ],
 }
