@@ -113,29 +113,23 @@
     },
     {
       "ledger": "effect-resolver-key-ledger.json",
-      "measuredCommit": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
-      "resolvableOnMain": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
-      "basis": "identical-src-tree",
-      "note": "#1397: regenerated onb2c43561 after receiver/member traversal changes. String-origin keys822->826 (bench620->624); bound-origin265, bench files380, the200 floor, scope and all notMeasured identities are unchanged. This is lookup provenance, not resolved-signature or nullability coverage. Preserve the exact measured ancestor with a merge commit. Historical measurements remain in git history; frozen research is unchanged.",
+      "measuredCommit": "31b21e951568348ecc19967cf5ede67ccd49c8b7",
+      "basis": "post-merge-write-back",
+      "note": "#1132 (0.25 F5): regenerated on 31b21e95 (the F5 branch head, clean src). String-origin keys 826->825 (tests 137->136): a member access on an array element, or on a local bound from an in-module call that returns an array, now resolves to the element's in-module class instead of asking the resolver with an unresolved receiver. Bound-origin 265, file counts, the 200 floor, scope and all notMeasured identities are unchanged. Pending until the PR lands; the previous identity b2c43561 remains in git history.",
       "durableIdentity": {
-        "status": "complete",
-        "commit": "b2c435610c3aa34accc0f28f66d5eca834d7a129",
-        "resolvedVia": "refs/remotes/origin/main",
-        "treeHashes": {
-          "/": "d21825d61604442be97a6df160da8c7357fd3bea",
-          "src": "6f5a5641229d629ed757afcb65e1338ef8a19fa4",
-          "bench/corpus": "7c6d1c2f7a18d8f015d23ceada79ef32915b9f73",
-          "Directory.Build.props": "7811483a1ed6977c2a53f8a0e449e317f750183b",
-          "Directory.Packages.props": "8747faf8266f22f60574fa662269343a75d3dddf",
-          "global.json": "6a6aeda3e25d40867cb94fbedc7e1dcdd789ed30"
-        },
-        "inputContentHashes": {
-          ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
-          "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
+        "status": "pending",
+        "phase1": {
+          "headCommit": "31b21e951568348ecc19967cf5ede67ccd49c8b7",
+          "pr": 1521,
+          "treeHashes": {
+            "src": "53525d46dd192180250b5dc72fdc413cc01e11c5"
+          },
+          "inputContentHashes": {
+            ".gitmodules": "67e10947f8fb3585b958d02a7bee7b8fa5a88027b45a9dec23e7ec1a8b4303d4",
+            "Directory.Packages.props": "793aede9c6252e81f389044f5109ddd7cd3dfab2dacc1813bfc430e512c5550a"
+          },
+          "artifactSha256": "a082f4e3dc87f0cb92e7499b30caeeeee8db27c6105b3bed34d3842432d2b676"
         }
-      },
-      "measuredTreeHashes": {
-        "src": "6f5a5641229d629ed757afcb65e1338ef8a19fa4"
       }
     },
     {
