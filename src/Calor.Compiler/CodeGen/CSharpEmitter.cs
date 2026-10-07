@@ -9417,6 +9417,24 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         var elementType = MapTypeName(node.ElementType);
 
+        if (node.DimensionSizes.Count > 0 && node.Initializer.Count > 0)
+        {
+            // #1132: sized form with §ROW lines (rank 3+, or sizes written with the
+            // initializer). Rows are the innermost vectors, row-major; regroup them into
+            // nested braces by the outer sizes. C# rejects a shape mismatch (CS0847).
+            var rows = node.Initializer.Select(row =>
+                "{ " + string.Join(", ", row.Select(e => e.Accept(this))) + " }").ToList();
+            for (var level = node.DimensionSizes.Count - 2; level > 0; level--)
+            {
+                if (node.DimensionSizes[level] is not IntLiteralNode { Value: > 0 and <= int.MaxValue } size
+                    || rows.Count % size.Value != 0)
+                    break;
+                rows = rows.Chunk((int)size.Value).Select(group => "{ " + string.Join(", ", group) + " }").ToList();
+            }
+            var sizes = string.Join(", ", node.DimensionSizes.Select(d => d.Accept(this)));
+            return $"new {elementType}[{sizes}] {{ {string.Join(", ", rows)} }}";
+        }
+
         if (node.DimensionSizes.Count > 0)
         {
             var dims = string.Join(", ", node.DimensionSizes.Select(d => d.Accept(this)));

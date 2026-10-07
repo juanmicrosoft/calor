@@ -406,7 +406,47 @@ public sealed class ConversionContext
     /// <summary>
     /// Original C# source code.
     /// </summary>
-    public string? OriginalSource { get; set; }
+    public string? OriginalSource
+    {
+        get => _originalSource;
+        set
+        {
+            _originalSource = value;
+            _reservedNames = null;
+        }
+    }
+
+    private string? _originalSource;
+    private HashSet<string>? _reservedNames;
+
+    /// <summary>
+    /// #1132: true when <paramref name="name"/> is spelled anywhere in the original
+    /// source (identifier tokens with escapes decoded, plus every identifier-shaped run
+    /// of text, which covers interpolation holes, strings and comments). Generated
+    /// names (<see cref="GenerateId"/>, the emitter's hoisted temps) skip these, so a
+    /// generated local can never capture, shadow or rebind a user name.
+    /// </summary>
+    public bool IsReservedName(string name)
+    {
+        if (_originalSource == null)
+            return false;
+        if (_reservedNames == null)
+        {
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var token in Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTokens(_originalSource))
+            {
+                if (token.RawKind == (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.IdentifierToken)
+                    names.Add(token.ValueText);
+            }
+            foreach (System.Text.RegularExpressions.Match match in
+                System.Text.RegularExpressions.Regex.Matches(_originalSource, @"[\p{L}_][\p{L}\p{Nd}_]*"))
+            {
+                names.Add(match.Value);
+            }
+            _reservedNames = names;
+        }
+        return _reservedNames.Contains(name);
+    }
 
     /// <summary>
     /// Checks if any errors were encountered.
@@ -425,10 +465,18 @@ public sealed class ConversionContext
     /// </summary>
     public string GenerateId(string prefix = "", string hint = "")
     {
-        _idCounter++;
         var sanitized = SanitizeHint(hint);
         var effectivePrefix = string.IsNullOrEmpty(sanitized) ? prefix : $"{prefix}{sanitized}";
-        return string.IsNullOrEmpty(effectivePrefix) ? $"id{_idCounter:D3}" : $"{effectivePrefix}{_idCounter:D3}";
+        if (string.IsNullOrEmpty(effectivePrefix))
+            effectivePrefix = "id";
+        string id;
+        do
+        {
+            _idCounter++;
+            id = $"{effectivePrefix}{_idCounter:D3}";
+        }
+        while (IsReservedName(id));
+        return id;
     }
 
     /// <summary>

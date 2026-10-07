@@ -156,6 +156,78 @@ or fails to round-trip back to C#; output that parses but that Calor's own
 compiler then rejects still fails the conversion, with nothing written and exit
 `1`. `--passthrough` does not change that outcome.
 
+### Array Expressions
+
+An array created inside an expression, such as a `return`, a call argument, or a
+branch of `?:`, now converts to native Calor. The C# evaluation order is kept. Each
+element is evaluated once, left to right, in place. The unselected branch of `?:`,
+and the right operand of `&&` or `||`, are still not evaluated. Before 0.25 a
+`return new T[,] { … }` produced Calor whose C# did not compile, and arrays in a
+`?:` branch did not parse. Only the post-conversion rescue (`§CSHARP`) hid that.
+
+This C#:
+
+```csharp
+public static Cell[,] Pick(bool wide, int v)
+{
+    return wide
+        ? new Cell[,] { { new Cell { V = v }, new Cell { V = v + 1 } } }
+        : new Cell[,] { { new Cell { V = v } } };
+}
+
+public static int Corner(bool wide) => Pick(wide, 7)[0, 0].V;
+```
+
+converts to:
+
+```calor
+§M{m001:Grids}
+  §CL{c001:Cell:pub}
+    §FLD{i32:V:pub}
+
+  §CL{c002:Grid:pub:stat}
+    §MT{m003:Pick:pub:stat} (bool:wide, i32:v) -> Cell[,]
+      §E{alloc,mut}
+      §R §IF{tern000} wide → §ARR2D{arr2d004:arr2d004:Cell} §ROW §NEW{Cell} V = v §/NEW §NEW{Cell} V = (+ v 1) §/NEW §/ARR2D{arr2d004} §EL → §ARR2D{arr2d006:arr2d006:Cell} §ROW §NEW{Cell} V = v §/NEW §/ARR2D{arr2d006}
+
+    §MT{m008:Corner:pub:stat} (bool:wide) -> i32
+      §E{alloc,mut}
+      §R (§IDX2D §C{Pick} §A wide §A 7 §/C 0 0).V
+```
+
+Three forms make this work:
+
+- **Inline `§ARR2D`.** In expression position the array is written on one line and
+  ends with `§/ARR2D{id}`, the same way `§ARR` already did. An object initializer
+  used as an element stays on its `§ROW` line (`§NEW{Cell} V = v §/NEW`). The
+  converter no longer moves it into a temporary variable ahead of the statement.
+- **Rank 3 and up.** `§ARR2D{id:id:i32:2:1:2}` followed by `§ROW` lines gives the
+  shape. The rows are the innermost vectors in row-major order. A row count that
+  does not match the shape is a C# compile error, never padded or cut.
+- **Grouped element access.** `(§IDX2D g 0 1).V` reads a member of an element.
+  Written without the parentheses, `.V` attached to the last index.
+
+Names the converter generates (`_hoist000`, `arr2d004`) now skip every identifier
+that appears in your C#. A local you named `_hoist000` is never rebound.
+
+**Supported natively:** one-dimensional, implicitly typed (`new[]`), jagged, and
+rectangular arrays of rank 2 or more. This covers initializers with or without
+written sizes, bare `{ … }` initializers of a declared array, and sized arrays
+without an initializer. They work as a return value, argument, binding, field or
+property initializer, member-access target, and `?:` branch. Elements can be any
+expression, including object initializers and other arrays.
+
+**Limits.** These shapes cannot be written in place, so the converter keeps them
+as C# and reports them. They never move out of their branch.
+
+- In a `?:`, `&&`, `||`, or `??` operand, a size that calls a method
+  (`flag ? new int[Next()] : …`) and an assignment used as an element are kept as
+  C# and reported as `conditional-expression-hoisting`.
+- If an expression-position array still produces Calor that does not parse, the
+  member is kept as C# by the rescue and reported as `post-validation-fallback`.
+  The array is not moved.
+- `stackalloc` arrays are unchanged by this work.
+
 ---
 
 ## Benchmark Comparison
