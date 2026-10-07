@@ -6,15 +6,19 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- **Binding is linear in module size again.** Since 0.22.0, name binding copied two
-  module-wide tables at every loop, branch, and lambda: the symbol table and the
-  callable-state map (which tracks what each stored lambda may mutate). Binding time therefore
-  grew with the square of the module size. On a synthetic module of 200 functions with 200
-  statements each, binding took 14.5 s; it now takes 0.2 s, as it did before 0.22.0. The
-  binder now undoes only what each loop's trial pass added, and it no longer stores the empty
-  callable state for locals that hold no lambda. The bound tree, diagnostics, symbol ids and
-  their order, and the generated C# are unchanged. This also fixes the failing
-  `Binding_MediumModule_Under500ms` performance test, which skipped the 0.22.0 NuGet publish.
+- **Name binding no longer slows down quadratically on large modules.** Since 0.22.0, the
+  binder made two kinds of module-wide copies. Before each loop, it copied the whole symbol table
+  and its declaration counters so it could undo a trial pass over the loop body. At each loop,
+  branch, and lambda, it copied the callable-state map (which tracks what each stored lambda may
+  mutate), and that map held an entry for every initialized local in the module. Binding time
+  therefore grew with the square of the module size. On a synthetic module of 200 functions
+  with 200 statements each, binding took 14.5 s; it now takes 0.2 s, as it did before 0.22.0.
+  The binder now undoes only what each trial pass added, and it no longer stores the empty
+  callable state. The bound tree, diagnostics, symbol ids and their order, and the generated C#
+  are unchanged. This also fixes the failing `Binding_MediumModule_Under500ms` performance
+  test, which skipped the 0.22.0 NuGet publish. Two smaller module-wide costs remain: locals
+  that hold lambdas still stay in the callable-state map, and nominal type lookups scan all
+  symbols.
 
 ## [0.24.0] - 2026-10-07
 

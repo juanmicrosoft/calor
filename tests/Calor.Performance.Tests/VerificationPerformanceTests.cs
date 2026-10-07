@@ -215,8 +215,9 @@ public class VerificationPerformanceTests
 
     /// <summary>
     /// Binding cost must grow linearly with the number of functions. The 0.22
-    /// regression (Stage B loop discovery and callable-state snapshots copying
-    /// module-wide maps at every loop and branch) made it quadratic: 8x the
+    /// regression (loop discovery copying the module-wide symbol table at every
+    /// loop, and callable-state snapshots at every loop, branch, and lambda
+    /// copying an entry for every local in the module) made it quadratic: 8x the
     /// functions cost about 64x the time. The ratio is far less load-sensitive
     /// than an absolute threshold; linear scaling gives about 8x.
     /// </summary>
