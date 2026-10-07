@@ -2231,13 +2231,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
     }
 
     /// <summary>
-    /// #1132: renders array elements left to right with object initializers kept on
-    /// one line. If any element must leave its line (multi-line, a § form when
-    /// <paramref name="hoistSectionMarkers"/>, or bindings it queued itself), every
-    /// non-literal element is bound to a fresh temp in source order. Hoisting only
-    /// some of them ran those ahead of earlier siblings (`{ x, SetX() }` read the new
-    /// x). Hoisted bindings stay queued, in evaluation order, for the caller to flush.
-    /// Inside a conditional region nothing is hoisted (<see cref="HoistToTempVar"/>).
+    /// #1132: renders elements (or arguments) left to right, object initializers on one line.
+    /// If any must leave its line, every non-literal one is bound in source order, so none
+    /// runs ahead of an earlier sibling; the bindings stay queued for the caller.
     /// </summary>
     private List<string> RenderArrayElements(
         IEnumerable<ExpressionNode> elements, bool hoistSectionMarkers, bool inlineSibling = true)
@@ -2276,11 +2272,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return values;
     }
 
-    /// <summary>
-    /// The §ROW lines of a rectangular initializer (innermost vectors, row-major).
-    /// With <paramref name="hoist"/> false (expression position) nothing is hoisted:
-    /// hoisting would run elements before earlier parts of the enclosing statement.
-    /// </summary>
+    /// <summary>The §ROW lines (innermost vectors, row-major); expression position hoists nothing.</summary>
     private List<string> RenderMultiDimRows(MultiDimArrayCreationNode node, bool hoist)
     {
         if (!hoist) _conditionalExpressionDepth++;
@@ -3145,11 +3137,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return varName;
     }
 
-    /// <summary>
-    /// #1132 (F5-ARRAY-04): a generated temp name that is not spelled anywhere in the
-    /// original C#. Without the check, a user local named <c>_hoist000</c> was rebound
-    /// by the converter's own hoist (Calor0260) or, in another scope, shadowed.
-    /// </summary>
+    /// <summary>#1132: a generated temp name not spelled in the source (a user `_hoist000` was rebound).</summary>
     private string FreshTemp(string prefix)
     {
         string name;
@@ -3207,17 +3195,13 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(FieldAccessNode node)
     {
-        // #1132: `xs[i].F` / `g[i, j].F`. Written bare, the trailing `.F` attached to
-        // the last index (`§IDX2D g 0 1.F` read as `g[0, 1.F]`, CS1061); hoisting the
-        // element instead read it before the rest of the statement. A parenthesized
-        // §IDX/§IDX2D groups the access in place.
+        // #1132: `(§IDX2D g 0 1).F`; bare, `.F` bound to the last index (CS1061).
         if (!_inInterpolation && node.Target is ArrayAccessNode or MultiDimArrayAccessNode)
         {
             var element = AcceptInConditionalRegion(node.Target);
             return $"({element}).{(node.FieldName.StartsWith('@') ? node.FieldName[1..] : node.FieldName)}";
         }
-        // `new T[,] { … }.Length`: the inline creation ends at its closer, so the member
-        // attaches in place; hoisting it ran the elements ahead of the statement.
+        // `new T[,] { … }.Length` in place: the inline creation ends at its closer.
         if (!_inInterpolation && node.Target is ArrayCreationNode { Initializer.Count: > 0 }
                 or MultiDimArrayCreationNode { Initializer.Count: > 0 })
         {
@@ -3274,9 +3258,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
                     evalInits.Add((init.PropertyName, valueStr));
             }
 
-            // #1132: an array element stays on its §ARR/§ROW line. The parser reads
-            // `§NEW{T} A = x B = y §/NEW` on one line, so the element is not hoisted
-            // ahead of its siblings (which would evaluate it out of source order).
+            // #1132: an array element stays on its line (`§NEW{T} A = x §/NEW`), not hoisted early.
             if (_inlineObjectInitializers > 0 && evalInits.All(i => !i.Value.Contains('\n')))
             {
                 var inits = string.Concat(evalInits.Select(i =>
@@ -3633,9 +3615,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             // Visit elements in inline-sibling context so that nested zero-arg
             // calls keep explicit §/C (otherwise `§ARR{...} §C{A} §C{B}` would
             // parse as ONE element `A(B())` instead of TWO `A(), B()`).
-            // #1132: nothing is hoisted out of an expression-position array (a
-            // conditional region), so its elements run in place, in source order, and
-            // only when the array itself is evaluated (an unselected ?: branch never).
+            // #1132: nothing is hoisted out of an expression-position array.
             _conditionalExpressionDepth++;
             string elements;
             try
@@ -5271,12 +5251,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
         if (node.Initializer.Count > 0)
         {
-            // #1132 (F5-ARRAY-01/02): an expression-position initializer stays inline,
-            // `§ARR2D{id:id:T[:shape]} §ROW … §/ARR2D{id}`, exactly where the C# had it.
-            // The old block form bound the rows to a name the C# emitter never
-            // declared (CS0103) and left a bare `new T[,]{…};` statement (CS0201);
-            // its hoisted elements also ran before the rest of the statement and,
-            // in a ?: branch, whether or not that branch was selected.
+            // #1132: inline, where the C# had it. The old block bound an undeclared name
+            // (CS0103/CS0201) and ran hoisted elements early, even in an unselected branch.
             var dims = node.DimensionSizes.Count > 0
                 ? ":" + string.Join(":", node.DimensionSizes.Select(d => d.Accept(this)))
                 : "";
