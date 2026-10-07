@@ -12,8 +12,12 @@ const metricPages = ['comprehension', 'correctness', 'edit-precision', 'error-de
   'generation-accuracy', 'information-density', 'refactoring-stability', 'token-economics'];
 const verificationPages = ['philosophy/static-verification', 'syntax-reference/contracts',
   'cli/compile', 'cli/verify', 'benchmarking/metrics/contract-verification'];
-const currentRelease = '0.22.0';
-const releaseDate = '2026-09-15';
+const currentRelease = '0.24.0';
+const releaseDate = '2026-10-07';
+// The release that last published static benchmark numbers. 0.24.0 publishes none: benchmark
+// publication is governed separately (#1276/#1422) and follows adjudication through #1410.
+const benchmarkRelease = '0.22.0';
+const benchmarkReleaseDate = '2026-09-15';
 const pauseHandoff = 'https://github.com/juanmicrosoft/calor/issues/1254#issuecomment-5637070487';
 const pauseCheckpoint = 'https://github.com/juanmicrosoft/calor/pull/1438#issuecomment-5637787747';
 const execFileAsync = promisify(execFile);
@@ -207,20 +211,20 @@ for (const width of [1366, 390]) {
     await expect(pill).toHaveAttribute('title', `Docs describe compiler v${currentRelease}`);
     if (width >= 640) await expect(pill).toBeVisible();
     await expect(page.getByText(
-      'Bounded nullability checks and practical .NET migration guidance.', { exact: true },
+      'Verifier soundness repairs, plus an advisory for 0.21.0 users.', { exact: true },
     )).toBeVisible();
     await page.getByRole('link', { name: "See what's new", exact: true }).click();
     await expect(page).toHaveURL(/\/docs\/changelog\/$/);
     await expect(page.getByRole('heading', { name: `[${currentRelease}] - ${releaseDate}`, exact: true })).toBeVisible();
     const article = page.locator('article');
-    for (const text of ['Supported possibly-null values now stop compilation',
-      'General assignment/rebinding, member writes, and constructor inputs',
-      'Generic outer-container nullability',
-      'Array annotations do not prove every slot initialized',
-      'D3/D12/D14 safeguards, which conservatively demote proofs and retain runtime guards, remain unchanged',
-      '#875 remains open',
-      'neither the pilot nor confirmation has completed',
-      'does not authorize collection or apply the pending accounting amendment']) {
+    for (const text of ['Advisory: false proofs in 0.21.0 (and the unpublished 0.22.0)',
+      '7 false proofs in 4 areas',
+      'The published 0.21.0 package is not changed',
+      'not a proof that the verifier is sound',
+      'Whole-compiler soundness is not established',
+      'It is not independently adjudicated or independently verified',
+      'No benchmark results are published with this release',
+      'never reached NuGet']) {
       await expect(article).toContainText(text);
     }
   });
@@ -279,8 +283,8 @@ test('current version and explicitly historical result provenance cannot silentl
   expect(SITE_VERSION).toBe(props.match(/<Version>(.*?)<\/Version>/)![1]);
   expect(provenance.sourceCommit).toBe(data.commit);
   expect(provenance.generatedDate).toBe(data.timestamp.slice(0, 10));
-  expect(provenance.generatedDate).toBe(releaseDate);
-  expect(provenance.publishingRelease).toBe(currentRelease);
+  expect(provenance.generatedDate).toBe(benchmarkReleaseDate);
+  expect(provenance.publishingRelease).toBe(benchmarkRelease);
   expect(fullSourceCommit).toHaveLength(40);
   expect(sourceProps.match(/<Version>(.*?)<\/Version>/)![1])
     .toBe(provenance.sourceDeclaredVersion);
@@ -319,7 +323,7 @@ test('current version and explicitly historical result provenance cannot silentl
       expect(claim).toContain(`${data.metrics.InformationDensity.ratio.toFixed(2)}x`);
     }
     expect(source.replace(/\s+/g, ' ')).toContain('not all behaviorally equivalent');
-    expect(normalized).toContain(`prepared for publication with v${currentRelease}`);
+    expect(normalized).toContain(`prepared for publication with v${benchmarkRelease}`);
     expect(normalized).toContain(`source \`${provenance.sourceCommit}\``);
     expect(normalized).toContain(`declared compiler v${provenance.sourceDeclaredVersion}`);
     expect(normalized).toContain(`${data.summary.statisticalRunCount} repetitions`);
@@ -377,6 +381,11 @@ test('research milestones stay distinct from software releases', async () => {
     new RegExp(`^## \\[${currentRelease.replaceAll('.', '\\.')}\\][\\s\\S]*?(?=^## \\[)`, 'm'),
   )?.[0] ?? '';
   const normalizedRootCurrentSection = rootCurrentSection.replace(/\s+/g, ' ');
+  // Benchmark numbers belong to the release that published them, not to every later release.
+  const rootBenchmarkSection = rootChangelog.match(
+    new RegExp(`^## \\[${benchmarkRelease.replaceAll('.', '\\.')}\\][\\s\\S]*?(?=^## \\[)`, 'm'),
+  )?.[0] ?? '';
+  const normalizedRootBenchmarkSection = rootBenchmarkSection.replace(/\s+/g, ' ');
   const websiteCurrentSection = websiteChangelog.match(
     new RegExp(`^## \\[${currentRelease.replaceAll('.', '\\.')}\\][\\s\\S]*?(?=^## \\[)`, 'm'),
   )?.[0] ?? '';
@@ -393,40 +402,43 @@ test('research milestones stay distinct from software releases', async () => {
   expect(banner).toContain(`v${currentRelease}`);
   expect(rootChangelog.match(/^## \[([^\]]+)\]/m)?.[1]).toBe('Unreleased');
   expect(rootChangelog.match(/^## \[(\d+\.\d+\.\d+)\]/m)?.[1]).toBe(currentRelease);
-  expect(rootCurrentSection).toContain('Benchmark Results (Statistical: 30 runs)');
-  expect(rootCurrentSection).toContain('Programs Tested');
+  expect(rootCurrentSection).not.toMatch(/Benchmark Results|Statistical: \d+ runs|Overall Advantage/);
+  expect(normalizedRootCurrentSection).toContain('No benchmark results are published with this release');
+  expect(normalizedRootCurrentSection).toContain('7 false proofs in 4 areas');
+  expect(rootBenchmarkSection).toContain('Benchmark Results (Statistical: 30 runs)');
+  expect(rootBenchmarkSection).toContain('Programs Tested');
   expect(websiteChangelog.match(/^## \[([^\]]+)\]/m)?.[1]).toBe('Unreleased');
   expect(websiteChangelog.match(/^## \[(\d+\.\d+\.\d+)\]/m)?.[1]).toBe(currentRelease);
-  expect(rootCurrentSection).toContain(
+  expect(rootBenchmarkSection).toContain(
     `Benchmark Results (Statistical: ${data.summary.statisticalRunCount} runs)`,
   );
-  expect(rootCurrentSection).toContain(
+  expect(rootBenchmarkSection).toContain(
     `Legacy Composite Direction-Normalized Ratio**: ${data.summary.overallAdvantage.toFixed(2)}`,
   );
-  expect(rootCurrentSection).toContain(
+  expect(rootBenchmarkSection).toContain(
     `${data.summary.calorWins} category ratios favor Calor; ${data.summary.cSharpWins} favors C#`,
   );
-  expect(normalizedRootCurrentSection).toContain(
+  expect(normalizedRootBenchmarkSection).toContain(
     `Programs Tested**: ${data.summary.programCount}; Calor parser accepted ${calorParseCount}; Roslyn syntax parser accepted ${cSharpParseCount}`,
   );
-  expect(rootCurrentSection).toMatch(new RegExp(`Recorded [Ss]ource\\*\\*: \`${provenance.sourceCommit}\``));
-  expect(rootCurrentSection).toContain(`declares version ${provenance.sourceDeclaredVersion}`);
+  expect(rootBenchmarkSection).toMatch(new RegExp(`Recorded [Ss]ource\\*\\*: \`${provenance.sourceCommit}\``));
+  expect(rootBenchmarkSection).toContain(`declares version ${provenance.sourceDeclaredVersion}`);
   for (const metric of ['Comprehension', 'ErrorDetection', 'TokenEconomics', 'InformationDensity'] as const) {
     const result = data.metrics[metric];
-    expect(normalizedRootCurrentSection).toContain(
+    expect(normalizedRootBenchmarkSection).toContain(
       `${metric} ${result.ratio.toFixed(2)}x [${result.ci95[0].toFixed(3)}, ${result.ci95[1].toFixed(3)}]`,
     );
   }
-  expect(normalizedRootCurrentSection).toContain('repeat deterministic observations over a fixed corpus');
-  expect(normalizedRootCurrentSection).toMatch(/not independent samples|do not establish independent sampling uncertainty/);
-  expect(normalizedRootCurrentSection).toMatch(/Each metric is direction-normalized so (?:a value|values) above 1 favor(?:s)? Calor/);
-  expect(normalizedRootCurrentSection).toMatch(/source pairs are not all behaviorally equivalent/i);
-  expect(normalizedRootCurrentSection.toLowerCase()).toContain(
+  expect(normalizedRootBenchmarkSection).toContain('repeat deterministic observations over a fixed corpus');
+  expect(normalizedRootBenchmarkSection).toMatch(/not independent samples|do not establish independent sampling uncertainty/);
+  expect(normalizedRootBenchmarkSection).toMatch(/Each metric is direction-normalized so (?:a value|values) above 1 favor(?:s)? Calor/);
+  expect(normalizedRootBenchmarkSection).toMatch(/source pairs are not all behaviorally equivalent/i);
+  expect(normalizedRootBenchmarkSection.toLowerCase()).toContain(
     'no measured language, agent-productivity, correctness, or safety advantage',
   );
-  expect(rootCurrentSection).not.toContain('Overall Advantage');
-  expect(rootCurrentSection).not.toContain('Calor scores higher');
-  expect(rootCurrentSection).not.toContain('higher calculator score');
+  expect(rootBenchmarkSection).not.toContain('Overall Advantage');
+  expect(rootBenchmarkSection).not.toContain('Calor scores higher');
+  expect(rootBenchmarkSection).not.toContain('higher calculator score');
   expect(websiteCurrentSection).not.toMatch(/Benchmark Results|Statistical: \d+ runs|Overall Advantage/);
   expect(websiteCurrentSection).not.toContain(
     `${data.summary.overallAdvantage.toFixed(2)}x`,
