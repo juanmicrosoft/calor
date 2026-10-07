@@ -18,7 +18,12 @@ the interface member path. A larger preserved declaration keeps its own label (i
 default bodies: `interface-property-semantics`; records: `record`). After Codex round 2, the check
 is limited to properties and indexers (not partial events), partners match by identifier value text
 and indexer parameter count, and a two-file partial migration (with and without
-`MergePartialClasses`) is compiled together and run against the original. Native conversion was not attempted:
+`MergePartialClasses`) is compiled together and run against the original. After the
+verification pass (APPROVE; its one open nit was the lossy merge path), a third row runs
+`calor migrate --lossy`-style migration so `PartialClassMerger` executes. Observed there, and not
+iterator-specific: the merge moves `Bag` into its own file, and a single-file compile of the
+caller then reports `Calor0410` (unknown effect) for a type declared in another file, so that row
+compiles with effects off; its combined C# still matches the original. Native conversion was not attempted:
 Calor has no iterator accessor, and a synthesized helper method would add a member and name
 collisions for a capacity of 400 non-test lines.
 
@@ -29,7 +34,7 @@ collisions for a capacity of 400 non-test lines.
 | `reproduce/reproduce.py` | Driver. Imports the R0 driver and `ProbeRunner` unchanged |
 | `results.json` | Per-surface results for F4-ITER-01/02 and the F4-ITER-03 control |
 | `generated/` | Every `.calr` produced, per surface (`.calr.txt`, kept out of the corpus ledgers) |
-| `reviews/` | Codex adversarial review records |
+| `reviews/` | Codex adversarial review records: `round-1.md` (REQUEST-CHANGES), `round-2.md` (APPROVE), `verification.md` (APPROVE) |
 
 ## Results (from `results.json`)
 

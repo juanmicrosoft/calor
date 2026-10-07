@@ -338,9 +338,11 @@ public class IteratorAccessorConversionTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task PartialIteratorParts_InSeparateFiles_MigrateWithoutRescue(bool mergePartialClasses)
+    [InlineData(false, ConversionFidelity.Lossless)]
+    [InlineData(true, ConversionFidelity.Lossless)]
+    [InlineData(true, ConversionFidelity.Lossy)] // PartialClassMerger runs only when lossy
+    public async Task PartialIteratorParts_InSeparateFiles_MigrateWithoutRescue(
+        bool mergePartialClasses, ConversionFidelity fidelity)
     {
         // Codex round 2, finding 3: the defining declarations live in one file and the
         // iterator implementations in another. Each part is preserved where it is.
@@ -359,7 +361,8 @@ public class IteratorAccessorConversionTests
                 Parallel = false,
                 SkipAnalyze = true,
                 SkipVerify = true,
-                MergePartialClasses = mergePartialClasses
+                MergePartialClasses = mergePartialClasses,
+                Fidelity = fidelity
             });
             var plan = await migrator.CreatePlanAsync(dir, MigrationDirection.CSharpToCalor);
             var report = await migrator.ExecuteAsync(plan);
@@ -370,9 +373,17 @@ public class IteratorAccessorConversionTests
                 var calor = File.ReadAllText(file.OutputPath!);
                 Assert.DoesNotMatch(@"§Y(IELD|BRK)", calor);
                 // Each file alone references the other's partial members, so the
-                // generated C# is validated once, together, by Run below.
+                // generated C# is validated once, together, by Run below. The lossy merge
+                // moves Bag into its own file, and a single-file compile cannot resolve
+                // the effects of a type declared elsewhere (Calor0410 on Probe.Run, which
+                // is not iterator-specific), so effects are enforced on the lossless rows only.
                 var compilation = Program.Compile(calor, Path.GetFileName(file.OutputPath!),
-                    new CompilationOptions { StatusWriter = TextWriter.Null, DeferGeneratedOutputValidation = true });
+                    new CompilationOptions
+                    {
+                        StatusWriter = TextWriter.Null,
+                        DeferGeneratedOutputValidation = true,
+                        EnforceEffects = fidelity == ConversionFidelity.Lossless
+                    });
                 Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors) + "\n" + calor);
                 generated.Add(compilation.GeneratedCode);
             }
