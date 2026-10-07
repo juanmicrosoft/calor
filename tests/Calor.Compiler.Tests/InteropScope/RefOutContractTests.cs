@@ -20,7 +20,7 @@ namespace Calor.Compiler.Tests.InteropScope;
 public class RefOutContractTests
 {
     /// <summary>SHA-256 over the 1.0.0 rules and case denominator. Changing either needs an amendment and a new pin.</summary>
-    private const string FrozenSeal = "449bb7720355696e25ea0c6aa8c849f1bbe6c417d6175393d7e45f0f5003158a";
+    private const string FrozenSeal = "d15b423600acdebf23221bfce643196ffccc27e723cbfc3e2d549e0c1c28e942";
 
     [Fact]
     public void CommittedContractPasses()
@@ -56,18 +56,30 @@ public class RefOutContractTests
         Case(contract, "D1-EFF-01")["observed"] = new JsonObject { ["errors"] = new JsonArray("Calor0410") };
         Case(contract, "D1-EFF-01")["status"] = "holds";
         contract["diagnostics"]![0]!["code"] = "Calor0299";
-        Assert.Empty(Run(contract));
+        Assert.Empty(Run(contract, symbol => symbol == "InvalidByReferenceOperand" ? "Calor0299" : null));
         Assert.Equal(FrozenSeal, RefOutContractValidator.Seal(contract));
     }
 
     [Fact]
     public void AllocatedSymbolResolvesToItsCode()
     {
+        // As if #943 had added DiagnosticCode.InvalidByReferenceOperand = "Calor0299".
         var contract = Contract();
         contract["diagnostics"]![0]!["code"] = "Calor0299";
         Case(contract, "D1-LV-01")["observed"] = new JsonObject { ["errors"] = new JsonArray("Calor0299") };
         Case(contract, "D1-LV-01")["status"] = "holds";
-        Assert.Empty(Run(contract));
+        Assert.Empty(Run(contract, symbol => symbol == "InvalidByReferenceOperand" ? "Calor0299" : null));
+    }
+
+    [Fact]
+    public void AllocationThatReusesAnExistingCodeFails()
+    {
+        // Round-2 review: mapping the symbol to Calor0200 (UndefinedReference) would turn D1-DECL-03's
+        // accidental refusal into a pass. The code must be the compiler's own constant for the symbol.
+        var contract = Contract();
+        contract["diagnostics"]![0]!["code"] = "Calor0200";
+        Case(contract, "D1-DECL-03")["status"] = "holds";
+        Assert.Contains(Run(contract), v => v.Code == "D007");
     }
 
     public static IEnumerable<object[]> NegativeControls => Negatives.Keys.Select(k => new object[] { k });
@@ -126,14 +138,20 @@ public class RefOutContractTests
         ["version without amendment"] = ("D009", c => c["contractVersion"] = "1.1.0"),
         ["independence claim"] = ("D010", c => Case(c, "D1-LV-01")["note"] = "Independently reviewed."),
         ["allocated code outside the range"] = ("D007", c => c["diagnostics"]![0]!["code"] = "Calor0999"),
+        ["proof observation removed"] = ("D003", c =>
+        {
+            Case(c, "D1-ANA-01")["observed"]!.AsObject().Remove("proof");
+            Case(c, "D1-ANA-01")["status"] = "violates";
+        }),
         ["proof status weakened to timeout"] = ("D008", c =>
         {
             Case(c, "D1-ANA-02")["observed"] = new JsonObject { ["errors"] = new JsonArray(), ["proof"] = "Timeout" };
         }),
     };
 
-    private static IReadOnlyList<ContractViolation> Run(JsonNode contract)
-        => RefOutContractValidator.Validate(contract, JsonNode.Parse(File.ReadAllText(Path.Combine(Root, RefOutContractValidator.R0ScopePath)))!, ReadRepoFile);
+    private static IReadOnlyList<ContractViolation> Run(JsonNode contract, Func<string, string?>? compilerConstant = null)
+        => RefOutContractValidator.Validate(contract, JsonNode.Parse(File.ReadAllText(Path.Combine(Root, RefOutContractValidator.R0ScopePath)))!,
+            ReadRepoFile, compilerConstant);
 
     internal static byte[]? ReadRepoFile(string path)
     {
@@ -193,8 +211,9 @@ public class RefOutContractCaseTests
         var errors = result.Diagnostics.Where(d => d.IsError).Select(d => d.Code).Distinct().OrderBy(x => x, StringComparer.Ordinal).ToList();
         var observed = c["observed"]!;
         Assert.Equal(observed["errors"]!.AsArray().Select(e => e!.GetValue<string>()).OrderBy(x => x, StringComparer.Ordinal), errors);
-        if (observed["proof"] is { } proof)
+        if (c["expected"]?["proof"] is not null)
         {
+            var proof = Assert.IsAssignableFrom<JsonNode>(observed["proof"]);
             var status = Assert.Single(options.ObligationResults!.Obligations, o => o.Kind == ObligationKind.ProofObligation).Status;
             Assert.Equal(proof.GetValue<string>(), status.ToString());
             // RO-ANA-3: an Unsupported obligation is visible (Calor1124) and keeps its runtime guard.

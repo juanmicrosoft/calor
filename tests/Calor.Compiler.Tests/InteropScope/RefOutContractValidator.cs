@@ -38,7 +38,7 @@ internal static class RefOutContractValidator
     [
         "alias-narrowing", "aliased-parameter", "array-element", "bare-field", "computed-expression", "constructor-argument",
         "delegate-by-ref", "discard", "discard-collision", "expression-call", "flow-attribute", "generic-type-payload", "immutable-binding",
-        "in-argument", "in-extension", "in-omitted", "in-parameter", "indexer-argument", "literal", "local", "loop-condition", "loop-variable",
+        "conditional-ref", "heap-alias-narrowing", "in-argument", "in-array-element", "in-extension", "in-omitted", "in-parameter", "indexer-argument", "literal", "local", "loop-condition", "loop-variable",
         "method-generic", "missing-modifier", "modifier-text", "named-argument", "narrowing", "nullable-annotation",
         "out-var", "out-var-loop-header", "overload-by-modifier", "parameter", "preserved-csharp", "property", "readonly-field", "readonly-field-ctor",
         "receiver-field", "ref-extension", "ref-local", "same-storage-twice", "short-circuit", "span-indexer",
@@ -59,8 +59,15 @@ internal static class RefOutContractValidator
     private static readonly Regex CalorCode = new(@"^Calor\d{4}$", RegexOptions.Compiled);
     private static readonly Regex SemVer = new(@"^\d+\.\d+\.\d+$", RegexOptions.Compiled);
 
-    public static IReadOnlyList<ContractViolation> Validate(JsonNode contract, JsonNode r0Scope, Func<string, byte[]?> readRepoFile)
+    /// <summary>The compiler's own constant for a diagnostic symbol (DiagnosticCode.&lt;symbol&gt;), or null.</summary>
+    public static string? CompilerConstant(string symbol)
+        => typeof(Calor.Compiler.Diagnostics.DiagnosticCode)
+            .GetField(symbol, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)?.GetValue(null) as string;
+
+    public static IReadOnlyList<ContractViolation> Validate(JsonNode contract, JsonNode r0Scope, Func<string, byte[]?> readRepoFile,
+        Func<string, string?>? compilerConstant = null)
     {
+        compilerConstant ??= CompilerConstant;
         var v = new List<ContractViolation>();
         void Fail(string code, string subject, string message) => v.Add(new ContractViolation(code, subject, message));
         var rules = Arr(contract["rules"]).ToList();
@@ -196,8 +203,9 @@ internal static class RefOutContractValidator
         {
             if (Str(d?["range"]) is not { } range || !range.StartsWith("Calor02", StringComparison.Ordinal) || Int(d?["allocatedBy"]) != 943)
                 Fail("D007", Str(d?["symbol"]) ?? "", "diagnostic symbol needs a Calor02xx range and #943 as allocator");
-            if (d?["code"] is not null && !(Str(d["code"]) is { } allocated && Regex.IsMatch(allocated, "^Calor02\\d\\d$")))
-                Fail("D007", Str(d?["symbol"]) ?? "", "an allocated code must be a Calor02xx code");
+            if (d?["code"] is not null && !(Str(d["code"]) is { } allocated && Regex.IsMatch(allocated, "^Calor02\\d\\d$")
+                    && Str(d["symbol"]) is { } sym && compilerConstant(sym) == allocated))
+                Fail("D007", Str(d?["symbol"]) ?? "", "an allocated code must be Calor02xx and equal the compiler's DiagnosticCode.<symbol>");
         }
         foreach (var c in cases.Where(c => Str(c?["kind"]) == "calor" && Str(c?["expected"]?["outcome"]) == "rejected"))
         {
@@ -243,6 +251,8 @@ internal static class RefOutContractValidator
         if (!In("status", Str(c["status"]))) { Fail("D003", id, "status outside the vocabulary"); return; }
         if (expected?["proof"] is { } p && !In("proof", Str(p))) Fail("D003", id, "proof expectation outside the vocabulary");
         if (expected?["proof"] != null && c["verify"]?.GetValue<bool>() != true) Fail("D003", id, "a proof expectation needs verify");
+        if (expected?["proof"] != null && Str(c["observed"]?["proof"]) is not ("Pending" or "Discharged" or "Failed" or "Timeout" or "Boundary" or "Unsupported"))
+            Fail("D003", id, "a proof expectation needs a recorded ObligationStatus observation");
         var errors = Arr(observed?["errors"]).Select(Str).ToList();
         bool meets = outcome == "accepted"
             ? errors.Count == 0 && ProofMeets(Str(expected?["proof"]), Str(observed?["proof"]))
