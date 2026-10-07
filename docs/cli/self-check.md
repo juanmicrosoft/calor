@@ -84,7 +84,7 @@ of the generated C#. The fence info string carries the page's claim:
 |:------|:--------|:------|
 | ```` ```calor ```` starting with `§M` | Complete program | No errors (warnings allowed) |
 | ```` ```calor expect=Calor0272 ```` | Intended negative example | The error **and** warning codes equal the listed set exactly; the adjacent prose (nearest heading to the next fence, plus any linked `output` fence) cites every listed code; a "line N, column M" claim before the fence matches a reported location |
-| ```` ```calor group=orders ```` | One file of a multi-file example | All members of the group compile together, as `calor --input a.calr --input b.calr` does, so cross-module effect checks run. A fence may join several groups (`group=a,b`); its expectations must hold in each. When a group mixes negative and positive members, the positive members are also compiled without the negative ones, because a failing file can stop generated-C# validation for the whole set |
+| ```` ```calor group=orders ```` | One file of a multi-file example | All members of the group compile together, as `calor --input a.calr --input b.calr` does, so cross-module effect checks run. A fence may join several groups (`group=a,b`); its expectations must hold in each. When some members report errors, the members that reported none are compiled again without the failing ones and must still report no errors, because a failing file can stop generated-C# validation for the whole set |
 | ```` ```text output ```` | Real diagnostics of the nearest preceding complete program | Every quoted `[file(line,col): ][error\|warning ]CalorNNNN: message` entry (continuation lines are joined) must match an actual diagnostic, and every actual error or warning must be quoted |
 | ```` ```text illustrative ```` (or `json illustrative`) | Output CI does not check | None. The site shows the block as "Example output (not checked)" |
 
@@ -93,9 +93,12 @@ a `file.calr:line:col` location, an `=== … ===` banner, or a `BLOCKED:` line),
 or a `json` fence whose keys are those of a CLI envelope or MCP response
 (`success`, `diagnostics`, `schemaVersion`, `suggestions`, `obligations`,
 `guards`, `patches`, `isError`, `decision`), and that carries neither label
-fails with `Calor1333`. Fences are found the way the site's MDX parser finds
-them: backtick or tilde fences of three or more characters, indented (in lists
-or JSX) or inside blockquotes. Unknown annotations, an
+fails with `Calor1333`. Fences are backtick or tilde fences of three or more
+characters, optionally indented (under a list item or inside JSX). A fence on a
+list-marker or blockquote line, an indented fence whose body dedents past its
+opener, and an unclosed fence fail with `Calor1334`: their extent depends on
+the enclosing container, so the check refuses to guess. Repeated annotations
+(`expect=` twice) also fail. Unknown annotations, an
 annotation on a fragment, and a complete program fenced with another language
 fail with `Calor1334`. MDX cannot hold HTML comments, so website pages write
 the suppression marker as `{/* drift:ignore */}`. On website pages it applies

@@ -138,13 +138,14 @@ A proof obligation asserts that a condition holds at a specific point in the fun
   §O{i32}
   §Q (>= balance amount)
 
-  §B{newBalance:i32} (- balance amount)
-  §PROOF{p1:non-negative} (>= newBalance INT:0)
+  §PROOF{p1:non-negative} (>= (- balance amount) INT:0)
 
-  §R newBalance
+  §R (- balance amount)
 ```
 
-Z3 proves this: given `balance >= amount` and `amount > 0`, then `balance - amount >= 0`.
+Z3 proves this: given `balance >= amount`, then `balance - amount >= 0`. State the proof on the
+expression: the obligation solver does not yet track `§B` locals, so a proof about one is
+reported `Unsupported`.
 
 ### Proof Obligation Statuses
 

@@ -1025,13 +1025,18 @@ public static class WebsiteExampleChecker
 
     // A JSON fence whose top-level keys are those of a CLI envelope or MCP tool response.
     private static readonly Regex OutputShapedJson = new(
-        @"^\s*""(?:success|diagnostics|schemaVersion|suggestions|obligations|guards|patches|isError|decision)""\s*:",
-        RegexOptions.Compiled | RegexOptions.Multiline);
+        @"""(?:success|diagnostics|schemaVersion|suggestions|obligations|guards|patches|isError|decision)""\s*:",
+        RegexOptions.Compiled);
 
-    // A CommonMark fence opener: optional indentation and blockquote markers, then three or
-    // more backticks or tildes. The website's MDX parser renders all of these as code blocks.
+    // A fence opener: optional indentation, then three or more backticks or tildes.
     private static readonly Regex FenceOpen = new(
-        @"^(?<indent> {0,3})(?<quote>(?:>\s?)*)(?<ws>\s*)(?<fence>`{3,}|~{3,})(?<info>[^`]*)$", RegexOptions.Compiled);
+        @"^(?<ws>[ \t]*)(?<fence>`{3,}|~{3,})(?<info>[^`]*)$", RegexOptions.Compiled);
+
+    // A fence opened on a list-item or blockquote line. CommonMark ends such a fence when its
+    // container ends (possibly implicitly), which a line scanner cannot follow, so the website
+    // convention forbids it and the check rejects it rather than guessing.
+    private static readonly Regex FenceInContainer = new(
+        @"^[ \t]*(?:>|[-*+][ \t]|\d{1,9}[.)][ \t])[ \t>]*(?:[-*+][ \t]|\d{1,9}[.)][ \t])?[ \t>]*(?:`{3,}|~{3,})", RegexOptions.Compiled);
 
     /// <summary>A fenced block of an MDX page.</summary>
     public sealed record Fence(
@@ -1073,26 +1078,43 @@ public static class WebsiteExampleChecker
 
     /// <summary>
     /// Splits an MDX page into its fenced blocks (1-based line numbers): backtick or tilde
-    /// fences of three or more characters, indented (e.g. inside a list or JSX element) or
-    /// inside a blockquote. Content lines lose the opener's indentation and quote markers.
+    /// fences of three or more characters, optionally indented (e.g. under a list item or in a
+    /// JSX element). Content lines lose the opener's indentation. Fence forms whose extent
+    /// depends on a container (list-marker or blockquote lines, indented bodies that dedent,
+    /// unclosed fences) are reported by the checker instead of being guessed.
     /// </summary>
-    public static List<Fence> ParseFences(string content)
+    public static List<Fence> ParseFences(string content) => ParseFences(content, null);
+
+    private static List<Fence> ParseFences(string content, List<int>? rejectedLines)
     {
         var fences = new List<Fence>();
         var lines = content.Replace("\r\n", "\n").Split('\n');
         for (var i = 0; i < lines.Length; i++)
         {
-            var open = FenceOpen.Match(lines[i].TrimStart().Length == lines[i].Length ? lines[i] : Dedent(lines[i]));
+            var open = FenceOpen.Match(lines[i]);
             if (!open.Success)
+            {
+                if (FenceInContainer.IsMatch(lines[i]))
+                    rejectedLines?.Add(i + 1);
                 continue;
-            var depth = open.Groups["quote"].Value.Count(c => c == '>');
-            var indent = lines[i].Length - lines[i].TrimStart().Length + open.Groups["ws"].Length;
+            }
+            var indent = open.Groups["ws"].Length;
             var marker = open.Groups["fence"].Value;
             var info = open.Groups["info"].Value.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
             var body = new List<string>();
             var close = i + 1;
-            while (close < lines.Length && !IsCloser(StripQuotes(lines[close], depth), marker))
-                body.Add(RemoveIndent(StripQuotes(lines[close++], depth), depth > 0 ? open.Groups["ws"].Length : indent));
+            var dedented = false;
+            while (close < lines.Length && !IsCloser(lines[close], marker))
+            {
+                // An indented fence (inside a list item or JSX element) whose body dedents past
+                // the opener may have been closed implicitly by its container.
+                if (indent > 0 && lines[close].Trim().Length > 0
+                    && lines[close].Length - lines[close].TrimStart().Length < indent)
+                    dedented = true;
+                body.Add(RemoveIndent(lines[close++], indent));
+            }
+            if (dedented || close >= lines.Length)
+                rejectedLines?.Add(i + 1);
             fences.Add(new Fence(info.Length > 0 ? info[0] : "", info.Skip(1).ToList(), body, i + 1,
                 Math.Min(close, lines.Length - 1) + 1));
             i = close;
@@ -1100,34 +1122,16 @@ public static class WebsiteExampleChecker
         return fences;
     }
 
-    // Fences nested in JSX or list items may be indented by more than three spaces; MDX
-    // still renders them as code, so the opener is matched after removing the indentation.
-    private static string Dedent(string line) => line.TrimStart();
-
     private static bool IsCloser(string line, string marker)
     {
         var trimmed = line.Trim();
         return trimmed.Length >= marker.Length && trimmed.All(c => c == marker[0]);
     }
 
-    private static string StripQuotes(string line, int depth)
-    {
-        for (var d = 0; d < depth; d++)
-        {
-            var trimmed = line.TrimStart();
-            if (!trimmed.StartsWith('>'))
-                return line;
-            line = trimmed[1..];
-            if (line.StartsWith(' '))
-                line = line[1..];
-        }
-        return line;
-    }
-
     private static string RemoveIndent(string line, int width)
     {
         var remove = 0;
-        while (remove < width && remove < line.Length && line[remove] == ' ')
+        while (remove < width && remove < line.Length && (line[remove] == ' ' || line[remove] == '\t'))
             remove++;
         return line[remove..];
     }
@@ -1154,8 +1158,14 @@ public static class WebsiteExampleChecker
     private static void CheckPage(DocFile page, List<Diagnostic> diagnostics, Coverage coverage)
     {
         var lines = page.Content.Replace("\r\n", "\n").Split('\n');
-        var fences = ParseFences(page.Content);
+        var rejected = new List<int>();
+        var fences = ParseFences(page.Content, rejected);
         var programs = new List<Fence>();
+        foreach (var line in rejected)
+            diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation,
+                "Unsupported fence form: a fence on a list-item or blockquote line, an indented fence whose body " +
+                "dedents past its opener, or an unclosed fence. Use a plain fence (indentation only) so the check " +
+                "sees exactly the block the site renders", page.Path, line));
 
         // The drift:ignore marker exempts prose from the keyword and code scans only; it never
         // exempts an executable example or quoted output from these checks.
@@ -1180,17 +1190,18 @@ public static class WebsiteExampleChecker
             foreach (var member in members)
                 units[member].Add(unit);
 
-            // A failing member can stop generated-C# validation for the whole group, which
-            // would hide errors in the others. Compile the positive members again without
-            // the negative ones; they must still compile.
-            var positives = members.Where(m => ExpectedCodes(m).Count == 0).ToList();
-            if (positives.Count > 0 && positives.Count < members.Count)
+            // A member that fails to compile can stop generated-C# validation for the whole
+            // group, which would hide errors in the others. Compile every member that reported
+            // no error again without the failing ones (warning-only negatives stay, so their
+            // dependants still resolve); none of them may report an error.
+            var clean = members.Where(m => unit.Actual.TryGetValue(m, out var a) && !a.Any(d => d.IsError)).ToList();
+            if (clean.Count > 0 && clean.Count < members.Count)
             {
-                foreach (var (member, actual) in Compile(page, positives, diagnostics))
+                foreach (var (member, actual) in Compile(page, clean, diagnostics))
                 {
                     foreach (var error in actual.Where(d => d.IsError))
                         diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteExampleMismatch,
-                            $"Complete calor example does not compile without its group's negative examples: {error.Code}: {error.Message}",
+                            $"Complete calor example does not compile once its group's failing examples are removed (a failing file can stop generated-C# validation for the whole group): {error.Code}: {error.Message}",
                             page.Path, member.FirstContentLine + Math.Max(error.Span.Line - 1, 0)));
                 }
             }
@@ -1282,6 +1293,15 @@ public static class WebsiteExampleChecker
                     page.Path, fence.OpenLine));
                 ok = false;
             }
+        }
+
+        foreach (var key in fence.Tokens.Select(t => t.Contains('=') ? t[..t.IndexOf('=')] : t)
+            .GroupBy(k => k, StringComparer.Ordinal).Where(g => g.Count() > 1).Select(g => g.Key))
+        {
+            diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation,
+                $"Fence annotation '{key}' is repeated; list every code in one expect= (or group in one group=)",
+                page.Path, fence.OpenLine));
+            ok = false;
         }
 
         if (fence.Has("output") && fence.Has("illustrative"))

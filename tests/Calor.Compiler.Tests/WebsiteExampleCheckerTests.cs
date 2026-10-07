@@ -237,19 +237,107 @@ public sealed class WebsiteExampleCheckerTests
     [Theory]
     [InlineData("~~~calor\n{0}\n~~~\n")]
     [InlineData("````calor\n{0}\n````\n")]
-    [InlineData("> ```calor\n> {1}\n> ```\n")]
     [InlineData("<Tabs>\n      ```calor\n      {1}\n      ```\n</Tabs>\n")]
     [InlineData("1. Step one:\n\n   ```calor\n   {1}\n   ```\n")]
     public void FenceVariantsThatMdxRendersAreChecked(string template)
     {
-        // Tilde, longer, blockquoted and indented fences all render as code; none may bypass the check.
-        var indented = template.Contains("<Tabs>") ? "      " : template.StartsWith("1.") ? "   " : "> ";
+        // Tilde, longer and indented fences all render as code; none may bypass the check.
+        var indented = template.Contains("<Tabs>") ? "      " : "   ";
         var body = string.Join("\n" + indented, UndefinedVariable.Replace("\r\n", "\n").Split('\n'));
         var page = template.Replace("{0}", UndefinedVariable).Replace("{1}", body);
         var finding = Assert.Single(Check(page));
         Assert.Equal(DiagnosticCode.DocDriftWebsiteExampleMismatch, finding.Code);
         Assert.Contains("Calor0200", finding.Message);
         Assert.Empty(Check(page.Replace("(+ x 1)", "(+ value 1)")));
+    }
+
+    [Theory]
+    [InlineData("> ```calor\n> §M{m1:A}\n> ```\n")]
+    [InlineData(">   > ```calor\n>   > §M{m1:A}\n>   > ```\n")]
+    [InlineData("- ```calor\n  §M{m1:A}\n  ```\n")]
+    [InlineData("1. ```calor\n   §M{m1:A}\n   ```\n")]
+    [InlineData("> ~~~text\n> hello\n\n```calor\n§M{m1:A}\n```\n")]
+    [InlineData("- item\n\n  ```calor\n§M{m001:Broken}\n  ```\n")]
+    [InlineData("```calor\n§M{m1:A}\n")]
+    public void ContainerDependentOrUnclosedFence_IsRejected(string page)
+    {
+        // Their extent depends on a list or blockquote container (review round 2, findings 1-2).
+        Assert.Contains(Check(page), f => f.Code == DiagnosticCode.DocDriftWebsiteAnnotation
+            && f.Message.Contains("Unsupported fence form"));
+    }
+
+    [Theory]
+    [InlineData("```calor expect=Calor0200 expect=Calor0201\n")]
+    [InlineData("```calor group=a group=b\n")]
+    [InlineData("```text illustrative illustrative\n")]
+    public void RepeatedAnnotation_IsRejected(string opener)
+    {
+        Assert.Contains(Check("Calor0200 Calor0201\n\n" + opener + UndefinedVariable + "\n```\n"),
+            f => f.Code == DiagnosticCode.DocDriftWebsiteAnnotation && f.Message.Contains("repeated"));
+    }
+
+    [Fact]
+    public void WarningOnlyNegativeCannotHideGeneratedCSharpErrors()
+    {
+        // Review round 2, finding 3: Orders expects only a warning, yet its generated C# is
+        // broken; the lexer-negative member suppresses validation for the whole group.
+        const string page = """
+            Orders warns with Calor0417.
+
+            ```calor group=g expect=Calor0417
+            §M{m001:Orders}
+              §F{f001:Save:pub} () -> void
+                §E{db:w}
+                §C{DbContext.SaveChanges} §/C
+              §F{f002:Version:pub} () -> i32
+                §R 1
+            ```
+
+            This one fails with Calor0002.
+
+            ```calor group=g expect=Calor0002
+            §M{m002:Broken}
+              §F{f001:Run:pub} () -> void
+                §E{cw}
+                §P "unterminated
+            ```
+            """;
+        Assert.Contains(Check(page), f => f.Message.Contains("Calor1002"));
+    }
+
+    [Fact]
+    public void PositiveMemberMayDependOnAWarningOnlyNegative()
+    {
+        // Review round 2, finding 5: the retry keeps warning-only members, so a caller that
+        // depends on one still resolves.
+        const string page = """
+            Warns with Calor0417.
+
+            ```calor group=g expect=Calor0417
+            §M{m001:Store}
+              §F{f001:Save:pub} () -> i32
+                §E{}
+                §R 1
+              §F{f002:Version:pub} () -> i32
+                §R 2
+            ```
+
+            ```calor group=g
+            §M{m002:Caller}
+              §F{f001:Run:pub} () -> i32
+                §E{}
+                §R §C{Save} §/C
+            ```
+
+            Fails with Calor0002.
+
+            ```calor group=g expect=Calor0002
+            §M{m003:Broken}
+              §F{f001:Run:pub} () -> void
+                §P "unterminated
+            ```
+            """;
+        Assert.Empty(Check(page));
     }
 
     [Fact]
@@ -283,6 +371,9 @@ public sealed class WebsiteExampleCheckerTests
         var response = "```json\n{\n  \"success\": true,\n  \"suggestions\": []\n}\n```\n";
         Assert.Equal(DiagnosticCode.DocDriftWebsiteOutputMismatch, Assert.Single(Check(response)).Code);
         Assert.Empty(Check(response.Replace("```json\n", "```json illustrative\n")));
+        // Compact JSON is detected too (review round 2, finding 4).
+        Assert.Equal(DiagnosticCode.DocDriftWebsiteOutputMismatch,
+            Assert.Single(Check("```json\n{\"success\":false,\"diagnostics\":[]}\n```\n")).Code);
         // Configuration files are not output.
         Assert.Empty(Check("```json\n{\n  \"sdk\": { \"version\": \"10.0.100\" }\n}\n```\n"));
     }
