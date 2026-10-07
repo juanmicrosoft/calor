@@ -55,6 +55,10 @@ public class ContractTranslatorSemanticsVersionGuardTests
     {
         var actualHash = ComputeFixtureHash();
         var actualVersion = ContractTranslator.SemanticsVersion;
+        // #1421: opt-in determinism record (no-op unless CALOR_DETERMINISM_RECORD_DIR is set), so a
+        // platform difference in translator output is compared as bytes, not only as Failed.
+        VerifierRuntimeDifferential.DeterminismRecord.WriteGenerated(
+            "translator-fixture", Encoding.UTF8.GetBytes($"{actualHash}|{actualVersion}"));
 
         // The version constant and the translator output must move together.
         // We assert both in one shot so the failure message is unambiguous.
@@ -114,7 +118,10 @@ public class ContractTranslatorSemanticsVersionGuardTests
             var rendered = fixture.Build(translator);
             buffer.Append(fixture.Name);
             buffer.Append(" :: ");
-            buffer.AppendLine(rendered);
+            // '\n', not AppendLine: Environment.NewLine is CRLF on Windows, which made the
+            // fixture hash platform-dependent (#1135, contract determinism row
+            // platform-TranslatorOutputMatchesCommittedBaseline).
+            buffer.Append(rendered).Append('\n');
         }
 
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(buffer.ToString()));

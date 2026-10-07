@@ -2327,6 +2327,8 @@ public sealed class Lexer
         else
         {
             info = InferTypedSignedInteger(magnitude, sign, literalBase);
+            if (info is { Width: IntegerLiteralWidth.Bits64 } inferred)
+                info = inferred with { WidthInferred = true };
         }
 
         if (info is { } validInfo)

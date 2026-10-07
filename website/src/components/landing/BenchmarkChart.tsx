@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { formatTimestamp } from '@/lib/timestamps';
 import { trackBenchmarkDetailClick } from '@/lib/analytics';
+import { HistoricalMethodLabel } from '@/components/benchmarks/HistoricalMethodLabel';
 import benchmarkData from '../../../public/data/benchmark-results.json';
 import provenance from '../../../public/data/benchmark-provenance.json';
 
@@ -13,6 +14,7 @@ export function BenchmarkChart() {
         <h2 id="evidence-heading" className="text-3xl font-bold tracking-tight">
           Evidence and its limits
         </h2>
+        <HistoricalMethodLabel className="mt-4" />
         <p className="mt-4 text-muted-foreground font-body">
           The historical static snapshot covers {benchmarkData.programs.length} source pairs
           and {Object.keys(benchmarkData.metrics).length} deterministic calculators.

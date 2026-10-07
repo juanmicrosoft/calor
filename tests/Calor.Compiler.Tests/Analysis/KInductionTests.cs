@@ -512,6 +512,36 @@ public class KInductionTests
         Assert.NotNull(prover);
     }
 
+    [Fact]
+    public void KInductionProver_RefusesUnrepresentableBoundsAndSteps()
+    {
+        // #1413 (S2 R-NUM review round 2): an oversized step was replaced by 1, and a wrapped
+        // unsigned bound became -1, both yielding Proven over a substituted transition.
+        Assert.True(Z3ContextFactory.IsAvailable, "this witness needs Z3");
+        var source = @"
+§M{m001:Test}
+  §F{f001:Probe:pub}
+    §O{i32}
+    §L{l1:i:0:10:1}
+      §B{t:i32} i
+    §R INT:0";
+        var func = GetFunction(source, out var parseDiag);
+        Assert.False(parseDiag.HasErrors, string.Join(Environment.NewLine, parseDiag.Select(d => d.Message)));
+        var loop = Assert.Single(func.Body.OfType<BoundForStatement>());
+        var span = loop.Span;
+        var oversizedStep = new BoundForStatement(span, loop.LoopVariable, loop.From, loop.To,
+            new BoundIntLiteral(span, 3_000_000_000), loop.Body);
+        var wrappedBound = new BoundForStatement(span, loop.LoopVariable, loop.From,
+            new BoundIntLiteral(span, -1, ulong.MaxValue, isUnsigned: true, "u64"), loop.Step, loop.Body);
+        // Control: the representable loop proves the same invariant.
+        Assert.Equal(KInductionStatus.Proven, new KInductionProver(new KInductionOptions()).ProveInvariant(loop, "i <= 11", func).Status);
+        foreach (var candidate in new[] { oversizedStep, wrappedBound })
+        {
+            var result = new KInductionProver(new KInductionOptions()).ProveInvariant(candidate, "i <= 11", func);
+            Assert.Equal(KInductionStatus.Unsupported, result.Status); // the whole loop is refused (amendment 1.3.1)
+        }
+    }
+
     [SkippableFact]
     public void LoopInvariantSynthesizer_SynthesizesForLoop()
     {

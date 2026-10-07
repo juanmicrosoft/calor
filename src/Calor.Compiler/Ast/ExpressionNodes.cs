@@ -23,6 +23,13 @@ public sealed class IntLiteralNode : ExpressionNode
     public IntegerLiteralWidth Width { get; private init; }
     public IntegerLiteralSignedness Signedness { get; }
     public bool IsHex => Base == IntegerLiteralBase.Hexadecimal;
+
+    /// <summary>
+    /// #1413: true for an <c>INT:</c> literal whose value is outside the int32 range, so its
+    /// 64-bit width was inferred rather than spelled (<c>LONG:</c>). The verifier refuses it
+    /// (divergence D2); code generation is unchanged.
+    /// </summary>
+    public bool WidthInferred { get; init; }
     public bool IsUnsigned => Signedness == IntegerLiteralSignedness.Unsigned;
     public ulong UnsignedValue => Magnitude;
     public bool IsLong

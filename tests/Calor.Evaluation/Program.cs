@@ -535,6 +535,12 @@ public static class Program
 
         rootCommand.AddCommand(scorecardCommand);
 
+        // #1276 registered pair differential oracle (run only after the registration merges)
+        rootCommand.AddCommand(Equivalence.PairOracleCommand.Create());
+        // #1276 results generator: metric runs over EQUIVALENT pairs and the dispositioned pair manifest
+        foreach (var command in Equivalence.PairResultsCommand.Create())
+            rootCommand.AddCommand(command);
+
         // Default: run benchmarks if no command specified
         rootCommand.SetHandler(async () =>
         {
@@ -626,7 +632,9 @@ public static class Program
 
         if (format is "markdown" or "both")
         {
-            var mdGenerator = new MarkdownReportGenerator();
+            // result.CommitHash came from git in the current directory (BenchmarkRunner), so look up
+            // the source-declared version in that same repository.
+            var mdGenerator = new MarkdownReportGenerator(Directory.GetCurrentDirectory());
             var mdPath = format == "both" ? Path.ChangeExtension(output, ".md") : output;
             await mdGenerator.SaveAsync(result, mdPath);
             Console.WriteLine($"Markdown report saved to: {mdPath}");

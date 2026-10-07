@@ -213,6 +213,11 @@ public class IntegrationTests
     ///
     /// <para>Before the correction this was <c>Proven</c> and <b>elided</b>: `calor run` threw and
     /// `calor run --verify` printed <c>1</c>.</para>
+    ///
+    /// <para>#1413 (S1 STR-NULL-NONASCII): string literals now reach Z3 per UTF-16 code unit, so
+    /// <c>len STR:"é"</c> is 1 in the solver as in .NET, and the postcondition that holds is
+    /// <c>result == 1</c>. The demotion this test pins is unchanged: a proof carried only by a
+    /// body-side string term is Assumed and never elides.</para>
     /// </summary>
     [SkippableFact]
     public void StringInBodyOnly_StillNeverElides()
@@ -223,7 +228,7 @@ public class IntegrationTests
 §M{m001:Test}
   §F{f001:ByteLen:pub} () -> i32
     §E{}
-    §S (== result INT:2)
+    §S (== result INT:1)
     §R (len STR:""\u00e9"")";
 
         var result = Program.Compile(source, "test.calr", NoCache());

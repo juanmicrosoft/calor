@@ -1,5 +1,6 @@
 using Calor.Compiler.Ast;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
 using Xunit;
 using System.Runtime.CompilerServices;
@@ -406,8 +407,9 @@ public class ImplicationProverTests
         using var ctx = Z3ContextFactory.Create();
         using var prover = new Z3ImplicationProver(ctx);
 
-        // String contracts are now supported via Z3's string theory
-        // s != "" -> s != "" is a tautology
+        // String contracts translate via Z3's string theory, but the solver's strings are
+        // never null while a .NET string may be: since #1413 an implication carried by the
+        // string model is Assumed (named string-model assumption), never reported Proven.
         var parameters = new List<(string Name, string Type)> { ("s", "string") };
 
         var antecedent = new BinaryOperationNode(
@@ -424,7 +426,9 @@ public class ImplicationProverTests
 
         var result = prover.ProveImplication(parameters, antecedent, consequent);
 
-        Assert.Equal(ImplicationStatus.Proven, result.Status);
+        Assert.Equal(ImplicationStatus.Unknown, result.Status);
+        Assert.Equal(ProofStatus.Assumed, result.Outcome!.Status);
+        Assert.Contains(Z3Verifier.StringModelAssumption, result.Outcome.Assumptions);
     }
 
     [SkippableFact]

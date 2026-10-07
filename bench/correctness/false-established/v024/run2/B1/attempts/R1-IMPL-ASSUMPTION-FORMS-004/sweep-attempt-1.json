@@ -1,0 +1,184 @@
+{
+  "baseline": "B1",
+  "caseId": "R1-IMPL-ASSUMPTION-FORMS-004",
+  "rowId": "IMPL-ASSUMPTION-FORMS",
+  "templateId": "T-IMPL-ASSUME",
+  "caseSha256": {
+    "calor": "1914c729b0e70a47a9ea7c9e2bf58d27a0e8d03451aa6b1a7bb81a7796fa51c8",
+    "oracle": "c07cfd20b29e75c218e026fcc8d3afa0e31d6461bfb5f3739e8a3574a176f863",
+    "prime": null
+  },
+  "claimSite": "implication",
+  "obligationKind": null,
+  "o1": {
+    "Kind": "violated",
+    "Inputs": 180,
+    "HypothesisHeld": 84,
+    "Reached": 84,
+    "HypothesisThrew": 0,
+    "BodyThrew": 0,
+    "Violations": 48,
+    "ViolationKind": "prop-throws",
+    "Witness": "(939949188, null)",
+    "Error": null,
+    "ReachedSample": [
+      "(0, null)",
+      "(0, \u0022\u0022)",
+      "(0, \u0022a\u0022)",
+      "(0, \u0022abc\u0022)",
+      "(0, \u0022ABC\u0022)",
+      "(0, \u0022b\u0022)",
+      "(0, \u0022\\u00e9\u0022)",
+      "(0, \u0022\\ud83d\\ude00ab\u0022)",
+      "(0, \u0022\\u200dabc\u0022)",
+      "(0, \u0022aaaa\u0022)",
+      "(0, \u0022zzz\u0022)",
+      "(0, \u0022a\\u0000b\u0022)",
+      "(1, null)",
+      "(1, \u0022\u0022)",
+      "(1, \u0022a\u0022)",
+      "(1, \u0022abc\u0022)"
+    ]
+  },
+  "channels": {
+    "CH-CONTRACT": {
+      "elided": {
+        "hasErrors": true,
+        "diagnostics": [
+          {
+            "code": "Calor0810",
+            "severity": "Error",
+            "line": 10,
+            "message": "LSP violation: Precondition in \u0027Impl.Run\u0027 is stronger than \u0027IProbe.Run\u0027. Counterexample: x=486144440, s=\u0022\u0022, result=0"
+          },
+          {
+            "code": "Calor0815",
+            "severity": "Info",
+            "line": 10,
+            "message": "Postcondition strengthening proven by Z3 for \u0027Impl.Run\u0027"
+          }
+        ],
+        "contracts": null,
+        "obligations": null,
+        "emitted": ""
+      },
+      "forced": {
+        "hasErrors": true,
+        "diagnostics": [
+          {
+            "code": "Calor0810",
+            "severity": "Error",
+            "line": 10,
+            "message": "LSP violation: Precondition in \u0027Impl.Run\u0027 is stronger than \u0027IProbe.Run\u0027. Counterexample: x=486144440, s=\u0022\u0022, result=0"
+          },
+          {
+            "code": "Calor0815",
+            "severity": "Info",
+            "line": 10,
+            "message": "Postcondition strengthening proven by Z3 for \u0027Impl.Run\u0027"
+          }
+        ],
+        "contracts": null,
+        "obligations": null,
+        "emitted": ""
+      }
+    }
+  },
+  "o2": {
+    "status": "not-applicable"
+  },
+  "claim": {
+    "compileErrors": [
+      "Calor0810"
+    ],
+    "direction": "Precondition",
+    "implicationDiagnostics": [
+      {
+        "code": "Calor0810",
+        "severity": "Error",
+        "line": 10,
+        "message": "LSP violation: Precondition in \u0027Impl.Run\u0027 is stronger than \u0027IProbe.Run\u0027. Counterexample: x=486144440, s=\u0022\u0022, result=0"
+      },
+      {
+        "code": "Calor0815",
+        "severity": "Info",
+        "line": 10,
+        "message": "Postcondition strengthening proven by Z3 for \u0027Impl.Run\u0027"
+      }
+    ],
+    "claimFound": true,
+    "token": "Failed",
+    "rawStatus": "Failed",
+    "isVacuous": false,
+    "counterexample": [
+      {
+        "name": "x",
+        "value": "486144440"
+      },
+      {
+        "name": "s",
+        "value": "\u0022\u0022"
+      },
+      {
+        "name": "result",
+        "value": "0"
+      }
+    ],
+    "modelReplay": {
+      "input": "(486144440, \u0022\u0022)",
+      "o1": "violated"
+    }
+  },
+  "forcedClaim": {
+    "compileErrors": [
+      "Calor0810"
+    ],
+    "direction": "Precondition",
+    "implicationDiagnostics": [
+      {
+        "code": "Calor0810",
+        "severity": "Error",
+        "line": 10,
+        "message": "LSP violation: Precondition in \u0027Impl.Run\u0027 is stronger than \u0027IProbe.Run\u0027. Counterexample: x=486144440, s=\u0022\u0022, result=0"
+      },
+      {
+        "code": "Calor0815",
+        "severity": "Info",
+        "line": 10,
+        "message": "Postcondition strengthening proven by Z3 for \u0027Impl.Run\u0027"
+      }
+    ],
+    "claimFound": true,
+    "token": "Failed",
+    "rawStatus": "Failed",
+    "isVacuous": false,
+    "counterexample": [
+      {
+        "name": "x",
+        "value": "486144440"
+      },
+      {
+        "name": "s",
+        "value": "\u0022\u0022"
+      },
+      {
+        "name": "result",
+        "value": "0"
+      }
+    ]
+  },
+  "guards": {
+    "marker": null,
+    "applicable": false
+  },
+  "status": "executed",
+  "class": "no-claim",
+  "classReason": "Failed with a genuine counterexample (model replayed under O1)",
+  "addedFindings": [],
+  "nonVacuityCheck": null,
+  "attempt": 1,
+  "bucket": "sweep",
+  "startedUtc": "2026-10-04T02:06:20.4175890Z",
+  "endedUtc": "2026-10-04T02:06:20.4410220Z",
+  "durationMs": 23
+}

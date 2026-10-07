@@ -59,7 +59,9 @@ public sealed class Z3Verifier : IDisposable
     /// produced genuine false <c>Proven</c>s that ELIDED a failing runtime check on the shipped
     /// <c>calor run --verify</c> path: <c>len(s)=0 ⟺ s=""</c> is a Z3 tautology while in C#
     /// <c>null</c> satisfies <c>IsNullOrEmpty</c> and <c>null == ""</c> is false; and
-    /// <c>"é".Length</c> is 1 in .NET, 2 under the byte model.
+    /// <c>"é".Length</c> is 1 in .NET, 2 under the byte model. Since #1413 literals are encoded
+    /// one code unit per character (\u{h}), so the length gap is closed; the null gap remains,
+    /// and this content-stable text is kept unchanged because assumption sets hash on it.
     /// <para>Unlike D4 and D9 these are <b>not closable by refusing an operation</b> — every total
     /// axiom of the sort is affected — so the proof is <b>demoted</b> rather than suppressed, and
     /// <c>Assumed</c> never elides. Lifting it is tracked by #875.</para>
@@ -73,9 +75,22 @@ public sealed class Z3Verifier : IDisposable
     private readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> _userTypeRegistry;
     private bool _disposed;
 
-    internal static bool ArithmeticSafetyEntailed(Context context, Solver solver, IEnumerable<BoolExpr> conditions)
+    /// <summary>#1413 (S2 R-NUM, amendments 1.3.1 and 1.3.2): whether the checked arithmetic is
+    /// overflow-sensitive, decided by rule with no solver call. It is not sensitive only when the
+    /// operand-width rule (ContractTranslator.StaticallyCannotOverflow) proves every operation's
+    /// result fits, which leaves the conditions simplifying to <c>true</c>; otherwise it is, so the
+    /// verdict depends only on operand types and literal values, never on solver time.</summary>
+    internal static bool IsOverflowSensitive(Context context, IReadOnlyCollection<BoolExpr> conditions)
+        => conditions.Count > 0
+           && !IsolatedSolver.Simplify(context, context.MkAnd(conditions.ToArray())).IsTrue;
+    /// <summary>#1413 review: an unsatisfiable precondition set containing a null-tolerant string,
+    /// array, or user-type form may be satisfiable by a null the solver cannot represent.</summary>
+    private const string NonNullModelUnsat =
+        "The precondition set is unsatisfiable only in the solver's non-null string/reference model (a null may satisfy it); no vacuity or unsatisfiability is claimed. Runtime check kept.";
+
+    internal static bool ArithmeticSafetyEntailed(Context context, IsolatedSolver solver, IEnumerable<BoolExpr> conditions)
     {
-        var safety = (BoolExpr)context.MkAnd(conditions.ToArray()).Simplify();
+        var safety = IsolatedSolver.Simplify(context, context.MkAnd(conditions.ToArray()));
         if (safety.IsTrue)
             return true;
         solver.Push();
@@ -113,6 +128,13 @@ public sealed class Z3Verifier : IDisposable
         RequiresNode precondition)
     {
         var sw = Stopwatch.StartNew();
+
+        if (QuantifierNesting.ContainsNestedQuantifier(precondition.Condition))
+        {
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(QuantifierNesting.Refusal)),
+                Duration: sw.Elapsed);
+        }
 
         var translator = CreateTranslator();
 
@@ -159,16 +181,18 @@ public sealed class Z3Verifier : IDisposable
         // This is informational - preconditions are always kept as runtime checks
         try
         {
-            var solver = _ctx.MkSolver();
-            solver.Set("timeout", _timeoutMs);
+            using var solver = new IsolatedSolver(_ctx, _timeoutMs);
             solver.Assert(preconditionExpr);
 
             var status = solver.Check();
             var warnings = translator.Warnings.Count > 0 ? translator.Warnings.ToList() : null;
+            if (status == Status.UNSATISFIABLE && (translator.TouchedStringTheory || translator.TouchedNullableReferenceSort) && translator.TouchedNullTolerantReferenceForm)
+                return ContractVerificationResult.FromOutcome(
+                    ProofOutcome.Assign(ProofEvidence.Unsupported(NonNullModelUnsat)), warnings, sw.Elapsed);
 
             return ContractVerificationResult.FromOutcome(
                 ProofOutcome.Assign(ProofEvidence.SolverVerdict(
-                    status, solver, translator.Variables, SatPolarity.SatIsProof,
+                    status, solver.CheckedSolver, solver.TranslateVariables(translator.Variables), SatPolarity.SatIsProof,
                     unsatNote: "Precondition is never satisfiable - function can never be called correctly")),
                 warnings,
                 sw.Elapsed);
@@ -209,6 +233,14 @@ public sealed class Z3Verifier : IDisposable
             outputType = null;
 
         var translator = CreateTranslator();
+
+        if (preconditions.Select(p => p.Condition).Append(postcondition.Condition)
+            .Any(QuantifierNesting.ContainsNestedQuantifier))
+        {
+            return ContractVerificationResult.FromOutcome(
+                ProofOutcome.Assign(ProofEvidence.Unsupported(QuantifierNesting.Refusal)),
+                Duration: sw.Elapsed);
+        }
 
         // A parameter named `result` collides with the postcondition result variable:
         // DeclareVariable("result") would silently overwrite it, aliasing the two into one
@@ -294,14 +326,16 @@ public sealed class Z3Verifier : IDisposable
         {
             try
             {
-                var preSolver = _ctx.MkSolver();
-                preSolver.Set("timeout", _timeoutMs);
+                using var preSolver = new IsolatedSolver(_ctx, _timeoutMs);
                 foreach (var preExpr in preconditionExprs)
                 {
                     preSolver.Assert(preExpr);
                 }
                 if (preSolver.Check() == Status.UNSATISFIABLE)
                 {
+                    if ((translator.TouchedStringTheory || translator.TouchedNullableReferenceSort) && translator.TouchedNullTolerantReferenceForm)
+                        return ContractVerificationResult.FromOutcome(
+                            ProofOutcome.Assign(ProofEvidence.Unsupported(NonNullModelUnsat)), Duration: sw.Elapsed);
                     return ContractVerificationResult.FromOutcome(
                         ProofOutcome.Assign(ProofEvidence.VacuousProof(
                             "Precondition set is unsatisfiable: the postcondition holds vacuously because no valid call exists. Runtime check kept.")),
@@ -449,8 +483,7 @@ public sealed class Z3Verifier : IDisposable
         // Create solver and perform verification
         try
         {
-            var solver = _ctx.MkSolver();
-            solver.Set("timeout", _timeoutMs);
+            using var solver = new IsolatedSolver(_ctx, _timeoutMs);
 
             // Assert all preconditions
             foreach (var binding in translator.BindingConstraints)
@@ -495,7 +528,12 @@ public sealed class Z3Verifier : IDisposable
 
             if (bodyArithmeticSafety != null)
                 solver.Assert(bodyArithmeticSafety);
-            var checkedArithmeticAssumed = !ArithmeticSafetyEntailed(_ctx, solver, checkedArithmeticConditions);
+            // #1413 (S1 NUM-OVERFLOW-CHECKED, registered assumed): a contract whose checked
+            // arithmetic is overflow-sensitive gets Assumed, the strongest outcome the registration
+            // allows for it — even when the preconditions rule the overflow out (the entailment the
+            // solver used to accept as an unconditional Proven). Only arithmetic the operand-width
+            // rule proves cannot overflow stays unconditional (amendment 1.3.2: by rule, no solver).
+            var checkedArithmeticAssumed = IsOverflowSensitive(_ctx, checkedArithmeticConditions);
             foreach (var condition in checkedArithmeticConditions)
                 solver.Assert(condition);
             if ((checkedArithmeticAssumed || bodyArithmeticSafety is { IsTrue: false })
@@ -552,17 +590,17 @@ public sealed class Z3Verifier : IDisposable
                 if (pathConditions.Count > 0)
                 {
                     assumptions.Add(ExceptionalPathDivisionAssumption);
-                    reasons.Add("the body divides, and paths with a zero divisor throw before the postcondition is evaluated");
+                    reasons.Add("the body divides or takes a substring, and paths where that throws never reach the postcondition");
                 }
                 if (contractDivisionAssumed)
                 {
                     assumptions.Add(ContractExpressionDivisionAssumption);
-                    reasons.Add("the contract expressions divide, and a zero divisor (or MinValue ÷ -1 overflow) would make the runtime contract check itself throw (W1 Slice 1, D8)");
+                    reasons.Add("the contract expressions divide or take a substring, and a zero divisor (or MinValue ÷ -1 overflow, or an out-of-range substring) would make the runtime contract check itself throw (W1 Slice 1, D8)");
                 }
                 if (stringModelAssumed)
                 {
                     assumptions.Add(StringModelAssumption);
-                    reasons.Add("the obligation is carried by the solver's string theory, whose strings are non-null and byte-counted while .NET's are nullable and UTF-16-code-unit-counted (v0.12, D3/D12)");
+                    reasons.Add("the obligation is carried by the solver's string theory, whose strings are non-null while .NET's are nullable (v0.12, D3/D12); literals are encoded per UTF-16 code unit since #1413, and the canonical assumption text is kept for hash stability");
                 }
                 if (referenceModelAssumed)
                 {
@@ -579,7 +617,7 @@ public sealed class Z3Verifier : IDisposable
 
             return ContractVerificationResult.FromOutcome(
                 ProofOutcome.Assign(ProofEvidence.SolverVerdict(
-                    status, solver, translator.Variables, SatPolarity.SatIsRefutation)),
+                    status, solver.CheckedSolver, solver.TranslateVariables(translator.Variables), SatPolarity.SatIsRefutation)),
                 warnings,
                 sw.Elapsed);
         }
@@ -1019,6 +1057,10 @@ public static class FunctionBodyEncoder
         List<BoolExpr> constraints,
         bool conditional)
     {
+        // #1413 review round 3: a side condition over a body local is not substituted (that would
+        // re-evaluate the initializer at each use and change its integer promotion); the
+        // translator cannot see the local, so the condition fails to model and the result is
+        // Unsupported.
         foreach (var stmt in statements)
         {
             switch (stmt)
@@ -1187,6 +1229,21 @@ public static class FunctionBodyEncoder
                     if (failure != null)
                         return failure;
                 }
+                // #1413 (S1 STR-OPS-COUNT-INDEX): Substring and IndexOf-with-start throw
+                // outside their range while the solver's versions are total. Same rule as a
+                // divisor: an unconditional range condition is a side condition; one in a
+                // conditionally-evaluated position is not modeled.
+                var range = translator.GetStringRangeCondition(sop);
+                if (range == null)
+                    return "a string operation's index range could not be modeled";
+                if (range.IsTrue)
+                    return null;
+                if (conditional)
+                {
+                    return "the body contains an indexed string operation (Substring/IndexOf with a start) "
+                        + "in a conditionally-evaluated position, which is not yet modeled for exception-path soundness";
+                }
+                constraints.Add(range);
                 return null;
             }
             default:
@@ -1266,9 +1323,11 @@ public static class FunctionBodyEncoder
 
                 // An int local is not a constant expression: uint + intVariable
                 // promotes to long, while uint + positiveIntLiteral promotes to uint.
-                var boundValue = substInit is IntLiteralNode { IsUnsigned: false, IsLong: false } literal
+                ExpressionNode? boundValue = substInit is IntLiteralNode { IsUnsigned: false, IsLong: false } literal
                     ? translator.BindInt32Constant(literal)
                     : substInit;
+                if (boundValue == null)
+                    return (null, "the binding initializer is an INT: literal outside the int32 range (D2)");
                 var extended = new Dictionary<string, ExpressionNode>(env, StringComparer.Ordinal)
                 {
                     [bind.Name] = boundValue
@@ -1521,4 +1580,218 @@ public static class FunctionBodyEncoder
             .Any(child => ReferencesNameInNode(child, name));
     }
 
+}
+
+/// <summary>
+/// A solver whose every <see cref="Check"/> runs in a fresh Z3 context, so that its verdict
+/// depends only on the asserted formulas and the context configuration, not on the history of the
+/// context that built them (#1135).
+/// </summary>
+/// <remarks>
+/// <para>
+/// Why: the .NET Z3 binding releases a native AST when the garbage collector finalizes its
+/// wrapper, and Z3 recycles the ids of released ASTs. In a long-lived context the ids of the
+/// terms a query creates, and so the order Z3's heuristics visit them in, therefore depend on
+/// when the GC ran. On the same tree the solver's work (rlimit count) for one query varied up to
+/// threefold between runs, and was identical when no GC ran. The F-4 oracle's one observed flip
+/// on an identical tree was such a query, a 64-bit array-element precondition, timing out at the
+/// 5 s per-check limit (#1135, run 33139062112, <c>case-000307</c>); its siblings take 30 to 65 ms.
+/// </para>
+/// <para>
+/// How: assertions are recorded in their push scopes. <see cref="Check"/> translates them into a
+/// new context with the building context's settings (<see cref="Z3ContextFactory.CreateLike"/>; a
+/// deterministic traversal, and nothing else lives there), creates a solver with the same timeout,
+/// and checks. Z3's default solver picks its engine by whether it has seen a push or an assertion
+/// after a check (its incremental mode); that choice is replayed, so each check runs the engine the
+/// shared-context solver ran. The query, the timeout, the settings, and the engine are unchanged.
+/// What is lost is the incremental solver's state from earlier checks of the same solver (learned
+/// clauses, phases): a satisfiable check can return a different, equally valid model (so a
+/// different counterexample), and a check near the timeout can finish differently. That state was
+/// itself GC-dependent.
+/// </para>
+/// <para>
+/// A context this factory did not create has unknown settings; then the check runs in that
+/// context itself, as before, without the isolation.
+/// </para>
+/// <para>
+/// With this class and <see cref="Simplify"/>, two runs of the oracle, one under GC stress, one
+/// with the server GC and no tiered compilation, issued byte-identical queries with identical
+/// rlimit counts (2,382 checks).
+/// </para>
+/// <para>
+/// The checked solver and its context stay alive until the next <see cref="Check"/> or
+/// <see cref="Dispose"/>, so the model and the unknown-reason can be read through
+/// <see cref="CheckedSolver"/> with variables mapped by <see cref="TranslateVariables"/>.
+/// </para>
+/// </remarks>
+public sealed class IsolatedSolver : IDisposable
+{
+    private readonly List<List<BoolExpr>> _scopes = [[]];
+    private readonly Context _source;
+    private readonly uint _timeoutMs;
+    private bool _incremental;
+    private bool _checked;
+    private Context? _checkContext;
+    private bool _ownsCheckContext;
+    private Solver? _checkSolver;
+
+    /// <param name="source">The context the asserted terms are built in.</param>
+    /// <param name="timeoutMs">The per-check timeout.</param>
+    public IsolatedSolver(Context source, uint timeoutMs)
+    {
+        _source = source ?? throw new ArgumentNullException(nameof(source));
+        _timeoutMs = timeoutMs;
+    }
+
+    /// <summary>Adds constraints to the current scope.</summary>
+    public void Assert(params BoolExpr[] constraints)
+    {
+        // Z3's default solver switches to incremental mode on an assertion after a check.
+        if (_checked)
+            _incremental = true;
+        _scopes[^1].AddRange(constraints);
+    }
+
+    /// <summary>Opens a scope. Like Z3's default solver, this switches to incremental mode.</summary>
+    public void Push()
+    {
+        _incremental = true;
+        _scopes.Add([]);
+    }
+
+    /// <summary>Discards the innermost scope and its constraints.</summary>
+    public void Pop()
+    {
+        if (_scopes.Count == 1)
+            throw new InvalidOperationException("Pop without a matching Push.");
+        _scopes.RemoveAt(_scopes.Count - 1);
+    }
+
+    /// <summary>
+    /// Checks the current constraints in a fresh context. Releases the previous check's
+    /// solver and context.
+    /// </summary>
+    public Status Check()
+    {
+        ReleaseCheck();
+        _checked = true;
+
+        var fresh = Z3ContextFactory.CreateLike(_source);
+        var context = fresh ?? _source;
+        _checkContext = context;
+        _ownsCheckContext = fresh != null;
+        var solver = context.MkSolver();
+        _checkSolver = solver;
+        solver.Set("timeout", _timeoutMs);
+        if (_incremental)
+        {
+            // A push switches Z3's default solver to incremental mode for good; popping it
+            // again keeps the base-level assertions at the base level, as in the source solver.
+            solver.Push();
+            solver.Pop();
+        }
+
+        for (var level = 0; level < _scopes.Count; level++)
+        {
+            if (level > 0)
+                solver.Push();
+            foreach (var constraint in _scopes[level])
+                solver.Assert(fresh == null ? constraint : (BoolExpr)constraint.Translate(fresh));
+        }
+
+        return solver.Check();
+    }
+
+    /// <summary>
+    /// <see cref="Expr.Simplify"/> run in a fresh context with <paramref name="context"/>'s
+    /// settings, with the result translated back into <paramref name="context"/>. Z3's rewriter
+    /// orders the arguments of commutative operators by term id, so simplifying in a long-lived
+    /// context gives an argument order that depends on when the GC released earlier terms
+    /// (#1135), and the order reaches the solver.
+    /// </summary>
+    public static BoolExpr Simplify(Context context, BoolExpr expr)
+    {
+        using var isolated = Z3ContextFactory.CreateLike(context);
+        if (isolated == null)
+            return (BoolExpr)expr.Simplify();
+        var simplified = (BoolExpr)expr.Translate(isolated).Simplify();
+        return (BoolExpr)simplified.Translate(context);
+    }
+
+    /// <summary>The solver of the last <see cref="Check"/>, for its model and unknown-reason.</summary>
+    public Solver CheckedSolver =>
+        _checkSolver ?? throw new InvalidOperationException("Check has not been called.");
+
+    /// <summary>
+    /// Maps translator variables into the last check's context, so the model of
+    /// <see cref="CheckedSolver"/> can evaluate them.
+    /// </summary>
+    public IReadOnlyDictionary<string, (Expr Expr, string Type)> TranslateVariables(
+        IReadOnlyDictionary<string, (Expr Expr, string Type)> variables)
+    {
+        var context = _checkContext
+            ?? throw new InvalidOperationException("Check has not been called.");
+        if (!_ownsCheckContext)
+            return variables;
+        var translated = new Dictionary<string, (Expr Expr, string Type)>(variables.Count);
+        foreach (var (name, (expr, type)) in variables)
+        {
+            try
+            {
+                translated[name] = (expr.Translate(context), type);
+            }
+            catch (Z3Exception)
+            {
+                // Keep the original: evaluating it fails, and Counterexample.FromModel records
+                // that binding as "<eval failed>" instead of losing the whole verdict.
+                translated[name] = (expr, type);
+            }
+        }
+        return translated;
+    }
+
+    public void Dispose() => ReleaseCheck();
+
+    private void ReleaseCheck()
+    {
+        _checkSolver?.Dispose();
+        _checkSolver = null;
+        if (_ownsCheckContext)
+            _checkContext?.Dispose();
+        _checkContext = null;
+        _ownsCheckContext = false;
+    }
+}
+
+/// <summary>
+/// #1413 (S1 row QNT-NESTED, registered unsupported-refused): for the registered nested bounded
+/// forall the emitter rejects the runtime lowering (<c>Calor0326</c>), yet the verifier reported
+/// it <c>Proven</c>. As a conservative restriction, the verifier channels (contracts,
+/// obligations and their assumptions, implications, guard validation) refuse any quantifier
+/// inside another — including forms the emitter can lower, such as a bounded inner quantifier
+/// under <c>(cast bool …)</c>. It applies to the expression the verifier sees, after
+/// simplification.
+/// </summary>
+internal static class QuantifierNesting
+{
+    public const string Refusal =
+        "nested quantifiers are not verified (the runtime lowering of a quantifier inside another is generally rejected, Calor0326). Runtime check kept.";
+
+    public static bool ContainsNestedQuantifier(ExpressionNode expression)
+        => DescendantsAndSelf(expression)
+            .Where(IsQuantifier)
+            .Any(quantifier => DescendantsAndSelf(quantifier).Skip(1).Any(IsQuantifier));
+
+    private static bool IsQuantifier(AstNode node)
+        => node is ForallExpressionNode or ExistsExpressionNode;
+
+    private static IEnumerable<AstNode> DescendantsAndSelf(AstNode node)
+    {
+        yield return node;
+        foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(node))
+        {
+            foreach (var descendant in DescendantsAndSelf(child))
+                yield return descendant;
+        }
+    }
 }

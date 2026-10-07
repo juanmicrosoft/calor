@@ -304,7 +304,7 @@ public sealed class ManifestLoader
     {
         try
         {
-            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var home = Verification.Z3.Cache.UserHome.Resolve();
             if (string.IsNullOrEmpty(home))
                 return null;
 

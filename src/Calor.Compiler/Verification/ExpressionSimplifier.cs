@@ -28,6 +28,10 @@ public sealed class ExpressionSimplifier : IAstVisitor<ExpressionNode>
     /// </summary>
     public ExpressionNode Simplify(ExpressionNode expr)
     {
+        // #1413 (S2 R-NUM): a contract holding a refused D2 literal is not rewritten, so the
+        // refusal reaches the verifier instead of being folded away.
+        if (Z3.ContractTranslator.ContainsRefusedLiteral(expr))
+            return expr;
         return expr.Accept(this);
     }
 

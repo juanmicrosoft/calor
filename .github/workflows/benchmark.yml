@@ -21,11 +21,8 @@ on:
         required: false
         default: 'false'
         type: boolean
-      allow_weaker_methodology:
-        description: '#1157: publish even if the result has FEWER statistical runs or a different metric set than the committed one. Only for a deliberate methodology change, which must then be stated in the PR body and CHANGELOG.'
-        required: false
-        default: 'false'
-        type: boolean
+      # #1422: no input may weaken or bypass the publication gate. A method change needs a
+      # merged #1407 amendment that names the new comparability key, never an override flag.
   # Run on pushes to benchmark-related files
   push:
     branches: [main]
@@ -34,10 +31,20 @@ on:
       - 'tests/TestData/Benchmarks/**'
       - 'tests/E2E/agent-tasks/**'
       - '.github/workflows/benchmark.yml'
+      # #1422: a change to any gate input re-runs the gate (and its cleanup).
+      - 'docs/plans/evidence/b1-1276/**'
+      - 'docs/plans/evidence/evidence-contract-1407/**'
+      - 'tests/Calor.Compiler.Tests/EvidenceContract/**'
+      - 'scripts/benchmark_publication_gate.py'
 
 jobs:
   benchmark:
     runs-on: ubuntu-latest
+    # #1422: publication and stale-PR cleanup are serialized, so an older passing run cannot
+    # update the publication PR after a newer refusal closed it.
+    concurrency:
+      group: benchmark-publication
+      cancel-in-progress: false
     permissions:
       contents: write
       pull-requests: write
@@ -45,6 +52,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # #1422: the publication gate checks provenance against origin/main and fails in a
+          # shallow clone.
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -52,7 +63,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Bootstrap verified Z3 assets
-        run: bash src/Calor.Compiler/scripts/download-z3.sh
+        uses: ./.github/actions/bootstrap-z3
 
       - name: Restore dependencies
         run: dotnet restore
@@ -60,19 +71,28 @@ jobs:
       - name: Build
         run: dotnet build -c Release --no-restore
 
+      # #1410: dispatch inputs reach the shell only through the environment, validated,
+      # never interpolated into the script (a `$(...)` value would run before the gate).
       - name: Run static benchmarks
+        env:
+          RUNS: ${{ github.event.inputs.statistical_runs || '30' }}
         run: |
+          set -euo pipefail
+          [[ "$RUNS" =~ ^[1-9][0-9]{0,3}$ ]] || { echo "::error::statistical_runs must be an integer from 1 to 9999"; exit 1; }
           dotnet run --project tests/Calor.Evaluation -c Release -- run \
             --statistical \
-            --runs "${{ github.event.inputs.statistical_runs || '30' }}" \
+            --runs "$RUNS" \
             --format website \
             --output website/public/data/benchmark-results.json \
             --verbose
 
       - name: Run statistical analysis
         if: github.event.inputs.statistical_runs != ''
+        env:
+          RUNS: ${{ github.event.inputs.statistical_runs || '30' }}
         run: |
-          RUNS="${{ github.event.inputs.statistical_runs || '30' }}"
+          set -euo pipefail
+          [[ "$RUNS" =~ ^[1-9][0-9]{0,3}$ ]] || { echo "::error::statistical_runs must be an integer from 1 to 9999"; exit 1; }
           dotnet run --project tests/Calor.Evaluation -c Release -- run \
             --statistical \
             --runs "$RUNS" \
@@ -165,26 +185,6 @@ jobs:
       - name: Generate docs/benchmarking/results.md
         run: node scripts/generate-results-md.js
 
-      # #1157: automatic runs now preserve the 30-run methodology. Retain this
-      # gate for explicit manual changes to run count or metric set; a weaker
-      # measurement must not be presented as a comparable movement in the score.
-      - name: Check the result is not a weaker measurement (#1157)
-        id: methodology
-        run: |
-          git show HEAD:website/public/data/benchmark-results.json > /tmp/benchmark-baseline.json \
-            || echo '{}' > /tmp/benchmark-baseline.json
-          ARGS=""
-          if [ "${{ github.event.inputs.allow_weaker_methodology }}" = "true" ]; then
-            ARGS="--allow-weaker"
-          fi
-          {
-            echo 'report<<METHODOLOGY_EOF'
-            node scripts/check-benchmark-methodology.js \
-              website/public/data/benchmark-results.json \
-              --baseline /tmp/benchmark-baseline.json $ARGS 2>&1 | tee /dev/stderr
-            echo 'METHODOLOGY_EOF'
-          } >> "$GITHUB_OUTPUT"
-
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
@@ -198,38 +198,110 @@ jobs:
             website/public/data/effect-discipline-results.json
           retention-days: 90
 
+      # #1422: everything above is diagnostic. It is uploaded, then discarded, so no number that
+      # the B1 results generator did not produce can reach the publication PR.
+      - name: Keep historical benchmark files historical (#1422)
+        run: |
+          set -euo pipefail
+          git reset --quiet --hard HEAD
+          git clean -fdq
+
+      - name: Regenerate the B1 results with the registered generator (#1422)
+        id: regenerate
+        run: |
+          set -euo pipefail
+          # B1's packet validator (seals, oracle reconciliation, known witness, recomputed statistics).
+          dotnet test tests/Calor.Compiler.Tests -c Release --no-build \
+            --filter "FullyQualifiedName~BenchmarkResultsTests|FullyQualifiedName~BenchmarkRegistrationTests"
+          REG=docs/plans/evidence/b1-1276/registration
+          RES=docs/plans/evidence/b1-1276/results
+          OUT="$RUNNER_TEMP/b1-regen"
+          mkdir -p "$OUT"
+          for i in 1 2; do
+            dotnet run --no-build --project tests/Calor.Evaluation -c Release -- pair-metrics \
+              --registration "$REG" --oracle-result "$RES/oracle-run-2.json" --output "$OUT/metrics-run-$i.json"
+          done
+          dotnet run --no-build --project tests/Calor.Evaluation -c Release -- pair-results \
+            --registration "$REG" --first-oracle-result "$RES/oracle-run-1.json" \
+            --oracle-result "$RES/oracle-run-2.json" \
+            --metrics "$OUT/metrics-run-1.json" "$OUT/metrics-run-2.json" --output "$OUT"
+
+      # #1422: the refusal gate. A refusal exits nonzero here, so every later step that opens a PR
+      # or pushes is skipped. No pipe sits between the gate and the step's exit status.
+      - name: Refuse incomparable or non-equivalent benchmark results (#1422)
+        id: methodology
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --quiet origin +refs/heads/main:refs/remotes/origin/main
+          python3 scripts/benchmark_publication_gate.py check \
+            --commit "$(git rev-parse HEAD)" \
+            --regenerated "$RUNNER_TEMP/b1-regen" \
+            --report "$RUNNER_TEMP/benchmark-gate-report.txt"
+          {
+            echo 'report<<BENCHMARK_GATE_EOF'
+            cat "$RUNNER_TEMP/benchmark-gate-report.txt"
+            echo 'BENCHMARK_GATE_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload the publication candidate and its inputs (#1422)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-publication-candidate
+          path: |
+            ${{ runner.temp }}/b1-regen
+            ${{ runner.temp }}/benchmark-gate-report.txt
+            website/public/data/benchmark-headline.json
+            bench/phase0-agent-native/commit-stamp-index.json
+          if-no-files-found: ignore
+          retention-days: 90
+
       - name: Create PR with benchmark results
         if: github.ref == 'refs/heads/main' || github.event_name == 'release' || github.event_name == 'workflow_dispatch'
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: update benchmark results"
-          title: "chore: Update benchmark results"
+          commit-message: "chore: update benchmark headline"
+          title: "chore: Update benchmark headline"
           body: |
-            This PR updates the benchmark results.
+            This PR publishes `website/public/data/benchmark-headline.json`, written by
+            `scripts/benchmark_publication_gate.py` (#1422) from the B1 results packet
+            (`docs/plans/evidence/b1-1276/results/`), and its provenance entry in
+            `bench/phase0-agent-native/commit-stamp-index.json`. Nothing else changes.
 
-            ## Methodology — read this before the numbers (#1157)
+            ## Gate report
 
             ```
             ${{ steps.methodology.outputs.report }}
             ```
 
-            `overallAdvantage` is a geometric mean over the metric set, computed from
-            `statisticalRunCount` runs. A change in either makes the before and after
-            figures **incomparable** — a lower number is not necessarily a regression.
-            The line above states both, so the swap is visible here rather than buried
-            in JSON.
+            The gate refuses this PR when an included pair is not EQUIVALENT, a registered pair or
+            the registration changed, the method differs without a #1407 amendment merged first,
+            the regenerated packet differs, or the provenance commit is not a full SHA on main.
+            Across different comparability keys no delta is reported. EQUIVALENT is not a
+            correctness claim, and the headline describes this fixed corpus only.
 
-            ## Changes
-            - Updated benchmark-results.json
-            - Generated HTML dashboard
-            - Updated docs/benchmarking/results.md
-
-            ## Metrics
             Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           branch: benchmark-results-update
           base: main
           delete-branch: true
+
+      # #1422: last step of the job, so a failure anywhere (gate, regeneration, or publication
+      # itself) must not leave an earlier publication PR mergeable. The listing is paginated and
+      # checked, every close is attempted, and any failed close fails the job.
+      - name: Close stale publication PRs after a refusal (#1422)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          prs="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100" \
+            --jq '.[] | select(.head.ref | startswith("benchmark-results")) | .number')"
+          failed=0
+          for pr in $prs; do
+            gh pr close "$pr" --comment "Closed by $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID: the #1422 publication gate refused or could not check the current results." || failed=1
+          done
+          exit "$failed"
 
   regression-check:
     runs-on: ubuntu-latest
@@ -264,8 +336,10 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.agent_refactoring == 'true'
     needs: benchmark
+    # #1422: this job measures and uploads only. It never commits or pushes, and a pass rate it
+    # cannot read fails the job instead of being recorded as 0.
     permissions:
-      contents: write
+      contents: read
 
     steps:
       - name: Checkout code
@@ -277,7 +351,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Bootstrap verified Z3 assets
-        run: bash src/Calor.Compiler/scripts/download-z3.sh
+        uses: ./.github/actions/bootstrap-z3
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -298,31 +372,40 @@ jobs:
 
       - name: Run Calor refactoring benchmark
         id: calor-benchmark
-        continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
+          set -euo pipefail
           cd tests/E2E/agent-tasks
           chmod +x run-agent-tests.sh
           ./run-agent-tests.sh --category refactoring-benchmark --filter calor --single-run 2>&1 | tee /tmp/calor-results.txt
-          # Extract pass rate
-          CALOR_PASS_RATE=$(grep -oP 'Pass Rate: \K[0-9]+' /tmp/calor-results.txt || echo "0")
-          echo "calor_pass_rate=$CALOR_PASS_RATE" >> $GITHUB_OUTPUT
+          # Extract pass rate; a missing figure fails the job rather than becoming 0 (#1422)
+          CALOR_PASS_RATE=$(sed "s/$(printf '\033')\[[0-9;]*m//g" /tmp/calor-results.txt | grep -oE 'Pass Rate: [0-9]+' | tail -n1 | sed 's/.*: //')
+          [[ "$CALOR_PASS_RATE" =~ ^[0-9]+$ ]] || { echo "::error::no Calor pass rate in the run output"; exit 1; }
+          echo "calor_pass_rate=$CALOR_PASS_RATE" >> "$GITHUB_OUTPUT"
 
       - name: Run C# refactoring benchmark
         id: csharp-benchmark
-        continue-on-error: true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
+          set -euo pipefail
           cd tests/E2E/agent-tasks
           ./run-agent-tests.sh --category refactoring-benchmark --filter csharp --single-run 2>&1 | tee /tmp/csharp-results.txt
-          # Extract pass rate
-          CSHARP_PASS_RATE=$(grep -oP 'Pass Rate: \K[0-9]+' /tmp/csharp-results.txt || echo "0")
-          echo "csharp_pass_rate=$CSHARP_PASS_RATE" >> $GITHUB_OUTPUT
+          # Extract pass rate; a missing figure fails the job rather than becoming 0 (#1422)
+          CSHARP_PASS_RATE=$(sed "s/$(printf '\033')\[[0-9;]*m//g" /tmp/csharp-results.txt | grep -oE 'Pass Rate: [0-9]+' | tail -n1 | sed 's/.*: //')
+          [[ "$CSHARP_PASS_RATE" =~ ^[0-9]+$ ]] || { echo "::error::no C# pass rate in the run output"; exit 1; }
+          echo "csharp_pass_rate=$CSHARP_PASS_RATE" >> "$GITHUB_OUTPUT"
 
       - name: Generate agent benchmark results JSON
+        env:
+          CALOR_PASS_RATE: ${{ steps.calor-benchmark.outputs.calor_pass_rate }}
+          CSHARP_PASS_RATE: ${{ steps.csharp-benchmark.outputs.csharp_pass_rate }}
         run: |
+          set -euo pipefail
+          for rate in "$CALOR_PASS_RATE" "$CSHARP_PASS_RATE"; do
+            [[ "$rate" =~ ^[0-9]+$ ]] || { echo "::error::missing pass rate; no results file is written"; exit 1; }
+          done
           mkdir -p website/public/data
           cat > website/public/data/agent-refactoring-results.json << EOF
           {
@@ -333,12 +416,12 @@ jobs:
             "description": "Measures Claude Code agent success rates on refactoring tasks",
             "results": {
               "calor": {
-                "passRate": ${{ steps.calor-benchmark.outputs.calor_pass_rate || 0 }},
+                "passRate": $CALOR_PASS_RATE,
                 "tasksTotal": 20,
                 "category": "refactoring-benchmark"
               },
               "csharp": {
-                "passRate": ${{ steps.csharp-benchmark.outputs.csharp_pass_rate || 0 }},
+                "passRate": $CSHARP_PASS_RATE,
                 "tasksTotal": 20,
                 "category": "refactoring-benchmark"
               }
@@ -357,16 +440,6 @@ jobs:
           name: agent-refactoring-results
           path: website/public/data/agent-refactoring-results.json
           retention-days: 90
-
-      - name: Commit agent benchmark results
-        if: github.ref == 'refs/heads/main'
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git pull --rebase origin main || true
-          git add website/public/data/agent-refactoring-results.json || true
-          git diff --staged --quiet || git commit -m "chore: Update agent refactoring benchmark results [skip ci]"
-          git push || echo "No changes to push"
 
       - name: Report benchmark summary
         run: |

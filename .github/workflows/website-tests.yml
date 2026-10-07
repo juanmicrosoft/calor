@@ -22,7 +22,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - run: src/Calor.Compiler/scripts/download-z3.sh
+      - name: Bootstrap verified Z3 assets
+        uses: ./.github/actions/bootstrap-z3
       - run: dotnet build src/Calor.Compiler/Calor.Compiler.csproj --nologo
       - run: npm run test:onboarding
         working-directory: website

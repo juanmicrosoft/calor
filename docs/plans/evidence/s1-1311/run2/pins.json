@@ -1,0 +1,390 @@
+{
+  "run": 2,
+  "registrationCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67",
+  "contractAmendments": [
+    "1.2.0 (s1-generated-cases exception, #1311)",
+    "1.2.1 (condition 4 amended: capture + ExecutionCeiling 1508)"
+  ],
+  "harnessCommits": {
+    "run1FinalHarness": "e7cbce77c5eefbfa7b6c7338f17b57bb4b06127e",
+    "pathOnlyMove": "0bfc414cb8b73ba9a61fb5b203c907838fef6a9f",
+    "capture": "d17674ddeb47a5673d64906c1d4b2415b17d07b5",
+    "executionCeiling": "ff2daf95c24182c669a1cc2a5d9f526c53e73351",
+    "executedAt": "ff2daf95c24182c669a1cc2a5d9f526c53e73351"
+  },
+  "baselines": {
+    "B1": {
+      "baseline": "B1",
+      "registrationCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67",
+      "binaryDirectory": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin",
+      "calorDllSha256": "79839f6c8681bb7132df876c624339385969cc69c5b9914eea09fdfbf48e6651",
+      "calorRuntimeDllSha256": "921582e70e858e875c38baeb4afe80a496d44a5a1507b3ce63c80a1112ceabed",
+      "microsoftZ3DllSha256": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175",
+      "z3Available": true,
+      "nativeZ3Path": null,
+      "nativeZ3Sha256": null,
+      "processLoadedZ3": [
+        {
+          "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+          "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada"
+        }
+      ],
+      "translatorSemanticsVersion": "z3-executable-semantics-v2",
+      "dotnetVersion": "10.0.401",
+      "runtime": ".NET 10.0.12",
+      "os": "macOS 27.0.1",
+      "rid": "osx-arm64",
+      "architecture": "Arm64",
+      "CALOR_NO_TYPE_CHECK": null,
+      "culture": "en-US for O1/O2",
+      "recordedUtc": "2026-10-04T02:03:28.9669390Z"
+    },
+    "N1": {
+      "baseline": "N1",
+      "registrationCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67",
+      "binaryDirectory": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin",
+      "calorDllSha256": "794b28d4956f786fe41e0e5ab2199cad1ab1271a2893ee42d9f9d303289b515b",
+      "calorRuntimeDllSha256": "b5b6dd8adfa76fff306e6a643f6a896852e45b45b0b613435bcf50df12658753",
+      "microsoftZ3DllSha256": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175",
+      "z3Available": true,
+      "nativeZ3Path": null,
+      "nativeZ3Sha256": null,
+      "processLoadedZ3": [
+        {
+          "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+          "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada"
+        },
+        {
+          "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib",
+          "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada"
+        }
+      ],
+      "translatorSemanticsVersion": "z3-executable-semantics-v2",
+      "dotnetVersion": "10.0.401",
+      "runtime": ".NET 10.0.12",
+      "os": "macOS 27.0.1",
+      "rid": "osx-arm64",
+      "architecture": "Arm64",
+      "CALOR_NO_TYPE_CHECK": null,
+      "culture": "en-US for O1/O2",
+      "recordedUtc": "2026-10-04T02:03:29.1467530Z"
+    },
+    "P845": {
+      "baseline": "P845",
+      "registrationCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67",
+      "binaryDirectory": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/P845bin",
+      "calorDllSha256": "4515cc2ac2f687a513421ec1c2f5f10965165c3c44d2ce8930f2ce153bc99537",
+      "calorRuntimeDllSha256": "fc050591d11061c40a68f4641668e1672355cc7430985eeb69efdef2a13885e6",
+      "microsoftZ3DllSha256": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175",
+      "z3Available": true,
+      "nativeZ3Path": null,
+      "nativeZ3Sha256": null,
+      "processLoadedZ3": [
+        {
+          "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+          "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada"
+        },
+        {
+          "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib",
+          "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada"
+        },
+        {
+          "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/P845bin/libz3.dylib",
+          "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada"
+        }
+      ],
+      "translatorSemanticsVersion": null,
+      "dotnetVersion": "10.0.401",
+      "runtime": ".NET 10.0.12",
+      "os": "macOS 27.0.1",
+      "rid": "osx-arm64",
+      "architecture": "Arm64",
+      "CALOR_NO_TYPE_CHECK": null,
+      "culture": "en-US for O1/O2",
+      "recordedUtc": "2026-10-04T02:03:29.3432540Z"
+    }
+  },
+  "sameBinariesAsRun1": {
+    "compared": "run2 <baseline>/pins.json against docs/plans/evidence/s1-1311/pins.json (run 1)",
+    "keys": [
+      "calorDllSha256",
+      "calorRuntimeDllSha256",
+      "microsoftZ3DllSha256",
+      "dotnetVersion",
+      "os",
+      "rid",
+      "runtime",
+      "translatorSemanticsVersion"
+    ],
+    "result": {
+      "B1": {
+        "calorDllSha256": true,
+        "calorRuntimeDllSha256": true,
+        "microsoftZ3DllSha256": true,
+        "dotnetVersion": true,
+        "os": true,
+        "rid": true,
+        "runtime": true,
+        "translatorSemanticsVersion": true
+      },
+      "N1": {
+        "calorDllSha256": true,
+        "calorRuntimeDllSha256": true,
+        "microsoftZ3DllSha256": true,
+        "dotnetVersion": true,
+        "os": true,
+        "rid": true,
+        "runtime": true,
+        "translatorSemanticsVersion": true
+      },
+      "P845": {
+        "calorDllSha256": true,
+        "calorRuntimeDllSha256": true,
+        "microsoftZ3DllSha256": true,
+        "dotnetVersion": true,
+        "os": true,
+        "rid": true,
+        "runtime": true,
+        "translatorSemanticsVersion": true
+      }
+    },
+    "allEqual": true
+  },
+  "loadedImageCapture": {
+    "file": "bench/correctness/false-established/v024/run2/loaded-image-capture.jsonl",
+    "method": "in-process dyld image list (_dyld_image_count/_dyld_get_image_name) of the sweep process; libz3 image under each baseline directory hashed in-process",
+    "registeredLibz3Sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+    "allCapturesPresentAndMatching": true,
+    "records": [
+      {
+        "baseline": "B1",
+        "phase": "before-case-1",
+        "utc": "2026-10-04T02:03:29.3649090Z",
+        "pid": 90703,
+        "method": "dyld image list (_dyld_image_count/_dyld_get_image_name, in-process)",
+        "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+        "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "registeredSha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "ok": true,
+        "mappedUnderBaseline": [
+          {
+            "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+            "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada"
+          }
+        ],
+        "allLibz3ImagesInProcess": [
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib",
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/P845bin/libz3.dylib"
+        ]
+      },
+      {
+        "baseline": "N1",
+        "phase": "before-case-1",
+        "utc": "2026-10-04T02:03:29.3845460Z",
+        "pid": 90703,
+        "method": "dyld image list (_dyld_image_count/_dyld_get_image_name, in-process)",
+        "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib",
+        "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "registeredSha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "ok": true,
+        "mappedUnderBaseline": [
+          {
+            "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib",
+            "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada"
+          }
+        ],
+        "allLibz3ImagesInProcess": [
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib",
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/P845bin/libz3.dylib"
+        ]
+      },
+      {
+        "baseline": "P845",
+        "phase": "before-case-1",
+        "utc": "2026-10-04T02:03:29.4029500Z",
+        "pid": 90703,
+        "method": "dyld image list (_dyld_image_count/_dyld_get_image_name, in-process)",
+        "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/P845bin/libz3.dylib",
+        "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "registeredSha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "ok": true,
+        "mappedUnderBaseline": [
+          {
+            "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/P845bin/libz3.dylib",
+            "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada"
+          }
+        ],
+        "allLibz3ImagesInProcess": [
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib",
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/P845bin/libz3.dylib"
+        ]
+      },
+      {
+        "baseline": "B1",
+        "phase": "after-last-case",
+        "utc": "2026-10-04T02:06:47.9181140Z",
+        "pid": 90703,
+        "method": "dyld image list (_dyld_image_count/_dyld_get_image_name, in-process)",
+        "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+        "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "registeredSha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "ok": true,
+        "mappedUnderBaseline": [
+          {
+            "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+            "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada"
+          }
+        ],
+        "allLibz3ImagesInProcess": [
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib",
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/P845bin/libz3.dylib"
+        ]
+      },
+      {
+        "baseline": "N1",
+        "phase": "after-last-case",
+        "utc": "2026-10-04T02:06:47.9288060Z",
+        "pid": 90703,
+        "method": "dyld image list (_dyld_image_count/_dyld_get_image_name, in-process)",
+        "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib",
+        "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "registeredSha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "ok": true,
+        "mappedUnderBaseline": [
+          {
+            "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib",
+            "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada"
+          }
+        ],
+        "allLibz3ImagesInProcess": [
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib",
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/P845bin/libz3.dylib"
+        ]
+      },
+      {
+        "baseline": "P845",
+        "phase": "after-last-case",
+        "utc": "2026-10-04T02:06:47.9393820Z",
+        "pid": 90703,
+        "method": "dyld image list (_dyld_image_count/_dyld_get_image_name, in-process)",
+        "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/P845bin/libz3.dylib",
+        "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "registeredSha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "ok": true,
+        "mappedUnderBaseline": [
+          {
+            "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/P845bin/libz3.dylib",
+            "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada"
+          }
+        ],
+        "allLibz3ImagesInProcess": [
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib",
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/P845bin/libz3.dylib"
+        ]
+      },
+      {
+        "baseline": "B1",
+        "phase": "crossrun-before-case-1",
+        "utc": "2026-10-04T02:07:07.7540180Z",
+        "pid": 92063,
+        "method": "dyld image list (_dyld_image_count/_dyld_get_image_name, in-process)",
+        "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+        "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "registeredSha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "ok": true,
+        "mappedUnderBaseline": [
+          {
+            "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+            "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada"
+          }
+        ],
+        "allLibz3ImagesInProcess": [
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib"
+        ]
+      },
+      {
+        "baseline": "N1",
+        "phase": "crossrun-before-case-1",
+        "utc": "2026-10-04T02:07:07.7660690Z",
+        "pid": 92063,
+        "method": "dyld image list (_dyld_image_count/_dyld_get_image_name, in-process)",
+        "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib",
+        "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "registeredSha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "ok": true,
+        "mappedUnderBaseline": [
+          {
+            "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib",
+            "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada"
+          }
+        ],
+        "allLibz3ImagesInProcess": [
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib"
+        ]
+      },
+      {
+        "baseline": "B1",
+        "phase": "crossrun-after-last-case",
+        "utc": "2026-10-04T02:07:14.5973910Z",
+        "pid": 92063,
+        "method": "dyld image list (_dyld_image_count/_dyld_get_image_name, in-process)",
+        "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+        "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "registeredSha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "ok": true,
+        "mappedUnderBaseline": [
+          {
+            "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+            "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada"
+          }
+        ],
+        "allLibz3ImagesInProcess": [
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib"
+        ]
+      },
+      {
+        "baseline": "N1",
+        "phase": "crossrun-after-last-case",
+        "utc": "2026-10-04T02:07:14.6071700Z",
+        "pid": 92063,
+        "method": "dyld image list (_dyld_image_count/_dyld_get_image_name, in-process)",
+        "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib",
+        "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "registeredSha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+        "ok": true,
+        "mappedUnderBaseline": [
+          {
+            "path": "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib",
+            "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada"
+          }
+        ],
+        "allLibz3ImagesInProcess": [
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/B1bin/libz3.dylib",
+          "/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/s1/N1bin/runtimes/osx-arm64/native/libz3.dylib"
+        ]
+      }
+    ],
+    "note": "run (pid 90703) captured B1, N1, P845 before case 1 and after the last case; crossrun (pid 92063), a separate process, captured B1 and N1 before its first and after its last case. Every record maps the baseline's own libz3 (B1bin/libz3.dylib, N1bin/runtimes/osx-arm64/native/libz3.dylib, P845bin/libz3.dylib) hashing the registered value. This confirms run 2 only; it does not confirm run 1's provenance (condition 7)."
+  },
+  "processLoadedZ3InPins": {
+    "note": "The e7cbce77 harness also records an lsof listing of its own PID in each pins.json (processLoadedZ3) before case 1 and compares it after the run; it agrees with the dyld capture.",
+    "baselineImageMatchesRegistered": {
+      "B1": true,
+      "N1": true,
+      "P845": true
+    }
+  },
+  "environment": {
+    "HOME": "isolated temporary directory (scratchpad/s1/run2home), CALOR_HOME and DOTNET_CLI_HOME likewise; CALOR_NO_TYPE_CHECK unset; cwd = repository root (global.json -> dotnet 10.0.401)",
+    "run1": "run 1 used the executor's normal HOME; the in-process channel runs with the verification cache off except CACHE-* rows, which use a per-case cache directory"
+  }
+}

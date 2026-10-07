@@ -443,7 +443,8 @@ internal readonly record struct IntLiteralInfo(
     IntegerLiteralSign Sign,
     IntegerLiteralBase Base,
     IntegerLiteralWidth Width,
-    IntegerLiteralSignedness Signedness)
+    IntegerLiteralSignedness Signedness,
+    bool WidthInferred = false)
 {
     public bool IsNegative => Sign == IntegerLiteralSign.Negative;
     public bool IsHex => Base == IntegerLiteralBase.Hexadecimal;

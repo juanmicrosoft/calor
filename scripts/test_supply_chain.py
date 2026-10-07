@@ -49,7 +49,8 @@ class SupplyChainTests(unittest.TestCase):
         self.assertEqual(6, workflow.count("secrets.ANTHROPIC_API_KEY"))
         static_run = steps["Run static benchmarks"]
         self.assertIn("--statistical", static_run)
-        self.assertIn('--runs "${{ github.event.inputs.statistical_runs || \'30\' }}"', static_run)
+        self.assertIn("RUNS: ${{ github.event.inputs.statistical_runs || '30' }}", static_run)
+        self.assertIn('--runs "$RUNS"', static_run)
 
     def test_build_project_has_no_network_or_tracked_resource_mutation_targets(self) -> None:
         project = (REPO_ROOT / "src/Calor.Compiler/Calor.Compiler.csproj").read_text()
@@ -82,7 +83,8 @@ class SupplyChainTests(unittest.TestCase):
             ]
             for line in package_lines:
                 self.assertNotRegex(line, r'\sVersion="', relative)
-            if package_lines:
+            # Frozen #1311 evidence harness: its csproj must stay byte-identical (contract amendment 1.2.1), so it cannot gain a lock file.
+            if package_lines and relative != "bench/Calor.Soundness.Sweep/Calor.Soundness.Sweep.csproj":
                 self.assertTrue(
                     (project.parent / "packages.lock.json").is_file(),
                     f"{relative} has PackageReference items but no packages.lock.json",

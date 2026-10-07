@@ -1,0 +1,69 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §U{System}
+  §U{System.Collections.Generic}
+
+  §NS{ns_global:_global:global}
+    §CSHARP{public class Source
+{
+    public static string log = "";
+
+    public IEnumerable<int> Guarded
+    {
+        get
+        {
+            try
+            {
+                log = log + "s";
+                yield return 1;
+                yield return 2;
+            }
+            finally
+            {
+                log = log + "f";
+            }
+        }
+    }
+
+    public IEnumerable<int> this[bool fail]
+    {
+        get
+        {
+            yield return 7;
+            if (fail)
+            {
+                throw new InvalidOperationException("late");
+            }
+            yield return 8;
+        }
+    }
+}}§/CSHARP
+
+    §CSHARP{public static class Probe
+{
+    public static string Run()
+    {
+        var src = new Source();
+        foreach (var x in src.Guarded)
+        {
+            if (x == 1)
+            {
+                break;
+            }
+        }
+        string seen = "";
+        try
+        {
+            foreach (var y in src[true])
+            {
+                seen = seen + y;
+            }
+        }
+        catch (InvalidOperationException e)
+        {
+            seen = seen + ":" + e.Message;
+        }
+        return Source.log + "|" + seen;
+    }
+}}§/CSHARP
+
+

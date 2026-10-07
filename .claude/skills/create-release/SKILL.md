@@ -85,7 +85,8 @@ Update these files with the new version:
 | `CHANGELOG.md` | Rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` and add benchmark summary |
 | `website/content/changelog.mdx` | Add new version section at the top (same content as CHANGELOG.md but MDX format, no benchmark stats) |
 | `website/src/components/landing/WhatsNewBanner.tsx` | Update version number and one-line description of the release |
-| `website/public/data/benchmark-provenance.json` | Match the regenerated benchmark source commit and declared source version |
+| `website/public/data/benchmark-provenance.json` | Match the regenerated benchmark source commit (the full 40-hex SHA the generator now writes) and declared source version |
+| `bench/phase0-agent-native/commit-stamp-index.json` | Update the `publicationStamps` entry for every changed benchmark stamp (#1417). A stamp naming a pre-merge branch commit gets a pending phase-1 identity and a post-merge write-back; `LedgerCommitStampTests` fails until the index matches |
 | `website/content/benchmarking/{index,methodology,results}.mdx` | Match the regenerated benchmark date and provenance |
 | `website/content/philosophy/index.mdx` | Match the publishing release, benchmark source, declared source version, and run count |
 | `website/tests/public-claims.spec.ts` | Update `currentRelease` and keep release/provenance drift gates current |

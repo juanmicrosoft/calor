@@ -149,6 +149,10 @@ public sealed class Parser
     /// </summary>
     private Token? _lastIfToken;
 
+    // #1485: indentation column of the §M line (-1 before ParseModule). A
+    // declaration written at the module's own column is the legacy flat layout.
+    private int _moduleIndentColumn = -1;
+
     /// <summary>
     /// Phase 4d -- TokenKinds whose textual form is a legacy structural
     /// closing tag (<c>§/M</c>, <c>§/F</c>, <c>§/CL</c>, …) that indent
@@ -241,6 +245,375 @@ public sealed class Parser
                 }
             }
         }
+    }
+
+    // ------------------------------------------------------------------
+    // #1485 -- indentation ownership of block bodies.
+    //
+    // A block-opening clause (§IF/§EI/§EL, §L, §WH, §DO, §EACH, §EACHKV,
+    // §USE, §TR/§CA/§FI, §SYNC, §UNSAFE, §FIXED, §W/§K) owns only the lines
+    // indented deeper than the line it sits on (plus any statement written on
+    // its own line). An EMPTY body is legal: the lexer then emits no Indent
+    // after the header, so the next line -- a same-column sibling or the
+    // enclosing block's Dedent -- belongs to the enclosing block. Before this,
+    // the body loops ran until the next Dedent, so a sibling statement after
+    // an empty clause was silently parsed into the clause and the enclosing
+    // block's Dedent was consumed as the clause's end.
+    //
+    // Flat closer form (body at the opener's own column, terminated by an
+    // explicit closer such as §/TR{id}) is still accepted: when the body is
+    // not indented and a matching closer follows at the opener's column, the
+    // block keeps the old run-until-closer behavior.
+    // ------------------------------------------------------------------
+
+    /// <summary>Ownership state for one block body (#1485).</summary>
+    /// <remarks>
+    /// <c>IndentColumn</c> is the indentation of the opener's line;
+    /// <c>HeaderLine</c> is the line the header ends on (later than the
+    /// opener's line when a bracketed header spans lines). Content on the
+    /// header line belongs to the body.
+    /// </remarks>
+    private readonly record struct BlockOwner(Token Opener, int IndentColumn, int HeaderLine, bool Flat);
+
+    // #1485: last token index of each kind, built on first use, so the closer
+    // scans can return at once when no such closer exists later in the file.
+    private Dictionary<TokenKind, int>? _lastIndexOfKind;
+
+    private bool HasTokenKindAfter(TokenKind kind, int position)
+    {
+        if (_lastIndexOfKind == null)
+        {
+            _lastIndexOfKind = new Dictionary<TokenKind, int>();
+            for (int i = 0; i < _tokens.Count; i++)
+                _lastIndexOfKind[_tokens[i].Kind] = i;
+        }
+        return _lastIndexOfKind.TryGetValue(kind, out var last) && last >= position;
+    }
+
+    /// <summary>
+    /// #1485 -- a chain continuation (§EI/§EL, §CA/§FI, §PPE) belongs to the
+    /// chain opened by <paramref name="chainOwner"/> unless its line sits at a
+    /// shallower column. Inside brackets the lexer emits no Dedent, so this
+    /// column test is what keeps an outer §EL from attaching to an inner §IF.
+    /// </summary>
+    private bool ContinuesChain(BlockOwner chainOwner)
+        => chainOwner.Flat || LineIndentColumnAt(_position) >= chainOwner.IndentColumn;
+
+    /// <summary>
+    /// The indentation column of the source line holding the token at
+    /// <paramref name="index"/>: the column of the first real token on that
+    /// line. Works inside brackets, where the lexer emits no Indent/Dedent.
+    /// </summary>
+    private int LineIndentColumnAt(int index)
+    {
+        if (index < 0 || index >= _tokens.Count) return 0;
+        var line = _tokens[index].Span.Line;
+        var column = _tokens[index].Span.Column;
+        for (int i = index - 1; i >= 0; i--)
+        {
+            var t = _tokens[i];
+            if (t.Kind is TokenKind.Dedent or TokenKind.Indent) continue;
+            if (t.Span.Line != line) break;
+            column = t.Span.Column;
+        }
+        return column;
+    }
+
+    private int IndexOfRecentToken(Token token)
+    {
+        for (int i = Math.Min(_position, _tokens.Count - 1); i >= 0; i--)
+        {
+            if (_tokens[i].Span.Start == token.Span.Start && _tokens[i].Kind == token.Kind)
+                return i;
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// Begins the body of the block opened by <paramref name="opener"/> (call
+    /// after the opener's header has been parsed). <paramref name="closer"/>
+    /// and <paramref name="id"/> identify the explicit closer that would put
+    /// the block in flat closer form. <paramref name="siblingKinds"/> are
+    /// openers that, at the opener's own column, end the search for that
+    /// closer (e.g. a following §K ends an empty §K).
+    /// </summary>
+    private BlockOwner BeginBlockBody(Token opener, TokenKind closer, string? id, params TokenKind[] siblingKinds)
+    {
+        var openerIndex = IndexOfRecentToken(opener);
+        var column = openerIndex >= 0 ? LineIndentColumnAt(openerIndex) : opener.Span.Column;
+        var headerLine = opener.Span.Line;
+        for (int i = _position - 1; i >= 0; i--)
+        {
+            if (_tokens[i].Kind is TokenKind.Dedent or TokenKind.Indent) continue;
+            headerLine = Math.Max(headerLine, _tokens[i].Span.Line);
+            break;
+        }
+        var owner = new BlockOwner(opener, column, headerLine, Flat: false);
+
+        // An indented body is the ordinary indent form. (A body that starts on
+        // the header's line may still continue in flat closer form, so it gets
+        // the closer scan below.)
+        if (Check(TokenKind.Dedent) || Check(TokenKind.Eof)
+            || Current.Span.Line != headerLine && LineIndentColumnAt(_position) > column)
+            return owner;
+
+        return owner with { Flat = HasFlatCloserAhead(owner, closer, id, siblingKinds) };
+    }
+
+    /// <summary>
+    /// #1485 -- true when this lambda's §/LAM closer follows: one naming
+    /// <paramref name="id"/>, or (for an id-less lambda) the first id-less
+    /// closer not taken by a nested §LAM. The scan ignores indentation but
+    /// stops at the next member or type declaration.
+    /// </summary>
+    private bool HasLambdaCloserAhead(string? id)
+    {
+        if (!HasTokenKindAfter(TokenKind.EndLambda, _position)) return false;
+        var nested = 0;
+        for (int i = _position; i < _tokens.Count; i++)
+        {
+            var t = _tokens[i];
+            switch (t.Kind)
+            {
+                case TokenKind.Eof:
+                case TokenKind.Func:
+                case TokenKind.AsyncFunc:
+                case TokenKind.Method:
+                case TokenKind.AsyncMethod:
+                case TokenKind.Constructor:
+                case TokenKind.Class:
+                case TokenKind.Interface:
+                case TokenKind.Enum:
+                    return false;
+                case TokenKind.Lambda:
+                    nested++;
+                    break;
+                case TokenKind.EndLambda:
+                    var closerId = i + 2 < _tokens.Count
+                                   && _tokens[i + 1].Kind == TokenKind.OpenBrace
+                                   && _tokens[i + 2].Kind == TokenKind.Identifier
+                        ? _tokens[i + 2].Text
+                        : null;
+                    if (!string.IsNullOrEmpty(id) && closerId == id) return true;
+                    if (nested == 0 && (string.IsNullOrEmpty(id) || closerId == null)) return true;
+                    if (nested > 0) nested--;
+                    break;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>The opener kind whose explicit closer is <paramref name="closer"/>.</summary>
+    private static TokenKind? OpenerKindOf(TokenKind closer) => closer switch
+    {
+        TokenKind.EndTry => TokenKind.Try,
+        TokenKind.EndIf => TokenKind.If,
+        TokenKind.EndFor => TokenKind.For,
+        TokenKind.EndWhile => TokenKind.While,
+        TokenKind.EndDo => TokenKind.Do,
+        TokenKind.EndForeach => TokenKind.Foreach,
+        TokenKind.EndEachKV => TokenKind.EachKV,
+        TokenKind.EndUse => TokenKind.Use,
+        TokenKind.EndSyncBlock => TokenKind.SyncBlock,
+        TokenKind.EndUnsafe => TokenKind.Unsafe,
+        TokenKind.EndFixed => TokenKind.Fixed,
+        TokenKind.EndMatch => TokenKind.Match,
+        TokenKind.EndCase => TokenKind.Case,
+        TokenKind.EndFunc => TokenKind.Func,
+        TokenKind.EndAsyncFunc => TokenKind.AsyncFunc,
+        TokenKind.EndClass => TokenKind.Class,
+        TokenKind.EndEnum => TokenKind.Enum,
+        TokenKind.EndLambda => TokenKind.Lambda,
+        TokenKind.EndPreprocessor => TokenKind.Preprocessor,
+        TokenKind.EndGet => TokenKind.Get,
+        TokenKind.EndSet => TokenKind.Set,
+        TokenKind.EndInit => TokenKind.Init,
+        _ => null,
+    };
+
+    /// <summary>
+    /// True when the block owned by <paramref name="owner"/> is written in flat
+    /// closer form: its first body line after the opener's line is at the
+    /// opener's own column (not deeper), and an explicit
+    /// <paramref name="closer"/> that is not the closer of a nested block follows on a
+    /// line at that column before the enclosing block ends. Nested blocks are
+    /// matched by id when the closer carries one, otherwise by counting
+    /// same-kind openers on lines at the opener's column.
+    /// </summary>
+    private bool HasFlatCloserAhead(BlockOwner owner, TokenKind closer, string? id, TokenKind[] siblingKinds)
+    {
+        if (!HasTokenKindAfter(closer, _position)) return false;
+
+        var openerKind = OpenerKindOf(closer);
+        var nestedIds = new HashSet<string>(StringComparer.Ordinal);
+        var nestedSameKind = 0;
+        var lastLine = owner.HeaderLine;
+        var lineColumn = -1;
+        var sawLaterLine = false;
+        var bracketDepth = 0;
+        for (int i = _position; i < _tokens.Count; i++)
+        {
+            var t = _tokens[i];
+            if (t.Kind == TokenKind.Eof) return false;
+            if (t.Kind == TokenKind.Indent) continue;
+            if (t.Kind == TokenKind.Dedent)
+            {
+                if (t.IndentationDepth < owner.Opener.IndentationDepth) return false;
+                continue;
+            }
+
+            // A line that starts inside brackets is a continuation line: its
+            // indentation says nothing about block structure (the lexer skips
+            // it too), so it neither ends the scan nor starts a body line.
+            var inBrackets = bracketDepth > 0;
+            if (t.Kind is TokenKind.OpenParen or TokenKind.OpenBracket or TokenKind.OpenBrace) bracketDepth++;
+            else if (t.Kind is TokenKind.CloseParen or TokenKind.CloseBracket or TokenKind.CloseBrace && bracketDepth > 0) bracketDepth--;
+            if (inBrackets)
+            {
+                lastLine = t.Span.Line;
+                continue;
+            }
+
+            // Content on the header's own line is body content: nested openers
+            // there are tracked, and a closer there that is not a nested
+            // block's closes this block on that line (so no flat body).
+            var onHeaderLine = t.Span.Line == owner.HeaderLine;
+            if (!onHeaderLine && t.Span.Line != lastLine)
+            {
+                lastLine = t.Span.Line;
+                lineColumn = t.Span.Column;
+                if (lineColumn < owner.IndentColumn) return false;
+                // The first body line is deeper: ordinary indent form.
+                if (!sawLaterLine && lineColumn > owner.IndentColumn) return false;
+                sawLaterLine = true;
+                if (lineColumn == owner.IndentColumn && Array.IndexOf(siblingKinds, t.Kind) >= 0) return false;
+            }
+            if (!onHeaderLine && lineColumn != owner.IndentColumn) continue;
+
+            var braceId = i + 2 < _tokens.Count
+                          && _tokens[i + 1].Kind == TokenKind.OpenBrace
+                          && _tokens[i + 2].Kind == TokenKind.Identifier
+                ? _tokens[i + 2].Text
+                : null;
+
+            if (t.Kind == closer)
+            {
+                // A closer naming a block opened later in this scan, or an
+                // id-less closer while a nested same-kind block is open, closes
+                // that nested block. Any other closer is ours -- including one
+                // with a mismatched id, which the block end reports.
+                if (braceId != null && braceId != id && nestedIds.Contains(braceId))
+                {
+                    if (nestedSameKind > 0) nestedSameKind--;
+                    continue;
+                }
+                if (braceId == null && nestedSameKind > 0)
+                {
+                    nestedSameKind--;
+                    continue;
+                }
+                return !onHeaderLine;
+            }
+
+            if (openerKind is { } kind && t.Kind == kind) nestedSameKind++;
+            if (braceId != null) nestedIds.Add(braceId);
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// True while the current token can start a statement of the body owned by
+    /// <paramref name="owner"/>. Dedent/Eof return true so the caller's
+    /// existing block-end checks decide.
+    /// </summary>
+    private bool IsInBlockBody(BlockOwner owner)
+        => owner.Flat
+           || Check(TokenKind.Dedent)
+           || Check(TokenKind.Eof)
+           || Current.Span.Line == owner.HeaderLine
+           || LineIndentColumnAt(_position) > owner.IndentColumn;
+
+    /// <summary>
+    /// Declaration bodies (§F/§AF, §CL, §EN) written at the module's own column
+    /// are the legacy flat layout (every line at column 1, no closers): there a
+    /// function body or class member sits at the declaration's own column, and
+    /// such a line could not belong to the module anyway. In that layout a
+    /// declaration body ends at an unindented line only when the line opens a
+    /// sibling declaration. Indented declarations use the ordinary rule, so an
+    /// empty nested §CL does not adopt the next same-column §MT.
+    /// </summary>
+    private bool IsInDeclarationBody(BlockOwner owner, bool interopIsSibling)
+        => IsInBlockBody(owner)
+           || owner.IndentColumn <= _moduleIndentColumn && !IsSiblingDeclarationOpener(interopIsSibling);
+
+    private bool IsSiblingDeclarationOpener(bool interopIsSibling)
+        => Check(TokenKind.Func) || Check(TokenKind.AsyncFunc)
+           || Check(TokenKind.Class) || Check(TokenKind.Interface)
+           || Check(TokenKind.Enum) || Check(TokenKind.Record)
+           || Check(TokenKind.Delegate) || Check(TokenKind.Namespace)
+           || interopIsSibling && Check(TokenKind.CSharpInterop);
+
+    /// <summary>True when the current Dedent closes the indented body of <paramref name="owner"/>.</summary>
+    private bool IsOwnedDedent(BlockOwner owner)
+        => Check(TokenKind.Dedent) && Current.IndentationDepth == owner.Opener.IndentationDepth;
+
+    /// <summary>
+    /// Ends the body owned by <paramref name="owner"/>. An indented body is
+    /// closed by its own Dedent (or the explicit closer); an empty or
+    /// same-line body consumes nothing, leaving a same-column sibling or the
+    /// enclosing block's Dedent for the enclosing block. A returned
+    /// synthetic Dedent token marks an implicit end.
+    /// </summary>
+    private Token ExpectOwnedBlockEnd(TokenKind closer, BlockOwner owner)
+    {
+        if (owner.Flat || Check(closer) || IsOwnedDedent(owner))
+            return ExpectBlockEnd(closer);
+        if (Check(TokenKind.Eof))
+            return Current;
+        if (Check(TokenKind.Dedent) || LineIndentColumnAt(_position) <= owner.IndentColumn)
+            return ImplicitBlockEndToken();
+        // A deeper, unowned token (e.g. a statement at §K column inside a
+        // match): keep the old diagnostic.
+        return ExpectBlockEnd(closer);
+    }
+
+    private Token ImplicitBlockEndToken()
+    {
+        for (int i = _position - 1; i >= 0; i--)
+        {
+            if (_tokens[i].Kind is not (TokenKind.Dedent or TokenKind.Indent))
+                return new Token(TokenKind.Dedent, "", _tokens[i].Span);
+        }
+        return new Token(TokenKind.Dedent, "", Current.Span);
+    }
+
+    /// <summary>
+    /// #1485 -- like <see cref="ConsumeDedentBeforeChain"/>, but consumes the
+    /// Dedent only when it closes <paramref name="owner"/>'s own indented
+    /// body. A Dedent from a shallower level belongs to an enclosing block,
+    /// and the continuation after it (e.g. an outer §CA or §EL) is not ours.
+    /// </summary>
+    private void ConsumeOwnedDedentBeforeChain(BlockOwner owner, params TokenKind[] continuations)
+    {
+        if (IsOwnedDedent(owner) && Array.IndexOf(continuations, Peek(1).Kind) >= 0)
+            Advance();
+    }
+
+    /// <summary>
+    /// #1485 -- statement list for a block body owned by <paramref name="owner"/>;
+    /// stops at the explicit <paramref name="closer"/>, any Dedent, or the
+    /// first statement that is not indented under the opener.
+    /// </summary>
+    private List<StatementNode> ParseOwnedStatementBlock(BlockOwner owner, TokenKind closer)
+    {
+        var statements = new List<StatementNode>();
+        while (!IsAtEnd && !Check(closer) && !Check(TokenKind.Dedent) && IsInBlockBody(owner))
+        {
+            var stmt = ParseStatement();
+            if (stmt != null)
+                statements.Add(stmt);
+        }
+        return statements;
     }
 
     private Token Expect(TokenKind kind)
@@ -735,6 +1108,7 @@ public sealed class Parser
     private ModuleNode ParseModule()
     {
         var startToken = Expect(TokenKind.Module);
+        _moduleIndentColumn = LineIndentColumnAt(_position - 1);
         var attrs = ParseAttributes();
         var overflowModifier = attrs["_pos2"];
         if (overflowModifier?.StartsWith("overflow=", StringComparison.Ordinal) == true)
@@ -1549,18 +1923,20 @@ public sealed class Parser
         }
 
         // Parse BODY - either explicit §BODY/§END_BODY or implicit (no BODY markers)
+        // #1485: an empty implicit body must not swallow a same-column sibling.
+        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndFunc, id);
         if (Check(TokenKind.Body))
         {
             // Explicit §BODY ... §END_BODY
             body = ParseBody();
         }
-        else if (!IsBlockEnd(TokenKind.EndFunc))
+        else if (!IsBlockEnd(TokenKind.EndFunc) && IsInDeclarationBody(bodyOwner, interopIsSibling: false))
         {
             // Implicit body - parse statements until §/F
-            body = ParseImplicitBody();
+            body = ParseImplicitBody(bodyOwner);
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndFunc);
+        var endToken = ExpectOwnedBlockEnd(TokenKind.EndFunc, bodyOwner);
         var endAttrs = ParseAttributes();
         var endId = AttributeHelper.InterpretEndFuncAttributes(endAttrs);
 
@@ -1753,16 +2129,18 @@ public sealed class Parser
         }
 
         // Parse BODY - either explicit §BODY/§END_BODY or implicit
+        // #1485: an empty implicit body must not swallow a same-column sibling.
+        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndAsyncFunc, id);
         if (Check(TokenKind.Body))
         {
             body = ParseBody();
         }
-        else if (!IsBlockEnd(TokenKind.EndAsyncFunc))
+        else if (!IsBlockEnd(TokenKind.EndAsyncFunc) && IsInDeclarationBody(bodyOwner, interopIsSibling: false))
         {
-            body = ParseImplicitBody();
+            body = ParseImplicitBody(bodyOwner);
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndAsyncFunc);
+        var endToken = ExpectOwnedBlockEnd(TokenKind.EndAsyncFunc, bodyOwner);
         var endAttrs = ParseAttributes();
         var endId = AttributeHelper.InterpretEndFuncAttributes(endAttrs);
 
@@ -2254,11 +2632,14 @@ public sealed class Parser
     /// <summary>
     /// Parses an implicit body (no §BODY markers) - statements until §/F
     /// </summary>
-    private List<StatementNode> ParseImplicitBody()
+    private List<StatementNode> ParseImplicitBody(BlockOwner owner)
     {
         var statements = new List<StatementNode>();
 
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndFunc) && !IsBlockEnd(TokenKind.EndAsyncFunc))
+        // #1485: a flat body (statements at the function's own column) still
+        // ends at a sibling declaration such as the next §F.
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndFunc) && !IsBlockEnd(TokenKind.EndAsyncFunc)
+               && IsInDeclarationBody(owner, interopIsSibling: false))
         {
             var statement = ParseStatement();
             if (statement != null)
@@ -4514,7 +4895,10 @@ public sealed class Parser
                 info.Sign,
                 info.Base,
                 info.Width,
-                info.Signedness);
+                info.Signedness)
+            {
+                WidthInferred = info.WidthInferred,
+            };
         }
         var value = token.Value switch
         {
@@ -4840,9 +5224,10 @@ public sealed class Parser
         }
 
         var target = ParseExpression();
+        var matchOwner = BeginBlockBody(startToken, TokenKind.EndMatch, id);
         var cases = ParseMatchCases();
 
-        var endToken = ExpectBlockEnd(TokenKind.EndMatch);
+        var endToken = ExpectOwnedBlockEnd(TokenKind.EndMatch, matchOwner);
         var endAttrs = ParseAttributes();
         var endId = AttributeHelper.InterpretEndMatchAttributes(endAttrs);
 
@@ -4873,9 +5258,10 @@ public sealed class Parser
         var isExpression = attrs["_pos1"] == "expr";
 
         var target = ParseExpression();
+        var matchOwner = BeginBlockBody(startToken, TokenKind.EndMatch, id);
         var cases = ParseMatchCases();
 
-        var endToken = ExpectBlockEnd(TokenKind.EndMatch);
+        var endToken = ExpectOwnedBlockEnd(TokenKind.EndMatch, matchOwner);
         var endAttrs = ParseAttributes();
         var endId = AttributeHelper.InterpretEndMatchAttributes(endAttrs);
 
@@ -4899,9 +5285,15 @@ public sealed class Parser
     private List<MatchCaseNode> ParseMatchCases()
     {
         var cases = new List<MatchCaseNode>();
+        var firstCaseColumn = -1;
 
-        while (Check(TokenKind.Case))
+        // #1485: a §K on a line shallower than this match's first case belongs
+        // to an enclosing match (inside brackets the lexer emits no Dedent to
+        // say so).
+        while (Check(TokenKind.Case)
+               && (firstCaseColumn < 0 || LineIndentColumnAt(_position) >= firstCaseColumn))
         {
+            if (firstCaseColumn < 0) firstCaseColumn = LineIndentColumnAt(_position);
             var caseToken = Expect(TokenKind.Case);
             var pattern = ParsePattern();
 
@@ -4932,8 +5324,12 @@ public sealed class Parser
             }
             else
             {
-                // Block syntax - parse statements until closing tag or next case
-                while (!IsAtEnd && !Check(TokenKind.Case) && !IsBlockEnd(TokenKind.EndMatch) && !IsBlockEnd(TokenKind.EndCase))
+                // Block syntax - parse statements until closing tag or next case.
+                // #1485: the case owns only lines indented under its §K, so an
+                // empty case never consumes the match's (or a parent's) Dedent.
+                var caseOwner = BeginBlockBody(caseToken, TokenKind.EndCase, null, TokenKind.Case);
+                while (!IsAtEnd && !Check(TokenKind.Case) && !IsBlockEnd(TokenKind.EndMatch) && !IsBlockEnd(TokenKind.EndCase)
+                       && IsInBlockBody(caseOwner))
                 {
                     var stmt = ParseStatement();
                     if (stmt != null)
@@ -4942,8 +5338,9 @@ public sealed class Parser
                     }
                 }
 
-                // Consume optional §/K closing tag
-                if (IsBlockEnd(TokenKind.EndCase))
+                // Consume optional §/K closing tag, or the case body's own Dedent
+                if (Check(TokenKind.EndCase) || IsOwnedDedent(caseOwner)
+                    || caseOwner.Flat && IsBlockEnd(TokenKind.EndCase))
                 {
                     ExpectBlockEnd(TokenKind.EndCase);
                 }
@@ -5418,9 +5815,10 @@ public sealed class Parser
             step = ParseExpressionFromAttributeString(stepStr, startToken.Span);
 
         // Parse body statements
-        var body = ParseStatementBlock(TokenKind.EndFor);
+        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndFor, id);
+        var body = ParseOwnedStatementBlock(bodyOwner, TokenKind.EndFor);
 
-        var endToken = ExpectBlockEnd(TokenKind.EndFor);
+        var endToken = ExpectOwnedBlockEnd(TokenKind.EndFor, bodyOwner);
         var endAttrs = ParseAttributes();
         // Positional: [id]
         var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
@@ -5478,9 +5876,10 @@ public sealed class Parser
         var condition = ParseExpression();
 
         // Parse body statements
-        var body = ParseStatementBlock(TokenKind.EndWhile);
+        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndWhile, id);
+        var body = ParseOwnedStatementBlock(bodyOwner, TokenKind.EndWhile);
 
-        var endToken = ExpectBlockEnd(TokenKind.EndWhile);
+        var endToken = ExpectOwnedBlockEnd(TokenKind.EndWhile, bodyOwner);
         var endAttrs = ParseAttributes();
         // Positional: [id]
         var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
@@ -5507,9 +5906,10 @@ public sealed class Parser
         }
 
         // Parse body statements
-        var body = ParseStatementBlock(TokenKind.EndDo);
+        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndDo, id);
+        var body = ParseOwnedStatementBlock(bodyOwner, TokenKind.EndDo);
 
-        var endToken = ExpectBlockEnd(TokenKind.EndDo);
+        var endToken = ExpectOwnedBlockEnd(TokenKind.EndDo, bodyOwner);
         var endAttrs = ParseAttributes();
         // Positional: [id]
         var endId = endAttrs["_pos0"] ?? endAttrs["id"] ?? "";
@@ -5608,7 +6008,7 @@ public sealed class Parser
         {
             var lastBodySpan = startToken.Span;
 
-            List<StatementNode> ParseClauseBody()
+            List<StatementNode> ParseClauseBody(Token clauseToken)
             {
                 var body = new List<StatementNode>();
                 var ownsDedent = true;
@@ -5624,13 +6024,17 @@ public sealed class Parser
                 }
                 else
                 {
+                    // #1485: a block clause owns only lines indented under it.
+                    var clauseOwner = BeginBlockBody(clauseToken, TokenKind.EndIf, id);
                     while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf)
-                        && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf))
+                        && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf)
+                        && IsInBlockBody(clauseOwner))
                     {
                         var statement = ParseStatement();
                         if (statement != null)
                             body.Add(statement);
                     }
+                    ownsDedent = clauseOwner.Flat || IsOwnedDedent(clauseOwner);
                 }
 
                 if (body.Count > 0)
@@ -5640,22 +6044,23 @@ public sealed class Parser
                 return body;
             }
 
-            thenBody = ParseClauseBody();
+            thenBody = ParseClauseBody(startToken);
+            var arrowChainOwner = BeginBlockBody(startToken, TokenKind.EndIf, id) with { Flat = false };
 
             // Parse optional §EI (else if) and §EL (else) with arrow syntax
-            while (Check(TokenKind.ElseIf))
+            while (Check(TokenKind.ElseIf) && ContinuesChain(arrowChainOwner))
             {
                 var elseIfToken = Expect(TokenKind.ElseIf);
                 var elseIfCondition = ParseExpression();
-                var elseIfBody = ParseClauseBody();
+                var elseIfBody = ParseClauseBody(elseIfToken);
                 elseIfClauses.Add(new ElseIfClauseNode(elseIfToken.Span, elseIfCondition, elseIfBody));
             }
 
             // Parse optional §EL (else) with arrow syntax
-            if (Check(TokenKind.Else))
+            if (Check(TokenKind.Else) && ContinuesChain(arrowChainOwner))
             {
-                Expect(TokenKind.Else);
-                elseBody = ParseClauseBody();
+                var elseToken = Expect(TokenKind.Else);
+                elseBody = ParseClauseBody(elseToken);
             }
 
             if (Check(TokenKind.EndIf))
@@ -5674,8 +6079,12 @@ public sealed class Parser
             return new IfStatementNode(span, id, condition, thenBody, elseIfClauses, elseBody, attrs);
         }
 
-        // Standard multi-statement body
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf) && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf))
+        // Standard multi-statement body. #1485: each clause owns only the lines
+        // indented under it, so an empty clause leaves a same-column sibling
+        // (and the enclosing block's Dedent) to the enclosing block.
+        var clauseOwner = BeginBlockBody(startToken, TokenKind.EndIf, id);
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf) && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf)
+               && IsInBlockBody(clauseOwner))
         {
             var stmt = ParseStatement();
             if (stmt != null)
@@ -5684,18 +6093,21 @@ public sealed class Parser
             }
         }
 
-        // Phase 3 (indent-aware): if the body ended on a Dedent and a chain
-        // continuation (§EI/§EL) follows, consume the Dedent.
-        ConsumeDedentBeforeChain(TokenKind.ElseIf, TokenKind.Else);
+        // Phase 3 (indent-aware): if the body ended on its own Dedent and a
+        // chain continuation (§EI/§EL) follows, consume the Dedent.
+        ConsumeOwnedDedentBeforeChain(clauseOwner, TokenKind.ElseIf, TokenKind.Else);
 
         // Parse ELSEIF clauses
-        while (Check(TokenKind.ElseIf))
+        var chainOwner = clauseOwner;
+        while (Check(TokenKind.ElseIf) && ContinuesChain(chainOwner))
         {
             var elseIfToken = Expect(TokenKind.ElseIf);
             var elseIfCondition = ParseExpression();
             var elseIfBody = new List<StatementNode>();
 
-            while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf) && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf))
+            clauseOwner = BeginBlockBody(elseIfToken, TokenKind.EndIf, id);
+            while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf) && !Check(TokenKind.Else) && !Check(TokenKind.ElseIf)
+                   && IsInBlockBody(clauseOwner))
             {
                 var stmt = ParseStatement();
                 if (stmt != null)
@@ -5705,18 +6117,19 @@ public sealed class Parser
             }
 
             // Phase 3 (indent-aware): consume dangling Dedent before next §EI/§EL.
-            ConsumeDedentBeforeChain(TokenKind.ElseIf, TokenKind.Else);
+            ConsumeOwnedDedentBeforeChain(clauseOwner, TokenKind.ElseIf, TokenKind.Else);
 
             elseIfClauses.Add(new ElseIfClauseNode(elseIfToken.Span, elseIfCondition, elseIfBody));
         }
 
         // Parse ELSE clause
-        if (Check(TokenKind.Else))
+        if (Check(TokenKind.Else) && ContinuesChain(chainOwner))
         {
-            Expect(TokenKind.Else);
+            var elseToken = Expect(TokenKind.Else);
             elseBody = new List<StatementNode>();
 
-            while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf))
+            clauseOwner = BeginBlockBody(elseToken, TokenKind.EndIf, id);
+            while (!IsAtEnd && !IsBlockEnd(TokenKind.EndIf) && IsInBlockBody(clauseOwner))
             {
                 var stmt = ParseStatement();
                 if (stmt != null)
@@ -5726,7 +6139,7 @@ public sealed class Parser
             }
         }
 
-        var endToken2 = ExpectBlockEnd(TokenKind.EndIf);
+        var endToken2 = ExpectOwnedBlockEnd(TokenKind.EndIf, clauseOwner);
         var endAttrs2 = ParseAttributes();
         // Positional: [id]
         var endId2 = endAttrs2["_pos0"] ?? endAttrs2["id"] ?? "";
@@ -5858,22 +6271,6 @@ public sealed class Parser
         {
             _position = saved;
         }
-    }
-
-    private List<StatementNode> ParseStatementBlock(params TokenKind[] terminators)
-    {
-        var statements = new List<StatementNode>();
-
-        while (!IsAtEnd && !terminators.Any(Check) && !Check(TokenKind.Dedent))
-        {
-            var stmt = ParseStatement();
-            if (stmt != null)
-            {
-                statements.Add(stmt);
-            }
-        }
-
-        return statements;
     }
 
     private AttributeCollection ParseAttributes(int maxGroups = int.MaxValue)
@@ -7381,9 +7778,10 @@ public sealed class Parser
         var collection = ParseExpression();
 
         // Parse body statements
-        var body = ParseStatementBlock(TokenKind.EndForeach);
+        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndForeach, id);
+        var body = ParseOwnedStatementBlock(bodyOwner, TokenKind.EndForeach);
 
-        var endToken = ExpectBlockEnd(TokenKind.EndForeach);
+        var endToken = ExpectOwnedBlockEnd(TokenKind.EndForeach, bodyOwner);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -7860,9 +8258,10 @@ public sealed class Parser
         var dictionary = ParseExpression();
 
         // Parse body statements
-        var body = ParseStatementBlock(TokenKind.EndEachKV);
+        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndEachKV, id);
+        var body = ParseOwnedStatementBlock(bodyOwner, TokenKind.EndEachKV);
 
-        var endToken = ExpectBlockEnd(TokenKind.EndEachKV);
+        var endToken = ExpectOwnedBlockEnd(TokenKind.EndEachKV, bodyOwner);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -8879,9 +9278,13 @@ public sealed class Parser
         var nestedDelegates = new List<DelegateDefinitionNode>();
         var classItems = new List<AstNode>();
 
+        // #1485: a class owns only the lines indented under it, so an empty
+        // class does not adopt a same-column sibling type as a nested type.
+        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndClass, id);
         while (!IsAtEnd
                && !IsBlockEnd(TokenKind.EndClass)
-               && !Check(TokenKind.Namespace))
+               && !Check(TokenKind.Namespace)
+               && IsInDeclarationBody(bodyOwner, interopIsSibling: true))
         {
             if (Check(TokenKind.TypeParam))
             {
@@ -9017,7 +9420,7 @@ public sealed class Parser
         }
         else
         {
-            endToken = ExpectBlockEnd(TokenKind.EndClass);
+            endToken = ExpectOwnedBlockEnd(TokenKind.EndClass, bodyOwner);
             var endAttrs = ParseAttributes();
             var endId = endAttrs["_pos0"] ?? "";
 
@@ -10714,11 +11117,14 @@ public sealed class Parser
         };
 
         // Parse optional preconditions and body (for non-auto properties/indexers)
-        // Also stop at Equals for property default values, next accessor, or end tokens
+        // Also stop at Equals for property default values, next accessor, or end tokens.
+        // #1485: the accessor owns only the lines indented under it.
+        var accessorOwner = BeginBlockBody(startToken, endTokenKind, null,
+            TokenKind.Get, TokenKind.Set, TokenKind.Init);
         while (!IsAtEnd && !Check(TokenKind.Get) && !Check(TokenKind.Set) &&
                !Check(TokenKind.Init) && !IsBlockEnd(TokenKind.EndProperty) && !IsBlockEnd(TokenKind.EndIndexer) &&
                !Check(TokenKind.Equals) && !IsBlockEnd(TokenKind.EndGet) && !IsBlockEnd(TokenKind.EndSet) &&
-               !IsBlockEnd(TokenKind.EndInit))
+               !IsBlockEnd(TokenKind.EndInit) && IsInBlockBody(accessorOwner))
         {
             if (Check(TokenKind.Requires))
             {
@@ -10734,8 +11140,10 @@ public sealed class Parser
             }
         }
 
-        // Consume the closing token if present (§/GET or §/SET)
-        if (IsBlockEnd(endTokenKind))
+        // Consume the closing token if present (§/GET or §/SET), or the
+        // accessor body's own Dedent -- never the enclosing member's.
+        if (Check(endTokenKind) || IsOwnedDedent(accessorOwner)
+            || accessorOwner.Flat && IsBlockEnd(endTokenKind))
         {
             ExpectBlockEnd(endTokenKind);
         }
@@ -11093,9 +11501,10 @@ public sealed class Parser
         var resource = ParseExpression();
 
         // Parse body statements
-        var body = ParseStatementBlock(TokenKind.EndUse);
+        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndUse, id);
+        var body = ParseOwnedStatementBlock(bodyOwner, TokenKind.EndUse);
 
-        var endToken = ExpectBlockEnd(TokenKind.EndUse);
+        var endToken = ExpectOwnedBlockEnd(TokenKind.EndUse, bodyOwner);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -11130,9 +11539,13 @@ public sealed class Parser
             _diagnostics.ReportMissingRequiredAttribute(startToken.Span, "TRY", "id");
         }
 
-        // Parse try body
+        // Parse try body. #1485: each clause (§TR/§CA/§FI) owns only the lines
+        // indented under it; an empty §CA/§FI leaves a same-column sibling and
+        // the enclosing block's Dedent to the enclosing block.
+        var clauseOwner = BeginBlockBody(startToken, TokenKind.EndTry, id);
         var tryBody = new List<StatementNode>();
-        while (!IsAtEnd && !Check(TokenKind.Catch) && !Check(TokenKind.Finally) && !IsBlockEnd(TokenKind.EndTry))
+        while (!IsAtEnd && !Check(TokenKind.Catch) && !Check(TokenKind.Finally) && !IsBlockEnd(TokenKind.EndTry)
+               && IsInBlockBody(clauseOwner))
         {
             var stmt = ParseStatement();
             if (stmt != null)
@@ -11141,23 +11554,25 @@ public sealed class Parser
             }
         }
 
-        // Phase 3 (indent-aware): consume dangling Dedent before §CA/§FI.
-        ConsumeDedentBeforeChain(TokenKind.Catch, TokenKind.Finally);
+        // Phase 3 (indent-aware): consume the try body's own Dedent before §CA/§FI.
+        ConsumeOwnedDedentBeforeChain(clauseOwner, TokenKind.Catch, TokenKind.Finally);
 
         // Parse catch clauses
+        var chainOwner = clauseOwner;
         var catchClauses = new List<CatchClauseNode>();
-        while (Check(TokenKind.Catch))
+        while (Check(TokenKind.Catch) && ContinuesChain(chainOwner))
         {
-            catchClauses.Add(ParseCatchClause());
+            catchClauses.Add(ParseCatchClause(id, out clauseOwner));
         }
 
         // Parse optional finally
         List<StatementNode>? finallyBody = null;
-        if (Check(TokenKind.Finally))
+        if (Check(TokenKind.Finally) && ContinuesChain(chainOwner))
         {
-            Expect(TokenKind.Finally);
+            var finallyToken = Expect(TokenKind.Finally);
             finallyBody = new List<StatementNode>();
-            while (!IsAtEnd && !IsBlockEnd(TokenKind.EndTry))
+            clauseOwner = BeginBlockBody(finallyToken, TokenKind.EndTry, id);
+            while (!IsAtEnd && !IsBlockEnd(TokenKind.EndTry) && IsInBlockBody(clauseOwner))
             {
                 var stmt = ParseStatement();
                 if (stmt != null)
@@ -11167,7 +11582,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndTry);
+        var endToken = ExpectOwnedBlockEnd(TokenKind.EndTry, clauseOwner);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -11185,7 +11600,7 @@ public sealed class Parser
     /// §CATCH[IOException:ex]
     /// §CATCH
     /// </summary>
-    private CatchClauseNode ParseCatchClause()
+    private CatchClauseNode ParseCatchClause(string tryId, out BlockOwner clauseOwner)
     {
         var startToken = Expect(TokenKind.Catch);
         var attrs = ParseAttributes();
@@ -11207,9 +11622,11 @@ public sealed class Parser
             filter = ParseExpression();
         }
 
-        // Parse catch body
+        // Parse catch body (#1485: only lines indented under the §CA).
+        clauseOwner = BeginBlockBody(startToken, TokenKind.EndTry, tryId);
         var body = new List<StatementNode>();
-        while (!IsAtEnd && !Check(TokenKind.Catch) && !Check(TokenKind.Finally) && !IsBlockEnd(TokenKind.EndTry))
+        while (!IsAtEnd && !Check(TokenKind.Catch) && !Check(TokenKind.Finally) && !IsBlockEnd(TokenKind.EndTry)
+               && IsInBlockBody(clauseOwner))
         {
             var stmt = ParseStatement();
             if (stmt != null)
@@ -11218,8 +11635,8 @@ public sealed class Parser
             }
         }
 
-        // Phase 3 (indent-aware): consume dangling Dedent before next §CA/§FI in the chain.
-        ConsumeDedentBeforeChain(TokenKind.Catch, TokenKind.Finally);
+        // Phase 3 (indent-aware): consume this clause's own Dedent before the next §CA/§FI.
+        ConsumeOwnedDedentBeforeChain(clauseOwner, TokenKind.Catch, TokenKind.Finally);
 
         var span = body.Count > 0 ? startToken.Span.Union(body[^1].Span) : startToken.Span;
         return new CatchClauseNode(
@@ -11410,28 +11827,33 @@ public sealed class Parser
         var body = new List<StatementNode>();
         List<StatementNode>? elseBody = null;
 
-        while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof))
+        // #1485: an indent-form §PP owns only the lines indented under it.
+        var ppOwner = BeginBlockBody(startToken, TokenKind.EndPreprocessor, null);
+        while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof)
+               && IsInBlockBody(ppOwner))
         {
             var stmt = ParseStatement();
             if (stmt != null) body.Add(stmt);
         }
 
-        // Phase 3 (indent-aware): consume dangling Dedent before §PPE/§/PP so
-        // the chain continues even when the body lived at a deeper indent.
-        ConsumeDedentBeforeChain(TokenKind.PreprocessorElse, TokenKind.EndPreprocessor);
+        // Phase 3 (indent-aware): consume the body's own Dedent before §PPE/§/PP
+        // so the chain continues even when the body lived at a deeper indent.
+        ConsumeOwnedDedentBeforeChain(ppOwner, TokenKind.PreprocessorElse, TokenKind.EndPreprocessor);
 
-        if (Match(TokenKind.PreprocessorElse))
+        if (Check(TokenKind.PreprocessorElse) && ContinuesChain(ppOwner))
         {
+            var elseToken = Advance();
             elseBody = new List<StatementNode>();
-            while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof))
+            ppOwner = BeginBlockBody(elseToken, TokenKind.EndPreprocessor, null);
+            while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof) && IsInBlockBody(ppOwner))
             {
                 var stmt = ParseStatement();
                 if (stmt != null) elseBody.Add(stmt);
             }
-            ConsumeDedentBeforeChain(TokenKind.EndPreprocessor);
+            ConsumeOwnedDedentBeforeChain(ppOwner, TokenKind.EndPreprocessor);
         }
 
-        ExpectBlockEnd(TokenKind.EndPreprocessor);
+        ExpectOwnedBlockEnd(TokenKind.EndPreprocessor, ppOwner);
         return new PreprocessorDirectiveNode(startToken.Span, condition, body, elseBody);
     }
 
@@ -11454,19 +11876,24 @@ public sealed class Parser
         var items = new List<AstNode>();
 
         // Parse members until §PPE or §/PP
-        while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof))
+        // #1485: an indent-form §PP owns only the lines indented under it.
+        var ppOwner = BeginBlockBody(startToken, TokenKind.EndPreprocessor, null);
+        while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof)
+               && IsInBlockBody(ppOwner))
         {
             ParseMemberInPreprocessorBlock(
                 fields, properties, constructors, methods, events,
                 operatorOverloads, interopBlocks: interopBlocks, items: items);
         }
-        ConsumeDedentBeforeChain(
+        ConsumeOwnedDedentBeforeChain(
+            ppOwner,
             TokenKind.PreprocessorElse,
             TokenKind.EndPreprocessor);
 
         MemberPreprocessorBlockNode? elseBranch = null;
-        if (Match(TokenKind.PreprocessorElse))
+        if (Check(TokenKind.PreprocessorElse) && ContinuesChain(ppOwner))
         {
+            var ppeToken = Advance();
             // Check if the next token is another §PP (for #elif chains)
             if (Check(TokenKind.Preprocessor))
             {
@@ -11484,7 +11911,8 @@ public sealed class Parser
                 var elseInteropBlocks = new List<CSharpInteropBlockNode>();
                 var elseItems = new List<AstNode>();
 
-                while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof))
+                ppOwner = BeginBlockBody(ppeToken, TokenKind.EndPreprocessor, null);
+                while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof) && IsInBlockBody(ppOwner))
                 {
                     ParseMemberInPreprocessorBlock(
                         elseFields, elseProperties, elseConstructors, elseMethods,
@@ -11492,7 +11920,7 @@ public sealed class Parser
                         interopBlocks: elseInteropBlocks,
                         items: elseItems);
                 }
-                ConsumeDedentBeforeChain(TokenKind.EndPreprocessor);
+                ConsumeOwnedDedentBeforeChain(ppOwner, TokenKind.EndPreprocessor);
 
                 elseBranch = new MemberPreprocessorBlockNode(startToken.Span, "",
                     elseFields, elseProperties, elseConstructors, elseMethods,
@@ -11505,7 +11933,7 @@ public sealed class Parser
         // Only expect EndPreprocessor if we didn't recurse into an #elif (which consumes its own end)
         if (elseBranch == null || string.IsNullOrEmpty(elseBranch.Condition))
         {
-            ExpectBlockEnd(TokenKind.EndPreprocessor);
+            ExpectOwnedBlockEnd(TokenKind.EndPreprocessor, ppOwner);
         }
         else
         {
@@ -11538,7 +11966,10 @@ public sealed class Parser
         var items = new List<AstNode>();
 
         // Parse type declarations until §PPE or §/PP
-        while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof))
+        // #1485: an indent-form §PP owns only the lines indented under it.
+        var ppOwner = BeginBlockBody(startToken, TokenKind.EndPreprocessor, null);
+        while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.PreprocessorElse) && !Check(TokenKind.Eof)
+               && IsInBlockBody(ppOwner))
         {
             ParseTypeInPreprocessorBlock(
                 classes,
@@ -11550,13 +11981,15 @@ public sealed class Parser
                 items,
                 interopBlocks);
         }
-        ConsumeDedentBeforeChain(
+        ConsumeOwnedDedentBeforeChain(
+            ppOwner,
             TokenKind.PreprocessorElse,
             TokenKind.EndPreprocessor);
 
         TypePreprocessorBlockNode? elseBranch = null;
-        if (Match(TokenKind.PreprocessorElse))
+        if (Check(TokenKind.PreprocessorElse) && ContinuesChain(ppOwner))
         {
+            var ppeToken = Advance();
             if (Check(TokenKind.Preprocessor))
             {
                 elseBranch = ParseTypePreprocessorBlock();
@@ -11572,7 +12005,8 @@ public sealed class Parser
                 var elseInteropBlocks = new List<CSharpInteropBlockNode>();
                 var elseItems = new List<AstNode>();
 
-                while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof))
+                ppOwner = BeginBlockBody(ppeToken, TokenKind.EndPreprocessor, null);
+                while (!IsBlockEnd(TokenKind.EndPreprocessor) && !Check(TokenKind.Eof) && IsInBlockBody(ppOwner))
                 {
                     ParseTypeInPreprocessorBlock(
                         elseClasses,
@@ -11584,7 +12018,7 @@ public sealed class Parser
                         elseItems,
                         elseInteropBlocks);
                 }
-                ConsumeDedentBeforeChain(TokenKind.EndPreprocessor);
+                ConsumeOwnedDedentBeforeChain(ppOwner, TokenKind.EndPreprocessor);
 
                 elseBranch = new TypePreprocessorBlockNode(startToken.Span, "",
                     elseClasses, elseInterfaces, elseEnums, elseDelegates,
@@ -11597,7 +12031,7 @@ public sealed class Parser
 
         if (elseBranch == null || string.IsNullOrEmpty(elseBranch.Condition))
         {
-            ExpectBlockEnd(TokenKind.EndPreprocessor);
+            ExpectOwnedBlockEnd(TokenKind.EndPreprocessor, ppOwner);
         }
         else
         {
@@ -11895,7 +12329,16 @@ public sealed class Parser
             effects = ParseEffects(EffectRowPosition.Lambda);
         }
 
-        // Parse body - either expression or statements
+        // Parse body - either expression or statements.
+        // #1485: a block lambda without its §/LAM closer owns only the lines
+        // indented under its line (plus its header line). With the closer (the
+        // documented form, which the converter emits even when the body sits at
+        // the opener line's column and the closer at a shallower one), the body
+        // runs to it.
+        var lambdaOwner = BeginBlockBody(startToken, TokenKind.EndLambda, id);
+        if (!lambdaOwner.Flat && HasLambdaCloserAhead(id))
+            lambdaOwner = lambdaOwner with { Flat = true };
+
         ExpressionNode? expressionBody = null;
         List<StatementNode>? statementBody = null;
 
@@ -11976,13 +12419,14 @@ public sealed class Parser
             || Check(TokenKind.Subscribe) || Check(TokenKind.Unsubscribe)
             || Check(TokenKind.Using);
 
-        if (IsExpressionStart() && !IsBlockEnd(TokenKind.EndLambda) && !isStatementToken)
+        if (IsExpressionStart() && !IsBlockEnd(TokenKind.EndLambda) && !isStatementToken
+            && IsInBlockBody(lambdaOwner))
         {
             expressionBody = ParseExpression();
         }
 
-        // Check if there are more statements after the expression
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndLambda))
+        // Check if there are more statements after the expression.
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndLambda) && IsInBlockBody(lambdaOwner))
         {
             if (statementBody == null)
             {
@@ -11995,7 +12439,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndLambda);
+        var endToken = ExpectOwnedBlockEnd(TokenKind.EndLambda, lambdaOwner);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -12211,13 +12655,16 @@ public sealed class Parser
 
     private List<StatementNode> ParseEventAccessorBody(TokenKind startKind, TokenKind endKind)
     {
-        Advance(); // consume §EADD or §EREM
+        var startToken = Advance(); // consume §EADD or §EREM
         ParseAttributes(); // consume any attributes
 
         var body = new List<StatementNode>();
 
+        // #1485: the accessor owns only the lines indented under it.
+        var accessorOwner = BeginBlockBody(startToken, endKind, null, TokenKind.EventAdd, TokenKind.EventRemove);
         while (!IsAtEnd && !Check(endKind) && !Check(TokenKind.EventAdd) &&
-               !Check(TokenKind.EventRemove) && !IsBlockEnd(TokenKind.EndEvent) && !Check(TokenKind.Dedent))
+               !Check(TokenKind.EventRemove) && !IsBlockEnd(TokenKind.EndEvent) && !Check(TokenKind.Dedent)
+               && IsInBlockBody(accessorOwner))
         {
             var stmt = ParseStatement();
             if (stmt != null)
@@ -12226,8 +12673,9 @@ public sealed class Parser
             }
         }
 
-        // Consume the closing token if present (§/EADD or §/EREM)
-        if (IsBlockEnd(endKind))
+        // Consume the closing token if present (§/EADD or §/EREM), or the
+        // accessor body's own Dedent -- never the enclosing event's.
+        if (Check(endKind) || IsOwnedDedent(accessorOwner) || accessorOwner.Flat && IsBlockEnd(endKind))
         {
             ExpectBlockEnd(endKind);
         }
@@ -12918,8 +13366,10 @@ public sealed class Parser
         DateOnly? date = null;
         string? author = null;
 
-        // Parse decision content
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndDecision))
+        // Parse decision content. #1485: only the lines indented under the
+        // §DC (or on its header line) belong to it.
+        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndDecision, id);
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndDecision) && IsInDeclarationBody(bodyOwner, interopIsSibling: true))
         {
             if (Check(TokenKind.Chosen))
             {
@@ -12990,7 +13440,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndDecision);
+        var endToken = ExpectOwnedBlockEnd(TokenKind.EndDecision, bodyOwner);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -13065,12 +13515,15 @@ public sealed class Parser
         var hiddenFiles = new List<FileRefNode>();
         string? focusTarget = null;
 
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndContext))
+        // #1485: §CT, §VS and §HD own only the lines indented under them.
+        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndContext, null);
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndContext) && IsInDeclarationBody(bodyOwner, interopIsSibling: true))
         {
             if (Check(TokenKind.Visible))
             {
-                Advance();
-                while (!IsAtEnd && !IsBlockEnd(TokenKind.EndVisible))
+                var sectionToken = Advance();
+                var sectionOwner = BeginBlockBody(sectionToken, TokenKind.EndVisible, null);
+                while (!IsAtEnd && !IsBlockEnd(TokenKind.EndVisible) && IsInContextSection(sectionOwner))
                 {
                     if (Check(TokenKind.FileRef))
                     {
@@ -13081,12 +13534,15 @@ public sealed class Parser
                         Advance();
                     }
                 }
-                if (IsBlockEnd(TokenKind.EndVisible)) ExpectBlockEnd(TokenKind.EndVisible);
+                if (Check(TokenKind.EndVisible) || IsOwnedDedent(sectionOwner)
+                    || sectionOwner.Flat && IsBlockEnd(TokenKind.EndVisible))
+                    ExpectBlockEnd(TokenKind.EndVisible);
             }
             else if (Check(TokenKind.HiddenSection))
             {
-                Advance();
-                while (!IsAtEnd && !IsBlockEnd(TokenKind.EndHidden))
+                var sectionToken = Advance();
+                var sectionOwner = BeginBlockBody(sectionToken, TokenKind.EndHidden, null);
+                while (!IsAtEnd && !IsBlockEnd(TokenKind.EndHidden) && IsInContextSection(sectionOwner))
                 {
                     if (Check(TokenKind.FileRef))
                     {
@@ -13097,7 +13553,9 @@ public sealed class Parser
                         Advance();
                     }
                 }
-                if (IsBlockEnd(TokenKind.EndHidden)) ExpectBlockEnd(TokenKind.EndHidden);
+                if (Check(TokenKind.EndHidden) || IsOwnedDedent(sectionOwner)
+                    || sectionOwner.Flat && IsBlockEnd(TokenKind.EndHidden))
+                    ExpectBlockEnd(TokenKind.EndHidden);
             }
             else if (Check(TokenKind.Focus))
             {
@@ -13116,10 +13574,19 @@ public sealed class Parser
             }
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndContext);
+        var endToken = ExpectOwnedBlockEnd(TokenKind.EndContext, bodyOwner);
         var span = startToken.Span.Union(endToken.Span);
         return new ContextNode(span, isPartial, visibleFiles, hiddenFiles, focusTarget, attrs);
     }
+
+    /// <summary>
+    /// #1485 -- a §VS/§HD section owns the lines indented under it; in the
+    /// legacy flat layout (section at the module's column) it keeps taking
+    /// §FILE lines at its own column.
+    /// </summary>
+    private bool IsInContextSection(BlockOwner sectionOwner)
+        => IsInBlockBody(sectionOwner)
+           || sectionOwner.IndentColumn <= _moduleIndentColumn && Check(TokenKind.FileRef);
 
     private FileRefNode ParseFileRef()
     {
@@ -13364,8 +13831,12 @@ public sealed class Parser
 
         var members = new List<EnumMemberNode>();
 
-        // Parse enum members until we hit the closing tag
-        while (!IsAtEnd && !IsBlockEndAtIndent(TokenKind.EndEnum, startToken))
+        // Parse enum members until we hit the closing tag. #1485: members are
+        // the lines indented under the §EN (or on its own line); an empty enum
+        // ends at a same-column sibling.
+        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndEnum, id);
+        while (!IsAtEnd && !IsBlockEndAtIndent(TokenKind.EndEnum, startToken)
+               && IsInDeclarationBody(bodyOwner, interopIsSibling: true))
         {
             if (ConsumeContinuationDedent(startToken))
                 continue;
@@ -13406,7 +13877,10 @@ public sealed class Parser
             }
         }
 
-        var endToken = ExpectBlockEndAtIndent(TokenKind.EndEnum, startToken);
+        while (ConsumeContinuationDedent(startToken))
+        {
+        }
+        var endToken = ExpectOwnedBlockEnd(TokenKind.EndEnum, bodyOwner);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -13603,8 +14077,12 @@ public sealed class Parser
 
         var methods = new List<FunctionNode>();
 
-        // Parse extension methods until we hit the closing tag
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndEnumExtension))
+        // Parse extension methods until we hit the closing tag. #1485: the
+        // methods are the lines indented under the §EEXT (a §EEXT at the
+        // module's own column keeps the legacy flat layout).
+        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndEnumExtension, id);
+        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndEnumExtension)
+               && (IsInBlockBody(bodyOwner) || bodyOwner.IndentColumn <= _moduleIndentColumn))
         {
             if (Check(TokenKind.Func))
             {
@@ -13621,7 +14099,7 @@ public sealed class Parser
             }
         }
 
-        var endToken = ExpectBlockEnd(TokenKind.EndEnumExtension);
+        var endToken = ExpectOwnedBlockEnd(TokenKind.EndEnumExtension, bodyOwner);
         var endAttrs = ParseAttributes();
         var endId = endAttrs["_pos0"] ?? "";
 
@@ -14652,13 +15130,10 @@ public sealed class Parser
         var lockExpr = ParseExpression();
         Expect(TokenKind.CloseParen);
 
-        var body = new List<StatementNode>();
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndSyncBlock))
-        {
-            var stmt = ParseStatement();
-            if (stmt != null) body.Add(stmt);
-        }
-        if (IsBlockEnd(TokenKind.EndSyncBlock))
+        // #1485: the body owns only lines indented under the opener.
+        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndSyncBlock, id);
+        var body = ParseOwnedStatementBlock(bodyOwner, TokenKind.EndSyncBlock);
+        if (Check(TokenKind.EndSyncBlock) || IsOwnedDedent(bodyOwner) || bodyOwner.Flat && IsBlockEnd(TokenKind.EndSyncBlock))
         {
             ExpectBlockEnd(TokenKind.EndSyncBlock);
             ParseAttributes(); // consume optional {id} on closing tag
@@ -14676,13 +15151,10 @@ public sealed class Parser
         var attrs = ParseAttributes();
         var id = attrs["_pos0"] ?? "_unsafe";
 
-        var body = new List<StatementNode>();
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndUnsafe))
-        {
-            var stmt = ParseStatement();
-            if (stmt != null) body.Add(stmt);
-        }
-        if (IsBlockEnd(TokenKind.EndUnsafe))
+        // #1485: the body owns only lines indented under the opener.
+        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndUnsafe, id);
+        var body = ParseOwnedStatementBlock(bodyOwner, TokenKind.EndUnsafe);
+        if (Check(TokenKind.EndUnsafe) || IsOwnedDedent(bodyOwner) || bodyOwner.Flat && IsBlockEnd(TokenKind.EndUnsafe))
         {
             ExpectBlockEnd(TokenKind.EndUnsafe);
             ParseAttributes(); // consume optional {id} on closing tag
@@ -14714,13 +15186,10 @@ public sealed class Parser
             initializer = ParseExpression();
         }
 
-        var body = new List<StatementNode>();
-        while (!IsAtEnd && !IsBlockEnd(TokenKind.EndFixed))
-        {
-            var stmt = ParseStatement();
-            if (stmt != null) body.Add(stmt);
-        }
-        if (IsBlockEnd(TokenKind.EndFixed))
+        // #1485: the body owns only lines indented under the opener.
+        var bodyOwner = BeginBlockBody(startToken, TokenKind.EndFixed, id);
+        var body = ParseOwnedStatementBlock(bodyOwner, TokenKind.EndFixed);
+        if (Check(TokenKind.EndFixed) || IsOwnedDedent(bodyOwner) || bodyOwner.Flat && IsBlockEnd(TokenKind.EndFixed))
         {
             ExpectBlockEnd(TokenKind.EndFixed);
             ParseAttributes(); // consume optional {id} on closing tag

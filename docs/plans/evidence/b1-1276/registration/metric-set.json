@@ -1,0 +1,96 @@
+{
+  "metricSetId": "b1-1276-metric-set-v1",
+  "implementationVersion": "calor-evaluation-static-metrics@72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1",
+  "implementationFiles": [
+    {
+      "path": "tests/Calor.Evaluation/Core/MetricResult.cs",
+      "sha256": "87cb5d2bfbd25b6aee83505b80fabb3a32724193df1e37d0dcc734513c9c4252"
+    },
+    {
+      "path": "tests/Calor.Evaluation/Core/EvaluationContext.cs",
+      "sha256": "8886fc9a3b0a84b4894b9556e76231cbb82194d12ba82603a31efa8bfc69c78e"
+    },
+    {
+      "path": "tests/Calor.Evaluation/Metrics/TokenEconomicsCalculator.cs",
+      "sha256": "5bc495cd6c15d74c1de1e09d551282e2ca5bccdad4749f58cfa30ac6eef613f2"
+    },
+    {
+      "path": "tests/Calor.Evaluation/Metrics/GenerationAccuracyCalculator.cs",
+      "sha256": "2c79f66d2d31caad31e9daf79611a6e863c7ede3c8681d0b5b9896abb87bede5"
+    },
+    {
+      "path": "tests/Calor.Evaluation/Metrics/ComprehensionCalculator.cs",
+      "sha256": "3a5ec0d93982414146ecd0dba2c89f322878ddd77cc033a7891b9d80c492aaed"
+    },
+    {
+      "path": "tests/Calor.Evaluation/Metrics/EditPrecisionCalculator.cs",
+      "sha256": "9f26566074e86e4b1a8dee66843786bb5ee0e4c24d5e06620c28760d5207f3e2"
+    },
+    {
+      "path": "tests/Calor.Evaluation/Metrics/ErrorDetectionCalculator.cs",
+      "sha256": "fc56aafd0e04f19a597fb0194e1af1b7751d266b0c973d8632b0a7655ee6de29"
+    },
+    {
+      "path": "tests/Calor.Evaluation/Metrics/InformationDensityCalculator.cs",
+      "sha256": "2a28d330718ea16a02e19140b571f4ce0fb01730071fddf645bf79e5b3a52148"
+    },
+    {
+      "path": "tests/Calor.Evaluation/Metrics/RefactoringStabilityCalculator.cs",
+      "sha256": "d378aac43f79c0db376462d34202373b7a40134c3395bf97639d9e2998784a84"
+    },
+    {
+      "path": "tests/Calor.Evaluation/Metrics/CorrectnessCalculator.cs",
+      "sha256": "d789fe98bff822d363d48b11dedb7e9a648371166ffb92c450f3aac5530e3df6"
+    }
+  ],
+  "comparative": [
+    {
+      "category": "TokenEconomics",
+      "metric": "CompositeTokenEconomics",
+      "perPairValue": "AdvantageRatio r = csharpSize / calorSize, where size = cube root of (tokens x non-whitespace characters x lines) of the arm's source file; tokens from TokenEconomicsCalculator.TokenizeSource.",
+      "direction": "r > 1 means the C# source file is larger than the Calor source file; r < 1 means it is smaller.",
+      "whySymmetric": "One tokenizer, one character rule, and one line rule are applied to both source texts. No term is defined per language.",
+      "interpretation": "Measures the size of these two files as written, including each arm's boilerplate. It is a static source-size measure, not a measure of either language in general."
+    }
+  ],
+  "descriptiveOnly": [
+    {
+      "category": "GenerationAccuracy",
+      "metric": "CompositeAccuracy",
+      "reason": "Combines parse success with StructureCompleteness, which scores Calor AST node kinds and C# syntax node kinds with separate per-language rules (CalculateCalorStructureScore vs CalculateCSharpStructureScore)."
+    },
+    {
+      "category": "Comprehension",
+      "metric": "StructuralClarity",
+      "reason": "Scores Calor markers and C# patterns with separate per-language rules (CalculateCalorClarityScore vs CalculateCSharpClarityScore)."
+    },
+    {
+      "category": "EditPrecision",
+      "metric": "TargetingPrecision",
+      "reason": "Credits Calor unique-ID targeting and C# structural patterns with separate per-language rules (CalculateCalorEditPrecision vs CalculateCSharpEditPrecision)."
+    },
+    {
+      "category": "ErrorDetection",
+      "metric": "DetectionCapability",
+      "reason": "Scores detection factors with separate per-language rules (CalculateCalorErrorDetectionCapability vs CalculateCSharpErrorDetectionCapability)."
+    },
+    {
+      "category": "InformationDensity",
+      "metric": "SemanticDensity",
+      "reason": "Counts semantic elements with separate per-language counters (CountCalorSemanticElements vs CountCSharpSemanticElements)."
+    },
+    {
+      "category": "RefactoringStability",
+      "metric": "OverallStability",
+      "reason": "Scores stability with separate per-language rules (CalculateCalorStability vs CalculateCSharpStability)."
+    },
+    {
+      "category": "Correctness",
+      "metric": "EstimatedCorrectness",
+      "reason": "Without an LLM provider this is a structural estimate that awards points for language-specific constructs (for example Calor contracts and Option handling vs C# null checks); it executes no code."
+    }
+  ],
+  "descriptiveOnlyRule": "A descriptive-only metric enters no ratio, advantage, win count, interval, headline, or category ranking. If reported at all, each arm's mean is shown separately and labeled 'static feature score with a language-specific definition; not comparable across arms'. The reason for each entry is its definition in the pinned implementation file, read before any oracle run; it does not depend on any equivalence outcome or metric value.",
+  "notInThisSet": "The other calculators in tests/Calor.Evaluation/Metrics (TaskCompletion, Safety, EffectDiscipline, LlmEvaluation, AgentRefactoring, InteropEffectCoverage) are not in BenchmarkRunner's static run and are not registered here. The LLM- and agent-based ones need paid providers (0 USD ceiling, contract section 9); their past results are historical-only in the inventory (llm-and-agent-results).",
+  "claim": "Every metric here is a static feature score of two committed files. None is a coding-agent outcome, and none is presented as a measured language, productivity, correctness, or safety advantage (contract benchmarkEquivalence.claimRule)."
+}

@@ -1,0 +1,36 @@
+§M{m001:Custom:overflow=unchecked}
+  §U{System}
+  §U{System.Collections.Generic}
+
+  §CL{c001:Bag:pub}
+    §FLD{i32:started:pub:stat} = 0
+
+    §PROP{p002:Items:Seq<i32>:pub}
+      §GET{pub}
+        §ASSIGN started (+ started 1)
+        §YIELD 1
+        §YIELD 2
+
+    §IXER{ix005:Seq<i32>:pub}
+      §GET{pub}
+        §L{for003:i:0:(- 10 1):1}
+          §IF{if004} (>= i limit)
+            §YBRK
+          §YIELD i
+
+
+  §CL{c006:Probe:pub:stat}
+    §MT{m007:Run:pub:stat} () -> str
+      §E{alloc}
+      §B{bag} §NEW{Bag} §/NEW
+      §B{items} bag.Items
+      §B{i32:before} Bag.started
+      §B{~sum:i32} 0
+      §EACH{each008:i:var} items
+        §ASSIGN sum (+ sum i)
+      §B{~count:i32} 0
+      §EACH{each009:i:var} §IDX{bag} 3
+        §ASSIGN count (+ count 1)
+      §R (+ (+ (+ (+ (+ (+ before "|") Bag.started) "|") sum) "|") count)
+
+
