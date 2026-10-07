@@ -19,16 +19,22 @@ reviewed or verified.
 ## Per-row results
 
 `reproduce/reproduce.py` reuses the R0 driver and `ProbeRunner` unchanged and writes
-`results.json` and `generated/`. See the table in the PR body and `results.json`.
+`results.json` and `generated/` (Release build, macOS arm64; commit and `src/` tree are recorded
+in `results.json`). Surfaces: `cli-default`, `cli-passthrough`, `mcp-default`,
+`mcp-passthroughOnError`, `mcp-passthroughOnError-moduleName` (all five give the same outcome per
+row). `ProjectMigrator` with and without passthrough is covered by the tests, not by this script.
 
-| Case | Expected | Result |
-|---|---|---|
-| F3-LOCAL-01 | native | see `results.json` |
-| F3-LOCAL-02 (C-1) | native | see `results.json` |
-| F3-LOCAL-03 (C-2, C-3, forward call, delegate) | native | see `results.json` |
-| F3-LOCAL-04 (capturing, generic, iterator) | preserved | see `results.json` |
-| F3-LOCAL-05 (async; fixture `fixtures/F3-LOCAL-05.cs.txt`) | preserved | see `results.json` |
-| F3-LOCAL-A1 (analysis) | native-or-rejected | executable tests only (`LocalFunctionConversionTests`), no per-case evidence record |
+| Case | Expected | R0 baseline | This branch (all 5 surfaces) |
+|---|---|---|---|
+| F3-LOCAL-01 | native | preserved-match@permissive-effects | **native-match**, default compile, 0 losses, `3\|120` |
+| F3-LOCAL-02 (C-1) | native | preserved-match@permissive-effects | **native-match**, default compile, 0 losses, `3\|1002` |
+| F3-LOCAL-03 (C-2, C-3, forward call, delegate) | native | preserved-match@permissive-effects | **native-match**, default compile, 0 losses, `6\|5\|60\|3000\|502` |
+| F3-LOCAL-04 (capturing, generic, iterator) | preserved | preserved-match@permissive-effects | preserved-match@permissive-effects (3 `§CSHARP`, `local-function` issue; default compile still Calor0410 in the caller, unchanged) |
+| F3-LOCAL-05 (async; fixture `fixtures/F3-LOCAL-05.cs.txt`) | preserved | not-measured | preserved-match@permissive-effects (1 `§CSHARP`) |
+| F3-LOCAL-A1 (analysis) | native-or-rejected | not-measured | executable tests only (`LocalFunctionConversionTests`), no per-case evidence record |
+
+The Calor0410 on preserved rows is the R0 behavior for callers of `§CSHARP` members, not a
+local-function regression; #1144/#1430 own it.
 
 ## Tests
 
