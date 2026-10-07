@@ -1,0 +1,369 @@
+{
+  "schema": "v0.25-f4-1139-evidence/1",
+  "measuredCommit": "34024cfb32579a7b2c858ff832487285a1bcd774",
+  "srcTree": "9ba22d2fd3ad216f477721c8558b2d9953851d4c",
+  "dotnetSdk": "10.0.401",
+  "platform": "Darwin arm64",
+  "cases": [
+    {
+      "case": "F4-ITER-01",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-01.cs.txt",
+      "fixtureSha256": "0a1a21be9eac4d82bcf51a02705607d6b9de6fe98c50e649a532ae8f63f5db9e",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 14,
+          "interopPreservationCount": 2,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "iterator-accessor"
+          ],
+          "errorCodes": [],
+          "yieldTokensInOutput": 0,
+          "csharpInteropBlocks": 2,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "0|1|3|3",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 14,
+          "interopPreservationCount": 2,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "iterator-accessor"
+          ],
+          "errorCodes": [],
+          "yieldTokensInOutput": 0,
+          "csharpInteropBlocks": 2,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "0|1|3|3",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-no-fallback": {
+          "convertExit": 1,
+          "success": false,
+          "nativeConversionCount": null,
+          "interopPreservationCount": null,
+          "lossySubstitutionCount": null,
+          "dropCount": null,
+          "lossFeatures": [],
+          "errorCodes": [
+            "Calor1343"
+          ],
+          "output": "none (refused)"
+        },
+        "cli-migrate": {
+          "migrateExit": 0,
+          "lossFeatures": [
+            "iterator-accessor"
+          ],
+          "issueFeatures": [
+            "iterator-accessor"
+          ],
+          "unsupportedFeatures": [
+            "iterator-accessor"
+          ],
+          "yieldTokensInOutput": 0,
+          "csharpInteropBlocks": 2,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "0|1|3|3",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "iterator-accessor"
+          ],
+          "yieldTokensInOutput": 0,
+          "csharpInteropBlocks": 2,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "0|1|3|3",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "iterator-accessor"
+          ],
+          "yieldTokensInOutput": 0,
+          "csharpInteropBlocks": 2,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "0|1|3|3",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-passthroughOnError-moduleName": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "iterator-accessor"
+          ],
+          "yieldTokensInOutput": 0,
+          "csharpInteropBlocks": 2,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "0|1|3|3",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "0|1|3|3",
+        "exception": null
+      }
+    },
+    {
+      "case": "F4-ITER-02",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-02.cs.txt",
+      "fixtureSha256": "3a7a1da86ae98ee3ab5c935f8849701e38e2bfdaa7adc10b95b1a394e38a3820",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 14,
+          "interopPreservationCount": 2,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "iterator-accessor"
+          ],
+          "errorCodes": [],
+          "yieldTokensInOutput": 0,
+          "csharpInteropBlocks": 2,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "sf|7:late",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 14,
+          "interopPreservationCount": 2,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "iterator-accessor"
+          ],
+          "errorCodes": [],
+          "yieldTokensInOutput": 0,
+          "csharpInteropBlocks": 2,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "sf|7:late",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "cli-no-fallback": {
+          "convertExit": 1,
+          "success": false,
+          "nativeConversionCount": null,
+          "interopPreservationCount": null,
+          "lossySubstitutionCount": null,
+          "dropCount": null,
+          "lossFeatures": [],
+          "errorCodes": [
+            "Calor1343"
+          ],
+          "output": "none (refused)"
+        },
+        "cli-migrate": {
+          "migrateExit": 0,
+          "lossFeatures": [
+            "iterator-accessor"
+          ],
+          "issueFeatures": [
+            "iterator-accessor"
+          ],
+          "unsupportedFeatures": [
+            "iterator-accessor"
+          ],
+          "yieldTokensInOutput": 0,
+          "csharpInteropBlocks": 2,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "sf|7:late",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "iterator-accessor"
+          ],
+          "yieldTokensInOutput": 0,
+          "csharpInteropBlocks": 2,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "sf|7:late",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "iterator-accessor"
+          ],
+          "yieldTokensInOutput": 0,
+          "csharpInteropBlocks": 2,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "sf|7:late",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        },
+        "mcp-passthroughOnError-moduleName": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "iterator-accessor"
+          ],
+          "yieldTokensInOutput": 0,
+          "csharpInteropBlocks": 2,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "execution": {
+            "compiled": true,
+            "result": "sf|7:late",
+            "exception": null,
+            "matchesOriginal": true
+          }
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "sf|7:late",
+        "exception": null
+      }
+    }
+  ],
+  "controls": [
+    {
+      "case": "F4-ITER-03",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F4-ITER-03.calr.txt",
+      "fixtureSha256": "dd1de7e8703042dfb740ce1a58cc364c4b3f3af7b2c9571291397423613187e6",
+      "compile": {
+        "exit": 1,
+        "errorCodes": [
+          "Calor0209"
+        ],
+        "warningCodes": [],
+        "firstError": "'§YIELD' is illegal inside a property/indexer accessor.",
+        "firstErrorLine": 12
+      }
+    }
+  ]
+}

@@ -95,6 +95,85 @@ validation passed.
 | `for` loop | `§L{id:var:from:to:step}` |
 | `while` loop | `§WH{id}` |
 
+### Iterator Properties and Indexers
+
+A C# property or indexer getter that uses `yield return` or `yield break` is an
+*iterator accessor*. Calor has no iterator accessors: `§YIELD` inside a `§GET`
+is rejected with `Calor0209` (illegal yield). So the converter keeps the whole
+member as a `§CSHARP` block and reports it as an `iterator-accessor` loss.
+
+This C# property:
+
+```csharp
+public IEnumerable<int> Steps
+{
+    get
+    {
+        for (int i = Start; i > 0; i--)
+        {
+            yield return i;
+        }
+    }
+}
+```
+
+converts to:
+
+```calor
+§M{m001:Countdown}
+  §U{System.Collections.Generic}
+  §CL{c001:Countdown:pub}
+    §FLD{i32:Start:pub} = 3
+
+    §CSHARP{
+    public IEnumerable<int> Steps
+    {
+        get
+        {
+            for (int i = Start; i > 0; i--)
+            {
+                yield return i;
+            }
+        }
+    }
+    }§/CSHARP
+```
+
+The C# compiler still builds the iterator, so behavior does not change: the body
+runs only when someone enumerates the result, a `finally` runs when the
+enumerator is disposed (for example after a `break` in `foreach`), and an
+exception surfaces on the `MoveNext` call that reaches it.
+
+This happens in the converter itself. It is the same on `calor convert` (with or
+without `--passthrough`), `calor migrate`, the MCP `calor_convert` tool (with or
+without `passthroughOnError`), and the library API. With `--no-fallback` the
+conversion fails and names `iterator-accessor` instead.
+
+To make the member native Calor, move the loop into an iterator method and have
+the getter return its result. Calling an iterator method also defers the work, so
+the timing is the same:
+
+```calor
+§M{m001:Countdown}
+  §U{System.Collections.Generic}
+  §CL{c001:Countdown:pub}
+    §FLD{i32:Start:pub} = 3
+
+    §PROP{p001:Steps:Seq<i32>:pub}
+      §GET{pub}
+        §R §C{CountDown}
+
+    §MT{m002:CountDown:priv} () -> Seq<i32>
+      §E{}
+      §L{for1:i:Start:1:-1}
+        §YIELD i
+```
+
+**Limits.** Every yielding accessor is preserved, never converted to native
+Calor. Only the yields of the accessor itself count: a member whose yields sit in
+a nested local function is preserved for the local function instead. Iterators in
+ordinary methods still convert natively to `§YIELD`.
+
 ### What Changed in 0.17
 
 0.16 got all 364 modules to **parse**. 0.17 is about what happens next: a module
