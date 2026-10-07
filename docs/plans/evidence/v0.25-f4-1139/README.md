@@ -10,7 +10,12 @@ blocker references and the maintainer's approval (`docs/plans/v0.25-interop-scop
 accessor body contains a `yield` statement (excluding nested local functions and lambdas) to
 `§CSHARP` member interop, feature `iterator-accessor` (`FeatureSupport`: NotSupported). This is
 converter-level, so no surface depends on the post-conversion rescue. `Calor0209` for native
-`§YIELD` in an accessor is unchanged (F4-ITER-03 control). Native conversion was not attempted:
+`§YIELD` in an accessor is unchanged (F4-ITER-03 control). After Codex round 1, every `partial`
+property/indexer declaration is also preserved (`partial-property`, or `iterator-accessor` when a
+same-file part yields), because a native defining declaration became a second auto-property that
+only the rescue could hide; the iterator check also runs before the capability classifier and in
+the interface member path. A larger preserved declaration keeps its own label (interfaces with
+default bodies: `interface-property-semantics`; records: `record`). Native conversion was not attempted:
 Calor has no iterator accessor, and a synthesized helper method would add a member and name
 collisions for a capacity of 400 non-test lines.
 
@@ -37,7 +42,7 @@ No surface reports `post-validation-fallback`. The R0 baseline for the same fixt
 `compile-error:Calor0209` on MCP default and rescue-dependent `preserved-match` on the CLI.
 
 Library and project-migration (`ProjectMigrator`, with and without `PassthroughOnError`) surfaces,
-plus an interleaving fixture (producer/consumer order, `finally` on early `break`, deferred
+plus a split partial iterator property/indexer fixture and an interleaving fixture (producer/consumer order, `finally` on early `break`, deferred
 argument validation), are covered by
 `tests/Calor.Compiler.Tests/Migration/IteratorAccessorConversionTests.cs`.
 
