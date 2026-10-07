@@ -13210,6 +13210,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
                 case InterpolationSyntax interp:
                     var formatSpec = interp.FormatClause?.FormatStringToken.Text;
+                    // The generated C# is a regular $"..." literal; a format clause from a
+                    // verbatim or raw string whose text differs from its value (a backslash)
+                    // would be re-read with escapes. Keep the whole expression as C#.
+                    if (formatSpec != null
+                        && formatSpec.Contains('\\')
+                        && (interpolated.StringStartToken.Text.Contains('@')
+                            || interpolated.StringStartToken.Text.Contains("\"\"\"", StringComparison.Ordinal)))
+                        throw EscalateExpression(interpolated, "string-interpolation-hole");
                     var alignmentClause = interp.AlignmentClause?.Value.ToString();
                     // 0.25 F2 (#906): the hole stays in place. Hoisting a hole that contains a
                     // string literal into a temporary (the pre-0.25 workaround for nested quotes,
@@ -13248,8 +13256,18 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         && call.ArgumentList.Arguments.All(argument =>
             argument.NameColon == null
             && argument.RefKindKeyword.IsKind(SyntaxKind.None)
-            && (IsNativeHoleOperand(argument.Expression)
+            && (IsNativeHoleArgument(argument.Expression)
                 || argument.Expression is InvocationExpressionSyntax nested && IsNativeHoleCall(nested)));
+
+    /// <summary>
+    /// An argument of a C#-form hole call must read back through the parser's call lifting
+    /// (Parser.TryLiftInterpolationCall): a null literal or a member access on a non-name
+    /// (<c>typeof(T).Name</c>) does not, and would leave Calor syntax inside raw C#.
+    /// </summary>
+    private static bool IsNativeHoleArgument(ExpressionSyntax expression) =>
+        expression is not LiteralExpressionSyntax { RawKind: (int)SyntaxKind.NullLiteralExpression }
+        && (expression is not MemberAccessExpressionSyntax member || IsDottedName(member))
+        && IsNativeHoleOperand(expression);
 
     private static bool IsNativeHoleOperand(ExpressionSyntax expression) => expression switch
     {
@@ -13268,7 +13286,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 && System.Text.RegularExpressions.Regex.IsMatch(
                     number.ToString(System.Globalization.CultureInfo.InvariantCulture), @"^\d+\.\d+$")
             || literal.Token.Kind() is SyntaxKind.CharacterLiteralToken or SyntaxKind.TrueKeyword
-                or SyntaxKind.FalseKeyword or SyntaxKind.NullKeyword
+                or SyntaxKind.FalseKeyword
             || literal.Token.IsKind(SyntaxKind.StringLiteralToken) && !literal.Token.Text.StartsWith('@'),
         ParenthesizedExpressionSyntax parenthesized => IsNativeHoleOperand(parenthesized.Expression),
         BinaryExpressionSyntax binary => binary.Kind() is not (SyntaxKind.AsExpression or SyntaxKind.IsExpression

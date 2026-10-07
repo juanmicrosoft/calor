@@ -128,7 +128,10 @@ Holes convert natively when they are names, string, character, `bool` and `int` 
 `nameof`, `typeof`, or calls with a dotted target and positional arguments
 (`Math.Max(a, b)`). Any other hole, for example `{items[i]}`, `{customer?.Name}` or
 `{value.GetType().Name}`, keeps its original C# text as `§CS{...}` inside the hole. The conversion
-report counts it as interop, and its effects are assumed (`Calor0419`).
+report counts it as interop, and its effects are assumed (`Calor0419`). A call argument that is
+`null` or a member of something other than a name (`typeof(T).Name`) also keeps the hole as C#.
+A verbatim or raw interpolated string (`$@"..."`, `$"""..."""`) whose format clause contains a
+backslash keeps its whole statement as C#.
 
 For example, this C# selects `Kind(FormattableString)`, and so does the converted program:
 

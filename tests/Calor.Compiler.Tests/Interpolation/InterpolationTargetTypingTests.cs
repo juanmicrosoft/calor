@@ -308,6 +308,12 @@ public class InterpolationTargetTypingTests(ITestOutputHelper output)
             ("int n = 2; FormattableString f = $\"{1}|{n}|{3,4}\"; string s = $\"{1}|{7:D3}\"; return f.Format + \":\" + f.ArgumentCount + \":\" + s;", false),
             // Review round 2: typed literal arguments (decimal, long) and integral doubles stay C#.
             ("return $\"{Num(1.5m)}|{Num(2.0)}|{Num(3L)}|{4.0}|{x2(2.0)}\";", true),
+            // Review round 3: every argument the converter keeps native must lift back to a call.
+            ("int x = 2; return $\"{Math.Max(1.5, x + 1)}|{Pad(\"ab\", -x + 5)}|{x2(0.5)}\";", false),
+            ("int x = 2; return $\"{String.Concat(null, \"a\" + \"b\")}|{Pad(typeof(Holder).Name, 8)}\";", true),
+            // Review round 3: a backslash in a verbatim format clause; a regular one stays native.
+            ("int x = 3; return $@\"{x:000\\kg}\";", true),
+            ("int x = 3; return $\"{x:000\\\\kg}\";", false),
         ];
         var data = new TheoryData<string, Surface, bool>();
         foreach (var surface in new[] { Surface.Cli, Surface.Mcp })

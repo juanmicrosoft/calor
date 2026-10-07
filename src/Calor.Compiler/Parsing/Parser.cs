@@ -5150,6 +5150,7 @@ public sealed class Parser
             (char ch, CharOperationNode { Operation: CharOp.CharLiteral, Arguments: [StringLiteralNode one] }) =>
                 one.Value == ch.ToString(),
             (int number, IntLiteralNode calor) => calor.Value == number && !calor.IsLong && !calor.IsUnsigned,
+            (double number, FloatLiteralNode calor) => calor.Value.Equals(number) && !calor.IsDecimal && !calor.IsSingle,
             (bool flag, BoolLiteralNode calor) => calor.Value == flag,
             _ => false
         };
