@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Arithmetic on named refinement types (#1515).** A named refinement type is declared with
+  `§RTYPE`, for example `§RTYPE{r1:NatInt:i32} (>= # INT:0)`. Before this fix, the type checker
+  rejected arithmetic on such a value with `Calor0202`, because it did not unwrap `NatInt` to its
+  base type `i32`. Inline refinements (`§I{i32:x} | (>= # INT:0)`) already worked. Now operators
+  see a named refinement as its base type: `+ - * / %`, unary minus, comparisons, bitwise and
+  shift operators, logical operators on a `bool` refinement, and loop bounds. The result has the
+  **base** type, not the refinement, because `NatInt - NatInt` can be negative. The exception is
+  increment and decrement (`inc`, `dec`, `post-inc`, `post-dec`) of a variable: they keep the
+  refined type, because the write back into the variable is itself checked. Incrementing a
+  collection element or field gives the base type. Writing a result
+  back into a refined variable or return is still checked: you get the same verification
+  obligation and runtime guard as with an inline refinement. Binding a plain base value with
+  `§B{x:NatInt}` is still rejected by the type checker, as before.
+- **`decimal` arithmetic result type.** The type checker typed `decimal + decimal` as `i32`. It
+  now types it as `decimal`, as C# does. So `§B{x:i32} (+ a b)` with `decimal` operands is now a
+  type error (`Calor0202`) instead of a failure in the generated C#. A nested mix such as
+  `(+ (+ a b) f)` with an `f64` operand is now rejected like the direct `decimal + f64` case.
+  When the other operand is a type the checker does not model, such as a class with its own `+`
+  operator, the checker still leaves the result to the C# compiler.
+
 ## [0.24.0] - 2026-10-07
 
 Calor 0.24 is a soundness release. It repairs verifier defects found by a registered soundness

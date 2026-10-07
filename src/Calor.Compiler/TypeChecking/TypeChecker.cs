@@ -1445,7 +1445,20 @@ public sealed class TypeChecker
 
     private CalorType InferUnaryOperationType(UnaryOperationNode unary)
     {
-        var operandType = InferExpressionType(unary.Operand);
+        // A named refinement (§RTYPE) erases to its base type for operators, exactly as an inline
+        // refinement does (an inline-refined parameter is typed as its base). `-` and `~` yield
+        // the BASE type: a refinement does not survive arithmetic. #1515.
+        //
+        // Increment/decrement of a plain VARIABLE are the exception and keep its declared type.
+        // They write back into the refined variable, and that write is guarded (Subtype
+        // obligation + runtime check) before it commits, so the value they yield satisfies the
+        // refinement. Before #1515 they typed as the error type, so `§B{x:Nat} (inc a)` compiled;
+        // it still does. Any other operand (`§IDX` element, field, ...) has no mutation guard —
+        // both the emitter and ObligationGenerator only guard a ReferenceNode — so its result
+        // gets the base type like any other arithmetic.
+        var declaredOperandType = InferExpressionType(unary.Operand);
+        var operandType = EraseRefinement(declaredOperandType);
+        var incDecResultType = unary.Operand is ReferenceNode ? declaredOperandType : operandType;
         return unary.Operator switch
         {
             UnaryOperator.Not => PrimitiveType.Bool,
@@ -1453,7 +1466,7 @@ public sealed class TypeChecker
             UnaryOperator.BitwiseNot => operandType.Equals(PrimitiveType.Int) ? PrimitiveType.Int : ErrorType.Instance,
             UnaryOperator.PreIncrement or UnaryOperator.PreDecrement
                 or UnaryOperator.PostIncrement or UnaryOperator.PostDecrement
-                => IsNumericType(operandType) ? operandType : ErrorType.Instance,
+                => IsNumericType(operandType) ? incDecResultType : ErrorType.Instance,
             _ => ErrorType.Instance
         };
     }
@@ -4018,6 +4031,13 @@ public sealed class TypeChecker
         else
             rightType = InferExpressionType(binOp.Right);
 
+        // Operators see a named refinement (§RTYPE) as its base type, as they already see an
+        // inline-refined parameter. The result is the base type, never the refinement: `NatInt -
+        // NatInt` can be negative. Refinement checks on a result written back into a refined
+        // variable or return are the obligation engine's job and are unchanged. #1515.
+        leftType = EraseRefinement(leftType);
+        rightType = EraseRefinement(rightType);
+
         // Comparison operators return BOOL
         if (binOp.Operator is BinaryOperator.Equal or BinaryOperator.NotEqual
             or BinaryOperator.LessThan or BinaryOperator.LessOrEqual
@@ -4074,6 +4094,20 @@ public sealed class TypeChecker
         if (leftType.Equals(PrimitiveType.Float) || rightType.Equals(PrimitiveType.Float))
         {
             return PrimitiveType.Float;
+        }
+
+        // decimal op (decimal | integer | char) is decimal in C#. Falling through to Int typed
+        // `decimal + decimal` as i32, which let `§B{x:i32} (+ a b)` pass the checker (and fail in
+        // Roslyn) and let a nested `(+ (+ a b) someDouble)` dodge the decimal/float check above.
+        // Reached far more often once named decimal refinements stopped being rejected (#1515).
+        if (leftType.Equals(PrimitiveType.Decimal) || rightType.Equals(PrimitiveType.Decimal))
+        {
+            // Only when BOTH sides are modeled. Against an unmodeled operand (ErrorType) C# may
+            // pick a user-defined operator with any result type (`decimal + Box -> double`), so
+            // claiming decimal would invent a decimal/float conflict. Yield to Roslyn instead.
+            return leftType is ErrorType || rightType is ErrorType
+                ? ErrorType.Instance
+                : PrimitiveType.Decimal;
         }
 
         return PrimitiveType.Int;
@@ -4486,11 +4520,28 @@ public sealed class TypeChecker
     private static bool IsObliviousReferenceType(CalorType type)
         => type.Equals(PrimitiveType.String) || type.Equals(PrimitiveType.Object);
 
+    /// <summary>
+    /// Strips named-refinement wrappers (§RTYPE) down to the base type. Refinements erase at
+    /// runtime, so every operator and type-family test treats a refined value as its base. #1515.
+    /// </summary>
+    private static CalorType EraseRefinement(CalorType type)
+    {
+        while (type is RefinedType refined)
+            type = refined.BaseType;
+        return type;
+    }
+
     private static bool IsDefinitelyNotBool(CalorType type)
+        => IsDefinitelyNotBoolErased(EraseRefinement(type));
+
+    private static bool IsDefinitelyNotBoolErased(CalorType type)
         => !type.Equals(PrimitiveType.Bool) && type is not ErrorType && type is not ExternalType
             && type is not NeverType;
 
     private static bool IsNumeric(CalorType type)
+        => IsNumericErased(EraseRefinement(type));
+
+    private static bool IsNumericErased(CalorType type)
         => type.Equals(PrimitiveType.Int) || type.Equals(PrimitiveType.Float)
         || type.Equals(PrimitiveType.Char) || type.Equals(PrimitiveType.Decimal);
 
