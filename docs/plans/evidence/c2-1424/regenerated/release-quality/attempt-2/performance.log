@@ -1,0 +1,6 @@
+warmup run 1: 47.586s
+measured run 2: 49.945s
+measured run 3: 46.241s
+measured run 4: 47.110s
+median: 47.110s (maximum 24.000s)
+ERROR: performance median exceeded the ratcheted maximum

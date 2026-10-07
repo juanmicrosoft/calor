@@ -1,0 +1,317 @@
+{
+ "schema": "c2-1424/ledger/1",
+ "issue": 1424,
+ "candidate": "696ab82470626164979a07792ed74932ab88d9e6",
+ "contractVersion": "1.3.2",
+ "regeneration": {
+  "number": 1,
+  "of": 2,
+  "status": "INCOMPLETE (BLOCKED rows; see results.json)",
+  "countsAsRegeneration": "Counted as regeneration 1 of 2 (maintainer instruction). Reading of the contract: section 9 caps 'complete runs' at 2 and section 10 says 'within the regeneration ceilings'; a literal reading would not count an incomplete run, and the contract does not define the case. Counting it is the stricter reading, nothing in the contract forbids it, so the next regeneration is the last one allowed. Its 323 runner-minutes do not carry over: the 1,500-minute ceiling is per regeneration.",
+  "decision": "Maintainer decisions 2026-10-07 after this record: (1) 'Fix all 5, re-freeze, regenerate': fix PRs for the five causes, a second C1 freeze (which also registers the 62 new Verification tests), then a second and last C2 regeneration; (2) 'Store hashes only': the package binaries are not kept in git."
+ },
+ "accounting": "runnerMinutes: each job's completed_at - started_at rounded up, no OS multiplier (protocol.json budget.accounting), summed over every job GitHub listed, including jobs that never got a runner (GitHub gives them start and end times). runnerMinutesJobsWithARunner counts only jobs with a runner name.",
+ "ci": [
+  {
+   "runId": 37642265108,
+   "url": "https://github.com/juanmicrosoft/calor/actions/runs/37642265108",
+   "lane": "ci-determinism",
+   "what": "determinism-protocol.yml execution c2-1424-regen-1",
+   "event": "workflow_dispatch",
+   "headBranch": "c2-1424/candidate-696ab824",
+   "headSha": "696ab82470626164979a07792ed74932ab88d9e6",
+   "headShaIsCandidate": true,
+   "runAttempt": 1,
+   "createdAt": "2026-10-07T15:06:21Z",
+   "conclusion": "failure",
+   "outcome": "INFRASTRUCTURE-FAILURE: plan job succeeded (validator, history, budget accepted; matrix emitted) but its 10 attempt jobs were never listed by the API (never created or never acquired); the run concluded failure at 15:12:01Z. Cause not confirmed: it is consistent with the runner-acquisition failures of the concurrent test.yml run 37642277928 (annotation 'The job was not started because it repeatedly failed to be acquired (5 attempts)', ci/annotations-37642277928-tests-compiler.json) and the GitHub incident 'Incident with Git Operations, Pull Requests and Actions' opened 15:14:45Z, resolved 16:25:14Z (ci/githubstatus-incidents-2026-10-07.json), but the incident opened after this run ended. No attempt started, so under protocol.json workflow.deviations[2] this run 'is charged its minutes but is not an execution'; the candidate has not been executed under the protocol.",
+   "runnerMinutes": 2,
+   "runnerMinutesJobsWithARunner": 2,
+   "charge": "regeneration-compute (chargeRule c2-candidate-determinism-protocol); G3's plan step also counts it toward determinism-compute (G2 README deviation: the plan charges every dispatched run there)",
+   "jobCounts": {
+    "completed/success": 1
+   },
+   "record": "ci/run-37642265108.json",
+   "imagesObserved": [
+    "ubuntu-24.04 20260901.588"
+   ],
+   "dotnetObserved": []
+  },
+  {
+   "runId": 37642277928,
+   "url": "https://github.com/juanmicrosoft/calor/actions/runs/37642277928",
+   "lane": "ci-test",
+   "what": "test.yml workflow_dispatch, attempt 1",
+   "event": "workflow_dispatch",
+   "headBranch": "c2-1424/candidate-696ab824",
+   "headSha": "696ab82470626164979a07792ed74932ab88d9e6",
+   "headShaIsCandidate": true,
+   "runAttempt": 1,
+   "createdAt": "2026-10-07T15:06:27Z",
+   "conclusion": "failure",
+   "outcome": "PARTIAL / INFRASTRUCTURE-FAILURE: 17 jobs 'not started because it repeatedly failed to be acquired (5 attempts)'; 18 jobs succeeded (including test, calor-first-guard, quality-ratchets, tests (verification|semantics|conversion|enforcement|tasks|experimental|roundtrip-harness), verify-phase1, sdk-package-consumer (linux-x64)); roundtrip-verification and snapshot-diff-heuristic skipped by their conditions. No job failed on its own steps.",
+   "runnerMinutes": 136,
+   "runnerMinutesJobsWithARunner": 79,
+   "charge": "regeneration-compute",
+   "jobCounts": {
+    "completed/success": 18,
+    "completed/failure": 17,
+    "completed/skipped": 2
+   },
+   "record": "ci/run-37642277928.json",
+   "imagesObserved": [
+    "ubuntu-24.04 20260901.588",
+    "ubuntu-24.04 20261002.596"
+   ],
+   "dotnetObserved": [
+    "sdk 10.0.401 runtime 10.0.12"
+   ]
+  },
+  {
+   "runId": 37642281680,
+   "url": "https://github.com/juanmicrosoft/calor/actions/runs/37642281680",
+   "lane": "ci-tier2",
+   "what": "tier2.yml workflow_dispatch, attempt 1",
+   "event": "workflow_dispatch",
+   "headBranch": "c2-1424/candidate-696ab824",
+   "headSha": "696ab82470626164979a07792ed74932ab88d9e6",
+   "headShaIsCandidate": true,
+   "runAttempt": 1,
+   "createdAt": "2026-10-07T15:06:28Z",
+   "conclusion": "failure",
+   "outcome": "INFRASTRUCTURE-FAILURE: its one job was never acquired (outage). Nothing ran.",
+   "runnerMinutes": 3,
+   "runnerMinutesJobsWithARunner": 0,
+   "charge": "regeneration-compute",
+   "jobCounts": {
+    "completed/failure": 1
+   },
+   "record": "ci/run-37642281680.json",
+   "imagesObserved": [],
+   "dotnetObserved": []
+  },
+  {
+   "runId": 37644886479,
+   "url": "https://github.com/juanmicrosoft/calor/actions/runs/37644886479",
+   "lane": "ci-test",
+   "what": "test.yml workflow_dispatch, attempt 2 (new run after the outage; plan rule)",
+   "event": "workflow_dispatch",
+   "headBranch": "c2-1424/candidate-696ab824",
+   "headSha": "696ab82470626164979a07792ed74932ab88d9e6",
+   "headShaIsCandidate": true,
+   "runAttempt": 1,
+   "createdAt": "2026-10-07T15:33:39Z",
+   "conclusion": "success",
+   "outcome": "SUCCESS: every job succeeded except roundtrip-verification and snapshot-diff-heuristic, skipped by their own conditions (snapshot-diff-heuristic is pull_request-only; roundtrip-verification is gated on detect-changes has_non_docs_changes, which was false on this dispatch).",
+   "runnerMinutes": 175,
+   "runnerMinutesJobsWithARunner": 175,
+   "charge": "regeneration-compute",
+   "jobCounts": {
+    "completed/skipped": 2,
+    "completed/success": 35
+   },
+   "record": "ci/run-37644886479.json",
+   "imagesObserved": [
+    "macos-14-arm64 20260828.587",
+    "ubuntu-24.04 20260901.588",
+    "ubuntu-24.04 20261002.596",
+    "ubuntu-24.04-arm 20261002.596",
+    "windows-11-vs2026-arm64 20260901.588",
+    "windows-2025-vs2026 20260901.588"
+   ],
+   "dotnetObserved": [
+    "sdk 10.0.401 runtime 10.0.12"
+   ]
+  },
+  {
+   "runId": 37644891085,
+   "url": "https://github.com/juanmicrosoft/calor/actions/runs/37644891085",
+   "lane": "ci-tier2",
+   "what": "tier2.yml workflow_dispatch, attempt 2 (new run after the outage; plan rule)",
+   "event": "workflow_dispatch",
+   "headBranch": "c2-1424/candidate-696ab824",
+   "headSha": "696ab82470626164979a07792ed74932ab88d9e6",
+   "headShaIsCandidate": true,
+   "runAttempt": 1,
+   "createdAt": "2026-10-07T15:33:41Z",
+   "conclusion": "failure",
+   "outcome": "FAILURE BY DESIGN: fixture_compile_check 428 passed / 51 expected-negative / 30 known-failure, everything else 0; migrator checks OK; Tier 2 exits 1 because of the 30 known failures (G4 #1241: 'Tier 2 stays red until the 30 known failures are fixed').",
+   "runnerMinutes": 7,
+   "runnerMinutesJobsWithARunner": 7,
+   "charge": "regeneration-compute",
+   "jobCounts": {
+    "completed/failure": 1
+   },
+   "record": "ci/run-37644891085.json",
+   "imagesObserved": [
+    "ubuntu-24.04 20261002.596"
+   ],
+   "dotnetObserved": [
+    "sdk 10.0.401 runtime 10.0.12"
+   ]
+  }
+ ],
+ "totals": {
+  "regenerationComputeRunnerMinutes": 323,
+  "regenerationComputeRunnerMinutesJobsWithARunner": 263,
+  "ceiling": 1500,
+  "withinCeiling": true,
+  "determinismProtocolExecutionsQualifying": 0,
+  "determinismProtocolDispatches": 1
+ },
+ "observedNotCharged": [
+  {
+   "runId": 37629089909,
+   "url": "https://github.com/juanmicrosoft/calor/actions/runs/37629089909",
+   "what": "performance.yml nightly schedule on main, whose tip was the candidate at 13:30Z (not dispatched by C2; not charged)",
+   "headSha": "696ab82470626164979a07792ed74932ab88d9e6",
+   "headShaIsCandidate": true,
+   "conclusion": "failure",
+   "outcome": "FAILURE: Calor.Performance.Tests.VerificationPerformanceTests.Binding_MediumModule_Under500ms failed in warmup run 1 ('performance test run failed'); the same failure class stopped the v0.22.0 publish (contract section 2 B1 row).",
+   "runnerMinutes": 3,
+   "record": "ci/observed-not-charged/run-37629089909.json"
+  },
+  {
+   "runId": 37624076834,
+   "url": "https://github.com/juanmicrosoft/calor/actions/runs/37624076834",
+   "what": "test.yml push run of the candidate merge (pre-C1; recorded by C1 as the environment observation; not dispatched by C2; not charged)",
+   "headSha": "696ab82470626164979a07792ed74932ab88d9e6",
+   "headShaIsCandidate": true,
+   "conclusion": "success",
+   "runnerMinutes": 164
+  }
+ ],
+ "localEnvironment": {
+  "machine": "Apple M4 Max, 14 logical CPUs, 36 GiB, macOS 27.0.1 (26A434) arm64",
+  "dotnet": "SDK 10.0.401 (commit e34a38d2ae), runtime 10.0.12, MSBuild 18.9.11 (Homebrew)",
+  "dotnetForRoundTrip": "private root from dotnet-install.sh (sha256 082f7685...): SDK 10.0.401 + Microsoft.NETCore.App 8.0.31 + 10.0.12",
+  "node": "v20.20.2 (nodejs.org darwin-arm64 tarball, sha256 466e05f3...), npm 10.8.2, for the website build (nextjs-gh-pages.yml uses Node 20)",
+  "python": "3.14.8 (Homebrew) for every script",
+  "git": "2.54.0 (Apple Git-157)",
+  "isolation": "NUGET_PACKAGES, DOTNET_CLI_HOME, NuGet HTTP/plugin caches, and npm cache under the C2 scratch directory; test hosts got HOME/USERPROFILE under scratch through a runsettings file (RunSettingsFilePath) for release-quality attempt 2 and the Ids/Performance runs. The shell HOME was not redirected (the agent's worktree guard refuses a HOME redirect); the earlier local test runs therefore ran with the real HOME. No file under ~/.calor changed during C2 (checked by mtime after each lane).",
+  "load": "Other agent sessions ran builds and tests on the same machine (load average 6-16 during release-quality); wall-clock gates are not comparable to CI."
+ },
+ "local": [
+  {
+   "id": "L1",
+   "where": "C2 agent worktree, detached at the candidate",
+   "startedUtc": "2026-10-07T15:08:00Z",
+   "what": "download-z3.sh; dotnet restore --locked-mode; dotnet build -c Release",
+   "outcome": "all exit 0; every Z3 archive [verified] against scripts/z3-upstream-4.15.7.sha256",
+   "logs": "regenerated/pins/"
+  },
+  {
+   "id": "L2",
+   "where": "worktree",
+   "what": "B1 validator (58 tests), B1 registered generator (pair-metrics x2, pair-results), B2 gate",
+   "outcome": "validator 58 passed; generator outputs byte-identical to docs/plans/evidence/b1-1276/results; B2 gate REFUSED (B2-08)",
+   "logs": "regenerated/benchmark/"
+  },
+  {
+   "id": "L3",
+   "where": "worktree",
+   "what": "verifier-runtime differential regeneration (update mode) and check; ModeledFormsTests; EvidenceContractTests; LedgerCommitStampTests",
+   "outcome": "all passed; regenerated reports byte-identical to the committed ones (git status clean)",
+   "logs": "regenerated/tests/"
+  },
+  {
+   "id": "L4",
+   "where": "worktree + scratch",
+   "what": "gh release download z3-binaries-4.15.7; verify against .github/z3-binaries-4.15.7.sha256",
+   "outcome": "7 of 7 assets MATCH",
+   "logs": "regenerated/pins/z3-release-binaries.json"
+  },
+  {
+   "id": "L5",
+   "where": "worktree",
+   "what": "git submodule update --init",
+   "outcome": "gitlinks equal the candidate's (MediatR fb309026, serilog 0597ddfb, FluentValidation 71b3c60c)",
+   "logs": "regenerated/pins/submodule-status-fresh-clone.txt"
+  },
+  {
+   "id": "L6",
+   "where": "worktree",
+   "what": "candidate packages pack 1 and pack 2; release metadata; release notes",
+   "outcome": "packs succeed and pass check-packaged-z3.py --all-rids; see results.json candidate-packages",
+   "logs": "publication/"
+  },
+  {
+   "id": "L7",
+   "where": "worktree",
+   "what": "website build 1 and 2 (Node 20, npm ci, npm run build)",
+   "outcome": "both exit 0; trees differ (Next.js build id)",
+   "logs": "publication/"
+  },
+  {
+   "id": "L8",
+   "where": "fresh clone at the candidate",
+   "what": "fresh-clone reproduction (fresh-clone/fresh.log)",
+   "outcome": "every step exit 0; see fresh-clone/comparison.json",
+   "logs": "fresh-clone/"
+  },
+  {
+   "id": "L9",
+   "where": "worktree",
+   "what": "release-quality attempt 1 (publish-nuget.yml release-quality steps)",
+   "outcome": "ABORTED, no verdict: the first three steps passed; during the coverage step (15:39Z) the agent worktree directory was removed by the agent harness, not by the run, and the run was stopped. Its step record is kept.",
+   "logs": "regenerated/release-quality/attempt-1-aborted/"
+  },
+  {
+   "id": "L10",
+   "where": "fresh clone at the candidate (the worktree no longer existed)",
+   "what": "release-quality attempt 2, every step in order",
+   "outcome": "self-tests, test quality, coverage, mutation, flake (100 of 100 passed) exit 0; performance gate exit 1 (median 47.110 s > maximum 24.000 s on this loaded Mac); round-trip exit 1 (no .NET 8 runtime on the machine: corpus test projects target net8.0, TRX 'missing Results'); scorecard exit 0",
+   "logs": "regenerated/release-quality/attempt-2/"
+  },
+  {
+   "id": "L11",
+   "where": "fresh clone",
+   "what": "round-trip step again with the job's environment (private dotnet root with the .NET 8 runtime, as release-quality installs 8.0.x)",
+   "outcome": "exit 0: Synthetic, Synthetic2, MediatR, Serilog, FluentValidation all Pass; roundtrip_delta.py: no regressions vs eng/roundtrip-baselines.json",
+   "logs": "regenerated/roundtrip-net8/"
+  },
+  {
+   "id": "L12",
+   "where": "fresh clone",
+   "what": "python3 scripts/verify_corpus.py --report (tier2.yml step)",
+   "outcome": "FAIL by design: 428 / 51 / 30, all else 0",
+   "logs": "regenerated/tier2/"
+  },
+  {
+   "id": "L13",
+   "where": "fresh clone",
+   "what": "Calor.Ids.Tests and Calor.Performance.Tests (release-critical; not in test.yml's matrix)",
+   "outcome": "394 passed; 25 passed",
+   "logs": "regenerated/tests/fresh-*"
+  }
+ ],
+ "deviations": [
+  "The plan (plan.json) was written at 15:30Z, after the first dispatches and local runs, not first.",
+  "test.yml and tier2.yml were dispatched a second time (15:33Z), after githubstatus reported Actions operational (15:32:30Z), because jobs of their first runs were never acquired ('repeatedly failed to be acquired'). Both runs of each lane are recorded; neither replaces the other. GitHub's job re-run was not used.",
+  "The determinism protocol was not dispatched again: the registered case registry does not match the candidate (blocked row DETERMINISM-REGISTRY-DRIFT).",
+  "Release-quality attempt 1 was cut by the removal of the agent worktree; attempt 2 ran in the fresh clone. The round-trip step was run a second time with a .NET 8 runtime, which the release-quality job installs and the machine lacked; both results are recorded.",
+  "The shell HOME was not redirected (see localEnvironment.isolation).",
+  "test.yml's roundtrip-verification job was skipped on both dispatches by its own condition; the round-trip evidence is local (L11).",
+  "Durable retention: every attempt's outputs are retained, including raw coverage XML (files over about 1 MB on the orphan branch evidence/v0.24-archives, indexed by archives.json), except the two candidate .nupkg files: per the maintainer decision 'Store hashes only' only their SHA-256, sizes, entry hashes, and producing commands are kept (publication/candidate-packages.json, publication/40-pack-1.log, 41-pack-2.log).",
+  "No CI lane exists for the release-quality job without reaching publish-nuget.yml's adjudication gate, so it ran locally on macOS, not on ubuntu-latest."
+ ],
+ "g3Execution2": {
+  "source": "branch evidence/g3-1135-exec-2 tip f2d02af6a238d4a9a4159151b45f5b60027d472e",
+  "committedUnder": "g3-exec-2/",
+  "runId": 37213336898,
+  "commit": "d42d031352f2d8d5c1df56fffc19d901186bb94d",
+  "verdict": "DETERMINISTIC",
+  "runnerMinutes": 401,
+  "resultSha256": "06460f2959e278219b0c71b4c0d000c11b938c2dc50d936667db92a9e2e3fba9",
+  "attemptRecordsSha256": "6ccd38c9d8934a06f832b2f0dcc619fe3134b9b4c16e4666c84482519167c1d1",
+  "matchesC1Manifest": true,
+  "note": "Committed here because the C1 classifier exempts only new data files under c2-1424/ (and adjudication-1408/); a new file under g3-1135/ would invalidate the candidate. docs/plans/evidence/g3-1135/ledger.json therefore still lacks this entry; this ledger records it. Execution 2 ran before the S2 repairs and establishes nothing for the candidate."
+ },
+ "temporaryBranch": {
+  "name": "c2-1424/candidate-696ab824",
+  "pointsAt": "696ab82470626164979a07792ed74932ab88d9e6",
+  "purpose": "workflow_dispatch ref that resolves to the candidate (main had moved to the C1 landing). No workflow triggers on a push to it. Delete after A1."
+ },
+ "published": "nothing: no package push, tag, release, release-asset upload, Pages deploy, or publication PR; publish-nuget.yml, nextjs-gh-pages.yml, benchmark.yml, verify-release.yml were never dispatched",
+ "archivedFilesNote": "Files over about 1 MB (14 files, 119,726,710 bytes: the large .tar.gz archives, four CI job logs, two TRX files) are not on main. They live on the orphan branch evidence/v0.24-archives, commit 63e6a4a0a3f1d684f134035780aeaa7e463da469, at the same paths; archives.json maps each path to its SHA-256 and size (maintainer decision 2026-10-08)."
+}
