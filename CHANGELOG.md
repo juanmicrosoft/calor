@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- **Name binding no longer slows down quadratically on large modules.** Since 0.22.0, the
+- **Name binding no longer copies module-wide tables at every loop.** Since 0.22.0, the
   binder made two kinds of module-wide copies. Before each loop, it copied the whole symbol table
   and its declaration counters so it could undo a trial pass over the loop body. At each loop,
   branch, and lambda, it copied the callable-state map (which tracks what each stored lambda may
