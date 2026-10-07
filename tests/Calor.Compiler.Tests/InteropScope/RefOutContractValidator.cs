@@ -36,7 +36,7 @@ internal static class RefOutContractValidator
     /// <summary>Operand and call shapes that must each have at least one registered case.</summary>
     public static readonly string[] RequiredShapes =
     [
-        "alias-narrowing", "aliased-parameter", "array-element", "bare-field", "computed-expression", "constructor-argument",
+        "alias-narrowing", "aliased-parameter", "array-element", "getter-alias", "bare-field", "computed-expression", "constructor-argument",
         "delegate-by-ref", "discard", "discard-collision", "expression-call", "flow-attribute", "generic-type-payload", "immutable-binding",
         "conditional-ref", "heap-alias-narrowing", "in-argument", "in-array-element", "in-extension", "in-omitted", "in-parameter", "indexer-argument", "literal", "local", "loop-condition", "loop-variable",
         "method-generic", "missing-modifier", "modifier-text", "named-argument", "narrowing", "nullable-annotation",
@@ -58,6 +58,7 @@ internal static class RefOutContractValidator
     private static readonly Regex CaseId = new(@"^D1-[A-Z0-9]+-\d{2}$", RegexOptions.Compiled);
     private static readonly Regex CalorCode = new(@"^Calor\d{4}$", RegexOptions.Compiled);
     private static readonly Regex SemVer = new(@"^\d+\.\d+\.\d+$", RegexOptions.Compiled);
+    private static readonly Regex FullSha = new("^[0-9a-f]{40}$", RegexOptions.Compiled);
 
     /// <summary>The compiler's own constant for a diagnostic symbol (DiagnosticCode.&lt;symbol&gt;), or null.</summary>
     public static string? CompilerConstant(string symbol)
@@ -84,6 +85,9 @@ internal static class RefOutContractValidator
         if (Int(contract["issue"]) != 1427 || Int(contract["epic"]) != 1425 || Int(contract["consumer"]) != 943)
             Fail("D001", "issue", "contract must be #1427 under epic #1425, consumed by #943");
         if (doc == null) Fail("D001", "document", "contract document missing");
+        if (Str(contract["measuredAt"]?["commit"]) is not { } mc || !FullSha.IsMatch(mc) || mc.All(ch => ch == '0')
+            || Str(contract["measuredAt"]?["srcTree"]) is not { } mt || !FullSha.IsMatch(mt) || mt.All(ch => ch == '0'))
+            Fail("D001", "measuredAt", "measured commit and src tree must be full SHAs (sealed)");
         var consumes = Arr(contract["consumes"]).ToDictionary(c => Str(c?["id"]) ?? "", c => c!);
         if (!consumes.TryGetValue("nullability-0.22", out var nullability)
             || Str(nullability["revision"]) != NullabilityRevision || Str(nullability["blob"]) != NullabilityBlob
@@ -302,7 +306,7 @@ internal static class RefOutContractValidator
     }
 
     /// <summary>
-    /// SHA-256 over everything the contract freezes: rules, preludes, required shapes, diagnostics (without
+    /// SHA-256 over everything the contract freezes: measured identity, consumed revisions, rules, preludes, required shapes, diagnostics (without
     /// the allocated code) and every case field except `observed` and `status`, which #943 updates as
     /// behavior changes. Sources, mutants, expectations and notes are all sealed. The tests pin it.
     /// </summary>
@@ -310,6 +314,8 @@ internal static class RefOutContractValidator
     {
         var frozen = new JsonObject
         {
+            ["measuredAt"] = contract["measuredAt"]?.DeepClone(),
+            ["consumes"] = contract["consumes"]?.DeepClone(),
             ["rules"] = contract["rules"]?.DeepClone(),
             ["preludes"] = contract["preludes"]?.DeepClone(),
             ["requiredShapes"] = contract["requiredShapes"]?.DeepClone(),

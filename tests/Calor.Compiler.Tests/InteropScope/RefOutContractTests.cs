@@ -20,7 +20,7 @@ namespace Calor.Compiler.Tests.InteropScope;
 public class RefOutContractTests
 {
     /// <summary>SHA-256 over the 1.0.0 rules and case denominator. Changing either needs an amendment and a new pin.</summary>
-    private const string FrozenSeal = "db179d92b32a41b33248fb45480288b69fe1863bce43e51fd65afb90a1308839";
+    private const string FrozenSeal = "146848a800d9d85bf2874dde41a867c0883c11d609cd6e76f71bb7852c539820";
 
     [Fact]
     public void CommittedContractPasses()
@@ -137,6 +137,7 @@ public class RefOutContractTests
         ["status disagrees with observation"] = ("D008", c => Case(c, "D1-EFF-01")["status"] = "holds"),
         ["version without amendment"] = ("D009", c => c["contractVersion"] = "1.1.0"),
         ["independence claim"] = ("D010", c => Case(c, "D1-LV-01")["note"] = "Independently reviewed."),
+        ["measured identity zeroed"] = ("D001", c => c["measuredAt"]!["commit"] = new string('0', 40)),
         ["allocated code outside the range"] = ("D007", c => c["diagnostics"]![0]!["code"] = "Calor0999"),
         ["proof observation removed"] = ("D003", c =>
         {
@@ -202,7 +203,7 @@ public class RefOutContractCaseTests
             // RO-ANA-4: the same body passing `§A y` by value first, into the same cache directory.
             var warmOptions = Options();
             var warmSource = string.Join("\n", warm.Select(l => l!.GetValue<string>()).Prepend(Prelude(contract, c))) + "\n";
-            Assert.False(Program.Compile(warmSource, id + ".warmup.calr", warmOptions).HasErrors);
+            Assert.False(Program.Compile(warmSource, id + ".calr", warmOptions).HasErrors); // same file identity as the case
             Assert.Equal(ObligationStatus.Discharged,
                 Assert.Single(warmOptions.ObligationResults!.Obligations, o => o.Kind == ObligationKind.ProofObligation).Status);
         }
