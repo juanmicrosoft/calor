@@ -1030,13 +1030,13 @@ public static class WebsiteExampleChecker
 
     // A fence opener: optional indentation, then three or more backticks or tildes.
     private static readonly Regex FenceOpen = new(
-        @"^(?<ws>[ \t]*)(?<fence>`{3,}|~{3,})(?<info>[^`]*)$", RegexOptions.Compiled);
+        @"^(?<ws>[ \t]*)(?:(?<fence>`{3,})(?<info>[^`]*)|(?<fence>~{3,})(?<info>.*))$", RegexOptions.Compiled);
 
     // A fence opened on a list-item or blockquote line. CommonMark ends such a fence when its
     // container ends (possibly implicitly), which a line scanner cannot follow, so the website
     // convention forbids it and the check rejects it rather than guessing.
     private static readonly Regex FenceInContainer = new(
-        @"^[ \t]*(?:>|[-*+][ \t]|\d{1,9}[.)][ \t])[ \t>]*(?:[-*+][ \t]|\d{1,9}[.)][ \t])?[ \t>]*(?:`{3,}|~{3,})", RegexOptions.Compiled);
+        @"^[ \t]*(?:(?:>|[-*+]|\d{1,9}[.)])[ \t]*)+(?:`{3,}|~{3,})", RegexOptions.Compiled);
 
     /// <summary>A fenced block of an MDX page.</summary>
     public sealed record Fence(
@@ -1115,7 +1115,7 @@ public static class WebsiteExampleChecker
             }
             if (dedented || close >= lines.Length)
                 rejectedLines?.Add(i + 1);
-            fences.Add(new Fence(info.Length > 0 ? info[0] : "", info.Skip(1).ToList(), body, i + 1,
+            fences.Add(new Fence(info.Length > 0 ? info[0].ToLowerInvariant() : "", info.Skip(1).ToList(), body, i + 1,
                 Math.Min(close, lines.Length - 1) + 1));
             i = close;
         }
@@ -1153,7 +1153,7 @@ public static class WebsiteExampleChecker
         return diagnostics;
     }
 
-    private sealed record Unit(List<Fence> Members, Dictionary<Fence, List<Diagnostic>> Actual);
+    private sealed record Unit(List<Fence> Members, Dictionary<Fence, List<Diagnostic>> Actual, HashSet<Fence> FailedFiles);
 
     private static void CheckPage(DocFile page, List<Diagnostic> diagnostics, Coverage coverage)
     {
@@ -1186,20 +1186,24 @@ public static class WebsiteExampleChecker
             .GroupBy(x => x.Group, StringComparer.Ordinal)
             .Select(g => g.Select(x => x.Fence).ToList()))
         {
-            var unit = new Unit(members, Compile(page, members, diagnostics));
+            var (compiled, failedFiles) = Compile(page, members, diagnostics);
+            var unit = new Unit(members, compiled, failedFiles);
             foreach (var member in members)
                 units[member].Add(unit);
 
-            // A member that fails to compile can stop generated-C# validation for the whole
-            // group, which would hide errors in the others. Compile every member that reported
-            // no error again without the failing ones (warning-only negatives stay, so their
-            // dependants still resolve); none of them may report an error.
-            var clean = members.Where(m => unit.Actual.TryGetValue(m, out var a) && !a.Any(d => d.IsError)).ToList();
-            if (clean.Count > 0 && clean.Count < members.Count)
+            // A file that fails its own compile (no generated C#) stops generated-C# validation
+            // for the whole group, which would hide errors in the others. Compile every other
+            // member again without the failed files (members with only cross-module or
+            // warning findings stay, so dependants still resolve). The retry must not reveal
+            // any error code that the member did not already report.
+            var rest = members.Where(m => !unit.FailedFiles.Contains(m)).ToList();
+            if (rest.Count > 0 && rest.Count < members.Count)
             {
-                foreach (var (member, actual) in Compile(page, clean, diagnostics))
+                foreach (var (member, actual) in Compile(page, rest, diagnostics).Actual)
                 {
-                    foreach (var error in actual.Where(d => d.IsError))
+                    var known = unit.Actual.GetValueOrDefault(member)?.Where(d => d.IsError).Select(d => d.Code)
+                        .ToHashSet(StringComparer.Ordinal) ?? [];
+                    foreach (var error in actual.Where(d => d.IsError && !known.Contains(d.Code)))
                         diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteExampleMismatch,
                             $"Complete calor example does not compile once its group's failing examples are removed (a failing file can stop generated-C# validation for the whole group): {error.Code}: {error.Message}",
                             page.Path, member.FirstContentLine + Math.Max(error.Span.Line - 1, 0)));
@@ -1236,7 +1240,8 @@ public static class WebsiteExampleChecker
                 coverage.IllustrativeOutputs++;
             }
             else if ((OutputLanguages.Contains(fence.Language) && OutputShaped.IsMatch(string.Join("\n", fence.Lines)))
-                || (fence.Language == "json" && OutputShapedJson.IsMatch(string.Join("\n", fence.Lines))))
+                || ((fence.Language == "json" || OutputLanguages.Contains(fence.Language))
+                    && OutputShapedJson.IsMatch(string.Join("\n", fence.Lines))))
             {
                 diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteOutputMismatch,
                     "Fence looks like tool output but is labelled neither `output` (checked against the preceding " +
@@ -1355,9 +1360,11 @@ public static class WebsiteExampleChecker
     /// Compiles the members exactly as <c>calor --input m1.calr [--input m2.calr ...]</c> does
     /// with default options, and returns each member's error and warning diagnostics.
     /// </summary>
-    private static Dictionary<Fence, List<Diagnostic>> Compile(DocFile page, List<Fence> members, List<Diagnostic> diagnostics)
+    private static (Dictionary<Fence, List<Diagnostic>> Actual, HashSet<Fence> FailedFiles) Compile(
+        DocFile page, List<Fence> members, List<Diagnostic> diagnostics)
     {
         var result = new Dictionary<Fence, List<Diagnostic>>();
+        var failed = new HashSet<Fence>();
         var directory = Path.Combine(Path.GetTempPath(), "calor-website-check-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try
@@ -1381,7 +1388,14 @@ public static class WebsiteExampleChecker
                 },
                 crossModuleEnforcement: true,
                 crossModulePolicy: UnknownCallPolicy.Strict,
-                diagnosticSink: sink);
+                diagnosticSink: sink,
+                // Per-file outcome, before generated-C# validation and the cross-module pass:
+                // a file failing here produces no C#, which can mask the others' validation.
+                onFileResult: (file, compiled) =>
+                {
+                    if (compiled.HasErrors)
+                        failed.Add(members[files.FindIndex(f => f.FullName == file.FullName)]);
+                });
 
             foreach (var member in members)
                 result[member] = [];
@@ -1403,7 +1417,7 @@ public static class WebsiteExampleChecker
         {
             try { Directory.Delete(directory, recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
-        return result;
+        return (result, failed);
     }
 
     /// <summary>

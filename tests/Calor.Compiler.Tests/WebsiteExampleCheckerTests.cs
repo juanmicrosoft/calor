@@ -259,6 +259,8 @@ public sealed class WebsiteExampleCheckerTests
     [InlineData("> ~~~text\n> hello\n\n```calor\n§M{m1:A}\n```\n")]
     [InlineData("- item\n\n  ```calor\n§M{m001:Broken}\n  ```\n")]
     [InlineData("```calor\n§M{m1:A}\n")]
+    [InlineData("- - - ```calor\n      §M{m1:A}\n      ```\n")]
+    [InlineData("~~~calor `x`\n§M{m1:A}\n")]
     public void ContainerDependentOrUnclosedFence_IsRejected(string page)
     {
         // Their extent depends on a list or blockquote container (review round 2, findings 1-2).
@@ -274,6 +276,49 @@ public sealed class WebsiteExampleCheckerTests
     {
         Assert.Contains(Check("Calor0200 Calor0201\n\n" + opener + UndefinedVariable + "\n```\n"),
             f => f.Code == DiagnosticCode.DocDriftWebsiteAnnotation && f.Message.Contains("repeated"));
+    }
+
+    [Fact]
+    public void TildeFenceWithBackticksInItsInfoStringIsChecked()
+    {
+        Assert.Contains(Check("~~~calor `title`\n" + UndefinedVariable + "\n~~~\n"),
+            f => f.Code == DiagnosticCode.DocDriftWebsiteAnnotation || f.Code == DiagnosticCode.DocDriftWebsiteExampleMismatch);
+    }
+
+    [Fact]
+    public void CrossModuleNegativeCannotHideItsOwnGeneratedCSharpErrors()
+    {
+        // Review round 3: Handler's only errors come from the cross-module pass, so it produced
+        // C#, but the lexer-failing Broken file stopped that C# from being validated.
+        const string page = """
+            ```calor group=g
+            §M{m001:OrderService}
+              §F{f001:SaveOrder:pub}
+                §O{void}
+                §E{db:w}
+            ```
+
+            Handler fails with Calor0410 and warns with Calor0417.
+
+            ```calor group=g expect=Calor0410,Calor0417
+            §M{m002:Handler}
+              §F{f001:HandleRequest:pub}
+                §O{void}
+                §C{SaveOrder} §/C
+              §F{f002:Flush:pub} () -> void
+                §E{db:w}
+                §C{DbContext.SaveChanges} §/C
+            ```
+
+            Broken fails with Calor0002.
+
+            ```calor group=g expect=Calor0002
+            §M{m003:Broken}
+              §F{f001:Run:pub} () -> void
+                §P "unterminated
+            ```
+            """;
+        Assert.Contains(Check(page), f => f.Message.Contains("Calor1002"));
     }
 
     [Fact]
@@ -374,6 +419,9 @@ public sealed class WebsiteExampleCheckerTests
         // Compact JSON is detected too (review round 2, finding 4).
         Assert.Equal(DiagnosticCode.DocDriftWebsiteOutputMismatch,
             Assert.Single(Check("```json\n{\"success\":false,\"diagnostics\":[]}\n```\n")).Code);
+        // Language case and bare fences do not hide a response.
+        Assert.Single(Check("```JSON\n{\"success\":false}\n```\n"));
+        Assert.Single(Check("```\n{\"success\":false}\n```\n"));
         // Configuration files are not output.
         Assert.Empty(Check("```json\n{\n  \"sdk\": { \"version\": \"10.0.100\" }\n}\n```\n"));
     }
