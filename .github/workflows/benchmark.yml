@@ -298,7 +298,7 @@ jobs:
       # #1410: runs only after the #1422 refusal gate above passed (a refusal fails the job and
       # skips this step), and only on a dispatch that carried a verified identity. Push runs
       # never publish. The publication branch is built here from the candidate and pushed as is.
-      # (create-pull-request would re-apply the changes onto main after the check, so the
+      # (the peter-evans PR action would re-apply the changes onto main after the check, so the
       # pushed bytes could differ from the verified ones.) The work tree is verified
       # immediately before the commit: the changed files must be exactly the two #1422 outputs
       # (headline and stamp index), each with the adjudicated hash, and the commit records
