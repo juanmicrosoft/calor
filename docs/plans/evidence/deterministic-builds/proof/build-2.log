@@ -1,0 +1,254 @@
+Z3 Library Downloader
+=====================
+Version: 4.15.7
+
+[Managed] Downloading Microsoft.Z3.dll...
+  [verified] z3-4.15.7-x64-glibc-2.39.zip
+[Managed] Done.
+[osx-arm64] Downloading...
+  [verified] z3-4.15.7-arm64-osx-15.7.3.zip
+[osx-arm64] Done.
+[win-arm64] Downloading...
+  [verified] z3-4.15.7-arm64-win.zip
+[win-arm64] Done.
+[win-x64] Downloading...
+  [verified] z3-4.15.7-x64-win.zip
+[win-x64] Done.
+[win-x86] Downloading...
+  [verified] z3-4.15.7-x86-win.zip
+[win-x86] Done.
+[linux-arm64] Downloading...
+  [verified] z3-4.15.7-arm64-glibc-2.38.zip
+[linux-arm64] Done.
+[linux-x64] Downloading...
+  [verified] z3-4.15.7-x64-glibc-2.39.zip
+[linux-x64] Done.
+Verified Z3 managed and native assets against committed size/hash pins.
+
+Z3 libraries ready.
+  Managed: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/scripts/../z3/Microsoft.Z3.dll
+  Natives: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/scripts/../runtimes/*/native/
+Verified Z3 managed and native assets against committed size/hash pins.
+  Determining projects to restore...
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Runtime/Calor.Runtime.csproj (in 37 ms).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/Calor.Compiler.csproj (in 2.25 sec).
+  Calor.Runtime -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Calor.Compiler -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/bin/Release/net10.0/calor.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.83
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Calor.Compiler -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/bin/Release/net10.0/publish/
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Successfully created package '/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/build-2/out/nupkg/calor.0.24.0.nupkg'.
+  Determining projects to restore...
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Sdk/Calor.Sdk.csproj (in 37 ms).
+  Restored /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Tasks/Calor.Tasks.csproj (in 613 ms).
+  2 of 4 projects are up-to-date for restore.
+  Calor.Runtime -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Calor.Compiler -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/bin/Release/net10.0/calor.dll
+  Calor.Tasks -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll
+  Calor.Sdk -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Sdk/bin/Release/net10.0/Calor.Sdk.dll
+  Calor.Runtime -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Calor.Compiler -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Compiler/bin/Release/net10.0/calor.dll
+  Calor.Tasks -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll
+  Calor.Tasks -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/second-build/nested/elsewhere/calor-clone/src/Calor.Sdk/obj/sdk-tasks-publish/
+  Calor.Sdk pack: staged 25 files into tasks/net10.0
+  Successfully created package '/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/det/final/build-2/out/nupkg/Calor.Sdk.0.24.0.nupkg'.
+OK: Z3 assets in calor.0.24.0.nupkg match the committed pins.
+OK: Z3 assets in Calor.Sdk.0.24.0.nupkg match the committed pins.
+Generated release metadata for 2 artifact(s) and 380 package(s).
+
+added 285 packages in 2s
+npm warn install-scripts 1 package has install scripts not yet covered by allowScripts:
+npm warn install-scripts   fsevents@2.3.3 (install: (install scripts present))
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+npm notice
+npm notice New major version of npm available! 11.19.1 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice
+
+> calor-website@0.24.0 build
+> next build
+
+  ▲ Next.js 14.2.35
+
+   Creating an optimized production build ...
+Browserslist: browsers data (caniuse-lite) is 9 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+Browserslist: caniuse-lite is outdated. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+ ⚠ Compiled with warnings
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'method' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'corpus' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'sourceCommit' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'sourceDeclaredVersion' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'transpilationChecks' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'syntaxPatternScripts' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'contractVerificationTasks' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'behavioralExecutionTasks' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentRefactoringCard.tsx
+Should not import the named export 'agentRefactoring'.'method' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentRefactoringCard.tsx
+
+./src/components/benchmarks/AgentRefactoringCard.tsx
+Should not import the named export 'agentRefactoring'.'corpus' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentRefactoringCard.tsx
+
+./src/components/benchmarks/AgentRefactoringCard.tsx
+Should not import the named export 'agentRefactoring'.'sourceDeclaredVersion' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentRefactoringCard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'method' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'corpus' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'sourceCommit' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'sourceDeclaredVersion' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'transpilationChecks' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'syntaxPatternScripts' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'contractVerificationTasks' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+Should not import the named export 'agentTasks'.'behavioralExecutionTasks' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentBenchmarkDashboard.tsx
+
+./src/components/benchmarks/AgentRefactoringCard.tsx
+Should not import the named export 'agentRefactoring'.'method' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentRefactoringCard.tsx
+
+./src/components/benchmarks/AgentRefactoringCard.tsx
+Should not import the named export 'agentRefactoring'.'corpus' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentRefactoringCard.tsx
+
+./src/components/benchmarks/AgentRefactoringCard.tsx
+Should not import the named export 'agentRefactoring'.'sourceDeclaredVersion' (imported as 'provenance') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/components/benchmarks/AgentRefactoringCard.tsx
+
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/105) ...
+   Generating static pages (26/105) 
+   Generating static pages (52/105) 
+   Generating static pages (78/105) 
+ ✓ Generating static pages (105/105)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size     First Load JS
+┌ ○ /                                       5.85 kB         127 kB
+├ ○ /_not-found                             876 B          88.3 kB
+├ ● /docs/[[...slug]]                       12.1 kB         128 kB
+├   ├ /docs
+├   ├ /docs/benchmarking/agent-tasks
+├   ├ /docs/benchmarking/effect-rows-study
+├   └ [+94 more paths]
+├ ○ /robots.txt                             0 B                0 B
+├ ○ /search-index.json                      0 B                0 B
+└ ○ /sitemap.xml                            0 B                0 B
++ First Load JS shared by all               87.4 kB
+  ├ chunks/117-531fcaea7756ac14.js          31.8 kB
+  ├ chunks/fd9d1056-8e5c1cc36a160d8c.js     53.7 kB
+  └ other shared chunks (total)             1.94 kB
+
+
+○  (Static)  prerendered as static content
+●  (SSG)     prerendered as static HTML (uses getStaticProps)
+
