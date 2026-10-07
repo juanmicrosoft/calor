@@ -512,6 +512,19 @@ class GateTests(unittest.TestCase):
         self._candidate_then_main_moves({gate.STAMP_INDEX: json.dumps(index) + "\n"})
         self.assertIn("entries of", self.assertRefused("B2-07"))
 
+    def test_an_input_replaced_by_a_symlink_with_the_same_bytes_is_refused(self) -> None:
+        """Review round 2: the blob id is unchanged, only the tree-entry mode (100644 -> 120000) differs."""
+        candidate = self.f.git("rev-parse", "HEAD")
+        seal = self.f.root / gate.CONTRACT_SEAL
+        content = seal.read_text(encoding="utf-8")
+        blob_id = self.f.git("rev-parse", f"HEAD:{gate.CONTRACT_SEAL}")
+        seal.unlink()
+        os.symlink(content, seal)
+        self.f.commit_and_push("same bytes, now a symlink")
+        self.assertEqual(blob_id, self.f.git("rev-parse", f"origin/main:{gate.CONTRACT_SEAL}"))
+        self.f.git("checkout", "-q", "--detach", candidate)
+        self.assertIn(f"  B2-08 {gate.CONTRACT_SEAL} at HEAD differs", self.assertRefused("B2-08"))
+
     def test_a_duplicate_headline_stamp_entry_on_main_is_refused(self) -> None:
         """Review round 1, finding 2: a second headline entry appended on main is a change."""
         code, text = self.f.check()

@@ -365,10 +365,15 @@ def input_paths(root: Path) -> list:
 def check_inputs_fresh(root: Path, findings: list) -> None:
     """B2-08 freshness: main changed no headline input since the candidate (HEAD).
 
-    Git object ids are compared, so a file or directory counts as changed if any byte, mode, or
-    entry differs, and an input missing on one side differs from one present on the other."""
+    The whole tree entry (mode, type, object id) is compared, so a file or directory counts as
+    changed if any byte, mode, or entry differs (a regular file replaced by a symlink with the same
+    bytes included), and an input missing on one side differs from one present on the other.
+    RealPacketTests requires every input to exist, so none is absent on both sides by a rename."""
+    def entry(rev: str, path: str) -> str | None:
+        return git(root, "ls-tree", "--full-tree", rev, "--", path)
+
     for path in input_paths(root):
-        if git(root, "rev-parse", f"HEAD:{path}") != git(root, "rev-parse", f"{MAIN_REF}:{path}"):
+        if entry("HEAD", path) != entry(MAIN_REF, path):
             findings.append(("B2-08", f"{path} at HEAD differs from {MAIN_REF}; main changed a headline input "
                                       "since the candidate, so the candidate's headline would be stale"))
 
