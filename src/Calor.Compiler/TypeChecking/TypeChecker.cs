@@ -1445,7 +1445,11 @@ public sealed class TypeChecker
 
     private CalorType InferUnaryOperationType(UnaryOperationNode unary)
     {
-        var operandType = InferExpressionType(unary.Operand);
+        // A named refinement (§RTYPE) erases to its base type for operators, exactly as an inline
+        // refinement does (an inline-refined parameter is typed as its base). The result is the
+        // BASE type: a refinement does not survive arithmetic. Writing the result back into a
+        // refined variable is checked by the obligation engine (Subtype obligation + guard). #1515.
+        var operandType = EraseRefinement(InferExpressionType(unary.Operand));
         return unary.Operator switch
         {
             UnaryOperator.Not => PrimitiveType.Bool,
@@ -4018,6 +4022,13 @@ public sealed class TypeChecker
         else
             rightType = InferExpressionType(binOp.Right);
 
+        // Operators see a named refinement (§RTYPE) as its base type, as they already see an
+        // inline-refined parameter. The result is the base type, never the refinement: `NatInt -
+        // NatInt` can be negative. Refinement checks on a result written back into a refined
+        // variable or return are the obligation engine's job and are unchanged. #1515.
+        leftType = EraseRefinement(leftType);
+        rightType = EraseRefinement(rightType);
+
         // Comparison operators return BOOL
         if (binOp.Operator is BinaryOperator.Equal or BinaryOperator.NotEqual
             or BinaryOperator.LessThan or BinaryOperator.LessOrEqual
@@ -4486,11 +4497,28 @@ public sealed class TypeChecker
     private static bool IsObliviousReferenceType(CalorType type)
         => type.Equals(PrimitiveType.String) || type.Equals(PrimitiveType.Object);
 
+    /// <summary>
+    /// Strips named-refinement wrappers (§RTYPE) down to the base type. Refinements erase at
+    /// runtime, so every operator and type-family test treats a refined value as its base. #1515.
+    /// </summary>
+    private static CalorType EraseRefinement(CalorType type)
+    {
+        while (type is RefinedType refined)
+            type = refined.BaseType;
+        return type;
+    }
+
     private static bool IsDefinitelyNotBool(CalorType type)
+        => IsDefinitelyNotBoolErased(EraseRefinement(type));
+
+    private static bool IsDefinitelyNotBoolErased(CalorType type)
         => !type.Equals(PrimitiveType.Bool) && type is not ErrorType && type is not ExternalType
             && type is not NeverType;
 
     private static bool IsNumeric(CalorType type)
+        => IsNumericErased(EraseRefinement(type));
+
+    private static bool IsNumericErased(CalorType type)
         => type.Equals(PrimitiveType.Int) || type.Equals(PrimitiveType.Float)
         || type.Equals(PrimitiveType.Char) || type.Equals(PrimitiveType.Decimal);
 

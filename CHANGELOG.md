@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Arithmetic on named refinement types (#1515).** A named refinement type is declared with
+  `§RTYPE`, for example `§RTYPE{r1:NatInt:i32} (>= # INT:0)`. Before this fix, the type checker
+  rejected arithmetic on such a value with `Calor0202`, because it did not unwrap `NatInt` to its
+  base type `i32`. Inline refinements (`§I{i32:x} | (>= # INT:0)`) already worked. Now operators
+  see a named refinement as its base type: `+ - * / %`, unary minus, comparisons, bitwise and
+  shift operators, logical operators on a `bool` refinement, and loop bounds. The result has the
+  **base** type, not the refinement, because `NatInt - NatInt` can be negative. Writing a result
+  back into a refined variable or return is still checked: you get the same verification
+  obligation and runtime guard as with an inline refinement. Binding a plain base value with
+  `§B{x:NatInt}` is still rejected by the type checker, as before.
+
 ## [0.24.0] - 2026-10-07
 
 Calor 0.24 is a soundness release. It repairs verifier defects found by a registered soundness
