@@ -29,6 +29,17 @@ All notable changes to this project will be documented in this file.
   functions are still preserved as `§CSHARP` and reported as `local-function`. The
   `local-function` feature is now `Partial` instead of `NotSupported`.
 
+### Fixed
+
+- **Expression-bodied compound assignments keep their operator.** `void M() => Log += s;`
+  was converted to `Log = s` with no reported loss. It now converts to a compound
+  assignment (`§ASSIGN` is no longer used for `+=`, `-=`, and so on in this position).
+- **A local or parameter now shadows a same-named function in calls.** In
+  `§C{Add} §A 1 §/C`, if the innermost declaration named `Add` is a local or a parameter
+  (for example a `Func<i32, i32>`), the binder now treats the call as a delegate
+  invocation, as C# does. It used to resolve `Add` to a same-named class method or
+  module function, so overload errors and effect charges came from the wrong callee.
+
 ## [0.24.0] - 2026-10-07
 
 Calor 0.24 is a soundness release. It repairs verifier defects found by a registered soundness

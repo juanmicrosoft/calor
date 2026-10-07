@@ -566,6 +566,152 @@ public class LocalFunctionConversionTests
             Assert.Equal("5", Run(compilation.GeneratedCode));
     }
 
+    // ---- Codex review round 1 regressions ----
+
+    [Fact]
+    public void Review1_LocalShadowingAModuleFunction_IsNotQualifiedAway()
+    {
+        // The module Add prints and adds 1000; the call and the method group must
+        // stay on the local Add (emission once qualified both to the module Add).
+        var source = """
+            §M{m001:Shadow}
+              §F{f001:Add:pub} (i32:x) -> i32
+                §E{cw}
+                §P "wrong"
+                §R (+ x 1000)
+              §CL{c001:Probe:pub:stat}
+                §MT{m002:Run:pub:stat} () -> str
+                  §E{}
+                  §B{Func<i32, i32>:g} Add
+                  §R (+ (+ "" §C{Add} §A 2 §/C) §C{g} §A 0 §/C)
+                  §F{f002:Add} (i32:x) -> i32
+                    §R (+ x 1)
+            """;
+        var compilation = Program.Compile(source, "r1a.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
+        Assert.DoesNotContain("ShadowModule.Add", compilation.GeneratedCode);
+        Assert.Equal("31", Run(compilation.GeneratedCode));
+    }
+
+    [Fact]
+    public void Review1_CaptureOfAnEnclosingName_IsNeverQualifiedToAModuleFunction()
+    {
+        var source = """
+            §M{m001:Cap}
+              §F{f001:Add:pub} (i32:x) -> i32
+                §R (+ x 1000)
+              §CL{c001:Probe:pub:stat}
+                §MT{m002:Get:pub:stat} (Func<i32, i32>:Add) -> i32
+                  §E{cw}
+                  §F{f003:L} () -> i32
+                    §R §C{Add} §A 1 §/C
+                  §R §C{L} §/C
+            """;
+        var compilation = Program.Compile(source, "r1b.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(compilation.Diagnostics.Errors,
+            d => d.Code == "Calor1002" && d.Message.Contains("CS8421"));
+    }
+
+    [Theory]
+    [InlineData("§R §LAM{l001:x:i32} §E{} §C{Help} §A x §/C §/LAM{l001}")]
+    [InlineData("§R §LAM{l001:x:i32} §C{Help} §A x §/C §/LAM{l001}")]
+    public void Review1_LambdaUsingALocalFunction_CarriesItsEffects(string returned)
+    {
+        var source = "§M{m001:Escape}\n  §CL{c001:Probe:pub:stat}\n"
+            + "    §MT{m002:Get:pub:stat} () -> Func<i32, i32> §E{}\n      §E{cw}\n"
+            + "      §F{f001:Help} (i32:x) -> i32\n        §P \"hidden\"\n        §R x\n"
+            + "      " + returned + "\n";
+        var compilation = Program.Compile(source, "r2.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(compilation.Diagnostics.Errors,
+            d => d.Code is "Calor0410" or "Calor0424");
+    }
+
+    [Fact]
+    public void Review1_ASameNamedDelegateField_DoesNotShadowTheLocalFunctionRow()
+    {
+        var source = """
+            §M{m001:Escape}
+              §CL{c001:Probe:pub:stat}
+                §FLD{Func<i32, i32>:Help:priv:stat} §E{}
+                §MT{m002:Get:pub:stat} () -> Func<i32, i32> §E{}
+                  §E{cw}
+                  §F{f001:Help} (i32:x) -> i32
+                    §P "hidden"
+                    §R x
+                  §R Help
+            """;
+        var compilation = Program.Compile(source, "r3.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(compilation.Diagnostics.Errors, d => d.Code == "Calor0424");
+    }
+
+    [Fact]
+    public void Review1_AParameterShadowingASiblingLocal_IsInvokedAsAValue()
+    {
+        // Inside Other, Add is the delegate parameter (C#), not the class Add(str)
+        // and not the sibling local Add: no Calor0208, and its row is Unknown.
+        var result = new CSharpToCalorConverter().Convert("""
+            public static class Probe
+            {
+                public static string Add(string x) => x;
+                public static int M()
+                {
+                    int Add(int x) => x + 1;
+                    int Other(System.Func<int, int> Add) => Add(10);
+                    return Other(Add);
+                }
+            }
+            """);
+        Assert.True(result.Success, string.Join("\n", result.Issues));
+        var compilation = Program.Compile(result.CalorSource!, "r4.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.DoesNotContain(compilation.Diagnostics.Errors, d => d.Code == "Calor0208");
+        Assert.Contains(compilation.Diagnostics.Errors,
+            d => d.Code == "Calor0410" && d.Message.Contains("unknown"));
+    }
+
+    [Fact]
+    public void Review1_LocalFunctionInsideALambda_IsCalor0211()
+    {
+        var source = """
+            §M{m001:BadPlacement}
+              §F{f001:Make:pub} () -> Func<i32, i32> §E{}
+                §E{}
+                §R §LAM{l001:x:i32} §E{}
+                  §F{f002:L} (i32:y) -> i32
+                    §R y
+                  §R x
+                §/LAM{l001}
+            """;
+        var compilation = Program.Compile(source, "r5.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(compilation.Diagnostics.Errors,
+            d => d.Code == "Calor0211" && d.Message.Contains("must be declared directly"));
+    }
+
+    [Fact]
+    public void Review1_UnresolvedNames_AreNotProofOfNoCapture()
+    {
+        // `_f` is declared in another part of the partial class, invisible here.
+        var result = new CSharpToCalorConverter().Convert(
+            "public partial class C { public int M() { int L() => _f; return L(); } }");
+        Assert.Contains(result.Issues, issue => issue.Feature == "local-function");
+        Assert.DoesNotMatch(@"\n {6,}§F\{", result.CalorSource ?? "");
+    }
+
+    [Fact]
+    public void Review1_EmbeddedGenericLocalName_IsCalor0211()
+    {
+        var source = "§M{m001:Bad}\n  §F{f001:Outer:pub} () -> i32\n    §F{f002:L<T>} (i32:x) -> i32\n      §R x\n    §R 0\n";
+        var compilation = Program.Compile(source, "r7.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(compilation.Diagnostics.Errors,
+            d => d.Code == "Calor0211" && d.Message.Contains("generic"));
+    }
+
     [Fact]
     public void NativeLocal_RoundTripsThroughTheCalorEmitter()
     {

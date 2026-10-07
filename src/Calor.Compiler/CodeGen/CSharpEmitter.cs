@@ -146,6 +146,10 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         set;
     }
     private string? _currentFunctionId;
+    // 0.25 F3 (#847): see EmitCallableBody.
+    private HashSet<string> _bareCallNames = new(StringComparer.Ordinal);
+    private HashSet<string> _enclosingCallableNames = new(StringComparer.Ordinal);
+    private IEnumerable<string>? _localFunctionEnclosingNames;
     private string? _currentFilePath;
     private string _currentNamespace = "";
     private string? _currentInlineReturnRefinement;
@@ -1184,6 +1188,27 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         var previousReturnValueType = _currentReturnValueType;
         _currentReturnValueType = returnShape.ValueType;
+        // 0.25 F3 (#847): names that must reach C# bare, never qualified to a
+        // module function: this body's local functions (visible before their
+        // declaration), and inside a local function every name of its enclosing
+        // callables, so C# itself resolves (or rejects, CS8421) the name.
+        var previousBareCallNames = _bareCallNames;
+        var previousEnclosingNames = _enclosingCallableNames;
+        _bareCallNames = new HashSet<string>(_localFunctionEnclosingNames ?? [], StringComparer.Ordinal);
+        _localFunctionEnclosingNames = null;
+        var locals = body.OfType<LocalFunctionStatementNode>().ToArray();
+        _bareCallNames.UnionWith(locals.Select(local => local.Function.Name));
+        _enclosingCallableNames = locals.Length == 0
+            ? []
+            : parameters.Select(parameter => parameter.Name)
+                .Concat(Analysis.RecursiveAstWalker.EnumerateStatements(body).SelectMany(statement => statement switch
+                {
+                    BindStatementNode bind => [bind.Name],
+                    ForStatementNode loop => [loop.VariableName],
+                    ForeachStatementNode loop => [loop.VariableName],
+                    _ => Array.Empty<string>(),
+                }))
+                .ToHashSet(StringComparer.Ordinal);
         try
         {
             EmitCallableBodyCore(body, parameters, typeParameters, postconditions,
@@ -1192,6 +1217,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         finally
         {
             _currentReturnValueType = previousReturnValueType;
+            _bareCallNames = previousBareCallNames;
+            _enclosingCallableNames = previousEnclosingNames;
         }
     }
 
@@ -2987,6 +3014,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             _currentYieldRefinement = null;
             _inlineReturnGuardCounter = 0;
             var parameters = string.Join(", ", function.Parameters.Select(p => Visit(p)));
+            _localFunctionEnclosingNames = _bareCallNames.Concat(_enclosingCallableNames).ToArray();
             AppendLine($"static {returnShape.DeclarationType} {SanitizeIdentifier(function.Name)}({parameters})");
             AppendLine("{");
             Indent();
@@ -3095,6 +3123,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
             || target.Contains('.')
             || target.Contains('<')
             || IsVarDeclaredInScope(target)
+            || _bareCallNames.Contains(target)
             || _currentClassMemberNames.Contains(target)
             // ENCLOSING classes' members are bare-visible from nested types too
             // (#823 re-review NEW-1: a nested class calling an enclosing static

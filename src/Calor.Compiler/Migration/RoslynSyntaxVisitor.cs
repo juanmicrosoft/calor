@@ -4589,6 +4589,17 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (node is not SimpleNameSyntax name || name.Parent is NameColonSyntax)
                 continue;
             var symbol = _semanticModel.GetSymbolInfo(name).Symbol;
+            if (symbol == null)
+            {
+                // Unresolved (for example a member declared in another file of a
+                // partial class): it may be enclosing state, so it is not proof of
+                // no capture (#847 review round 1, finding 6). `nameof` and member
+                // names after a resolved qualifier carry no capture.
+                if (IsQualifiedMemberName(name)
+                    || name is IdentifierNameSyntax { Identifier.ValueText: "nameof" })
+                    continue;
+                return true;
+            }
             if (symbol is ILocalSymbol or IParameterSymbol)
             {
                 var owner = symbol.ContainingSymbol;

@@ -103,7 +103,8 @@ public sealed class ReturnValidationPass
             reason = "cannot declare an effect row; its effects are charged to the enclosing callable";
         else if (function.Preconditions.Count > 0 || function.Postconditions.Count > 0)
             reason = "cannot declare §Q/§S contracts";
-        else if (function.TypeParameters.Count > 0 || function.EffectParameters.Count > 0)
+        else if (function.TypeParameters.Count > 0 || function.EffectParameters.Count > 0
+                 || function.Name.Contains('<'))
             reason = "cannot be generic";
         else if (function.Parameters.Any(parameter => parameter.InlineRefinement != null
                      || _typeNamesWithFacts.Contains(parameter.TypeName))
@@ -189,6 +190,10 @@ public sealed class ReturnValidationPass
 
         if (node is LocalFunctionStatementNode local)
         {
+            // Walk() never enters expressions, so a local function inside a lambda
+            // is first seen here; it is misplaced (#847 review round 1, finding 5).
+            if (_localFunctionNodes.Add(local.Function))
+                CheckLocalFunction(local);
             WalkYields(local.Function, context);
             return;
         }

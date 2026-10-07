@@ -1999,9 +1999,14 @@ public sealed class EffectEnforcementPass
             _enclosing = enclosing;
         }
 
+        /// <summary>Names in <see cref="_scope"/> that are class members (fields,
+        /// properties). A local function shadows them; a parameter or binding
+        /// shadows the local function (#847 review round 1).</summary>
+        private readonly HashSet<string> _memberNames = new(StringComparer.Ordinal);
+
         private bool IsLocalFunctionName(string name) =>
             !name.Contains('.')
-            && !_scope.ContainsKey(name)
+            && (!_scope.ContainsKey(name) || _memberNames.Contains(name))
             && (_enclosing ?? _function).Body.OfType<LocalFunctionStatementNode>().Any(local =>
                 local.Function.Name.Equals(name, StringComparison.Ordinal));
 
@@ -2012,7 +2017,10 @@ public sealed class EffectEnforcementPass
                 foreach (var field in owner.Fields)
                 {
                     if (IsFieldFunctionTyped(owner, field))
+                    {
                         _scope[field.Name] = PolyRow.From(field.Row);
+                        _memberNames.Add(field.Name);
+                    }
                 }
 
                 // v0.17 S1 / #1136 — properties, on the same footing as fields.
@@ -2025,7 +2033,10 @@ public sealed class EffectEnforcementPass
                 foreach (var property in owner.Properties)
                 {
                     if (IsFunctionTyped(property.TypeName))
+                    {
                         _scope[property.Name] = PolyRow.From(property.Row);
+                        _memberNames.Add(property.Name);
+                    }
                 }
             }
 
@@ -2036,7 +2047,10 @@ public sealed class EffectEnforcementPass
             foreach (var parameter in _function.Parameters)
             {
                 if (IsParameterFunctionTyped(_function, parameter))
+                {
                     _scope[parameter.Name] = PolyRow.From(parameter.Row);
+                    _memberNames.Remove(parameter.Name);
+                }
             }
 
             foreach (var statement in _function.Body)
@@ -2118,6 +2132,7 @@ public sealed class EffectEnforcementPass
 
         private void CheckAssignmentSite(BindStatementNode bind)
         {
+            _memberNames.Remove(bind.Name);
             var declaresRow = bind.Row != null;
             var functionTyped = declaresRow || IsBindingFunctionTyped(bind);
             if (!functionTyped)
@@ -2585,15 +2600,16 @@ public sealed class EffectEnforcementPass
 
                 case ReferenceNode reference:
                 {
-                    if (_scope.TryGetValue(reference.Name, out var inScope))
-                        return new RowSource(inScope, $"'{reference.Name}'");
-
                     // 0.25 F3 (#847): a local function as a value has no declared
-                    // row; never read a same-named member's row for it.
+                    // row; never read a same-named member's row for it. It is
+                    // checked first because it shadows fields and properties.
                     if (IsLocalFunctionName(reference.Name))
                         return new RowSource(
                             _pass.LocalFunctionValueRow(_enclosing ?? _function),
                             $"local function '{reference.Name}'");
+
+                    if (_scope.TryGetValue(reference.Name, out var inScope))
+                        return new RowSource(inScope, $"'{reference.Name}'");
 
                     // A method group naming an in-module callable: its row is its
                     // DECLARED §E — and Assumed, with the reasons, when the effect
@@ -3237,18 +3253,54 @@ public sealed class EffectEnforcementPass
         /// </summary>
         private EffectSet InferFromLocalFunction(LocalFunctionStatementNode local)
         {
+            if (_localBodies.TryGetValue(local.Function, out var known))
+                return known;
+            if (!_localBodiesInProgress.Add(local.Function))
+                return EffectSet.Empty; // this body is being inferred; it is charged once it completes
             var previous = _localFunctionScope;
             _localFunctionScope = local.Function;
             try
             {
                 var body = InferFromStatements(local.Function.Body);
+                _localBodies[local.Function] = body;
                 _context.RecordLocalFunctionBody?.Invoke(local.Function, body, _context.Assumptions.ToArray());
                 return body;
             }
             finally
             {
                 _localFunctionScope = previous;
+                _localBodiesInProgress.Remove(local.Function);
             }
+        }
+
+        private readonly Dictionary<FunctionNode, EffectSet> _localBodies =
+            new(ReferenceEqualityComparer.Instance as IEqualityComparer<FunctionNode>);
+        private readonly HashSet<FunctionNode> _localBodiesInProgress =
+            new(ReferenceEqualityComparer.Instance as IEqualityComparer<FunctionNode>);
+        private int _lambdaDepth;
+
+        /// <summary>
+        /// 0.25 F3 (#847): the charge for USING a local function (a call, a delegate
+        /// invocation, a method-group argument). In this callable's own body its body
+        /// is already charged at the declaration, so nothing more. Inside a lambda the
+        /// lambda's row must carry it (the lambda may escape), so the union of every
+        /// local body of this callable; Unknown while one of them is still being
+        /// inferred (fail closed).
+        /// </summary>
+        private EffectSet LocalFunctionUseCharge()
+        {
+            if (_lambdaDepth == 0)
+                return EffectSet.Empty;
+            if (!_context.Functions.TryGetValue(_context.CurrentFunctionId, out var owner))
+                return EffectSet.Unknown;
+            var union = EffectSet.Empty;
+            foreach (var local in owner.Body.OfType<LocalFunctionStatementNode>())
+            {
+                if (_localBodiesInProgress.Contains(local.Function))
+                    return EffectSet.Unknown;
+                union = union.Union(InferFromLocalFunction(local));
+            }
+            return union;
         }
 
         /// <summary>The callable whose parameters and bindings an AST name search reads.</summary>
@@ -3258,14 +3310,21 @@ public sealed class EffectEnforcementPass
 
         /// <summary>
         /// 0.25 F3 (#847): whether a bare name, at this point of the current
-        /// callable, names one of its local functions and not a value.
+        /// callable, names one of its local functions. Only a lexical value (a
+        /// parameter or binding of the body being inferred) shadows it; fields and
+        /// properties do not, as in C#.
         /// </summary>
-        private bool IsLocalFunctionName(string name) =>
-            !name.Contains('.')
-            && _context.Functions.TryGetValue(_context.CurrentFunctionId, out var owner)
-            && owner.Body.OfType<LocalFunctionStatementNode>()
-                .Any(local => local.Function.Name.Equals(name, StringComparison.Ordinal))
-            && ResolveLocalValueType(name) == null;
+        private bool IsLocalFunctionName(string name)
+        {
+            if (name.Contains('.')
+                || !_context.Functions.TryGetValue(_context.CurrentFunctionId, out var owner)
+                || !owner.Body.OfType<LocalFunctionStatementNode>()
+                    .Any(local => local.Function.Name.Equals(name, StringComparison.Ordinal)))
+                return false;
+            var scope = AstScopeFunction() ?? owner;
+            return !scope.Parameters.Any(parameter => parameter.Name.Equals(name, StringComparison.Ordinal))
+                && CollectLocalBindings(name, scope.Body).Count == 0;
+        }
 
         private EffectSet InferFromStatement(StatementNode statement)
         {
@@ -3384,7 +3443,8 @@ public sealed class EffectEnforcementPass
                 var valueType = ResolveLocalValueType(reference.Name);
                 if (valueType == null && IsLocalFunctionName(reference.Name))
                 {
-                    // 0.25 F3 (#847): its body is already charged to this callable.
+                    // 0.25 F3 (#847): see LocalFunctionUseCharge.
+                    effects = effects.Union(LocalFunctionUseCharge());
                     continue;
                 }
                 if (valueType == null)
@@ -3421,7 +3481,7 @@ public sealed class EffectEnforcementPass
             switch (_context.CallGraph.IsLocalFunctionCall(_context.CurrentFunctionId, span))
             {
                 case true:
-                    return EffectSet.Empty;
+                    return LocalFunctionUseCharge();
                 case null when IsLocalFunctionName(target):
                     return EffectSet.Unknown;
             }
@@ -3872,9 +3932,12 @@ public sealed class EffectEnforcementPass
 
                     if (IsLocalFunctionName(reference.Name))
                     {
-                        // 0.25 F3 (#847): a delegate to a local function, invoked
-                        // inside the callable whose body charges every local body.
-                        return (PolyRow.Pure, string.Empty);
+                        // 0.25 F3 (#847): a delegate to a local function; see
+                        // LocalFunctionUseCharge.
+                        var charge = LocalFunctionUseCharge();
+                        return charge.IsUnknown
+                            ? (PolyRow.Unknown, $"a local function used inside a lambda in '{ownerName}' is still being inferred")
+                            : (PolyRow.Concrete(charge.ToRow()), string.Empty);
                     }
 
                     var internalFunc = FindInternalFunctionByName(reference.Name);
@@ -6125,11 +6188,20 @@ public sealed class EffectEnforcementPass
             // un-annotated lambda's type row at the six binding sites.
             var before = _context.Assumptions.Count;
 
-            var body = lambda.ExpressionBody != null
-                ? InferFromExpression(lambda.ExpressionBody)
-                : lambda.StatementBody != null
-                    ? InferFromStatements(lambda.StatementBody)
-                    : EffectSet.Empty;
+            _lambdaDepth++;
+            EffectSet body;
+            try
+            {
+                body = lambda.ExpressionBody != null
+                    ? InferFromExpression(lambda.ExpressionBody)
+                    : lambda.StatementBody != null
+                        ? InferFromStatements(lambda.StatementBody)
+                        : EffectSet.Empty;
+            }
+            finally
+            {
+                _lambdaDepth--;
+            }
 
             _context.RecordLambdaBody?.Invoke(
                 lambda,

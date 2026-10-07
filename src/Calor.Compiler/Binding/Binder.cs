@@ -6080,9 +6080,12 @@ public sealed class Binder
         var firstDot = target.IndexOf('.');
         if (firstDot <= 0)
         {
-            // 0.25 F3 (#847): a visible local function wins over every same-named
-            // member or module function, as in C#. A value of that name in an inner
-            // scope stops GetOverloads, so value shadowing is kept.
+            // 0.25 F3 (#847): C# simple-name lookup stops at the innermost
+            // declaration. A local or parameter of this name is invoked as a value,
+            // never as a same-named function (review round 1, finding 4); a visible
+            // local function wins over every same-named member or module function.
+            if (_scope.Lookup(target) is VariableSymbol { DeclaringTypeName: null })
+                yield break;
             if (_scope.GetOverloads(target).Any(_localFunctionSymbols.Contains))
             {
                 yield return target;
