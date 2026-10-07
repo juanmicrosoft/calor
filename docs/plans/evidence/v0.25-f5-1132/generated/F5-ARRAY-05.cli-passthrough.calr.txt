@@ -1,0 +1,33 @@
+§M{m001:F5-ARRAY-05:overflow=unchecked}
+  §U{System}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §MT{m002:Jagged:pub:stat} () -> i32[][]
+        §E{alloc}
+        §R §ARR{arrI32003:i32[]} §ARR{arrI32004:i32} 1 §/ARR{arrI32004} §ARR{arrI32005:i32} 2 3 §/ARR{arrI32005} §/ARR{arrI32003}
+
+      §MT{m006:Cube:pub:stat} () -> i32[,,]
+        §E{alloc}
+        §R §ARR2D{arr2d007:arr2d007:i32:2:1:2} §ROW 1 2 §ROW 3 4 §/ARR2D{arr2d007}
+
+      §MT{m009:Sized:pub:stat} () -> i32[]
+        §E{alloc}
+        §R §ARR{arrI32010:i32} 7 8 9 §/ARR{arrI32010}
+
+      §MT{m011:Run:pub:stat} () -> str
+        §E{alloc}
+        §ARR{implicitArr:str}
+          "a"
+          "b"
+        §B{~_hoist000} §ARR{arrI32014:i32} 5 6 §/ARR{arrI32014}
+        §ARR{nested:any}
+          _hoist000
+          "s"
+        §B{i32[][]:j} §C{Jagged}
+        §B{c} §C{Cube}
+        §B{i32[]:s} §C{Sized}
+        §R (+ (+ (+ (+ (+ (+ (+ (+ (+ (+ §IDX §IDX{j} 1 1 "|") §IDX2D{3} c 1 0 1) "|") c.Rank) "|") §IDX{s} 2) "|") §IDX{implicitArr} 1) "|") §IDX (cast i32[] §IDX{nested} 0) 1)
+
+
+

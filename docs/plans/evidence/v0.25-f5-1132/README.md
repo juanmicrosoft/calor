@@ -67,7 +67,18 @@ post-conversion rescue and reported as `post-validation-fallback` (F6 owns that 
 
 ## Results (from `results.json`)
 
-RESULTS_TABLE
+Measured at `453da318` (`src/` tree `82a3f174`), Release build, macOS arm64.
+
+| Case | R0 baseline (CLI / MCP default) | Every surface now (`cli-default`, `cli-passthrough`, `cli-no-fallback`, `cli-migrate`, `mcp-default`, `mcp-passthroughOnError`, `mcp-passthroughOnError-moduleName`) |
+|---|---|---|
+| F5-ARRAY-01 | preserved-match / compile-error:Calor0410 | 0 `§CSHARP`, 0 `§CS{`, no loss, default compile passes, run matches (`2x2\|2\|3`) |
+| F5-ARRAY-02 | preserved-match / preserved-match | same, run matches (`13\|2\|5\|67125`: the unselected branches' `Side(3)`, `Side(4)` never run) |
+| F5-ARRAY-03 (control) | native-match / native-match | same, run matches; output identical to the R0 `mcp-default` text |
+| F5-ARRAY-04 | preserved-match / compile-error:Calor0260 | same, run matches (`1\|2\|50\|boom\|123`: user `_hoist000` keeps 50, `Note(4)` never runs) |
+| F5-ARRAY-05 | preserved-match / compile-error:Calor0410 | same, run matches (`3\|4\|3\|9\|b\|6`) |
+
+35 of 35 cells are native and match. `--no-fallback` now succeeds on all five (nothing is
+unsupported). No surface reports `post-validation-fallback`.
 
 Library, CLI option, MCP and `ProjectMigrator` (with and without `PassthroughOnError`) surfaces,
 plus two ordering witnesses (element order around a mutating call, object initializers as 2-D
