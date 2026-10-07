@@ -9,14 +9,12 @@ MANIFEST = 'docs/plans/evidence/c1-1423/candidate-manifest.json'
 MAIN = 'refs/remotes/origin/main'
 FAILURES = []
 
-
 def git(*args, binary=False, env_utc=False):
     env = dict(os.environ, TZ='UTC') if env_utc else None
     out = subprocess.run(['git', *args], capture_output=True, check=False, env=env)
     if out.returncode != 0:
         return None
     return out.stdout if binary else out.stdout.decode().strip()
-
 
 @functools.lru_cache(maxsize=None)
 def blob(path, commit=CANDIDATE):
@@ -25,27 +23,22 @@ def blob(path, commit=CANDIDATE):
         FAILURES.append(f'{path} is absent at {commit}')
     return data
 
-
 def sha(data, lf=False):
     if lf:
         data = data.replace(b'\r\n', b'\n')
     return hashlib.sha256(data).hexdigest()
-
 
 def check(ok, message):
     if not ok:
         FAILURES.append(message)
     return ok
 
-
 def ancestor(commit, of=CANDIDATE):
     return subprocess.run(['git', 'merge-base', '--is-ancestor', commit, of]).returncode == 0
-
 
 def jload(path, commit=CANDIDATE):
     data = blob(path, commit)
     return json.loads(data) if data is not None else {}
-
 
 PRS = {int(k): (v['mergeCommit'], v['mergedAtUtc'], v['mergedViaPr']) for k, v in INPUTS['pullRequests'].items()}
 GATES = [(g['gate'], g['issue'], g['prs'], g['evidence'], g['closureStatus']) for g in INPUTS['gates']]
@@ -58,28 +51,48 @@ PACKETS = [(p['path'], p['lf']) for p in INPUTS['packets']]
 ISSUE_STATES = INPUTS['issueStatesAtFreeze']['states']
 
 
-
 def releasability():
     version = re.search(rb'<Version>([^<]+)</Version>', blob('Directory.Build.props')).group(1).decode()
     ref = f'refs/tags/v{version}'
     local = subprocess.run(['git', 'show-ref', '--verify', '--quiet', ref]).returncode   # 0 present, 1 absent, else error
-    remote = subprocess.run(['git', 'ls-remote', '--tags', 'origin', ref], capture_output=True, text=True)
     tagged = git('rev-parse', '--verify', '--quiet', ref + '^{commit}') if local == 0 else None
-    check(local in (0, 1) and remote.returncode == 0 and (local == 1 or tagged is not None), f'cannot decide whether {ref} exists')
+    remote = subprocess.run(['git', 'ls-remote', '--tags', 'origin', ref, ref + '^{}'], capture_output=True, text=True)
+    for problem in tag_problems(ref, local, tagged, remote.returncode, remote.stdout):
+        check(False, problem)
     check(version == INPUTS['candidate']['version'], f'candidate declares {version}, not the decided release version')
-    check(remote.stdout.strip() == '' if tagged is None else tagged == CANDIDATE,
-          f'tag v{version} exists ({tagged or remote.stdout.strip()}) and does not point at the candidate (R2 gate G009)')
     return dict(INPUTS['releasability'], versionAtCandidate=version, tagAtFreeze=tagged)
 
+def tag_problems(ref, local_rc, local_commit, remote_rc, remote_out, candidate=CANDIDATE):
+    """Local and remote are judged independently: each must be a confirmed absence or peel to the candidate."""
+    problems = []
+    if local_rc not in (0, 1) or (local_rc == 0 and local_commit is None):
+        problems.append(f'cannot decide whether local {ref} exists or what it peels to')
+    elif local_rc == 0 and local_commit != candidate:
+        problems.append(f'local {ref} peels to {local_commit}, not the candidate (R2 gate G009)')
+    found = {name: sha for sha, name in (l.split('\t', 1) for l in remote_out.splitlines() if '\t' in l)}
+    peeled = found.get(ref + '^{}', found.get(ref))
+    if (remote_rc != 0 or set(found) - {ref, ref + '^{}'} or len(remote_out.strip().splitlines()) != len(found)
+            or not all(re.fullmatch('[0-9a-f]{40}', v) for v in found.values()) or (ref + '^{}' in found and ref not in found)):
+        problems.append(f'cannot decide whether remote {ref} exists')
+    elif found and peeled != candidate:
+        problems.append(f'remote {ref} peels to {peeled}, not the candidate (R2 gate G009)')
+    return problems
+
+def tag_self_test():
+    c, o, r = 'c' * 40, 'a' * 40, 'refs/tags/v9.9.9'
+    cases = [((0, c, 0, ''), 0), ((1, None, 0, ''), 0), ((0, c, 0, f'{o}\t{r}\n'), 1), ((1, None, 0, f'{o}\t{r}\n{c}\t{r}^{{}}\n'), 0),
+             ((1, None, 0, f'{c}\t{r}\n{o}\t{r}^{{}}\n'), 1), ((1, None, 0, f'{c}\t{r}\n'), 0), ((0, o, 0, ''), 1),
+             ((0, None, 0, ''), 1), ((128, None, 0, ''), 1), ((1, None, 128, ''), 1), ((1, None, 0, 'garbage\n'), 1),
+             ((1, None, 0, f'nothex\t{r}\n{c}\t{r}^{{}}\n'), 1), ((1, None, 0, f'{c}\t{r}^{{}}\n'), 1)]
+    for args, expected in cases:
+        check(bool(tag_problems(r, *args, candidate=c)) == bool(expected), f'tag self-test failed for {args}')
 
 def files_under(prefix):
     out = git('ls-tree', '-r', '--name-only', CANDIDATE, '--', prefix) or ''
     return sorted(p for p in out.splitlines() if p)
 
-
 def hashes(paths):
     return {p: sha(blob(p)) for p in paths if blob(p) is not None}
-
 
 def verify_packet(path, lf):
     packet = jload(path)
@@ -90,7 +103,6 @@ def verify_packet(path, lf):
     return {'path': path, 'sha256': sha(raw), 'sha256LF': sha(raw, True), 'normalization': 'LF' if lf else 'raw',
             'fileCount': len(packet.get('files', {})), 'verifiedAtCandidate': not bad}
 
-
 def parse_pins(path):
     rows = []
     for line in blob(path).decode().splitlines():
@@ -98,7 +110,6 @@ def parse_pins(path):
         if len(parts) == 3 and not line.startswith('#'):
             rows.append({'name': parts[1], 'sha256': parts[0], 'bytes': int(parts[2])})
     return rows
-
 
 def build():
     shallow = git('rev-parse', '--is-shallow-repository')
@@ -305,8 +316,8 @@ def build():
         'review': N['review'],
     }
 
-
 def main():
+    tag_self_test()   # controls for the tag rule run on every invocation
     manifest = build()
     text = json.dumps(manifest, indent=2, ensure_ascii=False) + '\n'
     if '--check' in sys.argv:
@@ -318,7 +329,6 @@ def main():
         print('FAIL', f)
     print('OK' if not FAILURES else f'{len(FAILURES)} failure(s)')
     return 1 if FAILURES else 0
-
 
 if __name__ == '__main__':
     sys.exit(main())
