@@ -117,14 +117,17 @@ state. R2's `--benchmark-worktree` step compares those bytes with the hashes A1 
 candidate, so a main-dependent byte breaks that comparison.
 
 **New rule (B2-08 freshness).** HEAD is the candidate. It may publish while main has moved on, but
-only if no headline input differs between HEAD and `origin/main` (git object ids; a path missing
-on one side differs). The inputs are `INPUT_PATHS` plus every `calorPath`/`csharpPath` in the
-candidate's `registration/pairs.json` (452 files):
+only if no headline input differs between HEAD and `origin/main`. Each input's whole tree entry is
+compared (`git ls-tree`: mode, type, object id), so a file replaced by a same-bytes symlink differs,
+and a path missing on one side differs. The inputs are `INPUT_PATHS`, every file the candidate's
+three seals name, and every `calorPath`/`csharpPath` in the candidate's `registration/pairs.json`
+(452 files):
 
 | Input | Why it is an input |
 |---|---|
 | `docs/plans/evidence/b1-1276/registration`, `.../results` | the registered packet and the results packet the headline projects (B1 review records in `.../reviews` are not inputs) |
 | `docs/plans/evidence/evidence-contract-1407/contract.json` | method authorizations (B2-06) |
+| `.../evidence-contract-1407/sha256.json`, and every file the registration, results, and contract seals name (`docs/plans/b1-1276-benchmark-registration.md`, `docs/plans/v0.24-evidence-contract.md`, `artifact-inventory.json`, ...) | what B2-01 checks (review round 1) |
 | `tests/TestData/Benchmarks` and each registered pair file | the corpus the registration names (B2-03) |
 | `tests/Calor.Evaluation` | the registered generator (`pair-metrics`, `pair-results`; the metric uses no `src/` code) |
 | `EvidenceContract/Benchmark{Registration,Results}{Tests,Validator}.cs`, `EvidenceContractValidator.cs`, `EvidenceContractTests.cs`, `tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj` | B1's validator as the workflow runs it: the two filtered test classes, the partial validator class they call, the helpers they use (`RepoRoot`, `Contract`), and the project that compiles them |
@@ -133,23 +136,30 @@ candidate's `registration/pairs.json` (452 files):
 Not inputs: other files in `EvidenceContract/` (C1's `CandidateInvalidation*.cs`,
 `CandidateManifestTests.cs`), `src/` (B2-10 re-runs the generator at the candidate, and the headline
 records the candidate's `src` tree hash), build settings (`Directory.Build.props`, `global.json`),
-and `benchmark.yml` (a dispatch runs main's copy of the workflow anyway).
+and `benchmark.yml` (a dispatch runs main's copy of the workflow anyway). The sealed contract
+document is an input, so an amendment to the contract on main after the candidate refuses
+publication of that candidate. This is intended: the amendment may change what B2-06 accepts.
+`push.paths` lists every input outside the corpus directory, so a change to one re-runs the gate.
 
 **New rule (B2-07 against main).** The comparison is now with the headline published *at the
-candidate* (`HEAD:website/public/data/benchmark-headline.json`). Main is fenced separately: main's
-headline and its stamp-index entry (`path` = the headline, `stampPointer` = `/provenance/commit`)
-must each be unchanged since the candidate, or be exactly what this run writes (this candidate's
-publication PR already merged). Anything else refuses, so a candidate cannot publish over a newer
-headline on main. This keeps round-1 finding 4 closed: an older checkout cannot avoid the
-comparison, because a headline on main that the checkout lacks refuses unless it is byte-for-byte
-this run's own output. Other entries in the stamp index on main do not count.
+candidate* (`HEAD:website/public/data/benchmark-headline.json`). Main is fenced separately. Main's
+headline (exact bytes) and its headline stamp-index entries (every entry with `path` = the headline
+and `stampPointer` = `/provenance/commit`, in order) must each be unchanged since the candidate, or
+be exactly what this run writes (this candidate's publication PR already merged). Anything else
+refuses: a newer or different headline, an added or duplicated entry, or an unreadable index. So a
+candidate cannot publish over a newer headline on main. This keeps round-1 finding 4 of PR 1
+closed. An older checkout cannot avoid the comparison, because a headline on main that the
+checkout lacks refuses unless it is byte for byte this run's own output. Other entries in the
+stamp index on main do not count.
 
 **Deterministic bytes.** The headline is rendered from the candidate's packet, the candidate's
 published headline, and `git` object ids at the candidate. The stamp index is the candidate's
 committed index (read with `git show HEAD:`, not from the work tree) plus this entry. Both files are
 written as exact UTF-8 bytes (`write_bytes`, LF). Nothing reads the clock or main's later state.
+R2 needs no change: `verify_release_adjudication.py --benchmark-worktree` still compares the two
+files' sha256 with the adjudicated hashes. Those hashes now stay valid after main moves on.
 
-### Tests (`scripts/test_benchmark_publication_gate.py`, 60 = 50 + 10)
+### Tests (`scripts/test_benchmark_publication_gate.py`, 63 = 50 + 13)
 
 Changed because the rule changed:
 - `test_an_older_checkout_is_compared_with_the_headline_on_main` is replaced by
@@ -161,30 +171,73 @@ Changed because the rule changed:
   whole `EvidenceContract` directory is an input becomes three assertions. The directory is *not* an
   input. Every test class in the workflow's validator filter is. Every input matches a `push.paths`
   glob, evaluated with GitHub's `*`/`**` semantics.
-- Fixture: it also writes the validator files and an unrelated `CandidateManifestTests.cs`.
+- Fixture: it also writes the validator files, an unrelated `CandidateManifestTests.cs`, and a
+  sealed contract document outside every `INPUT_PATHS` entry.
 
 New:
 - Positive: `test_unrelated_test_files_on_main_after_the_candidate_do_not_block`. This is the C2
   case: C1-style tests added and edited in `EvidenceContract/`, plus `src/` and docs changes, on
   main after the candidate. It passes, and the bytes equal those written with main at the candidate.
-  `test_other_stamp_index_entries_on_main_do_not_block_or_change_the_bytes`.
-- Negative: `test_every_headline_input_changed_on_main_is_refused` covers 14 cases: registration,
-  results, contract, corpus directory, registered pair file, generator, the 6 validator files, the
-  project file, and the gate. Each starts from the same candidate. Each must refuse with B2-08 and
-  nothing else, and the case count is pinned. `test_a_generator_change_on_main_is_refused`,
+  Also `test_other_stamp_index_entries_on_main_do_not_block_or_change_the_bytes`.
+- Negative: `test_every_headline_input_changed_on_main_is_refused` covers 16 cases: registration,
+  results, contract, contract seal, a sealed document named only by a seal, corpus directory,
+  registered pair file, generator, the 6 validator files, the project file, and the gate. Each starts
+  from the same candidate. Each must refuse with B2-08 and nothing else, and the case count is
+  pinned. Also: `test_a_generator_change_on_main_is_refused`,
+  `test_an_input_replaced_by_a_symlink_with_the_same_bytes_is_refused`,
   `test_a_different_headline_published_on_main_after_the_candidate_is_refused` (B2-07),
   `test_a_changed_headline_stamp_entry_on_main_is_refused` (B2-07),
+  `test_a_duplicate_headline_stamp_entry_on_main_is_refused` (B2-07),
+  `test_an_unreadable_stamp_index_on_main_is_refused` (B2-07, 3 shapes), and
   `test_a_registered_pair_file_outside_the_corpus_directory_is_an_input`.
-- Determinism: `test_two_runs_write_identical_bytes` (second run over the first run's outputs, and a
-  third run from a clean tree) and `test_the_bytes_depend_on_the_committed_stamp_index_not_the_work_tree`.
+- Determinism: `test_two_runs_write_identical_bytes` (a second run over the first run's outputs, and
+  a third run from a clean tree) and `test_the_bytes_depend_on_the_committed_stamp_index_not_the_work_tree`.
 - Real repository: `RealPacketTests.test_every_headline_input_exists`. Every input exists, so a
-  renamed input cannot go silently absent on both sides. The input count is pinned
-  (`INPUT_PATHS` + 2 x 226).
+  renamed input cannot go silently absent on both sides. The three sealed documents are inputs. The
+  input count is pinned (`INPUT_PATHS` and the sealed files, plus 2 x 226). Every input outside the
+  corpus directory matches a push path.
 
 ### Mutation check (`mutation-check-pr2.txt`)
 
-MUTATION_SUMMARY
+The script is `mutation-check-pr2.py`. It makes 21 mutations, each disabling or weakening one new
+guard, and runs the full suite after each one. All 21 are killed:
+- the registered pair paths, the files the seals name, the contract seal, one validator file, the
+  generator, or the gate itself dropped from the inputs;
+- the freshness check disabled, or comparing object ids only so modes are ignored;
+- the whole `EvidenceContract` directory made an input again;
+- the comparison read from main's headline;
+- main's headline fence disabled, or narrowed so it no longer allows the idempotent re-run;
+- the stamp-entry fence disabled, comparing the whole index, comparing only the first entry, or
+  treating an unreadable index as absent;
+- the stamp index read from the work tree;
+- a run timestamp added to the headline;
+- three `push.paths` triggers removed or broadened.
 
 ### Local end-to-end on the real repository (`local-e2e-pr2.md`)
 
-E2E_SUMMARY
+The generator re-run is byte-identical to the committed packet, and B1's validator and R2's
+workflow-gate tests pass (79 of 79). With main simulated in local clones, the candidate writes the
+same headline (`c81adaed…`) and stamp index (`ea03d566…`) in four cases: main at the candidate, a
+second run, main with an unrelated `EvidenceContract/` test added (the C2 case), and main with this
+candidate's headline already merged. The pre-PR-2 gate refuses the C2 case with B2-08. In the
+merged case it writes a different headline (`6e79d9fb…`), which is the nondeterminism removed here.
+Main changing the generator or a registered pair file refuses with B2-08.
+
+### Reviews (`reviews/pr2-*.md`)
+
+Codex, read-only, reasoning effort high. Round 1: REQUEST-CHANGES (sealed files were not inputs;
+only the first stamp entry was compared). Round 2: REQUEST-CHANGES (object ids ignored file modes).
+Round 3: APPROVE. Verification pass: see `reviews/pr2-verification-pass-codex.md`.
+
+### Limits
+
+- The whole `tests/Calor.Evaluation` project and the whole corpus directory are inputs, so a main
+  change there that cannot affect the B1 metric (an LLM-benchmark task file, for example) still
+  refuses an older candidate. This errs toward refusing.
+- `src/`, `Directory.Build.props`, and `global.json` are not inputs. The B1 metric does not call the
+  compiler, and B2-10 re-runs the generator at the candidate.
+- A new partial-class file that main adds under `EvidenceContract/` is not an input unless a listed
+  file changes to use it. Such a file can only add members, which the listed files would have to
+  call, so a listed file changes too.
+- The end-to-end hashes are for the code commit `f2696b94`. The re-frozen 0.24 candidate gets its
+  own hashes, which A1 adjudicates. No workflow was run on GitHub, and nothing was published.

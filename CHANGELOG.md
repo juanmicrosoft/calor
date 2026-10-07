@@ -10,7 +10,8 @@ All notable changes to this project will be documented in this file.
   files (#1422).** The gate (`scripts/benchmark_publication_gate.py`) refused with `B2-08` whenever
   any file in `tests/Calor.Compiler.Tests/EvidenceContract/` differed between the candidate and
   `main`. Its freshness check now covers only the inputs of the headline: the registered B1 packet
-  and results, the contract, the 452 registered pair files and the benchmark corpus, the generator
+  and results, the contract, the sealed files the gate's seal check reads (for example the B1
+  registration document), the 452 registered pair files and the benchmark corpus, the generator
   (`tests/Calor.Evaluation`), the 6 validator source files plus their project file, and the gate
   itself. A change to any of these on `main` after the candidate still refuses.
 - **The headline bytes now depend only on the candidate.** The gate used to compare against the
