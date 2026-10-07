@@ -23,13 +23,10 @@
         §B{i32:_hoist000} 50
         §B{~thrown:str} ""
         §TR{try010}
-          §B{~_hoist001} §C{Note} 3
-          §B{~_hoist002} §C{Boom}
-          §B{~_hoist003} §C{Note} 4
           §ARR{xs:i32}
-            _hoist001
-            _hoist002
-            _hoist003
+            §C{Note} §A 3 §/C
+            §C{Boom} §/C
+            §C{Note} §A 4 §/C
           §ASSIGN thrown (+ "none" (len xs))
         §CA{InvalidOperationException:e}
           §ASSIGN thrown e.Message
