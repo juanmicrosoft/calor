@@ -89,9 +89,8 @@ public sealed class CallGraphAnalysis
         public Dictionary<string, List<(string Name, int DeclarationStart, Binding.BoundTypes.FunctionBoundType Type)>>
             Locals { get; } = new(StringComparer.Ordinal);
 
-        /// <summary>0.25 F3 (#847): (callerId, start, end) of every call the binder
-        /// resolved to a local function. A local function body is analyzed as part
-        /// of its enclosing callable, whose id is the callerId here.</summary>
+        /// <summary>0.25 F3 (#847): calls the binder resolved to a local function,
+        /// keyed by the enclosing callable's id.</summary>
         public HashSet<(string CallerId, int Start, int End)> LocalFunctionCalls { get; } = new();
 
         /// <summary>False when binding threw: no call site is known to be local.</summary>
@@ -103,8 +102,7 @@ public sealed class CallGraphAnalysis
     /// <summary>The declaration span of the variable the binder resolved a bare
     /// value reference (a call target or a <c>ReferenceNode</c>) to, or
     /// <c>null</c> when binding threw or the reference was not a variable.</summary>
-    /// <summary>0.25 F3 (#847): whether the binder resolved this call to a local
-    /// function. <c>null</c> when binding threw, so the caller can fail closed.</summary>
+    /// <summary>0.25 F3 (#847): <c>null</c> when binding threw (fail closed).</summary>
     public bool? IsLocalFunctionCall(string callerId, TextSpan call) =>
         _boundValues.Complete
             ? _boundValues.LocalFunctionCalls.Contains((callerId, call.Start, call.End))
@@ -746,8 +744,7 @@ public sealed class CallGraphAnalysis
                     LegacyId: ResolveLegacyFunctionId(function, functions)))
                 .Where(item => item.LegacyId != null)
                 .ToDictionary(item => item.SymbolId, item => item.LegacyId!);
-            // 0.25 F3 (#847): a local function's body is indexed under its enclosing
-            // callable's id (the effect pass infers it there). It is never a callee id.
+            // 0.25 F3 (#847): a local body is indexed under its enclosing callable's id.
             var callerIds = new Dictionary<SymbolId, string>(legacyIds);
             var localFunctionIds = new HashSet<SymbolId>();
             foreach (var local in boundModule.Functions.Where(function =>
@@ -778,8 +775,6 @@ public sealed class CallGraphAnalysis
                 if (!callerIds.TryGetValue(function.SymbolId, out var callerId))
                     continue;
 
-                // 0.25 F3 (#847): a local function's own signature is not its
-                // enclosing callable's; only its body is indexed under that id.
                 var isLocalFunction = function.MemberKind == BoundMemberKind.LocalFunction;
                 if (!isLocalFunction && function.Symbol.ReturnFunctionType is { } returnType)
                     declaredReturns[callerId] = returnType;
@@ -1182,8 +1177,7 @@ public sealed class CallGraphAnalysis
                 calls.Add(("<expression-call>", expressionCall.Span));
                 break;
             case LocalFunctionStatementNode local:
-                // 0.25 F3 (#847): the walker treats a local function as a leaf; its
-                // calls are edges of the enclosing callable, which it is charged to.
+                // 0.25 F3 (#847): a leaf for the walker; its calls are the enclosing callable's.
                 foreach (var statement in local.Function.Body)
                     CollectCallsFromNode(statement, calls);
                 return;

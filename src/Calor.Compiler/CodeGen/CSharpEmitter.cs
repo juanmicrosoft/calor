@@ -146,6 +146,37 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         set;
     }
     private string? _currentFunctionId;
+
+    private static readonly string[] DeclaringNameProperties =
+        ["VariableName", "BindingName", "IndexVariableName", "KeyName", "ValueName", "PointerName"];
+
+    /// <summary>0.25 F3 (#847): names a node and its descendants declare (an
+    /// over-approximation only leaves more names bare for C#).</summary>
+    private static IEnumerable<string> DeclaredNames(AstNode node)
+    {
+        var own = node switch
+        {
+            BindStatementNode bind => bind.Name,
+            ParameterNode parameter => parameter.Name,
+            LambdaParameterNode parameter => parameter.Name,
+            VariablePatternNode pattern => pattern.Name,
+            VarPatternNode pattern => pattern.Name,
+            _ => null,
+        };
+        if (own != null)
+            yield return own;
+        foreach (var property in DeclaringNameProperties)
+        {
+            if (node.GetType().GetProperty(property)?.GetValue(node) is string name)
+                yield return name;
+        }
+        foreach (var child in Analysis.RecursiveAstWalker.GetAllChildren(node))
+        {
+            foreach (var name in DeclaredNames(child))
+                yield return name;
+        }
+    }
+
     // 0.25 F3 (#847): see EmitCallableBody.
     private HashSet<string> _bareCallNames = new(StringComparer.Ordinal);
     private HashSet<string> _enclosingCallableNames = new(StringComparer.Ordinal);
@@ -1188,10 +1219,9 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     {
         var previousReturnValueType = _currentReturnValueType;
         _currentReturnValueType = returnShape.ValueType;
-        // 0.25 F3 (#847): names that must reach C# bare, never qualified to a
-        // module function: this body's local functions (visible before their
-        // declaration), and inside a local function every name of its enclosing
-        // callables, so C# itself resolves (or rejects, CS8421) the name.
+        // 0.25 F3 (#847): names never qualified to a module function: this body's
+        // local functions and, in a local body, every enclosing name (C# resolves
+        // or rejects it, CS8421).
         var previousBareCallNames = _bareCallNames;
         var previousEnclosingNames = _enclosingCallableNames;
         _bareCallNames = new HashSet<string>(_localFunctionEnclosingNames ?? [], StringComparer.Ordinal);
@@ -1201,13 +1231,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         _enclosingCallableNames = locals.Length == 0
             ? []
             : parameters.Select(parameter => parameter.Name)
-                .Concat(Analysis.RecursiveAstWalker.EnumerateStatements(body).SelectMany(statement => statement switch
-                {
-                    BindStatementNode bind => [bind.Name],
-                    ForStatementNode loop => [loop.VariableName],
-                    ForeachStatementNode loop => [loop.VariableName],
-                    _ => Array.Empty<string>(),
-                }))
+                .Concat(body.SelectMany(DeclaredNames))
                 .ToHashSet(StringComparer.Ordinal);
         try
         {
@@ -2969,12 +2993,8 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         return "";
     }
 
-    /// <summary>
-    /// 0.25 F3 (#847): a local function is emitted in place as a C# <c>static</c>
-    /// local function. <c>static</c> makes the C# compiler reject any capture of the
-    /// enclosing locals, parameters or <c>this</c>. The enclosing callable's emission
-    /// state is saved and restored around the body.
-    /// </summary>
+    /// <summary>0.25 F3 (#847): emitted in place as a C# <c>static</c> local function,
+    /// so any capture is a C# error; the enclosing emission state is restored.</summary>
     public string Visit(LocalFunctionStatementNode node)
     {
         var function = node.Function;

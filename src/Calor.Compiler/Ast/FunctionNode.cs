@@ -412,17 +412,10 @@ public sealed class ParameterNode : AstNode
 }
 
 /// <summary>
-/// A local function declared directly in the body of a <c>§F</c> or <c>§MT</c>
-/// (0.25 F3, #847). Written as a nested <c>§F{id:Name} (T:x) -&gt; R</c> and emitted
-/// in place as a C# <c>static</c> local function, so it cannot capture the
-/// enclosing locals, parameters or <c>this</c>. It is visible in the whole
-/// enclosing body, including before its declaration, and a bare call to its name
-/// resolves to it ahead of any same-named member.
-///
-/// <para>Generic reflection walks (<see cref="Analysis.RecursiveAstWalker"/>) treat
-/// this node as a leaf: the body belongs to a different callable. The passes that
-/// must see the body (binding, effects, return validation, emission) visit
-/// <see cref="Function"/> explicitly.</para>
+/// 0.25 F3 (#847): a nested <c>§F{id:Name} (T:x) -&gt; R</c> directly in a <c>§F</c>/<c>§MT</c>
+/// body, emitted in place as a C# <c>static</c> local function. Visible in the whole
+/// body, it shadows same-named members. <see cref="Analysis.RecursiveAstWalker"/>
+/// treats it as a leaf; passes that need the body visit <see cref="Function"/>.
 /// </summary>
 public sealed class LocalFunctionStatementNode : StatementNode
 {

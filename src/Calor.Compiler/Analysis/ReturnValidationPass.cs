@@ -85,8 +85,7 @@ public sealed class ReturnValidationPass
         WalkYields(module, YieldContext.None);
     }
 
-    // 0.25 F3 (#847): local functions declared directly in a §F/§MT body, and the
-    // FunctionNodes that are local functions (their bodies may not nest another).
+    // 0.25 F3 (#847): correctly placed local functions, and local FunctionNodes.
     private readonly HashSet<LocalFunctionStatementNode> _placedLocalFunctions =
         new(ReferenceEqualityComparer.Instance);
     private readonly HashSet<FunctionNode> _localFunctionNodes = new(ReferenceEqualityComparer.Instance);
@@ -190,8 +189,7 @@ public sealed class ReturnValidationPass
 
         if (node is LocalFunctionStatementNode local)
         {
-            // Walk() never enters expressions, so a local function inside a lambda
-            // is first seen here; it is misplaced (#847 review round 1, finding 5).
+            // Walk() skips expressions: one first seen here is inside a lambda (#847).
             if (_localFunctionNodes.Add(local.Function))
                 CheckLocalFunction(local);
             WalkYields(local.Function, context);

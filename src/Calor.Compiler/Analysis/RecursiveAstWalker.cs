@@ -198,13 +198,8 @@ public static class RecursiveAstWalker
                 .ThenBy(p => p.Name, StringComparer.Ordinal)
                 .ToArray());
 
-    /// <summary>
-    /// 0.25 F3 (#847): a <see cref="LocalFunctionStatementNode"/> is a leaf. Its body
-    /// is another callable that cannot capture the enclosing one, so returns, yields,
-    /// bindings and facts inside it never belong to the enclosing body. Passes that
-    /// must analyze the body visit <see cref="LocalFunctionStatementNode.Function"/>
-    /// explicitly.
-    /// </summary>
+    /// <summary>0.25 F3 (#847): a local function is a leaf; its body is another
+    /// callable, so nothing in it belongs to the enclosing body.</summary>
     public static bool IsSeparateCallable(Type type) => type == typeof(LocalFunctionStatementNode);
 
     private static bool CanHoldChildAstNode(Type propertyType)

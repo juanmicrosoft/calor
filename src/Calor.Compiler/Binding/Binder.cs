@@ -1399,16 +1399,13 @@ public sealed class Binder
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
-    // 0.25 F3 (#847): local functions declared directly in a §F/§MT body.
     private readonly HashSet<FunctionSymbol> _localFunctionSymbols = new(ReferenceEqualityComparer.Instance);
     private readonly List<BoundFunction> _boundLocalFunctions = new();
 
     /// <summary>
-    /// Declares the local functions of one callable body in a scope between the
-    /// host (class or module) scope and the body scope, so they are visible in the
-    /// whole body, before their declaration too, and to each other. Returns the
-    /// scope the body scope must be a child of (the host when there are none).
-    /// ReturnValidationPass (Calor0211) has already rejected every other placement.
+    /// 0.25 F3 (#847): declares a body's local functions in a scope between the host
+    /// and the body scope (visible before their declaration and to each other) and
+    /// returns the scope the body scope must be a child of.
     /// </summary>
     private Scope DeclareLocalFunctions(
         IReadOnlyList<StatementNode> body,
@@ -1442,11 +1439,8 @@ public sealed class Binder
     }
 
     /// <summary>
-    /// Binds each local function body as its own static callable: its scope sees
-    /// its parameters, the sibling local functions and the host scope, but never
-    /// the enclosing callable's locals or parameters (a C# <c>static</c> local
-    /// function). The result is a separate <see cref="BoundFunction"/> of kind
-    /// <see cref="BoundMemberKind.LocalFunction"/>.
+    /// Binds each local body as its own static callable that never sees the enclosing
+    /// locals or parameters (a C# <c>static</c> local function).
     /// </summary>
     private void BindLocalFunctions(
         List<(FunctionNode Node, FunctionSymbol Symbol)> locals,
@@ -1486,11 +1480,8 @@ public sealed class Binder
         }
     }
 
-    /// <summary>
-    /// 0.25 F3 (#847): C# name lookup stops at a visible local function even when
-    /// its overload check fails here (for example an argument type this module
-    /// cannot see), so the call site still names the local function.
-    /// </summary>
+    /// <summary>0.25 F3 (#847): C# lookup stops at a visible local function even when
+    /// its overload check fails here, so the call still names it.</summary>
     private IReadOnlyList<FunctionSymbol> WithLocalFunctionCandidates(
         string target,
         IReadOnlyList<FunctionSymbol> resolved)
@@ -1666,8 +1657,7 @@ public sealed class Binder
             // Passthrough nodes — no executable semantics
             FallbackCommentNode => null,
             RawCSharpNode => null,
-            // 0.25 F3 (#847): declared and bound as its own callable by
-            // DeclareLocalFunctions/BindLocalFunctions, not as enclosing flow.
+            // 0.25 F3 (#847): bound as its own callable (BindLocalFunctions).
             LocalFunctionStatementNode => null,
             PreprocessorDirectiveNode => null,
             EventSubscribeNode => null,
@@ -6081,9 +6071,8 @@ public sealed class Binder
         if (firstDot <= 0)
         {
             // 0.25 F3 (#847): C# simple-name lookup stops at the innermost
-            // declaration. A local or parameter of this name is invoked as a value,
-            // never as a same-named function (review round 1, finding 4); a visible
-            // local function wins over every same-named member or module function.
+            // declaration: a local or parameter is invoked as a value; a visible
+            // local function wins over same-named members and module functions.
             if (_scope.Lookup(target) is VariableSymbol { DeclaringTypeName: null })
                 yield break;
             if (_scope.GetOverloads(target).Any(_localFunctionSymbols.Contains))

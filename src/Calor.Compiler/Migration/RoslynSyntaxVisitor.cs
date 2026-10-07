@@ -4545,13 +4545,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return Array.Empty<StatementNode>();
     }
 
-    /// <summary>
-    /// 0.25 F3 (#847): the native local-function slice. A local function declared
-    /// directly in a method body, with no attributes, type parameters, async,
-    /// unsafe or extern modifier, no yield, no nested local function, plain
-    /// by-value parameters without defaults, and no capture of the enclosing
-    /// locals, parameters or <c>this</c>. Anything else is preserved as interop.
-    /// </summary>
+    /// <summary>0.25 F3 (#847): the native local-function slice (see FeatureSupport
+    /// "local-function"); anything else is preserved as interop.</summary>
     private bool IsNativeLocalFunction(LocalFunctionStatementSyntax local)
     {
         if (local.Parent is not BlockSyntax { Parent: MethodDeclarationSyntax }
@@ -4569,12 +4564,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return !CapturesEnclosingState(local);
     }
 
-    /// <summary>
-    /// Whether a local function reads or writes an enclosing local or parameter,
-    /// or uses <c>this</c>/<c>base</c> (explicitly, or implicitly through an
-    /// unqualified instance member). Answers true (capturing) when the semantic
-    /// model is unavailable: unknown is never native.
-    /// </summary>
+    /// <summary>Whether a local function uses an enclosing local or parameter, or
+    /// <c>this</c>/<c>base</c> (also implicitly). Unknown counts as capturing.</summary>
     private bool CapturesEnclosingState(LocalFunctionStatementSyntax local)
     {
         if (local.Modifiers.Any(SyntaxKind.StaticKeyword))
@@ -4591,10 +4582,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             var symbol = _semanticModel.GetSymbolInfo(name).Symbol;
             if (symbol == null)
             {
-                // Unresolved (for example a member declared in another file of a
-                // partial class): it may be enclosing state, so it is not proof of
-                // no capture (#847 review round 1, finding 6). `nameof` and member
-                // names after a resolved qualifier carry no capture.
+                // Unresolved (e.g. declared in another partial file): may be state.
                 if (IsQualifiedMemberName(name)
                     || name is IdentifierNameSyntax { Identifier.ValueText: "nameof" })
                     continue;
@@ -4676,9 +4664,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
                 if (!exprAssign.IsKind(SyntaxKind.SimpleAssignmentExpression))
                 {
-                    // `void M() => Log += s;` keeps its compound operator. It was
-                    // lowered to a plain assignment (`Log = s`), a silent change
-                    // that native local functions would also inherit (#847).
+                    // `=> Log += s` keeps its operator (it became `Log = s`; #847).
                     var compound = ConvertExpressionToStatement(exprAssign, GetTextSpan(expressionBody));
                     FlushPendingStatements(result);
                     if (compound != null)
@@ -6594,13 +6580,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         var statements = new List<StatementNode>();
 
-        // #777 (WS-W4 D4): local functions are never hoisted to module level (the
-        // call site would build-break or silently rebind to a same-named member).
-        // 0.25 F3 (#847): a member whose local functions are ALL in the native
-        // slice (IsNativeLocalFunction) converts them in place to a nested §F,
-        // emitted as a C# static local function. Any other local function escalates
-        // the whole member to §CSHARP interop, as before. Decided before any
-        // statement is processed so no member is half-converted.
+        // #777 (WS-W4 D4): local functions are never hoisted (orphaned call or
+        // silent rebind). 0.25 F3 (#847): if ALL are in the native slice they
+        // convert in place; otherwise the whole member escalates to §CSHARP.
         if (block.Parent is BaseMethodDeclarationSyntax or AccessorDeclarationSyntax)
         {
             var localFn = block.DescendantNodes()

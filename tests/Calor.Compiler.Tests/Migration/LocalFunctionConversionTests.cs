@@ -712,6 +712,52 @@ public class LocalFunctionConversionTests
             d => d.Code == "Calor0211" && d.Message.Contains("generic"));
     }
 
+    // ---- Codex review round 2 regressions ----
+
+    [Fact]
+    public void Review2_AnAliasOfALocalFunction_IgnoresASameNamedField()
+    {
+        // `f` aliases the printing local Help, not the pure field Help; invoked in
+        // an escaping lambda it must carry cw.
+        var source = """
+            §M{m001:Escape}
+              §CL{c001:Probe:pub:stat}
+                §FLD{Func<i32, i32>:Help:priv:stat} §E{}
+                §MT{m002:Get:pub:stat} () -> Func<i32, i32> §E{}
+                  §E{cw}
+                  §B{Func<i32, i32>:f} Help
+                  §R §LAM{l001:x:i32} §C{f} §A x §/C §/LAM{l001}
+                  §F{f001:Help} (i32:x) -> i32
+                    §P "hidden"
+                    §R x
+            """;
+        var compilation = Program.Compile(source, "r2a.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(compilation.Diagnostics.Errors,
+            d => d.Code is "Calor0410" or "Calor0424" or "Calor0425");
+    }
+
+    [Fact]
+    public void Review2_AnEnclosingPatternVariable_IsNeverQualifiedToAModuleFunction()
+    {
+        var source = """
+            §M{m001:Cap}
+              §F{f001:Add:pub} (i32:x) -> i32
+                §R (+ x 1000)
+              §CL{c001:Probe:pub:stat}
+                §MT{m002:Get:pub:stat} (object:o) -> i32
+                  §IF{i1} (is o Func<i32, i32> Add)
+                    §R 1
+                  §F{f003:L} () -> i32
+                    §R §C{Add} §A 1 §/C
+                  §R §C{L} §/C
+            """;
+        var compilation = Program.Compile(source, "r2b.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(compilation.Diagnostics.Errors,
+            d => d.Code == "Calor1002" && d.Message.Contains("CS8421"));
+    }
+
     [Fact]
     public void NativeLocal_RoundTripsThroughTheCalorEmitter()
     {
