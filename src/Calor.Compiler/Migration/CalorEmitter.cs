@@ -2268,7 +2268,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             _pendingHoistedLines.AddRange(hoisted);
             var literal = node is IntLiteralNode or StringLiteralNode or BoolLiteralNode
-                or FloatLiteralNode or DecimalLiteralNode;
+                or FloatLiteralNode or DecimalLiteralNode
+                // `null`/`default` take their type from the target; a temp would lose it.
+                or ReferenceNode { Name: "null" or "default" };
             values.Add(hoistAll && !literal ? HoistToTempVar(value) : value);
         }
         return values;
@@ -5286,12 +5288,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         else if (node.DimensionSizes.Count > 0)
         {
             var dims = string.Join(":", node.DimensionSizes.Select(EmitSizeAttribute));
-            return $"§ARR2D{{{node.Id}:{node.Name}:{elementType}:{dims}}}";
+            return $"§ARR2D{{{node.Id}:{node.Name}:{elementType}:{dims}}} §/ARR2D{{{node.Id}}}";
         }
         else
         {
             var zeros = string.Join(":", Enumerable.Repeat("0", node.Rank));
-            return $"§ARR2D{{{node.Id}:{node.Name}:{elementType}:{zeros}}}";
+            return $"§ARR2D{{{node.Id}:{node.Name}:{elementType}:{zeros}}} §/ARR2D{{{node.Id}}}";
         }
     }
 

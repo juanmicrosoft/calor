@@ -225,9 +225,10 @@ member-access target, and `?:` branch. Elements can be object initializers, call
 
 **Limits.** These shapes are kept as C# and reported, never moved:
 
-- An assignment used as an element or an index (`{ x = Next() }`, `a[i = 0]`), and a
-  size that calls a method inside a `?:`, `&&`, `||`, or `??` operand
-  (`flag ? new int[Next()] : …`). They are reported as
+- An assignment used as an element, an index, or a size (`{ x = Next() }`,
+  `a[i = 0]`, `new int[n = 3]`), and, inside a `?:`, `&&`, `||`, or `??` operand, a
+  sized array whose size is anything but a name or an integer literal
+  (`flag ? new int[n + 1] : …`). They are reported as
   `conditional-expression-hoisting`.
 - If an expression-position array still produces Calor that does not parse, the
   member is kept as C# by the rescue and reported as `post-validation-fallback`.

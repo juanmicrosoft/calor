@@ -15071,8 +15071,8 @@ public sealed class Parser
 
         // #1132: the sized form may carry §ROW lines too (`new T[2, 1, 2] { … }`): the
         // rows are the innermost vectors in row-major order, which is how a rank-3+
-        // initializer is written. Without rows the sized form is unchanged.
-        if (pos3 == null || Check(TokenKind.Row) || Check(TokenKind.Indent) && Peek(1).Kind == TokenKind.Row)
+        // initializer is written. An expression-position sized form ends with §/ARR2D.
+        if (pos3 == null || Check(TokenKind.Row) || Check(TokenKind.EndArray2D) || Check(TokenKind.Indent) && Peek(1).Kind == TokenKind.Row)
         {
             // Initializer form: parse §ROW elements until §/ARR2D
             while (!IsAtEnd && !IsBlockEnd(TokenKind.EndArray2D))
