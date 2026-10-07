@@ -249,6 +249,9 @@ public sealed class TypeChecker
     }
 
     private void RegisterFunction(FunctionNode func)
+        => _env.DefineFunction(GetCallableLookupName(func.Name), CreateCandidate(func));
+
+    private FunctionCandidate CreateCandidate(FunctionNode func)
     {
         _env.EnterScope();
 
@@ -274,12 +277,12 @@ public sealed class TypeChecker
         _env.ExitScope();
 
         var funcType = new FunctionType(paramTypes, returnType);
-        _env.DefineFunction(GetCallableLookupName(func.Name), new FunctionCandidate(
+        return new FunctionCandidate(
             funcType,
             func.Parameters.Select(parameter => parameter.Name).ToArray(),
             func.Parameters.Select(parameter => parameter.Modifier).ToArray(),
             func.Parameters.Select(parameter => parameter.DefaultValue != null).ToArray(),
-            GetTypeParameterNames(func)));
+            GetTypeParameterNames(func));
     }
 
     private void RegisterDelegate(DelegateDefinitionNode delegateDefinition)
@@ -340,12 +343,19 @@ public sealed class TypeChecker
             _env.DefineVariable(param.Name, paramType);
         }
 
+        // 0.25 F3 (#847): local functions shadow same-named functions in the whole
+        // body (and in each other), as in C#.
+        _env.EnterLocalFunctions();
+        foreach (var local in func.Body.OfType<LocalFunctionStatementNode>())
+            _env.DefineLocalFunction(GetCallableLookupName(local.Function.Name), CreateCandidate(local.Function));
+
         // Check body statements
         foreach (var stmt in func.Body)
         {
             CheckStatement(stmt);
         }
 
+        _env.ExitLocalFunctions();
         _currentReturnType = previousReturnType;
         _env.ExitScope();
     }
@@ -356,6 +366,9 @@ public sealed class TypeChecker
         {
             case CallStatementNode call:
                 CheckCallStatement(call);
+                break;
+            case LocalFunctionStatementNode local:
+                CheckFunction(local.Function);
                 break;
             case ReturnStatementNode ret:
                 CheckReturnStatement(ret);
@@ -4759,7 +4772,29 @@ public sealed class TypeEnvironment
     }
 
     public IReadOnlyList<FunctionCandidate> LookupFunctionCandidates(string name)
-        => _functions.TryGetValue(name, out var overloads)
+    {
+        foreach (var scope in _localFunctions)
+        {
+            if (scope.TryGetValue(name, out var locals))
+                return locals;
+        }
+        return _functions.TryGetValue(name, out var overloads)
             ? overloads
             : Array.Empty<FunctionCandidate>();
+    }
+
+    // 0.25 F3 (#847): local functions visible in the callable bodies being checked.
+    private readonly Stack<Dictionary<string, List<FunctionCandidate>>> _localFunctions = new();
+
+    public void EnterLocalFunctions() => _localFunctions.Push(new(StringComparer.Ordinal));
+
+    public void ExitLocalFunctions() => _localFunctions.Pop();
+
+    public void DefineLocalFunction(string name, FunctionCandidate candidate)
+    {
+        var scope = _localFunctions.Peek();
+        if (!scope.TryGetValue(name, out var overloads))
+            scope[name] = overloads = new List<FunctionCandidate>();
+        overloads.Add(candidate);
+    }
 }

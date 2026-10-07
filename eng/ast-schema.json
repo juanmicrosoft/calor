@@ -736,6 +736,10 @@
     {
       "name": "SyncBlockNode",
       "source": "UnsafeNodes.cs"
+    },
+    {
+      "name": "LocalFunctionStatementNode",
+      "source": "FunctionNode.cs"
     }
   ]
 }

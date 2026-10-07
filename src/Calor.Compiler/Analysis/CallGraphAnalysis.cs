@@ -88,6 +88,13 @@ public sealed class CallGraphAnalysis
         /// by name and declaration start.</summary>
         public Dictionary<string, List<(string Name, int DeclarationStart, Binding.BoundTypes.FunctionBoundType Type)>>
             Locals { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>0.25 F3 (#847): calls the binder resolved to a local function,
+        /// keyed by the enclosing callable's id.</summary>
+        public HashSet<(string CallerId, int Start, int End)> LocalFunctionCalls { get; } = new();
+
+        /// <summary>False when binding threw: no call site is known to be local.</summary>
+        public bool Complete { get; set; }
     }
 
     private BoundValueIndex _boundValues = new();
@@ -95,6 +102,12 @@ public sealed class CallGraphAnalysis
     /// <summary>The declaration span of the variable the binder resolved a bare
     /// value reference (a call target or a <c>ReferenceNode</c>) to, or
     /// <c>null</c> when binding threw or the reference was not a variable.</summary>
+    /// <summary>0.25 F3 (#847): <c>null</c> when binding threw (fail closed).</summary>
+    public bool? IsLocalFunctionCall(string callerId, TextSpan call) =>
+        _boundValues.Complete
+            ? _boundValues.LocalFunctionCalls.Contains((callerId, call.Start, call.End))
+            : null;
+
     public TextSpan? BoundValueDeclaration(string callerId, TextSpan reference) =>
         _boundValues.Declarations.TryGetValue((callerId, reference.Start, reference.End), out var span)
             ? span
@@ -596,7 +609,8 @@ public sealed class CallGraphAnalysis
                             functions,
                             functionNameToId,
                             methodNameToIds);
-                if (calleeIds.Count == 0)
+                if (calleeIds.Count == 0
+                    && !boundValues.LocalFunctionCalls.Contains((function.Id, span.Start, span.End)))
                 {
                     unresolvedCalls.Add(new AstUnresolvedCallSite(function.Id, callee, span));
                 }
@@ -717,6 +731,7 @@ public sealed class CallGraphAnalysis
         {
             var diagnostics = new Calor.Compiler.Diagnostics.DiagnosticBag();
             var boundModule = new Binder(diagnostics).Bind(ast);
+            boundValues.Complete = true;
             var incompatibleCallSpans = diagnostics
                 .Where(diagnostic =>
                     diagnostic.Code is Calor.Compiler.Diagnostics.DiagnosticCode.NoMatchingOverload
@@ -729,6 +744,17 @@ public sealed class CallGraphAnalysis
                     LegacyId: ResolveLegacyFunctionId(function, functions)))
                 .Where(item => item.LegacyId != null)
                 .ToDictionary(item => item.SymbolId, item => item.LegacyId!);
+            // 0.25 F3 (#847): a local body is indexed under its enclosing callable's id.
+            var callerIds = new Dictionary<SymbolId, string>(legacyIds);
+            var localFunctionIds = new HashSet<SymbolId>();
+            foreach (var local in boundModule.Functions.Where(function =>
+                         function.MemberKind == BoundMemberKind.LocalFunction))
+            {
+                localFunctionIds.Add(local.SymbolId);
+                if (local.EnclosingSymbolId is { } enclosing
+                    && legacyIds.TryGetValue(enclosing, out var enclosingId))
+                    callerIds[local.SymbolId] = enclosingId;
+            }
 
             foreach (var symbol in boundModule.SymbolsById.Values)
             {
@@ -746,12 +772,13 @@ public sealed class CallGraphAnalysis
 
             foreach (var function in boundModule.Functions)
             {
-                if (!legacyIds.TryGetValue(function.SymbolId, out var callerId))
+                if (!callerIds.TryGetValue(function.SymbolId, out var callerId))
                     continue;
 
-                if (function.Symbol.ReturnFunctionType is { } returnType)
+                var isLocalFunction = function.MemberKind == BoundMemberKind.LocalFunction;
+                if (!isLocalFunction && function.Symbol.ReturnFunctionType is { } returnType)
                     declaredReturns[callerId] = returnType;
-                foreach (var parameter in function.Symbol.Parameters)
+                foreach (var parameter in isLocalFunction ? [] : function.Symbol.Parameters)
                 {
                     if (parameter.FunctionType is not { } parameterType) continue;
                     if (!declaredTypes.TryGetValue(callerId, out var byName))
@@ -828,6 +855,12 @@ public sealed class CallGraphAnalysis
                         continue;
 
                     var key = new AstCallKey(callerId, target, node.Span.Start, node.Span.End);
+                    if (callees?.Any(callee => localFunctionIds.Contains(callee.Id)) == true)
+                    {
+                        boundCallSites.Add(key);
+                        boundValues.LocalFunctionCalls.Add((callerId, node.Span.Start, node.Span.End));
+                        continue;
+                    }
                     var calleeLegacyIds = callees?
                         .Select(callee => callee.Id)
                         .Where(calleeId => !calleeId.IsNone)
@@ -1143,6 +1176,11 @@ public sealed class CallGraphAnalysis
             case ExpressionCallNode expressionCall:
                 calls.Add(("<expression-call>", expressionCall.Span));
                 break;
+            case LocalFunctionStatementNode local:
+                // 0.25 F3 (#847): a leaf for the walker; its calls are the enclosing callable's.
+                foreach (var statement in local.Function.Body)
+                    CollectCallsFromNode(statement, calls);
+                return;
         }
 
         foreach (var child in RecursiveAstWalker.GetAllChildren(node))

@@ -1468,9 +1468,24 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return "";
     }
 
+    /// <summary>
+    /// 0.25 F3 (#847): a local function is a nested <c>§F{id:Name}</c> with no
+    /// visibility segment, written in place at the current indentation.
+    /// </summary>
+    public string Visit(LocalFunctionStatementNode node)
+    {
+        _nextFunctionIsLocal = true;
+        return Visit(node.Function);
+    }
+
+    private bool _nextFunctionIsLocal;
+
     public string Visit(FunctionNode node)
     {
         var visibility = GetVisibilityShorthand(node.Visibility);
+        var isLocal = _nextFunctionIsLocal;
+        _nextFunctionIsLocal = false;
+        var visibilitySegment = isLocal ? "" : ":" + visibility;
         var (typeParams, typeParamsAfterGroup) =
             SplitTypeParameterList(node.TypeParameters, node.EffectParameters);
         var functionName = node.Name;
@@ -1491,11 +1506,11 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             var inlineParams = node.Parameters.Count > 0 || node.Output != null ? $" ({inlineFmt})" : "";
             var inlineReturn = node.Output != null ? $" -> {output}{FormatEffectRow(node.Output.Row)}" : "";
-            AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(functionName)}{typeParams}:{visibility}}}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
+            AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(functionName)}{typeParams}{visibilitySegment}}}{typeParamsAfterGroup}{inlineParams}{inlineReturn}");
         }
         else
         {
-            AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(functionName)}{typeParams}:{visibility}}}{typeParamsAfterGroup}");
+            AppendLine($"§{funcTag}{{{node.Id}:{EscapeCalorIdentifier(functionName)}{typeParams}{visibilitySegment}}}{typeParamsAfterGroup}");
         }
         Indent();
 

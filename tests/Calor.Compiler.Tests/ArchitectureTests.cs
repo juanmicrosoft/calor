@@ -186,13 +186,18 @@ public class ArchitectureTests
         Assert.Equal(concreteNodes, nonGenericVisits);
         Assert.Equal(concreteNodes, genericVisits);
 
+        // 0.25 F3 (#847): a local function is a leaf for the walker by design; its
+        // body is a separate callable that the passes needing it visit explicitly.
+        Assert.Equal(
+            [typeof(LocalFunctionStatementNode)],
+            concreteNodes.Where(RecursiveAstWalker.IsSeparateCallable));
         foreach (var node in AstSchemaMetadata.Nodes)
         {
             Assert.Equal(
                 RecursiveAstWalker.GetAllChildProperties(node.NodeType)
                     .Select(property => property.Name)
                     .OrderBy(name => name, StringComparer.Ordinal),
-                node.ChildProperties);
+                RecursiveAstWalker.IsSeparateCallable(node.NodeType) ? [] : node.ChildProperties);
             var sourcePath = Path.Combine(
                 RepoRoot(),
                 "src",

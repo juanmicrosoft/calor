@@ -304,13 +304,28 @@ public class WedgeW4SliceAStructuralTests
         Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == "Get");
     }
 
-    // A member containing ANY local function escalates to §CSHARP interop. The
-    // hoist-to-module lowering is unsound in both directions: its happy path
+    // The hoist-to-module lowering is unsound in both directions: its happy path
     // (no same-named member) build-breaks (the call site is orphaned from the
     // hoisted function → CS0103), and when a same-named member DOES exist the
     // orphaned call silently rebinds to it and compiles clean (LossCount==0, wrong
-    // behaviour) — the §1 predicate-trust blocker. Escalate-all makes every
-    // outcome honest interop; no correct native coverage is lost.
+    // behaviour) — the §1 predicate-trust blocker. 0.25 F3 (#847): the bounded
+    // slice now converts IN PLACE as a nested §F (a C# static local function), so
+    // the call still names the local function. Everything else escalates the
+    // whole member to §CSHARP interop. Behaviour is compared by execution in
+    // Calor.Compiler.Tests LocalFunctionConversionTests.
+
+    private static void AssertLocalFunctionNative(ConversionResult result, string localName)
+    {
+        Assert.True(result.Success, string.Join("; ", result.Issues.Select(i => i.Message)));
+        Assert.DoesNotContain(result.Context.Losses,
+            l => l.Kind == ConversionLossKind.InteropPreserved);
+        Assert.DoesNotContain(result.Issues, i => i.Feature == "local-function");
+        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        // In place: a nested §F with no visibility segment, inside the member.
+        Assert.Matches(@"\n {6,}§F\{f\d+:" + localName + @"\}", result.CalorSource);
+        // Never hoisted as a module function.
+        Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == localName);
+    }
 
     private static void AssertLocalFunctionEscalated(ConversionResult result, string localName)
     {
@@ -332,20 +347,6 @@ public class WedgeW4SliceAStructuralTests
             """
             public class C
             {
-                public int M()
-                {
-                    int Add(int a, int b) => a + b;
-                    return Add(1, 2);
-                }
-            }
-            """,
-            "Add",
-            true
-        },
-        {
-            """
-            public class C
-            {
                 private int _offset = 2;
                 public int M(int value)
                 {
@@ -355,21 +356,6 @@ public class WedgeW4SliceAStructuralTests
             }
             """,
             "Next",
-            true
-        },
-        {
-            """
-            public class C
-            {
-                public bool M(int value)
-                {
-                    bool Even(int n) => n == 0 || Odd(n - 1);
-                    bool Odd(int n) => n != 0 && Even(n - 1);
-                    return Even(value);
-                }
-            }
-            """,
-            "Even",
             true
         },
         {
@@ -628,11 +614,8 @@ public class WedgeW4SliceAStructuralTests
     }
 
     [Fact]
-    public void D4_PlainLocalFunction_EscalatesToInterop()
+    public void D4_PlainLocalFunction_ConvertsNativelyInPlace()
     {
-        // Even a plain non-generic, non-capturing local function escalates: the
-        // hoist's own happy path build-breaks (orphaned call site), so there is no
-        // correct native conversion to preserve.
         var csharp = """
             public class D
             {
@@ -644,11 +627,31 @@ public class WedgeW4SliceAStructuralTests
             }
             """;
 
-        AssertLocalFunctionEscalated(Convert(csharp), "Add");
+        AssertLocalFunctionNative(Convert(csharp), "Add");
     }
 
     [Fact]
-    public void D4_RecursiveLocalFunction_EscalatesToInterop()
+    public void D4_MutuallyRecursiveLocalFunctions_ConvertNativelyInPlace()
+    {
+        var csharp = """
+            public class C
+            {
+                public bool M(int value)
+                {
+                    bool Even(int n) => n == 0 || Odd(n - 1);
+                    bool Odd(int n) => n != 0 && Even(n - 1);
+                    return Even(value);
+                }
+            }
+            """;
+
+        var result = Convert(csharp);
+        AssertLocalFunctionNative(result, "Even");
+        AssertLocalFunctionNative(result, "Odd");
+    }
+
+    [Fact]
+    public void D4_RecursiveLocalFunction_ConvertsNativelyInPlace()
     {
         var csharp = """
             public class F
@@ -665,16 +668,16 @@ public class WedgeW4SliceAStructuralTests
             }
             """;
 
-        AssertLocalFunctionEscalated(Convert(csharp), "Fac");
+        AssertLocalFunctionNative(Convert(csharp), "Fac");
     }
 
     [Fact]
-    public void D4_C1_LocalShadowsSameClassMethod_EscalatesToInterop_NotSilentRebind()
+    public void D4_C1_LocalShadowsSameClassMethod_ConvertsInPlace_NotSilentRebind()
     {
         // C-1: the class has both `int Foo() => 999` and a local `int Foo() => 1`.
         // The source M() returns 1; a naive hoist would orphan the call and silently
-        // rebind it to the class method (round-trip M() == 999) — a silent
-        // substitution with zero recorded losses. Escalate-all refuses it loudly.
+        // rebind it to the class method (round-trip M() == 999). In place, the
+        // nested §F keeps the call on the local function.
         var csharp = """
             public class C
             {
@@ -687,11 +690,11 @@ public class WedgeW4SliceAStructuralTests
             }
             """;
 
-        AssertLocalFunctionEscalated(Convert(csharp), "Foo");
+        AssertLocalFunctionNative(Convert(csharp), "Foo");
     }
 
     [Fact]
-    public void D4_C2_LocalShadowsInheritedMethod_EscalatesToInterop_NotSilentRebind()
+    public void D4_C2_LocalShadowsInheritedMethod_ConvertsInPlace_NotSilentRebind()
     {
         // C-2: the local `Foo` shadows an INHERITED Base.Foo(). A hoist would orphan
         // the call and it would rebind to the base method — silent.
@@ -707,11 +710,11 @@ public class WedgeW4SliceAStructuralTests
             }
             """;
 
-        AssertLocalFunctionEscalated(Convert(csharp), "Foo");
+        AssertLocalFunctionNative(Convert(csharp), "Foo");
     }
 
     [Fact]
-    public void D4_C3_LocalShadowsClassOverload_EscalatesToInterop_NotSilentRebind()
+    public void D4_C3_LocalShadowsClassOverload_ConvertsInPlace_NotSilentRebind()
     {
         // C-3: the local `Foo(int)` shadows a class overload `Foo(int)`. A hoist
         // would orphan the call and rebind to the class overload — silent.
@@ -727,6 +730,6 @@ public class WedgeW4SliceAStructuralTests
             }
             """;
 
-        AssertLocalFunctionEscalated(Convert(csharp), "Foo");
+        AssertLocalFunctionNative(Convert(csharp), "Foo");
     }
 }

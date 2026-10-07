@@ -19,7 +19,8 @@ public class ConversionScorecardTests
     // Baselines are exact (no slack): the corpus and converter are
     // deterministic, and per-fixture zero-regression is enforced against
     // baseline.json by NoRegressionsVsCommittedBaseline.
-    private const int BASELINE_FULLY_CONVERTED = 93;
+    // 0.25 F3 (#847): 93 -> 94, 074_LocalFunctions converts natively in place.
+    private const int BASELINE_FULLY_CONVERTED = 94;
     private const int BASELINE_ROUNDTRIP = 97;
 
     private static readonly Lazy<ConversionScorecard> _scorecard = new(() =>
@@ -118,14 +119,16 @@ public class ConversionScorecardTests
     }
 
     [Fact]
-    public void LocalFunctionInterop_IsNotReportedAsNativeFeatureConversion()
+    public void NonCapturingLocalFunctions_AreReportedAsNativeFeatureConversion()
     {
+        // 0.25 F3 (#847): 074's local functions are non-capturing, so they convert
+        // in place natively; the interop case is covered by LocalFunctionConversionTests.
         Assert.Contains("local_function", Scorecard.ByFeature);
         var localFunctions = Scorecard.ByFeature["local_function"];
 
         Assert.Equal(1, localFunctions.Total);
-        Assert.Equal(0, localFunctions.Passed);
-        Assert.Equal(0, localFunctions.Rate);
+        Assert.Equal(1, localFunctions.Passed);
+        Assert.Equal(1, localFunctions.Rate);
     }
 
     [Fact]
