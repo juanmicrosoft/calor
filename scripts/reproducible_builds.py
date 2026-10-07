@@ -14,11 +14,13 @@ in different directories, produce the same bytes. This script checks exactly tha
         Hash every published file a reproducible-build.sh output directory holds:
         each .nupkg (and each zip entry with its timestamp), each release-metadata
         file, and each website file plus the gate's tree digest.
-  compare A.json B.json [--markdown FILE]
-        Exit 1 unless every hash in A equals the one in B (and no file is missing).
+  compare A.json B.json --targets all|packages|website [--markdown FILE]
+        Exit 1 unless both outputs hold everything the target publishes and every hash
+        in A equals the one in B (no file missing on either side).
   run --workdir DIR [--evidence DIR] [--targets all|packages|website] [--z3 download|copy]
         The full proof: two fresh clones at different paths, each built with its own
-        HOME, NuGet cache, npm cache and time zone, then hash and compare.
+        HOME, NuGet cache, npm cache, time zone, locale and ambient timestamp variables,
+        then hash and compare.
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -38,15 +41,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from verify_release_adjudication import tree_digest  # noqa: E402  (the gate's own digest)
 
 BUILD_SCRIPT = REPO_ROOT / "scripts/reproducible-build.sh"
-Z3_DIRS = ("src/Calor.Compiler/z3", "src/Calor.Compiler/runtimes")
-SCHEMA = "calor/reproducible-build-hashes/1"
+Z3_REGISTRY = REPO_ROOT / "eng/z3-consumers.json"
+SCHEMA = "calor/reproducible-build-hashes/2"
 
 # Two deliberately different environments for the two builds. Paths differ in depth
-# and name; the time zone differs so a wall-clock or local-time leak shows up.
+# and name; the time zone, locale and the timestamp variables NuGet and the SDK know
+# about differ, so a wall-clock, local-time, locale or ambient-epoch leak shows up.
 BUILDS = (
-    {"name": "build-1", "tree": "a/calor", "tz": "UTC"},
-    {"name": "build-2", "tree": "second-build/nested/elsewhere/calor-clone", "tz": "Pacific/Kiritimati"},
+    {"name": "build-1", "tree": "a/calor", "env": {"TZ": "UTC", "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8"}},
+    {"name": "build-2", "tree": "second-build/nested/elsewhere/calor-clone",
+     "env": {"TZ": "Pacific/Kiritimati", "LANG": "tr_TR.UTF-8", "LC_ALL": "tr_TR.UTF-8",
+             "SOURCE_DATE_EPOCH": "1700000000", "DeterministicTimestamp": "2025-02-03T00:00:00Z"}},
 )
+
+# What each target must produce. An empty or partial output is a failure, not a match.
+EXPECTED = {
+    "packages": {"packages": ("calor.", "Calor.Sdk."), "releaseMetadata": (".provenance.json", ".sbom.spdx.json")},
+    "website": {"websiteFiles": ("index.html", "404.html", "sitemap.xml", "search-index.json")},
+}
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -85,19 +97,33 @@ def clone(dest: Path, ref: str, z3: str, log: Path | None = None) -> str:
     if z3 == "download":
         run(["bash", str(dest / "src/Calor.Compiler/scripts/download-z3.sh")], cwd=dest, log=log)
     else:
-        for rel in Z3_DIRS:
-            source = REPO_ROOT / rel
-            if not source.is_dir():
-                sys.exit(f"--z3 copy needs verified assets in {source}; bootstrap this checkout first")
-            shutil.copytree(source, dest / rel)
-    run([sys.executable, str(dest / "scripts/verify-z3-assets.py")], cwd=dest, log=log)
+        copy_z3_assets(REPO_ROOT, dest)
+    run([sys.executable, str(dest / "scripts/verify-z3-assets.py"), "--write-provenance"], cwd=dest, log=log)
     return commit
+
+
+def z3_asset_paths() -> list[str]:
+    """The registered (eng/z3-consumers.json) and pinned Z3 assets, nothing else."""
+    registry = json.loads(Z3_REGISTRY.read_text(encoding="utf-8"))
+    return [registry["managed"]["path"], *(entry["path"] for entry in registry["supportedRids"])]
+
+
+def copy_z3_assets(source_root: Path, dest: Path) -> None:
+    # Only the registered, pinned files: never whole ignored directories, which could
+    # carry unverified files (a stray .cs file there would even be compiled).
+    for rel in z3_asset_paths():
+        source = source_root / rel
+        if not source.is_file():
+            sys.exit(f"--z3 copy needs verified assets ({source} is missing); bootstrap this checkout first")
+        (dest / rel).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, dest / rel)
 
 
 # ---------------------------------------------------------------------------- hash
 
-def hash_build(out: Path) -> dict:
-    result: dict = {"schema": SCHEMA, "packages": {}, "releaseMetadata": {}, "website": None}
+def hash_build(out: Path, toolchain: dict | None = None) -> dict:
+    result: dict = {"schema": SCHEMA, "packages": {}, "releaseMetadata": {}, "website": None,
+                    "toolchain": toolchain or {}}
     for nupkg in sorted((out / "nupkg").glob("*.nupkg")):
         entries = {}
         with zipfile.ZipFile(nupkg) as archive:
@@ -142,11 +168,42 @@ def flatten(hashes: dict) -> dict[str, str]:
     return flat
 
 
-def compare(a: dict, b: dict) -> list[str]:
-    fa, fb = flatten(a), flatten(b)
+def inventory_problems(hashes: dict, target: str, label: str) -> list[str]:
+    """An output that lacks what the target publishes cannot count as reproduced."""
     problems = []
-    if not fa and not fb:
-        return ["nothing was hashed in either build"]
+    targets = ("packages", "website") if target == "all" else (target,)
+    if "packages" in targets:
+        names = list(hashes.get("packages", {}))
+        for prefix in EXPECTED["packages"]["packages"]:
+            if len([n for n in names if n.startswith(prefix) and n.endswith(".nupkg")]) != 1:
+                problems.append(f"{label}: expected exactly one {prefix}*.nupkg, got {sorted(names)}")
+        for name, pkg in hashes.get("packages", {}).items():
+            if not pkg.get("entries"):
+                problems.append(f"{label}: {name} has no entries")
+        metadata = list(hashes.get("releaseMetadata", {}))
+        for suffix in EXPECTED["packages"]["releaseMetadata"]:
+            if len([n for n in metadata if n.endswith(suffix)]) != 1:
+                problems.append(f"{label}: expected exactly one *{suffix} release-metadata file, got {sorted(metadata)}")
+    if "website" in targets:
+        site = hashes.get("website") or {}
+        files = site.get("files") or {}
+        if not files:
+            problems.append(f"{label}: the website output is missing or empty")
+        for required in EXPECTED["website"]["websiteFiles"]:
+            if files and required not in files:
+                problems.append(f"{label}: the website output has no {required}")
+    return problems
+
+
+def toolchain_notes(a: dict, b: dict) -> list[str]:
+    ta, tb = a.get("toolchain") or {}, b.get("toolchain") or {}
+    return [f"toolchain differs: {k}: {ta.get(k)} != {tb.get(k)}"
+            for k in sorted(set(ta) | set(tb)) if ta.get(k) != tb.get(k)]
+
+
+def compare(a: dict, b: dict, target: str = "all") -> list[str]:
+    problems = inventory_problems(a, target, "A") + inventory_problems(b, target, "B")
+    fa, fb = flatten(a), flatten(b)
     for key in sorted(set(fa) | set(fb)):
         if key not in fa:
             problems.append(f"only in B: {key}")
@@ -180,19 +237,24 @@ def markdown(a: dict, b: dict, labels: tuple[str, str], problems: list[str]) -> 
         f"Differences: {len(problems)}.",
     ]
     lines += [f"- {p}" for p in problems[:200]]
+    notes = toolchain_notes(a, b)
+    lines += ["", "Toolchains:", f"- {labels[0]}: {json.dumps(a.get('toolchain') or {}, sort_keys=True)}",
+              f"- {labels[1]}: {json.dumps(b.get('toolchain') or {}, sort_keys=True)}"]
+    lines += [f"- note: {n}" for n in notes]
     return "\n".join(lines) + "\n"
 
 
 # ----------------------------------------------------------------------------- run
 
-def tool_versions(env: dict) -> dict:
+def tool_versions(env: dict, cwd: Path | None = None) -> dict:
+    """The toolchain decides the bytes: record it next to every hash set."""
     def out(cmd: list[str]) -> str:
         try:
-            return subprocess.check_output(cmd, env=env, text=True, stderr=subprocess.STDOUT).strip()
+            return subprocess.check_output(cmd, env=env, cwd=cwd, text=True, stderr=subprocess.STDOUT).strip()
         except (OSError, subprocess.CalledProcessError) as error:
             return f"unavailable: {error}"
-    return {"dotnet": out(["dotnet", "--version"]), "node": out(["node", "--version"]),
-            "npm": out(["npm", "--version"]), "python": sys.version.split()[0]}
+    return {"os": f"{platform.system()} {platform.machine()}", "dotnet": out(["dotnet", "--version"]),
+            "node": out(["node", "--version"]), "npm": out(["npm", "--version"])}
 
 
 def run_proof(args: argparse.Namespace) -> int:
@@ -213,8 +275,7 @@ def run_proof(args: argparse.Namespace) -> int:
             "PATH": os.environ["PATH"],
             "HOME": str(home),
             "TMPDIR": str(root / "tmp"),
-            "TZ": build["tz"],
-            "LANG": "C.UTF-8",
+            **build["env"],
             "NUGET_PACKAGES": str(home / "nuget-packages"),
             "DOTNET_CLI_HOME": str(home),
             "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
@@ -227,13 +288,12 @@ def run_proof(args: argparse.Namespace) -> int:
         commit = clone(tree, args.ref, args.z3, log=log)
         out = root / "out"
         run(["bash", str(tree / "scripts/reproducible-build.sh"), str(tree), str(out), args.targets], env=env, log=log)
-        hashes = hash_build(out)
-        hashes.update({"build": build["name"], "commit": commit, "tree": str(tree), "timeZone": build["tz"],
-                       "toolchain": tool_versions(env)})
+        hashes = hash_build(out, tool_versions(env, cwd=tree))
+        hashes.update({"build": build["name"], "commit": commit, "tree": str(tree), "environment": build["env"]})
         (evidence / f"{build['name']}.hashes.json").write_text(json.dumps(hashes, indent=1) + "\n", encoding="utf-8")
         results[build["name"]] = hashes
     a, b = results["build-1"], results["build-2"]
-    problems = compare(a, b)
+    problems = compare(a, b, args.targets)
     (evidence / "comparison.md").write_text(markdown(a, b, ("build-1", "build-2"), problems), encoding="utf-8")
     print(f"{len(problems)} differences; see {evidence / 'comparison.md'}")
     return 1 if problems else 0
@@ -253,6 +313,8 @@ def main() -> int:
     p.add_argument("a")
     p.add_argument("b")
     p.add_argument("--markdown")
+    p.add_argument("--targets", choices=("all", "packages", "website"), required=True,
+                   help="what both outputs must contain; an empty or partial output fails")
     p = sub.add_parser("run")
     p.add_argument("--workdir", required=True)
     p.add_argument("--evidence")
@@ -265,12 +327,15 @@ def main() -> int:
         print(clone(Path(args.dest).resolve(), args.ref, args.z3))
         return 0
     if args.command == "hash":
-        Path(args.json).write_text(json.dumps(hash_build(Path(args.out)), indent=1) + "\n", encoding="utf-8")
+        hashes = hash_build(Path(args.out), tool_versions(dict(os.environ)))
+        Path(args.json).write_text(json.dumps(hashes, indent=1) + "\n", encoding="utf-8")
         return 0
     if args.command == "compare":
         a = json.loads(Path(args.a).read_text(encoding="utf-8"))
         b = json.loads(Path(args.b).read_text(encoding="utf-8"))
-        problems = compare(a, b)
+        problems = compare(a, b, args.targets)
+        for note in toolchain_notes(a, b):
+            print(f"note: {note}")
         if args.markdown:
             Path(args.markdown).write_text(markdown(a, b, ("A", "B"), problems), encoding="utf-8")
         for problem in problems[:200]:

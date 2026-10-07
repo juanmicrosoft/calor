@@ -16,7 +16,8 @@ All notable changes to this project will be documented in this file.
     (NuGet's `DeterministicTimestamp`).
   - Release builds of the shipped projects embedded the absolute checkout path in DLLs and
     PDBs. They now map it to `/_/` (MSBuild's `DeterministicSourcePaths`).
-  - Next.js picked a random build ID for every build. It is now `calor-<website version>`.
+  - Next.js picked a random build ID for every build. It is now the site version plus the first
+    12 characters of the commit, for example `calor-0.24.0-296c618e30f7`.
   - webpack module IDs in the site's JavaScript were hashed from strings that held absolute
     paths. A small webpack plugin now hashes them with the checkout path removed.
   - The site's entry scripts were named by a hash of their build inputs, which also held

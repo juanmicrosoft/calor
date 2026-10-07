@@ -1,6 +1,22 @@
+const { execFileSync } = require('child_process');
 const path = require('path');
 const { version } = require('./package.json');
 const { PathIndependentModuleIdsPlugin } = require('./reproducible-module-ids');
+
+// The commit being built. A checkout of the same commit anywhere gives the same value;
+// a source tree without git gives 'nogit' (still deterministic, never random).
+function sourceCommit() {
+  try {
+    const head = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: __dirname,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return /^[0-9a-f]{40,64}$/.test(head) ? head.slice(0, 12) : 'nogit';
+  } catch {
+    return 'nogit';
+  }
+}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -16,9 +32,10 @@ const nextConfig = {
   // Reproducible publication builds: Next.js otherwise generates a random build id per
   // build, which lands in every HTML page and in the _next/static/<id>/ path, so no two
   // builds of one commit share a tree hash. The release gate (#1410) rebuilds the site and
-  // compares its tree hash with the adjudicated one. The id comes from the site version,
-  // so it still changes every release (cache busting) but never between builds of one commit.
-  generateBuildId: async () => `calor-${version}`,
+  // compares its tree hash with the adjudicated one. The id is the site version plus the
+  // commit, so it is fixed for one commit and changes with every deployment of a new one
+  // (Next's router uses a changed id to detect a new deployment).
+  generateBuildId: async () => `calor-${version}-${sourceCommit()}`,
   // Nothing in the client bundles may depend on the checkout directory.
   webpack: (config, { isServer, dev }) => {
     // Module ids: see reproducible-module-ids.js.

@@ -3,22 +3,22 @@ name: Reproducible publication builds
 # The release gate (#1410) rebuilds the NuGet packages, the release metadata and the
 # website at publication and compares SHA-256 hashes with the adjudicated ones. This
 # workflow builds each surface twice, in this checkout and in a fresh clone at another
-# path, and fails on any byte difference. Local proof and design:
+# path, and fails on any byte difference. The second build also gets its own HOME,
+# NuGet and npm caches, time zone and locale, plus ambient SOURCE_DATE_EPOCH and
+# DeterministicTimestamp values that must be ignored. Local proof and design:
 # docs/plans/evidence/deterministic-builds/.
+#
+# No paths filter: packages and the site read inputs from all over the tree (README.md,
+# docs/assets, bench/ and tests/ files embedded as resources, scripts, the bootstrap action).
 on:
   pull_request:
     branches: [main, 'release/**']
-    paths:
-      - 'src/**'
-      - 'website/**'
-      - 'Directory.*'
-      - 'global.json'
-      - 'NuGet.Config'
-      - 'scripts/reproducible-build.sh'
-      - 'scripts/reproducible_builds.py'
-      - 'scripts/generate-release-metadata.py'
-      - '.github/workflows/reproducible-builds.yml'
   workflow_dispatch:
+
+env:
+  # Second-build environment. HOME and the caches live under RUNNER_TEMP (set per step).
+  SECOND_TZ: Pacific/Kiritimati
+  SECOND_LOCALE: tr_TR.UTF-8
 
 permissions:
   contents: read
@@ -51,8 +51,15 @@ jobs:
       - name: Build and pack in the checkout
         run: bash scripts/reproducible-build.sh . "$RUNNER_TEMP/build-1" packages
 
-      - name: Build and pack in the clone
-        run: bash scripts/reproducible-build.sh "$RUNNER_TEMP/second/nested/calor-clone" "$RUNNER_TEMP/build-2" packages
+      - name: Build and pack in the clone (isolated HOME, caches, time zone, locale)
+        run: |
+          set -euo pipefail
+          home="$RUNNER_TEMP/home-2"
+          mkdir -p "$home"
+          HOME="$home" DOTNET_CLI_HOME="$home" NUGET_PACKAGES="$home/nuget-packages" \
+            npm_config_cache="$home/npm-cache" TZ="$SECOND_TZ" LANG="$SECOND_LOCALE" LC_ALL="$SECOND_LOCALE" \
+            SOURCE_DATE_EPOCH=1700000000 DeterministicTimestamp=2025-02-03T00:00:00Z \
+            bash scripts/reproducible-build.sh "$RUNNER_TEMP/second/nested/calor-clone" "$RUNNER_TEMP/build-2" packages
 
       - name: Compare every package, entry and metadata file
         run: |
@@ -60,7 +67,7 @@ jobs:
           python3 scripts/reproducible_builds.py hash "$RUNNER_TEMP/build-1" --json "$RUNNER_TEMP/packages-1.json"
           python3 scripts/reproducible_builds.py hash "$RUNNER_TEMP/build-2" --json "$RUNNER_TEMP/packages-2.json"
           python3 scripts/reproducible_builds.py compare "$RUNNER_TEMP/packages-1.json" "$RUNNER_TEMP/packages-2.json" \
-            --markdown "$RUNNER_TEMP/packages.md"
+            --targets packages --markdown "$RUNNER_TEMP/packages.md"
           cat "$RUNNER_TEMP/packages.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload hashes
@@ -101,8 +108,14 @@ jobs:
       - name: Build the site in the checkout
         run: bash scripts/reproducible-build.sh . "$RUNNER_TEMP/build-1" website
 
-      - name: Build the site in the clone
-        run: bash scripts/reproducible-build.sh "$RUNNER_TEMP/second/nested/calor-clone" "$RUNNER_TEMP/build-2" website
+      - name: Build the site in the clone (isolated HOME, npm cache, time zone, locale)
+        run: |
+          set -euo pipefail
+          home="$RUNNER_TEMP/home-2"
+          mkdir -p "$home"
+          HOME="$home" npm_config_cache="$home/npm-cache" TZ="$SECOND_TZ" LANG="$SECOND_LOCALE" LC_ALL="$SECOND_LOCALE" \
+            SOURCE_DATE_EPOCH=1700000000 \
+            bash scripts/reproducible-build.sh "$RUNNER_TEMP/second/nested/calor-clone" "$RUNNER_TEMP/build-2" website
 
       - name: Compare every website file and the release gate's tree digest
         run: |
@@ -110,7 +123,7 @@ jobs:
           python3 scripts/reproducible_builds.py hash "$RUNNER_TEMP/build-1" --json "$RUNNER_TEMP/website-1.json"
           python3 scripts/reproducible_builds.py hash "$RUNNER_TEMP/build-2" --json "$RUNNER_TEMP/website-2.json"
           python3 scripts/reproducible_builds.py compare "$RUNNER_TEMP/website-1.json" "$RUNNER_TEMP/website-2.json" \
-            --markdown "$RUNNER_TEMP/website.md"
+            --targets website --markdown "$RUNNER_TEMP/website.md"
           cat "$RUNNER_TEMP/website.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload hashes

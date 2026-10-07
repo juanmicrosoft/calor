@@ -28,10 +28,11 @@
     <Deterministic>true</Deterministic>
     <CalorRepoRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)'))</CalorRepoRoot>
     <!-- NuGet pack writes this time into every .nupkg zip entry instead of the wall
-         clock. A fixed constant: no git or environment input (an ambient
-         SOURCE_DATE_EPOCH is deliberately ignored). Override only with
-         -p:DeterministicTimestamp=... -->
-    <DeterministicTimestamp Condition="'$(DeterministicTimestamp)' == ''">2000-01-01T00:00:00Z</DeterministicTimestamp>
+         clock. A fixed constant with no condition: no git or environment input can
+         change it (an ambient SOURCE_DATE_EPOCH or DeterministicTimestamp environment
+         variable is ignored). Only an explicit -p:DeterministicTimestamp=... global
+         property overrides it. -->
+    <DeterministicTimestamp>2000-01-01T00:00:00Z</DeterministicTimestamp>
   </PropertyGroup>
 
   <!-- Release builds of the shipped projects (everything under src/) map the

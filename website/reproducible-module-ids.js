@@ -29,9 +29,16 @@ function rootForms(dir) {
   const forms = new Set();
   for (const root of roots) {
     const trimmed = root.replace(/[\\/]+$/, '');
-    forms.add(trimmed);
-    forms.add(encodeURIComponent(trimmed));
-    forms.add(JSON.stringify(trimmed).slice(1, -1));
+    // Both separator styles (Windows identifiers can mix them).
+    for (const sep of [trimmed, trimmed.replace(/\\/g, '/'), trimmed.replace(/\//g, '\\')]) {
+      // Raw, JSON-escaped (Next JSON-stringifies loader options), and each of those
+      // URL-encoded (it then URL-encodes the JSON into the loader query).
+      for (const text of [sep, JSON.stringify(sep).slice(1, -1)]) {
+        forms.add(text);
+        forms.add(encodeURIComponent(text));
+        forms.add(encodeURI(text));
+      }
+    }
   }
   // Longest first, so /private/tmp/x is removed before /tmp/x would be.
   return [...forms].filter(Boolean).sort((a, b) => b.length - a.length);
