@@ -26,14 +26,16 @@ All notable changes to this project will be documented in this file.
   source C# and in the other files of a project migration, so a user local such as
   `_hoist000` is no longer rebound (`Calor0260`).
 - Effect checking: the elements of `§ARR2D` rows are now charged (they were not
-  inferred, so a row could hide an effect). Array members such as `GetLength` and
-  `Rank` resolve on `System.Array` instead of reporting `Calor0410`. `SetValue` and
-  `CopyTo` are charged `mut`; `Clone`, `GetEnumerator`, `GetValue` and `ToString` are
-  charged `alloc`; `Initialize` stays an unknown call, because it runs element constructors.
+  inferred, so a row could hide an effect). `System.Array`'s own members on an array
+  (`GetLength`, `Rank`, …) now resolve instead of reporting `Calor0410`: `CopyTo` is `mut`,
+  `SetValue` is `mut` and `alloc` (boxing), `GetValue`, `Clone`, `GetEnumerator` and
+  `ToString` are `alloc`. Any other member, including extension methods and `Initialize`
+  (it runs element constructors), stays an unknown call.
 - Shapes that cannot be written in place stay C# and are reported as
   `conditional-expression-hoisting`: an assignment used as an array element, index or size
-  (it was evaluated twice), and a sized array whose size is not a name or integer literal
-  when the array is itself a `?:`, `&&`, `||` or `??` operand.
+  (it was evaluated twice), a sized array whose size is not a name or integer literal
+  when the array is itself a `?:`, `&&`, `||` or `??` operand, and a `ref`/`out`/`in`
+  argument whose address calls a method when a later argument must be moved.
 
 ## [0.24.0] - 2026-10-07
 

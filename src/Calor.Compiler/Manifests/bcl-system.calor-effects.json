@@ -102,22 +102,7 @@
         "Find": [],
         "FindAll": [],
         "Exists": [],
-        "TrueForAll": [],
-        "GetLength": [],
-        "GetLongLength": [],
-        "GetLowerBound": [],
-        "GetUpperBound": [],
-        "GetValue": ["alloc"],
-        "SetValue": ["mut"],
-        "CopyTo": ["mut"],
-        "Clone": ["alloc"],
-        "GetEnumerator": ["alloc"],
-        "ToString": ["alloc"]
-      },
-      "getters": {
-        "Length": [],
-        "LongLength": [],
-        "Rank": []
+        "TrueForAll": []
       }
     },
     {

@@ -11071,6 +11071,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         for (var i = 0; i < args.Count; i++)
         {
+            // A ref/out/in argument must stay storage, so an address it computes
+            // (`in xs[I()]`) cannot move ahead of a hoisted later argument: preserve.
+            if (i < last && syntax is { } refs && i < refs.Count && !refs[i].RefKindKeyword.IsKind(SyntaxKind.None)
+                && refs[i].Expression.DescendantNodesAndSelf().Any(node => node is InvocationExpressionSyntax
+                    or AssignmentExpressionSyntax or PostfixUnaryExpressionSyntax or PrefixUnaryExpressionSyntax
+                    or BaseObjectCreationExpressionSyntax))
+                throw EscalateExpression(refs[i], "conditional-expression-hoisting");
             var hoist = Complex(args[i]) || i < last && !InPlace(i);
             if (!hoist)
                 continue;
@@ -12667,8 +12674,19 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new ArrayCreationNode(GetTextSpan(arrayCreation), id, name, elementType, size, initializer, new AttributeCollection());
     }
 
-    private ArrayCreationNode ConvertImplicitArrayCreation(ImplicitArrayCreationExpressionSyntax implicitArray)
+    private ExpressionNode ConvertImplicitArrayCreation(ImplicitArrayCreationExpressionSyntax implicitArray)
     {
+        // #1132: `new[,] { … }` is rectangular; convert it with its created type, or
+        // preserve it when that type is unknown.
+        if (implicitArray.Commas.Count > 0)
+        {
+            if (_semanticModel != null && implicitArray.SyntaxTree == _semanticModel.SyntaxTree
+                && _semanticModel.GetTypeInfo(implicitArray).Type is IArrayTypeSymbol { ElementType.TypeKind: not TypeKind.Error } created
+                && SyntaxFactory.ParseTypeName(created.ToDisplayString()) is ArrayTypeSyntax createdType)
+                return ConvertMultiDimArray(createdType, implicitArray.Initializer, GetTextSpan(implicitArray), created.Rank);
+            throw EscalateExpression(implicitArray, "multidim-array");
+        }
+
         var id = _context.GenerateId("arr");
         var initializer = implicitArray.Initializer.Expressions
             .Select(element => ConvertInPlace(element, always: true))
@@ -12923,6 +12941,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Walk up: InitializerExpression -> EqualsValueClause -> VariableDeclarator -> VariableDeclaration
         if (node.Parent is EqualsValueClauseSyntax { Parent: VariableDeclaratorSyntax { Parent: VariableDeclarationSyntax declaration } })
         {
+            // #1132: the leftmost rank specifier is the declared array's own; the rest
+            // belong to its element (`int[][,]` holds int[,]).
+            if (declaration.Type is ArrayTypeSyntax arrayType)
+                return TypeMapper.CSharpToCalor(arrayType.ElementType.ToString()
+                    + string.Concat(arrayType.RankSpecifiers.Skip(1).Select(rank => rank.ToString())));
             var typeStr = declaration.Type.ToString();
             // Handle single-dimensional arrays: "double[]"
             if (typeStr.EndsWith("[]"))
@@ -12957,7 +12980,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     }
 
     /// <summary>
-    /// #1132: converts an array element or size (always) or an index containing an assignment
+    /// #1132: converts an array element, size or multi-dimensional index (always), or an index containing an assignment,
     /// as a conditional operand: a statement it would need ahead of it (an assignment,
     /// <c>x++</c>, a decomposed chain) is captured in place or preserved as C#, so the
     /// expression is not run early, out of order with its siblings, or twice (an
@@ -12991,7 +13014,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             _context.RecordFeatureUsage("multidim-array");
             var indices = elementAccess.ArgumentList.Arguments
-                .Select(a => ConvertInPlace(a.Expression))
+                .Select(a => ConvertInPlace(a.Expression, always: true))
                 .ToList();
             return new MultiDimArrayAccessNode(span, array, indices);
         }
@@ -13587,10 +13610,16 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
             Flatten(arrayInitializer, 0);
             var sized = arrayType.RankSpecifiers[0].Sizes.Any(size => size is not OmittedArraySizeExpressionSyntax);
-            // An empty level hides the sizes below it (`new int[0, 3] {}`): keep the
-            // written sizes then (C# requires them to be constants matching the braces).
-            if (sized && shape.Contains(0))
-                dimensionSizes.AddRange(arrayType.RankSpecifiers[0].Sizes.Select(ConvertExpression));
+            // An empty level hides the sizes below it (`new int[0, 3] {}`) and leaves no
+            // elements: the creation is just its sizes, the written ones when present
+            // (C# requires them to be constants matching the braces).
+            if (shape.Contains(0))
+            {
+                initializer.Clear();
+                dimensionSizes.AddRange(sized
+                    ? arrayType.RankSpecifiers[0].Sizes.Select(ConvertExpression)
+                    : shape.Select(length => (ExpressionNode)new IntLiteralNode(span, length)));
+            }
             else if (rank > 2 || sized)
                 dimensionSizes.AddRange(shape.Select(length => (ExpressionNode)new IntLiteralNode(span, length)));
         }

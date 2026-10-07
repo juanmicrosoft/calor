@@ -2145,7 +2145,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Initializer.Count > 0)
         {
             // Pre-evaluate elements so hoisted bindings land before the §ARR block
-            var evalElements = RenderArrayElements(node.Initializer, hoistSectionMarkers: true, inlineSibling: false);
+            var evalElements = RenderArrayElements(node.Initializer, hoistSectionMarkers: false);
             AppendLine($"§ARR{{{variableName}:{elementType}}}");
             Indent();
             foreach (var val in evalElements)
