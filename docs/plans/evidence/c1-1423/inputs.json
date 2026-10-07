@@ -1,0 +1,682 @@
+{
+  "candidate": {
+    "commit": "696ab82470626164979a07792ed74932ab88d9e6",
+    "freezeObservedUtc": "2026-10-07T12:55:16Z",
+    "version": "0.24.0"
+  },
+  "note": "Hand-recorded inputs to generate_candidate_manifest.py (merge commits from the GitHub API at the freeze; every one is re-verified against git by the generator and by CandidateManifestTests).",
+  "pullRequests": {
+    "1466": {
+      "mergeCommit": "669e535c8a9dac967a73c70b28f9f2d0bcf84c80",
+      "mergedAtUtc": "2026-10-02T13:10:12Z",
+      "mergedViaPr": null
+    },
+    "1470": {
+      "mergeCommit": "585b45d683eb19c1ab7caa413361d5ae890a0144",
+      "mergedAtUtc": "2026-10-02T13:58:47Z",
+      "mergedViaPr": null
+    },
+    "1471": {
+      "mergeCommit": "24a9b0bad4749d723814d7b320a5f7c8d2f38f77",
+      "mergedAtUtc": "2026-10-03T17:16:38Z",
+      "mergedViaPr": null
+    },
+    "1472": {
+      "mergeCommit": "39b5edecc505bdefcd8811c8a8c073fbf1241361",
+      "mergedAtUtc": "2026-10-03T00:01:21Z",
+      "mergedViaPr": null
+    },
+    "1473": {
+      "mergeCommit": "f0e0eb682a8658364170ad49aff2d2c433d570f8",
+      "mergedAtUtc": "2026-10-03T18:03:52Z",
+      "mergedViaPr": null
+    },
+    "1474": {
+      "mergeCommit": "9ca52196baf0faedb91a947659c5e6a4c4966e30",
+      "mergedAtUtc": "2026-10-07T02:12:35Z",
+      "mergedViaPr": 1475
+    },
+    "1475": {
+      "mergeCommit": "5ebdbee2fee7fc87d0db187ea81024c3aadcbc54",
+      "mergedAtUtc": "2026-10-07T02:12:33Z",
+      "mergedViaPr": null
+    },
+    "1476": {
+      "mergeCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67",
+      "mergedAtUtc": "2026-10-03T00:36:51Z",
+      "mergedViaPr": null
+    },
+    "1477": {
+      "mergeCommit": "91fa778093be03850d809cc591e24c37906b5190",
+      "mergedAtUtc": "2026-10-03T16:32:37Z",
+      "mergedViaPr": null
+    },
+    "1478": {
+      "mergeCommit": "bf584fb71db140ca19e5c956a241a0da7dd02f60",
+      "mergedAtUtc": "2026-10-03T18:04:25Z",
+      "mergedViaPr": null
+    },
+    "1479": {
+      "mergeCommit": "7d37bf8d84662a79eb41efcf241b264a55d1e82d",
+      "mergedAtUtc": "2026-10-03T22:44:19Z",
+      "mergedViaPr": null
+    },
+    "1480": {
+      "mergeCommit": "0a68bee223dcb49a4d8dc74e37e97518cf2da8e8",
+      "mergedAtUtc": "2026-10-04T03:10:04Z",
+      "mergedViaPr": null
+    },
+    "1481": {
+      "mergeCommit": "31e834cc84eaf3fe32b82b1df366bfa999eaaf48",
+      "mergedAtUtc": "2026-10-03T22:18:08Z",
+      "mergedViaPr": null
+    },
+    "1482": {
+      "mergeCommit": "f621d5518d8ac19dee2d20422f94e9edcc1cb7b8",
+      "mergedAtUtc": "2026-10-03T21:08:04Z",
+      "mergedViaPr": null
+    },
+    "1484": {
+      "mergeCommit": "2019a8a87913520b7774ee729afeef252911766d",
+      "mergedAtUtc": "2026-10-03T23:02:33Z",
+      "mergedViaPr": null
+    },
+    "1486": {
+      "mergeCommit": "f5e9ffee0535f098d7f830ae2ed9dcdcd7e677dc",
+      "mergedAtUtc": "2026-10-04T02:26:44Z",
+      "mergedViaPr": null
+    },
+    "1487": {
+      "mergeCommit": "40708acaabbc4995d0c8d5ca27b3f09273eb8f25",
+      "mergedAtUtc": "2026-10-03T23:41:48Z",
+      "mergedViaPr": null
+    },
+    "1488": {
+      "mergeCommit": "2d8ee096ea7146c52fb7fb022f2e387327922780",
+      "mergedAtUtc": "2026-10-04T02:02:18Z",
+      "mergedViaPr": null
+    },
+    "1491": {
+      "mergeCommit": "e967aba840d80897c4ae4e18b94d909605bb1d5b",
+      "mergedAtUtc": "2026-10-04T03:23:29Z",
+      "mergedViaPr": null
+    },
+    "1492": {
+      "mergeCommit": "0142438f42278021d95c6169dfe397a7f63eea3c",
+      "mergedAtUtc": "2026-10-04T04:33:45Z",
+      "mergedViaPr": null
+    },
+    "1494": {
+      "mergeCommit": "ef89c027dd933f4991fd3a85db4b1d1fd707c8db",
+      "mergedAtUtc": "2026-10-04T15:21:24Z",
+      "mergedViaPr": null
+    },
+    "1495": {
+      "mergeCommit": "eb12fef4122b88a22f3ec62f374de341dc7f4e06",
+      "mergedAtUtc": "2026-10-04T19:18:10Z",
+      "mergedViaPr": null
+    },
+    "1496": {
+      "mergeCommit": "ba2e31cb6373bcc10aeaa04e3f94e9067d0b8c06",
+      "mergedAtUtc": "2026-10-04T18:06:38Z",
+      "mergedViaPr": null
+    },
+    "1497": {
+      "mergeCommit": "af5482016a2abaec2ac60309f94a863819eb572b",
+      "mergedAtUtc": "2026-10-04T20:03:25Z",
+      "mergedViaPr": null
+    },
+    "1498": {
+      "mergeCommit": "275902c3c597d049eb74f319ca0ab68805e2cccc",
+      "mergedAtUtc": "2026-10-04T21:48:12Z",
+      "mergedViaPr": null
+    },
+    "1499": {
+      "mergeCommit": "dfc581d4c3ffb108b0d08da3b3a1039cfe8e02d7",
+      "mergedAtUtc": "2026-10-07T01:25:11Z",
+      "mergedViaPr": null
+    },
+    "1500": {
+      "mergeCommit": "d42d031352f2d8d5c1df56fffc19d901186bb94d",
+      "mergedAtUtc": "2026-10-04T15:31:25Z",
+      "mergedViaPr": null
+    },
+    "1501": {
+      "mergeCommit": "ffa75e8bf2e899826a2cfa9c524835d735d9b1c5",
+      "mergedAtUtc": "2026-10-04T16:48:02Z",
+      "mergedViaPr": null
+    },
+    "1502": {
+      "mergeCommit": "aa23d58915b1f591a82852391633b5609c9bb2f9",
+      "mergedAtUtc": "2026-10-07T00:30:53Z",
+      "mergedViaPr": null
+    },
+    "1503": {
+      "mergeCommit": "9f5dfd763f90aebe16e4e4783f4c1703e464c8d3",
+      "mergedAtUtc": "2026-10-04T22:33:53Z",
+      "mergedViaPr": null
+    },
+    "1504": {
+      "mergeCommit": "f552e38be6124f91ba0887c669e59aaaae968046",
+      "mergedAtUtc": "2026-10-04T20:55:13Z",
+      "mergedViaPr": null
+    },
+    "1506": {
+      "mergeCommit": "9af3aeb0dbc1de2387f1f5433c7f956a5eb664d7",
+      "mergedAtUtc": "2026-10-04T21:48:22Z",
+      "mergedViaPr": null
+    },
+    "1507": {
+      "mergeCommit": "7d94d095729a4e8ba74a4a50574c24f844dec9f1",
+      "mergedAtUtc": "2026-10-06T15:01:41Z",
+      "mergedViaPr": null
+    },
+    "1509": {
+      "mergeCommit": "696ab82470626164979a07792ed74932ab88d9e6",
+      "mergedAtUtc": "2026-10-07T12:51:39Z",
+      "mergedViaPr": null
+    }
+  },
+  "gates": [
+    {
+      "gate": "R0",
+      "issue": 1407,
+      "prs": [
+        1466,
+        1470,
+        1477,
+        1478,
+        1484,
+        1488,
+        1501,
+        1504,
+        1507
+      ],
+      "evidence": "docs/plans/evidence/evidence-contract-1407/",
+      "closureStatus": "FROZEN, gate MET (contract.json gateStatus); contract 1.3.2."
+    },
+    {
+      "gate": "R1",
+      "issue": 1419,
+      "prs": [
+        1476
+      ],
+      "evidence": "docs/plans/evidence/r1-1419/",
+      "closureStatus": "Registration merged before any sweep result."
+    },
+    {
+      "gate": "S1",
+      "issue": 1311,
+      "prs": [
+        1480
+      ],
+      "evidence": "docs/plans/evidence/s1-1311/",
+      "closureStatus": "Run 1 and the conforming run 2 committed."
+    },
+    {
+      "gate": "S2",
+      "issue": 1413,
+      "prs": [
+        1494,
+        1495,
+        1496,
+        1497,
+        1498,
+        1502,
+        1503,
+        1499
+      ],
+      "evidence": "docs/plans/evidence/s2-1413/",
+      "closureStatus": "dispositions.json closure CLOSED / SUCCESS (carried below in s2Closure)."
+    },
+    {
+      "gate": "G1",
+      "issue": 1420,
+      "prs": [
+        1471
+      ],
+      "evidence": "docs/plans/evidence/g1-1420/",
+      "closureStatus": "Consumer/RID inventory eng/z3-consumers.json."
+    },
+    {
+      "gate": "G2",
+      "issue": 1421,
+      "prs": [
+        1479,
+        1486
+      ],
+      "evidence": "docs/plans/evidence/g2-1421/",
+      "closureStatus": "Protocol 1.3.0 FROZEN-AT-MERGE."
+    },
+    {
+      "gate": "G3",
+      "issue": 1135,
+      "prs": [
+        1492,
+        1500
+      ],
+      "evidence": "docs/plans/evidence/g3-1135/",
+      "closureStatus": "NOT CLOSED on the candidate: README says \"Status: not closed\"; execution 1 NON-DETERMINISTIC; execution 2 (DETERMINISTIC, commit d42d0313) is parked on branch evidence/g3-1135-exec-2 for C2 to commit."
+    },
+    {
+      "gate": "G4",
+      "issue": 1241,
+      "prs": [
+        1481
+      ],
+      "evidence": "docs/plans/evidence/g4-1241/",
+      "closureStatus": "Tier 2 expectations eng/tier2-fixture-expectations.json."
+    },
+    {
+      "gate": "P1",
+      "issue": 1417,
+      "prs": [
+        1472
+      ],
+      "evidence": "docs/plans/evidence/p1-1417/",
+      "closureStatus": "DurableProvenance verifier and fresh-clone log."
+    },
+    {
+      "gate": "B1",
+      "issue": 1276,
+      "prs": [
+        1473,
+        1482
+      ],
+      "evidence": "docs/plans/evidence/b1-1276/",
+      "closureStatus": "Registration and oracle results with dispositions."
+    },
+    {
+      "gate": "B2",
+      "issue": 1422,
+      "prs": [
+        1487
+      ],
+      "evidence": "docs/plans/evidence/b2-1422/",
+      "closureStatus": "Refusal gate scripts/benchmark_publication_gate.py."
+    },
+    {
+      "gate": "R2",
+      "issue": 1410,
+      "prs": [
+        1474,
+        1475
+      ],
+      "evidence": "docs/plans/evidence/r2-1410/",
+      "closureStatus": "Release gate; merged last, immediately before C1 (amendment 1.1.0)."
+    }
+  ],
+  "additionalMerged": [
+    {
+      "issue": 1485,
+      "pr": 1491,
+      "title": "Parser: an empty clause body no longer swallows the next statement",
+      "evidence": "docs/plans/evidence/fix-1485/"
+    },
+    {
+      "issue": null,
+      "pr": 1506,
+      "title": "Fix flaky MarkdownReportGenerator test (process-wide current directory race)",
+      "evidence": null
+    },
+    {
+      "issue": null,
+      "pr": 1509,
+      "title": "Release prep: Calor 0.24.0 (version bump and release notes; no release cut)",
+      "evidence": "docs/plans/evidence/release-0.24.0/"
+    }
+  ],
+  "openItems": [
+    {
+      "id": "R2-NO-MAINTENANCE-RELEASE",
+      "source": "docs/plans/evidence/r2-1410/release-gate.md §7",
+      "owner": "maintainer / A1",
+      "item": "The contract defines no maintenance or non-0.24 release path; every surface is blocked until #1408 records MILESTONE-SUCCEEDED. A maintenance path needs a #1407 amendment first."
+    },
+    {
+      "id": "R2-RELEASE-PR-CONDITION-7",
+      "source": "release-gate.md §6",
+      "owner": "maintainer / A1",
+      "item": "The release PR precedes #1423 and cannot consume an adjudication identity. Whether checking its products (version, rendered notes) against the record satisfies §8 condition 7, or the row needs an amendment, is undecided."
+    },
+    {
+      "id": "R2-BYTE-REPRODUCIBILITY",
+      "source": "release-gate.md §8; reviews/refresh-codex.md",
+      "owner": "C2",
+      "item": "The release gate compares rebuilt bytes with C2-recorded hashes and fails closed where a build is not byte-reproducible (the benchmark generator stamps the run time). C2 must make these builds reproducible or retain the candidate bytes durably. B2's headline embeds its comparison with the headline on main, so its adjudicated hash must be computed against main as it will be at publication. Bot PR #1505 (benchmark headline) was closed unmerged (coordinator, 2026-10-07)."
+    },
+    {
+      "id": "R2-BRANCH-PROTECTION",
+      "source": "release-gate.md §5",
+      "owner": "maintainer",
+      "item": "Recommended settings not enforceable by a workflow: environment-scoped NUGET_API_KEY with a main-only policy; branch protection without admin bypass and with tests (verification) required; a v* tag ruleset; github-pages deployments restricted to main; a red release-audit run treated as a gate bypass."
+    },
+    {
+      "id": "G3-NOT-CLOSED",
+      "source": "docs/plans/evidence/g3-1135/README.md",
+      "owner": "C2",
+      "item": "G3 is not closed on the candidate. Execution 2 (DETERMINISTIC, 2,137 AGREE-PASS) ran on d42d0313, before the S2 repairs changed the verifier and the committed oracle reports, so it establishes nothing for this candidate. C2 commits the parked records (branch evidence/g3-1135-exec-2, verified here against their ledger entry) and runs the protocol on the candidate, charged to regeneration-compute (amendment 1.2.0)."
+    },
+    {
+      "id": "CHILD-ISSUES-OPEN",
+      "source": "GitHub issue states at the freeze",
+      "owner": "maintainer / A1",
+      "item": "Every child issue except #1276 is OPEN at the freeze, although its gate PRs merged; #1493 (fixed by R-TEXT #1497) is also OPEN. Terminal condition 1 needs every child other than #1408 closed with its closure evidence."
+    },
+    {
+      "id": "TOOLCHAIN-AND-IMAGES",
+      "source": "artifact-inventory toolchain-pins open defect",
+      "owner": "C2",
+      "item": "Ordinary CI and publish workflows request SDK '10.0.x' and use runner labels; hosted runner images cannot be pinned. The manifest records the SDK, runtime, and images observed in the candidate's own push run (platforms.runnerImages.observedAtFreeze), not a pin, and image or SDK drift produces no git change for the classifier to see. Only the G2 protocol pins SDK 10.0.401 / runtime 10.0.12. C2 records the realized SDK, runtime, ImageOS, and ImageVersion of every job.",
+      "status": "DECIDED 2026-10-07 (ENVIRONMENT-OBSERVED-NOT-PINNED): accepted as observed, not pinned; no amendment; C2 records what each regeneration used."
+    },
+    {
+      "id": "C1-TEST-COUNT-DELTA",
+      "source": "this manifest invalidation.c1OwnedPaths",
+      "owner": "C2",
+      "item": "C1 adds 86 tests to Calor.Compiler.Tests (eng/test-manifest.json expectedTotal 12,947 -> 13,033). The release-test-suites artifact for the candidate is the candidate's own suite (12,947 tests, 3 skipped); a run at a later commit includes the C1 tests and must say so."
+    },
+    {
+      "id": "CLASSIFIER-NOT-A-TRIPWIRE",
+      "source": "docs/plans/v0.24-c1-candidate.md",
+      "owner": "maintainer / C2 / A1",
+      "item": "No CI check blocks a later invalidating merge to main. C2 and A1 must run the classifier on <candidate>..<their commit> from a checkout of the C1 landing commit (the trust anchor; running it from the commit being judged lets that commit change the classifier), and record the verdict. Making it a required check is a maintainer decision."
+    }
+  ],
+  "pinFiles": [
+    "global.json",
+    "Directory.Build.props",
+    "Directory.Build.targets",
+    "Directory.Packages.props",
+    ".github/z3-binaries-4.15.7.sha256",
+    "src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256",
+    "eng/z3-consumers.json",
+    "eng/test-manifest.json",
+    "eng/tier2-fixture-expectations.json",
+    ".github/actions/bootstrap-z3/action.yml",
+    "src/Calor.Compiler/scripts/download-z3.sh",
+    "src/Calor.Compiler/scripts/download-z3.ps1",
+    "scripts/verify-z3-assets.py",
+    "website/package.json",
+    "website/package-lock.json",
+    ".gitmodules",
+    ".gitattributes",
+    "bench/phase0-agent-native/commit-stamp-index.json"
+  ],
+  "trees": [
+    "src",
+    "tests",
+    "tools",
+    "bench",
+    "eng",
+    "scripts",
+    ".github",
+    ".claude",
+    "website",
+    "samples",
+    "docs"
+  ],
+  "producers": [
+    {
+      "id": "soundness-sweep",
+      "title": "S1 sweep tool (#1311)",
+      "version": "ExecutionCeiling 1508 (amendment 1.2.1); registration 1.0.0",
+      "directory": "bench/Calor.Soundness.Sweep/",
+      "files": []
+    },
+    {
+      "id": "r1-case-generator",
+      "title": "R1 case generator and independent oracle R1-O1 (#1419)",
+      "version": "registration 1.0.0",
+      "directory": "tests/Calor.Compiler.Tests/SoundnessRegistration/",
+      "files": []
+    },
+    {
+      "id": "b1-pair-oracle",
+      "title": "B1 pair oracle b1-1276-pair-oracle (#1276)",
+      "version": "oracle version 1; generator b1-1276-results-generator-v1; inputs b1-1276-signature-inputs-v1",
+      "directory": "tests/Calor.Evaluation/Equivalence/",
+      "files": []
+    },
+    {
+      "id": "determinism-runner",
+      "title": "G2 determinism protocol runner and decider (#1421)",
+      "version": "protocolVersion 1.3.0",
+      "directory": null,
+      "files": [
+        "scripts/determinism_protocol.py",
+        "scripts/determinism_runner.py",
+        ".github/workflows/determinism-protocol.yml",
+        "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DeterminismRecord.cs",
+        "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DifferentialModels.cs"
+      ]
+    },
+    {
+      "id": "r2-release-verifier",
+      "title": "R2 adjudication-identity verifier (#1410)",
+      "version": "identity calor-adjudication:v1",
+      "directory": null,
+      "files": [
+        "scripts/verify_release_adjudication.py"
+      ]
+    },
+    {
+      "id": "b2-publication-gate",
+      "title": "B2 benchmark publication gate (#1422)",
+      "version": "no override option",
+      "directory": null,
+      "files": [
+        "scripts/benchmark_publication_gate.py",
+        ".github/workflows/benchmark.yml"
+      ]
+    },
+    {
+      "id": "z3-asset-verifier",
+      "title": "G1 Z3 asset verifier (#1420)",
+      "version": "z3 4.15.7",
+      "directory": null,
+      "files": [
+        "scripts/verify-z3-assets.py",
+        "scripts/check-packaged-z3.py"
+      ]
+    },
+    {
+      "id": "evidence-contract-validator",
+      "title": "R0 validator (#1407)",
+      "version": "contract 1.3.2",
+      "directory": "tests/Calor.Compiler.Tests/EvidenceContract/",
+      "files": []
+    },
+    {
+      "id": "durable-provenance",
+      "title": "P1 durable provenance verifier (#1417)",
+      "version": "index schema 2",
+      "directory": "tests/Calor.Compiler.Tests/Provenance/",
+      "files": []
+    }
+  ],
+  "packets": [
+    {
+      "path": "docs/plans/evidence/evidence-contract-1407/sha256.json",
+      "lf": true
+    },
+    {
+      "path": "docs/plans/evidence/r1-1419/sha256.json",
+      "lf": true
+    },
+    {
+      "path": "docs/plans/evidence/s1-1311/sha256.json",
+      "lf": true
+    },
+    {
+      "path": "docs/plans/evidence/g2-1421/sha256.json",
+      "lf": true
+    },
+    {
+      "path": "docs/plans/evidence/b1-1276/registration/sha256.json",
+      "lf": true
+    },
+    {
+      "path": "docs/plans/evidence/b1-1276/results/sha256.json",
+      "lf": false
+    }
+  ],
+  "issueStatesAtFreeze": {
+    "observedVia": "gh issue list -R juanmicrosoft/calor --milestone 0.24 --state all, run by the C1 agent at the freeze (2026-10-07)",
+    "states": {
+      "1407": "OPEN",
+      "1419": "OPEN",
+      "1311": "OPEN",
+      "1413": "OPEN",
+      "1420": "OPEN",
+      "1421": "OPEN",
+      "1135": "OPEN",
+      "1241": "OPEN",
+      "1417": "OPEN",
+      "1276": "CLOSED (COMPLETED, 2026-10-03T16:32:38Z)",
+      "1422": "OPEN",
+      "1410": "OPEN"
+    }
+  },
+  "notes": {
+    "statusNote": "The candidate is the commit below. This manifest lands after it, in the C1 pull request; the invalidation classifier (tests/Calor.Compiler.Tests/EvidenceContract/CandidateInvalidation.cs) decides whether any later commit invalidates it. Freezing is recorded, not authorized publication: nothing here publishes or releases.",
+    "mergeOf": "PR #1509 (release preparation for 0.24.0: version bump and notes with the N1 advisory), merged on top of #1475 (R2, the last child gate). Re-freeze of PR #1508 after maintainer decision RELEASE-VERSION-0.24.0.",
+    "reachabilityRule": "Contract §6 / P1 DurableProvenance: full 40-hex SHA, ancestor of explicitly fetched refs/remotes/origin/main; shallow clone fails. Re-checked by CandidateManifestTests through DurableProvenance.Verify.",
+    "freezeObservation": "git fetch origin; git rev-parse refs/remotes/origin/main returned the candidate when C1 started.",
+    "submodulesSource": "git ls-tree <candidate> (every gitlink; .gitmodules URLs in inputContentHashes)",
+    "dotnetTools": "none: no .config/dotnet-tools.json exists at the candidate",
+    "centralPackageVersions": "Directory.Packages.props (hash in lockfiles and inputContentHashes)",
+    "ciSetupDotnet": "setup-dotnet requests '10.0.x' in ordinary CI and publish workflows (toolchain-pins open defect at the cutoff; not repaired by any gate). Only the determinism protocol pins an exact SDK and runtime.",
+    "productVersion": "0.24.0 (Directory.Build.props <Version>; checked by the generator, see releasability)",
+    "translatorSemanticsVersion": "z3-executable-semantics-v2 (ContractTranslator.SemanticsVersion)",
+    "verificationCacheFormat": "1.22 (VerificationCacheEntry.CurrentFormatVersion)",
+    "ordinaryCiImages": "test.yml and other workflows also use the floating labels ubuntu-latest and windows-latest; hosted images are not pinnable. The images observed at the freeze are in observedAtFreeze.",
+    "amendmentLogHashRule": "SHA-256 over one UTF-8 line per entry, \"version|timestampUtc|reviewedInPr|afterDecisionBearingInspection|mergeCommit\\n\". The full log text (justifications, inspection statements) is bound by the contract.json hash in sha256Json.files.",
+    "s2Note": "Q6: the R0 terminal validator does not read the S2 record, so closure.result is carried here and must be carried into the #1408 terminal record explicitly.",
+    "review": "Reduced independence (contract §9 deviation): Codex adversarial review (at most 3 rounds plus a verification pass) and maintainer review and merge. This is not independent review."
+  },
+  "registeredFiles": [
+    "docs/plans/evidence/g2-1421/protocol.json",
+    "docs/plans/evidence/g2-1421/cases.json",
+    "docs/plans/evidence/r1-1419/registration.json",
+    "docs/plans/evidence/r1-1419/manifest-B1.json",
+    "docs/plans/evidence/r1-1419/manifest-N1.json",
+    "docs/plans/evidence/b1-1276/registration/pairs.json",
+    "docs/plans/evidence/b1-1276/results/pair-manifest.json",
+    "docs/plans/evidence/s2-1413/dispositions.json",
+    "docs/plans/evidence/g3-1135/ledger.json",
+    "docs/plans/evidence/evidence-contract-1407/artifact-inventory.json"
+  ],
+  "invalidation": {
+    "classifier": "tests/Calor.Compiler.Tests/EvidenceContract/CandidateInvalidation.cs",
+    "tests": [
+      "tests/Calor.Compiler.Tests/EvidenceContract/CandidateInvalidationTests.cs",
+      "tests/Calor.Compiler.Tests/EvidenceContract/CandidateManifestTests.cs"
+    ],
+    "rangeCommand": "From a checkout of the C1 landing commit (the trust anchor): CALOR_C1_CLASSIFY_TARGET=<full SHA> dotnet test tests/Calor.Compiler.Tests --filter FullyQualifiedName~CandidateManifestTests.RangeFromTheCandidateIsNotInvalidated (full clone with refs/remotes/origin/main fetched; without the variable the target is the newest commit that changes a C1 file)",
+    "rule": "Default deny. Every commit in <candidate>..<target> is diffed against each of its parents with renames off; one non-exempt path makes the verdict INVALID. See docs/plans/v0.24-c1-candidate.md.",
+    "c1OwnedPaths": {
+      "exemptBeforeLanding": [
+        "docs/plans/evidence/c1-1423/",
+        "docs/plans/v0.24-c1-candidate.md",
+        "tests/Calor.Compiler.Tests/EvidenceContract/CandidateInvalidation.cs",
+        "tests/Calor.Compiler.Tests/EvidenceContract/CandidateInvalidationTests.cs",
+        "tests/Calor.Compiler.Tests/EvidenceContract/CandidateManifestTests.cs"
+      ],
+      "exemptAfterLanding": [
+        "docs/plans/evidence/c1-1423/reviews/ (newly added data and text files only)"
+      ],
+      "contentChecked": [
+        "eng/test-manifest.json: before the landing only; regular file; only Calor.Compiler.Tests expectedTotal (increase) and an appended note"
+      ],
+      "downstreamEvidence": [
+        "docs/plans/evidence/c2-1424/ (newly added data and text files only)",
+        "docs/plans/evidence/adjudication-1408/ (newly added data and text files only)"
+      ]
+    }
+  },
+  "observedEnvironment": {
+    "status": "OBSERVED, NOT PINNED (maintainer decision ENVIRONMENT-OBSERVED-NOT-PINNED, 2026-10-07)",
+    "source": "Tests workflow run 37624076834 (push of the candidate 696ab824 to main); \"Set up job\" and \"Setup .NET\" log lines read with gh run view --job <id> --log at the re-freeze",
+    "dotnet": {
+      "sdk": "10.0.401",
+      "runtime": "10.0.12",
+      "jobs": "all six jobs below report the same SDK and runtime"
+    },
+    "images": [
+      {
+        "label": "ubuntu-latest",
+        "image": "ubuntu-24.04",
+        "version": "20260927.320.1",
+        "provisioner": "20260901.588",
+        "job": "test 112801277007"
+      },
+      {
+        "label": "ubuntu-latest",
+        "image": "ubuntu-24.04",
+        "version": "20261004.327.1",
+        "provisioner": "20261002.596",
+        "job": "tests (compiler) 112801277346"
+      },
+      {
+        "label": "windows-latest",
+        "image": "windows-2025-vs2026",
+        "version": "20260925.250.1",
+        "provisioner": "20260901.588",
+        "job": "z3-consumer-matrix (win-x64) 112801277042"
+      },
+      {
+        "label": "windows-11-arm",
+        "image": "windows-11-vs2026-arm64",
+        "version": "20261004.176.1",
+        "provisioner": "20261002.596",
+        "job": "z3-consumer-matrix (win-arm64) 112801277160"
+      },
+      {
+        "label": "macos-14",
+        "image": "macos-14-arm64",
+        "version": "20260831.0302.1",
+        "provisioner": "20260828.587",
+        "job": "z3-consumer-matrix (osx-arm64) 112801276943"
+      },
+      {
+        "label": "ubuntu-24.04-arm",
+        "image": "ubuntu-24.04-arm",
+        "version": "20261004.142.1",
+        "provisioner": "20261002.596",
+        "job": "z3-consumer-matrix (linux-arm64) 112801277417"
+      }
+    ],
+    "binding": "Accepted as observed, not pinned (maintainer decision ENVIRONMENT-OBSERVED-NOT-PINNED, 2026-10-07; no amendment). The git-based classifier cannot see environment drift. C2 records the SDK, runtime, ImageOS, and ImageVersion each regeneration used.",
+    "note": "The same label (ubuntu-latest) resolved to two image versions within this one run, which is why exact image equality is not a usable requirement."
+  },
+  "releasability": {
+    "status": "RELEASABLE VERSION (no conflicting tag at the freeze)",
+    "history": "The first freeze (5ebdbee2, PR #1508 as first pushed) declared 0.22.0, already tagged at 72a0a855, so the R2 gate would fail G009. Maintainer decision RELEASE-VERSION-0.24.0: release prep PR #1509 merged first; this re-freeze names its merge commit.",
+    "rule": "The generator fails unless the candidate declares the decided version and tag v<version> is absent or points at the candidate. A tag created later at another commit, or any version or notes change, invalidates the freeze."
+  },
+  "maintainerDecisions": [
+    {
+      "id": "RELEASE-VERSION-0.24.0",
+      "date": "2026-10-07",
+      "by": "@juanmicrosoft (relayed to the C1 agent by the coordinating agent)",
+      "decision": "The release version is 0.24.0. A separate release-preparation PR (version bump and a CHANGELOG 0.24.0 section with the N1 advisory) merges to main before the freeze; C1 then re-freezes in PR #1508 on that merge commit."
+    },
+    {
+      "id": "ENVIRONMENT-OBSERVED-NOT-PINNED",
+      "date": "2026-10-07",
+      "by": "@juanmicrosoft (relayed to the C1 agent by the coordinating agent)",
+      "decision": "Environment binding is accepted as observed, not pinned. No #1407 amendment. C2 records the SDK, runtime, ImageOS, and ImageVersion each regeneration used."
+    }
+  ],
+  "resolvedOpenItems": [
+    {
+      "id": "CANDIDATE-NOT-RELEASABLE",
+      "resolvedBy": "Re-freeze on 696ab824 (PR #1509, version 0.24.0, no v0.24.0 tag at the freeze)."
+    },
+    {
+      "id": "N1-ADVISORY-NOT-IN-CANDIDATE",
+      "resolvedBy": "CHANGELOG.md [0.24.0] section of the candidate carries the advisory (\"Advisory: false proofs in 0.21.0 (and the unpublished 0.22.0)\")."
+    }
+  ]
+}
