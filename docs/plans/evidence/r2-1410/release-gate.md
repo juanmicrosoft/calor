@@ -162,7 +162,10 @@ installed-tool check. A maintenance path would need a #1407 amendment first.
   the release run with the hashes #1424 recorded. Where a build is not byte-reproducible (the
   benchmark generator stamps the run time, for example), the gate fails closed. #1423/#1424 must
   either make these builds reproducible or retain the candidate bytes durably so the release run
-  can publish them; R2 does not weaken the comparison.
+  can publish them; R2 does not weaken the comparison. B2's headline also embeds its comparison
+  with the headline already on `main`, so the adjudicated headline hash must be computed against
+  `main` as it will be at publication, and a re-dispatch after that PR merges fails closed
+  (`reviews/refresh-codex.md`).
 - **Notes and site come from the candidate.** Adjudicated wording must already be in the
   candidate's `CHANGELOG.md` and `website/`; a post-adjudication edit changes the candidate
   (§8 stopping rule 4).
