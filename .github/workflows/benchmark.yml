@@ -1,12 +1,22 @@
 name: Benchmarks
 
+# #1410 (0.24 R2): benchmark publication (the headline PR) is gated on one successful
+# #1408 adjudication identity AND the #1422 refusal gate; nothing publishes without both.
+# The agent-refactoring job is read-only (#1422) and publishes nothing. A dispatch must
+# carry the identity and fails before any benchmark runs if it does not verify; the
+# publishing step re-verifies that the changed files are exactly the adjudicated #1422
+# outputs (benchmark-headline.json and its commit-stamp-index.json entry).
+# Push runs measure only and never publish. There is no `release: created` trigger:
+# publish-nuget dispatches this workflow from main after the release exists, and a
+# dispatch checks out the adjudicated candidate, not the dispatch ref.
+# Design: docs/plans/evidence/r2-1410/release-gate.md.
 on:
-  # Release and push events run deterministic benchmarks only.
-  release:
-    types: [created]
-  # Allow manual trigger
   workflow_dispatch:
     inputs:
+      adjudication_identity:
+        description: 'calor-adjudication:v1:<adjudication commit>:<terminal record sha256> (#1410)'
+        required: true
+        type: string
       statistical_runs:
         description: 'Number of statistical runs (default 30)'
         required: false
@@ -37,6 +47,9 @@ on:
       - 'tests/Calor.Compiler.Tests/EvidenceContract/**'
       - 'scripts/benchmark_publication_gate.py'
 
+env:
+  ADJUDICATION_IDENTITY: ${{ inputs.adjudication_identity }}
+
 jobs:
   benchmark:
     runs-on: ubuntu-latest
@@ -53,9 +66,35 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # #1422: the publication gate checks provenance against origin/main and fails in a
-          # shallow clone.
+          # Full history: the #1410 adjudication gate and the #1422 publication gate both check
+          # provenance against main and fail (never skip) in a shallow clone.
           fetch-depth: 0
+
+      - name: Verify the adjudication identity (#1410)
+        id: gate
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::benchmark publication is dispatched only from main (got $GITHUB_REF)"; exit 1
+          fi
+          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY"
+
+      - name: Check out the candidate and verify the GitHub release (#1410)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE: ${{ steps.gate.outputs.candidate }}
+          TAG: ${{ steps.gate.outputs.tag }}
+          VER: ${{ steps.gate.outputs.version }}
+        run: |
+          set -euo pipefail
+          git checkout -q --detach "$CANDIDATE"
+          gh release view "$TAG" --json body --jq .body > "$RUNNER_TEMP/release-body.md"
+          TITLE="$(gh release view "$TAG" --json name --jq .name)"
+          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+            --expect-head --require-tag --version "$VER" --release-body "$RUNNER_TEMP/release-body.md" \
+            --release-tag "$TAG" --release-title "$TITLE"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -256,35 +295,70 @@ jobs:
           if-no-files-found: ignore
           retention-days: 90
 
-      - name: Create PR with benchmark results
-        if: github.ref == 'refs/heads/main' || github.event_name == 'release' || github.event_name == 'workflow_dispatch'
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: update benchmark headline"
-          title: "chore: Update benchmark headline"
-          body: |
-            This PR publishes `website/public/data/benchmark-headline.json`, written by
-            `scripts/benchmark_publication_gate.py` (#1422) from the B1 results packet
-            (`docs/plans/evidence/b1-1276/results/`), and its provenance entry in
-            `bench/phase0-agent-native/commit-stamp-index.json`. Nothing else changes.
-
-            ## Gate report
-
-            ```
-            ${{ steps.methodology.outputs.report }}
-            ```
-
-            The gate refuses this PR when an included pair is not EQUIVALENT, a registered pair or
-            the registration changed, the method differs without a #1407 amendment merged first,
-            the regenerated packet differs, or the provenance commit is not a full SHA on main.
-            Across different comparability keys no delta is reported. EQUIVALENT is not a
-            correctness claim, and the headline describes this fixed corpus only.
-
-            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          branch: benchmark-results-update
-          base: main
-          delete-branch: true
+      # #1410: runs only after the #1422 refusal gate above passed (a refusal fails the job and
+      # skips this step), and only on a dispatch that carried a verified identity. Push runs
+      # never publish. The publication branch is built here from the candidate and pushed as is.
+      # (the peter-evans PR action would re-apply the changes onto main after the check, so the
+      # pushed bytes could differ from the verified ones.) The work tree is verified
+      # immediately before the commit: the changed files must be exactly the two #1422 outputs
+      # (headline and stamp index), each with the adjudicated hash, and the commit records
+      # exactly that tree.
+      - name: Verify and publish the benchmark results PR (#1410)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.gate.outputs.tag }}
+          VER: ${{ steps.gate.outputs.version }}
+          REPORT: ${{ steps.methodology.outputs.report }}
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_release_adjudication.py --identity "$ADJUDICATION_IDENTITY" \
+            --expect-head --require-tag --version "$VER" --benchmark-worktree
+          BRANCH="benchmark-results-$TAG"
+          git switch -q -c "$BRANCH"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add -A
+          git diff --cached --quiet && { echo "Adjudicated benchmark files are already in the candidate; nothing to publish."; exit 0; }
+          TREE="$(git write-tree)"
+          CANDIDATE="$(git rev-parse HEAD)"
+          # A retry reuses a branch pushed earlier only if it is the candidate plus exactly the
+          # verified tree; anything else on that branch fails the job.
+          if git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null; then
+            git fetch -q origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+            test "$(git rev-parse "origin/$BRANCH^{tree}")" = "$TREE" \
+              && test "$(git rev-parse "origin/$BRANCH^")" = "$CANDIDATE" \
+              || { echo "::error::branch $BRANCH exists with content other than the verified results"; exit 1; }
+          else
+            git commit -q -m "chore: publish adjudicated benchmark results for $TAG"
+            git push origin "HEAD:refs/heads/$BRANCH"
+          fi
+          if [ "$(gh pr list --head "$BRANCH" --state open --json number --jq length)" != 0 ]; then
+            echo "PR for $BRANCH already open"; exit 0
+          fi
+          {
+            echo "Adjudicated benchmark results for $TAG (adjudication identity \`$ADJUDICATION_IDENTITY\`)."
+            echo
+            echo "## Gate report (#1422)"
+            echo
+            echo '```'
+            echo "$REPORT"
+            echo '```'
+            echo
+            echo "This PR publishes \`website/public/data/benchmark-headline.json\`, written by"
+            echo "\`scripts/benchmark_publication_gate.py\` (#1422) from the B1 results packet"
+            echo "(\`docs/plans/evidence/b1-1276/results/\`), and its provenance entry in"
+            echo "\`bench/phase0-agent-native/commit-stamp-index.json\`. Nothing else changes."
+            echo
+            echo "The #1422 gate refuses this PR when an included pair is not EQUIVALENT, a registered pair or"
+            echo "the registration changed, the method differs without a #1407 amendment merged first,"
+            echo "the regenerated packet differs, or the provenance commit is not a full SHA on main."
+            echo "Across different comparability keys no delta is reported. EQUIVALENT is not a"
+            echo "correctness claim, and the headline describes this fixed corpus only."
+            echo
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > "$RUNNER_TEMP/pr-body.md"
+          gh pr create --base main --head "$BRANCH" --title "chore: adjudicated benchmark results for $TAG" --body-file "$RUNNER_TEMP/pr-body.md"
 
       # #1422: last step of the job, so a failure anywhere (gate, regeneration, or publication
       # itself) must not leave an earlier publication PR mergeable. The listing is paginated and

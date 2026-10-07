@@ -3,8 +3,9 @@ name: create-release
 description: >-
     Automate the Calor release process end-to-end: bump version across Directory.Build.props,
     website, and changelog files; run the statistical benchmark suite
-    (30 runs); open and merge a release PR; create the GitHub release with proper pre-release
-    tagging; trigger the website deploy; and verify both packages reached nuget.org.
+    (30 runs); open and merge a release PR; publish through the #1410 adjudication-gated
+    publish-nuget workflow (which creates the GitHub release and dispatches the website deploy);
+    and verify both packages reached nuget.org.
     Use when the user asks to "cut a release",
     "create a release", "ship a version", "release vX.Y.Z", or "do a release".
 allowed-tools: Bash, Read, Write, Edit
@@ -18,6 +19,15 @@ This skill automates the release process: bump versions across all components, r
 **VS Code extension support was withdrawn after v0.13.1.** There is no VSIX build, no Marketplace
 publish, and no `editors/vscode` tree. Any step below that mentions them describes a channel that
 no longer exists — the only release artifacts are the two NuGet packages.
+
+**Release gate (#1410).** Since 0.24 R2, no public surface publishes without one successful #1408
+adjudication identity, `calor-adjudication:v1:<adjudication commit>:<terminal record sha256>`.
+There is no manual `gh release create` step and no version override: `publish-nuget.yml` is the
+only release path, and it creates the GitHub release itself after the packages are pushed. A
+release created by hand publishes nothing else and turns `release-audit.yml` red. The contract
+(`docs/plans/v0.24-evidence-contract.md`) defines no maintenance-release path, so until #1408
+records `MILESTONE-SUCCEEDED` no release can be cut. Design:
+`docs/plans/evidence/r2-1410/release-gate.md`.
 
 ## Steps to Perform
 
@@ -190,57 +200,23 @@ Wait for any CI checks, then merge:
 gh pr merge --squash --delete-branch
 ```
 
-### 6. Create GitHub Release
+### 6. Publish through the adjudication gate
 
-First, extract the changelog content for this version from CHANGELOG.md. The content is between `## [X.Y.Z]` and the next `## [` line. This will include the benchmark results section.
-
-Determine if this is a pre-release (any version < 1.0.0 is pre-release).
-
-**First sync local `main`** — step 5 merged the PR on the remote, and `gh pr merge --delete-branch`
-makes no promise of fast-forwarding your local branch:
+Do **not** run `gh release create`. Dispatch the gated release workflow from `main` with the
+identity that #1408 recorded (the adjudication commit is on `main`; the candidate, the version, and
+the notes all come from the record, and every one is checked):
 
 ```bash
-git checkout main && git pull --ff-only
-sed -n 's/.*<Version>\([^<]*\)<\/Version>.*/\1/p' Directory.Build.props   # MUST show the new version
+ID='calor-adjudication:v1:<adjudication commit>:<terminal record sha256>'
+gh workflow run publish-nuget.yml --ref main -f adjudication_identity="$ID"
 ```
 
-Do not skip that check. If you tag a stale `main`, the tag lands on the **pre-bump** commit,
-`publish-nuget` checks out the tag, `Directory.Build.props` still holds the previous version, and
-`dotnet nuget push --skip-duplicate` silently no-ops — a release that reports success and ships
-nothing. Recovering means deleting the release and tag and re-cutting.
-
-Extract the notes. Write them to a file and pass `--notes-file`; the notes contain backticks and
-`$`, which a shell-quoted `--notes` string will mangle. **Replace `0.12.1` below with the version
-you are cutting**, and then check the result is non-empty — a version string that matches nothing
-yields a silent empty file and a release with an empty body:
-
-```bash
-VER=0.12.1                                    # <-- the version being released
-awk -v v="$VER" '$0 ~ "^## \\[" v "\\]" {f=1; print; next} f && /^## \[/ {exit} f' \
-    CHANGELOG.md > /tmp/notes.md
-test -s /tmp/notes.md || { echo "ERROR: no CHANGELOG section for $VER"; exit 1; }
-head -1 /tmp/notes.md                          # sanity: should be "## [$VER] - YYYY-MM-DD"
-```
-
-Create the release (omit `--target` — it defaults to the default branch's head, which you have
-just verified):
-
-```bash
-# For pre-release (version < 1.0.0):
-gh release create "v$VER" --title "v$VER" --notes-file /tmp/notes.md --prerelease
-
-# For stable release (version >= 1.0.0):
-gh release create "v$VER" --title "v$VER" --notes-file /tmp/notes.md
-```
-
-**If you do pass `--target`, it must be a FULL 40-character SHA** — use
-`--target "$(git rev-parse origin/main)"` after a `git fetch origin main`. A short SHA is rejected
-with a message that points at the tag rather than the target, and is easy to misread:
-
-```
-tag_name is not a valid tag
-Release.target_commitish is invalid
-```
+The workflow fails closed unless the identity verifies. In order, it: verifies the identity;
+runs the release test gates on the candidate commit; packs and verifies the packages and the notes
+(the `CHANGELOG.md` section for the version, rendered from the candidate) against the adjudicated
+hashes; pushes to NuGet; creates the GitHub release `vX.Y.Z` at the candidate with the notes plus a
+`<!-- calor-adjudication: ... -->` trailer; attaches release metadata; and dispatches the website
+and benchmark workflows from `main` with the same identity; each checks out the candidate.
 
 ### 7. Cleanup and Return to Main Branch
 
@@ -255,16 +231,18 @@ Remove the temporary benchmark markdown file:
 rm -f benchmark-results.md
 ```
 
-Trigger the website deploy (the `nextjs-gh-pages` workflow runs on release creation, but if the banner/changelog were updated after the release tag was created, trigger a manual deploy):
+The website deploy is dispatched by `publish-nuget`. A re-deploy needs the same
+identity and the release tag; it deploys only the adjudicated site tree:
 
 ```bash
-gh workflow run nextjs-gh-pages.yml
+gh workflow run nextjs-gh-pages.yml --ref main -f adjudication_identity="$ID"
 ```
 
 ### 8. Verify NuGet — DO NOT SKIP
 
-**Creating the release triggers `publish-nuget`; it does not make it succeed.** A tag and website
-can go live while the packages are absent, so the release can look complete when it is not.
+**Dispatching `publish-nuget` does not make it succeed.** Since #1410 the GitHub release, the
+website, and the benchmark PR come only after the NuGet push, but a successful push is still not
+proof that nuget.org serves the packages.
 
 **Wait for the publish workflow first.** Querying nuget.org before it finishes shows the previous
 version and looks like failure.
@@ -273,9 +251,8 @@ version and looks like failure.
 VER=0.12.1   # the version you cut
 
 # Watch the publish workflow to completion (get the run id for THIS tag)
-gh run list --event release --limit 10 \
-  --json databaseId,workflowName,headBranch,status,conclusion \
-  --jq ".[] | select(.headBranch==\"v$VER\" and .workflowName==\"Publish to NuGet\") | \"\(.databaseId)\t\(.status)\t\(.conclusion)\""
+gh run list --workflow publish-nuget.yml --event workflow_dispatch --limit 5 \
+  --json databaseId,status,conclusion,createdAt
 gh run watch <run-id>
 ```
 
@@ -324,12 +301,12 @@ the Marketplace listing is abandoned at v0.3.8; the language server (`calor lsp`
 A failed publish is not a reason to delete the tag or bump the version. Fix the cause and re-run
 the failing channel only.
 
-- **NuGet.** `gh run rerun` re-runs at the **tag's** commit, and `publish-nuget.yml` reads
-  `.github/z3-binaries-<ver>.sha256` from the checked-out tree. So if the fix was a manifest
-  change committed to `main`, a rerun re-reads the *old* manifest off the tag and fails
-  identically. Use the dispatch path instead, which checks out the default branch and takes a
-  version override: `gh workflow run publish-nuget.yml -f version=$VER`. Safe to repeat — the push
-  uses `--skip-duplicate`.
+- **NuGet.** Re-dispatch with the same identity:
+  `gh workflow run publish-nuget.yml --ref main -f adjudication_identity="$ID"`. Every job checks
+  out the adjudicated candidate, so a fix committed to `main` after the candidate does **not**
+  reach the packages; such a fix changes the candidate and needs a new adjudication (#1407 §8
+  stopping rule 4). The push uses `--skip-duplicate`, and an existing release is accepted only if
+  its body already carries this identity.
 - **A failed publish never justifies re-cutting.** Fix the cause and re-dispatch; the tag stays.
 
 Note that republishing `z3-binaries` retroactively changes what **every past tag** resolves to, so
