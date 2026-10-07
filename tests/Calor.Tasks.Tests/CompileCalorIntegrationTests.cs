@@ -1416,8 +1416,8 @@ public class CompileCalorIntegrationTests : IDisposable
     // drop the refutation.
     // #826 review M4: the in-process VerifyGate tests find libz3 through the
     // test host's deps.json probing, which the real MSBuild task path does NOT
-    // get — the gate there depends on CopyZ3NativeToTasksOutput placing the
-    // native lib at the Tasks output ROOT. Pin that deployment directly: if
+    // get — the gate there depends on the host native reaching the Tasks output
+    // ROOT (Calor.Compiler's AddZ3AssetsToOutput items, #1420). Pin that deployment directly: if
     // the copy target regresses, this fails while the other gate tests stay
     // green.
     [Fact]
@@ -1438,12 +1438,20 @@ public class CompileCalorIntegrationTests : IDisposable
             var binDir = Path.Combine(repoRoot!, "src", "Calor.Tasks", "bin", config, "net10.0");
             if (!File.Exists(Path.Combine(binDir, "Calor.Tasks.dll"))) continue;
             checkedConfigs++;
-            var hasNative = File.Exists(Path.Combine(binDir, "libz3.dylib"))
-                || File.Exists(Path.Combine(binDir, "libz3.so"))
-                || File.Exists(Path.Combine(binDir, "libz3.dll"));
-            Assert.True(hasNative,
+            // #1420: the root copy must be THIS host's native and byte-identical
+            // to the bootstrapped source asset that ValidateZ3Assets hash-checked;
+            // a stale or foreign library here would be loaded first.
+            var lib = OperatingSystem.IsWindows() ? "libz3.dll"
+                : OperatingSystem.IsMacOS() ? "libz3.dylib" : "libz3.so";
+            var os = OperatingSystem.IsWindows() ? "win" : OperatingSystem.IsMacOS() ? "osx" : "linux";
+            var rid = $"{os}-{System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant()}";
+            var native = Path.Combine(binDir, lib);
+            Assert.True(File.Exists(native),
                 $"No libz3 native library at the Calor.Tasks output root ({binDir}) — "
-                + "the MSBuild verify gate would silently report Z3 unavailable (CopyZ3NativeToTasksOutput regressed?)");
+                + "the MSBuild verify gate would silently report Z3 unavailable (AddZ3AssetsToOutput regressed?)");
+            var source = Path.Combine(repoRoot!, "src", "Calor.Compiler", "runtimes", rid, "native", lib);
+            Assert.True(File.ReadAllBytes(source).AsSpan().SequenceEqual(File.ReadAllBytes(native)),
+                $"{native} differs from the verified {source}");
         }
         Assert.True(checkedConfigs > 0, "No built Calor.Tasks output found to check");
     }

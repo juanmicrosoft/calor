@@ -25,6 +25,23 @@ internal static class DifferentialGate
     internal const string RuntimeCultureName = "en-US";
 
     private const int MaximumDepth = 3;
+
+    // #1413 (S2 R-NUM, amendment 1.3.2): overflow sensitivity is decided by rule from operand
+    // widths, with no solver. The provable postconditions of these forms guard a 64-bit product
+    // (`value == 2` / `value == 3`), which the rule cannot see, so they are Assumed
+    // [checked-arithmetic] by the registered NUM-OVERFLOW-CHECKED row. The allowance covers exactly
+    // these 12 cells (4 forms x 3 depths, provable postconditions); every other cell is unchanged.
+    private static readonly HashSet<string> CheckedArithmeticPostconditionForms = new(StringComparer.Ordinal)
+    {
+        "scalar-type:i64", "scalar-type:u64", "array-element-type:i64", "array-element-type:u64",
+    };
+
+    private static IReadOnlyList<string> AllowedAssumptionsFor(
+        DifferentialForm form, ContractPosition position, CasePolarity polarity)
+        => position == ContractPosition.Postcondition && polarity == CasePolarity.Provable
+           && CheckedArithmeticPostconditionForms.Contains(form.Id)
+            ? form.AllowedAssumptions.Append(Z3Verifier.CheckedArithmeticAssumption).ToList()
+            : form.AllowedAssumptions;
     private static readonly TextSpan Span = TextSpan.Empty;
     private static readonly AttributeCollection Attributes = new();
 
@@ -82,6 +99,7 @@ internal static class DifferentialGate
                 .ToList();
         }
 
+        DeterminismRecord.WriteCells(results);
         var failSafeControls = RunFailSafeControls();
         return BuildReport(forms, results, failSafeControls);
     }
@@ -132,7 +150,7 @@ internal static class DifferentialGate
                             polarity,
                             function,
                             proofId,
-                            form.AllowedAssumptions));
+                            AllowedAssumptionsFor(form, position, polarity)));
                     }
                 }
             }
@@ -402,8 +420,9 @@ internal static class DifferentialGate
                 ?? throw new InvalidOperationException(
                     $"SelfRef differential case '{testCase.Id}' did not translate.");
 
-            using var solver = context.MkSolver();
-            solver.Set("timeout", VerificationOptions.DefaultTimeoutMs);
+            // #1135: checked in a fresh context, like the verifier, so the verdict does not
+            // depend on when the GC released earlier terms of the shared context.
+            using var solver = new IsolatedSolver(context, VerificationOptions.DefaultTimeoutMs);
             var polarity = testCase.Position == ContractPosition.Precondition
                 ? SatPolarity.SatIsProof
                 : SatPolarity.SatIsRefutation;
@@ -411,11 +430,12 @@ internal static class DifferentialGate
                 testCase.Position == ContractPosition.Precondition
                     ? translated
                     : context.MkNot(translated));
+            var status = solver.Check();
             outcomes[testCase.Function.Id] = ProofOutcome.Assign(
                 ProofEvidence.SolverVerdict(
-                    solver.Check(),
-                    solver,
-                    translator.Variables,
+                    status,
+                    solver.CheckedSolver,
+                    solver.TranslateVariables(translator.Variables),
                     polarity,
                     unsatNote: testCase.Position == ContractPosition.Precondition
                         ? "Precondition is never satisfiable"
@@ -660,18 +680,24 @@ internal static class DifferentialGate
                 ["scalar-type:i64"] =
                     "The translator models integer literals only through signed i32. The i64 row therefore " +
                     "uses signedness at -1 plus an i32-overflow boundary witness (2 * Int32.MaxValue) rather " +
-                    "than claiming coverage of Int64.MinValue/MaxValue literals.",
+                    "than claiming coverage of Int64.MinValue/MaxValue literals. Its provable " +
+                    "postconditions are Assumed [checked-arithmetic] (amendment 1.3.2): the guarded " +
+                    "64-bit product can overflow for some i64, and overflow is decided by rule.",
                 ["scalar-type:u32"] =
                     "The u32 row combines non-negativity with the C# shift-count mask: " +
                     "for witness 3, shifting by 32 is the identity for u32 and zero for u64. " +
                     "This distinguishes the widths without requiring integer overflow.",
                 ["scalar-type:u64"] =
                     "The u64 row combines non-negativity with the non-wrapping result of " +
-                    "3 * Int32.MaxValue; it does not claim direct UInt64.MaxValue literal coverage.",
+                    "3 * Int32.MaxValue; it does not claim direct UInt64.MaxValue literal coverage. Its " +
+                    "provable postconditions are Assumed [checked-arithmetic] (amendment 1.3.2): the " +
+                    "guarded 64-bit product can overflow for some u64, and overflow is decided by rule.",
                 ["array-element-types"] =
                     "Integer array rows apply the same per-type boundary predicates to values[0]. Runtime " +
                     "uses a non-null one-element array with the matching deterministic witness; proofs are " +
-                    "therefore conditional only on the production nullable-reference-model assumption.",
+                    "therefore conditional only on the production nullable-reference-model assumption, " +
+                    "except the i64/u64 provable postconditions, which are also Assumed " +
+                    "[checked-arithmetic] as in the scalar rows (amendment 1.3.2).",
                 ["scalar-type:str"] =
                     "The string row proves non-negative length using the non-null ASCII runtime witness " +
                     "'ascii'. The solver result remains explicitly conditional on the production string-" +

@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
@@ -19,7 +21,7 @@ internal sealed record ContractViolation(string Code, string Subject, string Mes
 /// known value, and an absent field is a violation rather than a default. The rules encode the
 /// contract's frozen sections; changing what they accept is a contract amendment.</para>
 /// </summary>
-internal static class EvidenceContractValidator
+internal static partial class EvidenceContractValidator
 {
     /// <summary>The proof-outcome tokens frozen by #1407. Adding or removing one is an amendment.</summary>
     public static readonly IReadOnlyList<string> FrozenOutcomeTokens =
@@ -121,6 +123,143 @@ internal static class EvidenceContractValidator
             if (status is not ("PROPOSED" or "ACCEPTED"))
                 v.Add(new("C011", id, $"ceiling status '{status}' is not PROPOSED or ACCEPTED"));
         }
+        var amendmentVersions = Array(contract["amendmentLog"]).Select(a => Str(a?["version"])).OfType<string>().ToHashSet(StringComparer.Ordinal);
+        foreach (var exception in Array(capacity?["exceptions"]))
+        {
+            // A raise (stopping rule 1) is valid only exactly as an amendment registered it, in an
+            // amendment that is in the log: a different PR, gate, value, or ceiling needs a new
+            // amendment and a validator change, which review sees. A per-PR exception is keyed by
+            // its PR; a per-gate exception (1.2.0) is keyed by its issue and names no PR.
+            var ceilingId = Str(exception?["ceiling"]);
+            var pr = Int(exception?["pr"]);
+            var issue = Int(exception?["issue"]);
+            var hasPr = exception?["pr"] is not null;
+            var subject = hasPr
+                ? $"exception {ceilingId ?? "?"} #{pr?.ToString(CultureInfo.InvariantCulture) ?? "?"}"
+                : $"exception {ceilingId ?? "?"} issue #{issue?.ToString(CultureInfo.InvariantCulture) ?? "?"}";
+            double? raised = exception?["value"] is JsonValue rv && rv.TryGetValue<double>(out var r) ? r : null;
+            var recordedIn = Str(exception?["amendment"]);
+            var match = RegisteredCeilingExceptions.FirstOrDefault(e =>
+                e.Ceiling == ceilingId && e.Value == raised && e.Amendment == recordedIn
+                && (e.Pr is { } registeredPr ? hasPr && pr == registeredPr && issue == e.Issue : !hasPr && issue == e.Issue));
+            if (match is null || recordedIn is null || !amendmentVersions.Contains(recordedIn))
+                v.Add(new("C011", subject, "ceiling exception is not one registered by a logged amendment (1.1.0: pr-size, #1473, 1520; 1.2.0: s1-generated-cases, issue #1311, 3008; 1.3.0: s2-repairs, issue #1413, 7, and review-rounds-per-pr, #1496, 5; 1.3.1: review-rounds-per-pr, #1503 (revert-only), 5, and #1502, re-registered by 1.3.2 with value 6 (one change: the no-solver overflow rule))"));
+            // A later amendment that changed the registered text must itself be logged (1.2.1
+            // amended condition 4 of the #1311 exception).
+            if (match?.TextAmendment is { } textAmendment && !amendmentVersions.Contains(textAmendment))
+                v.Add(new("C011", subject, $"the registered text of this exception was set by amendment {textAmendment}, which is not in the amendment log"));
+            if (string.IsNullOrWhiteSpace(Str(exception?["justification"])))
+                v.Add(new("C011", subject, "exception needs a justification"));
+            // An exception that authorizes work, not just a number (every per-gate exception, and the
+            // 1.3.0 per-PR review exception), carries registered text bound by hash: its scope,
+            // conditions, and justification. Weakening, dropping, adding, or reordering a condition
+            // needs a new amendment and a validator change.
+            if (match?.TextSha256 is { } registeredText)
+            {
+                var conditions = Array(exception?["conditions"]);
+                if (string.IsNullOrWhiteSpace(Str(exception?["scope"])) || conditions.Count == 0
+                    || conditions.Any(c => string.IsNullOrWhiteSpace(Str(c))))
+                    v.Add(new("C011", subject, "this exception needs a scope and non-empty conditions"));
+                var text = TextSha256([Str(exception?["scope"]), .. conditions.Select(Str), Str(exception?["justification"])]);
+                if (text != registeredText)
+                    v.Add(new("C011", subject, "exception scope, conditions, or justification differ from the registered text"));
+            }
+            else if (match is not null && (exception?["scope"] is not null || exception?["conditions"] is not null))
+            {
+                v.Add(new("C011", subject, "this exception has no registered scope or conditions"));
+            }
+            if (match is not null)
+            {
+                // The added amount is recorded in exactly the registered field (1.2.0: addedExecutions;
+                // 1.3.0: addedPrs); any other added-amount field is unregistered.
+                foreach (var field in AddedAmountFields)
+                {
+                    if (field == match.AddedField)
+                    {
+                        if (Int(exception?[field]) != match.Added)
+                            v.Add(new("C011", subject, $"exception must record {field} {match.Added}"));
+                    }
+                    else if (exception?[field] is not null)
+                    {
+                        v.Add(new("C011", subject, $"exception records an unregistered {field}"));
+                    }
+                }
+                // A finding-scoped exception (1.3.0 decision A; 1.3.1 #1502) names exactly its registered findings,
+                // in order; any other exception names none.
+                var findings = exception?["findings"] is null ? null : Array(exception["findings"]).Select(Str).ToList();
+                if (match.Findings is { } registeredFindings
+                    ? findings is null || !findings.SequenceEqual(registeredFindings, StringComparer.Ordinal)
+                    : findings is not null)
+                    v.Add(new("C011", subject, match.Findings is null
+                        ? "this exception is not scoped to findings"
+                        : $"exception must name exactly the findings {string.Join(", ", match.Findings)}"));
+                // A base-bound change exception (1.3.1) records its registered revertOnly flag (#1503:
+                // true; #1502: false, three registered changes) and base commit, names that commit in its
+                // first condition (the registered change-scope condition), and requires an APPROVE
+                // verdict; any other exception carries neither field.
+                if (match.BaseCommit is { } baseCommit)
+                {
+                    var expectedRevertOnly = match.RevertOnly == true;
+                    if (exception?["revertOnly"] is not JsonValue ro || !ro.TryGetValue<bool>(out var revertOnly) || revertOnly != expectedRevertOnly)
+                        v.Add(new("C011", subject, $"this exception must record revertOnly {(expectedRevertOnly ? "true" : "false")}"));
+                    if (Str(exception?["baseCommit"]) != baseCommit)
+                        v.Add(new("C011", subject, $"this exception must record baseCommit {baseCommit}"));
+                    var conditionTexts = Array(exception?["conditions"]).Select(Str).ToList();
+                    if (conditionTexts.FirstOrDefault() is not { } scopeCondition
+                        || !scopeCondition.StartsWith(match.ScopeCondition!, StringComparison.Ordinal)
+                        || !scopeCondition.Contains(baseCommit, StringComparison.Ordinal))
+                        v.Add(new("C011", subject, $"the first condition must be the '{match.ScopeCondition}' condition naming the base commit"));
+                    if (!conditionTexts.Any(c => c is not null && c.StartsWith("Verification pass must APPROVE.", StringComparison.Ordinal)))
+                        v.Add(new("C011", subject, "this exception needs the condition that the verification pass must APPROVE"));
+                }
+                else if (exception?["revertOnly"] is not null || exception?["baseCommit"] is not null)
+                {
+                    v.Add(new("C011", subject, "this exception is not registered with a base commit"));
+                }
+            }
+        }
+        // One exception per identity: a per-PR exception is identified by ceiling and PR, a per-gate
+        // one by ceiling and issue (the same identities the matching above uses).
+        var seenExceptions = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var exception in Array(capacity?["exceptions"]))
+        {
+            var key = exception?["pr"] is not null
+                ? $"pr|{Str(exception?["ceiling"])}|{Int(exception?["pr"])}"
+                : $"gate|{Str(exception?["ceiling"])}|{Int(exception?["issue"])}";
+            if (!seenExceptions.Add(key))
+                v.Add(new("C011", $"exception {Str(exception?["ceiling"]) ?? "?"}", "duplicate ceiling exception"));
+        }
+
+        // Charge rules (1.2.0) move named work from one ceiling to another without changing any
+        // value. Each is valid only exactly as an amendment registered it.
+        var ceilingIds = ceilings.Select(c => Str(c?["id"])).OfType<string>().ToHashSet(StringComparer.Ordinal);
+        var seenRules = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var rule in Array(capacity?["chargeRules"]))
+        {
+            var id = Str(rule?["id"]);
+            var subject = $"charge rule {id ?? "?"}";
+            var chargedTo = Str(rule?["chargedTo"]);
+            var notChargedTo = Str(rule?["notChargedTo"]);
+            var recordedIn = Str(rule?["amendment"]);
+            var registered = RegisteredChargeRules.FirstOrDefault(c =>
+                c.Id == id && c.ChargedTo == chargedTo && c.NotChargedTo == notChargedTo && c.Amendment == recordedIn);
+            if (registered.Id is null || recordedIn is null || !amendmentVersions.Contains(recordedIn))
+                v.Add(new("C011", subject, "charge rule is not one registered by a logged amendment (1.2.0: c2-candidate-determinism-protocol, determinism-compute -> regeneration-compute)"));
+            if (chargedTo is null || !ceilingIds.Contains(chargedTo) || notChargedTo is null || !ceilingIds.Contains(notChargedTo))
+                v.Add(new("C011", subject, "charge rule must name two existing ceilings"));
+            foreach (var field in new[] { "work", "rule", "justification" })
+            {
+                if (string.IsNullOrWhiteSpace(Str(rule?[field])))
+                    v.Add(new("C011", subject, $"charge rule needs {field}"));
+            }
+            // The work, rule, and justification carry the binding to the #1423 candidate, the
+            // ledger, and the one-execution limit; they are the registered text, bound by hash.
+            if (registered.Id is not null
+                && TextSha256([Str(rule?["work"]), Str(rule?["rule"]), Str(rule?["justification"])]) != registered.TextSha256)
+                v.Add(new("C011", subject, "charge rule work, rule, or justification differ from the registered text"));
+            if (id is not null && !seenRules.Add(id))
+                v.Add(new("C011", subject, "duplicate charge rule"));
+        }
         var anyProposed = Str(capacity?["status"]) == "PROPOSED"
             || ceilings.Any(c => Str(c?["status"]) == "PROPOSED");
         if (Str(contract["gateStatus"]) == "MET" && (anyProposed || Str(contract["status"]) == "PROPOSED"))
@@ -151,6 +290,71 @@ internal static class EvidenceContractValidator
 
         v.AddRange(ValidateAmendments(contract));
         return v;
+    }
+
+    /// <summary>
+    /// Ceiling raises registered by amendments (stopping rule 1). A per-PR raise names its PR (and its
+    /// gate's issue); a per-gate raise (amendment 1.2.0) has no PR and is keyed by the gate's issue.
+    /// A raise that authorizes work also binds its scope, conditions, and justification by
+    /// <see cref="TextSha256"/>, and may record its added amount in one registered field.
+    /// <c>TextAmendment</c> names the amendment that last changed that text, which must be in the log:
+    /// amendment 1.2.1 amended condition 4 of the #1311 exception (run-2 harness: the libz3 capture and
+    /// ExecutionCeiling 1500 to 1508), so the hash is of the 1.2.1 text and the 1.2.0 text no longer
+    /// validates. Amendment 1.3.0 registers a seventh S2 repair PR scoped to exactly two
+    /// review-found discovery findings (decision A), and PR #1496's review-round overrun with its
+    /// required final verification pass (decision B). Amendment 1.3.1 registers one change after the ceiling
+    /// (#1502: exactly three registered changes, owning discovery D-NUM-WHILE-BOUND; #1503: revert-only)
+    /// and one verification-only pass that must APPROVE for each of PRs #1502 and #1503, each bound
+    /// to its base commit (the PR head when the amendment was drafted). Amendment 1.3.2 re-registers
+    /// #1502's exception (value 6, base bdb430db, scope condition "One change only."): the 1.3.1 text
+    /// of part (b) contradicted its own determinism condition, so the no-overflow decision becomes a
+    /// rule with no solver; the 1.3.1 text of #1502 no longer validates.
+    /// </summary>
+    private static readonly RegisteredException[] RegisteredCeilingExceptions =
+    [
+        new("pr-size", 1473, 1276, 1520, "1.1.0"),
+        new("s1-generated-cases", null, 1311, 3008, "1.2.0", "addedExecutions", 1508, "1.2.1", "d9a57518b7e26e744fe7080177cdfb5e3ea9051f9eaaec5c233f083ccf896bac"),
+        new("s2-repairs", null, 1413, 7, "1.3.0", "addedPrs", 1, "1.3.0", "2254c411e46b2f8aa9cc0c262328bd68dc491a8a84855ed3fa92be80ab656fab",
+            ["D-OBL-PROOF-GETTER", "D-OBL-THROWING-PREDECESSOR"]),
+        new("review-rounds-per-pr", 1496, 1413, 5, "1.3.0", null, null, "1.3.0", "755c4c7d3da8630de5f9648f017c00d0c44485531c6f646fa9f4d902e4c89fa8"),
+        new("review-rounds-per-pr", 1502, 1413, 6, "1.3.1", null, null, "1.3.2", "cb311f2aa08a4c7fec003064a4dbd400ba32767670cf2bad13506e20b6b0f21e",
+            ["D-NUM-WHILE-BOUND"], BaseCommit: "bdb430db1c1dfdbcd578c5b1b74110841be95a2d", RevertOnly: false, ScopeCondition: "One change only."),
+        new("review-rounds-per-pr", 1503, 1413, 5, "1.3.1", null, null, "1.3.1", "fd4a1147a5ebdf12ec319f87b3ac3e074d9a82c82e95509b52c127901b118bf7",
+            BaseCommit: "9b54c9c3d8d7fb178c5594ddc757d871fbb34ab4", RevertOnly: true, ScopeCondition: "Revert only."),
+    ];
+
+    private sealed record RegisteredException(
+        string Ceiling, int? Pr, int? Issue, double Value, string Amendment,
+        string? AddedField = null, int? Added = null, string? TextAmendment = null, string? TextSha256 = null,
+        string[]? Findings = null, string? BaseCommit = null, bool? RevertOnly = null, string? ScopeCondition = null);
+
+    /// <summary>Fields in which an exception may record the amount it adds; at most the registered one appears.</summary>
+    private static readonly string[] AddedAmountFields = ["addedExecutions", "addedPrs"];
+
+    /// <summary>
+    /// Charge reallocations registered by amendments; they change no ceiling value. The work, rule,
+    /// and justification are bound by <see cref="TextSha256"/>.
+    /// </summary>
+    private static readonly (string Id, string ChargedTo, string NotChargedTo, string Amendment, string TextSha256)[] RegisteredChargeRules =
+    [
+        ("c2-candidate-determinism-protocol", "regeneration-compute", "determinism-compute", "1.2.0", "603d579b53a09c0d8e756817b7fbe5acfee2b97a8bdbd6a5fced854132ae03d0"),
+    ];
+
+    /// <summary>
+    /// SHA-256 (lowercase hex) of a framed encoding of the given strings, binding registered prose to
+    /// the validator. Each string has CRLF normalized to LF (a missing string is empty). The encoding
+    /// is the part count, LF, then for each part its UTF-8 byte length, ':', its bytes, and LF, so
+    /// text cannot move between parts (for example from a condition into the justification) without
+    /// changing the hash.
+    /// </summary>
+    internal static string TextSha256(IEnumerable<string?> parts)
+    {
+        var normalized = parts.Select(p => (p ?? "").Replace("\r\n", "\n", StringComparison.Ordinal)).ToList();
+        var framed = new StringBuilder();
+        framed.Append(normalized.Count.ToString(CultureInfo.InvariantCulture)).Append('\n');
+        foreach (var part in normalized)
+            framed.Append(Encoding.UTF8.GetByteCount(part).ToString(CultureInfo.InvariantCulture)).Append(':').Append(part).Append('\n');
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(framed.ToString())));
     }
 
     private static IEnumerable<ContractViolation> ValidateGraph(List<JsonNode?> children, HashSet<int> childIssues)
@@ -249,7 +453,7 @@ internal static class EvidenceContractValidator
                 previous = parsed;
             if (string.IsNullOrWhiteSpace(Str(entry?["justification"])))
                 yield return new("C010", subject, "amendment has no justification");
-            if (Int(entry?["reviewedInPr"]) is null)
+            if (Int(entry?["reviewedInPr"]) is not > 0)
                 yield return new("C010", subject, "amendment names no reviewed PR");
             if (!IsUtcTimestamp(Str(entry?["timestampUtc"])))
                 yield return new("C010", subject, "amendment has no UTC timestamp");
@@ -352,7 +556,57 @@ internal static class EvidenceContractValidator
                 v.Add(new("I011", id, $"owning issue {owner} is not a 0.24 child"));
         }
 
+        v.AddRange(ValidatePendingUpdates(contract, inventory, byId, classifications));
         return v;
+    }
+
+    /// <summary>
+    /// I013 (amendment 1.1.0): a pending inventory update names a known artifact, the open PR whose
+    /// repair motivates it, the amendment that recorded it, a known target classification, and a
+    /// resolving PR for each defect it would resolve. It is never applied by the validator: rows are
+    /// checked against the artifacts as committed.
+    /// </summary>
+    private static IEnumerable<ContractViolation> ValidatePendingUpdates(
+        JsonNode contract, JsonNode inventory, Dictionary<string, JsonNode> byId, HashSet<string> classifications)
+    {
+        var amendments = Array(contract["amendmentLog"]).Select(a => Str(a?["version"])).OfType<string>().ToHashSet(StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        if (inventory["pendingUpdates"] is { } present && present is not JsonArray)
+            yield return new("I013", "pendingUpdates", "pendingUpdates must be an array");
+        foreach (var update in Array(inventory["pendingUpdates"]))
+        {
+            var id = Str(update?["id"]) ?? "?";
+            if (!seen.Add(id))
+                yield return new("I013", id, "duplicate pending update id");
+            var artifact = Str(update?["artifact"]);
+            if (artifact is null || !byId.ContainsKey(artifact))
+                yield return new("I013", id, $"pending update names unknown artifact '{artifact}'");
+            if (Int(update?["repairingPr"]) is not > 0)
+                yield return new("I013", id, "pending update must name the repairing PR");
+            var amendment = Str(update?["recordedInAmendment"]);
+            if (amendment is null || !amendments.Contains(amendment))
+                yield return new("I013", id, $"pending update names no recorded amendment ('{amendment}')");
+            if (Str(update?["status"]) != "pending-merge")
+                yield return new("I013", id, "a pending update has status 'pending-merge'; an applied update is removed by its write-back");
+            var after = Str(update?["classificationAfter"]);
+            if (after is null || !classifications.Contains(after))
+                yield return new("I013", id, $"unknown classificationAfter '{after}'");
+            if (update?["changes"] is not JsonObject)
+                yield return new("I013", id, "pending update needs a changes object (empty when only defects resolve)");
+            var cutoffDefects = artifact is not null && byId.TryGetValue(artifact, out var record)
+                ? Array(record["openDefects"]).Select(Str).OfType<string>().ToHashSet(StringComparer.Ordinal)
+                : [];
+            if (update?["defectResolutions"] is not JsonArray)
+                yield return new("I013", id, "defectResolutions must be an array (empty when no defect resolves)");
+            foreach (var resolution in Array(update?["defectResolutions"]))
+            {
+                if (string.IsNullOrWhiteSpace(Str(resolution?["defect"])) || Int(resolution?["resolvedByPr"]) is not > 0
+                    || string.IsNullOrWhiteSpace(Str(resolution?["scope"])))
+                    yield return new("I013", id, "a defect resolution needs the defect text, a resolving PR, and its scope");
+                else if (!cutoffDefects.Contains(Str(resolution?["defect"])!))
+                    yield return new("I013", id, "a defect resolution must quote one of the artifact's cutoff openDefects verbatim");
+            }
+        }
     }
 
     // ------------------------------------------------------------------

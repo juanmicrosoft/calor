@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Calor.Compiler.Ast;
 using Calor.Compiler.Parsing;
+using Calor.Compiler.Verification;
 using Calor.Compiler.Verification.Z3;
 using Microsoft.CSharp.RuntimeBinder;
 using Xunit;
@@ -101,6 +102,16 @@ public sealed class NumericExecutableSemanticsTests
                     Ensures(Equal(negation, Literal(runtimeResult ?? 0))));
                 var label = $"-{type}({value})";
 
+                if (IsNarrow(type))
+                {
+                    // #1413 (S2 R-NUM, frozen row NUM-NARROW-ARITH / divergence D1): negation of a
+                    // sub-32-bit operand is refused, whatever C# computes.
+                    Assert.True(
+                        result.Status == ContractVerificationStatus.Unsupported,
+                        $"{label}: narrow negation must be refused (D1), got {result.Status}");
+                    continue;
+                }
+
                 if (runtimeError is RuntimeBinderException)
                 {
                     Assert.True(
@@ -115,9 +126,7 @@ public sealed class NumericExecutableSemanticsTests
                 }
                 else
                 {
-                    Assert.True(
-                        result.Status == ContractVerificationStatus.Proven,
-                        $"{label}: expected Proven, got {result.Status}: {result.CounterexampleDescription}");
+                    AssertExpectedVerdict(result, label, OverflowSensitive(type, null, null));
                     Assert.False(
                         result.EffectiveOutcome.IsVacuous,
                         $"{label}: operand constraints were unsatisfiable, so the proof tested no runtime value");
@@ -167,6 +176,18 @@ public sealed class NumericExecutableSemanticsTests
             Ensures(condition));
 
         var label = $"{leftType}({leftValue}) {op} {rightType}({rightValue})";
+        if (IsNarrow(leftType) && IsNarrow(rightType) && op is BinaryOperator.Add or BinaryOperator.Subtract
+                or BinaryOperator.Multiply or BinaryOperator.Divide or BinaryOperator.Modulo
+                or BinaryOperator.LeftShift or BinaryOperator.RightShift)
+        {
+            // #1413 (S2 R-NUM, frozen row NUM-NARROW-ARITH / divergence D1): arithmetic and shifts
+            // whose operands are both sub-32-bit are refused, whatever C# computes.
+            Assert.True(
+                result.Status == ContractVerificationStatus.Unsupported,
+                $"{label}: narrow arithmetic must be refused (D1), got {result.Status}");
+            return;
+        }
+
         if (runtimeError is RuntimeBinderException)
         {
             Assert.True(
@@ -183,13 +204,76 @@ public sealed class NumericExecutableSemanticsTests
             return;
         }
 
-        Assert.True(
-            result.Status == ContractVerificationStatus.Proven,
-            $"{label}: expected Proven, got {result.Status}: {result.CounterexampleDescription}");
+        AssertExpectedVerdict(result, label, OverflowSensitive(leftType, rightType, op));
         Assert.False(
             result.EffectiveOutcome.IsVacuous,
             $"{label}: operand constraint was unsatisfiable, so the proof tested no runtime value");
     }
+
+    private static bool IsNarrow(string type) => type is "i8" or "u8" or "i16" or "u16";
+
+    /// <summary>
+    /// #1413 (S2 R-NUM, frozen row NUM-OVERFLOW-CHECKED: "Assumed (checked-arithmetic)"): a checked
+    /// operation that throws for SOME operand values of its types is overflow-sensitive and must be
+    /// Assumed with exactly the checked-arithmetic assumption, even though the preconditions fix
+    /// values that do not throw; every other case must be Proven. The oracle is C# itself: the
+    /// operation is evaluated on the boundary values of both types.
+    /// </summary>
+    private static void AssertExpectedVerdict(Calor.Compiler.Verification.Z3.ContractVerificationResult result, string label, bool sensitive)
+    {
+        var outcome = result.EffectiveOutcome;
+        if (sensitive)
+            Assert.True(
+                outcome.Status == ProofStatus.Assumed && outcome.Assumptions.SequenceEqual([Z3Verifier.CheckedArithmeticAssumption]),
+                $"{label}: overflow-sensitive, expected Assumed (checked-arithmetic), got {outcome.Status} [{string.Join("; ", outcome.Assumptions)}]");
+        else
+            Assert.True(
+                outcome.Status == ProofStatus.Proven,
+                $"{label}: expected Proven, got {outcome.Status} [{string.Join("; ", outcome.Assumptions)}]: {result.CounterexampleDescription}");
+    }
+
+    private static bool OverflowSensitive(string leftType, string? rightType, BinaryOperator? op)
+    {
+        var lefts = Boundaries(leftType);
+        if (op is null)
+            return lefts.Any(value => Throws(() => { dynamic operand = value; return checked(-operand); }));
+        // Division and modulo throw for a zero divisor and for MinValue / -1 in checked and unchecked
+        // code alike; the verifier carries those as contract-division conditions (D8), not as
+        // checked-arithmetic, so they are not part of the NUM-OVERFLOW-CHECKED shape.
+        if (op is not (BinaryOperator.Add or BinaryOperator.Subtract or BinaryOperator.Multiply))
+            return false;
+        return lefts.Any(left => Boundaries(rightType!).Any(right => Throws(() => EvaluateDynamic(left, right, op.Value))));
+    }
+
+    private static bool Throws(Func<object> evaluate)
+    {
+        try
+        {
+            evaluate();
+            return false;
+        }
+        catch (DivideByZeroException)
+        {
+            return false; // a zero divisor is the separate contract-division condition, not overflow
+        }
+        catch (OverflowException)
+        {
+            return true;
+        }
+    }
+
+    private static object[] Boundaries(string type) => type switch
+    {
+        "i32" => [int.MinValue, -1, 0, 1, int.MaxValue],
+        "u32" => [0U, 1U, uint.MaxValue],
+        "i64" => [long.MinValue, -1L, 0L, 1L, long.MaxValue],
+        "u64" => [0UL, 1UL, ulong.MaxValue],
+        "i8" => [sbyte.MinValue, (sbyte)-1, (sbyte)0, (sbyte)1, sbyte.MaxValue],
+        "u8" => [(byte)0, (byte)1, byte.MaxValue],
+        "i16" => [short.MinValue, (short)-1, (short)0, (short)1, short.MaxValue],
+        "u16" => [(ushort)0, (ushort)1, ushort.MaxValue],
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, null),
+    };
 
     private static object EvaluateDynamic(object left, object right, BinaryOperator op)
     {

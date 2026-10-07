@@ -492,6 +492,15 @@ public sealed class ObligationGenerator
 
     private ExpressionNode GetEffectiveRefinementPredicate(
         RefinementTypeNode refinementType)
+        => EffectiveRefinementPredicate(refinementType, _refinementTypes);
+
+    /// <summary>
+    /// A refinement type's predicate conjoined with those of the refinement types it is
+    /// based on (the predicate the runtime guard checks).
+    /// </summary>
+    internal static ExpressionNode EffectiveRefinementPredicate(
+        RefinementTypeNode refinementType,
+        IReadOnlyDictionary<string, RefinementTypeNode> refinementTypes)
     {
         var predicates = new Stack<ExpressionNode>();
         var current = refinementType;
@@ -499,7 +508,7 @@ public sealed class ObligationGenerator
         while (visited.Add(current.Name))
         {
             predicates.Push(current.Predicate);
-            if (!_refinementTypes.TryGetValue(
+            if (!refinementTypes.TryGetValue(
                     current.BaseTypeName,
                     out current))
             {

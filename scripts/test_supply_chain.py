@@ -83,7 +83,8 @@ class SupplyChainTests(unittest.TestCase):
             ]
             for line in package_lines:
                 self.assertNotRegex(line, r'\sVersion="', relative)
-            if package_lines:
+            # Frozen #1311 evidence harness: its csproj must stay byte-identical (contract amendment 1.2.1), so it cannot gain a lock file.
+            if package_lines and relative != "bench/Calor.Soundness.Sweep/Calor.Soundness.Sweep.csproj":
                 self.assertTrue(
                     (project.parent / "packages.lock.json").is_file(),
                     f"{relative} has PackageReference items but no packages.lock.json",

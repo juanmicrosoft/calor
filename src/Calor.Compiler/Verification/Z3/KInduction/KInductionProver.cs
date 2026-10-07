@@ -112,6 +112,9 @@ public sealed class KInductionProver : IDisposable
         BoundFunction function)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
+        if (HasUnrepresentableLiteral(loop.From) || HasUnrepresentableLiteral(loop.To)
+            || loop.Step != null && HasUnrepresentableLiteral(loop.Step))
+            return new KInductionResult(KInductionStatus.Unsupported, 0, invariantExpression, duration: sw.Elapsed);
 
         // Extract loop context
         var context = ExtractLoopContext(loop);
@@ -157,6 +160,10 @@ public sealed class KInductionProver : IDisposable
         BoundFunction function)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
+        // #1413 (S2 R-NUM, amendment 1.3.1): bounds are modeled as 32-bit, so a literal outside
+        // int32 anywhere in the condition or the body makes the whole loop Unsupported.
+        if (HasUnrepresentableLiteral(loop.Condition) || loop.Body.Any(HasUnrepresentableLiteral))
+            return new KInductionResult(KInductionStatus.Unsupported, 0, invariantExpression, duration: sw.Elapsed);
 
         for (var k = 1; k <= _options.MaxK; k++)
         {
@@ -242,7 +249,7 @@ public sealed class KInductionProver : IDisposable
             solver.Set("timeout", _options.TimeoutMs);
 
             // Create variables
-            var loopVar = _ctx.MkBVConst(loop.LoopVariable.Name, 32);
+            var loopVar = _ctx.MkBVConst(ContractTranslator.Z3Name(loop.LoopVariable.Name), 32);
 
             // Get bounds
             var fromValue = GetIntValue(loop.From);
@@ -288,7 +295,7 @@ public sealed class KInductionProver : IDisposable
             var iterations = new List<BitVecExpr> { loopVar };
             for (var i = 1; i <= k; i++)
             {
-                iterations.Add(_ctx.MkBVConst($"{loop.LoopVariable.Name}_{i}", 32));
+                iterations.Add(_ctx.MkBVConst(ContractTranslator.Z3Name($"{loop.LoopVariable.Name}_{i}"), 32));
             }
 
             // Assert invariant holds for first k iterations
@@ -301,7 +308,10 @@ public sealed class KInductionProver : IDisposable
                 }
 
                 // Assert transition: i+1 = i + step
-                var stepValue = loop.Step != null ? GetIntValue(loop.Step) ?? 1 : 1;
+                // #1413 (S2 R-NUM): an explicit step that cannot be modeled is refused, not replaced by 1.
+                var explicitStep = loop.Step != null ? GetIntValue(loop.Step) : 1;
+                if (explicitStep is not { } stepValue)
+                    return new KInductionResult(KInductionStatus.Unsupported, k);
                 inductiveSolver.Assert(_ctx.MkEq(
                     iterations[i + 1],
                     _ctx.MkBVAdd(iterations[i], _ctx.MkBV(stepValue, 32))));
@@ -363,7 +373,7 @@ public sealed class KInductionProver : IDisposable
             var solver = _ctx.MkSolver();
             solver.Set("timeout", _options.TimeoutMs);
 
-            var loopVar = _ctx.MkBVConst(loopVarName, 32);
+            var loopVar = _ctx.MkBVConst(ContractTranslator.Z3Name(loopVarName), 32);
 
             // Step 4: Base case - invariant holds at loop entry
             // For while loops, we assume the loop variable starts at some value
@@ -406,7 +416,7 @@ public sealed class KInductionProver : IDisposable
             var iterations = new List<BitVecExpr> { loopVar };
             for (var i = 1; i <= k; i++)
             {
-                iterations.Add(_ctx.MkBVConst($"{loopVarName}_{i}", 32));
+                iterations.Add(_ctx.MkBVConst(ContractTranslator.Z3Name($"{loopVarName}_{i}"), 32));
             }
 
             // Assert loop condition holds for all k iterations
@@ -501,9 +511,12 @@ public sealed class KInductionProver : IDisposable
                 var conjuncts = new List<BoolExpr>();
                 foreach (var part in parts)
                 {
+                    // #1413 review: a conjunct that cannot be parsed (e.g. a nested quantifier)
+                    // must not be dropped — proving the rest would report the whole invariant.
                     var parsed = ParseSimpleInvariant(part, varName, varExpr);
-                    if (parsed != null)
-                        conjuncts.Add(parsed);
+                    if (parsed == null)
+                        return null;
+                    conjuncts.Add(parsed);
                 }
                 if (conjuncts.Count > 0)
                     return _ctx.MkAnd(conjuncts.ToArray());
@@ -573,11 +586,18 @@ public sealed class KInductionProver : IDisposable
         return null;
     }
 
+    private static bool HasUnrepresentableLiteral(BoundNode node)
+        => node is BoundIntLiteral literal && !(literal.IsUnsigned ? literal.UnsignedValue <= int.MaxValue
+               : literal.Value is >= int.MinValue and <= int.MaxValue)
+           || node.ChildNodes.Any(HasUnrepresentableLiteral);
+
     private static long? GetIntValue(BoundExpression expr)
     {
         return expr switch
         {
-            BoundIntLiteral intLit => intLit.Value,
+            // #1413 (S2 R-NUM, D2): the bounds are modeled as 32-bit; a value outside int32 is refused.
+            BoundIntLiteral intLit when (intLit.IsUnsigned ? intLit.UnsignedValue <= int.MaxValue
+                : intLit.Value is >= int.MinValue and <= int.MaxValue) => intLit.Value,
             _ => null
         };
     }

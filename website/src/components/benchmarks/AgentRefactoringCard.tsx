@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import { Bot, CheckCircle2, XCircle } from 'lucide-react';
+import { HistoricalMethodLabel } from './HistoricalMethodLabel';
 
 // Build-time import of agent refactoring data
 import agentData from '../../../public/data/agent-refactoring-results.json';
@@ -63,6 +64,8 @@ export function AgentRefactoringCard() {
         <Bot className="h-5 w-5 text-calor-pink" />
         <h3 className="text-lg font-semibold">Agent Refactoring Benchmark</h3>
       </div>
+
+      <HistoricalMethodLabel className="mb-4" />
 
       <p className="text-sm text-muted-foreground mb-4">
         Historical Claude Code study of the bundled refactoring tasks (rename, extract, inline,

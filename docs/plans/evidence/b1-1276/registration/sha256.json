@@ -1,0 +1,12 @@
+{
+  "algorithm": "sha256",
+  "normalization": "LF",
+  "files": {
+    "docs/plans/evidence/b1-1276/registration/corpus-inventory.json": "65c6a2a35b2157972e0d20e8c3c9106dea8ff0309104720da9062d7c38de9009",
+    "docs/plans/evidence/b1-1276/registration/exclusions.json": "d76623d8617aa8b5706fa7053e7c2917cdcfddfbaa732e04e9fe015e59caf755",
+    "docs/plans/evidence/b1-1276/registration/metric-set.json": "3d284bb04ec7bf247aedfbc535636914caad8ed3e1706366d3a3c1099381a0b3",
+    "docs/plans/evidence/b1-1276/registration/pairs.json": "0f0d760a3f247dc6c952c39d5499656ecd0b08b99e8c4148a809302e62a93a7f",
+    "docs/plans/evidence/b1-1276/registration/registration.json": "15db2b1ee375eae1f160db506e746eccd3d5e0249979c391df94edebe40b71b6",
+    "docs/plans/b1-1276-benchmark-registration.md": "c91308d4e1b864bed63eecb24e88bc14cd6966f6437a8aaf396159af07f7dcfc"
+  }
+}

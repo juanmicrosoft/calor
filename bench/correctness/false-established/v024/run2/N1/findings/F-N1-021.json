@@ -1,0 +1,81 @@
+{
+  "findingId": "F-N1-021",
+  "baseline": "N1",
+  "registrationCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67",
+  "rowId": "OBL-SUBTYPE",
+  "caseId": "R1-OBL-SUBTYPE-002",
+  "templateId": "T-OBL-SUBTYPE",
+  "caseSha256": {
+    "calor": "77faca2e64d6f527151974458b105b1dac59020d2f6445ed8a74b65e9dff569d",
+    "oracle": "9e4716d538bafd2e33d7226d40682d04f9591989792bacbe8c1c181509f6aec4",
+    "prime": null
+  },
+  "class": "spurious-refutation",
+  "claim": {
+    "site": "obligation",
+    "token": "Failed",
+    "rawStatus": "Failed",
+    "isVacuous": null,
+    "assumptions": [],
+    "guardInElidedEmission": true,
+    "guardInForcedEmission": true
+  },
+  "witness": {
+    "inputs": "(-5562123229525975277)",
+    "source": "the solver counterexample model, replayed under O1",
+    "o1": "model input: excluded-hyp-false; case verdict: holds-sampled",
+    "o2": "not-run",
+    "o2Detail": null
+  },
+  "nonVacuityCheck": null,
+  "classReason": "model (-5562123229525975277) does not violate the property under O1 (excluded-hyp-false)",
+  "minimized": {
+    "status": "registered-case: a single-function probe generated from one template; not reduced further",
+    "calorSource": "\u00A7M{m1:R1Case}\n  \u00A7RTYPE{r1:Src:i64} (== # LONG:9223372036854775807)\n  \u00A7RTYPE{r2:Dst:i64} (!= # LONG:-5562123229525975277)\n  \u00A7F{f1:Probe:pub}\n    \u00A7I{Src:x}\n    \u00A7O{i32}\n    \u00A7E{}\n    \u00A7B{n:Dst} x\n    \u00A7R INT:0\n",
+    "calorPrimeSource": null,
+    "csharpReproduction": "// R1 #1419 independent oracle for R1-OBL-SUBTYPE-002\nusing System;\nusing System.Collections.Generic;\nusing System.Linq;\nusing System.Numerics;\npublic static class R1Oracle\n{\n    public const string Claim = \u0022forall\u0022;\n    public const bool Exhaustive = false;\n    public const bool Checked = true;\n    public static bool Hyp(long x) =\u003E x == 9223372036854775807L;\n    public static bool Prop(long x) =\u003E x != (-5562123229525975277L);\n    public static bool HypO(object?[] a) =\u003E Hyp((long)a[0]!);\n    public static bool HasBody =\u003E false;\n    public static object? BodyO(object?[] a) =\u003E null;\n    public static bool PropO(object?[] a, object? r) =\u003E Prop((long)a[0]!);\n    public static IEnumerable\u003Cobject?[]\u003E Inputs()\n    {\n        yield return new object?[] { (long)((-9223372036854775808L)) };\n        yield return new object?[] { (long)((-9223372036854775807L)) };\n        yield return new object?[] { (long)((-9158689404174041138L)) };\n        yield return new object?[] { (long)((-8667054910479005346L)) };\n        yield return new object?[] { (long)((-6396021130874212715L)) };\n        yield return new object?[] { (long)((-5562123229525975278L)) };\n        yield return new object?[] { (long)((-5562123229525975277L)) };\n        yield return new object?[] { (long)((-5562123229525975276L)) };\n        yield return new object?[] { (long)((-1477128292582669697L)) };\n        yield return new object?[] { (long)((-2147483648)) };\n        yield return new object?[] { (long)((-2)) };\n        yield return new object?[] { (long)((-1)) };\n        yield return new object?[] { (long)(0) };\n        yield return new object?[] { (long)(1) };\n        yield return new object?[] { (long)(2) };\n        yield return new object?[] { (long)(2147483647) };\n        yield return new object?[] { (long)(2147483648L) };\n        yield return new object?[] { (long)(4294967295L) };\n        yield return new object?[] { (long)(4294967296L) };\n        yield return new object?[] { (long)(5035740280050173422L) };\n        yield return new object?[] { (long)(7272560506368991261L) };\n        yield return new object?[] { (long)(9223372036854775806L) };\n        yield return new object?[] { (long)(9223372036854775807L) };\n    }\n}\n\npublic static class Repro\n{\n    public static int Main()\n    {\n        int reached = 0;\n        foreach (var a in R1Oracle.Inputs())\n        {\n            bool hyp; object? r = null; bool ok; string why;\n            try { hyp = R1Oracle.HypO(a); } catch { continue; }\n            if (!hyp) continue;\n            if (R1Oracle.HasBody) { try { r = R1Oracle.BodyO(a); } catch { continue; } }\n            reached\u002B\u002B;\n            try { ok = R1Oracle.PropO(a, r); why = \u0022false\u0022; } catch (Exception e) { ok = false; why = \u0022throws \u0022 \u002B e.GetType().Name; }\n            var shown = \u0022(\u0022 \u002B string.Join(\u0022, \u0022, a.Select(v =\u003E v is null ? \u0022null\u0022 : v is Array arr ? \u0022[\u0022 \u002B string.Join(\u0022, \u0022, arr.Cast\u003Cobject\u003E()) \u002B \u0022]\u0022 : v is string s ? \u0022\\\u0022\u0022 \u002B s \u002B \u0022\\\u0022\u0022 : Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture))) \u002B \u0022)\u0022;\n            if (R1Oracle.Claim == \u0022exists\u0022) { if (ok) { Console.WriteLine(\u0022witness \u0022 \u002B shown); return 0; } continue; }\n            if (!ok) { Console.WriteLine(\u0022property \u0022 \u002B why \u002B \u0022 at \u0022 \u002B shown \u002B (R1Oracle.HasBody ? \u0022 result=\u0022 \u002B Convert.ToString(r, System.Globalization.CultureInfo.InvariantCulture) : \u0022\u0022)); return 1; }\n        }\n        Console.WriteLine((R1Oracle.Claim == \u0022exists\u0022 ? \u0022no witness\u0022 : \u0022no violation\u0022) \u002B \u0022 in the registered domain; reached inputs: \u0022 \u002B reached);\n        return 0;\n    }\n}",
+    "reproductionOutput": "no violation in the registered domain; reached inputs: 1 (exit 0)",
+    "sha256": "77faca2e64d6f527151974458b105b1dac59020d2f6445ed8a74b65e9dff569d"
+  },
+  "environment": {
+    "calorDllSha256": "794b28d4956f786fe41e0e5ab2199cad1ab1271a2893ee42d9f9d303289b515b",
+    "z3NativeSha256": null,
+    "z3NativeSource": "not captured",
+    "dotnetVersion": "10.0.401",
+    "os": "macOS 27.0.1",
+    "translatorSemanticsVersion": "z3-executable-semantics-v2"
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "bucket": "sweep",
+      "status": "executed",
+      "token": "Failed",
+      "class": "spurious-refutation",
+      "startedUtc": "2026-10-04T02:05:23.2962200Z",
+      "durationMs": 15,
+      "path": "attempts/R1-OBL-SUBTYPE-002/sweep-attempt-1.json"
+    }
+  ],
+  "otherBaseline": {
+    "id": "B1",
+    "result": "reproduces",
+    "rerun": {
+      "caseId": "R1-OBL-SUBTYPE-002",
+      "baseline": "B1",
+      "status": "executed",
+      "token": "Failed",
+      "class": "spurious-refutation",
+      "addedFindings": [],
+      "path": "attempts/R1-OBL-SUBTYPE-002/reserve-cross-baseline-attempt-1.json"
+    },
+    "otherSweepResult": {
+      "token": "Failed",
+      "class": "spurious-refutation",
+      "result": "reproduces"
+    }
+  },
+  "affectedGuarantee": "Form: Unrefined-to-refined assignment (row OBL-SUBTYPE). Guard path: a Discharged obligation drops its emitted runtime guard under the default ObligationPolicy (Discharged = Ignore) with ElideProvenGuards on (CSharpEmitter obligation sites). Public surfaces that describe this form: website/content/syntax-reference/refinement-types.mdx, website/content/guides/verification-guarantees.mdx (located by search; their wording was not audited by S1). No experiment relying on this form was identified by S1; S2 (#1413) confirms.",
+  "filedIssue": null,
+  "disposition": null
+}

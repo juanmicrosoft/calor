@@ -1,0 +1,14 @@
+§M{m001:Custom:overflow=unchecked}
+  §U{System}
+
+  §CL{c001:Probe:pub:stat}
+    §MT{m002:ParseDecl:pub:stat} (str:text) -> i32
+      §R (? (cast bool §CS{(int.TryParse(text, out var n))}) n (- 1))
+
+    §MT{m003:IsNumber:pub:stat} (str:text) -> bool
+      §R §C{int.TryParse} §A text §A{out} _ §/C
+
+    §MT{m004:Run:pub:stat} () -> str
+      §R (+ (+ (+ (+ (+ (+ §C{ParseDecl} §A "7" §/C "|") §C{ParseDecl} §A "q" §/C) "|") §C{IsNumber} §A "5" §/C) "|") §C{IsNumber} §A "z" §/C)
+
+

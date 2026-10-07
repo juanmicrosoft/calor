@@ -1,0 +1,90 @@
+{
+  "findingId": "F-B1-014",
+  "baseline": "B1",
+  "registrationCommit": "6a1a78db71b04bee3f2d42268e92800d94333f67",
+  "rowId": "OBL-MUTATION-KILL",
+  "caseId": "R1-OBL-MUTATION-KILL-001",
+  "templateId": "T-OBL-KILL-PRE",
+  "caseSha256": {
+    "calor": "2f6d6f98880eca0d3397a012571e982e48dbe73e1082027f52251074b07e0b2c",
+    "oracle": "3005d269c6bf1f230b355450fb4e4138da3969fb0a6d4864da7d72b1edc9f4a0",
+    "prime": null
+  },
+  "class": "false-unconditional-proof",
+  "claim": {
+    "site": "obligation",
+    "token": "Discharged",
+    "rawStatus": "Discharged",
+    "isVacuous": null,
+    "assumptions": [],
+    "guardInElidedEmission": false,
+    "guardInForcedEmission": true
+  },
+  "witness": {
+    "inputs": "(0) -\u003E result=(-408872766)",
+    "source": "the O1 witness",
+    "o1": "violated prop-false",
+    "o2": "guard threw",
+    "o2Detail": {
+      "input": "(0)",
+      "o1": "violated",
+      "o2": "guard-threw",
+      "exception": "System.InvalidOperationException: Proof obligation [p1: claim] violated",
+      "divergence": false
+    }
+  },
+  "nonVacuityCheck": {
+    "id": "R1-O1-reached",
+    "result": "passed"
+  },
+  "classReason": null,
+  "minimized": {
+    "status": "registered-case: a single-function probe generated from one template; not reduced further",
+    "calorSource": "\u00A7M{m1:R1Case}\n  \u00A7F{f1:Probe:priv} (i32:x) -\u003E i32\n    \u00A7E{}\n    \u00A7Q (\u003E x INT:-1)\n    \u00A7ASSIGN x INT:-408872766\n    \u00A7PROOF{p1:claim} (\u003E x INT:-1)\n    \u00A7R x\n",
+    "calorPrimeSource": null,
+    "csharpReproduction": "// R1 #1419 independent oracle for R1-OBL-MUTATION-KILL-001\nusing System;\nusing System.Collections.Generic;\nusing System.Linq;\nusing System.Numerics;\npublic static class R1Oracle\n{\n    public const string Claim = \u0022forall\u0022;\n    public const bool Exhaustive = false;\n    public const bool Checked = true;\n    public static bool Hyp(int x) =\u003E x \u003E (-1);\n    public static int Body(int x)\n    {\n        x = (-408872766); return x;\n    }\n    public static bool Prop(int x, int result) =\u003E result \u003E (-1);\n    public static bool HypO(object?[] a) =\u003E Hyp((int)a[0]!);\n    public static bool HasBody =\u003E true;\n    public static object? BodyO(object?[] a) =\u003E Body((int)a[0]!);\n    public static bool PropO(object?[] a, object? r) =\u003E Prop((int)a[0]!, (int)r!);\n    public static IEnumerable\u003Cobject?[]\u003E Inputs()\n    {\n        yield return new object?[] { (int)((-2147483648)) };\n        yield return new object?[] { (int)((-2147483647)) };\n        yield return new object?[] { (int)((-2000461444)) };\n        yield return new object?[] { (int)((-848556702)) };\n        yield return new object?[] { (int)((-408872767)) };\n        yield return new object?[] { (int)((-408872766)) };\n        yield return new object?[] { (int)((-408872765)) };\n        yield return new object?[] { (int)((-2)) };\n        yield return new object?[] { (int)((-1)) };\n        yield return new object?[] { (int)(0) };\n        yield return new object?[] { (int)(1) };\n        yield return new object?[] { (int)(2) };\n        yield return new object?[] { (int)(111550084) };\n        yield return new object?[] { (int)(1279523445) };\n        yield return new object?[] { (int)(1500420170) };\n        yield return new object?[] { (int)(1575662388) };\n        yield return new object?[] { (int)(2147483646) };\n        yield return new object?[] { (int)(2147483647) };\n    }\n}\n\npublic static class Repro\n{\n    public static int Main()\n    {\n        int reached = 0;\n        foreach (var a in R1Oracle.Inputs())\n        {\n            bool hyp; object? r = null; bool ok; string why;\n            try { hyp = R1Oracle.HypO(a); } catch { continue; }\n            if (!hyp) continue;\n            if (R1Oracle.HasBody) { try { r = R1Oracle.BodyO(a); } catch { continue; } }\n            reached\u002B\u002B;\n            try { ok = R1Oracle.PropO(a, r); why = \u0022false\u0022; } catch (Exception e) { ok = false; why = \u0022throws \u0022 \u002B e.GetType().Name; }\n            var shown = \u0022(\u0022 \u002B string.Join(\u0022, \u0022, a.Select(v =\u003E v is null ? \u0022null\u0022 : v is Array arr ? \u0022[\u0022 \u002B string.Join(\u0022, \u0022, arr.Cast\u003Cobject\u003E()) \u002B \u0022]\u0022 : v is string s ? \u0022\\\u0022\u0022 \u002B s \u002B \u0022\\\u0022\u0022 : Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture))) \u002B \u0022)\u0022;\n            if (R1Oracle.Claim == \u0022exists\u0022) { if (ok) { Console.WriteLine(\u0022witness \u0022 \u002B shown); return 0; } continue; }\n            if (!ok) { Console.WriteLine(\u0022property \u0022 \u002B why \u002B \u0022 at \u0022 \u002B shown \u002B (R1Oracle.HasBody ? \u0022 result=\u0022 \u002B Convert.ToString(r, System.Globalization.CultureInfo.InvariantCulture) : \u0022\u0022)); return 1; }\n        }\n        Console.WriteLine((R1Oracle.Claim == \u0022exists\u0022 ? \u0022no witness\u0022 : \u0022no violation\u0022) \u002B \u0022 in the registered domain; reached inputs: \u0022 \u002B reached);\n        return 0;\n    }\n}",
+    "reproductionOutput": "property false at (0) result=-408872766 (exit 1)",
+    "sha256": "2f6d6f98880eca0d3397a012571e982e48dbe73e1082027f52251074b07e0b2c"
+  },
+  "environment": {
+    "calorDllSha256": "79839f6c8681bb7132df876c624339385969cc69c5b9914eea09fdfbf48e6651",
+    "z3NativeSha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+    "z3NativeSource": "post-run native-check.json (same process layout)",
+    "dotnetVersion": "10.0.401",
+    "os": "macOS 27.0.1",
+    "translatorSemanticsVersion": "z3-executable-semantics-v2"
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "bucket": "sweep",
+      "status": "executed",
+      "token": "Discharged",
+      "class": "false-unconditional-proof",
+      "startedUtc": "2026-10-03T16:52:23.4064320Z",
+      "durationMs": 13,
+      "path": "attempts/R1-OBL-MUTATION-KILL-001/sweep-attempt-1.json"
+    }
+  ],
+  "otherBaseline": {
+    "id": "N1",
+    "result": "reproduces",
+    "rerun": {
+      "caseId": "R1-OBL-MUTATION-KILL-001",
+      "baseline": "N1",
+      "status": "executed",
+      "token": "Discharged",
+      "class": "false-unconditional-proof",
+      "addedFindings": [],
+      "path": "attempts/R1-OBL-MUTATION-KILL-001/reserve-cross-baseline-attempt-1.json"
+    },
+    "otherSweepResult": {
+      "token": "Discharged",
+      "class": "false-unconditional-proof",
+      "result": "reproduces"
+    }
+  },
+  "affectedGuarantee": "Form: Guard facts killed by assignment (row OBL-MUTATION-KILL). Guard path: a Discharged obligation drops its emitted runtime guard under the default ObligationPolicy (Discharged = Ignore) with ElideProvenGuards on (CSharpEmitter obligation sites). Public surfaces that describe this form: website/content/syntax-reference/refinement-types.mdx, website/content/guides/verification-guarantees.mdx (located by search; their wording was not audited by S1). No experiment relying on this form was identified by S1; S2 (#1413) confirms.",
+  "filedIssue": null,
+  "disposition": null
+}

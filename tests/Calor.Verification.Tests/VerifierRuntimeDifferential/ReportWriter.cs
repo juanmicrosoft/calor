@@ -10,6 +10,9 @@ internal static class ReportWriter
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true,
+        // The default is Environment.NewLine, CRLF on Windows (#1135, contract determinism row
+        // platform-CommittedReportsMatchGeneratedOracle). The committed report is LF.
+        NewLine = "\n",
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
@@ -20,111 +23,111 @@ internal static class ReportWriter
     {
         var coverage = report.Coverage;
         var builder = new StringBuilder();
-        builder.AppendLine("# Verifier ↔ Generated Runtime Differential (F-4)");
-        builder.AppendLine();
-        builder.AppendLine($"- **Result:** {(report.Passed ? "PASS" : "FAIL")}");
-        builder.AppendLine($"- **Whitelist hash:** `{report.WhitelistSha256}`");
-        builder.AppendLine($"- **Mismatches:** {coverage.Mismatches}");
-        builder.AppendLine(
+        Line(builder, "# Verifier ↔ Generated Runtime Differential (F-4)");
+        Line(builder);
+        Line(builder, $"- **Result:** {(report.Passed ? "PASS" : "FAIL")}");
+        Line(builder, $"- **Whitelist hash:** `{report.WhitelistSha256}`");
+        Line(builder, $"- **Mismatches:** {coverage.Mismatches}");
+        Line(builder,
             $"- **Forms solver-handled:** {coverage.FormsCovered}/{coverage.FormsWhitelisted} " +
             $"({Percent(coverage.FormCoverageFraction)})");
-        builder.AppendLine(
+        Line(builder,
             $"- **Forms eliding:** {coverage.FormsEliding}/{coverage.FormsWhitelisted} " +
             $"({Percent(coverage.ElisionCoverageFraction)})");
-        builder.AppendLine(
+        Line(builder,
             $"- **Cartesian cells solver-handled:** {coverage.MatrixCellsCovered}/{coverage.MatrixCellsApplicable} " +
             $"({Percent(coverage.MatrixCoverageFraction)})");
-        builder.AppendLine(
+        Line(builder,
             $"- **Cartesian cells registered:** {coverage.MatrixCellsRegistered}");
-        builder.AppendLine(
+        Line(builder,
             $"- **Generated cases:** {coverage.CasesGenerated} " +
             $"(3 positions × depths 1–{report.MaximumNestingDepth} × 2 polarities per applicable form)");
-        builder.AppendLine();
+        Line(builder);
 
-        builder.AppendLine("## Typed outcomes");
-        builder.AppendLine();
-        builder.AppendLine("| Outcome | Cases |");
-        builder.AppendLine("|---|---:|");
+        Line(builder, "## Typed outcomes");
+        Line(builder);
+        Line(builder, "| Outcome | Cases |");
+        Line(builder, "|---|---:|");
         foreach (var (status, count) in report.OutcomeCounts)
-            builder.AppendLine($"| `{status}` | {count} |");
-        builder.AppendLine();
+            Line(builder, $"| `{status}` | {count} |");
+        Line(builder);
 
-        builder.AppendLine("## Coverage by category");
-        builder.AppendLine();
-        builder.AppendLine("| Category | Whitelisted | Applicable | Solver-handled | Eliding | Mismatches |");
-        builder.AppendLine("|---|---:|---:|---:|---:|---:|");
+        Line(builder, "## Coverage by category");
+        Line(builder);
+        Line(builder, "| Category | Whitelisted | Applicable | Solver-handled | Eliding | Mismatches |");
+        Line(builder, "|---|---:|---:|---:|---:|---:|");
         foreach (var category in report.Forms.GroupBy(form => form.Category, StringComparer.Ordinal)
                      .OrderBy(group => group.Key, StringComparer.Ordinal))
         {
-            builder.AppendLine(
+            Line(builder,
                 $"| `{category.Key}` | {category.Count()} | " +
                 $"{category.Count(form => form.Applicable)} | " +
                 $"{category.Count(form => form.SolverHandled)} | " +
                 $"{category.Count(form => form.Elides)} | " +
                 $"{category.Sum(form => form.Mismatches)} |");
         }
-        builder.AppendLine();
+        Line(builder);
 
-        builder.AppendLine("## Encoding notes");
-        builder.AppendLine();
+        Line(builder, "## Encoding notes");
+        Line(builder);
         foreach (var (form, note) in report.EncodingNotes)
-            builder.AppendLine($"- `{form}` — {note}");
-        builder.AppendLine();
+            Line(builder, $"- `{form}` — {note}");
+        Line(builder);
 
-        builder.AppendLine("## Explicit Assumed allowances");
-        builder.AppendLine();
-        builder.AppendLine(
+        Line(builder, "## Explicit Assumed allowances");
+        Line(builder);
+        Line(builder,
             "`Assumed` is accepted only for provable cells whose form lists the exact production " +
             "assumption set below. Refutable cells must always be `Refuted`.");
-        builder.AppendLine();
+        Line(builder);
         foreach (var form in report.Forms.Where(form => form.AllowedAssumptions.Count > 0))
         {
-            builder.AppendLine(
+            Line(builder,
                 $"- `{form.Id}` — " +
                 string.Join("; ", form.AllowedAssumptions.Select(ShortAssumption)));
         }
-        builder.AppendLine();
+        Line(builder);
 
-        builder.AppendLine("## Per-form coverage");
-        builder.AppendLine();
-        builder.AppendLine("| Form | Solver-handled | Cases | Pre | Post | Obligation | Elides | Mismatches |");
-        builder.AppendLine("|---|:---:|---:|---:|---:|---:|:---:|---:|");
+        Line(builder, "## Per-form coverage");
+        Line(builder);
+        Line(builder, "| Form | Solver-handled | Cases | Pre | Post | Obligation | Elides | Mismatches |");
+        Line(builder, "|---|:---:|---:|---:|---:|---:|:---:|---:|");
         foreach (var form in report.Forms)
         {
-            builder.AppendLine(
+            Line(builder,
                 $"| `{form.Id}` | {(form.SolverHandled ? "yes" : "no")} | " +
                 $"{form.Cases} | {form.PreconditionCases} | " +
                 $"{form.PostconditionCases} | {form.ObligationCases} | " +
                 $"{(form.Elides ? "yes" : "no")} | {form.Mismatches} |");
         }
-        builder.AppendLine();
+        Line(builder);
 
         var excluded = report.Forms.Where(form => !form.Applicable).ToList();
         if (excluded.Count > 0)
         {
-            builder.AppendLine("## Registered but not runtime-encodable");
-            builder.AppendLine();
+            Line(builder, "## Registered but not runtime-encodable");
+            Line(builder);
             foreach (var form in excluded)
-                builder.AppendLine($"- `{form.Id}` — {form.ExclusionReason}");
-            builder.AppendLine();
+                Line(builder, $"- `{form.Id}` — {form.ExclusionReason}");
+            Line(builder);
         }
 
-        builder.AppendLine("## Fail-safe controls");
-        builder.AppendLine();
-        builder.AppendLine("| Scenario | Channel | Typed status | Guard retained | Runtime | Result |");
-        builder.AppendLine("|---|---|---|:---:|---|:---:|");
+        Line(builder, "## Fail-safe controls");
+        Line(builder);
+        Line(builder, "| Scenario | Channel | Typed status | Guard retained | Runtime | Result |");
+        Line(builder, "|---|---|---|:---:|---|:---:|");
         foreach (var control in report.FailSafeControls)
         {
-            builder.AppendLine(
+            Line(builder,
                 $"| {control.Scenario} | {control.Channel} | `{control.Status}` | " +
                 $"{(control.GuardRetained ? "yes" : "no")} | `{control.RuntimeVerdict}` | " +
                 $"{(control.Passed ? "pass" : "fail")} |");
         }
-        builder.AppendLine();
+        Line(builder);
 
-        builder.AppendLine("## Oracle");
-        builder.AppendLine();
-        builder.AppendLine(
+        Line(builder, "## Oracle");
+        Line(builder);
+        Line(builder,
             "Every case is emitted twice. The runtime assembly is compiled from the guard-forced " +
             "emission (`ElideProvenGuards = false`); the elision-enabled emission " +
             "(`ElideProvenGuards = true`, the v0.15 default) is inspected separately " +
@@ -132,18 +135,23 @@ internal static class ReportWriter
             "without a guard failure, `refuted`/`failed` must fire the generated guard, and every " +
             "non-decisive status must retain the guard. The generator also requires the declared " +
             "target form to occur in every base expression and rejects vacuous proofs.");
-        builder.AppendLine();
+        Line(builder);
 
         if (report.Mismatches.Count > 0)
         {
-            builder.AppendLine("## Mismatches");
-            builder.AppendLine();
+            Line(builder, "## Mismatches");
+            Line(builder);
             foreach (var mismatch in report.Mismatches)
-                builder.AppendLine($"- `{mismatch.Id}` / `{mismatch.FormId}` — {mismatch.Detail}");
+                Line(builder, $"- `{mismatch.Id}` / `{mismatch.FormId}` — {mismatch.Detail}");
         }
 
-        return builder.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
+        return builder.ToString();
     }
+
+    // '\n', not AppendLine: Environment.NewLine is CRLF on Windows (#1135). Writing LF directly
+    // (rather than replacing CRLF afterwards) leaves any CR inside a detail visible to the gate.
+    private static StringBuilder Line(StringBuilder builder, string text = "") =>
+        builder.Append(text).Append('\n');
 
     private static string Percent(double fraction) =>
         (fraction * 100).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + "%";

@@ -76,7 +76,10 @@ public class VerifierTests
             new[] { preconditionLowerBound, preconditionUpperBound },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        // #1413 (S2 R-NUM): frozen row NUM-OVERFLOW-CHECKED ("Assumed (checked-arithmetic)"): the
+        // precondition rules the overflow out, but the shape is overflow-sensitive, so it is Assumed.
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Equal([Z3Verifier.CheckedArithmeticAssumption], result.EffectiveOutcome.Assumptions);
     }
 
     [SkippableFact]
@@ -490,7 +493,10 @@ public class VerifierTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        // #1413 (S2 R-NUM): frozen row NUM-OVERFLOW-CHECKED ("Assumed (checked-arithmetic)"): the
+        // precondition rules the overflow out, but the shape is overflow-sensitive, so it is Assumed.
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Equal([Z3Verifier.CheckedArithmeticAssumption], result.EffectiveOutcome.Assumptions);
     }
 
     // ===========================================
@@ -773,7 +779,10 @@ public class VerifierTests
             new[] { precondition },
             postcondition);
 
-        Assert.Equal(ContractVerificationStatus.Proven, result.Status);
+        // #1413 (S2 R-NUM): frozen row NUM-OVERFLOW-CHECKED ("Assumed (checked-arithmetic)"): the
+        // precondition rules the overflow out, but the shape is overflow-sensitive, so it is Assumed.
+        Assert.Equal(ProofStatus.Assumed, result.EffectiveOutcome.Status);
+        Assert.Equal([Z3Verifier.CheckedArithmeticAssumption], result.EffectiveOutcome.Assumptions);
     }
 
     [SkippableFact]
@@ -1699,7 +1708,8 @@ public class VerifierTests
         using var verifier = new Z3Verifier(ctx);
 
         // Postcondition: (>= (indexof "abcabc" "b" 3) 3)
-        // Should be PROVEN because searching from index 3 finds "b" at index 4, which is >= 3
+        // #1413 review: the emitter drops the start index ("abcabc".IndexOf("b", Ordinal) is 1),
+        // so the solver's indexof-from-3 (4) describes a different call. The form is refused.
         var parameters = new List<(string Name, string Type)>();
 
         var postcondition = new EnsuresNode(
@@ -1727,7 +1737,8 @@ public class VerifierTests
             Array.Empty<RequiresNode>(),
             postcondition);
 
-        AssertStringProofAssumed(result);
+        Assert.Equal(ProofStatus.Unsupported, result.EffectiveOutcome.Status);
+        Assert.Equal(1, "abcabc".IndexOf("b", StringComparison.Ordinal));
     }
 
     // ===========================================

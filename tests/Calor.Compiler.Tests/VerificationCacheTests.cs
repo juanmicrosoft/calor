@@ -325,7 +325,7 @@ public class VerificationCacheTests : IDisposable
         // #914 F4: raw names/types are length-prefixed ("1#i", "3#i32") so
         // delimiter characters in SDK-supplied text cannot forge structure.
         Assert.Contains("(FORALL ((1#i 3#i32))", canonical);
-        Assert.Contains("(>= REF:1#i INT:0)", canonical);
+        Assert.Contains("(>= REF:1#i INT:Bits32:Signed:Decimal:+0)", canonical);
     }
 
     #endregion

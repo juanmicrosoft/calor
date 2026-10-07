@@ -1,0 +1,550 @@
+{
+  "B1": [
+    {
+      "findingId": "F-B1-001",
+      "rowId": "NUM-NARROW-ARITH",
+      "caseId": "R1-NUM-NARROW-ARITH-005",
+      "class": "required-demotion-absent",
+      "token": "Proven",
+      "o1": "holds-exhaustive"
+    },
+    {
+      "findingId": "F-B1-002",
+      "rowId": "NUM-LITERAL-OVERSIZE",
+      "caseId": "R1-NUM-LITERAL-OVERSIZE-003",
+      "class": "required-demotion-absent",
+      "token": "Proven",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-B1-003",
+      "rowId": "NUM-OVERFLOW-CHECKED",
+      "caseId": "R1-NUM-OVERFLOW-CHECKED-007",
+      "class": "required-demotion-absent",
+      "token": "Proven",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-B1-004",
+      "rowId": "NUM-OVERFLOW-CHECKED",
+      "caseId": "R1-NUM-OVERFLOW-CHECKED-008",
+      "class": "required-demotion-absent",
+      "token": "Proven",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-B1-005",
+      "rowId": "NUM-OVERFLOW-CHECKED",
+      "caseId": "R1-NUM-OVERFLOW-CHECKED-009",
+      "class": "required-demotion-absent",
+      "token": "Proven",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-B1-006",
+      "rowId": "QNT-NESTED",
+      "caseId": "R1-QNT-NESTED-001",
+      "class": "required-demotion-absent",
+      "token": "Proven",
+      "o1": "holds-exhaustive"
+    },
+    {
+      "findingId": "F-B1-007",
+      "rowId": "QNT-NESTED",
+      "caseId": "R1-QNT-NESTED-003",
+      "class": "required-demotion-absent",
+      "token": "Proven",
+      "o1": "holds-exhaustive"
+    },
+    {
+      "findingId": "F-B1-008",
+      "rowId": "QNT-NESTED",
+      "caseId": "R1-QNT-NESTED-004",
+      "class": "required-demotion-absent",
+      "token": "Proven",
+      "o1": "holds-exhaustive"
+    },
+    {
+      "findingId": "F-B1-009",
+      "rowId": "STR-OPS-COUNT-INDEX",
+      "caseId": "R1-STR-OPS-COUNT-INDEX-003",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-B1-010",
+      "rowId": "STR-NULL-NONASCII",
+      "caseId": "R1-STR-NULL-NONASCII-001",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-exhaustive"
+    },
+    {
+      "findingId": "F-B1-011",
+      "rowId": "STR-NULL-NONASCII",
+      "caseId": "R1-STR-NULL-NONASCII-004",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-exhaustive"
+    },
+    {
+      "findingId": "F-B1-012",
+      "rowId": "OBL-BRANCH-FACTS",
+      "caseId": "R1-OBL-BRANCH-FACTS-006",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-B1-013",
+      "rowId": "OBL-BRANCH-FACTS",
+      "caseId": "R1-OBL-BRANCH-FACTS-007",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-B1-014",
+      "rowId": "OBL-MUTATION-KILL",
+      "caseId": "R1-OBL-MUTATION-KILL-001",
+      "class": "false-unconditional-proof",
+      "token": "Discharged",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-B1-015",
+      "rowId": "OBL-MUTATION-KILL",
+      "caseId": "R1-OBL-MUTATION-KILL-003",
+      "class": "false-unconditional-proof",
+      "token": "Discharged",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-B1-016",
+      "rowId": "OBL-MUTATION-KILL",
+      "caseId": "R1-OBL-MUTATION-KILL-004",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-B1-017",
+      "rowId": "OBL-MUTATION-KILL",
+      "caseId": "R1-OBL-MUTATION-KILL-005",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-B1-018",
+      "rowId": "OBL-MUTATION-KILL",
+      "caseId": "R1-OBL-MUTATION-KILL-006",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-B1-019",
+      "rowId": "OBL-MUTATION-KILL",
+      "caseId": "R1-OBL-MUTATION-KILL-007",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-B1-020",
+      "rowId": "OBL-REFINEMENT-RETURN",
+      "caseId": "R1-OBL-REFINEMENT-RETURN-002",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-B1-021",
+      "rowId": "OBL-SUBTYPE",
+      "caseId": "R1-OBL-SUBTYPE-002",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-B1-022",
+      "rowId": "OBL-SELFREF",
+      "caseId": "R1-OBL-SELFREF-001",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-B1-023",
+      "rowId": "OBL-SELFREF",
+      "caseId": "R1-OBL-SELFREF-002",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-B1-024",
+      "rowId": "OBL-SELFREF",
+      "caseId": "R1-OBL-SELFREF-003",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-B1-025",
+      "rowId": "OBL-SELFREF",
+      "caseId": "R1-OBL-SELFREF-004",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-B1-026",
+      "rowId": "OBL-SELFREF",
+      "caseId": "R1-OBL-SELFREF-005",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "vacuous-in-domain"
+    },
+    {
+      "findingId": "F-B1-027",
+      "rowId": "IMPL-ASSUMPTION-FORMS",
+      "caseId": "R1-IMPL-ASSUMPTION-FORMS-001",
+      "class": "false-unconditional-proof",
+      "token": "Proven",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-B1-028",
+      "rowId": "IMPL-ASSUMPTION-FORMS",
+      "caseId": "R1-IMPL-ASSUMPTION-FORMS-003",
+      "class": "false-unconditional-proof",
+      "token": "Proven",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-B1-029",
+      "rowId": "IMPL-ASSUMPTION-FORMS",
+      "caseId": "R1-IMPL-ASSUMPTION-FORMS-005",
+      "class": "false-unconditional-proof",
+      "token": "Proven",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-B1-030",
+      "rowId": "IMPL-DIVISION-TOTALIZED",
+      "caseId": "R1-IMPL-DIVISION-TOTALIZED-001",
+      "class": "false-unconditional-proof",
+      "token": "Proven",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-B1-031",
+      "rowId": "CACHE-LITERAL-WIDTH",
+      "caseId": "R1-CACHE-LITERAL-WIDTH-001",
+      "class": "false-unconditional-proof",
+      "token": "Proven",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-B1-032",
+      "rowId": "CACHE-LITERAL-WIDTH",
+      "caseId": "R1-CACHE-LITERAL-WIDTH-001",
+      "class": "stale-cache-proof",
+      "token": "Proven",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-B1-033",
+      "rowId": "CACHE-LITERAL-WIDTH",
+      "caseId": "R1-CACHE-LITERAL-WIDTH-002",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-B1-034",
+      "rowId": "CACHE-LITERAL-WIDTH",
+      "caseId": "R1-CACHE-LITERAL-WIDTH-002",
+      "class": "stale-cache-proof",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    }
+  ],
+  "N1": [
+    {
+      "findingId": "F-N1-001",
+      "rowId": "NUM-NARROW-ARITH",
+      "caseId": "R1-NUM-NARROW-ARITH-005",
+      "class": "required-demotion-absent",
+      "token": "Proven",
+      "o1": "holds-exhaustive"
+    },
+    {
+      "findingId": "F-N1-002",
+      "rowId": "NUM-LITERAL-OVERSIZE",
+      "caseId": "R1-NUM-LITERAL-OVERSIZE-003",
+      "class": "required-demotion-absent",
+      "token": "Proven",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-N1-003",
+      "rowId": "NUM-OVERFLOW-CHECKED",
+      "caseId": "R1-NUM-OVERFLOW-CHECKED-007",
+      "class": "required-demotion-absent",
+      "token": "Proven",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-N1-004",
+      "rowId": "NUM-OVERFLOW-CHECKED",
+      "caseId": "R1-NUM-OVERFLOW-CHECKED-008",
+      "class": "required-demotion-absent",
+      "token": "Proven",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-N1-005",
+      "rowId": "NUM-OVERFLOW-CHECKED",
+      "caseId": "R1-NUM-OVERFLOW-CHECKED-009",
+      "class": "required-demotion-absent",
+      "token": "Proven",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-N1-006",
+      "rowId": "QNT-NESTED",
+      "caseId": "R1-QNT-NESTED-001",
+      "class": "required-demotion-absent",
+      "token": "Proven",
+      "o1": "holds-exhaustive"
+    },
+    {
+      "findingId": "F-N1-007",
+      "rowId": "QNT-NESTED",
+      "caseId": "R1-QNT-NESTED-003",
+      "class": "required-demotion-absent",
+      "token": "Proven",
+      "o1": "holds-exhaustive"
+    },
+    {
+      "findingId": "F-N1-008",
+      "rowId": "QNT-NESTED",
+      "caseId": "R1-QNT-NESTED-004",
+      "class": "required-demotion-absent",
+      "token": "Proven",
+      "o1": "holds-exhaustive"
+    },
+    {
+      "findingId": "F-N1-009",
+      "rowId": "STR-OPS-COUNT-INDEX",
+      "caseId": "R1-STR-OPS-COUNT-INDEX-003",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-N1-010",
+      "rowId": "STR-NULL-NONASCII",
+      "caseId": "R1-STR-NULL-NONASCII-001",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-exhaustive"
+    },
+    {
+      "findingId": "F-N1-011",
+      "rowId": "STR-NULL-NONASCII",
+      "caseId": "R1-STR-NULL-NONASCII-004",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-exhaustive"
+    },
+    {
+      "findingId": "F-N1-012",
+      "rowId": "OBL-BRANCH-FACTS",
+      "caseId": "R1-OBL-BRANCH-FACTS-006",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-N1-013",
+      "rowId": "OBL-BRANCH-FACTS",
+      "caseId": "R1-OBL-BRANCH-FACTS-007",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-N1-014",
+      "rowId": "OBL-MUTATION-KILL",
+      "caseId": "R1-OBL-MUTATION-KILL-001",
+      "class": "false-unconditional-proof",
+      "token": "Discharged",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-N1-015",
+      "rowId": "OBL-MUTATION-KILL",
+      "caseId": "R1-OBL-MUTATION-KILL-003",
+      "class": "false-unconditional-proof",
+      "token": "Discharged",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-N1-016",
+      "rowId": "OBL-MUTATION-KILL",
+      "caseId": "R1-OBL-MUTATION-KILL-004",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-N1-017",
+      "rowId": "OBL-MUTATION-KILL",
+      "caseId": "R1-OBL-MUTATION-KILL-005",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-N1-018",
+      "rowId": "OBL-MUTATION-KILL",
+      "caseId": "R1-OBL-MUTATION-KILL-006",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-N1-019",
+      "rowId": "OBL-MUTATION-KILL",
+      "caseId": "R1-OBL-MUTATION-KILL-007",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-N1-020",
+      "rowId": "OBL-REFINEMENT-RETURN",
+      "caseId": "R1-OBL-REFINEMENT-RETURN-002",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-N1-021",
+      "rowId": "OBL-SUBTYPE",
+      "caseId": "R1-OBL-SUBTYPE-002",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-N1-022",
+      "rowId": "OBL-SELFREF",
+      "caseId": "R1-OBL-SELFREF-001",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-N1-023",
+      "rowId": "OBL-SELFREF",
+      "caseId": "R1-OBL-SELFREF-002",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-N1-024",
+      "rowId": "OBL-SELFREF",
+      "caseId": "R1-OBL-SELFREF-003",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-N1-025",
+      "rowId": "OBL-SELFREF",
+      "caseId": "R1-OBL-SELFREF-004",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-N1-026",
+      "rowId": "OBL-SELFREF",
+      "caseId": "R1-OBL-SELFREF-005",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "vacuous-in-domain"
+    },
+    {
+      "findingId": "F-N1-027",
+      "rowId": "IMPL-ASSUMPTION-FORMS",
+      "caseId": "R1-IMPL-ASSUMPTION-FORMS-001",
+      "class": "false-unconditional-proof",
+      "token": "Proven",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-N1-028",
+      "rowId": "IMPL-ASSUMPTION-FORMS",
+      "caseId": "R1-IMPL-ASSUMPTION-FORMS-003",
+      "class": "false-unconditional-proof",
+      "token": "Proven",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-N1-029",
+      "rowId": "IMPL-ASSUMPTION-FORMS",
+      "caseId": "R1-IMPL-ASSUMPTION-FORMS-005",
+      "class": "false-unconditional-proof",
+      "token": "Proven",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-N1-030",
+      "rowId": "IMPL-DIVISION-TOTALIZED",
+      "caseId": "R1-IMPL-DIVISION-TOTALIZED-001",
+      "class": "false-unconditional-proof",
+      "token": "Proven",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-N1-031",
+      "rowId": "CACHE-LITERAL-WIDTH",
+      "caseId": "R1-CACHE-LITERAL-WIDTH-001",
+      "class": "false-unconditional-proof",
+      "token": "Proven",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-N1-032",
+      "rowId": "CACHE-LITERAL-WIDTH",
+      "caseId": "R1-CACHE-LITERAL-WIDTH-001",
+      "class": "stale-cache-proof",
+      "token": "Proven",
+      "o1": "violated"
+    },
+    {
+      "findingId": "F-N1-033",
+      "rowId": "CACHE-LITERAL-WIDTH",
+      "caseId": "R1-CACHE-LITERAL-WIDTH-002",
+      "class": "spurious-refutation",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    },
+    {
+      "findingId": "F-N1-034",
+      "rowId": "CACHE-LITERAL-WIDTH",
+      "caseId": "R1-CACHE-LITERAL-WIDTH-002",
+      "class": "stale-cache-proof",
+      "token": "Failed",
+      "o1": "holds-sampled"
+    }
+  ]
+}

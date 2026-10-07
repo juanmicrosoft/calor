@@ -1,0 +1,215 @@
+name: determinism-protocol
+
+# 0.24 G2 (#1421): execution machinery for the registered verifier determinism protocol
+# (docs/plans/evidence/g2-1421/protocol.json, amendment 1.1.0). #1135 executes it. Dispatch
+# only: no automatic trigger. Every dispatched run is charged to determinism-compute, and the
+# plan job refuses a re-run, an executed commit, a docs-only repair, or a run over the budget.
+# scripts/determinism_protocol.py checks this file's structure (workflow_problems, D013).
+
+run-name: determinism ${{ inputs.mode }} ${{ inputs.execution_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [control, execution]
+        required: true
+      execution_id:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: determinism-protocol
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      mode: ${{ steps.plan.outputs.mode }}
+      execution: ${{ steps.plan.outputs.execution }}
+    steps:
+      # Every job starts here: a re-run stops before any action runs, and HOME, USERPROFILE,
+      # DOTNET_CLI_HOME, git's global config, and NuGet packages move under the runner temp
+      # directory, so no later step reads or writes the runner's real home directory.
+      - name: Isolate the home directory and refuse a re-run
+        run: |
+          set -euo pipefail
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          home="$RUNNER_TEMP/determinism-home"
+          mkdir -p "$home"
+          printf 'HOME=%s\nUSERPROFILE=%s\nDOTNET_CLI_HOME=%s\n' "$home" "$home" "$home" >> "$GITHUB_ENV"
+          printf 'APPDATA=%s\nLOCALAPPDATA=%s\n' "$home/AppData/Roaming" "$home/AppData/Local" >> "$GITHUB_ENV"
+          printf 'XDG_CONFIG_HOME=%s\nXDG_DATA_HOME=%s\nXDG_CACHE_HOME=%s\n' "$home/.config" "$home/.local/share" "$home/.cache" >> "$GITHUB_ENV"
+          printf 'NUGET_HTTP_CACHE_PATH=%s\nNUGET_PLUGINS_CACHE_PATH=%s\n' "$home/nuget-http" "$home/nuget-plugins" >> "$GITHUB_ENV"
+          mkdir -p "$home/tmp"
+          printf 'TEMP=%s\nTMP=%s\nTMPDIR=%s\nNUGET_SCRATCH=%s\n' "$home/tmp" "$home/tmp" "$home/tmp" "$home/tmp/NuGetScratch" >> "$GITHUB_ENV"
+          printf 'NUGET_PACKAGES=%s\nOUT=%s\n' "$RUNNER_TEMP/determinism-nuget" "$RUNNER_TEMP/determinism" >> "$GITHUB_ENV"
+          printf 'JOB_STARTED=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
+          if [ "$RUNNER_OS" = Windows ]; then echo "PY=python" >> "$GITHUB_ENV"; else echo "PY=python3" >> "$GITHUB_ENV"; fi
+          HOME="$home" git config --global core.autocrlf false
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate, check history and budget, and plan the run
+        id: plan
+        env:
+          MODE: ${{ inputs.mode }}
+          EXECUTION: ${{ inputs.execution_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git show origin/main:scripts/determinism_protocol.py > "$RUNNER_TEMP/determinism_protocol_main.py"
+          "$PY" scripts/determinism_runner.py plan --mode "$MODE" --execution-id "$EXECUTION" \
+            --main-validator "$RUNNER_TEMP/determinism_protocol_main.py" --github-output "$GITHUB_OUTPUT"
+
+  attempts:
+    needs: plan
+    name: attempts (${{ matrix.env }} job ${{ matrix.job }})
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      MSBUILDDISABLENODEREUSE: '1'
+    steps:
+      # Every job starts here: a re-run stops before any action runs, and HOME, USERPROFILE,
+      # DOTNET_CLI_HOME, git's global config, and NuGet packages move under the runner temp
+      # directory, so no later step reads or writes the runner's real home directory.
+      - name: Isolate the home directory and refuse a re-run
+        run: |
+          set -euo pipefail
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          home="$RUNNER_TEMP/determinism-home"
+          mkdir -p "$home"
+          printf 'HOME=%s\nUSERPROFILE=%s\nDOTNET_CLI_HOME=%s\n' "$home" "$home" "$home" >> "$GITHUB_ENV"
+          printf 'APPDATA=%s\nLOCALAPPDATA=%s\n' "$home/AppData/Roaming" "$home/AppData/Local" >> "$GITHUB_ENV"
+          printf 'XDG_CONFIG_HOME=%s\nXDG_DATA_HOME=%s\nXDG_CACHE_HOME=%s\n' "$home/.config" "$home/.local/share" "$home/.cache" >> "$GITHUB_ENV"
+          printf 'NUGET_HTTP_CACHE_PATH=%s\nNUGET_PLUGINS_CACHE_PATH=%s\n' "$home/nuget-http" "$home/nuget-plugins" >> "$GITHUB_ENV"
+          mkdir -p "$home/tmp"
+          printf 'TEMP=%s\nTMP=%s\nTMPDIR=%s\nNUGET_SCRATCH=%s\n' "$home/tmp" "$home/tmp" "$home/tmp" "$home/tmp/NuGetScratch" >> "$GITHUB_ENV"
+          printf 'NUGET_PACKAGES=%s\nOUT=%s\n' "$RUNNER_TEMP/determinism-nuget" "$RUNNER_TEMP/determinism" >> "$GITHUB_ENV"
+          printf 'JOB_STARTED=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
+          if [ "$RUNNER_OS" = Windows ]; then echo "PY=python" >> "$GITHUB_ENV"; else echo "PY=python3" >> "$GITHUB_ENV"; fi
+          HOME="$home" git config --global core.autocrlf false
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install the pinned SDK into a private root
+        run: |
+          set -euo pipefail
+          "$PY" scripts/determinism_runner.py install-sdk --root "$RUNNER_TEMP/dotnet-1421" --work "$RUNNER_TEMP/determinism-installer"
+
+      - name: Bootstrap verified Z3 assets
+        uses: ./.github/actions/bootstrap-z3
+
+      - name: Check and record the environment
+        run: |
+          set -euo pipefail
+          "$PY" scripts/determinism_runner.py env-check --env "${{ matrix.env }}" --dotnet-root "$RUNNER_TEMP/dotnet-1421" --out "$OUT"
+
+      - name: Build the registered test hosts
+        env:
+          PROJECTS: ${{ matrix.projects }}
+        run: |
+          set -euo pipefail
+          for project in $PROJECTS; do
+            dotnet build "$project" -c Release
+          done
+
+      - name: Run every attempt of this job
+        run: |
+          set -euo pipefail
+          "$PY" scripts/determinism_runner.py run-job --env "${{ matrix.env }}" --job "${{ matrix.job }}" \
+            --mode "${{ needs.plan.outputs.mode }}" --execution-id "${{ needs.plan.outputs.execution }}" --out "$OUT" \
+            --job-timeout "${{ matrix.timeout }}"
+
+      - name: Record attempts that did not run
+        if: always()
+        run: |
+          set -euo pipefail
+          "$PY" scripts/determinism_runner.py fill-missing --env "${{ matrix.env }}" --job "${{ matrix.job }}" \
+            --mode "${{ needs.plan.outputs.mode }}" --execution-id "${{ needs.plan.outputs.execution }}" --out "$OUT"
+
+      - name: Upload attempt records
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: attempts-${{ needs.plan.outputs.execution }}-${{ matrix.env }}-j${{ matrix.job }}-r${{ github.run_attempt }}
+          path: ${{ runner.temp }}/determinism/
+          if-no-files-found: error
+          retention-days: 90
+
+  decide:
+    needs: [plan, attempts]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      # Every job starts here: a re-run stops before any action runs, and HOME, USERPROFILE,
+      # DOTNET_CLI_HOME, git's global config, and NuGet packages move under the runner temp
+      # directory, so no later step reads or writes the runner's real home directory.
+      - name: Isolate the home directory and refuse a re-run
+        run: |
+          set -euo pipefail
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          home="$RUNNER_TEMP/determinism-home"
+          mkdir -p "$home"
+          printf 'HOME=%s\nUSERPROFILE=%s\nDOTNET_CLI_HOME=%s\n' "$home" "$home" "$home" >> "$GITHUB_ENV"
+          printf 'APPDATA=%s\nLOCALAPPDATA=%s\n' "$home/AppData/Roaming" "$home/AppData/Local" >> "$GITHUB_ENV"
+          printf 'XDG_CONFIG_HOME=%s\nXDG_DATA_HOME=%s\nXDG_CACHE_HOME=%s\n' "$home/.config" "$home/.local/share" "$home/.cache" >> "$GITHUB_ENV"
+          printf 'NUGET_HTTP_CACHE_PATH=%s\nNUGET_PLUGINS_CACHE_PATH=%s\n' "$home/nuget-http" "$home/nuget-plugins" >> "$GITHUB_ENV"
+          mkdir -p "$home/tmp"
+          printf 'TEMP=%s\nTMP=%s\nTMPDIR=%s\nNUGET_SCRATCH=%s\n' "$home/tmp" "$home/tmp" "$home/tmp" "$home/tmp/NuGetScratch" >> "$GITHUB_ENV"
+          printf 'NUGET_PACKAGES=%s\nOUT=%s\n' "$RUNNER_TEMP/determinism-nuget" "$RUNNER_TEMP/determinism" >> "$GITHUB_ENV"
+          printf 'JOB_STARTED=%s\n' "$(date +%s)" >> "$GITHUB_ENV"
+          if [ "$RUNNER_OS" = Windows ]; then echo "PY=python" >> "$GITHUB_ENV"; else echo "PY=python3" >> "$GITHUB_ENV"; fi
+          HOME="$home" git config --global core.autocrlf false
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Download every attempt record
+        uses: actions/download-artifact@v4
+        with:
+          pattern: attempts-${{ needs.plan.outputs.execution }}-*-r1
+          path: ${{ runner.temp }}/records
+
+      # Exits non-zero unless DETERMINISTIC (CONTROL-DETERMINISTIC in control mode).
+      - name: Decide agreement under the frozen rule
+        run: |
+          set -euo pipefail
+          "$PY" scripts/determinism_runner.py decide --records "$RUNNER_TEMP/records" \
+            --execution-id "${{ needs.plan.outputs.execution }}" --mode "${{ needs.plan.outputs.mode }}" \
+            --out "$RUNNER_TEMP/result/result.json"
+
+      - name: Upload the result record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: result-${{ needs.plan.outputs.execution }}-r${{ github.run_attempt }}
+          path: ${{ runner.temp }}/result/
+          if-no-files-found: error
+          retention-days: 90

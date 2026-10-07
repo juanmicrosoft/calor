@@ -79,7 +79,23 @@ public sealed class VerificationCacheEntry
     // Evict entry-state-only proofs produced before the exit-state gate (#1183).
     // 1.16: contract simplification preserves typed evaluation and IEEE equality.
     // Recheck proofs made from predicates rewritten by the former untyped rules.
-    public const string CurrentFormatVersion = "1.18";
+    // 1.19 (#1135): on Windows, non-ASCII string literals reached Z3 in the code page instead of
+    // UTF-8, so a Windows entry for one may hold a verdict the byte model does not give. Linux and
+    // macOS output is unchanged, so SemanticsVersion stays; the bump evicts every entry instead.
+    // 1.20 (#1413, S1 CACHE-LITERAL-WIDTH): integer literal keys include width and
+    // signedness. Older keys hashed only the value, so `x + INT:1` and `x + LONG:1`
+    // shared one entry and a warm cache served the LONG proof for the INT text — a
+    // false Proven that elides the guard. The bump evicts every entry written under the old keys.
+    // 1.21 (#1413, S1 STR-NULL-NONASCII; #1493): string literals reach Z3 per UTF-16 code unit
+    // (not per UTF-8 byte) and non-ASCII identifiers get injective ASCII symbol names, on every
+    // platform, so verdicts over non-ASCII text change. SemanticsVersion stays (the translator
+    // fixture output is unchanged); the bump evicts every entry instead. (1.20 is the
+    // #1413 cache-literal-width repair, merged first.)
+    // 1.22 (#1413, S2 R-NUM): sub-32-bit arithmetic/negation (D1) and INT: literals outside the
+    // int32 range (D2) are refused, and checked arithmetic that can overflow on some input is
+    // Assumed even when the preconditions rule it out. Older entries may hold Proven for them.
+    // (1.21 is taken by the S2 text-encoding repair, #1497.)
+    public const string CurrentFormatVersion = "1.22";
 
     /// <summary>#778: the compiler-semantics ledger version that produced this entry.
     /// A verdict computed under different compile semantics must not be served, even

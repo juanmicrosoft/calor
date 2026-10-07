@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "issue": 1407,
-  "contractVersion": "1.0.1",
+  "contractVersion": "1.3.2",
   "cutoffCommit": "72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1",
   "scope": "Release-critical proof, verification, corpus, benchmark, provenance, environment, and publication artifacts for milestone 0.24, derived from .github/workflows/*, tools/, tests/, scripts/, bench/, eng/, and website/public/data at the cutoff commit.",
   "fieldNotes": {
@@ -9,7 +9,8 @@
     "provenance.identity": "One of contract.json durableIdentityKinds or nonDurableIdentityKinds.",
     "regeneration.command": "Required for authoritative and derived entries. Historical-only and stale entries give regeneration.note instead when no current command is valid.",
     "owningIssues": "The 0.24 issues that own a repair or consumption of the artifact. Implementation owners are Claude Code agents; @juanmicrosoft reviews and merges.",
-    "openDefects": "Known defects at the cutoff. An open defect blocks establishment until closed; it does not change the role classification."
+    "openDefects": "Known defects at the cutoff. An open defect blocks establishment until closed; it does not change the role classification.",
+    "pendingUpdates": "Amendment 1.1.0. Inventory edits a reviewed amendment has recorded but not applied, each naming the open PR whose repair motivates it. reclassificationRule lets an artifact's record change only through an amendment that names the repairing PR, and a repair exists only once that PR is merged, so an entry here changes nothing: validators, gates, and #1408 read artifacts only. After the named PR merges, a write-back amendment (a PATCH version that records the PR's merge commit) applies the entry's changes to the artifact and removes the entry. If the PR closes unmerged or merges with a different repair, the write-back removes the entry without applying it, or a new amendment records the actual repair. openDefects is never edited: the write-back records each resolution beside it in defectResolutions {defect, resolvedByPr, scope}, so evidence rows still name a resolving PR per cutoff defect (E014)."
   },
   "artifacts": [
     {
@@ -105,7 +106,10 @@
       "provenance": { "identity": "git-committed", "detail": "File at the cutoff commit." },
       "storage": { "kind": "git", "retention": "permanent" },
       "owningIssues": [1423, 1424],
-      "openDefects": ["The LedgerCommitStampTests _comment says the test job runs at fetch-depth 0 and shards stay shallow; test.yml does the reverse (#1417)."]
+      "openDefects": ["The LedgerCommitStampTests _comment says the test job runs at fetch-depth 0 and shards stay shallow; test.yml does the reverse (#1417)."],
+      "defectResolutions": [
+        { "defect": "The LedgerCommitStampTests _comment says the test job runs at fetch-depth 0 and shards stay shallow; test.yml does the reverse (#1417).", "resolvedByPr": 1472, "scope": "The comment is removed together with the runtime skip site it described." }
+      ]
     },
     {
       "id": "z3-upstream-pins",
@@ -114,7 +118,7 @@
       "classification": "authoritative",
       "reason": "Checksum and size pins for the developer and CI bootstrap of Z3 4.15.7 upstream archives; ValidateZ3Assets fails the build when assets are missing or wrong.",
       "producer": "Hand-pinned (W1 Slice 2, #789)",
-      "consumers": ["Every workflow bootstrap step (9 of 12 workflow files)", "Calor.Compiler.csproj ValidateZ3Assets target", "#1420"],
+      "consumers": [".github/actions/bootstrap-z3, the single owned bootstrap used by every Z3-consuming workflow job (21 jobs in 7 workflow files at #1471), including the publish-nuget.yml publish job", "Calor.Compiler.csproj ValidateZ3Assets and AddZ3AssetsToOutput targets", "eng/z3-consumers.json (pins.archives)", ".github/workflows/z3-pin-check.yml", "#1420"],
       "derivedFrom": [],
       "sourceRevisions": "Cutoff commit.",
       "configuration": "Z3_VERSION 4.15.7; RIDs linux-x64, linux-arm64, osx-arm64, win-x64, win-arm64 (osx-x64 and win-x86 excluded from packing).",
@@ -124,16 +128,19 @@
       "provenance": { "identity": "content-hash", "detail": "SHA-256 and byte size per archive." },
       "storage": { "kind": "git", "retention": "permanent" },
       "owningIssues": [1420],
-      "openDefects": ["Two asset provenance paths (this one and z3-release-binaries) with separate pins (#1420)."]
+      "openDefects": ["Two asset provenance paths (this one and z3-release-binaries) with separate pins (#1420)."],
+      "defectResolutions": [
+        { "defect": "Two asset provenance paths (this one and z3-release-binaries) with separate pins (#1420).", "resolvedByPr": 1471, "scope": "One acquisition path for builds, tests, and packing. Both pin files remain; the bootstrap checks archives against this file and extracted outputs against the asset pins." }
+      ]
     },
     {
       "id": "z3-release-binaries",
       "kind": "environment",
       "paths": [".github/z3-binaries-4.15.7.sha256", "GitHub release z3-binaries-4.15.7 assets"],
       "classification": "authoritative",
-      "reason": "The Z3 binaries packed into shipped NuGet packages.",
+      "reason": "Content-hash pins for the Z3 binaries packed into shipped NuGet packages. After #1471 no build, test, or pack downloads the z3-binaries-4.15.7 release: every job, including publish-nuget.yml publish, acquires Z3 through the single owned bootstrap (.github/actions/bootstrap-z3) from the upstream archives pinned by z3-upstream-pins, and verifies each extracted output against .github/z3-binaries-4.15.7.sha256. The packed bytes are therefore identical, by content hash, to the pinned assets. The release itself is a pinned mirror produced by build-z3.yml and watched by z3-pin-check.yml.",
       "producer": ".github/workflows/build-z3.yml (workflow_dispatch only)",
-      "consumers": ["publish-nuget.yml publish job 'Download Z3 binaries'", ".github/workflows/z3-pin-check.yml (daily)", "#1420"],
+      "consumers": [".github/actions/bootstrap-z3 (verifies every extracted output against the asset pins)", "scripts/check-packaged-z3.py (packed bytes of both packages, every supported RID)", ".github/workflows/z3-pin-check.yml (daily drift monitor of the release mirror)", "eng/z3-consumers.json (pins.assets)", "#1420"],
       "derivedFrom": [],
       "sourceRevisions": "Release assets built by build-z3.yml; pins at the cutoff commit.",
       "configuration": "Assets Microsoft.Z3.dll, libz3-linux-x64.so, libz3-linux-arm64.so, libz3-osx-arm64.dylib, libz3-win-x64.dll, libz3-win-x86.dll, libz3-win-arm64.dll.",
@@ -324,19 +331,22 @@
       "kind": "provenance",
       "paths": ["bench/phase0-agent-native/commit-stamp-index.json", "bench/phase0-agent-native/calor0425-corpus-ledger.json", "bench/phase0-agent-native/higher-order-demand-ledger.json", "bench/phase0-agent-native/effect-rows-probe-ledger.json", "bench/phase0-agent-native/effect-resolver-key-ledger.json", "bench/phase0-agent-native/effect-rows-benefit-ledger.json"],
       "classification": "authoritative",
-      "reason": "The current durable-identity index beside measuredCommit stamps; the #1417 test subject. Bases: measured-on-top-of (1), identical-src-tree (3), landing-commit-only (1).",
+      "reason": "The durable-identity index beside measuredCommit stamps (schema 2 at #1472). Each entry keeps its historical stamp and records durableIdentity {status, commit, resolvedVia, treeHashes, inputContentHashes}, verified by tests/Calor.Compiler.Tests/Provenance/DurableProvenance.cs: commit on fetched origin/main, whole-tree and named tree hashes, manifest SHA-256, identical-src-tree verified at both commits, fail (not skip) in shallow or unfetched clones, and a two-phase write-back for squash merges.",
       "producer": "Ledger generators plus hand-maintained index (PR #1199)",
-      "consumers": ["tests/Calor.Compiler.Tests/LedgerCommitStampTests.cs", "roadmap provenance citations", "#1417"],
+      "consumers": ["tests/Calor.Compiler.Tests/LedgerCommitStampTests.cs", "tests/Calor.Compiler.Tests/Provenance/DurableProvenance.cs", "roadmap provenance citations", "#1417", "#1422"],
       "derivedFrom": [],
       "sourceRevisions": "Each ledger's measuredCommit (full SHA) and resolvableOnMain.",
       "configuration": "basisKinds in the index.",
       "seeds": "Not applicable.",
       "environment": "Not applicable.",
       "regeneration": { "command": "dotnet test tests/Calor.Compiler.Tests/ --filter \"FullyQualifiedName~LedgerCommitStampTests\" (validates; ledgers regenerate through their own generators)" },
-      "provenance": { "identity": "full-sha", "detail": "measuredCommit and resolvableOnMain are 40-hex SHAs." },
+      "provenance": { "identity": "full-sha", "detail": "durableIdentity.commit is a 40-hex SHA on fetched refs/remotes/origin/main, verified with tree and content hashes; measuredCommit stamps are unchanged." },
       "storage": { "kind": "git", "retention": "permanent" },
       "owningIssues": [1417],
-      "openDefects": ["Reachability tested against HEAD, shallow clones skip, identical-src-tree not verified by the test (#1417)."]
+      "openDefects": ["Reachability tested against HEAD, shallow clones skip, identical-src-tree not verified by the test (#1417)."],
+      "defectResolutions": [
+        { "defect": "Reachability tested against HEAD, shallow clones skip, identical-src-tree not verified by the test (#1417).", "resolvedByPr": 1472, "scope": "All three parts: only fetched origin/main counts (P005), shallow fails (P006), identical-src-tree verified at both commits (P009)." }
+      ]
     },
     {
       "id": "benchmark-corpus",
@@ -393,7 +403,10 @@
       "provenance": { "identity": "short-sha", "detail": "c2a8816d." },
       "storage": { "kind": "git", "retention": "permanent" },
       "owningIssues": [1417, 1422, 1410],
-      "openDefects": ["Short SHA identity (#1417)."]
+      "openDefects": ["Short SHA identity (#1417)."],
+      "defectResolutions": [
+        { "defect": "Short SHA identity (#1417).", "resolvedByPr": 1472, "scope": "The #1417 part only: commit-stamp-index.json records the durable identity of each short stamp beside it by unique-prefix expansion (c2a8816d to c2a8816d1bd3864e70966120c9849e8f8d988cb2, 107462e, 580e189). The file itself still carries the short stamps. A prefix expansion identifies a commit; it does not show the numbers came from a clean checkout of it and does not make them valid." }
+      ]
     },
     {
       "id": "benchmark-results-md",
@@ -662,6 +675,7 @@
       "openDefects": []
     }
   ],
+  "pendingUpdates": [],
   "excludedFromScope": [
     { "path": "bench/phase0-agent-native/epochs/", "reason": "Agent-experiment epochs from 0.15-0.20; no 0.24 claim reads them." },
     { "path": "bench/conversion-results/", "reason": "Converter edge-case CSVs last changed 2026-04-21; not proof, benchmark, or publication evidence." },
