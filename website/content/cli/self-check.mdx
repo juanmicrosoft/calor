@@ -12,7 +12,15 @@ calor self-check docs [--root <repository>] [--format text|json] [--fix]
 The check verifies documented section keywords, diagnostic codes and bands,
 effect codes, fenced Calor programs, exemplar C# compilation, version-text
 rules, and generated instruction mirrors. It exits 1 on drift and emits
-`Calor1320`–`Calor1331` diagnostics.
+`Calor1320`–`Calor1334` diagnostics.
+
+It also checks this website. Every complete Calor program on these pages
+(a `calor` code block whose first line starts with `§M`) is compiled the way
+`calor --input` compiles it and must succeed. An example that is meant to fail
+is labelled with the codes it must report (for example `expect=Calor0272`), and
+the check fails if the compiler reports any other code. Compiler output shown
+on a page is either checked against the real diagnostics or labelled
+illustrative. The changelog is excluded because it records past releases.
 
 `--fix` regenerates supported mirrors such as `AGENTS.md` from their canonical
 source. It does not rewrite arbitrary prose.

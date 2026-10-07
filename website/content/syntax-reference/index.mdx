@@ -35,8 +35,8 @@ Complete reference for Calor syntax. Calor uses Lisp-style expressions for all o
 | Ensures | `§S expr` | `§S (>= result 0)` |
 | For Loop | `§L{var:from:to:step}` | `§L{i:1:100:1}` |
 | While Loop | `§WH condition` | `§WH (> i 0)` |
-| Do-While Loop | `§DO` (body indented) | `§DO` then `§WHILE cond` |
-| If/ElseIf/Else | `§IF cond` then `§EI` / `§EL` at same column | `§IF (> x 0)` |
+| Do-While Loop | `§DO{id}` (body indented) | `§DO{do1}` then `§/DO{do1} cond` |
+| If/ElseIf/Else | `§IF{id} cond` then `§EI` / `§EL` at same column | `§IF{if1} (> x 0)` |
 | Call | `§C{target}...§/C` | `§C{Math.Max} §A 1 §A 2 §/C` |
 | C# Attribute | `[@Name]` or `[@Name(args)]` | `[@HttpPost]`, `[@Route("api")]` |
 | Print | `§P expr` | `§P "Hello"` |
@@ -120,7 +120,7 @@ to reference the element from external tooling (e.g. `calor navigate`).
 | Modules | `§M{Calculator}` | `§M{m001:Calculator}` |
 | Functions | `§F{Add:pub}` | `§F{f001:Add:pub}` |
 | Loops | `§L{i:1:10:1}` | `§L{for1:i:1:10:1}` |
-| Conditionals | `§IF cond` | `§IF{if1} cond` |
+| Conditionals | none: an `§IF` statement always needs an ID | `§IF{if1} cond` |
 
 ---
 
@@ -132,7 +132,7 @@ to reference the element from external tooling (e.g. `calor navigate`).
     §O{void}
     §E{cw}
     §L{i:1:100:1}
-      §IF (== (% i 15) 0) → §P "FizzBuzz"
+      §IF{if1} (== (% i 15) 0) → §P "FizzBuzz"
       §EI (== (% i 3) 0) → §P "Fizz"
       §EI (== (% i 5) 0) → §P "Buzz"
       §EL → §P i

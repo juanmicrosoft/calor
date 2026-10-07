@@ -192,9 +192,9 @@ Return statements in nested scopes must correctly unwind to the function boundar
 | Narrowing | Explicit required | Data may be lost |
 
 ```calor
-§B{i} INT:42
-§B{f} i           // OK: implicit widening to float
-§B{j} §CAST{INT} f  // Required: explicit narrowing
+§B{i:i32} 42
+§B{f:f64} i                  // OK: implicit widening
+§B{j:i32} (cast i32 f)       // Required: explicit narrowing
 ```
 
 **Test:** `S8: NumericConversion_IntToFloat`

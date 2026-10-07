@@ -2,6 +2,8 @@ using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
 using Calor.Compiler.Diagnostics;
+using Calor.Compiler.Verification.Z3.Cache;
+using Calor.Compiler.Effects;
 
 namespace Calor.Compiler.SelfCheck;
 
@@ -91,6 +93,13 @@ public sealed class DocDriftInputs
     /// </summary>
     public DocFile? ExemplarDoc { get; init; }
     public DocFile? AgentTaskReferenceDoc { get; init; }
+
+    /// <summary>
+    /// Website pages (<c>website/content/**/*.mdx</c>, historical records excluded) whose
+    /// examples, negative-example annotations and quoted output are checked by
+    /// <see cref="WebsiteExampleChecker"/> (#1143).
+    /// </summary>
+    public IReadOnlyList<DocFile> WebsiteDocs { get; init; } = [];
 }
 
 /// <summary>
@@ -198,6 +207,8 @@ public static class DocDriftChecker
             diagnostics.AddRange(ExemplarCompileChecker.CheckAgentTaskReference(agentReference));
         }
 
+        diagnostics.AddRange(WebsiteExampleChecker.Check(inputs.WebsiteDocs));
+
         return diagnostics;
     }
 
@@ -257,6 +268,13 @@ public static class DocDriftChecker
         // agent manuals cannot drift (#708). It is NOT in the keyword/diagnostic
         // scan sets — that would double-report every finding already raised on
         // CLAUDE.md; the mirror check covers it instead.
+        // The public website (#1143). Historical records keep the syntax, versions and
+        // codes that shipped; WebsiteExampleChecker.HistoricalExclusions names each one.
+        var websiteDocs = LoadDocsInDirectory(root, WebsiteExampleChecker.ContentRelativePath, loadErrors,
+                recursive: true, pattern: "*.mdx")
+            .Where(doc => !WebsiteExampleChecker.IsHistorical(doc.Path))
+            .ToList();
+
         var mirrorDocs = new List<MirrorDoc>();
         var inventory = LoadAstInventoryMirror(root, loadErrors);
         if (inventory != null)
@@ -289,8 +307,8 @@ public static class DocDriftChecker
             DiagnosticCodes = GetImplementedDiagnosticCodes(),
             KnownEffectCodes = Effects.EffectCodes.KnownCompactCodes,
             DocumentedEffectCodes = Effects.EffectCodes.DocumentedCompactCodes,
-            KeywordDocs = scannedDocs,
-            DiagnosticCodeDocs = scannedDocs,
+            KeywordDocs = scannedDocs.Concat(websiteDocs).ToList(),
+            DiagnosticCodeDocs = scannedDocs.Concat(websiteDocs).ToList(),
             // The exemplar is excluded from the parse-only example check (Calor1328)
             // because ExemplarCompileChecker gives it a strictly stronger compile
             // check (Calor1330) whose stage 1 already reports any parse failure —
@@ -298,9 +316,14 @@ public static class DocDriftChecker
             ParseExampleDocs = scannedDocs
                 .Where(d => d.Path != ExemplarCompileChecker.RelativePath).ToList(),
             EffectsReferenceDoc = effectsDoc,
-            EffectDocsForwardOnly = NonNull(syntaxIndex),
+            // Website pages with an "Effect Codes" table are checked forward-only (every listed code exists).
+            EffectDocsForwardOnly = NonNull(syntaxIndex)
+                .Concat(websiteDocs.Where(doc => Regex.IsMatch(doc.Content, @"^#{1,6}\s+Effect Codes\s*$", RegexOptions.Multiline)))
+                .ToList(),
             CliCodesDoc = cliCodesDoc,
-            VersionScanDocs = NonNull(claudeMd).Concat(NonNull(copilotInstructions)).Concat(versionDocs).ToList(),
+            VersionScanDocs = NonNull(claudeMd).Concat(NonNull(copilotInstructions)).Concat(versionDocs)
+                .Concat(websiteDocs).ToList(),
+            WebsiteDocs = websiteDocs,
             SemanticsVersionDocs = semanticsDocs,
             MirrorDocs = mirrorDocs,
             ExemplarDoc = exemplarDoc,
@@ -477,12 +500,13 @@ public static class DocDriftChecker
             foreach (Match match in KeywordRef.Matches(line.Text))
             {
                 var name = match.Groups[1].Value;
-                if (!keywordSet.Contains(name))
+                // `§/X` is the website's standard placeholder for "any closer" (docs/ suppress it per line).
+                if (!keywordSet.Contains(name) && !(IsMdx(doc) && name == "/X"))
                 {
                     diagnostics.Add(Drift(
                         DiagnosticCode.DocDriftUnknownKeyword,
                         $"Documented keyword '§{name}' does not exist in the lexer's keyword table " +
-                        $"(if this is intentional meta-notation, put '{SuppressionMarker}' on the preceding line)",
+                        $"(if this is intentional meta-notation, put '{MarkerFor(doc)}' on the preceding line)",
                         doc.Path, line.Number, match.Index + 1));
                 }
             }
@@ -533,7 +557,7 @@ public static class DocDriftChecker
                     diagnostics.Add(Drift(
                         DiagnosticCode.DocDriftUnknownDiagnosticCode,
                         $"Documented diagnostic code '{match.Value}' is not defined in DiagnosticCode " +
-                        $"(if this is intentional meta-notation, put '{SuppressionMarker}' on the preceding line)",
+                        $"(if this is intentional meta-notation, put '{MarkerFor(doc)}' on the preceding line)",
                         doc.Path, line.Number, match.Index + 1));
                 }
             }
@@ -614,7 +638,7 @@ public static class DocDriftChecker
                     if (fenceInfo == "calor")
                     {
                         var suppressed = i > 0 &&
-                            lines[i - 1].Contains(SuppressionMarker, StringComparison.Ordinal);
+                            WebsiteExampleChecker.IsSuppressionLine(lines[i - 1]);
                         current = new CalorFence([], i + 2, suppressed);
                     }
                 }
@@ -810,7 +834,7 @@ public static class DocDriftChecker
                 var match = EffectTableRow.Match(line);
                 if (match.Success)
                 {
-                    var suppressed = i > 0 && lines[i - 1].Contains(SuppressionMarker, StringComparison.Ordinal);
+                    var suppressed = i > 0 && WebsiteExampleChecker.IsSuppressionLine(lines[i - 1]);
                     rows.Add((match.Groups["code"].Value, i + 1, match.Groups["code"].Index + 1, suppressed));
                 }
             }
@@ -862,11 +886,17 @@ public static class DocDriftChecker
             }
 
             result.Add(new ScannedLine(line, i + 1, inForeignFence, previousHadMarker));
-            previousHadMarker = line.Contains(SuppressionMarker, StringComparison.Ordinal);
+            previousHadMarker = WebsiteExampleChecker.IsSuppressionLine(line);
         }
 
         return result;
     }
+
+    private static bool IsMdx(DocFile doc) => doc.Path.EndsWith(".mdx", StringComparison.OrdinalIgnoreCase);
+
+    // MDX rejects HTML comments, so website pages use the JSX-comment form of the marker.
+    private static string MarkerFor(DocFile doc) =>
+        IsMdx(doc) ? WebsiteExampleChecker.MdxSuppressionMarker : SuppressionMarker;
 
     private static Diagnostic Drift(string code, string message, string path, int line, int column)
         => new(code, DiagnosticSeverity.Error, message, path, line, column);
@@ -911,7 +941,7 @@ public static class DocDriftChecker
     }
 
     private static List<DocFile> LoadDocsInDirectory(
-        string root, string relativeDir, List<Diagnostic> loadErrors, bool recursive = false)
+        string root, string relativeDir, List<Diagnostic> loadErrors, bool recursive = false, string pattern = "*.md")
     {
         var fullDir = Path.Combine(root, relativeDir);
         if (!Directory.Exists(fullDir))
@@ -924,7 +954,7 @@ public static class DocDriftChecker
         }
 
         return Directory
-            .EnumerateFiles(fullDir, "*.md", recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly)
+            .EnumerateFiles(fullDir, pattern, recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly)
             .OrderBy(p => p, StringComparer.Ordinal)
             .Select(p => new DocFile(Path.GetRelativePath(root, p), File.ReadAllText(p)))
             .ToList();
@@ -932,4 +962,586 @@ public static class DocDriftChecker
 
     private static List<DocFile> NonNull(params DocFile?[] docs)
         => docs.Where(d => d != null).Select(d => d!).ToList();
+}
+
+/// <summary>
+/// Checks the public website's MDX pages (<c>website/content/**/*.mdx</c>) against the
+/// compiler's actual behaviour (#1143). Fence convention:
+/// <list type="bullet">
+/// <item>A <c>```calor</c> fence whose first non-blank line starts with <c>§M</c> is a
+/// complete program. It is compiled exactly as <c>calor --input file.calr</c> compiles it
+/// (CLI defaults, generated C# validated by Roslyn) and must report no errors.</item>
+/// <item><c>```calor expect=Calor0272</c> marks an intended negative example. Its error and
+/// warning codes must equal the listed set, and the adjacent prose (from the nearest heading
+/// to the next fence or heading) must cite every listed code. A prose claim of the form
+/// "line N, column M" before the fence must match a reported location.</item>
+/// <item><c>group=name</c> on several complete programs of one page compiles them together,
+/// as <c>calor --input a.calr --input b.calr</c> does (cross-module effect checks).</item>
+/// <item>A fence labelled <c>output</c> quotes the diagnostics of the nearest preceding
+/// complete program (or its group); the quoted <c>CalorNNNN: message</c> entries must equal
+/// the actual error and warning diagnostics. A fence labelled <c>illustrative</c> is
+/// explicitly not real output. A fence that looks like tool output but carries neither
+/// label is a finding.</item>
+/// </list>
+/// Pages listed in <see cref="HistoricalExclusions"/> are records of released versions
+/// and keep the syntax and codes that shipped.
+/// </summary>
+public static class WebsiteExampleChecker
+{
+    /// <summary>Repository-relative root of the website's MDX content.</summary>
+    public static readonly string ContentRelativePath = Path.Combine("website", "content");
+
+    /// <summary>
+    /// Website pages excluded from every website check, with the reason. Each one is a
+    /// historical record whose old syntax, versions and codes are correct for its time.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string> HistoricalExclusions =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["changelog.mdx"] = "release history: keeps the syntax, versions and diagnostic codes that shipped",
+        };
+
+    /// <summary>MDX cannot hold HTML comments, so the drift suppression marker takes JSX-comment form.</summary>
+    public const string MdxSuppressionMarker = "{/* drift:ignore */}";
+
+    private static readonly Regex CompleteProgramStart = new(@"^§M(?:\s|\{|$)", RegexOptions.Compiled);
+    private static readonly Regex CodePattern = new(@"^Calor\d{4}$", RegexOptions.Compiled);
+    private static readonly Regex GroupPattern = new(@"^[A-Za-z0-9_-]+$", RegexOptions.Compiled);
+    private static readonly Regex Heading = new(@"^#{1,6}\s", RegexOptions.Compiled);
+    private static readonly Regex LocationClaim = new(@"\bline (?<line>\d+), column (?<column>\d+)\b", RegexOptions.Compiled);
+
+    // One quoted diagnostic in an output fence: an optional "path(l,c): " prefix, an optional
+    // severity word, the code, and the message (continuation lines are appended).
+    private static readonly Regex QuotedDiagnostic = new(
+        @"^(?:\S+\((?<line>\d+),(?<column>\d+)\):\s*)?(?:(?<severity>error|warning)\s+)?(?<code>Calor\d{4}):\s*(?<message>.*)$",
+        RegexOptions.Compiled);
+
+    // Lines that make a fence read as real tool output.
+    private static readonly Regex OutputShaped = new(
+        @"Calor\d{4}:|^\s*(?:error|warning)\b|\.calr[:(]\d+[:,]\d+|^\s*===.*===\s*$|^\s*BLOCKED:",
+        RegexOptions.Compiled | RegexOptions.Multiline);
+
+    private static readonly HashSet<string> OutputLanguages = new(StringComparer.Ordinal) { "", "text", "console", "plaintext" };
+
+    // A JSON fence whose top-level keys are those of a CLI envelope or MCP tool response.
+    private static readonly Regex OutputShapedJson = new(
+        @"""(?:success|diagnostics|schemaVersion|suggestions|obligations|guards|patches|isError|decision)""\s*:",
+        RegexOptions.Compiled);
+
+    // A fence opener: optional indentation, then three or more backticks or tildes.
+    private static readonly Regex FenceOpen = new(
+        @"^(?<ws>[ \t]*)(?:(?<fence>`{3,})(?<info>[^`]*)|(?<fence>~{3,})(?<info>.*))$", RegexOptions.Compiled);
+
+    // A fence opened on a list-item or blockquote line. CommonMark ends such a fence when its
+    // container ends (possibly implicitly), which a line scanner cannot follow, so the website
+    // convention forbids it and the check rejects it rather than guessing.
+    private static readonly Regex FenceInContainer = new(
+        @"^[ \t]*(?:(?:>|[-*+]|\d{1,9}[.)])[ \t]*)+(?:`{3,}|~{3,})", RegexOptions.Compiled);
+
+    /// <summary>A fenced block of an MDX page.</summary>
+    public sealed record Fence(
+        string Language,
+        IReadOnlyList<string> Tokens,
+        IReadOnlyList<string> Lines,
+        int OpenLine,
+        int CloseLine)
+    {
+        public int FirstContentLine => OpenLine + 1;
+        public string Source => string.Join("\n", Lines) + "\n";
+
+        public bool IsCompleteProgram => Language == "calor"
+            && Lines.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l)) is { } first
+            && CompleteProgramStart.IsMatch(first.TrimStart());
+
+        public string? Value(string key) => Tokens
+            .Where(t => t.StartsWith(key + "=", StringComparison.Ordinal))
+            .Select(t => t[(key.Length + 1)..])
+            .FirstOrDefault();
+
+        public bool Has(string flag) => Tokens.Contains(flag, StringComparer.Ordinal);
+    }
+
+    /// <summary>Counts reported by <see cref="Check"/> (used by tests and the evidence record).</summary>
+    public sealed class Coverage
+    {
+        public int Pages { get; set; }
+        public int CompletePrograms { get; set; }
+        public int NegativePrograms { get; set; }
+        public int GroupedPrograms { get; set; }
+        public int CheckedOutputs { get; set; }
+        public int IllustrativeOutputs { get; set; }
+    }
+
+    /// <summary>True when the page is a historical record excluded from website checks.</summary>
+    public static bool IsHistorical(string path) =>
+        HistoricalExclusions.ContainsKey(Path.GetRelativePath(ContentRelativePath, path).Replace('\\', '/'));
+
+    /// <summary>
+    /// Splits an MDX page into its fenced blocks (1-based line numbers): backtick or tilde
+    /// fences of three or more characters, optionally indented (e.g. under a list item or in a
+    /// JSX element). Content lines lose the opener's indentation. Fence forms whose extent
+    /// depends on a container (list-marker or blockquote lines, indented bodies that dedent,
+    /// unclosed fences) are reported by the checker instead of being guessed.
+    /// </summary>
+    public static List<Fence> ParseFences(string content) => ParseFences(content, null);
+
+    private static List<Fence> ParseFences(string content, List<int>? rejectedLines)
+    {
+        var fences = new List<Fence>();
+        var lines = content.Replace("\r\n", "\n").Split('\n');
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var open = FenceOpen.Match(lines[i]);
+            if (!open.Success)
+            {
+                if (FenceInContainer.IsMatch(lines[i]))
+                    rejectedLines?.Add(i + 1);
+                continue;
+            }
+            var indent = open.Groups["ws"].Length;
+            var marker = open.Groups["fence"].Value;
+            var info = open.Groups["info"].Value.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            var body = new List<string>();
+            var close = i + 1;
+            var dedented = false;
+            while (close < lines.Length && !IsCloser(lines[close], marker))
+            {
+                // An indented fence (inside a list item or JSX element) whose body dedents past
+                // the opener may have been closed implicitly by its container.
+                if (indent > 0 && lines[close].Trim().Length > 0
+                    && lines[close].Length - lines[close].TrimStart().Length < indent)
+                    dedented = true;
+                body.Add(RemoveIndent(lines[close++], indent));
+            }
+            if (dedented || close >= lines.Length)
+                rejectedLines?.Add(i + 1);
+            fences.Add(new Fence(info.Length > 0 ? info[0].ToLowerInvariant() : "", info.Skip(1).ToList(), body, i + 1,
+                Math.Min(close, lines.Length - 1) + 1));
+            i = close;
+        }
+        return fences;
+    }
+
+    private static bool IsCloser(string line, string marker)
+    {
+        // Only spaces and tabs may surround a closer: CommonMark treats any other
+        // whitespace (e.g. U+00A0) as content, so the fence stays open.
+        var trimmed = line.Trim(' ', '\t');
+        return trimmed.Length >= marker.Length && trimmed.All(c => c == marker[0]);
+    }
+
+    private static string RemoveIndent(string line, int width)
+    {
+        var remove = 0;
+        while (remove < width && remove < line.Length && (line[remove] == ' ' || line[remove] == '\t'))
+            remove++;
+        return line[remove..];
+    }
+
+    internal static bool IsSuppressionLine(string line) =>
+        line.Contains(DocDriftChecker.SuppressionMarker, StringComparison.Ordinal)
+        || line.Contains(MdxSuppressionMarker, StringComparison.Ordinal);
+
+    /// <summary>Runs every website check over the given pages.</summary>
+    public static List<Diagnostic> Check(IReadOnlyList<DocFile> pages, Coverage? coverage = null)
+    {
+        var diagnostics = new List<Diagnostic>();
+        coverage ??= new Coverage();
+        foreach (var page in pages)
+        {
+            coverage.Pages++;
+            CheckPage(page, diagnostics, coverage);
+        }
+        return diagnostics;
+    }
+
+    private sealed record Unit(List<Fence> Members, Dictionary<Fence, List<Diagnostic>> Actual, HashSet<Fence> FailedFiles);
+
+    private static void CheckPage(DocFile page, List<Diagnostic> diagnostics, Coverage coverage)
+    {
+        var lines = page.Content.Replace("\r\n", "\n").Split('\n');
+        var rejected = new List<int>();
+        var fences = ParseFences(page.Content, rejected);
+        var programs = new List<Fence>();
+        foreach (var line in rejected)
+            diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation,
+                "Unsupported fence form: a fence on a list-item or blockquote line, an indented fence whose body " +
+                "dedents past its opener, or an unclosed fence. Use a plain fence (indentation only) so the check " +
+                "sees exactly the block the site renders", page.Path, line));
+
+        // The drift:ignore marker exempts prose from the keyword and code scans only; it never
+        // exempts an executable example or quoted output from these checks.
+        foreach (var fence in fences)
+        {
+            if (!ValidateAnnotations(page, fence, diagnostics))
+                continue;
+            if (fence.IsCompleteProgram)
+                programs.Add(fence);
+        }
+
+        // Compile every unit: an ungrouped program alone, each group's members together.
+        // A program may belong to several groups (e.g. one callee module shared by two
+        // caller examples); its expectations must then hold in every group.
+        var units = programs.ToDictionary(p => p, _ => new List<Unit>());
+        foreach (var members in programs
+            .SelectMany(f => Groups(f).Select(g => (Group: g, Fence: f)))
+            .GroupBy(x => x.Group, StringComparer.Ordinal)
+            .Select(g => g.Select(x => x.Fence).ToList()))
+        {
+            var (compiled, failedFiles) = Compile(page, members, diagnostics);
+            var unit = new Unit(members, compiled, failedFiles);
+            foreach (var member in members)
+                units[member].Add(unit);
+
+            // A file that fails its own compile (no generated C#) stops generated-C# validation
+            // for the whole group, which would hide errors in the others. Compile every other
+            // member again without the failed files (members with only cross-module or
+            // warning findings stay, so dependants still resolve). The retry must not reveal
+            // any error code that the member did not already report.
+            var rest = members.Where(m => !unit.FailedFiles.Contains(m)).ToList();
+            if (rest.Count > 0 && rest.Count < members.Count)
+            {
+                foreach (var (member, actual) in Compile(page, rest, diagnostics).Actual)
+                {
+                    var known = unit.Actual.GetValueOrDefault(member)?.Where(d => d.IsError).Select(d => d.Code)
+                        .ToHashSet(StringComparer.Ordinal) ?? [];
+                    foreach (var error in actual.Where(d => d.IsError && !known.Contains(d.Code)))
+                        diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteExampleMismatch,
+                            $"Complete calor example does not compile once its group's failing examples are removed (a failing file can stop generated-C# validation for the whole group): {error.Code}: {error.Message}",
+                            page.Path, member.FirstContentLine + Math.Max(error.Span.Line - 1, 0)));
+                }
+            }
+        }
+
+        foreach (var program in programs)
+        {
+            coverage.CompletePrograms++;
+            if (program.Value("group") != null)
+                coverage.GroupedPrograms++;
+            if (ExpectedCodes(program).Count > 0)
+                coverage.NegativePrograms++;
+            foreach (var unit in units[program])
+                CheckProgram(page, lines, fences, program, unit, diagnostics);
+        }
+
+        foreach (var fence in fences.Where(f => f.Language != "calor"))
+        {
+            if (fence.Has("output"))
+            {
+                coverage.CheckedOutputs++;
+                var source = programs.LastOrDefault(p => p.CloseLine < fence.OpenLine);
+                if (source != null && units[source].Count > 1)
+                    diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation,
+                        "`output` fence follows an example that belongs to several groups; it is ambiguous which compile it quotes",
+                        page.Path, fence.OpenLine));
+                else
+                    CheckOutput(page, fence, source == null ? null : units[source].Single(), diagnostics);
+            }
+            else if (fence.Has("illustrative"))
+            {
+                coverage.IllustrativeOutputs++;
+            }
+            else if ((OutputLanguages.Contains(fence.Language) && OutputShaped.IsMatch(string.Join("\n", fence.Lines)))
+                || ((fence.Language == "json" || OutputLanguages.Contains(fence.Language))
+                    && OutputShapedJson.IsMatch(string.Join("\n", fence.Lines))))
+            {
+                diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteOutputMismatch,
+                    "Fence looks like tool output but is labelled neither `output` (checked against the preceding " +
+                    "example) nor `illustrative` (not real output); add one to the fence info string",
+                    page.Path, fence.OpenLine));
+            }
+        }
+    }
+
+    private static IEnumerable<string> Groups(Fence fence) =>
+        fence.Value("group") is { } groups
+            ? groups.Split(',')
+            : [$"\0{fence.OpenLine}"];
+
+    private static void CheckProgram(DocFile page, string[] lines, List<Fence> fences, Fence program, Unit unit,
+        List<Diagnostic> diagnostics)
+    {
+        if (!unit.Actual.TryGetValue(program, out var actual))
+            return; // compile crashed; already reported
+        var expected = ExpectedCodes(program);
+        if (expected.Count == 0)
+        {
+            foreach (var error in actual.Where(d => d.IsError))
+                diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteExampleMismatch,
+                    $"Complete calor example does not compile: {error.Code}: {error.Message} " +
+                    "(fix the example; an intended negative example declares its codes with `expect=`)",
+                    page.Path, program.FirstContentLine + Math.Max(error.Span.Line - 1, 0)));
+            return;
+        }
+
+        var actualCodes = actual.Select(d => d.Code).ToHashSet(StringComparer.Ordinal);
+        if (!actualCodes.SetEquals(expected))
+            diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteExampleMismatch,
+                $"Negative calor example declares expect={string.Join(",", expected.Order(StringComparer.Ordinal))} " +
+                $"but the compiler reports [{string.Join(", ", actual.Select(d => $"{d.Severity.ToString().ToLowerInvariant()} {d.Code}: {d.Message}"))}]",
+                page.Path, program.OpenLine));
+
+        CheckProseClaims(page, lines, fences, program, expected, actual, diagnostics);
+    }
+
+    private static bool ValidateAnnotations(DocFile page, Fence fence, List<Diagnostic> diagnostics)
+    {
+        var allowed = fence.Language == "calor"
+            ? new[] { "expect=", "group=" }
+            : new[] { "output", "illustrative" };
+        var ok = true;
+        foreach (var token in fence.Tokens)
+        {
+            if (!allowed.Any(a => a.EndsWith('=') ? token.StartsWith(a, StringComparison.Ordinal) : token == a))
+            {
+                diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation,
+                    $"Unknown or misplaced fence annotation '{token}' on a ```{fence.Language} fence " +
+                    $"(allowed here: {string.Join(", ", allowed.Select(a => a.TrimEnd('=')))})",
+                    page.Path, fence.OpenLine));
+                ok = false;
+            }
+        }
+
+        foreach (var key in fence.Tokens.Select(t => t.Contains('=') ? t[..t.IndexOf('=')] : t)
+            .GroupBy(k => k, StringComparer.Ordinal).Where(g => g.Count() > 1).Select(g => g.Key))
+        {
+            diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation,
+                $"Fence annotation '{key}' is repeated; list every code in one expect= (or group in one group=)",
+                page.Path, fence.OpenLine));
+            ok = false;
+        }
+
+        if (fence.Has("output") && fence.Has("illustrative"))
+        {
+            diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation,
+                "A fence cannot be both `output` (checked) and `illustrative`", page.Path, fence.OpenLine));
+            ok = false;
+        }
+
+        if (fence.Language == "calor" && fence.Tokens.Count > 0 && !fence.IsCompleteProgram)
+        {
+            diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation,
+                "`expect=`/`group=` apply only to complete programs (first line starts with §M); " +
+                "on a fragment they would be silently ignored", page.Path, fence.OpenLine));
+            ok = false;
+        }
+
+        if (fence.Value("expect") is { } expect
+            && (expect.Length == 0 || expect.Split(',').Any(code => !CodePattern.IsMatch(code))))
+        {
+            diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation,
+                $"Malformed expect={expect}: list Calor diagnostic codes separated by commas", page.Path, fence.OpenLine));
+            ok = false;
+        }
+
+        if (fence.Value("group") is { } group && group.Split(',').Any(g => !GroupPattern.IsMatch(g)))
+        {
+            diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation,
+                $"Malformed group={group}", page.Path, fence.OpenLine));
+            ok = false;
+        }
+
+        // A non-calor fence holding a complete program would bypass every check above.
+        if (fence.Language != "calor"
+            && fence.Lines.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l)) is { } first
+            && CompleteProgramStart.IsMatch(first.TrimStart()))
+        {
+            diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation,
+                $"A complete Calor program (starts with §M) is fenced as ```{fence.Language}; label it ```calor so it is checked",
+                page.Path, fence.OpenLine));
+            ok = false;
+        }
+
+        return ok;
+    }
+
+    private static HashSet<string> ExpectedCodes(Fence fence) =>
+        (fence.Value("expect") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).ToHashSet(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Compiles the members exactly as <c>calor --input m1.calr [--input m2.calr ...]</c> does
+    /// with default options, and returns each member's error and warning diagnostics.
+    /// </summary>
+    private static (Dictionary<Fence, List<Diagnostic>> Actual, HashSet<Fence> FailedFiles) Compile(
+        DocFile page, List<Fence> members, List<Diagnostic> diagnostics)
+    {
+        var result = new Dictionary<Fence, List<Diagnostic>>();
+        var failed = new HashSet<Fence>();
+        var directory = Path.Combine(Path.GetTempPath(), "calor-website-check-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var files = new List<FileInfo>();
+            for (var i = 0; i < members.Count; i++)
+            {
+                var path = Path.Combine(directory, $"example{i + 1}.calr");
+                File.WriteAllText(path, members[i].Source);
+                files.Add(new FileInfo(path));
+            }
+
+            var sink = new DiagnosticBag();
+            CompilationDriver.CompileAll(
+                files,
+                file => new CompilationOptions
+                {
+                    StatusWriter = TextWriter.Null,
+                    ProjectDirectory = directory,
+                    VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
+                },
+                crossModuleEnforcement: true,
+                crossModulePolicy: UnknownCallPolicy.Strict,
+                diagnosticSink: sink,
+                // Per-file outcome, before generated-C# validation and the cross-module pass:
+                // a file failing here produces no C#, which can mask the others' validation.
+                onFileResult: (file, compiled) =>
+                {
+                    if (compiled.HasErrors)
+                        failed.Add(members[files.FindIndex(f => f.FullName == file.FullName)]);
+                });
+
+            foreach (var member in members)
+                result[member] = [];
+            foreach (var diagnostic in sink.Where(d => d.IsError || d.IsWarning))
+            {
+                var index = diagnostic.FilePath == null ? 0
+                    : files.FindIndex(f => string.Equals(Path.GetFullPath(f.FullName),
+                        Path.GetFullPath(diagnostic.FilePath), StringComparison.Ordinal));
+                result[members[Math.Max(index, 0)]].Add(diagnostic);
+            }
+        }
+        catch (Exception exception)
+        {
+            diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteExampleMismatch,
+                $"Complete calor example crashed the compiler: {exception.Message}", page.Path, members[0].OpenLine));
+            result.Clear();
+        }
+        finally
+        {
+            try { Directory.Delete(directory, recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
+        return (result, failed);
+    }
+
+    /// <summary>
+    /// The adjacent prose of a negative example must cite every expected code (so the page
+    /// says what the compiler says), and a "line N, column M" claim before the fence must
+    /// match a reported location.
+    /// </summary>
+    private static void CheckProseClaims(DocFile page, string[] lines, List<Fence> fences, Fence program,
+        HashSet<string> expected, List<Diagnostic> actual, List<Diagnostic> diagnostics)
+    {
+        var before = ProseBefore(lines, fences, program);
+        // A checked `output` fence quoting this example's diagnostics is part of its claim,
+        // even when a heading separates the two.
+        var linkedOutputs = fences
+            .Where(f => f.Language != "calor" && f.Has("output")
+                && fences.LastOrDefault(p => p.IsCompleteProgram && p.CloseLine < f.OpenLine) == program)
+            .SelectMany(f => f.Lines);
+        var prose = ProseAfter(lines, fences, program);
+        var after = prose + "\n" + string.Join("\n", linkedOutputs);
+        foreach (var code in expected.Order(StringComparer.Ordinal))
+        {
+            if (!Regex.IsMatch(before + "\n" + after, $@"\b{code}\b"))
+                diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation,
+                    $"Negative example expects {code} but the adjacent prose (nearest heading to the next fence) never cites it",
+                    page.Path, program.OpenLine));
+        }
+
+        foreach (Match claim in LocationClaim.Matches(before + "\n" + prose))
+        {
+            var line = int.Parse(claim.Groups["line"].Value);
+            var column = int.Parse(claim.Groups["column"].Value);
+            if (!actual.Any(d => d.Span.Line == line && d.Span.Column == column))
+                diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteAnnotation,
+                    $"Prose claims a diagnostic at line {line}, column {column}, but the compiler reports " +
+                    $"[{string.Join(", ", actual.Select(d => $"{d.Code} at line {d.Span.Line}, column {d.Span.Column}"))}]",
+                    page.Path, program.OpenLine));
+        }
+    }
+
+    private static string ProseBefore(string[] lines, List<Fence> fences, Fence fence)
+    {
+        var start = fences.Where(f => f.CloseLine < fence.OpenLine).Select(f => f.CloseLine).DefaultIfEmpty(0).Max();
+        for (var i = fence.OpenLine - 2; i >= start; i--)
+        {
+            if (Heading.IsMatch(lines[i]))
+            {
+                start = i;
+                break;
+            }
+        }
+        return string.Join("\n", lines[start..(fence.OpenLine - 1)]);
+    }
+
+    private static string ProseAfter(string[] lines, List<Fence> fences, Fence fence)
+    {
+        // Up to the next calor fence or heading; non-calor fences in between (e.g. the
+        // quoted output) count as part of the claim.
+        var end = fences.Where(f => f.OpenLine > fence.CloseLine && f.Language == "calor")
+            .Select(f => f.OpenLine - 1).DefaultIfEmpty(lines.Length).Min();
+        var text = new List<string>();
+        for (var i = fence.CloseLine; i < end && i < lines.Length; i++)
+        {
+            if (Heading.IsMatch(lines[i]) && !fences.Any(f => i + 1 > f.OpenLine && i + 1 < f.CloseLine))
+                break;
+            text.Add(lines[i]);
+        }
+        return string.Join("\n", text);
+    }
+
+    private static void CheckOutput(DocFile page, Fence output, Unit? unit, List<Diagnostic> diagnostics)
+    {
+        if (unit == null)
+        {
+            diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteOutputMismatch,
+                "`output` fence has no preceding complete calor example on this page to check it against",
+                page.Path, output.OpenLine));
+            return;
+        }
+
+        var quoted = new List<(string? Severity, string Code, string Message, string? Location)>();
+        foreach (var line in output.Lines)
+        {
+            var match = QuotedDiagnostic.Match(line.Trim());
+            if (match.Success)
+                quoted.Add((match.Groups["severity"].Success ? match.Groups["severity"].Value : null,
+                    match.Groups["code"].Value, match.Groups["message"].Value,
+                    match.Groups["line"].Success ? $"{match.Groups["line"].Value},{match.Groups["column"].Value}" : null));
+            else if (quoted.Count > 0 && line.Trim().Length > 0)
+                quoted[^1] = quoted[^1] with { Message = quoted[^1].Message + " " + line.Trim() };
+            else if (line.Trim().Length > 0)
+                diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteOutputMismatch,
+                    $"`output` fence line is not a quoted diagnostic and cannot be checked: '{line.Trim()}'",
+                    page.Path, output.OpenLine));
+        }
+
+        var remaining = unit.Members.SelectMany(m => unit.Actual.GetValueOrDefault(m) ?? []).ToList();
+        foreach (var (severity, code, message, location) in quoted)
+        {
+            var match = remaining.FirstOrDefault(d => d.Code == code
+                && Normalize(d.Message) == Normalize(message)
+                && (severity == null || string.Equals(severity, d.Severity.ToString(), StringComparison.OrdinalIgnoreCase))
+                && (location == null || location == $"{d.Span.Line},{d.Span.Column}"));
+            if (match == null)
+            {
+                diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteOutputMismatch,
+                    $"`output` fence quotes {(location == null ? "" : $"({location}) ")}{(severity == null ? "" : severity + " ")}{code}: '{Normalize(message)}', which the " +
+                    $"preceding example does not produce. Actual: [{string.Join(" | ", remaining.Select(d => $"({d.Span.Line},{d.Span.Column}) {d.Severity.ToString().ToLowerInvariant()} {d.Code}: {d.Message}"))}]",
+                    page.Path, output.OpenLine));
+                continue;
+            }
+            remaining.Remove(match);
+        }
+
+        foreach (var missing in remaining)
+            diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteOutputMismatch,
+                $"`output` fence omits {missing.Severity.ToString().ToLowerInvariant()} {missing.Code}: {missing.Message}, " +
+                "which the preceding example also reports",
+                page.Path, output.OpenLine));
+    }
+
+    private static string Normalize(string text) => Regex.Replace(text, @"\s+", " ").Trim();
+
+    private static Diagnostic Finding(string code, string message, string path, int line) =>
+        new(code, DiagnosticSeverity.Error, message, path, line, 1);
 }

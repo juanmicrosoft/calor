@@ -66,7 +66,7 @@ are intentionally invalid. Their corrected controls use an explicit default.
 
 **Rejected:** `input` on line 4, column 22.
 
-```calor
+```calor expect=Calor0272
 §M{m1:InitRejected}
   §F{f1:Copy:pub} (?str:input) -> void
     §E{}
@@ -86,7 +86,7 @@ are intentionally invalid. Their corrected controls use an explicit default.
 
 **Rejected:** `input` on line 4, column 8.
 
-```calor
+```calor expect=Calor0273
 §M{m1:ReturnRejected}
   §F{f1:Name:pub} (?str:input) -> str
     §E{}
@@ -106,7 +106,7 @@ are intentionally invalid. Their corrected controls use an explicit default.
 
 **Rejected:** `input` on line 6, column 17.
 
-```calor
+```calor expect=Calor0274
 §M{m1:ArgumentRejected}
   §F{f1:Take:pub} (str:value) -> void
     §E{}

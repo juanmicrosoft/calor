@@ -19,17 +19,28 @@ public sealed class NullabilityDocumentationTests
         Assert.NotNull(directory);
         var guide = File.ReadAllText(Path.Combine(directory.FullName, "website", "content",
             "guides", "nullability-and-dotnet-interop.mdx"));
-        var examples = Regex.Matches(guide, @"```calor\r?\n(?<source>[\s\S]*?)\r?\n```");
+        var examples = Regex.Matches(guide, @"```calor(?<meta>[^\r\n]*)\r?\n(?<source>[\s\S]*?)\r?\n```");
         Assert.Equal(10, examples.Count);
         foreach (Match example in examples)
         {
             var source = example.Groups["source"].Value.Replace("\r\n", "\n");
             var name = Regex.Match(source, @"§M\{m1:(\w+)\}").Groups[1].Value;
             Assert.NotEmpty(name);
+            // The fence annotation self-check enforces (#1143) must agree with this test's table.
+            Assert.Equal(ExpectedDiagnostic(name).Code is { Length: > 0 } code ? $" expect={code}" : "",
+                example.Groups["meta"].Value);
             foreach (var mode in new[] { "default", "type-off", "effects-off", "transpile", "verify" })
                 yield return [name, source, mode];
         }
     }
+
+    private static (string Code, int Line, int Column) ExpectedDiagnostic(string name) => name switch
+    {
+        "InitRejected" => (Code: "Calor0272", Line: 4, Column: 22),
+        "ReturnRejected" => (Code: "Calor0273", Line: 4, Column: 8),
+        "ArgumentRejected" => (Code: "Calor0274", Line: 6, Column: 17),
+        _ => (Code: "", Line: 0, Column: 0)
+    };
 
     [Theory]
     [MemberData(nameof(Examples))]
@@ -43,13 +54,7 @@ public sealed class NullabilityDocumentationTests
             VerifyContracts = mode == "verify",
             StatusWriter = TextWriter.Null
         });
-        var expected = name switch
-        {
-            "InitRejected" => (Code: "Calor0272", Line: 4, Column: 22),
-            "ReturnRejected" => (Code: "Calor0273", Line: 4, Column: 8),
-            "ArgumentRejected" => (Code: "Calor0274", Line: 6, Column: 17),
-            _ => (Code: "", Line: 0, Column: 0)
-        };
+        var expected = ExpectedDiagnostic(name);
         if (expected.Code.Length != 0)
         {
             Assert.True(result.HasErrors);

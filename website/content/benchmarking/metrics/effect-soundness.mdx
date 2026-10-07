@@ -62,7 +62,7 @@ The compiler traces effect violations through the resolved call graph:
 
 Violations produce compile errors with full call chains:
 
-```
+```text illustrative
 error Calor0410: Function 'ProcessOrder' uses effect 'network'
                  but does not declare it
   Call chain: ProcessOrder → NotifyCustomer → SendEmail → HttpClient.PostAsync
@@ -87,7 +87,7 @@ A function declared with only database effects:
 
 The compiler catches this:
 
-```
+```text illustrative
 error Calor0410: Function 'ProcessOrder' uses effect 'net:w'
                  but does not declare it
   Call chain: ProcessOrder → SendConfirmation → EmailService.Send → HttpClient.PostAsync
@@ -164,7 +164,7 @@ Callers must include all effects of their callees:
 
 If `ProcessAndLog` declared only `§E{db:rw}`, the compiler would error:
 
-```
+```text illustrative
 error Calor0410: Function 'ProcessAndLog' uses effect 'cw'
                  but does not declare it
   Call chain: ProcessAndLog → LogMessage → Console.WriteLine
@@ -182,7 +182,7 @@ Unknown external calls produce warnings:
 calor -i app.calr -o app.g.cs
 ```
 
-```
+```text illustrative
 warning Calor0411: Unknown effects for call to 'ThirdParty.DoSomething'
 ```
 
@@ -194,7 +194,7 @@ Promote unknown effects to errors:
 calor -i app.calr -o app.g.cs --strict-effects
 ```
 
-```
+```text illustrative
 error Calor0411: Unknown effects for call to 'ThirdParty.DoSomething'
   Add effect declaration to manifest or declare pessimistic effects
 ```

@@ -4,6 +4,48 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Website examples are now checked in CI (#1143)
+
+`calor self-check docs` now reads `website/content/**/*.mdx`, not only `docs/`. It already runs
+on every pull request, so a wrong website example now fails CI.
+
+- **Complete programs compile.** A `calor` code block whose first line starts with `§M` is
+  compiled the way `calor --input file.calr` compiles it, including the check of the generated
+  C#. It must report no errors. 49 programs on 96 pages are checked.
+- **Failing examples say how they fail.** An example meant to fail is labelled with its
+  diagnostic codes, for example `expect=Calor0272`. The check fails if the compiler reports any
+  other error or warning code, or if the text around the example does not name the code.
+  Multi-file examples are compiled together with `group=`.
+- **Quoted compiler output is real or labelled.** A block marked `output` must match the
+  diagnostics the example above it produces. Output that is not checked, such as `calor query`
+  results and MCP responses, is marked `illustrative`, and the site now shows it as "Example
+  output (not checked)". A block that looks like tool output and has neither label fails.
+- **Diagnostic codes, keywords and versions.** Website pages now get the same checks as
+  `docs/`: every cited `CalorNNNN` code exists, every `§` keyword exists, and no page
+  hardcodes the current version. The changelog page is excluded because it records past
+  releases.
+
+The new check found 11 website examples that did not compile. This change fixes them:
+
+- 3 in the nullability guide were intentional failures; they are now labelled.
+- 4 used old syntax: `§IF` without an ID (2), a C# line inside a Calor block, and `←`
+  annotations inside code.
+- 2 in the cross-module effects guide used undefined types and a call with a missing argument,
+  and could only be compiled as a pair. They are now one consistent two-file example, and its
+  quoted output is checked.
+- 2 refinement-type examples did arithmetic on named refinement types (`§RTYPE`), which the
+  type checker rejects today (`Calor0202`). They now write the refinements inline, and the
+  pages say why.
+
+The 0.25 baseline counted 13 failures; the other 2 were method fragments (`§MT`), which are not
+complete programs. This change also fixes 5 stale keyword references in prose (`§FOREACH` twice,
+`§MATCH`, `§CAST`, `§WHILE`) and replaced
+an invented error format on the `compile` page with real, checked output. The MCP walkthrough
+in the dependent-types tutorial showed a response its example could not produce; it now shows
+responses captured from the MCP server. The refinement-type pages now say that a default
+`calor` compile does not run the obligation solver (the `calor_refine` MCP tool does). New findings use
+`Calor1332`–`Calor1334`.
+
 ## [0.24.0] - 2026-10-07
 
 Calor 0.24 is a soundness release. It repairs verifier defects found by a registered soundness

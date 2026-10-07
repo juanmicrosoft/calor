@@ -22,7 +22,7 @@ calor self-check docs --format sarif  # SARIF 2.1.0 on stdout
 ```
 
 Exit codes: `0` no drift, `1` drift findings, `2` no repository root found.
-Findings use the `Calor1320`–`Calor1328` band (see
+Findings use the `Calor1320`–`Calor1334` band (see
 [Structured Output](/calor/cli/structured-output/)).
 
 ## Covered files
@@ -38,6 +38,10 @@ Findings use the `Calor1320`–`Calor1328` band (see
 - the **version scan only** additionally covers all of `docs/**/*.md`,
   excluding dated records under `docs/plans/`, `docs/experiments/`,
   `docs/design/`, and `docs/process/`
+- every `website/content/**/*.mdx` page except the historical records listed
+  in `WebsiteExampleChecker.HistoricalExclusions` (today: `changelog.mdx`).
+  These pages get the keyword, diagnostic-code, version and forward-only
+  effect-table checks, plus the website example checks below
 
 ## Checks
 
@@ -57,6 +61,9 @@ Findings use the `Calor1320`–`Calor1328` band (see
 | Every complete `§M` program in the agent syntax exemplar compiles to valid C# (Roslyn-semantic-checked) | `Calor1330` |
 | Every complete declaration example in the agent-task reference compiles to valid C# | `Calor1330` |
 | The exemplar never binds an array-returning BCL call to a generic collection type (the E1a trap) | `Calor1331` |
+| Every complete website example compiles with the CLI defaults, or reports exactly the codes its `expect=` annotation declares | `Calor1332` |
+| Every website `output` fence matches the diagnostics its example actually produces; output-shaped fences are labelled `output` or `illustrative` | `Calor1333` |
+| Website fence annotations are well-formed, and a negative example's codes and claimed line/column appear in its adjacent prose | `Calor1334` |
 
 ## Parse-checked examples
 
@@ -65,6 +72,45 @@ Fenced code blocks tagged `calor` whose **first non-blank line starts with
 with the real compiler on every run — if the syntax rots, the check fails
 with `Calor1328` at the offending doc line. Blocks that do not start with
 `§M` are treated as deliberate fragments and are skipped.
+
+## Website examples (#1143)
+
+`website/content/**/*.mdx` uses the same complete-program rule, but compiles
+each program **exactly as `calor --input file.calr` does** with default
+options: lexer, parser, binder, type and effect checks, and Roslyn validation
+of the generated C#. The fence info string carries the page's claim:
+
+| Fence | Meaning | Check |
+|:------|:--------|:------|
+| ```` ```calor ```` starting with `§M` | Complete program | No errors (warnings allowed) |
+| ```` ```calor expect=Calor0272 ```` | Intended negative example | The error **and** warning codes equal the listed set exactly; the adjacent prose (nearest heading to the next fence, plus any linked `output` fence) cites every listed code; a "line N, column M" claim before the fence matches a reported location |
+| ```` ```calor group=orders ```` | One file of a multi-file example | All members of the group compile together, as `calor --input a.calr --input b.calr` does, so cross-module effect checks run. A fence may join several groups (`group=a,b`); its expectations must hold in each. When a member fails its own compile (so it produces no C#), the other members are compiled again without it and may not report any new error code, because a failing file can stop generated-C# validation and the cross-module pass for the whole set |
+| ```` ```text output ```` | Real diagnostics of the nearest preceding complete program | Every quoted `[file(line,col): ][error\|warning ]CalorNNNN: message` entry (continuation lines are joined) must match an actual diagnostic, and every actual error or warning must be quoted |
+| ```` ```text illustrative ```` (or `json illustrative`) | Output CI does not check | None. The site shows the block as "Example output (not checked)" |
+
+A bare or `text` fence that looks like tool output (it contains `CalorNNNN:`,
+a `file.calr:line:col` location, an `=== … ===` banner, or a `BLOCKED:` line),
+or a `json` fence whose keys are those of a CLI envelope or MCP response
+(`success`, `diagnostics`, `schemaVersion`, `suggestions`, `obligations`,
+`guards`, `patches`, `isError`, `decision`), and that carries neither label
+fails with `Calor1333`. Fences are backtick or tilde fences of three or more
+characters, optionally indented (under a list item or inside JSX). A fence on a
+list-marker or blockquote line, an indented fence whose body dedents past its
+opener, and an unclosed fence fail with `Calor1334`: their extent depends on
+the enclosing container, so the check refuses to guess. Repeated annotations
+(`expect=` twice) also fail. Unknown annotations, an
+annotation on a fragment, and a complete program fenced with another language
+fail with `Calor1334`. MDX cannot hold HTML comments, so website pages write
+the suppression marker as `{/* drift:ignore */}`. On website pages it applies
+to the keyword and diagnostic-code scans of prose only; it never exempts a
+complete program or an output fence. On website pages the
+generic closer placeholder (section sign, slash, X) is accepted without a
+marker.
+
+Limits: the output-shape test is a heuristic, so CLI output that has none of
+those shapes is only labelled by review. Output of commands other than
+compilation (`calor query`, `calor analyze`, MCP responses) is labelled
+`illustrative`, not checked.
 
 ## Deep-checked exemplar
 
@@ -127,7 +173,8 @@ doc (or the registry it is checked against) instead of suppressing.
 ## What it cannot catch
 
 Semantic and prose drift: wrong descriptions of behavior, stale line
-counts or file paths, outdated flag defaults, incorrect *output* examples,
+counts or file paths, outdated flag defaults, incorrect *output* examples
+(except website `output` fences),
 rotted `calor` fragments (blocks not starting with `§M`), undocumented
 features (other than effect codes and the `Calor13xx` table, which are
 checked for completeness), and anything in files outside the covered set.
