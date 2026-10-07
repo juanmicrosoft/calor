@@ -81,7 +81,8 @@ class Fixture:
             self.git("config", key, value)
         self.git("remote", "add", "origin", str(self.origin))
         for path in ("src/a.txt", "tests/Calor.Evaluation/a.txt", "website/public/data/benchmark-results.json",
-                     "scripts/benchmark_publication_gate.py"):
+                     "scripts/benchmark_publication_gate.py", *[p for p in gate.INPUT_PATHS if p.endswith((".cs", ".csproj"))],
+                     f"{gate.VALIDATOR}/CandidateManifestTests.cs"):
             self.write(path, "{}\n")
         shutil.copy(REPO_ROOT / "scripts/benchmark_publication_gate.py", self.root / "scripts/benchmark_publication_gate.py")
         self.write_json(gate.STAMP_INDEX, {"publicationStamps": []})
@@ -416,12 +417,126 @@ class GateTests(unittest.TestCase):
         self.assertEqual(0, code, text)
         self.assertTrue(self.f.headline()["comparableWithPublished"])
 
-    def test_an_older_checkout_is_compared_with_the_headline_on_main(self) -> None:
+    def test_a_candidate_whose_headline_already_reached_main_rewrites_the_same_bytes(self) -> None:
+        """#1422 PR 2 (replaces 'an older checkout is compared with the headline on main'): the comparison
+        is with the headline published at the candidate, so a re-run after this candidate's own headline
+        merged writes exactly the bytes main already has, not a 'comparable with main' variant."""
         self._publish_headline()
+        on_main = {p: (self.f.root / p).read_bytes() for p in (gate.HEADLINE, gate.STAMP_INDEX)}
         self.f.git("checkout", "-q", "--detach", "HEAD~1")
         code, text = self.f.check()
         self.assertEqual(0, code, text)
-        self.assertTrue(self.f.headline()["comparableWithPublished"], "compared with origin/main, not HEAD")
+        self.assertIsNone(self.f.headline()["comparableWithPublished"], "compared with HEAD, not origin/main")
+        self.assertEqual(on_main, {p: (self.f.root / p).read_bytes() for p in on_main})
+
+    # ---- #1422 PR 2: freshness is scoped to headline inputs; the bytes depend on the candidate only ----
+
+    def _candidate_then_main_moves(self, changes: dict) -> str:
+        """Fix the candidate at HEAD, then land `changes` on main and check the candidate out again."""
+        candidate = self.f.git("rev-parse", "HEAD")
+        for path, text in changes.items():
+            self.f.write(path, text)
+        self.f.commit_and_push("main moves on after the candidate")
+        self.f.git("checkout", "-q", "--detach", candidate)
+        return candidate
+
+    def _outputs(self) -> dict:
+        return {p: (self.f.root / p).read_bytes() for p in (gate.HEADLINE, gate.STAMP_INDEX)}
+
+    def _clean(self) -> None:
+        self.f.git("checkout", "-q", "--", ".")
+        self.f.git("clean", "-fdq")
+
+    def test_unrelated_test_files_on_main_after_the_candidate_do_not_block(self) -> None:
+        """The C2 (#1424) case: C1 added candidate tests next to B1's validator after the candidate."""
+        code, text = self.f.check()
+        self.assertEqual(0, code, text)
+        at_candidate = self._outputs()
+        self._clean()
+        self._candidate_then_main_moves({f"{gate.VALIDATOR}/CandidateInvalidationTests.cs": "new C1 test\n",
+                                         f"{gate.VALIDATOR}/CandidateManifestTests.cs": "edited C1 test\n",
+                                         "src/b.txt": "compiler change\n", "docs/other.md": "notes\n"})
+        code, text = self.f.check()
+        self.assertEqual(0, code, text)
+        self.assertEqual(at_candidate, self._outputs(), "main's unrelated changes must not change the bytes")
+
+    def test_every_headline_input_changed_on_main_is_refused(self) -> None:
+        # (file changed on main, the input the refusal names)
+        cases = [(f"{gate.REGISTRATION}/registration.json", gate.REGISTRATION),
+                 (f"{gate.RESULTS}/results.json", gate.RESULTS), (gate.CONTRACT, gate.CONTRACT),
+                 ("tests/TestData/Benchmarks/Cat/new.txt", "tests/TestData/Benchmarks"),
+                 ("tests/TestData/Benchmarks/Cat/A.calr", "tests/TestData/Benchmarks/Cat/A.calr"),
+                 ("tests/Calor.Evaluation/a.txt", "tests/Calor.Evaluation"),
+                 *[(p, p) for p in gate.INPUT_PATHS if p.endswith((".py", ".cs", ".csproj"))]]
+        self.assertEqual(14, len(cases))
+        base = self.f.git("rev-parse", "HEAD")
+        for path, named in cases:
+            with self.subTest(input=path):
+                # Each case starts from the same candidate, with main reset to it.
+                self.f.git("checkout", "-q", "-f", "main")
+                self.f.git("reset", "-q", "--hard", base)
+                self.f.git("push", "-q", "-f", "origin", "HEAD:refs/heads/main")
+                self._candidate_then_main_moves({path: f"changed on main after the candidate: {path}\n"})
+                text = self.assertRefused("B2-08")
+                self.assertIn(f"  B2-08 {named} at HEAD differs from", text)
+                self.assertEqual({"B2-08"}, set(re.findall(r"(?m)^  (B2-\d\d) ", text)),
+                                 "the candidate itself is sound; only freshness refuses")
+
+    def test_a_registered_pair_file_outside_the_corpus_directory_is_an_input(self) -> None:
+        self.f.write("samples/Z.calr", "z calor\n")
+        row = dict(self.f.registered[0], calorPath="samples/Z.calr", calorSha256=self.f.file_sha("samples/Z.calr"))
+        self.f.write_json(f"{gate.REGISTRATION}/pairs.json", {"pairs": [row] + self.f.registered[1:]})
+        self.f.commit_and_push("a registration naming a file elsewhere")
+        self.assertIn("samples/Z.calr", gate.input_paths(self.f.root))
+        self.f.write_json(f"{gate.REGISTRATION}/pairs.json", {"pairs": self.f.registered})
+        self.f.commit_and_push("restore")
+        self.assertNotIn("samples/Z.calr", gate.input_paths(self.f.root))
+
+    def test_a_generator_change_on_main_is_refused(self) -> None:
+        self._candidate_then_main_moves({"tests/Calor.Evaluation/Equivalence/PairResultsCommand.cs": "changed\n"})
+        self.assertIn("tests/Calor.Evaluation at HEAD differs", self.assertRefused("B2-08"))
+
+    def test_a_different_headline_published_on_main_after_the_candidate_is_refused(self) -> None:
+        self._candidate_then_main_moves({gate.HEADLINE: json.dumps({"headline": "newer"}) + "\n"})
+        self.assertIn("changed since the candidate and is not this run's headline", self.assertRefused("B2-07"))
+
+    def test_a_changed_headline_stamp_entry_on_main_is_refused(self) -> None:
+        index = {"publicationStamps": [{"path": gate.HEADLINE, "stampPointer": "/provenance/commit",
+                                        "measuredCommit": "0" * 40}]}
+        self._candidate_then_main_moves({gate.STAMP_INDEX: json.dumps(index) + "\n"})
+        self.assertIn("entry of", self.assertRefused("B2-07"))
+
+    def test_other_stamp_index_entries_on_main_do_not_block_or_change_the_bytes(self) -> None:
+        code, text = self.f.check()
+        self.assertEqual(0, code, text)
+        at_candidate = self._outputs()
+        self._clean()
+        index = {"publicationStamps": [{"path": "other.json", "stampPointer": "/commit", "measuredCommit": "1" * 40}]}
+        self._candidate_then_main_moves({gate.STAMP_INDEX: json.dumps(index) + "\n"})
+        code, text = self.f.check()
+        self.assertEqual(0, code, text)
+        self.assertEqual(at_candidate, self._outputs())
+
+    def test_two_runs_write_identical_bytes(self) -> None:
+        code, text = self.f.check()
+        self.assertEqual(0, code, text)
+        first = self._outputs()
+        code, text = self.f.check()  # second run in the same work tree, over the first run's outputs
+        self.assertEqual(0, code, text)
+        self.assertEqual(first, self._outputs())
+        self._clean()
+        code, text = self.f.check()
+        self.assertEqual(0, code, text)
+        self.assertEqual(first, self._outputs())
+
+    def test_the_bytes_depend_on_the_committed_stamp_index_not_the_work_tree(self) -> None:
+        code, text = self.f.check()
+        self.assertEqual(0, code, text)
+        first = self._outputs()
+        self.f.write_json(gate.STAMP_INDEX, {"publicationStamps": [{"path": "x", "stampPointer": "/y"}]})
+        code, text = self.f.check()
+        self.assertEqual(0, code, text)
+        self.assertEqual(first, self._outputs())
 
     def test_short_sha_provenance_is_refused(self) -> None:
         code, text = self.f.check(self.f.git("rev-parse", "--short", "HEAD"))
@@ -580,11 +695,21 @@ class WorkflowTests(unittest.TestCase):
                       WORKFLOW.read_text())
         # The workflow runs B1's C# validators, so they are gate inputs that must be fresh too.
         self.assertIn("BenchmarkResultsTests", step_script("Regenerate the B1 results with the registered generator (#1422)"))
-        self.assertIn("tests/Calor.Compiler.Tests/EvidenceContract", gate.FRESHNESS_PATHS)
+        # #1422 PR 2: the validator files are inputs one by one, not the whole directory, and every
+        # test class the workflow's filter runs is one of them.
+        self.assertNotIn(gate.VALIDATOR, gate.INPUT_PATHS)
+        regenerate = step_script("Regenerate the B1 results with the registered generator (#1422)")
+        for test_class in re.findall(r"FullyQualifiedName~(\w+)", regenerate):
+            with self.subTest(validator=test_class):
+                self.assertIn(f"{gate.VALIDATOR}/{test_class}.cs", gate.INPUT_PATHS)
         push_paths = WORKFLOW.read_text().split("  push:\n", 1)[1].split("\njobs:", 1)[0]
-        for path in gate.FRESHNESS_PATHS:
+        self.assertNotIn(f"'{gate.VALIDATOR}/**'", push_paths)
+        patterns = re.findall(r"(?m)^      - '([^']+)'$", push_paths)
+        for path in gate.INPUT_PATHS:
             with self.subTest(gate_input=path):
-                self.assertTrue(f"'{path}" in push_paths or f"'{path.rsplit('/', 1)[0]}/**'" in push_paths, path)
+                # GitHub glob: '**' crosses directories, '*' does not.
+                self.assertTrue(any(re.fullmatch(re.escape(p).replace(r"\*\*", ".*").replace(r"\*", "[^/]*"), probe)
+                                    for p in patterns for probe in (path, f"{path}/x")), path)
 
     def test_publication_steps_run_only_after_the_gate_succeeds(self) -> None:
         names = list(steps())
@@ -665,6 +790,15 @@ class RealPacketTests(unittest.TestCase):
         self.assertEqual({"EQUIVALENT": 17, "EXCLUDED-PRE-REGISTERED": 9, "NOT-EQUIVALENT": 192, "UNCLASSIFIED": 8},
                          results["byDisposition"])
         self.assertEqual([], amendments, "the B1 key is the registered one; no amendment is needed or cited")
+
+    def test_every_headline_input_exists(self) -> None:
+        """A renamed input would be absent at both the candidate and main and so never differ; it must
+        be renamed in INPUT_PATHS too. Every registered pair file is an input."""
+        paths = gate.input_paths(REPO_ROOT)
+        for path in paths:
+            with self.subTest(input=path):
+                self.assertTrue((REPO_ROOT / path).exists(), path)
+        self.assertEqual(len(gate.INPUT_PATHS) + 2 * 226, len(paths), "226 registered pairs, two files each")
 
     def test_a_committed_headline_is_the_projection_of_the_committed_packet(self) -> None:
         """However a headline reaches main, it must be what the gate writes from the packet."""

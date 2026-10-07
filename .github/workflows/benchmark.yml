@@ -44,7 +44,11 @@ on:
       # #1422: a change to any gate input re-runs the gate (and its cleanup).
       - 'docs/plans/evidence/b1-1276/**'
       - 'docs/plans/evidence/evidence-contract-1407/**'
-      - 'tests/Calor.Compiler.Tests/EvidenceContract/**'
+      # The B1 validator files only (INPUT_PATHS in the gate), not other EvidenceContract tests.
+      - 'tests/Calor.Compiler.Tests/EvidenceContract/Benchmark*.cs'
+      - 'tests/Calor.Compiler.Tests/EvidenceContract/EvidenceContractValidator.cs'
+      - 'tests/Calor.Compiler.Tests/EvidenceContract/EvidenceContractTests.cs'
+      - 'tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj'
       - 'scripts/benchmark_publication_gate.py'
 
 env:
