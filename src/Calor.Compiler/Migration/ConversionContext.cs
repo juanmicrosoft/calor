@@ -161,6 +161,24 @@ public sealed class ConversionLoss
     public required string Description { get; init; }
     public int? Line { get; init; }
     public string? File { get; init; }
+
+    /// <summary>
+    /// #1144: the path that produced this loss — <c>interop</c>, <c>rescue</c>,
+    /// <c>passthrough</c>, <c>lossy</c> or <c>dropped</c> (<see cref="ConversionPath"/>).
+    /// </summary>
+    public string Path
+    {
+        get => _path ?? ConversionPath.ForKind(Kind);
+        init => _path = value;
+    }
+    private readonly string? _path;
+
+    /// <summary>#1144: the failure that fired a rescue or passthrough (<see cref="ConversionTrigger"/>); null otherwise.</summary>
+    public string? Trigger { get; init; }
+
+    /// <summary>#1144: the option or default that made the rescue or passthrough reachable (<see cref="ConversionEnabledBy"/>); null otherwise.</summary>
+    public string? EnabledBy { get; init; }
+
     public bool IsSemanticLoss => Kind is ConversionLossKind.FallbackTodo
         or ConversionLossKind.Dropped
         or ConversionLossKind.PreprocessorStripped
@@ -171,7 +189,8 @@ public sealed class ConversionLoss
         var location = File != null
             ? $"{File}:{Line?.ToString() ?? "?"}"
             : Line.HasValue ? $"line {Line}" : "unknown location";
-        return $"[{Kind}] {location} [{Feature}] {Description}";
+        var path = Trigger != null ? $" [{Path}: {Trigger}]" : "";
+        return $"[{Kind}] {location} [{Feature}]{path} {Description}";
     }
 }
 
@@ -327,6 +346,9 @@ public sealed class ConversionContext
     /// <summary>When true, wraps unsupported constructs in §CSHARP blocks instead of emitting broken Calor.</summary>
     public bool PassthroughOnError { get; set; }
 
+    /// <summary>Mirrors <see cref="ConversionOptions.RescueUnusableMembers"/> so reports can name the default that applied (#1144).</summary>
+    public bool RescueUnusableMembers { get; set; }
+
     /// <summary>
     /// When true, the emitter elides the trailing <c>§/C</c> on zero-arg
     /// expression-context <c>§C</c> calls. RFC <c>v0.6-call-closer-elision</c>
@@ -393,13 +415,24 @@ public sealed class ConversionContext
     /// </summary>
     public void RecordLoss(ConversionLossKind kind, string feature, string description, int? line = null)
     {
+        RecordLoss(kind, feature, description, line, path: null, trigger: null, enabledBy: null);
+    }
+
+    /// <summary>Records a loss with explicit #1144 path provenance.</summary>
+    public void RecordLoss(
+        ConversionLossKind kind, string feature, string description, int? line,
+        string? path, string? trigger, string? enabledBy)
+    {
         _losses.Add(new ConversionLoss
         {
             Kind = kind,
             Feature = feature,
             Description = description.Length > 120 ? description[..117] + "..." : description,
             Line = line,
-            File = SourceFile
+            File = SourceFile,
+            Path = path!,
+            Trigger = trigger,
+            EnabledBy = enabledBy
         });
     }
 

@@ -271,6 +271,7 @@ public sealed class BatchTool : McpToolBase
                 ErrorCount = f.Issues.Count(i => i.Severity == ConversionIssueSeverity.Error),
                 WarningCount = f.Issues.Count(i => i.Severity == ConversionIssueSeverity.Warning),
                 CsharpBlockCount = CountCsharpBlocks(f.OutputPath),
+                ConversionPaths = f.ConversionPaths,
                 Issues = f.Issues
                     .Where(i => i.Severity is ConversionIssueSeverity.Error or ConversionIssueSeverity.Warning)
                     .Select(i => ConversionIssueEnvelope.Build(i, f.SourcePath))
@@ -788,6 +789,11 @@ public sealed class BatchTool : McpToolBase
 
         [JsonPropertyName("csharpBlockCount")]
         public int CsharpBlockCount { get; init; }
+
+        /// <summary>#1144: per-file path summary (outcome, per-path counts, triggers, options that applied).</summary>
+        [JsonPropertyName("conversionPaths")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public ConversionPathSummary? ConversionPaths { get; init; }
 
         /// <summary>Envelope schema v1.1 diagnostic entries (shared EnvelopeDiagnostic shape).</summary>
         [JsonPropertyName("issues")]

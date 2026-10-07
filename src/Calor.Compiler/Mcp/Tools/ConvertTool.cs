@@ -416,7 +416,7 @@ public sealed class ConvertTool : McpToolBase
                 Explanation = explanationOutput,
                 FeatureHints = featureHints.Count > 0 ? featureHints : null,
                 NativeFeaturesUsed = nativeFeaturesUsed.Count > 0 ? nativeFeaturesUsed : null,
-                LossSummary = ConversionLossSummaryOutput.From(result),
+                LossSummary = ConversionLossSummaryOutput.From(result, success),
                 Tip = "Use calor_help with feature='overview' to see all available Calor syntax before writing or editing .calr files."
             };
 
@@ -1172,7 +1172,7 @@ public sealed class ConvertTool : McpToolBase
             },
             DurationMs = (int)duration.TotalMilliseconds,
             FeatureHints = featureHints.Count > 0 ? featureHints : null,
-            LossSummary = ConversionLossSummaryOutput.From(result)
+            LossSummary = ConversionLossSummaryOutput.From(result, success)
         };
     }
 
@@ -1249,8 +1249,13 @@ public sealed class ConvertTool : McpToolBase
         [JsonPropertyName("locations")]
         public required List<ConversionLossLocationOutput> Locations { get; init; }
 
-        public static ConversionLossSummaryOutput From(ConversionResult result) => new()
+        /// <summary>#1144: per-path counts, triggers, outcome and the rescue/passthrough options that applied.</summary>
+        [JsonPropertyName("paths")]
+        public required ConversionPathSummary Paths { get; init; }
+
+        public static ConversionLossSummaryOutput From(ConversionResult result, bool success) => new()
         {
+            Paths = ConversionPathSummary.From(result, success),
             NativeConversions = result.NativeConversionCount,
             InteropPreservations = result.InteropPreservationCount,
             LossySubstitutions = result.LossySubstitutionCount,
@@ -1261,7 +1266,10 @@ public sealed class ConvertTool : McpToolBase
                 Feature = loss.Feature,
                 File = loss.File,
                 Line = loss.Line,
-                Description = loss.Description
+                Description = loss.Description,
+                Path = loss.Path,
+                Trigger = loss.Trigger,
+                EnabledBy = loss.EnabledBy
             }).ToList()
         };
     }
@@ -1284,6 +1292,18 @@ public sealed class ConvertTool : McpToolBase
 
         [JsonPropertyName("description")]
         public required string Description { get; init; }
+
+        /// <summary>#1144: interop | rescue | passthrough | lossy | dropped.</summary>
+        [JsonPropertyName("path")]
+        public required string Path { get; init; }
+
+        [JsonPropertyName("trigger")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Trigger { get; init; }
+
+        [JsonPropertyName("enabledBy")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? EnabledBy { get; init; }
     }
 
     private sealed class ExplanationOutput

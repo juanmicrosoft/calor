@@ -181,7 +181,11 @@
       ],
       "provisionalSize": "M",
       "readiness": {
-        "status": "NOT_STARTED"
+        "status": "IN_PROGRESS",
+        "branch": "milestone-0.25/f6-1144-conversion-reporting",
+        "evidence": "docs/plans/evidence/v0.25-f6-1144/surface-matrix.json",
+        "tests": "tests/Calor.Compiler.Tests/ConversionReporting/ConversionPathReportingTests.cs",
+        "note": "Implementation evidence only. Not READY: needs a #1423 candidate, approver review, and passed evidence per registered F6 case."
       }
     }
   ],

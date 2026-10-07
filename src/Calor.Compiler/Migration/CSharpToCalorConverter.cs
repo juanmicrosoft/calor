@@ -33,6 +33,9 @@ public sealed class ConversionResult
             or ConversionLossKind.PreprocessorStripped
             or ConversionLossKind.DirectiveRemoved);
     public int DropCount => Context.Losses.Count(loss => loss.Kind == ConversionLossKind.Dropped);
+
+    /// <summary>#1144: the paths this conversion took (native, interop, rescue, passthrough, lossy, refused).</summary>
+    public ConversionPathSummary Paths => ConversionPathSummary.From(this);
 }
 
 /// <summary>
@@ -1210,18 +1213,26 @@ public sealed class CSharpToCalorConverter
         // requireRoundTrip (review C1(b)): a member is "failed" when its emitted
         // Calor does not parse OR - when the whole output's round trip failed -
         // when the member alone does not survive the round trip.
-        bool MemberFailed(
+        // #1144: returns the trigger that fired for the member, or null when it is usable.
+        string? MemberFailed(
             IReadOnlyList<ClassDefinitionNode>? classes = null,
             IReadOnlyList<InterfaceDefinitionNode>? interfaces = null,
             IReadOnlyList<EnumDefinitionNode>? enums = null,
             IReadOnlyList<DelegateDefinitionNode>? delegates = null)
             => !MemberParsesCleanly(module, classes, interfaces, enums, delegates)
-               || (requireRoundTrip
-                   && !MemberRoundTripsCleanly(
-                       module, context, parseOptions, outputKind, cancellationToken,
-                       classes, interfaces, enums, delegates));
+                ? ConversionTrigger.ParseFailure
+                : requireRoundTrip
+                  && !MemberRoundTripsCleanly(
+                      module, context, parseOptions, outputKind, cancellationToken,
+                      classes, interfaces, enums, delegates)
+                    ? ConversionTrigger.RoundTripFailure
+                    : null;
 
-        var sources = CollectTopLevelTypeSources(root);
+        // #1144 (F6-REPORT-11): the visitor gives a global-namespace type the
+        // caller's ModuleName as its namespace identity, so the source side must
+        // use the same fallback or a custom module name disables the rescue.
+        var sources = CollectTopLevelTypeSources(root, context.ModuleName);
+        var triggers = new List<string>();
 
         var failedClasses = new List<ClassDefinitionNode>();
         var failedInterfaces = new List<InterfaceDefinitionNode>();
@@ -1232,11 +1243,12 @@ public sealed class CSharpToCalorConverter
 
         foreach (var cls in module.Classes)
         {
-            if (MemberFailed(classes: new[] { cls }) &&
+            if (MemberFailed(classes: new[] { cls }) is { } trigger &&
                 TryTakeSource(sources, "class", GetSymbolIdentity(cls, module), out var csharp))
             {
                 var interop = MakeFallbackInterop(csharp, cls);
                 interops.Add(interop);
+                triggers.Add(trigger);
                 replacements[cls] = interop;
                 failedClasses.Add(cls);
             }
@@ -1244,11 +1256,12 @@ public sealed class CSharpToCalorConverter
 
         foreach (var iface in module.Interfaces)
         {
-            if (MemberFailed(interfaces: new[] { iface }) &&
+            if (MemberFailed(interfaces: new[] { iface }) is { } trigger &&
                 TryTakeSource(sources, "interface", GetSymbolIdentity(iface, module), out var csharp))
             {
                 var interop = MakeFallbackInterop(csharp, iface);
                 interops.Add(interop);
+                triggers.Add(trigger);
                 replacements[iface] = interop;
                 failedInterfaces.Add(iface);
             }
@@ -1256,11 +1269,12 @@ public sealed class CSharpToCalorConverter
 
         foreach (var en in module.Enums)
         {
-            if (MemberFailed(enums: new[] { en }) &&
+            if (MemberFailed(enums: new[] { en }) is { } trigger &&
                 TryTakeSource(sources, "enum", GetSymbolIdentity(en, module), out var csharp))
             {
                 var interop = MakeFallbackInterop(csharp, en);
                 interops.Add(interop);
+                triggers.Add(trigger);
                 replacements[en] = interop;
                 failedEnums.Add(en);
             }
@@ -1268,11 +1282,12 @@ public sealed class CSharpToCalorConverter
 
         foreach (var del in module.Delegates)
         {
-            if (MemberFailed(delegates: new[] { del }) &&
+            if (MemberFailed(delegates: new[] { del }) is { } trigger &&
                 TryTakeSource(sources, "delegate", GetSymbolIdentity(del, module), out var csharp))
             {
                 var interop = MakeFallbackInterop(csharp, del);
                 interops.Add(interop);
+                triggers.Add(trigger);
                 replacements[del] = interop;
                 failedDelegates.Add(del);
             }
@@ -1285,10 +1300,12 @@ public sealed class CSharpToCalorConverter
 
         context.Stats.InteropBlocksEmitted += interops.Count;
         context.Stats.FallbackInteropBlocksEmitted += interops.Count;
-        foreach (var interop in interops)
+        for (var i = 0; i < interops.Count; i++)
         {
+            var (path, enabledBy) = RescueProvenance(triggers[i], context);
             context.RecordLoss(ConversionLossKind.InteropPreserved, "post-validation-fallback",
-                interop.Reason ?? "Member re-preserved as §CSHARP after emitted Calor failed to parse (#717)");
+                interops[i].Reason ?? "Member re-preserved as §CSHARP after emitted Calor failed to parse (#717)",
+                line: null, path, triggers[i], enabledBy);
         }
         var items = module.Items
             .Select(item => replacements.TryGetValue(item, out var replacement)
@@ -1313,6 +1330,25 @@ public sealed class CSharpToCalorConverter
             update.InteropBlocks = module.InteropBlocks.Concat(interops).ToList();
             update.Items = items;
         });
+    }
+
+    /// <summary>
+    /// #1144: which option made a #717 rescue reachable, and so whether it counts as
+    /// automatic rescue or as requested passthrough. Precedence when both
+    /// RescueUnusableMembers and PassthroughOnError are on: automatic rescue, because
+    /// it would have fired without the passthrough request.
+    /// </summary>
+    private static (string Path, string EnabledBy) RescueProvenance(string trigger, ConversionContext context)
+    {
+        if (trigger == ConversionTrigger.RoundTripFailure)
+            return context.RescueUnusableMembers
+                ? (ConversionPath.Rescue, ConversionEnabledBy.RescueUnusableMembers)
+                : (ConversionPath.Passthrough, ConversionEnabledBy.PassthroughOnError);
+        if (context.Fidelity == ConversionFidelity.Lossless)
+            return (ConversionPath.Rescue, ConversionEnabledBy.LosslessFidelity);
+        return context.Mode == ConversionMode.Interop
+            ? (ConversionPath.Rescue, ConversionEnabledBy.InteropMode)
+            : (ConversionPath.Passthrough, ConversionEnabledBy.PassthroughOnError);
     }
 
     /// <summary>Emits a module containing only the given member(s) and reports whether
@@ -1456,7 +1492,9 @@ public sealed class CSharpToCalorConverter
     /// identity. Several entries for one identity are legitimate partial
     /// declarations; same-named types in other namespaces have different keys.
     /// </summary>
-    private static Dictionary<string, List<TypeSource>> CollectTopLevelTypeSources(CompilationUnitSyntax root)
+    private static Dictionary<string, List<TypeSource>> CollectTopLevelTypeSources(
+        CompilationUnitSyntax root,
+        string? globalNamespaceIdentity)
     {
         var map = new Dictionary<string, List<TypeSource>>(StringComparer.Ordinal);
         foreach (var member in root.DescendantNodes()
@@ -1480,7 +1518,7 @@ public sealed class CSharpToCalorConverter
             }
 
             var isPartial = member.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword));
-            var identity = GetSyntaxTypeIdentity(member, name);
+            var identity = GetSyntaxTypeIdentity(member, name, globalNamespaceIdentity);
             var key = $"{kind}/{identity}";
             (map.TryGetValue(key, out var list) ? list : map[key] = new List<TypeSource>())
                 .Add(new TypeSource(isPartial, DeclarationSourceText(member)));
@@ -1561,7 +1599,8 @@ public sealed class CSharpToCalorConverter
 
     private static string GetSyntaxTypeIdentity(
         MemberDeclarationSyntax member,
-        string name)
+        string name,
+        string? globalNamespaceIdentity = null)
     {
         var namespaceIdentity = string.Join(
             ".",
@@ -1569,6 +1608,8 @@ public sealed class CSharpToCalorConverter
                 .OfType<BaseNamespaceDeclarationSyntax>()
                 .Select(item => item.Name.ToString().Replace("@", ""))
                 .Reverse());
+        if (namespaceIdentity.Length == 0)
+            namespaceIdentity = globalNamespaceIdentity ?? "";
         var arity = member switch
         {
             TypeDeclarationSyntax type => type.TypeParameterList?.Parameters.Count ?? 0,
@@ -1595,6 +1636,7 @@ public sealed class CSharpToCalorConverter
             Fidelity = _options.Fidelity,
             Mode = _options.Mode,
             PassthroughOnError = _options.PassthroughOnError,
+            RescueUnusableMembers = _options.RescueUnusableMembers,
             UseImplicitCallCloser = _options.UseImplicitCallCloser
         };
     }

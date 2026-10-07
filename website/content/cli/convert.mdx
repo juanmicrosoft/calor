@@ -84,6 +84,72 @@ default, without `--passthrough`, which widens it further. "Conversion
 successful" is printed only when there are no recorded losses and requested
 validation passed.
 
+### Which Path Preserved Each Member
+
+Each recorded loss names the **path** that produced it, and the **trigger** that
+fired when a rescue or passthrough did the work:
+
+| Path | Meaning |
+|:-----|:--------|
+| `interop` | The converter does not support this construct, so it kept the C#. No trigger. |
+| `rescue` | Automatic rescue. The member converted, but its Calor failed to parse (`parse-failure`) or failed to round-trip back to compiling C# (`round-trip-failure`), so the original C# was kept. You did not have to ask for it. |
+| `passthrough` | The C# was kept only because you asked for passthrough (`--passthrough`, or `passthroughOnError` in MCP). |
+| `lossy` / `dropped` | A substitution or removal that `--lossy` allowed. |
+
+`enabledBy` names the default or option that made a rescue possible:
+`lossless-fidelity` (parse failures are always rescued in the default lossless
+mode), `rescueUnusableMembers` (on by default in `calor convert`), or
+`passthroughOnError`. When both rescue and passthrough could have fired, the
+report says `rescue`, because the member would have been rescued without the
+flag. So on the command line `--passthrough` rarely changes the report; it
+matters mostly together with `--lossy`.
+
+Try it on a method whose last statement carries a label:
+
+```csharp
+// Counter.cs
+public class Counter
+{
+    public int Next(int x)
+    {
+        done:
+        return x + 1;
+    }
+}
+```
+
+```bash
+calor convert Counter.cs -o Counter.calr
+```
+
+```text
+Conversion completed with 1 interop preservation(s), 0 lossy substitution(s), and 0 drop(s) — output is not fully native Calor:
+  InteropPreserved: 1
+    Counter.cs:? [post-validation-fallback] [rescue: round-trip-failure] Converted Calor for 'global::Counter' did not parse or did not survive the C# round trip; original C# preserved (#717).
+  ⓘ 1 member preserved as §CSHARP interop block(s) — the output parses, but this C# still needs migrating.
+  Preservation paths: 1 by automatic rescue (round-trip-failure: 1; no passthrough request needed)
+```
+
+With `--format json`, every `data.losses[]` entry carries `path`, and `trigger`
+and `enabledBy` when they apply. `data.conversionPaths` summarizes the file:
+
+```json
+"conversionPaths": {
+  "schemaVersion": 1,
+  "outcome": "preserved",
+  "interop": 0, "rescue": 1, "passthrough": 0, "lossy": 0, "dropped": 0,
+  "triggers": { "round-trip-failure": 1 },
+  "rescueUnusableMembers": true,
+  "passthroughOnError": false
+}
+```
+
+`outcome` is `native`, `preserved`, `lossy`, or `refused`. A refused
+conversion writes nothing, exits `1`, and prints
+`Conversion refused; no output written (automatic rescue: on, --passthrough: off).`
+Before 0.25 the text said "via --passthrough fallback" for every rescue, even
+when you had not passed the flag.
+
 | C# Construct | Calor Equivalent |
 |:-------------|:----------------|
 | `namespace` | `§M{id:Name}` module |

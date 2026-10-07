@@ -504,6 +504,7 @@ public static class ConvertCommand
             envelope.Data.UnsupportedFeatureCount = explanation.TotalUnsupportedCount;
             var featureCounts = explanation.GetFeatureCounts();
             envelope.Data.FeatureCounts = featureCounts.Count > 0 ? featureCounts : null;
+            envelope.Data.ConversionPaths = result.Paths;
         }
 
         if (!result.Success)
@@ -530,6 +531,10 @@ public static class ConvertCommand
                     Console.Error.WriteLine($"  ⚠ {warning.Message}");
                 }
             }
+            // #1144: name the path taken (refused) and the defaults that applied.
+            Console.Error.WriteLine(
+                $"  Conversion refused; no output written (automatic rescue: {(result.Context.RescueUnusableMembers ? "on" : "off")}, " +
+                $"--passthrough: {(result.Context.PassthroughOnError ? "on" : "off")}).");
             return (1, result);
         }
 
@@ -558,6 +563,7 @@ public static class ConvertCommand
         if (validationErrors.Count > 0)
         {
             envelope?.Data.Success = false;
+            envelope?.Data.ConversionPaths = ConversionPathSummary.From(result, success: false);
             Console.Error.WriteLine($"Validation failed ({validationErrors.Count} error{(validationErrors.Count == 1 ? "" : "s")}):");
             foreach (var err in validationErrors.Take(5))
                 Console.Error.WriteLine($"  {err}");
@@ -580,6 +586,7 @@ public static class ConvertCommand
         {
             envelope?.AddCommandError($"Conversion timed out after {timeoutSeconds}s", inputPath);
             envelope?.Data.Success = false;
+            envelope?.Data.ConversionPaths = ConversionPathSummary.From(result, success: false);
             Console.Error.WriteLine($"Error: Conversion timed out after {timeoutSeconds}s");
             Console.Error.WriteLine("Destination was not modified.");
             return (1, result);
@@ -609,7 +616,8 @@ public static class ConvertCommand
                 foreach (var loss in group.Take(5))
                 {
                     var file = loss.File ?? Path.GetFileName(inputPath);
-                    statusOut.WriteLine($"    {file}:{loss.Line?.ToString() ?? "?"} [{loss.Feature}] {loss.Description}");
+                    var path = loss.Trigger != null ? $" [{loss.Path}: {loss.Trigger}]" : "";
+                    statusOut.WriteLine($"    {file}:{loss.Line?.ToString() ?? "?"} [{loss.Feature}]{path} {loss.Description}");
                 }
                 if (group.Count() > 5)
                     statusOut.WriteLine($"    ... and {group.Count() - 5} more");
@@ -620,17 +628,18 @@ public static class ConvertCommand
         // raw C# that still need migrating. Reported whenever present, NOT gated on
         // --passthrough: a file whose members were wrapped by the visitor (known-
         // unsupported features) carries the same "N raw-C# members" caveat and the notice
-        // is useful there too. When the #717 passthrough fallback rescued some, attribute
-        // that subset so the flag's effect is visible without over-claiming the rest.
+        // is useful there too. #1144: the path that preserved each one (automatic
+        // rescue, requested passthrough, converter interop) is reported from the loss
+        // ledger, never inferred from the flags — rescue fires without --passthrough.
         var interopCount = result.Context.Stats.InteropBlocksEmitted;
         if (interopCount > 0)
         {
-            var fallbackCount = result.Context.Stats.FallbackInteropBlocksEmitted;
-            var attribution = fallbackCount > 0 ? $" ({fallbackCount} via --passthrough fallback)" : "";
             statusOut.WriteLine(
                 $"  ⓘ {interopCount} member{(interopCount == 1 ? "" : "s")} preserved as §CSHARP interop " +
-                $"block(s){attribution} — the output parses, but this C# still needs migrating.");
+                "block(s) — the output parses, but this C# still needs migrating.");
         }
+        if (ConversionPathSummary.Describe(losses, "--passthrough") is { } pathLine)
+            statusOut.WriteLine($"  {pathLine}");
 
         // Show warnings
         var warnings = result.Issues.Where(i => i.Severity == ConversionIssueSeverity.Warning).ToList();
@@ -826,9 +835,13 @@ public static class ConvertCommand
                     Feature = l.Feature,
                     Line = l.Line,
                     File = l.File,
-                    Description = l.Description
+                    Description = l.Description,
+                    Path = l.Path,
+                    Trigger = l.Trigger,
+                    EnabledBy = l.EnabledBy
                 }).ToList()
                 : null;
+            Data.ConversionPaths = result.Paths;
         }
 
         public void SetBenchmark(FileMetrics metrics)
@@ -900,6 +913,9 @@ public static class ConvertCommand
         /// <summary>C# → Calor only: per-loss detail (kind, feature, file:line, description); absent when empty.</summary>
         public List<ConvertLossData>? Losses { get; set; }
 
+        /// <summary>C# → Calor only (#1144): per-file path summary — outcome, per-path counts, triggers, and the rescue/passthrough options that applied.</summary>
+        public ConversionPathSummary? ConversionPaths { get; set; }
+
         /// <summary>Present when <c>--benchmark</c> produced metrics.</summary>
         public ConvertBenchmarkData? Benchmark { get; set; }
     }
@@ -911,6 +927,11 @@ public static class ConvertCommand
         public int? Line { get; init; }
         public string? File { get; init; }
         public string Description { get; init; } = "";
+
+        /// <summary>#1144: interop | rescue | passthrough | lossy | dropped.</summary>
+        public string Path { get; init; } = "";
+        public string? Trigger { get; init; }
+        public string? EnabledBy { get; init; }
     }
 
     private sealed class ConvertBenchmarkData

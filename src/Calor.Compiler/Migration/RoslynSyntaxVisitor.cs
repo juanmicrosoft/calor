@@ -6785,13 +6785,25 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // to the verbatim preservation (#836 C1).
             _pendingStatements.Clear();
             _context.IncrementSkipped();
+            var (path, trigger, enabledBy) = StatementPreservationProvenance();
             _context.RecordLoss(ConversionLossKind.InteropPreserved,
                 ex is MemberInteropEscalationException esc ? esc.FeatureName : "conversion-error",
                 $"Statement preserved as raw C#: {TruncateForMessage(statement.ToString())}",
-                statement.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
+                statement.GetLocation().GetLineSpan().StartLinePosition.Line + 1,
+                path, trigger, enabledBy);
             return new RawCSharpNode(GetTextSpan(statement), statement.ToFullString());
         }
     }
+
+    /// <summary>
+    /// #1144: statement-level preservation is gated on ShouldPreserveCSharp. Under
+    /// lossy fidelity in standard mode only PassthroughOnError opens that gate, so the
+    /// preservation is a requested passthrough; otherwise it is converter interop.
+    /// </summary>
+    private (string? Path, string? Trigger, string? EnabledBy) StatementPreservationProvenance()
+        => _context.Fidelity == ConversionFidelity.Lossy && _context.Mode == ConversionMode.Standard
+            ? (ConversionPath.Passthrough, ConversionTrigger.UnsupportedConstruct, ConversionEnabledBy.PassthroughOnError)
+            : (null, null, null);
 
     private StatementNode? HandleUnsupportedStatement(StatementSyntax statement)
     {
@@ -6812,9 +6824,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // In Interop mode, preserve unsupported statements as raw C# passthrough
         if (_context.ShouldPreserveCSharp)
         {
+            var (path, trigger, enabledBy) = StatementPreservationProvenance();
             _context.RecordLoss(ConversionLossKind.InteropPreserved, featureName,
                 $"Statement preserved as raw C#: {TruncateForMessage(statement.ToString())}",
-                lineSpan.StartLinePosition.Line + 1);
+                lineSpan.StartLinePosition.Line + 1, path, trigger, enabledBy);
             return new RawCSharpNode(GetTextSpan(statement), statement.ToFullString());
         }
 
