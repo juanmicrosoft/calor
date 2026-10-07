@@ -81,6 +81,17 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+      # The bytes behind the hashes, kept briefly so a difference (here, or against
+      # hashes recorded on another machine) can be diagnosed entry by entry.
+      - name: Upload the first build's packages for diagnosis
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reproducible-packages-build-1
+          path: ${{ runner.temp }}/build-1/nupkg/*.nupkg
+          if-no-files-found: ignore
+          retention-days: 7
+
   website:
     runs-on: ubuntu-latest
     timeout-minutes: 30

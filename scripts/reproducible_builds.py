@@ -30,6 +30,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -54,11 +55,22 @@ BUILDS = (
              "SOURCE_DATE_EPOCH": "1700000000", "DeterministicTimestamp": "2025-02-03T00:00:00Z"}},
 )
 
-# What each target must produce. An empty or partial output is a failure, not a match.
+# What each target must produce. An empty, partial or hollow output is a failure, not a
+# match. (reproducible-build.sh also runs the publish job's own package inspections.)
 EXPECTED = {
-    "packages": {"packages": ("calor.", "Calor.Sdk."), "releaseMetadata": (".provenance.json", ".sbom.spdx.json")},
+    "packages": {
+        "packages": {
+            "calor.": ("calor.nuspec", "tools/net10.0/any/calor.dll", "tools/net10.0/any/DotnetToolSettings.xml",
+                       "tools/net10.0/any/Microsoft.Z3.dll"),
+            "Calor.Sdk.": ("Calor.Sdk.nuspec", "Sdk/Sdk.props", "Sdk/Sdk.targets", "tasks/net10.0/Calor.Tasks.dll",
+                           "tasks/net10.0/calor.dll", "tasks/net10.0/Microsoft.Z3.dll"),
+        },
+        "releaseMetadata": (".provenance.json", ".sbom.spdx.json"),
+    },
     "website": {"websiteFiles": ("index.html", "404.html", "sitemap.xml", "search-index.json")},
 }
+# Assets index.html loads; every one must be in the tree (a site without its scripts is hollow).
+NEXT_ASSET = re.compile(r'(?:src|href)="[^"]*?/(_next/static/[^"?#]+)"')
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -145,7 +157,10 @@ def hash_build(out: Path, toolchain: dict | None = None) -> dict:
     site = out / "website"
     if site.is_dir():
         files = {p.relative_to(site).as_posix(): sha256_file(p) for p in site.rglob("*") if p.is_file()}
-        result["website"] = {"treeSha256": tree_digest(site), "fileCount": len(files), "files": dict(sorted(files.items()))}
+        index = site / "index.html"
+        assets = sorted(set(NEXT_ASSET.findall(index.read_text(encoding="utf-8", errors="replace")))) if index.is_file() else []
+        result["website"] = {"treeSha256": tree_digest(site), "fileCount": len(files),
+                             "indexAssets": assets, "files": dict(sorted(files.items()))}
     return result
 
 
@@ -174,12 +189,15 @@ def inventory_problems(hashes: dict, target: str, label: str) -> list[str]:
     targets = ("packages", "website") if target == "all" else (target,)
     if "packages" in targets:
         names = list(hashes.get("packages", {}))
-        for prefix in EXPECTED["packages"]["packages"]:
-            if len([n for n in names if n.startswith(prefix) and n.endswith(".nupkg")]) != 1:
+        for prefix, required in EXPECTED["packages"]["packages"].items():
+            matches = [n for n in names if n.startswith(prefix) and n.endswith(".nupkg")]
+            if len(matches) != 1:
                 problems.append(f"{label}: expected exactly one {prefix}*.nupkg, got {sorted(names)}")
-        for name, pkg in hashes.get("packages", {}).items():
-            if not pkg.get("entries"):
-                problems.append(f"{label}: {name} has no entries")
+                continue
+            entries = hashes["packages"][matches[0]].get("entries") or {}
+            for entry in required:
+                if entry not in entries:
+                    problems.append(f"{label}: {matches[0]} has no {entry}")
         metadata = list(hashes.get("releaseMetadata", {}))
         for suffix in EXPECTED["packages"]["releaseMetadata"]:
             if len([n for n in metadata if n.endswith(suffix)]) != 1:
@@ -192,6 +210,12 @@ def inventory_problems(hashes: dict, target: str, label: str) -> list[str]:
         for required in EXPECTED["website"]["websiteFiles"]:
             if files and required not in files:
                 problems.append(f"{label}: the website output has no {required}")
+        assets = site.get("indexAssets") or []
+        if files and not any(a.endswith(".js") for a in assets):
+            problems.append(f"{label}: index.html loads no _next/static script")
+        for asset in assets:
+            if asset not in files:
+                problems.append(f"{label}: index.html loads {asset}, which the output lacks")
     return problems
 
 

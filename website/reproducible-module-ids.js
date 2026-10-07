@@ -1,24 +1,40 @@
 // Path-independent webpack module ids (reproducible publication builds).
 //
-// Next.js 14 names each client-entry module with a loader request whose query holds
-// URL-encoded ABSOLUTE paths (next-flight-client-entry-loader?modules=%7B%22request%22%3A
-// %22%2Fhome%2F...). webpack's deterministic module ids hash that identifier, and its
-// contextify step relativizes the resource but not the query, so the same commit built in
-// two directories gets different module ids, different chunk bytes and different chunk
-// file names. The release gate (#1410) compares the built tree's hash with the adjudicated
+// Next.js 14 names each client-entry module with a loader request whose query holds the
+// loader options JSON-stringified and then URL-encoded, with ABSOLUTE paths inside
+// (next-flight-client-entry-loader?modules=%7B%22request%22%3A%22%2Fhome%2F...).
+// webpack's deterministic module ids hash that identifier, and its contextify step
+// relativizes the resource but not the query, so the same commit built in two
+// directories gets different module ids, different chunk bytes and different chunk file
+// names. The release gate (#1410) compares the built tree's hash with the adjudicated
 // one, so the site must not depend on where it is checked out.
 //
 // This plugin runs before webpack's own DeterministicModuleIdsPlugin and assigns the
-// same kind of hash-derived numeric id, computed from the identifier with every form of
-// the repository root removed. webpack then finds every module already numbered.
+// same kind of hash-derived numeric id, computed from a canonical form of the
+// identifier in which the repository root is replaced by <root>. webpack then finds
+// every module already numbered.
 'use strict';
 
 const crypto = require('crypto');
 const fs = require('fs');
-const path = require('path');
 
 const NAME = 'CalorPathIndependentModuleIds';
 
+// Decode every run of %XX escapes (URL-encoded loader queries), then fold JSON-escaped
+// and native Windows separators to '/'. Lossy on purpose: only a hash input.
+function canonical(text) {
+  const decoded = text.replace(/(?:%[0-9A-Fa-f]{2})+/g, run => {
+    try {
+      return decodeURIComponent(run);
+    } catch {
+      return run;
+    }
+  });
+  // JSON escapes first ("\\" separator, \" quote), then native backslashes.
+  return decoded.replace(/\\\\/g, '/').replace(/\\"/g, '"').replace(/\\/g, '/');
+}
+
+// The checkout root as given and as its realpath, in canonical form, longest first.
 function rootForms(dir) {
   const roots = new Set([dir]);
   try {
@@ -26,27 +42,26 @@ function rootForms(dir) {
   } catch {
     // Keep the given path only.
   }
-  const forms = new Set();
-  for (const root of roots) {
-    const trimmed = root.replace(/[\\/]+$/, '');
-    // Both separator styles (Windows identifiers can mix them).
-    for (const sep of [trimmed, trimmed.replace(/\\/g, '/'), trimmed.replace(/\//g, '\\')]) {
-      // Raw, JSON-escaped (Next JSON-stringifies loader options), and each of those
-      // URL-encoded (it then URL-encodes the JSON into the loader query).
-      for (const text of [sep, JSON.stringify(sep).slice(1, -1)]) {
-        forms.add(text);
-        forms.add(encodeURIComponent(text));
-        forms.add(encodeURI(text));
-      }
-    }
-  }
-  // Longest first, so /private/tmp/x is removed before /tmp/x would be.
-  return [...forms].filter(Boolean).sort((a, b) => b.length - a.length);
+  return [...roots]
+    .map(root => canonical(root).replace(/\/+$/, ''))
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
 }
 
+const PATH_CHAR = 'A-Za-z0-9._~\\-';
+const escapeRegExp = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Replace the root only where it starts an absolute path: at the start of the text or
+// after a character that cannot be part of a path segment (a quote, '!', '?', '=', ...),
+// and only when a separator or a non-path character follows. So with a checkout at /app,
+// "/app/website/src/app/x.tsx" becomes "<root>/website/src/app/x.tsx" and the inner
+// "src/app" is left alone.
 function normalize(identifier, forms) {
-  let name = identifier;
-  for (const form of forms) name = name.split(form).join('<root>');
+  let name = canonical(identifier);
+  for (const form of forms) {
+    const pattern = new RegExp(`(^|[^${PATH_CHAR}/])${escapeRegExp(form)}(?=$|/|[^${PATH_CHAR}])`, 'g');
+    name = name.replace(pattern, '$1<root>');
+  }
   return name;
 }
 
@@ -86,4 +101,4 @@ class PathIndependentModuleIdsPlugin {
   }
 }
 
-module.exports = { PathIndependentModuleIdsPlugin, normalize, rootForms };
+module.exports = { PathIndependentModuleIdsPlugin, normalize, rootForms, canonical };

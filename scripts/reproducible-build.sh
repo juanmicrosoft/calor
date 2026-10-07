@@ -5,7 +5,8 @@
 #   scripts/reproducible-build.sh <tree> <out> [packages|website|all]
 #
 # packages: the publish-nuget.yml `publish` job's commands (locked restore, Release
-#           build, pack the CLI with --no-build, pack the SDK with every RID), then
+#           build, pack the CLI with --no-build, pack the SDK with every RID, the SDK
+#           content inspection and the packaged-Z3 checks), then
 #           scripts/generate-release-metadata.py with the tree's HEAD as the commit.
 # website:  the nextjs-gh-pages.yml build (npm ci, npm run build) copied to <out>/website.
 #
@@ -33,6 +34,7 @@ if [ "$what" != website ]; then
   dotnet build src/Calor.Compiler/Calor.Compiler.csproj -c Release --no-restore
   dotnet pack src/Calor.Compiler/Calor.Compiler.csproj -c Release --no-build -o "$out/nupkg"
   dotnet pack src/Calor.Sdk/Calor.Sdk.csproj -c Release -o "$out/nupkg" /p:CalorSdkRequireAllRids=true
+  bash .github/scripts/inspect-sdk-nupkg.sh "$(ls "$out"/nupkg/Calor.Sdk.*.nupkg)" --all-rids
   python3 scripts/check-packaged-z3.py "$out"/nupkg/calor.*.nupkg --prefix tools/net10.0/any --all-rids
   python3 scripts/check-packaged-z3.py "$out"/nupkg/Calor.Sdk.*.nupkg --prefix tasks/net10.0 --all-rids
   # Same arguments as the publish job; --repository is fixed so a clone's

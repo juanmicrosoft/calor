@@ -138,13 +138,33 @@ function ids(root, sep) {
   return modules.map(m => assigned.get(m));
 }
 process.stdout.write(JSON.stringify([ids('/tmp/check"out/calor', '/'),
-  ids('/tmp/other/deeper/calor', '/'), ids('C:\\work\\calor', '\\'), ids('D:\\a\\b c\\calor', '\\')]));
+  ids('/tmp/other/deeper/calor', '/'), ids('/app', '/'), ids('/website', '/'), ids('/src', '/'),
+  ids('C:\\work\\calor', '\\'), ids('D:\\a\\b c\\calor', '\\')]));
 """
-        a, b, win_a, win_b = run_node(script)
+        a, b, app, website, src, win_a, win_b = run_node(script)
         self.assertEqual(a, b)
+        # Roots that also occur inside repository-relative paths (src/app, /website/...).
+        self.assertEqual(a, app)
+        self.assertEqual(a, website)
+        self.assertEqual(a, src)
         # Windows roots: backslashes, JSON-escaped as \\ inside the URL-encoded loader query.
         self.assertEqual(win_a, win_b)
         self.assertEqual(4, len(set(a)), "distinct modules get distinct ids")
+
+    def test_only_a_leading_root_is_replaced(self) -> None:
+        script = r"""
+const m = require('./reproducible-module-ids');
+process.stdout.write(JSON.stringify([
+  m.normalize('/app/website/src/app/layout.tsx', m.rootForms('/app')),
+  m.normalize('loader.js?x=' + encodeURIComponent(JSON.stringify({ request: '/app/src/app' })) + '!/app/x',
+              m.rootForms('/app')),
+  m.normalize('/tmp/calor-other/x.js', m.rootForms('/tmp/calor')),
+]));
+"""
+        plain, query, sibling = run_node(script)
+        self.assertEqual("<root>/website/src/app/layout.tsx", plain)
+        self.assertEqual('loader.js?x={"request":"<root>/src/app"}!<root>/x', query)
+        self.assertEqual("/tmp/calor-other/x.js", sibling, "a sibling directory is not the root")
 
     def test_docs_walk_is_sorted(self) -> None:
         source = (REPO_ROOT / "website/src/lib/docs.ts").read_text(encoding="utf-8")
@@ -178,6 +198,8 @@ class WorkflowTests(unittest.TestCase):
             "dotnet pack src/Calor.Compiler/Calor.Compiler.csproj -c Release --no-build -o",
             "dotnet pack src/Calor.Sdk/Calor.Sdk.csproj -c Release -o",
             "/p:CalorSdkRequireAllRids=true",
+            "bash .github/scripts/inspect-sdk-nupkg.sh",
+            "python3 scripts/check-packaged-z3.py",
         ):
             with self.subTest(command=command):
                 self.assertIn(command, publish)
@@ -185,19 +207,26 @@ class WorkflowTests(unittest.TestCase):
 
 
 class CompareToolTests(unittest.TestCase):
-    def build(self, root: Path, stamp: tuple = STAMP, entry: bytes = b"dll", site: str = "<html>") -> Path:
-        """A complete output: both packages, both metadata files, the required site files."""
+    SCRIPT = "_next/static/chunks/app.js"
+
+    def build(self, root: Path, stamp: tuple = STAMP, entry: bytes = b"dll", site: str = "<html>",
+              drop: tuple = ()) -> Path:
+        """A complete output: both packages with their essential entries, both metadata files,
+        the required site files and the script index.html loads. `drop` removes entries."""
         (root / "nupkg").mkdir(parents=True)
-        for name in ("calor.1.0.0.nupkg", "Calor.Sdk.1.0.0.nupkg"):
-            with zipfile.ZipFile(root / "nupkg" / name, "w") as archive:
-                archive.writestr(zipfile.ZipInfo("lib/demo.dll", stamp), entry)
+        for prefix, required in rb.EXPECTED["packages"]["packages"].items():
+            with zipfile.ZipFile(root / "nupkg" / f"{prefix}1.0.0.nupkg", "w") as archive:
+                for name in ("lib/demo.dll", *required):
+                    if name not in drop:
+                        archive.writestr(zipfile.ZipInfo(name, stamp), entry)
         (root / "release-metadata").mkdir()
         for name in ("n.provenance.json", "n.sbom.spdx.json"):
             (root / "release-metadata" / name).write_text("{}", encoding="utf-8")
-        (root / "website/_next").mkdir(parents=True)
-        (root / "website/index.html").write_text(site, encoding="utf-8")
-        for name in ("404.html", "sitemap.xml", "search-index.json", "_next/app.js"):
-            (root / "website" / name).write_text(name, encoding="utf-8")
+        (root / "website/_next/static/chunks").mkdir(parents=True)
+        (root / "website/index.html").write_text(f'<script src="/calor/{self.SCRIPT}"></script>{site}', encoding="utf-8")
+        for name in ("404.html", "sitemap.xml", "search-index.json", self.SCRIPT):
+            if name not in drop:
+                (root / "website" / name).write_text(name, encoding="utf-8")
         return root
 
     def hashes(self, **kwargs) -> dict:
@@ -212,6 +241,7 @@ class CompareToolTests(unittest.TestCase):
         self.assertEqual(5, a["website"]["fileCount"])
 
     def test_zip_timestamp_alone_is_a_difference(self) -> None:
+        self.assertEqual([self.SCRIPT], self.hashes()["website"]["indexAssets"])
         problems = rb.compare(self.hashes(), self.hashes(stamp=(2026, 10, 7, 15, 19, 42)), "packages")
         self.assertTrue(any("nupkg/calor.1.0.0.nupkg!lib/demo.dll" in p for p in problems), problems)
         self.assertTrue(any(p.startswith("differs: nupkg/calor.1.0.0.nupkg:") for p in problems), problems)
@@ -225,8 +255,8 @@ class CompareToolTests(unittest.TestCase):
     def test_a_file_missing_on_one_side_fails(self) -> None:
         a = self.hashes()
         b = json.loads(json.dumps(a))
-        del b["website"]["files"]["_next/app.js"]
-        self.assertIn("only in A: website/_next/app.js", rb.compare(a, b, "website"))
+        del b["website"]["files"][self.SCRIPT]
+        self.assertIn(f"only in A: website/{self.SCRIPT}", rb.compare(a, b, "website"))
 
     def test_identical_but_empty_or_partial_outputs_fail(self) -> None:
         empty = {"packages": {}, "releaseMetadata": {}, "website": None}
@@ -239,6 +269,11 @@ class CompareToolTests(unittest.TestCase):
             empty_site = rb.hash_build(root)
         self.assertEqual(0, empty_site["website"]["fileCount"])
         self.assertIn("A: the website output is missing or empty", rb.compare(empty_site, empty_site, "website"))
+        hollow = self.hashes(drop=("Sdk/Sdk.props", "tools/net10.0/any/calor.dll", self.SCRIPT))
+        problems = rb.compare(hollow, hollow, "all")
+        for needle in ("Calor.Sdk.1.0.0.nupkg has no Sdk/Sdk.props", "calor.1.0.0.nupkg has no tools/net10.0/any/calor.dll",
+                       f"index.html loads {self.SCRIPT}, which the output lacks"):
+            self.assertTrue(any(needle in p for p in problems), (needle, problems))
         partial = self.hashes()
         del partial["packages"]["Calor.Sdk.1.0.0.nupkg"]
         del partial["releaseMetadata"]["n.provenance.json"]
