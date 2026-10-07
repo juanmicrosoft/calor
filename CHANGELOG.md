@@ -17,8 +17,9 @@ on every pull request, so a wrong website example now fails CI.
   other error or warning code, or if the text around the example does not name the code.
   Multi-file examples are compiled together with `group=`.
 - **Quoted compiler output is real or labelled.** A block marked `output` must match the
-  diagnostics the example above it produces. Output that is not checked is marked
-  `illustrative`. A block that looks like tool output and has neither label fails.
+  diagnostics the example above it produces. Output that is not checked, such as `calor query`
+  results and MCP responses, is marked `illustrative`, and the site now shows it as "Example
+  output (not checked)". A block that looks like tool output and has neither label fails.
 - **Diagnostic codes, keywords and versions.** Website pages now get the same checks as
   `docs/`: every cited `CalorNNNN` code exists, every `§` keyword exists, and no page
   hardcodes the current version. The changelog page is excluded because it records past
@@ -39,7 +40,10 @@ The new check found 11 website examples that did not compile. This change fixes 
 The 0.25 baseline counted 13 failures; the other 2 were method fragments (`§MT`), which are not
 complete programs. This change also fixes 5 stale keyword references in prose (`§FOREACH` twice,
 `§MATCH`, `§CAST`, `§WHILE`) and replaced
-an invented error format on the `compile` page with real, checked output. New findings use
+an invented error format on the `compile` page with real, checked output. The MCP walkthrough
+in the dependent-types tutorial showed a response its example could not produce; it now shows
+responses captured from the MCP server. The refinement-type pages now say that a default
+`calor` compile does not run the obligation solver (the `calor_refine` MCP tool does). New findings use
 `Calor1332`–`Calor1334`.
 
 ## [0.24.0] - 2026-10-07

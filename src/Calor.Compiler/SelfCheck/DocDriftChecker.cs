@@ -1023,14 +1023,23 @@ public static class WebsiteExampleChecker
 
     private static readonly HashSet<string> OutputLanguages = new(StringComparer.Ordinal) { "", "text", "console", "plaintext" };
 
+    // A JSON fence whose top-level keys are those of a CLI envelope or MCP tool response.
+    private static readonly Regex OutputShapedJson = new(
+        @"^\s*""(?:success|diagnostics|schemaVersion|suggestions|obligations|guards|patches|isError|decision)""\s*:",
+        RegexOptions.Compiled | RegexOptions.Multiline);
+
+    // A CommonMark fence opener: optional indentation and blockquote markers, then three or
+    // more backticks or tildes. The website's MDX parser renders all of these as code blocks.
+    private static readonly Regex FenceOpen = new(
+        @"^(?<indent> {0,3})(?<quote>(?:>\s?)*)(?<ws>\s*)(?<fence>`{3,}|~{3,})(?<info>[^`]*)$", RegexOptions.Compiled);
+
     /// <summary>A fenced block of an MDX page.</summary>
     public sealed record Fence(
         string Language,
         IReadOnlyList<string> Tokens,
         IReadOnlyList<string> Lines,
         int OpenLine,
-        int CloseLine,
-        bool Suppressed)
+        int CloseLine)
     {
         public int FirstContentLine => OpenLine + 1;
         public string Source => string.Join("\n", Lines) + "\n";
@@ -1062,27 +1071,65 @@ public static class WebsiteExampleChecker
     public static bool IsHistorical(string path) =>
         HistoricalExclusions.ContainsKey(Path.GetRelativePath(ContentRelativePath, path).Replace('\\', '/'));
 
-    /// <summary>Splits an MDX page into its fenced blocks (1-based line numbers).</summary>
+    /// <summary>
+    /// Splits an MDX page into its fenced blocks (1-based line numbers): backtick or tilde
+    /// fences of three or more characters, indented (e.g. inside a list or JSX element) or
+    /// inside a blockquote. Content lines lose the opener's indentation and quote markers.
+    /// </summary>
     public static List<Fence> ParseFences(string content)
     {
         var fences = new List<Fence>();
         var lines = content.Replace("\r\n", "\n").Split('\n');
         for (var i = 0; i < lines.Length; i++)
         {
-            var trimmed = lines[i].TrimStart();
-            if (!trimmed.StartsWith("```", StringComparison.Ordinal))
+            var open = FenceOpen.Match(lines[i].TrimStart().Length == lines[i].Length ? lines[i] : Dedent(lines[i]));
+            if (!open.Success)
                 continue;
-            var info = trimmed[3..].Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            var depth = open.Groups["quote"].Value.Count(c => c == '>');
+            var indent = lines[i].Length - lines[i].TrimStart().Length + open.Groups["ws"].Length;
+            var marker = open.Groups["fence"].Value;
+            var info = open.Groups["info"].Value.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
             var body = new List<string>();
             var close = i + 1;
-            while (close < lines.Length && !lines[close].TrimStart().StartsWith("```", StringComparison.Ordinal))
-                body.Add(lines[close++]);
-            var suppressed = i > 0 && IsSuppressionLine(lines[i - 1]);
+            while (close < lines.Length && !IsCloser(StripQuotes(lines[close], depth), marker))
+                body.Add(RemoveIndent(StripQuotes(lines[close++], depth), depth > 0 ? open.Groups["ws"].Length : indent));
             fences.Add(new Fence(info.Length > 0 ? info[0] : "", info.Skip(1).ToList(), body, i + 1,
-                Math.Min(close, lines.Length - 1) + 1, suppressed));
+                Math.Min(close, lines.Length - 1) + 1));
             i = close;
         }
         return fences;
+    }
+
+    // Fences nested in JSX or list items may be indented by more than three spaces; MDX
+    // still renders them as code, so the opener is matched after removing the indentation.
+    private static string Dedent(string line) => line.TrimStart();
+
+    private static bool IsCloser(string line, string marker)
+    {
+        var trimmed = line.Trim();
+        return trimmed.Length >= marker.Length && trimmed.All(c => c == marker[0]);
+    }
+
+    private static string StripQuotes(string line, int depth)
+    {
+        for (var d = 0; d < depth; d++)
+        {
+            var trimmed = line.TrimStart();
+            if (!trimmed.StartsWith('>'))
+                return line;
+            line = trimmed[1..];
+            if (line.StartsWith(' '))
+                line = line[1..];
+        }
+        return line;
+    }
+
+    private static string RemoveIndent(string line, int width)
+    {
+        var remove = 0;
+        while (remove < width && remove < line.Length && line[remove] == ' ')
+            remove++;
+        return line[remove..];
     }
 
     internal static bool IsSuppressionLine(string line) =>
@@ -1110,10 +1157,10 @@ public static class WebsiteExampleChecker
         var fences = ParseFences(page.Content);
         var programs = new List<Fence>();
 
+        // The drift:ignore marker exempts prose from the keyword and code scans only; it never
+        // exempts an executable example or quoted output from these checks.
         foreach (var fence in fences)
         {
-            if (fence.Suppressed)
-                continue;
             if (!ValidateAnnotations(page, fence, diagnostics))
                 continue;
             if (fence.IsCompleteProgram)
@@ -1132,6 +1179,21 @@ public static class WebsiteExampleChecker
             var unit = new Unit(members, Compile(page, members, diagnostics));
             foreach (var member in members)
                 units[member].Add(unit);
+
+            // A failing member can stop generated-C# validation for the whole group, which
+            // would hide errors in the others. Compile the positive members again without
+            // the negative ones; they must still compile.
+            var positives = members.Where(m => ExpectedCodes(m).Count == 0).ToList();
+            if (positives.Count > 0 && positives.Count < members.Count)
+            {
+                foreach (var (member, actual) in Compile(page, positives, diagnostics))
+                {
+                    foreach (var error in actual.Where(d => d.IsError))
+                        diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteExampleMismatch,
+                            $"Complete calor example does not compile without its group's negative examples: {error.Code}: {error.Message}",
+                            page.Path, member.FirstContentLine + Math.Max(error.Span.Line - 1, 0)));
+                }
+            }
         }
 
         foreach (var program in programs)
@@ -1145,7 +1207,7 @@ public static class WebsiteExampleChecker
                 CheckProgram(page, lines, fences, program, unit, diagnostics);
         }
 
-        foreach (var fence in fences.Where(f => !f.Suppressed && f.Language != "calor"))
+        foreach (var fence in fences.Where(f => f.Language != "calor"))
         {
             if (fence.Has("output"))
             {
@@ -1162,7 +1224,8 @@ public static class WebsiteExampleChecker
             {
                 coverage.IllustrativeOutputs++;
             }
-            else if (OutputLanguages.Contains(fence.Language) && OutputShaped.IsMatch(string.Join("\n", fence.Lines)))
+            else if ((OutputLanguages.Contains(fence.Language) && OutputShaped.IsMatch(string.Join("\n", fence.Lines)))
+                || (fence.Language == "json" && OutputShapedJson.IsMatch(string.Join("\n", fence.Lines))))
             {
                 diagnostics.Add(Finding(DiagnosticCode.DocDriftWebsiteOutputMismatch,
                     "Fence looks like tool output but is labelled neither `output` (checked against the preceding " +
@@ -1335,10 +1398,11 @@ public static class WebsiteExampleChecker
         // A checked `output` fence quoting this example's diagnostics is part of its claim,
         // even when a heading separates the two.
         var linkedOutputs = fences
-            .Where(f => f.Language != "calor" && f.Has("output") && !f.Suppressed
+            .Where(f => f.Language != "calor" && f.Has("output")
                 && fences.LastOrDefault(p => p.IsCompleteProgram && p.CloseLine < f.OpenLine) == program)
             .SelectMany(f => f.Lines);
-        var after = ProseAfter(lines, fences, program) + "\n" + string.Join("\n", linkedOutputs);
+        var prose = ProseAfter(lines, fences, program);
+        var after = prose + "\n" + string.Join("\n", linkedOutputs);
         foreach (var code in expected.Order(StringComparer.Ordinal))
         {
             if (!Regex.IsMatch(before + "\n" + after, $@"\b{code}\b"))
@@ -1347,7 +1411,7 @@ public static class WebsiteExampleChecker
                     page.Path, program.OpenLine));
         }
 
-        foreach (Match claim in LocationClaim.Matches(before))
+        foreach (Match claim in LocationClaim.Matches(before + "\n" + prose))
         {
             var line = int.Parse(claim.Groups["line"].Value);
             var column = int.Parse(claim.Groups["column"].Value);

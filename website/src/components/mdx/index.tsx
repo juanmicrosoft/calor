@@ -108,11 +108,13 @@ export const mdxComponents = {
     const codeElement = children as React.ReactElement<{
       className?: string;
       children?: string;
+      'data-illustrative'?: string;
     }>;
     if (codeElement?.props) {
       const { className, children: code } = codeElement.props;
       const language = className?.replace('language-', '') || 'text';
-      return <CodeBlock code={code || ''} language={language} />;
+      const illustrative = codeElement.props['data-illustrative'] === 'true';
+      return <CodeBlock code={code || ''} language={language} illustrative={illustrative} />;
     }
     return <pre {...props}>{children}</pre>;
   },

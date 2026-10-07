@@ -110,21 +110,25 @@ parameters is rejected with `Calor0202` (type mismatch).
     §O{i32}
     §Q (>= balance amount)                  // sufficient funds
 
-    §B{newBalance:i32} (- balance amount)
-    §PROOF{p1:balance-safe} (>= newBalance INT:0)
+    §PROOF{p1:balance-safe} (>= (- balance amount) INT:0)
 
-    §R newBalance
+    §R (- balance amount)
 ```
 
+The proof states its condition on the expression itself. The obligation solver does not
+yet track local bindings, so a proof about a `§B` name is reported `Unsupported`.
+
 ### Z3 Proves the Obligation
+
+A default `calor` compile does not run the obligation solver; it keeps every runtime guard.
+The `calor_refine` MCP tool (`action: "obligations"`) runs it.
 
 The obligation engine runs this verification:
 
 1. **Assume**: `balance >= 0` and `amount > 0` (from the parameter refinements), `balance >= amount` (precondition)
-2. **Compute**: `newBalance = balance - amount`
-3. **Check**: Is `newBalance >= 0`?
+2. **Check**: Is `balance - amount >= 0`?
 
-Z3 proves it: given `balance >= amount` and `amount > 0`, then `balance - amount >= 0`. The proof obligation is **discharged** — no runtime guard needed.
+Z3 proves it: given `balance >= amount`, then `balance - amount >= 0`. The proof obligation is **discharged**.
 
 ### When Z3 Finds a Counterexample
 
@@ -137,13 +141,13 @@ Remove the precondition:
   §O{i32}
   // No §Q — missing sufficient funds check!
 
-  §B{newBalance:i32} (- balance amount)
-  §PROOF{p1:balance-safe} (>= newBalance INT:0)
+  §PROOF{p1:balance-safe} (>= (- balance amount) INT:0)
 
-  §R newBalance
+  §R (- balance amount)
 ```
 
-Z3 finds: `balance = 0, amount = 1 → newBalance = -1`. The obligation **fails** with a concrete counterexample. With the default policy, this is a compilation error.
+Z3 finds a counterexample: any `amount` larger than `balance`. The obligation **fails**, and
+`calor_refine` reports the concrete values. With the default policy, it is reported as an error.
 
 ### The Fix Cycle
 
@@ -168,12 +172,6 @@ An agent has written code with unconstrained parameters:
     §O{i32}
     §R (/ a b)
 
-  §F{f002:IndexArray:pub}
-    §I{i32:index}
-    §I{i32:size}
-    §O{i32}
-    §R index
-
 ```
 
 ### Step 1: Discover Missing Refinements
@@ -186,35 +184,29 @@ The agent calls `calor_refine` with `action: "types"`:
 }
 ```
 
+The responses below were captured from the MCP server for this example. CI does not re-run
+them, so they are labelled as example output.
+
 Response:
 
-```json
+```json illustrative
 {
   "success": true,
   "suggestions": [
     {
       "function_id": "f001",
       "parameter_name": "b",
-      "current_type": "i32",
+      "current_type": "INT",
       "suggested_predicate": "(!= # INT:0)",
-      "reason": "used_as_divisor",
+      "reason": "'b' is used as a divisor without a non-zero constraint",
       "confidence": "high",
-      "calor_syntax": "§I{i32:b} | (!= # INT:0)"
-    },
-    {
-      "function_id": "f002",
-      "parameter_name": "index",
-      "current_type": "i32",
-      "suggested_predicate": "(>= # INT:0)",
-      "reason": "used_as_index",
-      "confidence": "high",
-      "calor_syntax": "§I{i32:index} | (>= # INT:0)"
+      "calor_syntax": "§I{INT:b} | (!= # INT:0)"
     }
   ]
 }
 ```
 
-The tool analyzed the function bodies and detected that `b` is used as a divisor (must be non-zero) and `index` is used as an array index (must be non-negative).
+The tool analyzed the function body and detected that `b` is used as a divisor, so it must be non-zero.
 
 ### Step 2: Add Refinements and Check Obligations
 
@@ -223,41 +215,42 @@ The agent applies the suggestions and calls `calor_refine` with
 
 ```json
 {
-  "source": "§M{Calculator}\n§F{Divide:pub}\n  §I{i32:a}\n  §I{i32:b} | (!= # INT:0)\n  §O{i32}\n  §R (/ a b)\n..."
+  "source": "§M{m001:Calculator}\n  §F{f001:Divide:pub}\n    §I{i32:a}\n    §I{i32:b} | (!= # INT:0)\n    §O{i32}\n    §R (/ a b)\n"
 }
 ```
 
 Response:
 
-```json
+```json illustrative
 {
   "success": true,
   "summary": {
-    "total": 2,
+    "total": 1,
     "discharged": 0,
     "failed": 0,
-    "boundary": 2
+    "timeout": 0,
+    "assumed": 0,
+    "boundary": 1,
+    "pending": 0,
+    "unsupported": 0
   },
   "obligations": [
     {
       "id": "obl_0",
       "kind": "RefinementEntry",
       "function_id": "f001",
-      "description": "b must satisfy (!= # INT:0)",
-      "status": "Boundary"
-    },
-    {
-      "id": "obl_1",
-      "kind": "RefinementEntry",
-      "function_id": "f002",
-      "description": "index must satisfy (>= # INT:0)",
-      "status": "Boundary"
+      "description": "Parameter 'b' must satisfy inline refinement",
+      "status": "Boundary",
+      "line": 5,
+      "column": 5,
+      "suggested_fix": "Add runtime guard: if (!(b satisfies predicate)) throw"
     }
-  ]
+  ],
+  "compilationErrors": []
 }
 ```
 
-Both are `Boundary` — the functions are public, so the compiler can't verify what callers pass. Runtime guards will be emitted automatically.
+The obligation is `Boundary`: the function is public, so the compiler can't verify what callers pass. A runtime guard is emitted automatically.
 
 ### Step 3: Discover Guards for Failed Obligations
 
@@ -273,13 +266,13 @@ If the agent had private functions with failed obligations, it would call
 
 Response:
 
-```json
+```json illustrative
 {
   "success": true,
   "guards": [
     {
       "obligation_id": "obl_0",
-      "description": "Add precondition requiring b != 0",
+      "description": "Add precondition requiring 'b' satisfies the refinement",
       "calor_expression": "§Q (!= b INT:0)",
       "insertion_kind": "precondition",
       "confidence": "high",
@@ -287,8 +280,8 @@ Response:
     },
     {
       "obligation_id": "obl_0",
-      "description": "Add if-guard returning error",
-      "calor_expression": "§IF{g1} (== b INT:0) → §R (err \"division by zero\")",
+      "description": "Add runtime guard at function entry for 'b'",
+      "calor_expression": "§IF{g1} (! (!= b INT:0)) → §R (err \"Refinement violated: b\")",
       "insertion_kind": "if_guard",
       "confidence": "medium"
     }
@@ -312,14 +305,16 @@ For the full repair loop in a single call, the agent uses `calor_refine` with
 
 Response:
 
-```json
+```json illustrative
 {
   "success": true,
   "policy": "default",
   "summary": {
-    "total": 2,
+    "total": 1,
     "discharged": 0,
-    "boundary": 2
+    "failed": 0,
+    "timeout": 0,
+    "boundary": 1
   },
   "patches": [
     {
@@ -328,11 +323,22 @@ Response:
       "policy_action": "AlwaysGuard",
       "patch_kind": "precondition",
       "calor_code": "§Q (!= b INT:0)",
-      "description": "Add precondition for b",
+      "description": "Add precondition requiring 'b' satisfies the refinement",
       "confidence": "high",
       "discharges_obligations": ["obl_0"]
+    },
+    {
+      "obligation_id": "obl_0",
+      "obligation_status": "Boundary",
+      "policy_action": "AlwaysGuard",
+      "patch_kind": "if_guard",
+      "calor_code": "§IF{g1} (! (!= b INT:0)) → §R (err \"Refinement violated: b\")",
+      "description": "Add runtime guard at function entry for 'b'",
+      "confidence": "medium",
+      "discharges_obligations": ["obl_0"]
     }
-  ]
+  ],
+  "compilation_errors": []
 }
 ```
 

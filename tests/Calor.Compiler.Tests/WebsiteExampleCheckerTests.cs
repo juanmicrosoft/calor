@@ -151,6 +151,11 @@ public sealed class WebsiteExampleCheckerTests
         var wrongPlace = Assert.Single(Check("### Calor0200\n\nRejected: `x` on line 4, column 12.\n\n" + Fence("calor expect=Calor0200", UndefinedVariable)));
         Assert.Equal(DiagnosticCode.DocDriftWebsiteAnnotation, wrongPlace.Code);
         Assert.Contains("line 4, column 12", wrongPlace.Message);
+
+        // A claim after the fence is checked too (review round 1, finding 7).
+        Assert.Empty(Check(Fence("calor expect=Calor0200", UndefinedVariable) + "\nCalor0200 occurs on line 4, column 11.\n"));
+        var after = Assert.Single(Check(Fence("calor expect=Calor0200", UndefinedVariable) + "\nCalor0200 occurs on line 99, column 99.\n"));
+        Assert.Contains("line 99, column 99", after.Message);
     }
 
     [Fact]
@@ -219,9 +224,67 @@ public sealed class WebsiteExampleCheckerTests
     }
 
     [Fact]
-    public void MdxSuppressionMarkerExemptsTheNextFence()
+    public void SuppressionMarkerNeverExemptsAnExampleOrItsOutput()
     {
-        Assert.Empty(Check(WebsiteExampleChecker.MdxSuppressionMarker + "\n" + Fence("calor", UndefinedVariable)));
+        // drift:ignore is for meta-notation in prose; executable examples and quoted output
+        // are always checked (review round 1, finding 3).
+        Assert.Contains(Check(WebsiteExampleChecker.MdxSuppressionMarker + "\n" + Fence("calor", UndefinedVariable)),
+            f => f.Code == DiagnosticCode.DocDriftWebsiteExampleMismatch);
+        Assert.Contains(Check(WebsiteExampleChecker.MdxSuppressionMarker + "\n```\nerror Calor0410: x\n```\n"),
+            f => f.Code == DiagnosticCode.DocDriftWebsiteOutputMismatch);
+    }
+
+    [Theory]
+    [InlineData("~~~calor\n{0}\n~~~\n")]
+    [InlineData("````calor\n{0}\n````\n")]
+    [InlineData("> ```calor\n> {1}\n> ```\n")]
+    [InlineData("<Tabs>\n      ```calor\n      {1}\n      ```\n</Tabs>\n")]
+    [InlineData("1. Step one:\n\n   ```calor\n   {1}\n   ```\n")]
+    public void FenceVariantsThatMdxRendersAreChecked(string template)
+    {
+        // Tilde, longer, blockquoted and indented fences all render as code; none may bypass the check.
+        var indented = template.Contains("<Tabs>") ? "      " : template.StartsWith("1.") ? "   " : "> ";
+        var body = string.Join("\n" + indented, UndefinedVariable.Replace("\r\n", "\n").Split('\n'));
+        var page = template.Replace("{0}", UndefinedVariable).Replace("{1}", body);
+        var finding = Assert.Single(Check(page));
+        Assert.Equal(DiagnosticCode.DocDriftWebsiteExampleMismatch, finding.Code);
+        Assert.Contains("Calor0200", finding.Message);
+        Assert.Empty(Check(page.Replace("(+ x 1)", "(+ value 1)")));
+    }
+
+    [Fact]
+    public void NegativeGroupMemberCannotHideAnotherMembersErrors()
+    {
+        // A lexer failure in the negative member stops generated-C# validation for the whole
+        // group; the positive member must still be validated on its own (review round 1, finding 2).
+        const string page = """
+            ```calor group=g
+            §M{m001:Orders}
+              §F{f001:Save:pub} () -> void
+                §E{db:w}
+                §C{DbContext.SaveChanges} §/C
+            ```
+
+            This one fails with Calor0002.
+
+            ```calor group=g expect=Calor0002
+            §M{m002:Broken}
+              §F{f001:Run:pub} () -> void
+                §E{cw}
+                §P "unterminated
+            ```
+            """;
+        Assert.Contains(Check(page), f => f.Code == DiagnosticCode.DocDriftWebsiteExampleMismatch && f.Message.Contains("Calor1002"));
+    }
+
+    [Fact]
+    public void JsonResponseFence_MustBeLabelled()
+    {
+        var response = "```json\n{\n  \"success\": true,\n  \"suggestions\": []\n}\n```\n";
+        Assert.Equal(DiagnosticCode.DocDriftWebsiteOutputMismatch, Assert.Single(Check(response)).Code);
+        Assert.Empty(Check(response.Replace("```json\n", "```json illustrative\n")));
+        // Configuration files are not output.
+        Assert.Empty(Check("```json\n{\n  \"sdk\": { \"version\": \"10.0.100\" }\n}\n```\n"));
     }
 
     // --- Repository wiring ---
@@ -292,7 +355,7 @@ public sealed class WebsiteExampleCheckerTests
             $"grouped={coverage.GroupedPrograms} checkedOutputs={coverage.CheckedOutputs} illustrative={coverage.IllustrativeOutputs}");
     }
 
-    private const string Pinned = "pages=96 complete=49 negative=5 grouped=3 checkedOutputs=2 illustrative=24";
+    private const string Pinned = "pages=96 complete=49 negative=5 grouped=3 checkedOutputs=2 illustrative=32";
 
     [Theory]
     [InlineData("guides/nullability-and-dotnet-interop.mdx", "```calor expect=Calor0272\n", "```calor\n")]

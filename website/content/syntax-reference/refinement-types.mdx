@@ -241,17 +241,21 @@ parameters is rejected with `Calor0202` (type mismatch).
     §O{i32}
     §Q (>= balance amount)                  // sufficient funds
 
-    §B{result:i32} (- balance amount)
-    §PROOF{p1:balance-safe} (>= result INT:0)
+    §PROOF{p1:balance-safe} (>= (- balance amount) INT:0)
 
-    §R result
+    §R (- balance amount)
 ```
+
+The proof states its condition on the expression itself. The obligation solver does not
+yet track local bindings, so a proof about a `§B` name is reported `Unsupported`.
+A default `calor` compile does not run the obligation solver; it keeps every runtime guard.
+The `calor_refine` MCP tool (`action: "obligations"`) runs it.
 
 The obligation engine:
 1. Creates `Boundary` obligations for `balance` and `amount` (public function)
 2. Creates a `ProofObligation` for `p1`
 3. Z3 proves `p1`: given `balance >= 0`, `amount > 0`, and `balance >= amount`, then `balance - amount >= 0`
-4. Emitted C#: runtime guards for the public boundary parameters, and `// PROVEN: proof obligation [p1: balance-safe]` in place of the `p1` guard (the default since 0.15; `--keep-proven-guards` emits the `p1` guard too)
+4. Emitted C#: a default `calor` compile does not solve obligations, so it emits runtime guards for `balance`, `amount` and `p1`. The emitter writes `// PROVEN: proof obligation [p1: balance-safe]` in place of the `p1` guard only when the obligation was discharged in that same compilation (`--keep-proven-guards` keeps the guard even then)
 
 ---
 
