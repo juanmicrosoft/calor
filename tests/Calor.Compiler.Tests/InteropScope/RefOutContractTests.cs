@@ -20,7 +20,7 @@ namespace Calor.Compiler.Tests.InteropScope;
 public class RefOutContractTests
 {
     /// <summary>SHA-256 over the 1.0.0 rules and case denominator. Changing either needs an amendment and a new pin.</summary>
-    private const string FrozenSeal = "b56c32340289e1933c25cba0890bb8b440cd97bdca0dd9da9160398cbbd742da";
+    private const string FrozenSeal = "449bb7720355696e25ea0c6aa8c849f1bbe6c417d6175393d7e45f0f5003158a";
 
     [Fact]
     public void CommittedContractPasses()
@@ -34,6 +34,40 @@ public class RefOutContractTests
     {
         var seal = RefOutContractValidator.Seal(Contract());
         Assert.True(seal == FrozenSeal, $"rules or cases changed (seal {seal}); record an amendment and re-pin");
+    }
+
+    [Fact]
+    public void VacuousWitnessSubstitutionPassesTheValidatorButBreaksTheSeal()
+    {
+        // Round-1 review: a case whose source no longer passes anything by reference, with a mutant that
+        // still "changes" the output, satisfies D003/D006; only the seal catches it.
+        var contract = Contract();
+        var c = Case(contract, "D1-CS-02");
+        c["source"] = new JsonArray("public static class Probe { public static string Run() { return \"9\"; } }");
+        c["mutants"] = new JsonArray(new JsonObject { ["kind"] = "copy", ["find"] = "return \"9\";", ["replace"] = "return \"0\";" });
+        Assert.Empty(Run(contract));
+        Assert.NotEqual(FrozenSeal, RefOutContractValidator.Seal(contract));
+    }
+
+    [Fact]
+    public void ObservationUpdatesDoNotChangeTheSeal()
+    {
+        var contract = Contract();
+        Case(contract, "D1-EFF-01")["observed"] = new JsonObject { ["errors"] = new JsonArray("Calor0410") };
+        Case(contract, "D1-EFF-01")["status"] = "holds";
+        contract["diagnostics"]![0]!["code"] = "Calor0299";
+        Assert.Empty(Run(contract));
+        Assert.Equal(FrozenSeal, RefOutContractValidator.Seal(contract));
+    }
+
+    [Fact]
+    public void AllocatedSymbolResolvesToItsCode()
+    {
+        var contract = Contract();
+        contract["diagnostics"]![0]!["code"] = "Calor0299";
+        Case(contract, "D1-LV-01")["observed"] = new JsonObject { ["errors"] = new JsonArray("Calor0299") };
+        Case(contract, "D1-LV-01")["status"] = "holds";
+        Assert.Empty(Run(contract));
     }
 
     public static IEnumerable<object[]> NegativeControls => Negatives.Keys.Select(k => new object[] { k });
@@ -91,6 +125,11 @@ public class RefOutContractTests
         ["status disagrees with observation"] = ("D008", c => Case(c, "D1-EFF-01")["status"] = "holds"),
         ["version without amendment"] = ("D009", c => c["contractVersion"] = "1.1.0"),
         ["independence claim"] = ("D010", c => Case(c, "D1-LV-01")["note"] = "Independently reviewed."),
+        ["allocated code outside the range"] = ("D007", c => c["diagnostics"]![0]!["code"] = "Calor0999"),
+        ["proof status weakened to timeout"] = ("D008", c =>
+        {
+            Case(c, "D1-ANA-02")["observed"] = new JsonObject { ["errors"] = new JsonArray(), ["proof"] = "Timeout" };
+        }),
     };
 
     private static IReadOnlyList<ContractViolation> Run(JsonNode contract)
@@ -127,17 +166,29 @@ public class RefOutContractCaseTests
     {
         var contract = RefOutContractTests.Contract();
         var c = Find(contract, id);
-        var source = string.Join("\n", contract["preludes"]![c["prelude"]!.GetValue<string>()]!.AsArray().Select(l => l!.GetValue<string>())
-            .Concat(c["source"]!.AsArray().Select(l => l!.GetValue<string>()))) + "\n";
+        var source = string.Join("\n", c["source"]!.AsArray().Select(l => l!.GetValue<string>()).Prepend(Prelude(contract, c))) + "\n";
         var verify = c["verify"]?.GetValue<bool>() == true;
         if (verify) Assert.True(Z3ContextFactory.IsAvailable, "proof cases need Z3");
-        var options = new CompilationOptions
+        var cacheDir = c["warmup"] is null ? null : Directory.CreateTempSubdirectory("refout-cache-").FullName;
+        CompilationOptions Options() => new()
         {
             VerifyContracts = verify,
             VerifyRefinements = verify,
             ContractMode = verify ? ContractMode.Debug : new CompilationOptions().ContractMode,
-            VerificationCacheOptions = new VerificationCacheOptions { Enabled = false },
+            VerificationCacheOptions = cacheDir is null
+                ? new VerificationCacheOptions { Enabled = false }
+                : new VerificationCacheOptions { Enabled = true, CacheDirectory = cacheDir },
         };
+        if (c["warmup"] is JsonArray warm)
+        {
+            // RO-ANA-4: the same body passing `§A y` by value first, into the same cache directory.
+            var warmOptions = Options();
+            var warmSource = string.Join("\n", warm.Select(l => l!.GetValue<string>()).Prepend(Prelude(contract, c))) + "\n";
+            Assert.False(Program.Compile(warmSource, id + ".warmup.calr", warmOptions).HasErrors);
+            Assert.Equal(ObligationStatus.Discharged,
+                Assert.Single(warmOptions.ObligationResults!.Obligations, o => o.Kind == ObligationKind.ProofObligation).Status);
+        }
+        var options = Options();
         var result = Program.Compile(source, id + ".calr", options);
         var errors = result.Diagnostics.Where(d => d.IsError).Select(d => d.Code).Distinct().OrderBy(x => x, StringComparer.Ordinal).ToList();
         var observed = c["observed"]!;
@@ -146,6 +197,13 @@ public class RefOutContractCaseTests
         {
             var status = Assert.Single(options.ObligationResults!.Obligations, o => o.Kind == ObligationKind.ProofObligation).Status;
             Assert.Equal(proof.GetValue<string>(), status.ToString());
+            // RO-ANA-3: an Unsupported obligation is visible (Calor1124) and keeps its runtime guard.
+            const string guard = "Proof obligation [pr1] violated";
+            if (status == ObligationStatus.Unsupported)
+            {
+                Assert.Contains(result.Diagnostics, d => d.Code == "Calor1124");
+                Assert.Contains(guard, result.GeneratedCode);
+            }
         }
         if (errors.Count == 0 && c["status"]!.GetValue<string>() == "holds" && c["expected"]?["emits"] is JsonArray emits)
         {
@@ -193,6 +251,9 @@ public class RefOutContractCaseTests
             context.Unload();
         }
     }
+
+    private static string Prelude(JsonNode contract, JsonNode c)
+        => string.Join("\n", contract["preludes"]![c["prelude"]!.GetValue<string>()]!.AsArray().Select(l => l!.GetValue<string>()));
 
     private static IEnumerable<object[]> Ids(string kind) => RefOutContractTests.Contract()["cases"]!.AsArray()
         .Where(c => c!["kind"]!.GetValue<string>() == kind).Select(c => new object[] { c!["id"]!.GetValue<string>() });

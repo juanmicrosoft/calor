@@ -36,11 +36,11 @@ internal static class RefOutContractValidator
     /// <summary>Operand and call shapes that must each have at least one registered case.</summary>
     public static readonly string[] RequiredShapes =
     [
-        "aliased-parameter", "array-element", "bare-field", "computed-expression", "constructor-argument",
-        "delegate-by-ref", "discard", "expression-call", "flow-attribute", "generic-type-payload", "immutable-binding",
-        "in-argument", "in-omitted", "in-parameter", "literal", "local", "loop-condition", "loop-variable",
+        "alias-narrowing", "aliased-parameter", "array-element", "bare-field", "computed-expression", "constructor-argument",
+        "delegate-by-ref", "discard", "discard-collision", "expression-call", "flow-attribute", "generic-type-payload", "immutable-binding",
+        "in-argument", "in-extension", "in-omitted", "in-parameter", "indexer-argument", "literal", "local", "loop-condition", "loop-variable",
         "method-generic", "missing-modifier", "modifier-text", "named-argument", "narrowing", "nullable-annotation",
-        "out-var", "overload-by-modifier", "parameter", "preserved-csharp", "property", "readonly-field",
+        "out-var", "out-var-loop-header", "overload-by-modifier", "parameter", "preserved-csharp", "property", "readonly-field", "readonly-field-ctor",
         "receiver-field", "ref-extension", "ref-local", "same-storage-twice", "short-circuit", "span-indexer",
         "static-field", "struct-element", "struct-element-field", "struct-local-field", "wrong-modifier",
     ];
@@ -122,7 +122,7 @@ internal static class RefOutContractValidator
                 case "calor":
                     if (Str(c?["prelude"]) is not { } p || preludes?[p] is null) Fail("D003", id, "unknown prelude");
                     if (Arr(c?["source"]).Count() == 0) Fail("D003", id, "no source");
-                    ValidateCalorExpectation(c!, id, In, Fail);
+                    ValidateCalorExpectation(c!, id, In, Fail, SymbolCodes(contract));
                     break;
                 case "csharp":
                 case "r0-fixture":
@@ -196,6 +196,8 @@ internal static class RefOutContractValidator
         {
             if (Str(d?["range"]) is not { } range || !range.StartsWith("Calor02", StringComparison.Ordinal) || Int(d?["allocatedBy"]) != 943)
                 Fail("D007", Str(d?["symbol"]) ?? "", "diagnostic symbol needs a Calor02xx range and #943 as allocator");
+            if (d?["code"] is not null && !(Str(d["code"]) is { } allocated && Regex.IsMatch(allocated, "^Calor02\\d\\d$")))
+                Fail("D007", Str(d?["symbol"]) ?? "", "an allocated code must be a Calor02xx code");
         }
         foreach (var c in cases.Where(c => Str(c?["kind"]) == "calor" && Str(c?["expected"]?["outcome"]) == "rejected"))
         {
@@ -225,7 +227,13 @@ internal static class RefOutContractValidator
         return v;
     }
 
-    private static void ValidateCalorExpectation(JsonNode c, string id, Func<string, string?, bool> In, Action<string, string, string> Fail)
+    /// <summary>Registered diagnostic symbols mapped to their allocated code, or to null before #943 allocates one.</summary>
+    public static Dictionary<string, string?> SymbolCodes(JsonNode contract)
+        => Arr(contract["diagnostics"]).Where(d => Str(d?["symbol"]) != null)
+            .ToDictionary(d => Str(d!["symbol"])!, d => Str(d!["code"]));
+
+    private static void ValidateCalorExpectation(JsonNode c, string id, Func<string, string?, bool> In, Action<string, string, string> Fail,
+        IReadOnlyDictionary<string, string?> symbolCodes)
     {
         // D008: the recorded status must agree with the observation.
         var expected = c["expected"];
@@ -238,7 +246,8 @@ internal static class RefOutContractValidator
         var errors = Arr(observed?["errors"]).Select(Str).ToList();
         bool meets = outcome == "accepted"
             ? errors.Count == 0 && ProofMeets(Str(expected?["proof"]), Str(observed?["proof"]))
-            : errors.Contains(Str(expected?["diagnostic"]));
+            : Str(expected?["diagnostic"]) is { } diag
+              && errors.Contains(symbolCodes.TryGetValue(diag, out var code) ? code ?? diag : diag);
         if (meets != (Str(c["status"]) == "holds"))
             Fail("D008", id, $"status '{Str(c["status"])}' disagrees with the observation");
     }
@@ -247,7 +256,7 @@ internal static class RefOutContractValidator
     {
         null => true,
         "discharged" => observed == "Discharged",
-        "not-discharged" => observed is not null && observed != "Discharged" && observed != "Failed",
+        "unsupported" => observed == "Unsupported",
         _ => false,
     };
 
@@ -282,17 +291,28 @@ internal static class RefOutContractValidator
         return count;
     }
 
-    /// <summary>SHA-256 over the frozen case denominator (ids and tracked fields); the tests pin it.</summary>
+    /// <summary>
+    /// SHA-256 over everything the contract freezes: rules, preludes, required shapes, diagnostics (without
+    /// the allocated code) and every case field except `observed` and `status`, which #943 updates as
+    /// behavior changes. Sources, mutants, expectations and notes are all sealed. The tests pin it.
+    /// </summary>
     public static string Seal(JsonNode contract)
     {
-        var rows = Arr(contract["cases"]).Select(c => string.Join("\u001f",
-                Str(c?["id"]), Str(c?["area"]), Str(c?["shape"]), Str(c?["polarity"]), Str(c?["kind"]),
-                string.Join(",", Arr(c?["rules"]).Select(Str)), Str(c?["conversion"]),
-                Str(c?["expected"]?["outcome"]), Str(c?["expected"]?["diagnostic"]), Str(c?["expected"]?["proof"]),
-                Str(c?["expectedOutput"])))
-            .OrderBy(r => r, StringComparer.Ordinal);
-        var ruleRows = Arr(contract["rules"]).Select(r => Str(r?["id"]) + "\u001f" + Str(r?["text"])).OrderBy(r => r, StringComparer.Ordinal);
-        return Sha(Encoding.UTF8.GetBytes(string.Join("\n", rows.Concat(ruleRows))));
+        var frozen = new JsonObject
+        {
+            ["rules"] = contract["rules"]?.DeepClone(),
+            ["preludes"] = contract["preludes"]?.DeepClone(),
+            ["requiredShapes"] = contract["requiredShapes"]?.DeepClone(),
+            ["diagnostics"] = contract["diagnostics"]?.DeepClone(),
+            ["cases"] = contract["cases"]?.DeepClone(),
+        };
+        foreach (var d in Arr(frozen["diagnostics"]).OfType<JsonObject>()) d.Remove("code");
+        foreach (var c in Arr(frozen["cases"]).OfType<JsonObject>())
+        {
+            c.Remove("observed");
+            c.Remove("status");
+        }
+        return Sha(Encoding.UTF8.GetBytes(frozen.ToJsonString()));
     }
 
     public static string Sha(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
