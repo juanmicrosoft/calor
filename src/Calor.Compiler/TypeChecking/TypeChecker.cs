@@ -4087,6 +4087,15 @@ public sealed class TypeChecker
             return PrimitiveType.Float;
         }
 
+        // decimal op (decimal | integer | char) is decimal in C#. Falling through to Int typed
+        // `decimal + decimal` as i32, which let `§B{x:i32} (+ a b)` pass the checker (and fail in
+        // Roslyn) and let a nested `(+ (+ a b) someDouble)` dodge the decimal/float check above.
+        // Reached far more often once named decimal refinements stopped being rejected (#1515).
+        if (leftType.Equals(PrimitiveType.Decimal) || rightType.Equals(PrimitiveType.Decimal))
+        {
+            return PrimitiveType.Decimal;
+        }
+
         return PrimitiveType.Int;
     }
 

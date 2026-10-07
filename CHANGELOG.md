@@ -16,6 +16,10 @@ All notable changes to this project will be documented in this file.
   back into a refined variable or return is still checked: you get the same verification
   obligation and runtime guard as with an inline refinement. Binding a plain base value with
   `§B{x:NatInt}` is still rejected by the type checker, as before.
+- **`decimal` arithmetic result type.** The type checker typed `decimal + decimal` as `i32`. It
+  now types it as `decimal`, as C# does. So `§B{x:i32} (+ a b)` with `decimal` operands is now a
+  type error (`Calor0202`) instead of a failure in the generated C#. A nested mix such as
+  `(+ (+ a b) f)` with an `f64` operand is now rejected like the direct `decimal + f64` case.
 
 ## [0.24.0] - 2026-10-07
 

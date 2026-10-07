@@ -21,11 +21,12 @@ namespace Calor.Compiler.Tests.Analysis;
 /// </summary>
 public class NamedRefinementArithmeticTests
 {
+    // Generated-output validation stays ON: an accepted program must also compile as C#, so a
+    // test cannot pass on a program the checker accepts but Roslyn rejects.
     private static CompilationResult Check(string source)
         => Program.Compile(source, "t.calr", new CompilationOptions
         {
             EnableTypeChecking = true,
-            DeferGeneratedOutputValidation = true,
         });
 
     private static void AssertNoErrors(string source)
@@ -39,6 +40,14 @@ public class NamedRefinementArithmeticTests
     {
         "f64" or "f32" => "(> # FLOAT:0.0)",
         _ => "(>= # INT:0)",
+    };
+
+    /// <summary>The C# result type of a binary arithmetic operator on two values of this base:
+    /// sub-int widths promote to int (C# 12.4.7).</summary>
+    private static string ResultOf(string baseType) => baseType switch
+    {
+        "i16" or "u8" => "i32",
+        _ => baseType,
     };
 
     public static TheoryData<string, string> OperatorsByBase()
@@ -59,7 +68,7 @@ public class NamedRefinementArithmeticTests
         AssertNoErrors($"""
             §M{"{"}m:R{"}"}
               §RTYPE{"{"}r1:Nat:{baseType}{"}"} {Predicate(baseType)}
-              §F{"{"}f1:Op:pub{"}"} (Nat:a, Nat:b) -> {baseType}
+              §F{"{"}f1:Op:pub{"}"} (Nat:a, Nat:b) -> {ResultOf(baseType)}
                 §R ({op} a b)
             """);
     }
@@ -71,7 +80,7 @@ public class NamedRefinementArithmeticTests
         AssertNoErrors($"""
             §M{"{"}m:R{"}"}
               §RTYPE{"{"}r1:Nat:{baseType}{"}"} {Predicate(baseType)}
-              §F{"{"}f1:Op:pub{"}"} (Nat:a, {baseType}:b) -> {baseType}
+              §F{"{"}f1:Op:pub{"}"} (Nat:a, {baseType}:b) -> {ResultOf(baseType)}
                 §R ({op} b a)
             """);
     }
@@ -144,6 +153,33 @@ public class NamedRefinementArithmeticTests
             """);
     }
 
+    /// <summary>
+    /// Pins the unary RESULT type. Before #1515 unary minus on a named refinement silently
+    /// returned the error type, which is assignable anywhere, so the refined bind below was
+    /// accepted. Now the result is the base type, and binding it into the refinement is rejected
+    /// exactly like binding any other base value.
+    /// </summary>
+    [Fact]
+    public void UnaryMinus_ResultIsTheBaseType_NotTheRefinementNorAnErrorType()
+    {
+        var result = Check("""
+            §M{m:R}
+              §RTYPE{r1:Nat:i32} (>= # INT:0)
+              §RTYPE{r2:Pos:f64} (> # FLOAT:0.0)
+              §F{f1:Neg:pub} (Nat:a) -> i32
+                §B{y:Nat} (- a)
+                §R y
+              §F{f2:NegF:pub} (Pos:x) -> i32
+                §B{z:i32} (- x)
+                §R z
+            """);
+
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Message.Contains("Cannot assign i32 to variable of type i32{#i32}"));
+        Assert.Contains(result.Diagnostics.Errors,
+            d => d.Message.Contains("Cannot assign f64 to variable of type i32"));
+    }
+
     [Theory]
     [InlineData("==")]
     [InlineData("!=")]
@@ -153,6 +189,8 @@ public class NamedRefinementArithmeticTests
     [InlineData(">=")]
     public void Comparison_OnNamedRefinements_TypeChecksAsBool(string op)
     {
+        // Bare comparisons already returned bool before #1515 without looking at operand types;
+        // the last comparison compares arithmetic RESULTS, which is what the fix enables.
         AssertNoErrors($"""
             §M{"{"}m:R{"}"}
               §RTYPE{"{"}r1:Nat:i32{"}"} (>= # INT:0)
@@ -162,7 +200,7 @@ public class NamedRefinementArithmeticTests
                 §B{"{"}p:bool{"}"} ({op} a b)
                 §B{"{"}q:bool{"}"} ({op} a c)
                 §B{"{"}r:bool{"}"} ({op} x a)
-                §R (&& p (&& q (|| r ({op} a INT:3))))
+                §R (&& p (&& q (|| r ({op} (+ a b) (* x INT:2)))))
             """);
     }
 
@@ -256,6 +294,38 @@ public class NamedRefinementArithmeticTests
     }
 
     [Fact]
+    public void DecimalRefinementArithmetic_IsDecimal()
+    {
+        AssertNoErrors("""
+            §M{m:R}
+              §RTYPE{r1:Money:decimal} (>= # INT:0)
+              §F{f1:Sum:pub} (Money:a, Money:b) -> decimal
+                §B{boxed:Option<decimal>} §SM (+ a b)
+                §B{total:decimal} (* (+ a b) INT:2)
+                §R total
+            """);
+
+        var narrowed = Check("""
+            §M{m:R}
+              §RTYPE{r1:Money:decimal} (>= # INT:0)
+              §F{f1:Sum:pub} (Money:a, Money:b) -> i32
+                §B{x:i32} (+ a b)
+                §R x
+            """);
+        Assert.Contains(narrowed.Diagnostics.Errors, d => d.Code == DiagnosticCode.TypeMismatch
+            && d.Message.Contains("Cannot assign decimal to variable of type i32"));
+
+        var nested = Check("""
+            §M{m:R}
+              §RTYPE{r1:Money:decimal} (>= # INT:0)
+              §F{f1:Mix:pub} (Money:a, Money:b, f64:f) -> decimal
+                §R (+ (+ a b) f)
+            """);
+        Assert.Contains(nested.Diagnostics.Errors,
+            d => d.Message.Contains("Cannot mix decimal and f64 in arithmetic"));
+    }
+
+    [Fact]
     public void NonNumericRefinement_IsStillRejectedInArithmetic()
     {
         var result = Check("""
@@ -303,6 +373,10 @@ public class NamedRefinementArithmeticTests
           §F{f7:Step:pub} (Nat:a) -> i32
             §B{~x:Nat} a
             §ASSIGN x (- x INT:5)
+            §R x
+          §F{f8:Dec:pub} (Nat:a) -> i32
+            §B{~x:Nat} a
+            (dec x)
             §R x
         """;
 
@@ -369,6 +443,11 @@ public class NamedRefinementArithmeticTests
         var asg = Assert.Throws<TargetInvocationException>(() => Invoke(assembly, "Step", 2));
         Assert.IsType<ArgumentOutOfRangeException>(asg.InnerException);
         Assert.Contains("Nat", asg.InnerException!.Message);
+
+        // Decrement of a Nat-typed mutable is guarded as well.
+        Assert.Equal(2, Invoke(assembly, "Dec", 3));
+        var dec = Assert.Throws<TargetInvocationException>(() => Invoke(assembly, "Dec", 0));
+        Assert.IsType<ArgumentOutOfRangeException>(dec.InnerException);
     }
 
     [Fact]
@@ -447,6 +526,12 @@ public class NamedRefinementArithmeticTests
 
         Assert.Equal(StatusOf("i1"), StatusOf("n1"));
         Assert.Equal(StatusOf("i2"), StatusOf("n2"));
+        // a = 0 is a counterexample to a - 5 >= 0, so it must never be discharged. (Today the
+        // solver reports assignment obligations on parameters as Unsupported, for named and
+        // inline refinements alike; either way the runtime guard is kept.)
         Assert.NotEqual(ObligationStatus.Discharged, StatusOf("n1"));
+        Assert.NotEqual(ObligationStatus.Discharged, StatusOf("n2"));
+        // Both named-refinement assignment guards are emitted.
+        Assert.Equal(2, CountOccurrences(result.GeneratedCode, "Value violates refinement type 'Nat'"));
     }
 }
