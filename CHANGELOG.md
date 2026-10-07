@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **C# iterator properties and indexers no longer convert to illegal Calor (#1139).** A getter
+  that uses `yield return` or `yield break` is a C# *iterator accessor*. Calor has none:
+  `§YIELD` inside a `§GET` is error `Calor0209`. The converter used to emit exactly that. Only
+  the CLI's post-conversion rescue hid it; the MCP `calor_convert` tool and the library API
+  returned Calor that failed to compile. Now the converter keeps the whole member as a
+  `§CSHARP` block and reports an `iterator-accessor` loss. The output is the same on
+  `calor convert`, `calor migrate`, MCP `calor_convert` and the library, with or without
+  passthrough, and it compiles with default options. Laziness, `finally` on dispose, and
+  exception timing match the original in 2 of 2 registered fixtures on 6 surfaces (3 CLI, 3
+  MCP). With `--no-fallback` the conversion fails and names the feature. Iterator methods
+  still convert natively to `§YIELD`. See "Iterator Properties and Indexers" on the
+  `calor convert` docs page.
+- **C# 13 partial properties and indexers are preserved instead of breaking the build.** Calor
+  has no partial members, so a defining declaration such as `public partial int Q { get; }`
+  used to become a second, auto-implemented property (C# error `CS0102`). The converter now
+  keeps every `partial` property or indexer declaration as `§CSHARP` and reports a
+  `partial-property` loss, or `iterator-accessor` when any part in the same file yields. Parts
+  split across files are each preserved, but only parts in the same file share the
+  `iterator-accessor` label.
+
 ## [0.24.0] - 2026-10-07
 
 Calor 0.24 is a soundness release. It repairs verifier defects found by a registered soundness

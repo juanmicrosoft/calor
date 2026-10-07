@@ -155,7 +155,10 @@
       ],
       "provisionalSize": "S-M",
       "readiness": {
-        "status": "NOT_STARTED"
+        "status": "IN_PROGRESS",
+        "branch": "milestone-0.25/f4-1139-iterator-accessors",
+        "evidence": "docs/plans/evidence/v0.25-f4-1139/README.md",
+        "note": "Converter preserves iterator accessors as §CSHARP on every surface without rescue. READY is left to the maintainer (A1 era): needs candidate commit, per-case evidence with requirementSha256, approver, and #1423/#1426 blocker references. F4-ITER-04 stays not-measured."
       }
     },
     {
