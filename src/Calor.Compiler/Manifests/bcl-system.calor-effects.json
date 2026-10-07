@@ -110,7 +110,10 @@
         "GetValue": [],
         "SetValue": ["mut"],
         "CopyTo": ["mut"],
-        "Initialize": ["mut"]
+        "Initialize": ["mut"],
+        "Clone": ["alloc"],
+        "GetEnumerator": ["alloc"],
+        "ToString": ["alloc"]
       },
       "getters": {
         "Length": [],

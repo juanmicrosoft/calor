@@ -246,6 +246,87 @@ public class ArrayExpressionConversionTests
         }
         """;
 
+    // Codex round 1 reproductions that must stay native: an inline array argument before
+    // a hoisted constructor argument; postfix in an element; a computed size after a
+    // plain one; constructor arguments inside an element; written sizes behind an empty
+    // level; an implicitly typed array of calls; jagged and rectangular-of-jagged
+    // creation; fresh (not shared) empty arrays; a nested sized array.
+    private const string Shapes = """
+        public class Cell
+        {
+            public int N;
+
+            public Cell(int n)
+            {
+                N = n;
+            }
+
+            public Cell(int a, int b)
+            {
+                N = a * 10 + b;
+            }
+        }
+
+        public static class L
+        {
+            public static string log = "";
+            public static int x = 0;
+            public static int n = 1;
+
+            public static int S(int v)
+            {
+                log = log + v;
+                return v;
+            }
+
+            public static int Bump()
+            {
+                x = x + 1;
+                return x;
+            }
+
+            public static int Next()
+            {
+                n = n + 1;
+                return n;
+            }
+
+            public static int Use(int[] a, Cell c)
+            {
+                return a.Length + c.N;
+            }
+        }
+
+        public static class Probe
+        {
+            static int[][] Make(bool f)
+            {
+                return f ? new int[][] { new int[L.n + 1], new int[L.S(6)] } : new int[][] { new int[L.S(7)] };
+            }
+
+            public static string Run()
+            {
+                int u = L.Use(new int[] { L.S(1) }, new Cell(L.S(2)));
+                int y = 0;
+                int[] b = { y, y++, y };
+                var d = new int[L.n, L.Next()];
+                Cell[] cs = { new Cell(L.x, L.Bump()) };
+                var e1 = new int[0, 3] { };
+                var e2 = new int[2, 0, 3] { { }, { } };
+                var imp = new[] { L.S(3), L.S(4) };
+                var jag = new int[2][];
+                var mj = new int[,][] { { new int[] { 7 } } };
+                bool fresh = new int[0] == new int[0];
+                int[] empty = { };
+                var nested = new int[][] { new int[0], new int[2] };
+                var made = Make(true);
+                return u + "|" + b[0] + b[1] + b[2] + "|" + d.GetLength(0) + d.GetLength(1) + made[0].Length + made[1].Length
+                    + "|" + cs[0].N + "|" + e1.GetLength(1) + e2.GetLength(2) + "|" + (imp is int[]) + "|" + jag.Length + mj[0, 0][0]
+                    + "|" + fresh + empty.Length + nested[1].Length + "|" + L.log;
+            }
+        }
+        """;
+
     public static TheoryData<string, string, Surface> Rows()
     {
         var data = new TheoryData<string, string, Surface>();
@@ -258,6 +339,7 @@ public class ArrayExpressionConversionTests
             data.Add("F5-ARRAY-05", "3|4|3|9|b|6", surface);
             data.Add("ordering", "0,1,1,1,2,2|3,3|2,4|FalseTrue2|12,12|7,3,3,22|6,boom|n1n2n3234t1t2340013454567671", surface);
             data.Add("placement", "3,11,36,357|123456", surface);
+            data.Add("shapes", "3|001|1236|1|33|True|27|False02|12346", surface);
         }
         return data;
     }
@@ -310,6 +392,28 @@ public class ArrayExpressionConversionTests
         var context = new ConversionContext { OriginalSource = "int arr001 = 0; var _hoist000 = arr002;" };
         Assert.Equal("arr003", context.GenerateId("arr"));
         Assert.True(context.IsReservedName("_hoist000"));
+
+        // Codex round 1: a name spelled only with an escape inside an interpolation hole,
+        // or only in another file of the project (a base-class field), is reserved too.
+        const string probe = """
+            public class Probe2 : Base
+            {
+                static int S() { return 1; }
+
+                public string Go()
+                {
+                    int[] a = { S(), 2 };
+                    int[] b = { a[0], S() };
+                    return $"{_hoist001}" + a[0] + b.Length + _hoist002;
+                }
+            }
+            """;
+        var baseTree = CSharpSyntaxTree.ParseText("public class Base { public int _hoist000 = 99; public int _hoist001 = 98; public int _hoist002 = 97; }");
+        var escaped = new CSharpToCalorConverter(new ConversionOptions { AdditionalSemanticSyntaxTrees = [baseTree], ValidateRoundTripCSharp = false })
+            .Convert(probe);
+        Assert.True(escaped.Success, string.Join("\n", escaped.Issues));
+        Assert.DoesNotMatch(@"§B\{~_hoist00[012]\}", escaped.CalorSource!);
+        Assert.Matches(@"§B\{~_hoist003\}", escaped.CalorSource!);
     }
 
     [Fact]
@@ -325,9 +429,9 @@ public class ArrayExpressionConversionTests
     [Fact]
     public void UnsupportedShapes_ArePreservedWithAReport_AndRunLikeTheOriginal()
     {
-        // Negative controls: a size with a call in a ?: branch and an assignment used as
-        // an element in a ?: branch cannot be written in place natively; each is
-        // preserved as C# with a named loss, never hoisted out of the branch.
+        // Negative controls: a size with a call in a ?: branch, and an assignment used as
+        // an array element or an index, cannot be written in place natively; each is
+        // preserved as C# with a named loss, never hoisted or evaluated twice.
         const string source = """
             public static class L
             {
@@ -338,6 +442,14 @@ public class ArrayExpressionConversionTests
                     log = log + v;
                     return v;
                 }
+
+                public static int Bump()
+                {
+                    x = x + 1;
+                    return x;
+                }
+
+                public static int x = 0;
             }
 
             public static class Probe
@@ -348,18 +460,23 @@ public class ArrayExpressionConversionTests
                     int[] xs = flag ? new int[L.S(7)] : new int[1];
                     int x = 0;
                     int[] ys = flag ? new int[] { x = 5 } : new int[] { 9 };
-                    return xs.Length + "," + ys[0] + "," + x + "|" + L.log;
+                    // Codex round 1: an assignment used as an element or index was queued
+                    // ahead of the statement AND kept as the value (evaluated twice).
+                    int[] a = { L.x, L.x = L.Bump(), L.x };
+                    var t = new[] { 10, 20 };
+                    int pick = t[L.x = 0];
+                    return xs.Length + "," + ys[0] + "," + x + "," + a[0] + a[1] + a[2] + "," + pick + "|" + L.log;
                 }
             }
             """;
         var result = new CSharpToCalorConverter().Convert(source);
         Assert.True(result.Success, string.Join("\n", result.Issues));
-        Assert.Equal(2, result.Losses.Count(loss => loss.Feature == "conditional-expression-hoisting"
+        Assert.Equal(4, result.Losses.Count(loss => loss.Feature == "conditional-expression-hoisting"
             && loss.Kind == ConversionLossKind.InteropPreserved));
         var compilation = Program.Compile(result.CalorSource!, "preserved.calr",
-            new CompilationOptions { StatusWriter = TextWriter.Null });
+            new CompilationOptions { StatusWriter = TextWriter.Null, EnforceEffects = false });
         Assert.False(compilation.HasErrors, string.Join("\n", compilation.Diagnostics.Errors));
-        Assert.Equal("1,9,0|", Run(source));
+        Assert.Equal("1,9,0,011,10|", Run(source));
         Assert.Equal(Run(source), Run(compilation.GeneratedCode));
     }
 
@@ -397,16 +514,19 @@ public class ArrayExpressionConversionTests
     }
 
     [Theory]
-    [InlineData("§B{i32:n} §C{g.GetLength} §A 0 §/C", false)]
-    [InlineData("§B{i32:n} g.Rank", false)]
-    [InlineData("§C{g.SetValue} §A 1 §A 0 §A 0 §/C", true)]
-    [InlineData("§B{x} §ARR2D{a:a:str} §ROW §C{Console.ReadLine} §/C §/ARR2D{a}", true)]
-    public void ArrayMembersAndRowElements_AreCharged(string statement, bool undeclaredEffect)
+    [InlineData("§B{i32:n} §C{g.GetLength} §A 0 §/C", "", false)]
+    [InlineData("§B{i32:n} g.Rank", "", false)]
+    [InlineData("§C{g.SetValue} §A 1 §A 0 §A 0 §/C", "alloc", true)]
+    [InlineData("§B{x} §C{g.Clone} §/C", "", true)]
+    [InlineData("§B{x} §C{g.Clone} §/C", "alloc", false)]
+    [InlineData("§B{x} §ARR2D{a:a:str} §ROW §C{Console.ReadLine} §/C §/ARR2D{a}", "alloc", true)]
+    public void ArrayMembersAndRowElements_AreCharged(string statement, string declared, bool undeclaredEffect)
     {
         // Array members resolve on System.Array (they were unknown, Calor0410), a
         // mutating one is charged, and the elements of §ARR2D rows are charged (they
-        // were not inferred at all, so a row could launder an effect).
-        var calor = $"§M{{m1:T}}\n  §CL{{c1:G:pub:stat}}\n    §MT{{m2:Go:pub:stat}} (i32[,]:g) -> void\n      §E{{alloc}}\n      {statement}\n";
+        // were not inferred at all, so a row could launder an effect). Clone allocates:
+        // System.Array's pure default must not certify it (Codex round 1).
+        var calor = $"§M{{m1:T}}\n  §CL{{c1:G:pub:stat}}\n    §MT{{m2:Go:pub:stat}} (i32[,]:g) -> void\n      §E{{{declared}}}\n      {statement}\n";
         var compilation = Program.Compile(calor, "effects.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
         Assert.Equal(undeclaredEffect, compilation.Diagnostics.Errors.Any(d => d.Code == "Calor0410"));
         Assert.DoesNotContain(compilation.Diagnostics, d => d.Code == "Calor0411");
@@ -416,6 +536,7 @@ public class ArrayExpressionConversionTests
     {
         "ordering" => Ordering,
         "placement" => Placement,
+        "shapes" => Shapes,
         _ => R0Fixture(row)
     };
 

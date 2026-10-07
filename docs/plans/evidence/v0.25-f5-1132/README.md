@@ -36,6 +36,28 @@ Evaluation-order repairs found while writing the witnesses (all silent before):
   They are now charged. Object-initializer stores to a field of an in-module class were reported as
   an unknown setter (`Calor0411`/`Calor0410`); they are charged `mut` only.
 
+After Codex round 1 (REQUEST-CHANGES, `reviews/round-1.md`):
+
+- Call/constructor arguments: when a later argument is hoisted (`§NEW`, collections, a ternary
+  holding them), every earlier argument that is not a literal, lambda, `ref`/`out`/`in` argument, or
+  local/parameter read is bound first, in order (`Use(new int[] { S(1) }, new Cell(S(2)))` ran
+  `S(2)` first once arrays stopped being hoisted).
+- Array elements are converted as conditional operands (`ConvertInPlace`): an assignment used as an
+  element, or an index containing an assignment, is preserved as C# (`conditional-expression-hoisting`)
+  instead of being queued ahead of the statement AND kept as the value (evaluated twice); `x++` stays
+  native (`post-inc`); a decomposed chain is captured in place.
+- Statement-position sizes are quoted in place like expression-position ones (`new int[n, Next()]`
+  read `n` after `Next()`); `§NEW` arguments hoist all-or-nothing in order (`new Cell(x, Next())`).
+- Written sizes are kept when an empty level hides them (`new int[0, 3] {}` became `[0, 0]`).
+- Generated-name reservation walks the parsed tree (escaped identifiers in interpolation holes) and
+  the project's other files (`AdditionalSemanticSyntaxTrees`, cached per tree; only digit-final names
+  can collide with a generated name).
+- `System.Array` instance members `Clone`, `GetEnumerator`, `ToString` are `alloc` (the type's pure
+  default would have certified them once array receivers resolved to it).
+- `new[] { F(), G() }` uses Roslyn's element type (was `object[]`); `new int[2][]` / `new int[,][]`
+  emit the created rank before the element's ranks (C# emitter and binding types); `new T[0]` and
+  `{ }` stay fresh arrays (were the shared `Array.Empty<T>()`).
+
 Statement-position output (F5-ARRAY-03) is byte-identical to the R0 baseline.
 
 ## F5-ARRAY-06: declared boundary
@@ -43,13 +65,15 @@ Statement-position output (F5-ARRAY-03) is byte-identical to the R0 baseline.
 | Shape | Expression position | Statement position |
 |---|---|---|
 | 1-D (`new T[] {…}`, `new[] {…}`, `T[] x = {…}`) | native | native |
-| jagged (`T[][]`, `T[,][]`) | native | native |
+| jagged (`T[][]`, `T[,][]`, `T[][,]`) | native | native |
 | rectangular rank 2 with initializer (with or without written sizes, bare `{…}`) | native | native |
 | rectangular rank 3+ with initializer | native (sized `§ARR2D` + `§ROW`) | native |
 | sized, no initializer, literal/name sizes | native | native |
 | sized, no initializer, computed sizes | native (quoted embedded size), except inside a `?:`/`&&`/`\|\|`/`??` operand when the size calls a method: preserved, `conditional-expression-hoisting` | native (sizes hoisted in order) |
 | element is an object initializer | native, inline | native |
-| element is an assignment, inside a conditional operand | preserved, `conditional-expression-hoisting` | — |
+| element (or index) is an assignment | preserved, `conditional-expression-hoisting` | preserved, same |
+| element is `x++` / `x--` | native | native |
+| empty (`new T[0]`, `{ }`) | native, fresh array | native, fresh array |
 | element type: any type the converter maps (primitives, user classes, arrays, `object`, delegates) | native | native |
 | `stackalloc` | unchanged by F5 | unchanged |
 
@@ -94,4 +118,11 @@ mid-row, field/property initializers, computed sizes in argument and return posi
   seen in a non-registered probe, not array-expression specific.
 - An object initializer outside an array (`c = new Cell { V = 7 }`) on a class that has methods
   reported an unknown setter before this change; the field fix above also covers it.
+- Not array-specific, unchanged here: method-chain decomposition (`a.F(x).G(new T())`) still hoists
+  chain arguments; an assignment used as a call argument (`F(x = S())`) is still queued and kept as
+  the value; a local read as an earlier argument stays in place when a later argument is hoisted (only
+  a closure invoked by that argument could change it). `System.Array` static `Copy` is listed pure
+  (pre-existing manifest entry).
+- `int[] r = c ? new int[3] : null;` fails conversion loudly (`Calor0272`, nullability of the
+  declared binding); seen on a non-registered probe, not attributable to this change.
 - MCP `calor_migrate` and `calor_batch`, MSBuild and LSP surfaces: not run. macOS arm64 only.

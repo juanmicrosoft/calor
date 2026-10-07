@@ -2,10 +2,11 @@
   §CL{c001:ArrayDemo:pub}
     §MT{m002:CreateSized:pub} (i32:n) -> i32[]
       §E{alloc}
-      §R §ARR{i32:arrI32003:n}
+      §R §ARR{i32:arrI32003:n} §/ARR{arrI32003}
 
     §MT{m004:CreateEmpty:pub} () -> str[]
-      §R §C{Array.Empty<str>}
+      §E{alloc}
+      §R §ARR{str:arrStr005:0} §/ARR{arrStr005}
 
     §MT{m006:Wrap:pub} (str:value) -> any[]
       §E{alloc}

@@ -12,22 +12,28 @@ All notable changes to this project will be documented in this file.
   produced Calor whose C# did not compile (`CS0103`, `CS0201`), arrays in a `?:` branch
   did not parse, and only the post-conversion rescue (`§CSHARP`) hid both. Elements are
   now evaluated once, left to right, in place. The unselected `?:` branch and the right
-  operand of `&&`/`||` are still skipped. Previously, elements, sizes and array
-  arguments could be moved into temporaries that ran before earlier parts of the same
-  statement. For example, `Use(S(1), new int[] { S(2) })` called `S(2)` first.
+  operand of `&&`/`||` are still skipped. Previously, elements, sizes and arguments could
+  be moved into temporaries that ran before earlier parts of the same statement. For
+  example, `int[] a = { x, SetX(), x }` read the new `x` in the first slot, and
+  `new int[n, Next()]` read `n` after `Next()` ran.
 - New Calor forms: an inline `§ARR2D{id:id:T} §ROW … §/ARR2D{id}`, a sized `§ARR2D` with
   `§ROW` lines for rank 3 and up (`§ARR2D{id:id:i32:2:1:2}`), and `(§IDX2D g i j).Member`
-  for a member of an element. Jagged arrays keep their element type (`int[][]` holds
-  `int[]`), and a bare `T[,] g = { … }` initializer is a rectangular array.
+  for a member of an element. Jagged arrays keep their element type and rank order
+  (`new int[2][]`, `new int[,][]`), a bare `T[,] g = { … }` initializer is a rectangular
+  array, `new[] { F(), G() }` keeps its element type instead of becoming `object[]`, and
+  `new T[0]` / `{ }` are fresh arrays instead of the shared `Array.Empty<T>()`.
 - Names the converter generates (`_hoist000`, `arr2d004`) skip every identifier in the
-  source C#, so a user local such as `_hoist000` is no longer rebound (`Calor0260`).
+  source C# and in the other files of a project migration, so a user local such as
+  `_hoist000` is no longer rebound (`Calor0260`).
 - Effect checking: the elements of `§ARR2D` rows are now charged (they were not
-  inferred, so a row could hide an effect), array members such as `GetLength` and
-  `Rank` resolve on `System.Array` instead of reporting `Calor0410`, and `SetValue`,
-  `CopyTo` and `Initialize` are charged `mut`.
-- Shapes that cannot be written in place (a size that calls a method, or an assignment
-  used as an element, inside a `?:`, `&&`, `||` or `??` operand) stay C# and are
-  reported as `conditional-expression-hoisting`.
+  inferred, so a row could hide an effect). Array members such as `GetLength` and
+  `Rank` resolve on `System.Array` instead of reporting `Calor0410`; `SetValue`,
+  `CopyTo` and `Initialize` are charged `mut`, and `Clone`, `GetEnumerator` and
+  `ToString` are charged `alloc`.
+- Shapes that cannot be written in place stay C# and are reported as
+  `conditional-expression-hoisting`: an assignment used as an array element or an index
+  (it was evaluated twice), and a size that calls a method inside a `?:`, `&&`, `||` or
+  `??` operand.
 
 ## [0.24.0] - 2026-10-07
 

@@ -2131,6 +2131,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private void EmitArrayCreationWithName(ArrayCreationNode node, string variableName)
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
+        // #1132: `[T]` cannot spell an array of arrays (`[i32[]]` does not parse).
+        var arrayType = elementType.Contains('[') ? ArrayOf(elementType, "[]") : $"[{elementType}]";
 
         // Sanitize variable names containing section markers (e.g., §IDX §THIS §C{GetInt} §/C)
         // These can't appear inside {…} attribute blocks. Use a hoisted temp var instead.
@@ -2158,18 +2160,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         else if (node.Size != null)
         {
-            var size = node.Size.Accept(this);
-            // Hoist complex size expressions out of the attribute braces
-            // (§C calls, parenthesized expressions, commas break attribute parsing)
-            if (ContainsSectionMarker(size) || size.Contains('(') || size.Contains(',') || size.Contains(':'))
-                size = HoistToTempVar(size);
-            AppendLine($"§B{{[{elementType}]:{variableName}}} §ARR{{{elementType}:{variableName}:{size}}}");
+            // #1132: a complex size is quoted in place, not hoisted (a hoisted size ran
+            // before the statement's earlier reads).
+            var size = EmitSizeAttribute(node.Size);
+            AppendLine($"§B{{{arrayType}:{variableName}}} §ARR{{{elementType}:{variableName}:{size}}}");
             if (originalTarget != variableName)
                 AppendLine($"§ASSIGN {originalTarget} {variableName}");
         }
         else
         {
-            AppendLine($"§B{{[{elementType}]:{variableName}}} §C{{Array.Empty<{elementType}>}} §/C");
+            AppendLine($"§B{{{arrayType}:{variableName}}} §C{{Array.Empty<{elementType}>}} §/C");
             if (originalTarget != variableName)
                 AppendLine($"§ASSIGN {originalTarget} {variableName}");
         }
@@ -2178,7 +2178,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private void EmitMultiDimArrayCreationWithName(MultiDimArrayCreationNode node, string variableName, string? typeName)
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
-        var mappedType = typeName != null ? TypeMapper.CSharpToCalor(typeName) : $"{elementType}[{new string(',', Math.Max(node.Rank - 1, 0))}]";
+        var mappedType = typeName != null ? TypeMapper.CSharpToCalor(typeName) : ArrayOf(elementType, $"[{new string(',', Math.Max(node.Rank - 1, 0))}]");
 
         // Sanitize variable names containing section markers
         var originalTarget = variableName;
@@ -2206,15 +2206,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         else if (node.DimensionSizes.Count > 0)
         {
-            // Hoist dimension sizes that contain section markers, parens, colons, or commas
-            var evalDims = node.DimensionSizes.Select(d =>
-            {
-                var val = d.Accept(this);
-                if (ContainsSectionMarker(val) || val.Contains('(') || val.Contains(',') || val.Contains(':'))
-                    val = HoistToTempVar(val);
-                return val;
-            }).ToList();
-            var dims = string.Join(":", evalDims);
+            // #1132: complex sizes are quoted in place, in order; hoisting only some of
+            // them ran a call before an earlier size was read (`new int[n, Next()]`).
+            var dims = string.Join(":", node.DimensionSizes.Select(EmitSizeAttribute));
             AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}:{dims}}}");
             if (originalTarget != variableName)
                 AppendLine($"§ASSIGN {originalTarget} {variableName}");
@@ -2224,6 +2218,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
             var zeros = string.Join(":", Enumerable.Repeat("0", node.Rank));
             AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}:{zeros}}}");
         }
+    }
+
+    /// <summary>
+    /// #1132: the type of an array of <paramref name="elementType"/>. The new array's own
+    /// rank comes first, as in C# source: a 2-D array of i32[] is i32[,][], not i32[][,].
+    /// </summary>
+    private static string ArrayOf(string elementType, string rank)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(elementType, @"^(.+?)((?:\[,*\])+)$");
+        return match.Success ? match.Groups[1].Value + rank + match.Groups[2].Value : elementType + rank;
     }
 
     /// <summary>
@@ -3251,13 +3255,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Use AcceptInInlineSibling so nested zero-arg §C{...} keeps explicit §/C —
         // the v0.6.1 emitter default would otherwise let the next §A be absorbed
         // as the nested call's inline argument (silent AST corruption).
-        var args = node.Arguments.Select(a =>
-        {
-            var val = AcceptInInlineSibling(a);
-            if (ContainsSectionMarker(val))
-                val = HoistToTempVar(val);
-            return $"§A {val}";
-        });
+        // #1132: if one argument is hoisted, every non-literal argument is, in order
+        // (`new Cell(x, Next())` read x after Next() ran).
+        var args = RenderArrayElements(node.Arguments, hoistSectionMarkers: true).Select(val => $"§A {val}");
         var argsStr = node.Arguments.Count > 0 ? $" {string.Join(" ", args)}" : "";
 
         // Handle object initializers (multi-line block format)
@@ -3649,7 +3649,8 @@ public sealed class CalorEmitter : IAstVisitor<string>
         else if (node.Size != null)
         {
             var size = EmitSizeAttribute(node.Size);
-            return $"§ARR{{{elementType}:{id}:{size}}}";
+            // #1132: closed, so a sized element cannot take its enclosing §ARR's closer.
+            return $"§ARR{{{elementType}:{id}:{size}}} §/ARR{{{id}}}";
         }
         else
         {

@@ -208,25 +208,34 @@ Three forms make this work:
   Written without the parentheses, `.V` attached to the last index.
 
 Names the converter generates (`_hoist000`, `arr2d004`) now skip every identifier
-that appears in your C#. A local you named `_hoist000` is never rebound.
+that appears in your C# file, and in the other files of a `calor migrate` project.
+A local you named `_hoist000` is never rebound.
 
-**Supported natively:** one-dimensional, implicitly typed (`new[]`), jagged, and
-rectangular arrays of rank 2 or more. This covers initializers with or without
-written sizes, bare `{ … }` initializers of a declared array, and sized arrays
-without an initializer. They work as a return value, argument, binding, field or
-property initializer, member-access target, and `?:` branch. Elements can be any
-expression, including object initializers and other arrays.
+`new T[0]` and an empty `{ }` initializer now convert to a fresh zero-length array.
+Before, they became the shared `Array.Empty<T>()`, so `new int[0] == new int[0]`
+changed from `false` to `true`.
 
-**Limits.** These shapes cannot be written in place, so the converter keeps them
-as C# and reports them. They never move out of their branch.
+**Supported natively:** one-dimensional, implicitly typed (`new[]`), jagged (also a
+rectangular array of arrays, `new int[,][]`), and rectangular arrays of rank 2 or
+more. This covers initializers with or without written sizes, bare `{ … }`
+initializers of a declared array, and sized arrays without an initializer. They work
+as a return value, argument, binding, field or property initializer,
+member-access target, and `?:` branch. Elements can be object initializers, calls,
+`x++`, and other arrays.
 
-- In a `?:`, `&&`, `||`, or `??` operand, a size that calls a method
-  (`flag ? new int[Next()] : …`) and an assignment used as an element are kept as
-  C# and reported as `conditional-expression-hoisting`.
+**Limits.** These shapes are kept as C# and reported, never moved:
+
+- An assignment used as an element or an index (`{ x = Next() }`, `a[i = 0]`), and a
+  size that calls a method inside a `?:`, `&&`, `||`, or `??` operand
+  (`flag ? new int[Next()] : …`). They are reported as
+  `conditional-expression-hoisting`.
 - If an expression-position array still produces Calor that does not parse, the
   member is kept as C# by the rescue and reported as `post-validation-fallback`.
-  The array is not moved.
 - `stackalloc` arrays are unchanged by this work.
+
+Outside arrays, the converter can still move some subexpressions of a statement
+into temporaries (for example, steps of a method chain). Arrays no longer add to
+that, but this work does not change it.
 
 ---
 

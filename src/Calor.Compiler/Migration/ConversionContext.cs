@@ -418,31 +418,56 @@ public sealed class ConversionContext
 
     private string? _originalSource;
     private HashSet<string>? _reservedNames;
+    private readonly List<Microsoft.CodeAnalysis.SyntaxTree> _reservedSources = new();
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<
+        Microsoft.CodeAnalysis.SyntaxTree, HashSet<string>> TreeNames = new();
+
+    /// <summary>
+    /// #1132: other files whose names generated names must also avoid (the rest of a
+    /// project conversion: a base-class field is in scope here too).
+    /// </summary>
+    public void ReserveNamesFrom(IEnumerable<Microsoft.CodeAnalysis.SyntaxTree> trees)
+    {
+        _reservedSources.AddRange(trees);
+        _reservedNames = null;
+    }
+
+    // Generated names end in a counter, so only digit-final names can collide.
+    private static HashSet<string> NamesIn(Microsoft.CodeAnalysis.SyntaxTree tree, string text)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var token in tree.GetRoot().DescendantTokens())
+        {
+            if (token.RawKind == (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.IdentifierToken
+                && token.ValueText.Length > 0 && char.IsDigit(token.ValueText[^1]))
+                names.Add(token.ValueText);
+        }
+        foreach (System.Text.RegularExpressions.Match match in
+            System.Text.RegularExpressions.Regex.Matches(text, @"[\p{L}_][\p{L}\p{Nd}_]*\p{Nd}\b"))
+        {
+            names.Add(match.Value);
+        }
+        return names;
+    }
 
     /// <summary>
     /// #1132: true when <paramref name="name"/> is spelled anywhere in the original
-    /// source (identifier tokens with escapes decoded, plus every identifier-shaped run
-    /// of text, which covers interpolation holes, strings and comments). Generated
-    /// names (<see cref="GenerateId"/>, the emitter's hoisted temps) skip these, so a
+    /// source or a <see cref="ReserveNamesFrom"/> source: every identifier token of the
+    /// parsed tree (escapes decoded, interpolation holes included) plus every
+    /// identifier-shaped run of text (strings, comments). Generated names
+    /// (<see cref="GenerateId"/>, the emitter's hoisted temps) skip these, so a
     /// generated local can never capture, shadow or rebind a user name.
     /// </summary>
     public bool IsReservedName(string name)
     {
-        if (_originalSource == null)
+        if (_originalSource == null && _reservedSources.Count == 0)
             return false;
         if (_reservedNames == null)
         {
-            var names = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var token in Microsoft.CodeAnalysis.CSharp.SyntaxFactory.ParseTokens(_originalSource))
-            {
-                if (token.RawKind == (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.IdentifierToken)
-                    names.Add(token.ValueText);
-            }
-            foreach (System.Text.RegularExpressions.Match match in
-                System.Text.RegularExpressions.Regex.Matches(_originalSource, @"[\p{L}_][\p{L}\p{Nd}_]*"))
-            {
-                names.Add(match.Value);
-            }
+            var source = _originalSource ?? "";
+            var names = NamesIn(Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(source), source);
+            foreach (var tree in _reservedSources)
+                names.UnionWith(TreeNames.GetValue(tree, t => NamesIn(t, t.ToString())));
             _reservedNames = names;
         }
         return _reservedNames.Contains(name);
