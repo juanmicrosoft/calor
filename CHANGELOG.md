@@ -14,8 +14,8 @@ but the NuGet publish for 0.22.0 was skipped after its performance tests failed,
 reached NuGet. Milestone 0.23 was planning-only and shipped no code. If you upgrade from 0.21.0,
 read the 0.22.0 entry below as well: its changes are part of this release.
 
-The 0.24 evidence is adjudicated by the maintainer who directed and merged the repairs. It is not
-independently adjudicated or independently verified, so every 0.24 evidence claim is at most
+The 0.24 evidence is adjudicated by the maintainer who directed and merged the repairs. No independent party
+adjudicated or verified it, so every 0.24 evidence claim is at most
 *bounded*. No benchmark results are published with this release.
 
 ### Advisory: false proofs in 0.21.0 (and the unpublished 0.22.0)
