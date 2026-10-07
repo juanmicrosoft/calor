@@ -132,7 +132,11 @@ internal sealed class GateRepo : IDisposable
                 ["website"] = new JsonObject { ["treeSha256"] = TreeDigest(repo.WebsiteDir) },
                 ["benchmark-results"] = new JsonObject
                 {
-                    ["files"] = new JsonObject { [BenchmarkPath] = Sha(Encoding.UTF8.GetBytes(benchmark)) },
+                    ["files"] = new JsonObject
+                    {
+                        [BenchmarkPath] = Sha(Encoding.UTF8.GetBytes(benchmark)),
+                        [StampIndexPath] = Sha(Encoding.UTF8.GetBytes(StampIndex)),
+                    },
                 },
             },
         };
@@ -145,6 +149,7 @@ internal sealed class GateRepo : IDisposable
         repo.Git("update-ref", "refs/remotes/origin/main", repo.Adjudication);
         repo.Git("checkout", "-q", "--detach", repo.Candidate);
         repo.Write(BenchmarkPath, benchmark);
+        repo.Write(StampIndexPath, StampIndex);
         File.WriteAllText(repo.BodyPath, notesText + $"\n<!-- calor-adjudication: {repo.Identity} -->\n");
         return repo;
     }

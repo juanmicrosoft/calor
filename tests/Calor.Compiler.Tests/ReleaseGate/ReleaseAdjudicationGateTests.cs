@@ -25,7 +25,10 @@ public class ReleaseAdjudicationGateTests
     internal const string ManifestPath = "docs/plans/evidence/candidate-1423/manifest.json";
     internal const string FreezePath = "docs/plans/evidence/regeneration-1424/freeze-manifest.json";
     internal const string RegistryPath = "docs/plans/evidence/regeneration-1424/claim-registry.json";
-    internal const string BenchmarkPath = "website/public/data/benchmark-results.json";
+    // #1422 (B2): the only publishable benchmark files are the headline and its stamp-index entry.
+    internal const string BenchmarkPath = "website/public/data/benchmark-headline.json";
+    internal const string StampIndexPath = "bench/phase0-agent-native/commit-stamp-index.json";
+    internal const string StampIndex = "{\"publicationStamps\":[]}\n";
     internal const string ReleaseVersion = "0.24.0";
     internal const string Limitation =
         "adjudicated by the maintainer who directed and merged the repairs; not independently adjudicated";
@@ -362,6 +365,23 @@ public class ReleaseAdjudicationGateTests
         using var repo = GateRepo.Build();
         File.AppendAllText(Path.Combine(repo.Root, BenchmarkPath), " ");
         AssertCodes(repo, new[] { "G011" }, "--benchmark-worktree");
+    }
+
+    [Theory]
+    [InlineData("website/public/data/benchmark-results.json", true)]
+    [InlineData(StampIndexPath, false)]
+    public void BenchmarkRecordOtherThanExactlyTheB2OutputsFails(string path, bool add)
+    {
+        // #1422: the record may adjudicate only the headline and the stamp index, both of them,
+        // even when the extra file is present with the listed hash.
+        using var repo = GateRepo.Build(record: r =>
+        {
+            var files = r["publication"]!["benchmark-results"]!["files"]!.AsObject();
+            if (add) files[path] = Sha(Encoding.UTF8.GetBytes("{}\n"));
+            else files.Remove(path);
+        });
+        if (add) File.WriteAllText(Path.Combine(repo.Root, path), "{}\n");
+        AssertCodes(repo, new[] { "G011" });
     }
 
     [Theory]

@@ -43,6 +43,13 @@ TRAILER_RE = re.compile(r"^<!-- calor-adjudication: (\S+) -->$")
 SHA40 = re.compile(r"^[0-9a-f]{40}$")
 SHA64 = re.compile(r"^[0-9a-f]{64}$")
 FILE_SURFACES = ("nuget-packages", "release-metadata", "benchmark-results")
+# #1422 (B2) publishes exactly these two files: the headline written by
+# scripts/benchmark_publication_gate.py and its commit-stamp-index entry. No other benchmark
+# file (benchmark-results.json and the rest are diagnostic only) may be adjudicated for publication.
+BENCHMARK_PUBLICATION_FILES = (
+    "website/public/data/benchmark-headline.json",
+    "bench/phase0-agent-native/commit-stamp-index.json",
+)
 MANIFEST_ROLES = ("candidate-manifest", "raw-artifact-freeze")
 ROW_INDEPENDENCE = "reduced-maintainer-adjudicated"
 # The contract (section 9) forbids calling 0.24 evidence independently adjudicated or verified.
@@ -379,6 +386,10 @@ def check_publication_schema(gate: Gate, record: dict) -> None:
             isinstance(k, str) and k and SHA64.match(str(v)) for k, v in files.items()
         ):
             gate.fail("G011", f"record must adjudicate '{name}' as a non-empty {{file: sha256}} map")
+    benchmark = surface(record, "benchmark-results").get("files")
+    if isinstance(benchmark, dict) and benchmark and set(benchmark) != set(BENCHMARK_PUBLICATION_FILES):
+        gate.fail("G011", "record must adjudicate exactly the #1422 benchmark outputs "
+                  f"{list(BENCHMARK_PUBLICATION_FILES)} under 'benchmark-results', got {sorted(benchmark)}")
 
 
 def zip_entries(path: Path) -> dict[str, str]:

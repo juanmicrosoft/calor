@@ -48,7 +48,7 @@ calor-adjudication:v1:<adjudication commit, 40 hex>:<terminal record SHA-256, 64
 | `publication.nuget-packages.files` | `{<file name>: sha256}`; the pushed directory holds exactly these files; a version already on nuget.org must match entry for entry except `.signature.p7s` |
 | `publication.release-metadata.files` | `{<file name>: sha256}` of the SBOM and provenance JSON |
 | `publication.website.treeSha256` | SHA-256 over sorted `<sha256>  <relative path>` lines of the built tree |
-| `publication.benchmark-results.files` | `{<repo path>: sha256}`; every changed file in the publishing work tree is listed, with that hash |
+| `publication.benchmark-results.files` | `{<repo path>: sha256}` naming exactly the two #1422 (B2) outputs, `website/public/data/benchmark-headline.json` and `bench/phase0-agent-native/commit-stamp-index.json` (any other key set is `G011`); the changed files in the publishing work tree must be exactly these, with these hashes |
 
 Every publication block is schema-checked on every invocation, whichever surface is publishing.
 The gate checks the subset of the §8 predicate that a record can show; the full T001-T003 rules stay
