@@ -219,8 +219,10 @@ public class LinqSupportTests
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.NotNull(result.CalorSource);
         Assert.DoesNotContain("§ERR", result.CalorSource);
-        // Empty arrays use Array.Empty<T>() to avoid nested array parsing issues
-        Assert.Contains("Array.Empty<i32>", result.CalorSource);
+        // #1132: an empty initializer is a fresh zero-length array, not the shared
+        // Array.Empty<T>() (`new int[0] == new int[0]` is false in C#).
+        Assert.Contains("§ARR{i32:arr:0}", result.CalorSource);
+        Assert.DoesNotContain("Array.Empty", result.CalorSource);
     }
 
     [Fact]

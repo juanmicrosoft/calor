@@ -312,6 +312,7 @@ public sealed class CSharpToCalorConverter
         var startTime = DateTime.UtcNow;
         var context = CreateContext(sourceFile);
         context.OriginalSource = csharpSource;
+        context.ReserveNamesFrom(_options.AdditionalSemanticSyntaxTrees);
 
         try
         {
