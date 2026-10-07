@@ -1,0 +1,142 @@
+{
+  "schema": "v0.25-f2-906-rows/1",
+  "family": "F2",
+  "issue": 906,
+  "scopeVersion": "1.0.0",
+  "status": "IN_PROGRESS",
+  "note": "Implementation evidence on a draft branch, not a READY record. Results come from tests/Calor.Compiler.Tests/Interpolation/InterpolationTargetTypingTests.cs. Surfaces: cli = the ConversionOptions that `calor convert` builds with no flags (ConvertCommand.BuildCSharpToCalorOptions); mcp = MCP calor_convert with only `source`. Each C# row is converted, compiled by Calor with effect enforcement off (EnforceEffects = false, the --permissive-effects comparison mode the R0 baseline used), and Probe.Run() of the generated C# is compared with the original. The default-compile column records whether the converted output also compiles with effect enforcement on.",
+  "rows": [
+    {
+      "case": "F2-INTERP-01",
+      "role": "control",
+      "cli": "native-match",
+      "mcp": "native-match",
+      "defaultCompile": "pass",
+      "test": "RegisteredRow_ConvertsCompilesAndMatchesTheOriginal(F2-INTERP-01, *)",
+      "result": "control-passes"
+    },
+    {
+      "case": "F2-INTERP-02",
+      "cli": "native-match",
+      "mcp": "native-match",
+      "change": "FormattableString and IFormattable targets now convert to (cast global::System.FormattableString|IFormattable \"...\"); Calor binds Kind(FormattableString) instead of Kind(any).",
+      "test": "RegisteredRow_ConvertsCompilesAndMatchesTheOriginal(F2-INTERP-02, *); FormattableTargets_ConvertWithAnExplicitCast_StringTargetsDoNot",
+      "result": "fixed-on-branch",
+      "defaultCompile": "Calor0410 on both surfaces (converted code declares no effect rows; the comparison uses effect enforcement off, as in the R0 baseline)"
+    },
+    {
+      "case": "F2-INTERP-03",
+      "cli": "preserved-match",
+      "mcp": "preserved-match",
+      "change": "Handler targets escalate at conversion (feature string-interpolation-handler): the enclosing statement or member is kept as C#. MCP default previously emitted a STRING argument rejected by Calor0208. With GracefulFallback off the conversion reports the feature as unsupported.",
+      "test": "RegisteredRow_ConvertsCompilesAndMatchesTheOriginal(F2-INTERP-03, *); HandlerTarget_PreservesTheEnclosingCallAtConversionTime; HandlerTarget_WithoutGracefulFallback_IsRefusedAtConversion",
+      "result": "fixed-on-branch",
+      "defaultCompile": "Calor0410 on both surfaces (converted code declares no effect rows; the comparison uses effect enforcement off, as in the R0 baseline)"
+    },
+    {
+      "case": "F2-INTERP-04",
+      "role": "control",
+      "cli": "native-match",
+      "mcp": "native-match",
+      "test": "RegisteredRow_ConvertsCompilesAndMatchesTheOriginal(F2-INTERP-04, *); LiteralDollarText_StaysLiteral",
+      "result": "control-passes",
+      "defaultCompile": "pass"
+    },
+    {
+      "case": "F2-INTERP-05",
+      "observation": "Calor0200 for `nope` is reported at line 3, column 17 (the hole), not line 1, column 1. A second test pins a hole on line 4 at column 25.",
+      "test": "UndefinedHoleName_IsReportedAtTheHole; HoleDiagnostic_OnALaterLine_KeepsItsLineAndColumn",
+      "result": "fixed-on-branch"
+    },
+    {
+      "case": "F2-INTERP-06",
+      "observation": "`\"hello ${Console.ReadLine()}\"` in `§E{}` now fails with Calor0410 (effect 'cr' undeclared) and no Calor0419. With `§E{cr}` it compiles. A hole with named arguments stays raw C# and still reports Calor0419 (negative control).",
+      "test": "CallHole_InAPureFunction_IsAnUndeclaredEffect; CallHole_WithTheDeclaredEffect_Compiles; CallHole_ThatCannotBeLifted_StillReportsAssumedEffects",
+      "result": "fixed-on-branch"
+    },
+    {
+      "case": "F2-INTERP-07",
+      "role": "control",
+      "cli": "native-match",
+      "mcp": "native-match",
+      "test": "RegisteredRow_ConvertsCompilesAndMatchesTheOriginal(F2-INTERP-07, *)",
+      "result": "control-passes",
+      "defaultCompile": "Calor0410 on both surfaces (converted code declares no effect rows; the comparison uses effect enforcement off, as in the R0 baseline)"
+    },
+    {
+      "case": "F2-INTERP-08",
+      "cli": "native-match",
+      "mcp": "native-match",
+      "shapes": [
+        "Pick(string) vs Pick(FormattableString): C# selects string",
+        "Kind(FormattableString) vs Kind(object) with a direct literal: FormattableString",
+        "Kind(flag ? $\"..\" : $\"..\"): natural type string, so Kind(object)",
+        "Kind(flag ? (FormattableString)$\"..\" : $\"..\"): FormattableString",
+        "Pair(Next(), $\"q={Tag(\\\"t\\\")}\"): FormattableString-only parameter and left-to-right order (trace 'nt')",
+        "skip ? $\"{Tag(\\\"z\\\")}\" : \"skip\" with skip false: Tag not called",
+        "FormattableString return target and a Func<FormattableString> lambda body"
+      ],
+      "baselineOnMain": "cli: whole class preserved as C# (Calor1343, no Pair overload matches (INT, STRING)); mcp: conversion failed with Calor1343. The string-literal hole was hoisted ahead of Next().",
+      "test": "RegisteredRow_ConvertsCompilesAndMatchesTheOriginal(F2-INTERP-08, *); HoleWithStringLiteral_StaysInPlace",
+      "result": "fixed-on-branch",
+      "defaultCompile": "Calor0410 on both surfaces (converted code declares no effect rows; the comparison uses effect enforcement off, as in the R0 baseline)"
+    },
+    {
+      "case": "F2-INTERP-09",
+      "observation": "see corpusCounts: incomplete diagnostics 0 -> 0; in-repo bound expressions 4820 -> 4827; 4 serialized opaque hole boundaries -> 1",
+      "result": "measured-on-branch"
+    },
+    {
+      "case": "F2-INTERP-10",
+      "cli": "native-match",
+      "mcp": "native-match",
+      "shapes": [
+        "return $\"[{amount,10:N2}]{width}\" (decimal, alignment and format)",
+        "expression-bodied => $\"{d:F3}|{d,8}\"",
+        "fr-FR and invariant culture"
+      ],
+      "test": "RegisteredRow_ConvertsCompilesAndMatchesTheOriginal(F2-INTERP-10, *)",
+      "result": "passes-on-branch",
+      "defaultCompile": "Calor0410 on both surfaces (converted code declares no effect rows; the comparison uses effect enforcement off, as in the R0 baseline)"
+    }
+  ],
+  "corpusCounts": {
+    "case": "F2-INTERP-09",
+    "instrument": "tests/Calor.Compiler.Tests/Binding/BinderIncompleteRatchetTests.cs with corpus submodules at the pinned SHAs",
+    "incompleteDiagnostics": {
+      "before": 0,
+      "after": 0
+    },
+    "inRepoExpressionsBound": {
+      "before": 4820,
+      "after": 4827
+    },
+    "serializedOpaqueBoundaries": {
+      "serilog/src/Serilog/Debugging/SelfLog.cs": [
+        3,
+        1
+      ],
+      "FluentValidation/src/FluentValidation/ValidationException.cs": [
+        1,
+        0
+      ]
+    },
+    "binderAttempts": {
+      "FluentValidation/src/FluentValidation/ValidationException.cs": [
+        47,
+        48
+      ],
+      "FluentValidation/src/FluentValidation.Tests/MessageFormatterTests.cs": [
+        77,
+        76
+      ]
+    },
+    "bindingErrorIdentitiesChangedLocationOnly": 17,
+    "bindingErrorCountsChanged": 0,
+    "files": [
+      "bench/phase0-agent-native/binder-incomplete-baseline.json",
+      "bench/phase0-agent-native/binder-source-coverage.json"
+    ],
+    "status": "measured on the branch; must be re-measured on the #1423 candidate for READY"
+  }
+}

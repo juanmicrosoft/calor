@@ -9369,7 +9369,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 ElementAccessExpressionSyntax elementAccess => ConvertElementAccess(elementAccess),
                 LambdaExpressionSyntax lambda => ConvertLambdaExpression(lambda),
                 AwaitExpressionSyntax awaitExpr => ConvertAwaitExpression(awaitExpr),
-                InterpolatedStringExpressionSyntax interpolated => ConvertInterpolatedString(interpolated),
+                InterpolatedStringExpressionSyntax interpolated => ConvertTargetTypedInterpolatedString(interpolated),
                 ConditionalAccessExpressionSyntax condAccess =>
                     ConvertConditionalRegion(condAccess, () => ConvertConditionalAccess(condAccess)),
                 CastExpressionSyntax cast => ConvertCastExpression(cast),
@@ -11212,18 +11212,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     node.Span, typeName, new List<string>(),
                     new List<ExpressionNode>(), new List<ObjectInitializerAssignment>());
         }
-    }
-
-    /// <summary>
-    /// Checks if a C# expression tree contains any string literal tokens.
-    /// Used to detect when interpolation expressions would produce nested quotes.
-    /// </summary>
-    private static bool ContainsStringLiteral(ExpressionSyntax expression)
-    {
-        return expression.DescendantTokens().Any(t =>
-            t.IsKind(SyntaxKind.StringLiteralToken)
-            || t.IsKind(SyntaxKind.SingleLineRawStringLiteralToken)
-            || t.IsKind(SyntaxKind.Utf8StringLiteralToken));
     }
 
     private static IReadOnlyList<string?>? ExtractArgumentModifiers(SeparatedSyntaxList<ArgumentSyntax> arguments)
@@ -13122,10 +13110,61 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return new AwaitExpressionNode(GetTextSpan(awaitExpr), awaited, null);
     }
 
+    /// <summary>
+    /// 0.25 F2 (#906): converts an interpolated string while keeping its C# target type.
+    /// The generated C# regenerates a <c>$"..."</c> literal, and C# re-applies target typing to
+    /// it, so a target-typed literal is only safe while its position is unchanged. The
+    /// converted type is therefore made explicit:
+    /// <list type="bullet">
+    /// <item><c>string</c>, <c>object</c> and other targets that receive the formatted string:
+    /// native, unchanged.</item>
+    /// <item><see cref="System.FormattableString"/> and <see cref="System.IFormattable"/>: native,
+    /// wrapped in a cast to the target type. The cast keeps the overload C# selected (for example
+    /// <c>Kind(FormattableString)</c> over <c>Kind(object)</c>) and gives Calor the real type
+    /// instead of <c>str</c>.</item>
+    /// <item>A custom <c>[InterpolatedStringHandler]</c> type: not representable. The enclosing
+    /// statement or member is preserved as C# (or the conversion fails where preservation is off),
+    /// keeping the call and its handler construction intact.</item>
+    /// </list>
+    /// Without a semantic model the literal converts as before and C# re-applies target typing.
+    /// </summary>
+    private ExpressionNode ConvertTargetTypedInterpolatedString(InterpolatedStringExpressionSyntax interpolated)
+    {
+        var target = InterpolationTargetType(interpolated);
+        if (target is { } handler && IsInterpolatedStringHandler(handler))
+            throw EscalateExpression(interpolated, "string-interpolation-handler");
+
+        var converted = ConvertInterpolatedString(interpolated);
+        if (target is not { } formattable || !IsFormattableTarget(formattable))
+            _context.RecordFeatureUsage("string-interpolation-to-string");
+        else
+        {
+            _context.RecordFeatureUsage("string-interpolation-formattable");
+            return new TypeOperationNode(GetTextSpan(interpolated), TypeOp.Cast, converted,
+                TypeMapper.CSharpToCalor(formattable.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
+        }
+
+        return converted;
+    }
+
+    private ITypeSymbol? InterpolationTargetType(InterpolatedStringExpressionSyntax interpolated)
+    {
+        if (_semanticModel == null || interpolated.SyntaxTree != _semanticModel.SyntaxTree)
+            return null;
+        var type = _semanticModel.GetTypeInfo(interpolated, _cancellationToken).ConvertedType;
+        return type is null or { TypeKind: TypeKind.Error } ? null : type;
+    }
+
+    private static bool IsInterpolatedStringHandler(ITypeSymbol type) =>
+        type.GetAttributes().Any(attribute =>
+            attribute.AttributeClass?.ToDisplayString()
+                == "System.Runtime.CompilerServices.InterpolatedStringHandlerAttribute");
+
+    private static bool IsFormattableTarget(ITypeSymbol type) =>
+        type.ToDisplayString() is "System.FormattableString" or "System.IFormattable";
+
     private InterpolatedStringNode ConvertInterpolatedString(InterpolatedStringExpressionSyntax interpolated)
     {
-        _context.RecordFeatureUsage("string-interpolation");
-
         var parts = new List<InterpolatedStringPartNode>();
 
         foreach (var content in interpolated.Contents)
@@ -13143,16 +13182,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 case InterpolationSyntax interp:
                     var formatSpec = interp.FormatClause?.FormatStringToken.Text;
                     var alignmentClause = interp.AlignmentClause?.Value.ToString();
+                    // 0.25 F2 (#906): the hole stays in place. Hoisting a hole that contains a
+                    // string literal into a temporary (the pre-0.25 workaround for nested quotes,
+                    // which the lexer now scans) evaluated it before every earlier operand of the
+                    // enclosing statement and outside any enclosing conditional.
                     var interpExpr = ConvertExpression(interp.Expression);
-                    // If the expression contains string literals (quotes), hoist to temp variable
-                    // to avoid nested quote conflicts inside the interpolated string
-                    if (ContainsStringLiteral(interp.Expression))
-                    {
-                        var tempName = _context.GenerateId("_interp");
-                        _pendingStatements.Add(new BindStatementNode(
-                            GetTextSpan(interp), tempName, null, false, interpExpr, new AttributeCollection()));
-                        interpExpr = new ReferenceNode(GetTextSpan(interp), tempName);
-                    }
                     parts.Add(new InterpolatedStringExpressionNode(
                         GetTextSpan(interp),
                         interpExpr,

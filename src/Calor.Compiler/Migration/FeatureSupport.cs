@@ -170,11 +170,34 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "Basic pattern matching (type, constant, var) is supported"
         },
+        // 0.25 F2 (#906): the umbrella claim is Partial. Interpolated strings whose C# target
+        // receives the formatted string, and FormattableString/IFormattable targets, convert
+        // natively; custom interpolated-string handlers do not.
         ["string-interpolation"] = new FeatureInfo
         {
             Name = "string-interpolation",
+            Support = SupportLevel.Partial,
+            Description = "Interpolated strings assigned, returned or passed as string or object convert natively, keeping format specifiers, alignment, culture and hole order. FormattableString and IFormattable targets convert natively with an explicit cast that keeps the selected overload. Custom [InterpolatedStringHandler] targets are preserved as C# interop",
+            Workaround = "Keep handler-based calls (logging, assertion and builder APIs) as C# interop, or pass a formatted string to a string overload"
+        },
+        ["string-interpolation-to-string"] = new FeatureInfo
+        {
+            Name = "string-interpolation-to-string",
             Support = SupportLevel.Full,
-            Description = "String interpolation is converted to Calor format"
+            Description = "An interpolated string whose target receives the formatted string (string, object) converts to a native Calor string with ${...} holes"
+        },
+        ["string-interpolation-formattable"] = new FeatureInfo
+        {
+            Name = "string-interpolation-formattable",
+            Support = SupportLevel.Full,
+            Description = "An interpolated string targeting FormattableString or IFormattable converts natively with an explicit cast to that type, so the same overload is selected"
+        },
+        ["string-interpolation-handler"] = new FeatureInfo
+        {
+            Name = "string-interpolation-handler",
+            Support = SupportLevel.NotSupported,
+            Description = "An interpolated string passed to a custom [InterpolatedStringHandler] parameter cannot be represented in Calor; the enclosing statement or member is preserved as C# interop, or the conversion fails when preservation is off",
+            Workaround = "Keep the call as C# interop, or call a string overload with an already formatted string"
         },
         ["null-coalescing"] = new FeatureInfo
         {
