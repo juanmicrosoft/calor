@@ -71,6 +71,7 @@ class Fixture:
     PAIRS = [("Cat/A", "EQUIVALENT", True, "manifest.benchmarks"), ("Cat/B", "EQUIVALENT", True, "manifest.benchmarks"),
              ("Cat/C", "NOT-EQUIVALENT", False, "manifest.benchmarks"), ("Cat/D", "UNCLASSIFIED", False, "manifest.benchmarks"),
              ("Cat/E", "EXCLUDED-PRE-REGISTERED", False, "manifest.bugScenarios")]
+    CONTRACT_DOC = "docs/plans/contract.md"  # a sealed file outside every INPUT_PATHS entry
 
     def __init__(self, tmp: Path):
         self.tmp, self.root, self.origin = tmp, tmp / "work", tmp / "origin.git"
@@ -141,7 +142,10 @@ class Fixture:
 
     def write_contract(self) -> None:
         self.write_json(gate.CONTRACT, self.contract)
-        self.write_json(gate.CONTRACT_SEAL, {"files": {gate.CONTRACT: self.file_sha(gate.CONTRACT)}})
+        if not (self.root / self.CONTRACT_DOC).exists():
+            self.write(self.CONTRACT_DOC, "# contract\n")
+        self.write_json(gate.CONTRACT_SEAL, {"files": {gate.CONTRACT: self.file_sha(gate.CONTRACT),
+                                                       self.CONTRACT_DOC: self.file_sha(self.CONTRACT_DOC)}})
 
     def publish_results(self, message: str, reseal: bool = True, push: bool = True) -> str:
         """Write the manifest and results (deriving counts from the manifest) and commit them."""
@@ -467,8 +471,10 @@ class GateTests(unittest.TestCase):
                  ("tests/TestData/Benchmarks/Cat/new.txt", "tests/TestData/Benchmarks"),
                  ("tests/TestData/Benchmarks/Cat/A.calr", "tests/TestData/Benchmarks/Cat/A.calr"),
                  ("tests/Calor.Evaluation/a.txt", "tests/Calor.Evaluation"),
+                 (gate.CONTRACT_SEAL, gate.CONTRACT_SEAL),  # review round 1, finding 1
+                 (Fixture.CONTRACT_DOC, Fixture.CONTRACT_DOC),  # named only by the candidate's seal
                  *[(p, p) for p in gate.INPUT_PATHS if p.endswith((".py", ".cs", ".csproj"))]]
-        self.assertEqual(14, len(cases))
+        self.assertEqual(16, len(cases))
         base = self.f.git("rev-parse", "HEAD")
         for path, named in cases:
             with self.subTest(input=path):
@@ -504,7 +510,29 @@ class GateTests(unittest.TestCase):
         index = {"publicationStamps": [{"path": gate.HEADLINE, "stampPointer": "/provenance/commit",
                                         "measuredCommit": "0" * 40}]}
         self._candidate_then_main_moves({gate.STAMP_INDEX: json.dumps(index) + "\n"})
-        self.assertIn("entry of", self.assertRefused("B2-07"))
+        self.assertIn("entries of", self.assertRefused("B2-07"))
+
+    def test_a_duplicate_headline_stamp_entry_on_main_is_refused(self) -> None:
+        """Review round 1, finding 2: a second headline entry appended on main is a change."""
+        code, text = self.f.check()
+        self.assertEqual(0, code, text)
+        ours = json.loads((self.f.root / gate.STAMP_INDEX).read_text())["publicationStamps"][-1]
+        self._clean()
+        other = dict(ours, measuredCommit="0" * 40)
+        self._candidate_then_main_moves({gate.STAMP_INDEX: json.dumps({"publicationStamps": [ours, other]}) + "\n"})
+        self.assertIn("entries of", self.assertRefused("B2-07"))
+
+    def test_an_unreadable_stamp_index_on_main_is_refused(self) -> None:
+        for text in ("not json\n", "[]\n", '{"publicationStamps": {}}\n'):
+            with self.subTest(index=text):
+                self.f.git("checkout", "-q", "-f", "main")
+                self.f.git("reset", "-q", "--hard", "origin/main")
+                self._candidate_then_main_moves({gate.STAMP_INDEX: text})
+                self.assertIn("unreadable", self.assertRefused("B2-07"))
+                self.f.git("checkout", "-q", "-f", "main")
+                self.f.git("reset", "-q", "--hard", "HEAD~1")
+                self.f.git("push", "-q", "-f", "origin", "HEAD:refs/heads/main")
+                self.f.git("fetch", "-q", "origin", "+refs/heads/main:refs/remotes/origin/main")
 
     def test_other_stamp_index_entries_on_main_do_not_block_or_change_the_bytes(self) -> None:
         code, text = self.f.check()
@@ -798,7 +826,17 @@ class RealPacketTests(unittest.TestCase):
         for path in paths:
             with self.subTest(input=path):
                 self.assertTrue((REPO_ROOT / path).exists(), path)
-        self.assertEqual(len(gate.INPUT_PATHS) + 2 * 226, len(paths), "226 registered pairs, two files each")
+        sealed = {p for seal in gate.SEALS for p in gate.load(REPO_ROOT, seal)["files"]}
+        self.assertTrue({"docs/plans/v0.24-evidence-contract.md", "docs/plans/b1-1276-benchmark-registration.md",
+                         "docs/plans/evidence/evidence-contract-1407/artifact-inventory.json"} <= set(paths))
+        self.assertEqual(len(set(gate.INPUT_PATHS) | sealed) + 2 * 226, len(paths), "226 registered pairs, two files each")
+        # Every input outside the corpus directory re-runs the workflow on push.
+        push = WORKFLOW.read_text().split("  push:\n", 1)[1].split("\njobs:", 1)[0]
+        patterns = re.findall(r"(?m)^      - '([^']+)'$", push)
+        for path in [p for p in paths if p not in gate.INPUT_PATHS]:
+            with self.subTest(push_path=path):
+                self.assertTrue(any(re.fullmatch(re.escape(g).replace(r"\*\*", ".*").replace(r"\*", "[^/]*"), path)
+                                    for g in patterns), path)
 
     def test_a_committed_headline_is_the_projection_of_the_committed_packet(self) -> None:
         """However a headline reaches main, it must be what the gate writes from the packet."""

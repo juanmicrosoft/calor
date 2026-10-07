@@ -19,8 +19,8 @@ durable provenance identity (contract section 6). It refuses (exit 1, nothing wr
          headline (or its stamp-index entry) changed since the candidate to anything other than
          exactly the bytes this run writes;
   B2-08  the provenance commit is not a full SHA, not HEAD, not on fetched origin/main, or the
-         clone is shallow; or a headline input (INPUT_PATHS plus every registered pair file)
-         differs between the candidate and origin/main;
+         clone is shallow; or a headline input (INPUT_PATHS, every file the three seals name,
+         and every registered pair file) differs between the candidate and origin/main;
   B2-09  the working tree has changes other than the gate's own outputs;
   B2-10  the regenerated packet (pair-metrics twice, then pair-results) is missing or differs;
   B2-11  the results packet does not carry the registered population, sampling unit, and label.
@@ -34,7 +34,8 @@ Mentions of a hash in prose authorize nothing.
 Freshness (#1422 PR 2). The checked-out HEAD is the candidate (the workflow checks out the
 adjudicated candidate). It may publish while origin/main has moved on, but only if main changed
 none of the headline's inputs since the candidate: the registered B1 packet and results packet,
-the contract that authorizes methods, every registered pair file and the benchmark corpus, the
+the contract that authorizes methods, the three seals and every file they name (B2-01), every
+registered pair file and the benchmark corpus, the
 registered generator (tests/Calor.Evaluation), B1's C# validator files, and this gate. Other files
 (for example unrelated tests next to the validator) do not count. The written bytes are a function
 of the candidate alone: the comparison is with the headline published at the candidate, and the
@@ -80,7 +81,8 @@ VALIDATOR = "tests/Calor.Compiler.Tests/EvidenceContract"
 # tests, for example) are not benchmark inputs. src/ is not an input: the metric is computed by
 # tests/Calor.Evaluation alone, B2-10 re-runs the generator at the candidate, and the headline
 # records the candidate's src tree hash.
-INPUT_PATHS = (REGISTRATION, RESULTS, CONTRACT, "tests/TestData/Benchmarks", "tests/Calor.Evaluation",
+SEALS = (f"{REGISTRATION}/sha256.json", f"{RESULTS}/sha256.json", CONTRACT_SEAL)
+INPUT_PATHS = (REGISTRATION, RESULTS, CONTRACT, CONTRACT_SEAL, "tests/TestData/Benchmarks", "tests/Calor.Evaluation",
                f"{VALIDATOR}/BenchmarkRegistrationTests.cs", f"{VALIDATOR}/BenchmarkRegistrationValidator.cs",
                f"{VALIDATOR}/BenchmarkResultsTests.cs", f"{VALIDATOR}/BenchmarkResultsValidator.cs",
                f"{VALIDATOR}/EvidenceContractValidator.cs", f"{VALIDATOR}/EvidenceContractTests.cs",
@@ -149,8 +151,7 @@ def blob(root: Path, spec: str) -> bytes | None:
 
 def check_seals(root: Path, findings: list) -> None:
     """B2-01: every file each seal lists has the sealed bytes (results raw; the others LF-normalized)."""
-    for seal_path, normalize in ((f"{REGISTRATION}/sha256.json", lf_sha256), (f"{RESULTS}/sha256.json", sha256),
-                                 (CONTRACT_SEAL, lf_sha256)):
+    for seal_path, normalize in zip(SEALS, (lf_sha256, sha256, lf_sha256)):
         seal = load(root, seal_path)
         files = seal.get("files") or {}
         if not files:
@@ -339,8 +340,17 @@ def check_provenance(root: Path, commit: str, findings: list) -> None:
 
 
 def input_paths(root: Path) -> list:
-    """INPUT_PATHS plus every registered pair file named by the candidate's registration."""
+    """INPUT_PATHS, every file the candidate's three seals name (B2-01 checks them: the B1 registration
+    document, the contract document, the artifact inventory, ...), and every registered pair file."""
     paths = list(INPUT_PATHS)
+    for seal in SEALS:
+        try:
+            files = json.loads(git(root, "show", f"HEAD:{seal}") or "{}").get("files") or {}
+        except (ValueError, AttributeError):
+            files = {}
+        for path in sorted(files) if isinstance(files, dict) else []:
+            if path not in paths:
+                paths.append(path)
     try:
         pairs = json.loads(git(root, "show", f"HEAD:{REGISTRATION}/pairs.json") or "{}").get("pairs") or []
     except (ValueError, AttributeError):
@@ -474,16 +484,19 @@ def render(doc: dict) -> bytes:
     return (json.dumps(doc, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
 
 
-def stamp_entry(index_text: str | None) -> dict | None:
-    """The headline's entry in a stamp index (None when absent or unreadable)."""
+def stamp_entries(index_text: str | None) -> object:
+    """Every headline entry in a stamp index, in order ([] when the index is absent). An index that is
+    not a JSON object with a publicationStamps list is the marker "<unreadable>", which equals no
+    readable index, so it can never pass as unchanged or as this run's entry."""
+    if index_text is None:
+        return []
     try:
-        stamps = json.loads(index_text).get("publicationStamps") if index_text else None
+        stamps = json.loads(index_text).get("publicationStamps")
     except (ValueError, AttributeError):
-        return None
-    for stamp in stamps if isinstance(stamps, list) else []:
-        if isinstance(stamp, dict) and (stamp.get("path"), stamp.get("stampPointer")) == STAMP_KEY:
-            return stamp
-    return None
+        return "<unreadable>"
+    if not isinstance(stamps, list):
+        return "<unreadable>"
+    return [s for s in stamps if not isinstance(s, dict) or (s.get("path"), s.get("stampPointer")) == STAMP_KEY]
 
 
 def render_index(root: Path, entry: dict) -> bytes:
@@ -502,12 +515,12 @@ def check_main_publication(root: Path, outputs: dict, findings: list) -> None:
     if main != head and main != outputs[HEADLINE]:
         findings.append(("B2-07", f"{HEADLINE} on {MAIN_REF} changed since the candidate and is not this run's "
                                   "headline; a newer publication reached main, so this candidate is stale"))
-    head_entry = stamp_entry(git(root, "show", f"HEAD:{STAMP_INDEX}"))
-    main_entry = stamp_entry(git(root, "show", f"{MAIN_REF}:{STAMP_INDEX}"))
-    ours_entry = stamp_entry(outputs[STAMP_INDEX].decode("utf-8"))
-    if main_entry != head_entry and main_entry != ours_entry:
-        findings.append(("B2-07", f"the {HEADLINE} entry of {STAMP_INDEX} on {MAIN_REF} changed since the "
-                                  "candidate and is not this run's entry"))
+    head_entries = stamp_entries(git(root, "show", f"HEAD:{STAMP_INDEX}"))
+    main_entries = stamp_entries(git(root, "show", f"{MAIN_REF}:{STAMP_INDEX}"))
+    ours_entries = stamp_entries(outputs[STAMP_INDEX].decode("utf-8"))
+    if main_entries != head_entries and main_entries != ours_entries:
+        findings.append(("B2-07", f"the {HEADLINE} entries of {STAMP_INDEX} on {MAIN_REF} changed since the "
+                                  "candidate (added, removed, duplicated, or unreadable) and are not this run's entry"))
 
 
 def report(findings: list, candidate: dict | None) -> str:
