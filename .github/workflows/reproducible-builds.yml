@@ -1,0 +1,125 @@
+name: Reproducible publication builds
+
+# The release gate (#1410) rebuilds the NuGet packages, the release metadata and the
+# website at publication and compares SHA-256 hashes with the adjudicated ones. This
+# workflow builds each surface twice, in this checkout and in a fresh clone at another
+# path, and fails on any byte difference. Local proof and design:
+# docs/plans/evidence/deterministic-builds/.
+on:
+  pull_request:
+    branches: [main, 'release/**']
+    paths:
+      - 'src/**'
+      - 'website/**'
+      - 'Directory.*'
+      - 'global.json'
+      - 'NuGet.Config'
+      - 'scripts/reproducible-build.sh'
+      - 'scripts/reproducible_builds.py'
+      - 'scripts/generate-release-metadata.py'
+      - '.github/workflows/reproducible-builds.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  packages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Bootstrap verified Z3 assets
+        uses: ./.github/actions/bootstrap-z3
+
+      - name: Restore dependencies
+        run: dotnet restore src/Calor.Compiler/Calor.Compiler.csproj --locked-mode
+
+      # The clone gets this checkout's verified Z3 assets; its build re-verifies them.
+      - name: Clone to a second path
+        run: python3 scripts/reproducible_builds.py clone "$RUNNER_TEMP/second/nested/calor-clone" --z3 copy
+
+      - name: Build and pack in the checkout
+        run: bash scripts/reproducible-build.sh . "$RUNNER_TEMP/build-1" packages
+
+      - name: Build and pack in the clone
+        run: bash scripts/reproducible-build.sh "$RUNNER_TEMP/second/nested/calor-clone" "$RUNNER_TEMP/build-2" packages
+
+      - name: Compare every package, entry and metadata file
+        run: |
+          set -euo pipefail
+          python3 scripts/reproducible_builds.py hash "$RUNNER_TEMP/build-1" --json "$RUNNER_TEMP/packages-1.json"
+          python3 scripts/reproducible_builds.py hash "$RUNNER_TEMP/build-2" --json "$RUNNER_TEMP/packages-2.json"
+          python3 scripts/reproducible_builds.py compare "$RUNNER_TEMP/packages-1.json" "$RUNNER_TEMP/packages-2.json" \
+            --markdown "$RUNNER_TEMP/packages.md"
+          cat "$RUNNER_TEMP/packages.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload hashes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reproducible-packages-hashes
+          path: |
+            ${{ runner.temp }}/packages-*.json
+            ${{ runner.temp }}/packages.md
+          if-no-files-found: ignore
+          retention-days: 30
+
+  website:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # Same Node major as nextjs-gh-pages.yml, the workflow that publishes the site.
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: website/package-lock.json
+
+      - name: Clone to a second path
+        run: |
+          set -euo pipefail
+          dest="$RUNNER_TEMP/second/nested/calor-clone"
+          git clone --quiet --no-local --no-checkout "$GITHUB_WORKSPACE" "$dest"
+          git -C "$dest" -c advice.detachedHead=false checkout --quiet --detach "$(git rev-parse HEAD)"
+
+      - name: Build the site in the checkout
+        run: bash scripts/reproducible-build.sh . "$RUNNER_TEMP/build-1" website
+
+      - name: Build the site in the clone
+        run: bash scripts/reproducible-build.sh "$RUNNER_TEMP/second/nested/calor-clone" "$RUNNER_TEMP/build-2" website
+
+      - name: Compare every website file and the release gate's tree digest
+        run: |
+          set -euo pipefail
+          python3 scripts/reproducible_builds.py hash "$RUNNER_TEMP/build-1" --json "$RUNNER_TEMP/website-1.json"
+          python3 scripts/reproducible_builds.py hash "$RUNNER_TEMP/build-2" --json "$RUNNER_TEMP/website-2.json"
+          python3 scripts/reproducible_builds.py compare "$RUNNER_TEMP/website-1.json" "$RUNNER_TEMP/website-2.json" \
+            --markdown "$RUNNER_TEMP/website.md"
+          cat "$RUNNER_TEMP/website.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload hashes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reproducible-website-hashes
+          path: |
+            ${{ runner.temp }}/website-*.json
+            ${{ runner.temp }}/website.md
+          if-no-files-found: ignore
+          retention-days: 30

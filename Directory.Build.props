@@ -17,6 +17,36 @@
     <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
   </PropertyGroup>
 
+  <!-- Reproducible publication builds. The release gate (#1410,
+       scripts/verify_release_adjudication.py) rebuilds the packages at publication
+       and compares their SHA-256 with the adjudicated hashes, so two builds of one
+       commit must produce the same bytes in any checkout directory. Guarded by
+       scripts/test_reproducible_builds.py; proof in
+       docs/plans/evidence/deterministic-builds/. -->
+  <PropertyGroup Label="Reproducible builds">
+    <!-- Roslyn: no MVID/timestamp randomness (the SDK default, made explicit). -->
+    <Deterministic>true</Deterministic>
+    <CalorRepoRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)'))</CalorRepoRoot>
+    <!-- NuGet pack writes this time into every .nupkg zip entry instead of the wall
+         clock. A fixed constant: no git or environment input (an ambient
+         SOURCE_DATE_EPOCH is deliberately ignored). Override only with
+         -p:DeterministicTimestamp=... -->
+    <DeterministicTimestamp Condition="'$(DeterministicTimestamp)' == ''">2000-01-01T00:00:00Z</DeterministicTimestamp>
+  </PropertyGroup>
+
+  <!-- Release builds of the shipped projects (everything under src/) map the
+       checkout directory to /_/ and the NuGet package root to /_1/ in DLLs and PDBs
+       (the absolute PDB path in the debug directory and every document path). This
+       is the SDK's DeterministicSourcePaths mechanism, fed by the SourceRoot below
+       because source-control queries and SourceLink are disabled in this repo.
+       Debug builds and test/tool projects keep real paths for local debugging. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release' AND $(MSBuildProjectDirectory.Replace('\', '/').StartsWith('$(CalorRepoRoot.Replace('\', '/'))src/'))">
+    <DeterministicSourcePaths>true</DeterministicSourcePaths>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(DeterministicSourcePaths)' == 'true'">
+    <SourceRoot Include="$(CalorRepoRoot)" />
+  </ItemGroup>
+
   <PropertyGroup>
     <Company>Calor</Company>
     <Product>Calor Compiler</Product>

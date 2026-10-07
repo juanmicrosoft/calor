@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The NuGet packages and the website now build byte-for-byte the same every time.** The
+  release gate rebuilds both at publication and compares SHA-256 hashes with the recorded ones,
+  so before this fix no release could pass it. Two builds of one commit, in fresh clones at
+  different paths, now give identical hashes for both packages, every package entry, the
+  release metadata, and every website file. The files each package contains are the same as
+  before; only timestamps and embedded paths change. Six causes were fixed:
+  - Each `.nupkg` zip entry carried the time of packing. Packing now uses a fixed timestamp
+    (NuGet's `DeterministicTimestamp`).
+  - Release builds of the shipped projects embedded the absolute checkout path in DLLs and
+    PDBs. They now map it to `/_/` (MSBuild's `DeterministicSourcePaths`).
+  - Next.js picked a random build ID for every build. It is now `calor-<website version>`.
+  - webpack module IDs in the site's JavaScript were hashed from strings that held absolute
+    paths. A small webpack plugin now hashes them with the checkout path removed.
+  - The site's entry scripts were named by a hash of their build inputs, which also held
+    absolute paths. They are now named by a hash of their bytes (`[contenthash]`).
+  - The docs pages were listed in file-system order, which differs between macOS and Linux. They
+    are now sorted, so the sitemap and the search index have one fixed order.
+
+  A new CI workflow, `reproducible-builds.yml`, builds both surfaces twice and fails on any
+  byte difference.
+
 ## [0.24.0] - 2026-10-07
 
 Calor 0.24 is a soundness release. It repairs verifier defects found by a registered soundness
