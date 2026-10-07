@@ -119,7 +119,7 @@ post-conversion rescue and reported as `post-validation-fallback` (F6 owns that 
 
 ## Results (from `results.json`)
 
-Measured at `02f16b04` (`src/` tree `48e2cf60`), Release build, macOS arm64.
+Measured at `1d33c7e2` (`src/` tree `dfa86364`), Release build, macOS arm64.
 
 | Case | R0 baseline (CLI / MCP default) | Every surface now (`cli-default`, `cli-passthrough`, `cli-no-fallback`, `cli-migrate`, `mcp-default`, `mcp-passthroughOnError`, `mcp-passthroughOnError-moduleName`) |
 |---|---|---|

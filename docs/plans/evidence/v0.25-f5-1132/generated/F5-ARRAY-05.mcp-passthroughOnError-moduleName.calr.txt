@@ -19,9 +19,8 @@
       §ARR{implicitArr:str}
         "a"
         "b"
-      §B{~_hoist000} §ARR{arrI32014:i32} 5 6 §/ARR{arrI32014}
       §ARR{nested:any}
-        _hoist000
+        §ARR{arrI32014:i32} 5 6 §/ARR{arrI32014}
         "s"
       §B{i32[][]:j} §C{Jagged}
       §B{c} §C{Cube}
