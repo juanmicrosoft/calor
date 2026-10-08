@@ -463,7 +463,7 @@
       "derivedFrom": ["benchmark-corpus"],
       "sourceRevisions": "The candidate commit (HEAD of the run), bound as a full SHA in the headline's provenance (B2-08).",
       "configuration": "The B1 registration and results packets (docs/plans/evidence/b1-1276/), regenerated twice by the registered generator; no statistical_runs or LLM input reaches the headline.",
-      "seeds": "None; the B1 generator is deterministic.",
+      "seeds": "B1 registration: per-member input tuples from SplitMix64 seeded by SHA-256 of the pair id and member key; bootstrap intervals from SplitMix64 with state 1276, 10,000 resamples (docs/plans/evidence/b1-1276/registration/registration.json).",
       "environment": "ubuntu-latest; .NET SDK in the global.json band; Python 3.",
       "regeneration": { "command": "The benchmark.yml steps 'Regenerate the B1 results with the registered generator (#1422)' and 'Refuse incomparable or non-equivalent benchmark results (#1422)': dotnet run --project tests/Calor.Evaluation -c Release -- pair-metrics (twice) and pair-results over docs/plans/evidence/b1-1276/, then python3 scripts/benchmark_publication_gate.py check --commit <full HEAD SHA> --regenerated <dir> --report <file>" },
       "provenance": { "identity": "full-sha", "detail": "provenance.commit in the headline: the full SHA of the candidate, on origin/main (B2-08)." },

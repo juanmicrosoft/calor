@@ -323,7 +323,7 @@ give the details.
   explicit closer such as `§/TR{id}` still ends a body written at the
   opener's own column.
 
-- **Name binding no longer copies module-wide tables at every loop.** Since 0.22.0, the
+- **Name binding no longer copies the module-wide symbol table at every loop.** Since 0.22.0, the
   binder made two kinds of module-wide copies. Before each loop, it copied the whole symbol table
   and its declaration counters so it could undo a trial pass over the loop body. At each loop,
   branch, and lambda, it copied the callable-state map (which tracks what each stored lambda may
