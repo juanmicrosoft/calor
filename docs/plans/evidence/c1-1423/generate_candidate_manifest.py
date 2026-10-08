@@ -87,6 +87,18 @@ def tag_self_test():
     for args, expected in cases:
         check(bool(tag_problems(r, *args, candidate=c)) == bool(expected), f'tag self-test failed for {args}')
 
+def supersedes():
+    """The candidate this freeze replaces: an ancestor of the new candidate, named by the manifest landed for it."""
+    old = INPUTS['supersedes']
+    commit, at = old['commit'], old['manifestAtLanding']
+    check(commit != CANDIDATE and ancestor(commit), f'superseded candidate {commit} is not a proper ancestor of the candidate')
+    landed = git('show', at)
+    check(landed is not None and json.loads(landed)['candidate']['commit'] == commit,
+          f'{at} does not name the superseded candidate {commit}')
+    landing = at.split(':')[0]
+    check(ancestor(landing), f'the landing {landing} of the superseded freeze is not an ancestor of the candidate')
+    return old
+
 def files_under(prefix):
     out = git('ls-tree', '-r', '--name-only', CANDIDATE, '--', prefix) or ''
     return sorted(p for p in out.splitlines() if p)
@@ -131,7 +143,7 @@ def build():
     check(len(submodules) == 3, f'expected 3 gitlinks (the corpus submodules), found {len(submodules)}')
 
     contract = jload('docs/plans/evidence/evidence-contract-1407/contract.json')
-    check(contract.get('contractVersion') == '1.3.2', 'contractVersion is not 1.3.2')
+    check(contract.get('contractVersion') == '1.4.0', 'contractVersion is not 1.4.0')
     check(contract.get('status') == 'FROZEN' and contract.get('gateStatus') == 'MET', 'contract not FROZEN/MET')
     pr_of_amendment = {a['version']: a['reviewedInPr'] for a in contract.get('amendmentLog', [])}
     amendments = []
@@ -141,7 +153,7 @@ def build():
         check(merge is not None and ancestor(merge), f'amendment {a["version"]} PR #{pr} merge is not an ancestor')
         amendments.append({'version': a['version'], 'timestampUtc': a['timestampUtc'], 'reviewedInPr': pr,
                            'mergeCommit': merge, 'afterDecisionBearingInspection': a['afterDecisionBearingInspection']})
-    check([a['version'] for a in amendments] == ['1.0.1', '1.1.0', '1.1.1', '1.2.0', '1.2.1', '1.3.0', '1.3.1', '1.3.2'],
+    check([a['version'] for a in amendments] == ['1.0.1', '1.1.0', '1.1.1', '1.2.0', '1.2.1', '1.3.0', '1.3.1', '1.3.2', '1.4.0'],
           f'amendment versions differ: {list(pr_of_amendment)}')
     log_bytes = ''.join(f'{a["version"]}|{a["timestampUtc"]}|{a["reviewedInPr"]}|'
                         f'{str(a["afterDecisionBearingInspection"]).lower()}|{a["mergeCommit"]}\n' for a in amendments).encode()
@@ -193,6 +205,10 @@ def build():
     check(not open_findings, f'S2 findings without an accepted disposition: {open_findings}')
 
     protocol = jload('docs/plans/evidence/g2-1421/protocol.json')
+    check(protocol.get('protocolVersion') == '1.4.0', 'G2 protocolVersion is not 1.4.0')
+    inventory = jload('docs/plans/evidence/evidence-contract-1407/artifact-inventory.json')
+    stale = [a['id'] for a in inventory.get('artifacts', []) if a.get('classification') == 'stale']
+    check(not stale, f'inventory artifacts still stale (R2 G008 would reject every terminal record): {stale}')
     consumers = jload('eng/z3-consumers.json')
     ledger = jload('docs/plans/evidence/g3-1135/ledger.json')
     for e in ledger.get('entries', []):
@@ -312,6 +328,7 @@ def build():
         'maintainerDecisions': INPUTS['maintainerDecisions'],
         'knownOpenItems': OPEN_ITEMS,
         'resolvedOpenItems': INPUTS['resolvedOpenItems'],
+        'supersedes': supersedes(),
         'invalidation': INPUTS['invalidation'],
         'review': N['review'],
     }
