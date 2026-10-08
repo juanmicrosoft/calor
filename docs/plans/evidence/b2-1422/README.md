@@ -227,7 +227,9 @@ Main changing the generator or a registered pair file refuses with B2-08.
 
 Codex, read-only, reasoning effort high. Round 1: REQUEST-CHANGES (sealed files were not inputs;
 only the first stamp entry was compared). Round 2: REQUEST-CHANGES (object ids ignored file modes).
-Round 3: APPROVE. Verification pass: see `reviews/pr2-verification-pass-codex.md`.
+Round 3: APPROVE. The verification pass over the final diff (records and evidence added after
+round 3; no code change) has **not run yet**: Codex hit its usage limit on 2026-10-07 at 19:02
+(reset 22:57). It is to be recorded as `reviews/pr2-verification-pass-codex.md`.
 
 ### Limits
 
