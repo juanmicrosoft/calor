@@ -1487,9 +1487,7 @@ public sealed class EffectEnforcementPass
     private readonly Dictionary<FunctionNode, (EffectSet Body, IReadOnlyList<string> Reasons)> _localFunctionBodies =
         new(ReferenceEqualityComparer.Instance as IEqualityComparer<FunctionNode>);
 
-    /// <summary>0.25 F3 (#847): the row of an escaping local function: the union of
-    /// every local body of its callable (it may call siblings); Unknown if one was
-    /// never inferred.</summary>
+    /// <summary>0.25 F3 (#847): an escaping local function's row: the union of all local bodies.</summary>
     private PolyRow LocalFunctionValueRow(FunctionNode enclosing)
     {
         var body = EffectSet.Empty;
@@ -1985,8 +1983,7 @@ public sealed class EffectEnforcementPass
         private readonly Dictionary<string, PolyRow> _scope =
             new(StringComparer.Ordinal);
 
-        /// <summary>0.25 F3 (#847): for a local function body, the callable that
-        /// declares it (its owner class and sibling local functions).</summary>
+        /// <summary>0.25 F3 (#847): the callable declaring this local body.</summary>
         private readonly FunctionNode? _enclosing;
 
         public RowSiteChecker(EffectEnforcementPass pass, FunctionNode function, FunctionNode? enclosing = null)
@@ -1996,8 +1993,7 @@ public sealed class EffectEnforcementPass
             _enclosing = enclosing;
         }
 
-        /// <summary>Member entries of <see cref="_scope"/>: a local function shadows
-        /// them, a parameter or binding shadows it (#847).</summary>
+        /// <summary>Member entries of <see cref="_scope"/>, which a local function shadows (#847).</summary>
         private readonly HashSet<string> _memberNames = new(StringComparer.Ordinal);
 
         private bool IsLocalFunctionName(string name) =>
@@ -2583,8 +2579,7 @@ public sealed class EffectEnforcementPass
         {
             switch (expression)
             {
-                // 0.25 F3 (#847): either branch may be returned; a branch that is
-                // not a nameable function value is Unknown (#847 review round 2).
+                // 0.25 F3 (#847): either branch may flow; an unnameable branch is Unknown.
                 case ConditionalExpressionNode conditional
                     when SourceRow(conditional.WhenTrue) is var whenTrue
                         && SourceRow(conditional.WhenFalse) is var whenFalse
@@ -3238,13 +3233,10 @@ public sealed class EffectEnforcementPass
             return effects;
         }
 
-        /// <summary>0.25 F3 (#847): the local function being inferred; AST name searches
-        /// read its parameters and bindings, never the enclosing callable's.</summary>
+        /// <summary>0.25 F3 (#847): the local function whose parameters AST searches read.</summary>
         private FunctionNode? _localFunctionScope;
 
-        /// <summary>0.25 F3 (#847): a local body is charged to the enclosing callable at
-        /// its declaration, called or not; uses are charged by
-        /// <see cref="LocalFunctionUseCharge"/>. Inferred once per inference.</summary>
+        /// <summary>0.25 F3 (#847): a local body, charged to its callable where declared.</summary>
         private EffectSet InferFromLocalFunction(LocalFunctionStatementNode local)
         {
             if (_localBodies.TryGetValue(local.Function, out var known))
@@ -3273,10 +3265,8 @@ public sealed class EffectEnforcementPass
             new(ReferenceEqualityComparer.Instance as IEqualityComparer<FunctionNode>);
         private int _lambdaDepth;
 
-        /// <summary>0.25 F3 (#847): charge for a call, delegate invocation or method
-        /// group of a local function. Nothing in the callable's own body (charged at
-        /// the declaration); inside a lambda, which may escape, the union of all local
-        /// bodies, or Unknown while one is still being inferred.</summary>
+        /// <summary>0.25 F3 (#847): a use of a local function charges nothing in its callable's
+        /// body, and inside a (possibly escaping) lambda the union of all local bodies.</summary>
         private EffectSet LocalFunctionUseCharge()
         {
             if (_lambdaDepth == 0)
@@ -3293,13 +3283,11 @@ public sealed class EffectEnforcementPass
             return union;
         }
 
-        /// <summary>The callable whose parameters and bindings an AST name search reads.</summary>
         private FunctionNode? AstScopeFunction() =>
             _localFunctionScope
             ?? (_context.Functions.TryGetValue(_context.CurrentFunctionId, out var function) ? function : null);
 
-        /// <summary>0.25 F3 (#847): whether a bare name names a local function of the
-        /// current callable; only a parameter or binding shadows it, as in C#.</summary>
+        /// <summary>0.25 F3 (#847): a bare name naming a local function (not a parameter/binding).</summary>
         private bool IsLocalFunctionName(string name)
         {
             if (name.Contains('.')

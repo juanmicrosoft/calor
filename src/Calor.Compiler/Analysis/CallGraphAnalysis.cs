@@ -89,8 +89,7 @@ public sealed class CallGraphAnalysis
         public Dictionary<string, List<(string Name, int DeclarationStart, Binding.BoundTypes.FunctionBoundType Type)>>
             Locals { get; } = new(StringComparer.Ordinal);
 
-        /// <summary>0.25 F3 (#847): calls the binder resolved to a local function,
-        /// keyed by the enclosing callable's id.</summary>
+        /// <summary>0.25 F3 (#847): local-function calls, keyed by the enclosing callable.</summary>
         public HashSet<(string CallerId, int Start, int End)> LocalFunctionCalls { get; } = new();
 
         /// <summary>False when binding threw: no call site is known to be local.</summary>

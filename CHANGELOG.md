@@ -13,7 +13,8 @@ All notable changes to this project will be documented in this file.
   parameters or `this`; a capture is a compile error (`CS8421`). Its body's effects are
   charged to the enclosing callable. Other placements and shapes (nested in a block,
   `§E`, contracts, type parameters, refinement types, `§PROOF`, `§YIELD`) are rejected
-  with the new diagnostic `Calor0211`. See
+  with the new diagnostic `Calor0211`. So is a use as a value in a position whose effect
+  row Calor does not check, such as inside `??`, an array or a qualified store. See
   [Local Functions](website/content/syntax-reference/structure-tags.mdx).
 
 ### Changed

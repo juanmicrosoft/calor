@@ -337,6 +337,11 @@ Leave out the visibility segment: a local function is never visible outside its 
   to the enclosing callable where it is declared, whether or not it is called. Calls
   to it charge nothing more. If it escapes as a delegate value, the value's effect row
   is the union of all local function bodies of that callable.
+- **As a value.** You can pass a local function as a delegate, but only where its effect
+  row is checked: directly as a `§B` initializer, a `§R` value or the value of an `§ASSIGN`
+  to a simple name (or a `?:` branch of one of those), outside lambdas, or as a `§C{…}`
+  argument. Anywhere else (inside `??`, an array, a qualified store, `§C X …` arguments)
+  is a `Calor0211` error.
 - **Placement and shape.** It must sit directly in a `§F` or `§MT` body. It cannot be
   nested in a block, a lambda or another local function, and it cannot declare `§E`,
   `§Q`/`§S`, effect rows, type parameters or refinement types, contain `§PROOF`, or

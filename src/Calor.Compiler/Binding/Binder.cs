@@ -1402,11 +1402,8 @@ public sealed class Binder
     private readonly HashSet<FunctionSymbol> _localFunctionSymbols = new(ReferenceEqualityComparer.Instance);
     private readonly List<BoundFunction> _boundLocalFunctions = new();
 
-    /// <summary>
-    /// 0.25 F3 (#847): declares a body's local functions in a scope between the host
-    /// and the body scope (visible before their declaration and to each other) and
-    /// returns the scope the body scope must be a child of.
-    /// </summary>
+    /// <summary>0.25 F3 (#847): declares a body's local functions in a scope between the
+    /// host and the body scope; returns the body scope's parent.</summary>
     private Scope DeclareLocalFunctions(
         IReadOnlyList<StatementNode> body,
         SymbolId enclosing,
@@ -1438,10 +1435,7 @@ public sealed class Binder
         return scope;
     }
 
-    /// <summary>
-    /// Binds each local body as its own static callable that never sees the enclosing
-    /// locals or parameters (a C# <c>static</c> local function).
-    /// </summary>
+    /// <summary>Binds each local body as a static callable blind to the enclosing locals.</summary>
     private void BindLocalFunctions(
         List<(FunctionNode Node, FunctionSymbol Symbol)> locals,
         Scope localFunctionScope,
@@ -6070,9 +6064,8 @@ public sealed class Binder
         var firstDot = target.IndexOf('.');
         if (firstDot <= 0)
         {
-            // 0.25 F3 (#847): C# simple-name lookup stops at the innermost
-            // declaration: a local or parameter is invoked as a value; a visible
-            // local function wins over same-named members and module functions.
+            // 0.25 F3 (#847): C# simple-name lookup: a local/parameter is invoked as a
+            // value; a visible local function wins over members and module functions.
             if (_scope.Lookup(target) is VariableSymbol { DeclaringTypeName: null })
                 yield break;
             if (_scope.GetOverloads(target).Any(_localFunctionSymbols.Contains))
