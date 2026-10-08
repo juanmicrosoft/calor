@@ -69,7 +69,12 @@ function getAllDocFiles(dir: string = DOCS_DIR): string[] {
   }
 
   const files: string[] = [];
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  // readdir order depends on the file system (APFS and ext4 differ), and it decides the
+  // order of the sitemap, the search index, and ties in the nav. Sort by code point so
+  // every checkout builds the same bytes (reproducible publication builds).
+  const entries = fs
+    .readdirSync(dir, { withFileTypes: true })
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);

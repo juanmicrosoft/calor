@@ -1,0 +1,149 @@
+name: Reproducible publication builds
+
+# The release gate (#1410) rebuilds the NuGet packages, the release metadata and the
+# website at publication and compares SHA-256 hashes with the adjudicated ones. This
+# workflow builds each surface twice, in this checkout and in a fresh clone at another
+# path, and fails on any byte difference. The second build also gets its own HOME,
+# NuGet and npm caches, time zone and locale, plus ambient SOURCE_DATE_EPOCH and
+# DeterministicTimestamp values that must be ignored. Local proof and design:
+# docs/plans/evidence/deterministic-builds/.
+#
+# No paths filter: packages and the site read inputs from all over the tree (README.md,
+# docs/assets, bench/ and tests/ files embedded as resources, scripts, the bootstrap action).
+on:
+  pull_request:
+    branches: [main, 'release/**']
+  workflow_dispatch:
+
+env:
+  # Second-build environment. HOME and the caches live under RUNNER_TEMP (set per step).
+  SECOND_TZ: Pacific/Kiritimati
+  SECOND_LOCALE: tr_TR.UTF-8
+
+permissions:
+  contents: read
+
+jobs:
+  packages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Bootstrap verified Z3 assets
+        uses: ./.github/actions/bootstrap-z3
+
+      - name: Restore dependencies
+        run: dotnet restore src/Calor.Compiler/Calor.Compiler.csproj --locked-mode
+
+      # The clone gets this checkout's verified Z3 assets; its build re-verifies them.
+      - name: Clone to a second path
+        run: python3 scripts/reproducible_builds.py clone "$RUNNER_TEMP/second/nested/calor-clone" --z3 copy
+
+      - name: Build and pack in the checkout
+        run: bash scripts/reproducible-build.sh . "$RUNNER_TEMP/build-1" packages
+
+      - name: Build and pack in the clone (isolated HOME, caches, time zone, locale)
+        run: |
+          set -euo pipefail
+          home="$RUNNER_TEMP/home-2"
+          mkdir -p "$home"
+          HOME="$home" DOTNET_CLI_HOME="$home" NUGET_PACKAGES="$home/nuget-packages" \
+            npm_config_cache="$home/npm-cache" TZ="$SECOND_TZ" LANG="$SECOND_LOCALE" LC_ALL="$SECOND_LOCALE" \
+            SOURCE_DATE_EPOCH=1700000000 DeterministicTimestamp=2025-02-03T00:00:00Z \
+            bash scripts/reproducible-build.sh "$RUNNER_TEMP/second/nested/calor-clone" "$RUNNER_TEMP/build-2" packages
+
+      - name: Compare every package, entry and metadata file
+        run: |
+          set -euo pipefail
+          python3 scripts/reproducible_builds.py hash "$RUNNER_TEMP/build-1" --json "$RUNNER_TEMP/packages-1.json"
+          python3 scripts/reproducible_builds.py hash "$RUNNER_TEMP/build-2" --json "$RUNNER_TEMP/packages-2.json"
+          python3 scripts/reproducible_builds.py compare "$RUNNER_TEMP/packages-1.json" "$RUNNER_TEMP/packages-2.json" \
+            --targets packages --markdown "$RUNNER_TEMP/packages.md"
+          cat "$RUNNER_TEMP/packages.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload hashes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reproducible-packages-hashes
+          path: |
+            ${{ runner.temp }}/packages-*.json
+            ${{ runner.temp }}/packages.md
+          if-no-files-found: ignore
+          retention-days: 30
+
+      # The bytes behind the hashes, kept briefly so a difference (here, or against
+      # hashes recorded on another machine) can be diagnosed entry by entry.
+      - name: Upload the first build's packages for diagnosis
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reproducible-packages-build-1
+          path: ${{ runner.temp }}/build-1/nupkg/*.nupkg
+          if-no-files-found: ignore
+          retention-days: 7
+
+  website:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # Same Node major as nextjs-gh-pages.yml, the workflow that publishes the site.
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: website/package-lock.json
+
+      - name: Clone to a second path
+        run: |
+          set -euo pipefail
+          dest="$RUNNER_TEMP/second/nested/calor-clone"
+          git clone --quiet --no-local --no-checkout "$GITHUB_WORKSPACE" "$dest"
+          git -C "$dest" -c advice.detachedHead=false checkout --quiet --detach "$(git rev-parse HEAD)"
+
+      - name: Build the site in the checkout
+        run: bash scripts/reproducible-build.sh . "$RUNNER_TEMP/build-1" website
+
+      - name: Build the site in the clone (isolated HOME, npm cache, time zone, locale)
+        run: |
+          set -euo pipefail
+          home="$RUNNER_TEMP/home-2"
+          mkdir -p "$home"
+          HOME="$home" npm_config_cache="$home/npm-cache" TZ="$SECOND_TZ" LANG="$SECOND_LOCALE" LC_ALL="$SECOND_LOCALE" \
+            SOURCE_DATE_EPOCH=1700000000 \
+            bash scripts/reproducible-build.sh "$RUNNER_TEMP/second/nested/calor-clone" "$RUNNER_TEMP/build-2" website
+
+      - name: Compare every website file and the release gate's tree digest
+        run: |
+          set -euo pipefail
+          python3 scripts/reproducible_builds.py hash "$RUNNER_TEMP/build-1" --json "$RUNNER_TEMP/website-1.json"
+          python3 scripts/reproducible_builds.py hash "$RUNNER_TEMP/build-2" --json "$RUNNER_TEMP/website-2.json"
+          python3 scripts/reproducible_builds.py compare "$RUNNER_TEMP/website-1.json" "$RUNNER_TEMP/website-2.json" \
+            --targets website --markdown "$RUNNER_TEMP/website.md"
+          cat "$RUNNER_TEMP/website.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload hashes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reproducible-website-hashes
+          path: |
+            ${{ runner.temp }}/website-*.json
+            ${{ runner.temp }}/website.md
+          if-no-files-found: ignore
+          retention-days: 30
