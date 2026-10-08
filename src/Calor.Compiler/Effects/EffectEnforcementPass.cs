@@ -4694,15 +4694,10 @@ public sealed class EffectEnforcementPass
                         {
                             return callResultType;
                         }
-                        // #1132: `var g = Build();` where the in-module Build declares
-                        // an array return type (`-> Cell[,]`): array members (`g.Rank`,
-                        // `g.GetLength(0)`) live on System.Array, elements are `Cell`.
+                        // #1132: `var g = Build();` with an in-module array return type.
                         if (bind.Initializer is CallExpressionNode localCall
-                            && InferCallReturnType(localCall) is { } localResult
-                            && localResult.EndsWith(']'))
-                        {
+                            && InferCallReturnType(localCall) is { } localResult && localResult.EndsWith(']'))
                             return localResult;
-                        }
                         // Known value, unknown type. v0.15 E1 slice 2c: this
                         // stays a sentinel rather than becoming null, because
                         // null here means "no such value" and the two are
@@ -5221,8 +5216,7 @@ public sealed class EffectEnforcementPass
                 CallExpressionNode call => InferCallReturnType(call),
                 FieldAccessNode field => InferFieldAccessType(field),
                 NullConditionalNode conditional => InferMemberType(conditional.Target, conditional.MemberName),
-                // #1132: an element of `T[,]` / `T[][]` is `T` / `T[]` (the leftmost
-                // rank specifier is the outermost array), so `g[i, j].V` charges T's member.
+                // #1132: an element of `T[,]` / `T[][]` is `T` / `T[]`, so `g[i, j].V` charges T's member.
                 ArrayAccessNode access => ElementTypeOf(InferExpressionType(access.Array)),
                 MultiDimArrayAccessNode access => ElementTypeOf(InferExpressionType(access.Array)),
                 ArrayCreationNode creation => creation.ElementType + "[]",
@@ -5951,8 +5945,7 @@ public sealed class EffectEnforcementPass
                 var resolved = FindClassProperty(cls, initializer.PropertyName);
                 var property = resolved?.Property;
                 var accessor = property?.Initer ?? property?.Setter;
-                // #1132: `new Cell { V = 1 }` where V is a FIELD of an in-module class:
-                // a plain store, already charged as `mut` by the caller.
+                // #1132: a FIELD of an in-module class is a plain store, already charged `mut`.
                 if (property == null && cls.Fields.Any(field =>
                         field.Name.Equals(initializer.PropertyName, StringComparison.Ordinal)))
                 {
