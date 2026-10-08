@@ -1,0 +1,41 @@
+start 2026-10-07T15:25:48Z
+10.0.401
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  Calor.Runtime -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Calor.Compiler -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/src/Calor.Compiler/bin/Release/net10.0/calor.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:00.53
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Calor.Compiler -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/src/Calor.Compiler/bin/Release/net10.0/publish/
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Successfully created package '/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/out/fresh/packages/calor.0.24.0.nupkg'.
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  Calor.Runtime -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Calor.Compiler -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/src/Calor.Compiler/bin/Release/net10.0/calor.dll
+  Calor.Tasks -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll
+  Calor.Sdk -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/src/Calor.Sdk/bin/Release/net10.0/Calor.Sdk.dll
+  Calor.Runtime -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/src/Calor.Runtime/bin/Release/net10.0/Calor.Runtime.dll
+  Verified Z3 managed and native assets against committed size/hash pins.
+  Calor.Compiler -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/src/Calor.Compiler/bin/Release/net10.0/calor.dll
+  Calor.Tasks -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/src/Calor.Tasks/bin/Release/net10.0/Calor.Tasks.dll
+  Calor.Tasks -> /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/src/Calor.Sdk/obj/sdk-tasks-publish/
+  Calor.Sdk pack: staged 25 files into tasks/net10.0
+  Successfully created package '/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/out/fresh/packages/Calor.Sdk.0.24.0.nupkg'.
+OK: Z3 assets in calor.0.24.0.nupkg match the committed pins.
+OK: Z3 assets in Calor.Sdk.0.24.0.nupkg match the committed pins.
+total 234200
+drwxr-xr-x@  4 juanrivera  wheel       128 Oct  7 11:25 .
+drwxr-xr-x@ 13 juanrivera  wheel       416 Oct  7 11:25 ..
+-rw-r--r--@  1 juanrivera  wheel  60298449 Oct  7 11:25 calor.0.24.0.nupkg
+-rw-r--r--@  1 juanrivera  wheel  57981436 Oct  7 11:26 Calor.Sdk.0.24.0.nupkg
+f78b52ea0030440bc4ed53cec3ba1bddd670e3ed970df90b30e74a04b21d4781  /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/out/fresh/packages/calor.0.24.0.nupkg
+4c9e476a713ec20b97816c8a37cd9df14ce35f305bae3a403c711e472a9d9ad0  /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/out/fresh/packages/Calor.Sdk.0.24.0.nupkg
+end 2026-10-07T15:26:02Z PACK-EXIT=0

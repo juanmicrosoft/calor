@@ -1,0 +1,19 @@
+{
+ "schema": "c2-1424/classifier-record/1",
+ "issue": 1424,
+ "candidate": "696ab82470626164979a07792ed74932ab88d9e6",
+ "supplements": ["docs/plans/evidence/c2-1424/ledger.json", "docs/plans/evidence/c2-1424/regeneration-1-manifest.json"],
+ "why": "Added after the records commit so that no existing C2 record is edited (the C1 classifier exempts only newly added data files under c2-1424/).",
+ "classifier": {
+  "test": "Calor.Compiler.Tests.EvidenceContract.CandidateManifestTests.RangeFromTheCandidateIsNotInvalidated",
+  "anchor": "fd34f41f0d5600b92b5868392e1ea3e1d1c197ff",
+  "anchorCheckout": "fresh clone of https://github.com/juanmicrosoft/calor.git, detached at the anchor",
+  "target": "4db3551cc9bf650d4c6ef659c93b29c10362a20d",
+  "originMainAtRun": "5e6ae3d3bf3af8f4dd4ef836690a36d7d0cba964",
+  "verdict": "NOT-INVALIDATED",
+  "output": {"path": "docs/plans/evidence/c2-1424/classifier.txt", "sha256": "6f84afc208bd2d5ba3cba090f58211f964ce3e0e461c759ab2f89b30b55021e1"},
+  "laterCommits": "The next commit adds only new data files under c2-1424/ (this record, classifier.txt, and the delta review record); the final branch head is classified again before push and its verdict is stated in the PR description.",
+  "history": "The branch was rewritten twice on 2026-10-07/08: to remove the .nupkg binaries ('Store hashes only') and to move the 14 files over about 1 MB to the orphan branch evidence/v0.24-archives (archives.json). Earlier classifier runs targeted pre-rewrite commits 5b428a79, 9ec2ea14, d2fa1393, 2fc26788, 0868abb7, d1859b26 (all NOT-INVALIDATED); they are no longer on the branch.",
+  "reviewNote": "reviews/regeneration-1-delta-verification-codex.md reviewed the delta to 0868abb7 (before the archive move). The archive move changes no record content except archives.json and the references to it; no further Codex pass was run."
+ }
+}

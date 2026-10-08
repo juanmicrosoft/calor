@@ -1,0 +1,19 @@
+Test manifest, skip inventory, and assertion-quality checks passed.
+== ids check /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/samples/Collections/ ==
+All 2 IDs are valid.
+== ids check /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/samples/Contracts/ ==
+All 4 IDs are valid.
+== ids check /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/samples/FizzBuzz/ ==
+All 2 IDs are valid.
+== ids check /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/samples/Generics/ ==
+All 14 IDs are valid.
+== ids check /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/samples/HelloWorld/ ==
+All 2 IDs are valid.
+== ids check /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/samples/PatternMatching/ ==
+All 2 IDs are valid.
+== ids check /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/samples/SdkSample/ ==
+All 2 IDs are valid.
+== ids check /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/samples/TypeSystem/ ==
+All 6 IDs are valid.
+== ids check /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/fresh/samples/Verification/ ==
+All 15 IDs are valid.

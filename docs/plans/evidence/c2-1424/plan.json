@@ -1,0 +1,425 @@
+{
+ "schema": "c2-1424/plan/1",
+ "issue": 1424,
+ "gate": "C2",
+ "epic": 1409,
+ "contractVersion": "1.3.2",
+ "candidate": {
+  "commit": "696ab82470626164979a07792ed74932ab88d9e6",
+  "version": "0.24.0",
+  "manifest": "docs/plans/evidence/c1-1423/candidate-manifest.json",
+  "c1Landing": "fd34f41f0d5600b92b5868392e1ea3e1d1c197ff"
+ },
+ "writtenAtUtc": "2026-10-07T15:30:15Z",
+ "writtenNote": "Not written first. The task asked for this plan before execution; it was written at 15:30Z, after the three CI dispatches of 15:06Z (recorded in ledger.json) and after the first local runs (Z3 bootstrap, locked restore, build, B1 regeneration, the B2 gate, two packs, two website builds, the fresh-clone run). The commands below are the ones those runs used, taken from the inventory and the workflows; no command was chosen after seeing a result. Deviations are recorded in ledger.json deviations.",
+ "rules": [
+  "Every output is produced from the candidate commit: local runs from a detached checkout of the candidate (the C2 agent worktree, `git checkout --detach 696ab824...`) and from a fresh clone checked out at the candidate; CI runs only by workflow_dispatch on the temporary branch c2-1424/candidate-696ab824, which points exactly at the candidate, and each run's head_sha is verified equal to the candidate.",
+  "Nothing is published: no package push, no tag, no GitHub release, no release-asset upload, no Pages deploy, no publication PR, no commit to main (contract section 7 releasePath.publicationSeparation). publish-nuget.yml, nextjs-gh-pages.yml, benchmark.yml, and verify-release.yml are never dispatched.",
+  "Every attempt is retained in ledger.json, including infrastructure failures. Nothing is re-run until green, and GitHub's job re-run is never used. A lane is dispatched again (a new run, whole workflow) only when jobs of its previous run never started because GitHub could not acquire a runner ('The job was not started because it repeatedly failed to be acquired'; githubstatus Actions major_outage 15:14Z-15:32Z), and at most once per lane; both runs are recorded and neither replaces the other. This rule was written after observing that infrastructure failure in the 15:06Z runs.",
+  "The determinism protocol is not dispatched again by C2 without a maintainer decision: its registered case registry no longer matches the candidate (ledger.json blocked row DETERMINISM-REGISTRY-DRIFT), so an execution could not be DETERMINISTIC and would use the protocol's last execution slot (maxExecutions 3).",
+  "Historical-only artifacts are not regenerated. Stale artifacts keep their frozen classification: where a repaired producer exists, its output is regenerated and recorded as a candidate output, and the row says the inventory still classifies the artifact stale.",
+  "Every output lands under docs/plans/evidence/c2-1424/ as newly added .json/.jsonl/.md/.txt/.log/.trx/.csv/.gz/.sha256 files, the only paths C1's invalidation classifier exempts after the landing."
+ ],
+ "ceilings": {
+  "regenerationCompute": {
+   "ceilingRunnerMinutes": 1500,
+   "perCompleteRegeneration": true,
+   "maxCompleteRegenerations": 2,
+   "source": "contract section 9 #1424 regeneration; chargeRule c2-candidate-determinism-protocol (amendment 1.2.0)"
+  },
+  "plannedWorstCaseRunnerMinutes": {
+   "determinism-protocol execution": 655,
+   "test.yml workflow_dispatch": 250,
+   "tier2.yml workflow_dispatch": 15,
+   "total": 920
+  },
+  "spendUsd": 0
+ },
+ "lanes": [
+  {
+   "id": "ci-determinism",
+   "kind": "ci",
+   "command": "gh workflow run determinism-protocol.yml --ref c2-1424/candidate-696ab824 -f mode=execution -f execution_id=<id>",
+   "expectedDeterminism": "decided by the run (protocol verdict)",
+   "charge": "regeneration-compute (chargeRule c2-candidate-determinism-protocol: at most one execution per complete regeneration)"
+  },
+  {
+   "id": "ci-test",
+   "kind": "ci",
+   "command": "gh workflow run test.yml --ref c2-1424/candidate-696ab824",
+   "expectedDeterminism": "pass/fail verdicts deterministic; timings not",
+   "charge": "regeneration-compute"
+  },
+  {
+   "id": "ci-tier2",
+   "kind": "ci",
+   "command": "gh workflow run tier2.yml --ref c2-1424/candidate-696ab824",
+   "expectedDeterminism": "counts deterministic (G4: 428 / 51 / 30, job failure from the 30 known failures)",
+   "charge": "regeneration-compute"
+  },
+  {
+   "id": "local-worktree",
+   "kind": "local",
+   "where": "C2 agent worktree, detached at the candidate, macOS arm64, SDK 10.0.401 / runtime 10.0.12",
+   "charge": "local machine time (no contract ceiling for C2)"
+  },
+  {
+   "id": "local-fresh-clone",
+   "kind": "local",
+   "where": "git clone --no-checkout https://github.com/juanmicrosoft/calor.git <scratch>/fresh; git -C <scratch>/fresh checkout --detach 696ab824...",
+   "purpose": "fresh-clone reproduction of the deterministic subset (contract section 10 C2 closure evidence)"
+  }
+ ],
+ "artifacts": [
+  {
+   "id": "verifier-runtime-differential",
+   "classification": "authoritative",
+   "action": "regenerate",
+   "command": "CALOR_UPDATE_VERIFIER_RUNTIME_DIFFERENTIAL_REPORTS=1 dotnet test tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj -c Release --filter \"FullyQualifiedName~VerifierRuntimeDifferentialTests.CommittedReportsMatchGeneratedOracle\"; then the same test without the variable",
+   "expectedDeterminism": "byte-identical to the committed reports (pinned aa1f86f9... json, 24901f21... md by amendment 1.3.2); cross-platform determinism decided by the determinism protocol run",
+   "lanes": [
+    "local-worktree",
+    "local-fresh-clone",
+    "ci-test",
+    "ci-determinism"
+   ],
+   "outputs": "regenerated/verifier-runtime-differential/"
+  },
+  {
+   "id": "modeled-forms-whitelist",
+   "classification": "authoritative",
+   "action": "validate (source is the artifact)",
+   "command": "dotnet test tests/Calor.Verification.Tests/Calor.Verification.Tests.csproj --filter \"FullyQualifiedName~ModeledFormsTests\"",
+   "expectedDeterminism": "pass",
+   "lanes": [
+    "local-worktree",
+    "local-fresh-clone",
+    "ci-test"
+   ],
+   "outputs": "regenerated/tests/"
+  },
+  {
+   "id": "release-test-suites",
+   "classification": "authoritative",
+   "action": "validate (source is the artifact): run the 13 releaseCritical projects",
+   "command": "test.yml workflow_dispatch (remaining-tests matrix and test job) on the candidate",
+   "expectedDeterminism": "pass/fail per test; Calor.Compiler.Tests has 12,947 tests (3 skipped) at the candidate (C1-TEST-COUNT-DELTA)",
+   "lanes": [
+    "ci-test"
+   ],
+   "outputs": "ci/"
+  },
+  {
+   "id": "ci-test-reports",
+   "classification": "derived",
+   "action": "regenerate and retain durably",
+   "command": "download every TRX/report artifact of the test.yml dispatch run and commit them gzipped",
+   "expectedDeterminism": "verdicts deterministic; TRX timestamps and durations are not",
+   "lanes": [
+    "ci-test"
+   ],
+   "outputs": "ci/"
+  },
+  {
+   "id": "test-manifest",
+   "classification": "authoritative",
+   "action": "validate",
+   "command": "python3 scripts/check_test_quality.py (and scripts/check_trx.py in CI)",
+   "expectedDeterminism": "pass",
+   "lanes": [
+    "local-worktree",
+    "ci-test"
+   ],
+   "outputs": "regenerated/release-quality/"
+  },
+  {
+   "id": "z3-upstream-pins",
+   "classification": "authoritative",
+   "action": "re-materialize and verify (never rebuilt)",
+   "command": "src/Calor.Compiler/scripts/download-z3.sh",
+   "expectedDeterminism": "every archive matches its pin",
+   "lanes": [
+    "local-worktree",
+    "local-fresh-clone"
+   ],
+   "outputs": "regenerated/pins/"
+  },
+  {
+   "id": "z3-release-binaries",
+   "classification": "authoritative",
+   "action": "re-materialize and verify (never rebuilt or republished)",
+   "command": "gh release download z3-binaries-4.15.7 -D <scratch>; verify SHA-256 and size of every asset against .github/z3-binaries-4.15.7.sha256",
+   "expectedDeterminism": "every asset matches its pin",
+   "lanes": [
+    "local-worktree"
+   ],
+   "outputs": "regenerated/pins/"
+  },
+  {
+   "id": "toolchain-pins",
+   "classification": "authoritative",
+   "action": "verify",
+   "command": "dotnet restore --locked-mode",
+   "expectedDeterminism": "restore succeeds without rewriting a lockfile",
+   "lanes": [
+    "local-worktree",
+    "local-fresh-clone",
+    "ci-test"
+   ],
+   "outputs": "regenerated/pins/"
+  },
+  {
+   "id": "corpus-submodules",
+   "classification": "authoritative",
+   "action": "re-materialize and verify",
+   "command": "git submodule update --init; compare git submodule status with the candidate's gitlinks",
+   "expectedDeterminism": "MediatR fb309026..., serilog 0597ddfb..., FluentValidation 71b3c60c...",
+   "lanes": [
+    "local-worktree"
+   ],
+   "outputs": "regenerated/pins/"
+  },
+  {
+   "id": "roundtrip-reports",
+   "classification": "derived",
+   "action": "regenerate",
+   "command": "dotnet run --project tools/Calor.RoundTrip.Harness -c Release -- run --all --dotnet dotnet --output artifacts/migration/roundtrip (release-quality step) and test.yml roundtrip-verification",
+   "expectedDeterminism": "per-project counts deterministic; timings not",
+   "lanes": [
+    "local-worktree",
+    "ci-test"
+   ],
+   "outputs": "regenerated/release-quality/, ci/"
+  },
+  {
+   "id": "roundtrip-baselines",
+   "classification": "derived",
+   "action": "derive and compare (the committed file is not edited)",
+   "command": "compare eng roundtrip baseline counts with the regenerated roundtrip-reports",
+   "expectedDeterminism": "advisory delta",
+   "lanes": [
+    "local-worktree"
+   ],
+   "outputs": "regenerated/release-quality/"
+  },
+  {
+   "id": "quality-ratchet-baselines",
+   "classification": "authoritative",
+   "action": "validate",
+   "command": "python3 scripts/run_performance_gate.py; python3 scripts/run_mutation_gate.py; python3 scripts/check_coverage.py (each also --self-test)",
+   "expectedDeterminism": "coverage and mutation deterministic; performance is wall-clock and load-sensitive",
+   "lanes": [
+    "local-worktree",
+    "ci-test"
+   ],
+   "outputs": "regenerated/release-quality/"
+  },
+  {
+   "id": "release-quality-reports",
+   "classification": "derived",
+   "action": "regenerate locally (publish-nuget.yml would reach its publish job, and it now requires an adjudication identity)",
+   "command": "every step of publish-nuget.yml job release-quality, run in order without the workflow",
+   "expectedDeterminism": "verdicts deterministic except performance and flake (wall clock)",
+   "lanes": [
+    "local-worktree"
+   ],
+   "outputs": "regenerated/release-quality/"
+  },
+  {
+   "id": "sdk-consumer-check",
+   "classification": "derived",
+   "action": "regenerate",
+   "command": "test.yml sdk-package-consumer matrix (5 RIDs) on the candidate",
+   "expectedDeterminism": "pass per RID",
+   "lanes": [
+    "ci-test"
+   ],
+   "outputs": "ci/"
+  },
+  {
+   "id": "ledger-provenance-index",
+   "classification": "authoritative",
+   "action": "validate",
+   "command": "dotnet test tests/Calor.Compiler.Tests/ --filter \"FullyQualifiedName~LedgerCommitStampTests\"",
+   "expectedDeterminism": "pass",
+   "lanes": [
+    "local-worktree",
+    "ci-test"
+   ],
+   "outputs": "regenerated/tests/"
+  },
+  {
+   "id": "benchmark-corpus",
+   "classification": "authoritative",
+   "action": "validate (source is the artifact)",
+   "command": "B1 packet validator: dotnet test tests/Calor.Compiler.Tests -c Release --filter \"FullyQualifiedName~BenchmarkResultsTests|FullyQualifiedName~BenchmarkRegistrationTests\"",
+   "expectedDeterminism": "pass",
+   "lanes": [
+    "local-worktree"
+   ],
+   "outputs": "regenerated/benchmark/"
+  },
+  {
+   "id": "candidate-packages",
+   "classification": "authoritative",
+   "action": "regenerate unpublished and content-hash",
+   "command": "publish-nuget.yml publish job steps without attest/push/release: dotnet restore src/Calor.Compiler/Calor.Compiler.csproj --locked-mode; dotnet build src/Calor.Compiler/Calor.Compiler.csproj -c Release --no-restore; dotnet pack src/Calor.Compiler/Calor.Compiler.csproj -c Release --no-build -o <store>; dotnet pack src/Calor.Sdk/Calor.Sdk.csproj -c Release -o <store> /p:CalorSdkRequireAllRids=true; python3 scripts/check-packaged-z3.py ... --all-rids",
+   "expectedDeterminism": "unknown before the run; tested by two packs in the worktree and one in the fresh clone",
+   "lanes": [
+    "local-worktree",
+    "local-fresh-clone"
+   ],
+   "outputs": "regenerated/publication/"
+  },
+  {
+   "id": "release-metadata",
+   "classification": "authoritative",
+   "action": "regenerate unpublished from the candidate packages",
+   "command": "python3 scripts/generate-release-metadata.py --name calor-nuget-<candidate> --artifacts <store> --output <dir> --repository https://github.com/juanmicrosoft/calor --commit <candidate>",
+   "expectedDeterminism": "a function of the package bytes",
+   "lanes": [
+    "local-worktree",
+    "local-fresh-clone"
+   ],
+   "outputs": "regenerated/publication/"
+  },
+  {
+   "id": "nuget-packages",
+   "classification": "authoritative",
+   "action": "not regenerated (contract section 7: #1424 never regenerates nuget-packages; candidate-packages instead)"
+  },
+  {
+   "id": "evidence-contract",
+   "classification": "authoritative",
+   "action": "validate",
+   "command": "dotnet test tests/Calor.Compiler.Tests/ --filter \"FullyQualifiedName~EvidenceContractTests\"",
+   "expectedDeterminism": "pass",
+   "lanes": [
+    "local-worktree",
+    "local-fresh-clone"
+   ],
+   "outputs": "regenerated/tests/"
+  },
+  {
+   "id": "tier1-verification",
+   "classification": "stale",
+   "action": "repaired producer run as a candidate output (G4 #1241); classification unchanged",
+   "command": "test.yml verify-phase1 job",
+   "lanes": [
+    "ci-test"
+   ]
+  },
+  {
+   "id": "tier2-corpus-verification",
+   "classification": "stale",
+   "action": "repaired producer run as a candidate output (G4 #1241); classification unchanged",
+   "command": "python3 scripts/verify_corpus.py --report <file> (local) and tier2.yml workflow_dispatch",
+   "expectedDeterminism": "428 passed / 51 expected-negative / 30 known-failure; verdict FAIL by design",
+   "lanes": [
+    "local-worktree",
+    "ci-tier2"
+   ],
+   "outputs": "regenerated/tier2/"
+  },
+  {
+   "id": "benchmark-results",
+   "classification": "stale",
+   "action": "not regenerated under the legacy method (inventory note); the B1 registered generator output is regenerated instead",
+   "command": "dotnet run --no-build --project tests/Calor.Evaluation -c Release -- pair-metrics (twice) and pair-results, as benchmark.yml step 'Regenerate the B1 results with the registered generator (#1422)'",
+   "expectedDeterminism": "byte-identical to docs/plans/evidence/b1-1276/results",
+   "lanes": [
+    "local-worktree",
+    "local-fresh-clone"
+   ],
+   "outputs": "regenerated/benchmark/"
+  },
+  {
+   "id": "benchmark-provenance",
+   "classification": "stale",
+   "action": "not regenerated (hand-edited; no generator)"
+  },
+  {
+   "id": "benchmark-results-md",
+   "classification": "stale",
+   "action": "not regenerated (inherits the stale legacy results)"
+  },
+  {
+   "id": "website-benchmark-pages",
+   "classification": "stale",
+   "action": "not regenerated (hand-edited); built as part of the website candidate"
+  },
+  {
+   "id": "benchmark-workflow-output",
+   "classification": "stale",
+   "action": "publication candidate built locally: B2 headline via scripts/benchmark_publication_gate.py check, the benchmark.yml methodology step, without the workflow (benchmark.yml requires an adjudication identity)",
+   "command": "python3 scripts/benchmark_publication_gate.py check --commit <candidate> --regenerated <b1-regen> --report <file>",
+   "expectedDeterminism": "no run timestamp in the headline; the headline depends on refs/remotes/origin/main at the gate step",
+   "outputs": "regenerated/benchmark/"
+  },
+  {
+   "id": "benchmark-publication-pr",
+   "classification": "stale",
+   "action": "never regenerated (would be publication)"
+  },
+  {
+   "id": "website-deployment",
+   "classification": "stale",
+   "action": "build only, never deployed: cd website && npm ci && npm run build (Node 20, as nextjs-gh-pages.yml); R2 tree digest of website/out",
+   "expectedDeterminism": "unknown before the run; tested by two builds and the fresh clone",
+   "lanes": [
+    "local-worktree",
+    "local-fresh-clone"
+   ],
+   "outputs": "regenerated/publication/"
+  },
+  {
+   "id": "llm-and-agent-results",
+   "classification": "historical-only",
+   "action": "not regenerated (paid-spend ceiling 0 USD)"
+  },
+  {
+   "id": "changelog",
+   "classification": "historical-only",
+   "action": "not regenerated; the 0.24.0 section is rendered as the release-notes candidate"
+  },
+  {
+   "id": "github-release-notes",
+   "classification": "historical-only",
+   "action": "rendered unpublished with publish-nuget.yml's awk extract; R2 text digest; nothing posted"
+  },
+  {
+   "id": "v019-audit-disposition",
+   "classification": "historical-only",
+   "action": "not regenerated"
+  },
+  {
+   "id": "pre-cut-evidence-packets",
+   "classification": "historical-only",
+   "action": "not regenerated"
+  }
+ ],
+ "alsoRequired": [
+  {
+   "id": "g3-execution-2-records",
+   "action": "commit the parked records of run 37213336898 from branch evidence/g3-1135-exec-2 (tip f2d02af6) under docs/plans/evidence/c2-1424/g3-exec-2/ (the classifier exempts no new path under g3-1135/), hash-checked against C1's g3Execution2"
+  },
+  {
+   "id": "claim-registry",
+   "action": "commit the claim registry {\"claims\": [\"claim:<id>\", ...]} at the raw-artifact freeze (contract section 8 Required subjects; R2 claimRegistry)",
+   "outcome": "Committed as a DRAFT, not frozen: the release notes are changing; regeneration 2 commits the frozen registry."
+  },
+  {
+   "id": "raw-artifact-freeze",
+   "action": "a JSON manifest whose top-level candidate is the candidate SHA, listing every committed output with its SHA-256 (R2 evidenceManifests role raw-artifact-freeze)",
+   "outcome": "Produced as regeneration-1-manifest.json (role regeneration-1-record). After the maintainer decision of 2026-10-07 (fix, re-freeze, regenerate), the R2 raw-artifact-freeze manifest is regeneration 2's."
+  },
+  {
+   "id": "classifier",
+   "action": "CALOR_C1_CLASSIFY_TARGET=<C2 head> RangeFromTheCandidateIsNotInvalidated from a checkout of the C1 landing commit fd34f41f, recorded"
+  },
+  {
+   "id": "environment",
+   "action": "record SDK, runtime, OS image, ImageOS/ImageVersion (CI), Node, and Python for every lane (decision ENVIRONMENT-OBSERVED-NOT-PINNED)"
+  }
+ ]
+}

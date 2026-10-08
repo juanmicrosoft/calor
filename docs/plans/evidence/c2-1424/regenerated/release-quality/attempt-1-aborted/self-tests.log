@@ -1,0 +1,9 @@
+Test-quality negative self-tests passed.
+TRX inventory negative self-test passed.
+== ids check /var/folders/61/_j3z01s52cz0rgb1z_v9mydr0000gn/T/tmp.QL66ZhyNzN/samples/failing/ ==
+Sample ID negative self-test passed.
+Coverage ratchet negative self-test passed.
+Mutation gate negative self-test passed.
+Performance ratchet negative self-test passed.
+Flake gate negative self-test passed.
+compiler-shard-filter self-test passed (11 clauses, negation exact).

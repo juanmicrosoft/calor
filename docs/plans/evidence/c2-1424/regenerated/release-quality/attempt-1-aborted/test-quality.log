@@ -1,0 +1,19 @@
+Test manifest, skip inventory, and assertion-quality checks passed.
+== ids check /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/samples/Collections/ ==
+All 2 IDs are valid.
+== ids check /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/samples/Contracts/ ==
+All 4 IDs are valid.
+== ids check /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/samples/FizzBuzz/ ==
+All 2 IDs are valid.
+== ids check /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/samples/Generics/ ==
+All 14 IDs are valid.
+== ids check /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/samples/HelloWorld/ ==
+All 2 IDs are valid.
+== ids check /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/samples/PatternMatching/ ==
+All 2 IDs are valid.
+== ids check /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/samples/SdkSample/ ==
+All 2 IDs are valid.
+== ids check /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/samples/TypeSystem/ ==
+All 6 IDs are valid.
+== ids check /Users/juanrivera/repos/juanmicrosoft/calor/.claude/worktrees/agent-a565dbb43db23ced5/samples/Verification/ ==
+All 15 IDs are valid.
