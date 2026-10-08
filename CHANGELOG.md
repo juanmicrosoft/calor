@@ -4,6 +4,39 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Array expressions convert to native Calor and keep C# evaluation order (#1132).**
+  An array created inside an expression (a `return`, a call argument, a `?:` branch,
+  a field or property initializer) now converts natively. Before, `return new T[,] { … }`
+  produced Calor whose C# did not compile (`CS0103`, `CS0201`), arrays in a `?:` branch
+  did not parse, and only the post-conversion rescue (`§CSHARP`) hid both. Elements are
+  now evaluated once, left to right, in place. The unselected `?:` branch and the right
+  operand of `&&`/`||` are still skipped. Previously, elements, sizes and arguments could
+  be moved into temporaries that ran before earlier parts of the same statement. For
+  example, `int[] a = { x, SetX(), x }` read the new `x` in the first slot, and
+  `new int[n, Next()]` read `n` after `Next()` ran.
+- New Calor forms: an inline `§ARR2D{id:id:T} §ROW … §/ARR2D{id}`, a sized `§ARR2D` with
+  `§ROW` lines for rank 3 and up (`§ARR2D{id:id:i32:2:1:2}`), and `(§IDX2D g i j).Member`
+  for a member of an element. Jagged arrays keep their element type and rank order
+  (`new int[2][]`, `new int[,][]`), a bare `T[,] g = { … }` initializer is a rectangular
+  array, `new[] { F(), G() }` keeps its element type instead of becoming `object[]`, and
+  `new T[0]` / `{ }` are fresh arrays instead of the shared `Array.Empty<T>()`.
+- Names the converter generates (`_hoist000`, `arr2d004`) skip every identifier in the
+  source C# and in the other files of a project migration, so a user local such as
+  `_hoist000` is no longer rebound (`Calor0260`).
+- Effect checking: the elements of `§ARR2D` rows are now charged (they were not
+  inferred, so a row could hide an effect). `System.Array`'s own members on an array
+  (`GetLength`, `Rank`, …) now resolve instead of reporting `Calor0410`: `CopyTo` is `mut`,
+  `SetValue` is `mut` and `alloc` (boxing), `GetValue`, `Clone`, `GetEnumerator` and
+  `ToString` are `alloc`. Any other member, including extension methods and `Initialize`
+  (it runs element constructors), stays an unknown call.
+- Shapes that cannot be written in place stay C# and are reported as
+  `conditional-expression-hoisting`: an assignment used as an array element, index or size
+  (it was evaluated twice), a sized array whose size is not a name or integer literal
+  when the array is itself a `?:`, `&&`, `||` or `??` operand, and a `ref`/`out`/`in`
+  argument whose address calls a method when a later argument must be moved.
+
 ## [0.24.0] - 2026-10-07
 
 Calor 0.24 is a soundness release. It repairs verifier defects found by a registered soundness

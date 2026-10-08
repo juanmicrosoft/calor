@@ -168,7 +168,10 @@
       ],
       "provisionalSize": "M",
       "readiness": {
-        "status": "NOT_STARTED"
+        "status": "IN_PROGRESS",
+        "branch": "milestone-0.25/f5-1132-array-expressions",
+        "evidence": "docs/plans/evidence/v0.25-f5-1132/README.md",
+        "note": "F5-ARRAY-01..05 convert natively (no \u00a7CSHARP, no \u00a7CS, no loss) on CLI, migrate and MCP surfaces, compile with default options and run like the original; F5-ARRAY-03 output unchanged; F5-ARRAY-06 boundary declared in the evidence README. READY is left to the maintainer (A1 era): needs candidate commit, per-case evidence with requirementSha256, approver, and #1423/#1426 blocker references."
       }
     },
     {

@@ -915,14 +915,11 @@ public class ConverterReachTests
         var lines = rt.Calor.Split('\n');
         var opener = Array.FindIndex(lines, l => l.Contains("§ARR2D{", StringComparison.Ordinal));
         Assert.True(opener >= 0, rt.Calor);
-        var closer = Array.FindIndex(lines, opener, l => l.TrimStart().StartsWith("§R", StringComparison.Ordinal));
-        // Every hoisted binding sits above the opener, never between it and the rows.
-        for (var i = opener + 1; i < (closer < 0 ? lines.Length : closer); i++)
-        {
-            if (lines[i].Trim().Length == 0) continue;
-            Assert.DoesNotContain("§B{~_hoist", lines[i]);
-        }
-        Assert.Contains(lines.Take(opener), l => l.Contains("§B{~_hoist", StringComparison.Ordinal));
+        // #1132: object initializers now stay on their §ROW line (`§NEW{Cell} V = 1
+        // §/NEW`), so nothing is hoisted at all - neither inside the block (N1's
+        // Calor0100) nor ahead of it (which evaluated elements out of source order).
+        Assert.DoesNotContain("§B{~_hoist", rt.Calor);
+        Assert.Contains(lines, l => l.TrimStart().StartsWith("§ROW §NEW{Cell} V = 1 §/NEW", StringComparison.Ordinal));
         AssertRoundTripCompiles(rt);
     }
 

@@ -4694,6 +4694,10 @@ public sealed class EffectEnforcementPass
                         {
                             return callResultType;
                         }
+                        // #1132: `var g = Build();` with an in-module array return type.
+                        if (bind.Initializer is CallExpressionNode localCall
+                            && InferCallReturnType(localCall) is { } localResult && localResult.EndsWith(']'))
+                            return localResult;
                         // Known value, unknown type. v0.15 E1 slice 2c: this
                         // stays a sentinel rather than becoming null, because
                         // null here means "no such value" and the two are
@@ -5212,8 +5216,25 @@ public sealed class EffectEnforcementPass
                 CallExpressionNode call => InferCallReturnType(call),
                 FieldAccessNode field => InferFieldAccessType(field),
                 NullConditionalNode conditional => InferMemberType(conditional.Target, conditional.MemberName),
+                // #1132: an element of `T[,]` / `T[][]` is `T` / `T[]`, so `g[i, j].V` charges T's member.
+                ArrayAccessNode access => ElementTypeOf(InferExpressionType(access.Array)),
+                MultiDimArrayAccessNode access => ElementTypeOf(InferExpressionType(access.Array)),
+                ArrayCreationNode creation => creation.ElementType + "[]",
+                MultiDimArrayCreationNode creation => $"{creation.ElementType}[{new string(',', Math.Max(creation.Rank - 1, 0))}]",
                 _ => "?"
             };
+        }
+
+        private static string ElementTypeOf(string arrayType)
+        {
+            // Calor's `[T]` spelling of a one-dimensional array.
+            if (arrayType.Length > 2 && arrayType[0] == '[' && arrayType[^1] == ']')
+                return arrayType[1..^1];
+            var open = arrayType.IndexOf('[');
+            var close = open < 0 ? -1 : arrayType.IndexOf(']', open);
+            return open > 0 && close > open && arrayType[(open + 1)..close].All(c => c == ',')
+                ? arrayType[..open] + arrayType[(close + 1)..]
+                : "?";
         }
 
         private string InferCallReturnType(CallExpressionNode call)
@@ -5578,8 +5599,10 @@ public sealed class EffectEnforcementPass
                         ? InferFromExpression(arrayCreation.Size)
                         : EffectSet.Empty)
                     .Union(InferFromMany(arrayCreation.Initializer)),
+                // #1132: the rows' elements are evaluated too; they were not charged.
                 MultiDimArrayCreationNode multiDim => EffectSet.From("alloc")
-                    .Union(InferFromMany(multiDim.DimensionSizes)),
+                    .Union(InferFromMany(multiDim.DimensionSizes))
+                    .Union(InferFromMany(multiDim.Initializer.SelectMany(row => row).ToList())),
                 MultiDimArrayAccessNode multiDimAccess =>
                     InferFromExpression(multiDimAccess.Array).Union(InferFromMany(multiDimAccess.Indices)),
                 ArrayLengthNode arrayLength => InferFromExpression(arrayLength.Array),
@@ -5922,6 +5945,12 @@ public sealed class EffectEnforcementPass
                 var resolved = FindClassProperty(cls, initializer.PropertyName);
                 var property = resolved?.Property;
                 var accessor = property?.Initer ?? property?.Setter;
+                // #1132: a FIELD of an in-module class is a plain store, already charged `mut`.
+                if (property == null && cls.Fields.Any(field =>
+                        field.Name.Equals(initializer.PropertyName, StringComparison.Ordinal)))
+                {
+                    return EffectSet.Empty;
+                }
                 if (property == null || accessor == null)
                 {
                     return UnknownResolvedOperation(

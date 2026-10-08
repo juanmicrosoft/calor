@@ -5124,19 +5124,19 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(ArrayCreationNode node)
     {
-        var elementType = MapTypeName(node.ElementType);
+        var (elementType, elementRanks) = SplitArrayRanks(MapTypeName(node.ElementType));
 
         if (node.Size != null)
         {
             // Sized array expression: new int[10] or new int[n]
             var size = node.Size.Accept(this);
-            return $"new {elementType}[{size}]";
+            return $"new {elementType}[{size}]{elementRanks}";
         }
         else if (node.Initializer.Count > 0)
         {
             // Initialized array expression: new[] { 1, 2, 3 }
             var elements = string.Join(", ", node.Initializer.Select(e => e.Accept(this)));
-            return $"new {elementType}[] {{ {elements} }}";
+            return $"new {elementType}[]{elementRanks} {{ {elements} }}";
         }
         else
         {
@@ -9415,25 +9415,54 @@ public sealed class CSharpEmitter : IAstVisitor<string>
 
     public string Visit(MultiDimArrayCreationNode node)
     {
-        var elementType = MapTypeName(node.ElementType);
+        var (elementType, elementRanks) = SplitArrayRanks(MapTypeName(node.ElementType));
+
+        if (node.DimensionSizes.Count > 0 && node.Initializer.Count > 0)
+        {
+            // #1132: sized form with §ROW lines (rank 3+, or sizes written with the
+            // initializer). Rows are the innermost vectors, row-major; regroup them into
+            // nested braces by the outer sizes. C# rejects a shape mismatch (CS0847).
+            var rows = node.Initializer.Select(row =>
+                "{ " + string.Join(", ", row.Select(e => e.Accept(this))) + " }").ToList();
+            for (var level = node.DimensionSizes.Count - 2; level > 0; level--)
+            {
+                if (node.DimensionSizes[level] is not IntLiteralNode { Value: > 0 and <= int.MaxValue } size
+                    || rows.Count % size.Value != 0)
+                    break;
+                rows = rows.Chunk((int)size.Value).Select(group => "{ " + string.Join(", ", group) + " }").ToList();
+            }
+            var sizes = string.Join(", ", node.DimensionSizes.Select(d => d.Accept(this)));
+            return $"new {elementType}[{sizes}]{elementRanks} {{ {string.Join(", ", rows)} }}";
+        }
 
         if (node.DimensionSizes.Count > 0)
         {
             var dims = string.Join(", ", node.DimensionSizes.Select(d => d.Accept(this)));
-            return $"new {elementType}[{dims}]";
+            return $"new {elementType}[{dims}]{elementRanks}";
         }
         else if (node.Initializer.Count > 0)
         {
             var commas = new string(',', Math.Max(node.Rank - 1, 0));
             var rows = node.Initializer.Select(row =>
                 "{ " + string.Join(", ", row.Select(e => e.Accept(this))) + " }");
-            return $"new {elementType}[{commas}] {{ {string.Join(", ", rows)} }}";
+            return $"new {elementType}[{commas}]{elementRanks} {{ {string.Join(", ", rows)} }}";
         }
         else
         {
             var zeros = string.Join(", ", Enumerable.Repeat("0", node.Rank));
-            return $"new {elementType}[{zeros}]";
+            return $"new {elementType}[{zeros}]{elementRanks}";
         }
+    }
+
+    /// <summary>
+    /// #1132: splits an array element type into its base and its own rank specifiers.
+    /// In C# the created array's rank comes first: an int[] element sized 2 is
+    /// `new int[2][]`, not `new int[][2]`; a 2-D array of int[] is `new int[,][]`.
+    /// </summary>
+    private static (string Base, string Ranks) SplitArrayRanks(string elementType)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(elementType, @"^(.+?)((?:\[,*\])+)$");
+        return match.Success ? (match.Groups[1].Value, match.Groups[2].Value) : (elementType, "");
     }
 
     public string Visit(MultiDimArrayAccessNode node)

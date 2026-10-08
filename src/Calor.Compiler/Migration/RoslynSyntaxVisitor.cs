@@ -4038,7 +4038,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 .ToList();
 
             // Hoist §NEW, §LAM, §ARR from constructor initializer args — parser can't handle them nested
-            HoistComplexArguments(args);
+            HoistComplexArguments(args, node.Initializer.ArgumentList.Arguments);
 
             initializer = new ConstructorInitializerNode(
                 GetTextSpan(node.Initializer),
@@ -7267,7 +7267,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 .ToList();
 
             // Hoist complex arguments (§NEW, §ARR, ternaries with §NEW) to temp bindings
-            HoistComplexArguments(args);
+            HoistComplexArguments(args, invocation.ArgumentList.Arguments);
 
             var hasNamedArgs = invocation.ArgumentList.Arguments.Any(a => a.NameColon != null);
             var stmtArgNames = hasNamedArgs
@@ -8137,13 +8137,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 else if (args[i] is NewExpressionNode newNode)
                 {
                     var tempName = _context.GenerateId("_new", newNode.TypeName);
-                    _pendingStatements.Add(new BindStatementNode(
-                        span, tempName, null, false, args[i], new AttributeCollection()));
-                    args[i] = new ReferenceNode(args[i].Span, tempName);
-                }
-                else if (args[i] is ArrayCreationNode arrNode)
-                {
-                    var tempName = _context.GenerateId("_arr", arrNode.ElementType);
                     _pendingStatements.Add(new BindStatementNode(
                         span, tempName, null, false, args[i], new AttributeCollection()));
                     args[i] = new ReferenceNode(args[i].Span, tempName);
@@ -9328,15 +9321,20 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
         if (_conditionalRegionDepth > 0 &&
             expression is ArrayCreationExpressionSyntax { Initializer: null } sizedArray &&
+            // #1132: an array element's size is written in place (quoted), never hoisted.
+            expression.Parent is not InitializerExpressionSyntax { RawKind: (int)SyntaxKind.ArrayInitializerExpression } &&
             sizedArray.Type.RankSpecifiers.SelectMany(rank => rank.Sizes).Any(size =>
                 size is not IdentifierNameSyntax &&
                 size is not LiteralExpressionSyntax { Token.Value: int }))
             return PreserveConditionalOperand(expression);
 
+        // #1132: an object initializer that is an array element stays native - the
+        // emitter writes it on the element's line (`§NEW{T} A = x §/NEW`), in place.
         if (_conditionalRegionDepth > 0 &&
             (expression is AssignmentExpressionSyntax ||
-             expression is ObjectCreationExpressionSyntax { Initializer: not null } ||
-             expression is ImplicitObjectCreationExpressionSyntax { Initializer: not null }))
+             (expression is ObjectCreationExpressionSyntax { Initializer: not null } ||
+              expression is ImplicitObjectCreationExpressionSyntax { Initializer: not null })
+             && expression.Parent is not InitializerExpressionSyntax { RawKind: (int)SyntaxKind.ArrayInitializerExpression }))
         {
             return PreserveConditionalOperand(expression);
         }
@@ -11031,77 +11029,77 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     }
 
     /// <summary>
-    /// Hoists complex expression nodes (§NEW, §LAM, §ARR) from argument lists to temp bindings.
+    /// Hoists complex expression nodes (§NEW, §LAM) from argument lists to temp bindings.
     /// The parser cannot handle these nested inside §C or constructor initializer arguments.
+    /// #1132: arrays are not hoisted. The inline `§ARR{…} … §/ARR{…}` form parses as an
+    /// argument, and hoisting ran its elements before the earlier arguments.
     /// </summary>
-    private void HoistComplexArguments(List<ExpressionNode> args)
+    private void HoistComplexArguments(List<ExpressionNode> args, SeparatedSyntaxList<ArgumentSyntax>? syntax = null)
     {
-        for (int i = 0; i < args.Count; i++)
+        // An earlier argument stays in place when it evaluates nothing (a literal, a
+        // lambda) or nothing a later argument can change: a local or parameter read.
+        // A ref/out/in argument must stay storage. Without syntax, storage shapes stay.
+        bool InPlace(int i)
         {
-            if (_conditionalRegionDepth > 0 && IsInlineConditionalExpression(args[i]))
+            if (args[i] is IntLiteralNode or StringLiteralNode or BoolLiteralNode or FloatLiteralNode
+                or DecimalLiteralNode or LambdaExpressionNode or ThisExpressionNode)
+                return true;
+            if (syntax is not { } list || i >= list.Count)
+                return args[i] is ReferenceNode or FieldAccessNode or ArrayAccessNode or MultiDimArrayAccessNode;
+            // `null` / `default` take their type from the parameter, so they cannot be bound
+            // to an untyped temp (Codex round 2); they evaluate nothing either.
+            return !list[i].RefKindKeyword.IsKind(SyntaxKind.None)
+                || list[i].Expression is LiteralExpressionSyntax or DefaultExpressionSyntax
+                || _semanticModel != null && list[i].SyntaxTree == _semanticModel.SyntaxTree
+                    && _semanticModel.GetSymbolInfo(list[i].Expression).Symbol is ILocalSymbol or IParameterSymbol;
+        }
+
+        bool Complex(ExpressionNode arg) =>
+            !(_conditionalRegionDepth > 0 && IsInlineConditionalExpression(arg))
+            && (arg is NewExpressionNode or LambdaExpressionNode
+                    or ListCreationNode or DictionaryCreationNode or SetCreationNode
+                || arg is ConditionalExpressionNode cond
+                    && (ContainsComplexNode(cond.WhenTrue) || ContainsComplexNode(cond.WhenFalse)));
+
+        // #1132: a hoisted argument runs before the call's earlier arguments, so every
+        // earlier argument that is not InPlace is bound first, in order.
+        var last = -1;
+        for (var i = 0; i < args.Count; i++)
+        {
+            if (Complex(args[i]) && args[i] is not LambdaExpressionNode)
+                last = i;
+        }
+        for (var i = 0; i < args.Count; i++)
+        {
+            // A ref/out/in argument must stay storage, so an address it computes
+            // (`in xs[I()]`) cannot move ahead of a hoisted later argument: preserve.
+            if (i < last && syntax is { } refs && i < refs.Count && !refs[i].RefKindKeyword.IsKind(SyntaxKind.None)
+                && refs[i].Expression.DescendantNodesAndSelf().Any(node => node is InvocationExpressionSyntax
+                    or AssignmentExpressionSyntax or PostfixUnaryExpressionSyntax or PrefixUnaryExpressionSyntax
+                    or BaseObjectCreationExpressionSyntax))
+                throw EscalateExpression(refs[i], "conditional-expression-hoisting");
+            var hoist = Complex(args[i]) || i < last && !InPlace(i);
+            if (!hoist)
                 continue;
-            if (args[i] is NewExpressionNode newNode)
+            var tempName = args[i] switch
             {
-                var tempName = _context.GenerateId("_new", newNode.TypeName);
-                _pendingStatements.Add(new BindStatementNode(
-                    args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
-                args[i] = new ReferenceNode(args[i].Span, tempName);
-            }
-            else if (args[i] is LambdaExpressionNode)
-            {
-                var tempName = _context.GenerateId("_lam");
-                _pendingStatements.Add(new BindStatementNode(
-                    args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
-                args[i] = new ReferenceNode(args[i].Span, tempName);
-            }
-            else if (args[i] is ArrayCreationNode arrNode)
-            {
-                var tempName = _context.GenerateId("_arr", arrNode.ElementType);
-                _pendingStatements.Add(new BindStatementNode(
-                    args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
-                args[i] = new ReferenceNode(args[i].Span, tempName);
-            }
-            else if (args[i] is ListCreationNode listNode)
-            {
-                var tempName = _context.GenerateId("_list", listNode.ElementType);
-                _pendingStatements.Add(new BindStatementNode(
-                    args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
-                args[i] = new ReferenceNode(args[i].Span, tempName);
-            }
-            else if (args[i] is DictionaryCreationNode dictNode)
-            {
-                var tempName = _context.GenerateId("_dict");
-                _pendingStatements.Add(new BindStatementNode(
-                    args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
-                args[i] = new ReferenceNode(args[i].Span, tempName);
-            }
-            else if (args[i] is SetCreationNode setNode)
-            {
-                var tempName = _context.GenerateId("_set", setNode.ElementType);
-                _pendingStatements.Add(new BindStatementNode(
-                    args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
-                args[i] = new ReferenceNode(args[i].Span, tempName);
-            }
-            else if (args[i] is ConditionalExpressionNode condNode)
-            {
-                // Hoist §NEW/§ARR from ternary branches — parser can't handle
-                // §NEW nested inside §CALL through a ternary expression.
-                var needsHoist = ContainsComplexNode(condNode.WhenTrue)
-                    || ContainsComplexNode(condNode.WhenFalse);
-                if (needsHoist)
-                {
-                    var tempName = _context.GenerateId("_tern");
-                    _pendingStatements.Add(new BindStatementNode(
-                        args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
-                    args[i] = new ReferenceNode(args[i].Span, tempName);
-                }
-            }
+                NewExpressionNode newNode => _context.GenerateId("_new", newNode.TypeName),
+                LambdaExpressionNode => _context.GenerateId("_lam"),
+                ListCreationNode listNode => _context.GenerateId("_list", listNode.ElementType),
+                DictionaryCreationNode => _context.GenerateId("_dict"),
+                SetCreationNode setNode => _context.GenerateId("_set", setNode.ElementType),
+                ConditionalExpressionNode when Complex(args[i]) => _context.GenerateId("_tern"),
+                _ => _context.GenerateId("_arg")
+            };
+            _pendingStatements.Add(new BindStatementNode(
+                args[i].Span, tempName, null, false, args[i], new AttributeCollection()));
+            args[i] = new ReferenceNode(args[i].Span, tempName);
         }
     }
 
     private static bool ContainsComplexNode(ExpressionNode node)
     {
-        return node is NewExpressionNode or ArrayCreationNode or LambdaExpressionNode
+        return node is NewExpressionNode or LambdaExpressionNode
             or ListCreationNode or DictionaryCreationNode or SetCreationNode
             || (node is ConditionalExpressionNode cond
                 && (ContainsComplexNode(cond.WhenTrue) || ContainsComplexNode(cond.WhenFalse)));
@@ -11130,12 +11128,6 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (node is DictionaryCreationNode)
         {
             var tempName = _context.GenerateId("_dict");
-            _pendingStatements.Add(new BindStatementNode(span, tempName, null, false, node, new AttributeCollection()));
-            return new ReferenceNode(span, tempName);
-        }
-        if (node is ArrayCreationNode arrNode && arrNode.Initializer.Count > 0)
-        {
-            var tempName = _context.GenerateId("_arr", arrNode.ElementType);
             _pendingStatements.Add(new BindStatementNode(span, tempName, null, false, node, new AttributeCollection()));
             return new ReferenceNode(span, tempName);
         }
@@ -11176,9 +11168,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // ListCreationNode, DictionaryCreationNode, SetCreationNode emit block-level
         // §LIST/§DICT/§SET that can't appear inline. ArrayCreationNode emits inline
         // §ARR{...} so it's OK as a property/field default.
-        // §ARR2D is block-level and can't appear inline.
-        return node is ListCreationNode or DictionaryCreationNode or SetCreationNode
-            or MultiDimArrayCreationNode;
+        // #1132: §ARR2D has an inline form too (`§ARR2D{…} §ROW … §/ARR2D{…}`); it was
+        // rewritten to an empty `§NEW{}` here.
+        return node is ListCreationNode or DictionaryCreationNode or SetCreationNode;
     }
 
     /// <summary>
@@ -11310,7 +11302,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             .ToList();
 
         // Hoist §NEW, §LAM, §ARR arguments to temp bindings — the parser cannot handle them nested inside §C
-        HoistComplexArguments(args);
+        HoistComplexArguments(args, invocation.ArgumentList.Arguments);
 
         var hasNamedArgs = invocation.ArgumentList.Arguments.Any(a => a.NameColon != null);
         var argNames = hasNamedArgs
@@ -11913,7 +11905,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             .ToList() ?? new List<ExpressionNode>();
 
         // Hoist §NEW arguments to temp bindings — parser cannot handle §NEW nested inside §NEW
-        HoistComplexArguments(args);
+        HoistComplexArguments(args, objCreation.ArgumentList?.Arguments);
 
         // Convert StringBuilder to native operations
         if (typeName == "StringBuilder" || typeName == "System.Text.StringBuilder")
@@ -12646,7 +12638,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             }
         }
 
-        var elementType = TypeMapper.CSharpToCalor(arrayCreation.Type.ElementType.ToString());
+        // #1132 (F5-ARRAY-05): `new int[][] { … }` creates an array of int[]. Roslyn's
+        // ElementType is the innermost `int`; the remaining rank specifiers belong to
+        // the element type (it was emitted as an int array, CS0029 per element).
+        var elementType = TypeMapper.CSharpToCalor(arrayCreation.Type.ElementType.ToString()
+            + string.Concat(arrayCreation.Type.RankSpecifiers.Skip(1).Select(rank => rank.ToString())));
         var id = _context.GenerateId("arr", elementType);
         var name = id;
 
@@ -12659,38 +12655,55 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             if (rank.Sizes.Count > 0 && rank.Sizes[0] is ExpressionSyntax sizeExpr
                 && sizeExpr is not OmittedArraySizeExpressionSyntax)
             {
-                size = ConvertExpression(sizeExpr);
+                size = ConvertInPlace(sizeExpr, always: true);
             }
         }
 
         if (arrayCreation.Initializer != null)
         {
             initializer = arrayCreation.Initializer.Expressions
-                .Select(ConvertExpression)
+                .Select(element => ConvertInPlace(element, always: true))
                 .ToList();
         }
 
-        // For new T[0] with no initializer, use Array.Empty<T>() to avoid nested array ID mismatches
-        if (size is IntLiteralNode { Value: 0 } && initializer.Count == 0)
-        {
-            return new CallExpressionNode(GetTextSpan(arrayCreation),
-                $"Array.Empty<{elementType}>",
-                new List<ExpressionNode>(),
-                new List<string>());
-        }
+        // #1132: `new T[0]` and `new T[] {}` are fresh arrays (`new int[0] == new int[0]`
+        // is false), so they stay sized creations rather than the shared Array.Empty<T>().
+        if (size == null && initializer.Count == 0)
+            size = new IntLiteralNode(GetTextSpan(arrayCreation), 0);
 
         return new ArrayCreationNode(GetTextSpan(arrayCreation), id, name, elementType, size, initializer, new AttributeCollection());
     }
 
-    private ArrayCreationNode ConvertImplicitArrayCreation(ImplicitArrayCreationExpressionSyntax implicitArray)
+    private ExpressionNode ConvertImplicitArrayCreation(ImplicitArrayCreationExpressionSyntax implicitArray)
     {
+        // #1132: `new[,] { … }` is rectangular; convert it with its created type, or
+        // preserve it when that type is unknown.
+        if (implicitArray.Commas.Count > 0)
+        {
+            if (_semanticModel != null && implicitArray.SyntaxTree == _semanticModel.SyntaxTree
+                && _semanticModel.GetTypeInfo(implicitArray).Type is IArrayTypeSymbol { ElementType.TypeKind: not TypeKind.Error } created
+                && SyntaxFactory.ParseTypeName(created.ToDisplayString()) is ArrayTypeSyntax createdType)
+                return ConvertMultiDimArray(createdType, implicitArray.Initializer, GetTextSpan(implicitArray), created.Rank);
+            throw EscalateExpression(implicitArray, "multidim-array");
+        }
+
         var id = _context.GenerateId("arr");
         var initializer = implicitArray.Initializer.Expressions
-            .Select(ConvertExpression)
+            .Select(element => ConvertInPlace(element, always: true))
             .ToList();
 
         // Try declared type first, fall back to inferring from first element
-        var elementType = TryGetDeclaredArrayElementType(implicitArray) ?? InferElementType(initializer);
+        // #1132: Roslyn's best common type first; guessing from the first element made
+        // `new[] { S(1), S(2) }` an object[].
+        // The created type, not the receiving one: `object[] a = new[] { "a" }` is a string[].
+        var elementType = (_semanticModel != null && implicitArray.SyntaxTree == _semanticModel.SyntaxTree
+                && _semanticModel.GetTypeInfo(implicitArray).Type is IArrayTypeSymbol { ElementType.TypeKind: not TypeKind.Error } inferred
+                    // Nullability stays with the binder's per-element view.
+                    ? TypeMapper.CSharpToCalor(inferred.ElementType
+                        .WithNullableAnnotation(Microsoft.CodeAnalysis.NullableAnnotation.None).ToDisplayString())
+                    : null)
+            ?? TryGetDeclaredArrayElementType(implicitArray)
+            ?? InferElementType(initializer);
 
         return new ArrayCreationNode(GetTextSpan(implicitArray), id, id, elementType, null, initializer, new AttributeCollection());
     }
@@ -12702,12 +12715,28 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             case SyntaxKind.ArrayInitializerExpression:
             {
                 _context.RecordFeatureUsage("array-initializer");
+                // #1132: `T[,] g = { { … } };` - a bare initializer of a declared
+                // multi-dimensional array is the same rectangular creation.
+                var declared = initExpr.Parent is EqualsValueClauseSyntax clause
+                    ? clause.Parent switch
+                    {
+                        VariableDeclaratorSyntax { Parent: VariableDeclarationSyntax declaration } => declaration.Type,
+                        PropertyDeclarationSyntax property => property.Type,
+                        _ => null
+                    } as ArrayTypeSyntax
+                    : null;
+                if (declared != null && declared.RankSpecifiers[0].Rank > 1)
+                {
+                    return ConvertMultiDimArray(declared, initExpr, GetTextSpan(initExpr), declared.RankSpecifiers[0].Rank);
+                }
                 var id = _context.GenerateId("arr");
                 var initializer = initExpr.Expressions
-                    .Select(ConvertExpression)
+                    .Select(element => ConvertInPlace(element, always: true))
                     .ToList();
                 var elementType = TryGetDeclaredArrayElementType(initExpr) ?? InferElementType(initializer);
-                return new ArrayCreationNode(GetTextSpan(initExpr), id, id, elementType, null, initializer, new AttributeCollection());
+                return new ArrayCreationNode(GetTextSpan(initExpr), id, id, elementType,
+                    initializer.Count == 0 ? new IntLiteralNode(GetTextSpan(initExpr), 0) : null,
+                    initializer, new AttributeCollection());
             }
 
             case SyntaxKind.CollectionInitializerExpression:
@@ -12912,6 +12941,11 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // Walk up: InitializerExpression -> EqualsValueClause -> VariableDeclarator -> VariableDeclaration
         if (node.Parent is EqualsValueClauseSyntax { Parent: VariableDeclaratorSyntax { Parent: VariableDeclarationSyntax declaration } })
         {
+            // #1132: the leftmost rank specifier is the declared array's own; the rest
+            // belong to its element (`int[][,]` holds int[,]).
+            if (declaration.Type is ArrayTypeSyntax arrayType)
+                return TypeMapper.CSharpToCalor(arrayType.ElementType.ToString()
+                    + string.Concat(arrayType.RankSpecifiers.Skip(1).Select(rank => rank.ToString())));
             var typeStr = declaration.Type.ToString();
             // Handle single-dimensional arrays: "double[]"
             if (typeStr.EndsWith("[]"))
@@ -12945,6 +12979,31 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         };
     }
 
+    /// <summary>
+    /// #1132: converts an array element, size or multi-dimensional index (always), or an index containing an assignment,
+    /// as a conditional operand: a statement it would need ahead of it (an assignment,
+    /// <c>x++</c>, a decomposed chain) is captured in place or preserved as C#, so the
+    /// expression is not run early, out of order with its siblings, or twice (an
+    /// assignment expression is otherwise queued AND its right side kept as the value).
+    /// </summary>
+    private ExpressionNode ConvertInPlace(ExpressionSyntax expression, bool always = false)
+    {
+        // A lambda element evaluates nothing when the array is built; its body keeps
+        // its own statement context.
+        if (expression is AnonymousFunctionExpressionSyntax
+            || !always && !expression.DescendantNodesAndSelf().OfType<AssignmentExpressionSyntax>().Any())
+            return ConvertExpression(expression);
+        _conditionalRegionDepth++;
+        try
+        {
+            return ConvertExpression(expression);
+        }
+        finally
+        {
+            _conditionalRegionDepth--;
+        }
+    }
+
     private ExpressionNode ConvertElementAccess(ElementAccessExpressionSyntax elementAccess)
     {
         var span = GetTextSpan(elementAccess);
@@ -12955,12 +13014,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         {
             _context.RecordFeatureUsage("multidim-array");
             var indices = elementAccess.ArgumentList.Arguments
-                .Select(a => ConvertExpression(a.Expression))
+                .Select(a => ConvertInPlace(a.Expression, always: true))
                 .ToList();
             return new MultiDimArrayAccessNode(span, array, indices);
         }
 
-        var index = ConvertExpression(elementAccess.ArgumentList.Arguments[0].Expression);
+        var index = ConvertInPlace(elementAccess.ArgumentList.Arguments[0].Expression);
 
         // Only use char-at when the target is a string literal (e.g. "hello"[0])
         // Default to §IDX (ArrayAccess) — array/list indexing is far more common
@@ -13506,42 +13565,75 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     // --- Multidimensional array conversions ---
 
     private ExpressionNode ConvertMultiDimArrayCreation(ArrayCreationExpressionSyntax arrayCreation, int rank)
+        => ConvertMultiDimArray(arrayCreation.Type, arrayCreation.Initializer, GetTextSpan(arrayCreation), rank);
+
+    private ExpressionNode ConvertMultiDimArray(
+        ArrayTypeSyntax arrayType, InitializerExpressionSyntax? arrayInitializer, TextSpan span, int rank)
     {
         _context.RecordFeatureUsage("multidim-array");
         var id = _context.GenerateId("arr2d");
         var name = _context.GenerateId("arr2d");
-        var elementType = TypeMapper.CSharpToCalor(arrayCreation.Type.ElementType.ToString());
+        // Element type keeps any further rank specifiers (`new int[,][]` holds int[]).
+        var elementType = TypeMapper.CSharpToCalor(arrayType.ElementType.ToString()
+            + string.Concat(arrayType.RankSpecifiers.Skip(1).Select(spec => spec.ToString())));
 
         var dimensionSizes = new List<ExpressionNode>();
         var initializer = new List<IReadOnlyList<ExpressionNode>>();
 
-        if (arrayCreation.Type.RankSpecifiers.Count > 0)
+        if (arrayInitializer != null)
         {
-            var rankSpec = arrayCreation.Type.RankSpecifiers[0];
+            // #1132 (F5-ARRAY-05): flatten the nested braces into the innermost vectors
+            // (row-major) and record the shape. Rank 2 without written sizes keeps the
+            // plain §ROW form; rank 3+ or written sizes use the sized form with rows
+            // (the sizes of an initialized C# array are constants equal to this shape).
+            var shape = new int[rank];
+            void Flatten(InitializerExpressionSyntax init, int level)
+            {
+                shape[level] = init.Expressions.Count;
+                if (level == rank - 2)
+                {
+                    foreach (var rowExpr in init.Expressions)
+                    {
+                        if (rowExpr is not InitializerExpressionSyntax rowInit)
+                            throw new NotSupportedException("Multi-dimensional array initializer is not rectangular");
+                        shape[rank - 1] = rowInit.Expressions.Count;
+                        initializer.Add(rowInit.Expressions.Select(element => ConvertInPlace(element, always: true)).ToList());
+                    }
+                    return;
+                }
+                foreach (var inner in init.Expressions)
+                {
+                    if (inner is not InitializerExpressionSyntax innerInit)
+                        throw new NotSupportedException("Multi-dimensional array initializer is not rectangular");
+                    Flatten(innerInit, level + 1);
+                }
+            }
+            Flatten(arrayInitializer, 0);
+            var sized = arrayType.RankSpecifiers[0].Sizes.Any(size => size is not OmittedArraySizeExpressionSyntax);
+            // An empty level hides the sizes below it (`new int[0, 3] {}`) and leaves no
+            // elements: the creation is just its sizes, the written ones when present
+            // (C# requires them to be constants matching the braces).
+            if (shape.Contains(0))
+            {
+                initializer.Clear();
+                dimensionSizes.AddRange(sized
+                    ? arrayType.RankSpecifiers[0].Sizes.Select(ConvertExpression)
+                    : shape.Select(length => (ExpressionNode)new IntLiteralNode(span, length)));
+            }
+            else if (rank > 2 || sized)
+                dimensionSizes.AddRange(shape.Select(length => (ExpressionNode)new IntLiteralNode(span, length)));
+        }
+        else if (arrayType.RankSpecifiers.Count > 0)
+        {
+            var rankSpec = arrayType.RankSpecifiers[0];
             foreach (var sizeExpr in rankSpec.Sizes)
             {
                 if (sizeExpr is not OmittedArraySizeExpressionSyntax)
-                    dimensionSizes.Add(ConvertExpression(sizeExpr));
+                    dimensionSizes.Add(ConvertInPlace(sizeExpr, always: true));
             }
         }
 
-        if (arrayCreation.Initializer != null)
-        {
-            foreach (var rowExpr in arrayCreation.Initializer.Expressions)
-            {
-                if (rowExpr is InitializerExpressionSyntax rowInit)
-                {
-                    var row = rowInit.Expressions.Select(ConvertExpression).ToList();
-                    initializer.Add(row);
-                }
-                else
-                {
-                    initializer.Add(new List<ExpressionNode> { ConvertExpression(rowExpr) });
-                }
-            }
-        }
-
-        return new MultiDimArrayCreationNode(GetTextSpan(arrayCreation), id, name, elementType, rank, dimensionSizes, initializer);
+        return new MultiDimArrayCreationNode(span, id, name, elementType, rank, dimensionSizes, initializer);
     }
 
     private static MethodModifiers GetMethodModifiers(SyntaxTokenList modifiers)

@@ -1,0 +1,35 @@
+§M{m001:ConvertedModule:overflow=unchecked}
+  §U{System}
+
+  §NS{ns_global:_global:global}
+    §CL{c001:Probe:pub:stat}
+      §FLD{str:log:priv:stat} = ""
+
+      §MT{m002:Side:pub:stat} (i32:v) -> i32
+        §ASSIGN log (+ log v)
+        §R v
+
+      §MT{m003:Sum:pub:stat} (i32[]:xs) -> i32
+        §B{~s:i32} 0
+        §EACH{each004:x:var} xs
+          §ASSIGN s (+ s x)
+        §R s
+
+      §MT{m005:Pick:pub:stat} (bool:flag) -> i32[]
+        §E{alloc}
+        §R §IF{tern000} flag → §ARR{arrI32006:i32} §C{Side} §A 1 §/C §C{Side} §A 2 §/C §/ARR{arrI32006} §EL → §ARR{arrI32007:i32} §C{Side} §A 3 §/C §/ARR{arrI32007}
+
+      §MT{m008:Pick2D:pub:stat} (bool:flag) -> i32[,]
+        §E{alloc}
+        §R §IF{tern001} flag → §ARR2D{arr2d009:arr2d009:i32} §ROW §C{Side} §A 4 §/C §/ARR2D{arr2d009} §EL → §ARR2D{arr2d011:arr2d011:i32} §ROW §C{Side} §A 5 §/C §/ARR2D{arr2d011}
+
+      §MT{m013:Run:pub:stat} () -> str
+        §E{alloc}
+        §B{i32:a} §C{Sum} §ARR{arrI32014:i32} §C{Side} §A 6 §/C §C{Side} §A 7 §/C §/ARR{arrI32014}
+        §B{~_hoist000} §C{Pick} §A true §/C
+        §B{i32:b} (len _hoist000)
+        §B{i32:c} §IDX2D §C{Pick2D} §A false §/C 0 0
+        §R (+ (+ (+ (+ (+ (+ a "|") b) "|") c) "|") log)
+
+
+

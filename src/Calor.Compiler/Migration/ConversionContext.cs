@@ -406,7 +406,65 @@ public sealed class ConversionContext
     /// <summary>
     /// Original C# source code.
     /// </summary>
-    public string? OriginalSource { get; set; }
+    public string? OriginalSource
+    {
+        get => _originalSource;
+        set
+        {
+            _originalSource = value;
+            _reservedNames = null;
+        }
+    }
+
+    private string? _originalSource;
+    private HashSet<string>? _reservedNames;
+    private readonly List<Microsoft.CodeAnalysis.SyntaxTree> _reservedSources = new();
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<
+        Microsoft.CodeAnalysis.SyntaxTree, HashSet<string>> TreeNames = new();
+
+    /// <summary>#1132: other trees whose names generated names avoid (project files, the converted tree).</summary>
+    public void ReserveNamesFrom(IEnumerable<Microsoft.CodeAnalysis.SyntaxTree> trees)
+    {
+        _reservedSources.AddRange(trees);
+        _reservedNames = null;
+    }
+
+    // Generated names end in a counter, so only digit-final names can collide.
+    private static HashSet<string> NamesIn(Microsoft.CodeAnalysis.SyntaxTree tree, string text)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var token in tree.GetRoot().DescendantTokens())
+        {
+            if (token.RawKind == (int)Microsoft.CodeAnalysis.CSharp.SyntaxKind.IdentifierToken
+                && token.ValueText.Length > 0 && char.IsDigit(token.ValueText[^1]))
+                names.Add(token.ValueText);
+        }
+        foreach (System.Text.RegularExpressions.Match match in
+            System.Text.RegularExpressions.Regex.Matches(text, @"[\p{L}_][\p{L}\p{Nd}_]*\p{Nd}\b"))
+        {
+            names.Add(match.Value);
+        }
+        return names;
+    }
+
+    /// <summary>
+    /// #1132: true when <paramref name="name"/> is an identifier (escapes decoded) or identifier-shaped
+    /// text in the source or a reserved tree; generated names skip these.
+    /// </summary>
+    public bool IsReservedName(string name)
+    {
+        if (_originalSource == null && _reservedSources.Count == 0)
+            return false;
+        if (_reservedNames == null)
+        {
+            var source = _originalSource ?? "";
+            var names = NamesIn(Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(source), source);
+            foreach (var tree in _reservedSources)
+                names.UnionWith(TreeNames.GetValue(tree, t => NamesIn(t, t.ToString())));
+            _reservedNames = names;
+        }
+        return _reservedNames.Contains(name);
+    }
 
     /// <summary>
     /// Checks if any errors were encountered.
@@ -425,10 +483,18 @@ public sealed class ConversionContext
     /// </summary>
     public string GenerateId(string prefix = "", string hint = "")
     {
-        _idCounter++;
         var sanitized = SanitizeHint(hint);
         var effectivePrefix = string.IsNullOrEmpty(sanitized) ? prefix : $"{prefix}{sanitized}";
-        return string.IsNullOrEmpty(effectivePrefix) ? $"id{_idCounter:D3}" : $"{effectivePrefix}{_idCounter:D3}";
+        if (string.IsNullOrEmpty(effectivePrefix))
+            effectivePrefix = "id";
+        string id;
+        do
+        {
+            _idCounter++;
+            id = $"{effectivePrefix}{_idCounter:D3}";
+        }
+        while (IsReservedName(id));
+        return id;
     }
 
     /// <summary>

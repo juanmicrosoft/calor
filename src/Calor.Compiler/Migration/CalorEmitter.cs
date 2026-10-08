@@ -20,6 +20,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private int _hoistCounter;
     private int _conditionalExpressionDepth;
     private int _memberBodyDepth;
+    private int _inlineObjectInitializers;
 
     // How many lambda bodies deep we are emitting. A block lambda nested inside
     // ANOTHER lambda's body must never be hoisted to the enclosing statement:
@@ -68,6 +69,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         _lambdaBodyDepth = 0;
         _inInterpolation = false;
         _inInlineSiblingContext = 0;
+        _inlineObjectInitializers = 0;
         Visit(module);
         return _builder.ToString();
     }
@@ -1631,11 +1633,6 @@ public sealed class CalorEmitter : IAstVisitor<string>
                         DictionaryCreationNode d => d.Id,
                         SetCreationNode s => s.Id,
                         ArrayCreationNode a => a.Id,
-                        // The §ARR2D block binds its rows to a NAME, not to the
-                        // node id its siblings use (review N1): reference the same
-                        // name, or the emitted C# names a variable that does not
-                        // exist and the round trip fails.
-                        MultiDimArrayCreationNode m => MultiDimVariableName(m),
                         _ => null
                     };
                     if (collectionRef != null)
@@ -2002,7 +1999,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Sanitize variable names containing section markers
         var originalTarget = variableName;
         if (ContainsSectionMarker(variableName))
-            variableName = $"_hoist{_hoistCounter++:D3}";
+            variableName = FreshTemp("_hoist");
 
         // Pre-evaluate all elements to collect hoisted bindings before the list block.
         // AcceptInInlineSibling: each element line is parsed as a sibling expression
@@ -2134,32 +2131,26 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private void EmitArrayCreationWithName(ArrayCreationNode node, string variableName)
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
+        // #1132: `[T]` cannot spell an array of arrays (`[i32[]]` does not parse).
+        var arrayType = elementType.Contains('[') ? ArrayOf(elementType, "[]") : $"[{elementType}]";
 
         // Sanitize variable names containing section markers (e.g., §IDX §THIS §C{GetInt} §/C)
         // These can't appear inside {…} attribute blocks. Use a hoisted temp var instead.
         var originalTarget = variableName;
         if (ContainsSectionMarker(variableName))
         {
-            variableName = $"_hoist{_hoistCounter++:D3}";
+            variableName = FreshTemp("_hoist");
         }
 
         if (node.Initializer.Count > 0)
         {
-            // Pre-evaluate elements to flush hoisted bindings before the §ARR block
-            var evalElements = new List<string>();
-            foreach (var element in node.Initializer)
-            {
-                var val = element.Accept(this);
-                FlushHoistedLines();
-                if (ContainsSectionMarker(val))
-                    val = HoistToTempVar(val);
-                evalElements.Add(val);
-            }
+            // Pre-evaluate elements so hoisted bindings land before the §ARR block
+            var evalElements = RenderInPlace(node.Initializer);
             AppendLine($"§ARR{{{variableName}:{elementType}}}");
             Indent();
             foreach (var val in evalElements)
             {
-                AppendLine(val);
+                AppendLine(val.Replace("\n", "\n  ")); // a multi-line element moves with its line
             }
             Dedent();
             EmitBlockEnd($"§/ARR{{{variableName}}}");
@@ -2169,18 +2160,16 @@ public sealed class CalorEmitter : IAstVisitor<string>
         }
         else if (node.Size != null)
         {
-            var size = node.Size.Accept(this);
-            // Hoist complex size expressions out of the attribute braces
-            // (§C calls, parenthesized expressions, commas break attribute parsing)
-            if (ContainsSectionMarker(size) || size.Contains('(') || size.Contains(',') || size.Contains(':'))
-                size = HoistToTempVar(size);
-            AppendLine($"§B{{[{elementType}]:{variableName}}} §ARR{{{elementType}:{variableName}:{size}}}");
+            // #1132: a complex size is quoted in place, not hoisted (a hoisted size ran
+            // before the statement's earlier reads).
+            var size = EmitSizeAttribute(node.Size);
+            AppendLine($"§B{{{arrayType}:{variableName}}} §ARR{{{elementType}:{variableName}:{size}}}");
             if (originalTarget != variableName)
                 AppendLine($"§ASSIGN {originalTarget} {variableName}");
         }
         else
         {
-            AppendLine($"§B{{[{elementType}]:{variableName}}} §C{{Array.Empty<{elementType}>}} §/C");
+            AppendLine($"§B{{{arrayType}:{variableName}}} §C{{Array.Empty<{elementType}>}} §/C");
             if (originalTarget != variableName)
                 AppendLine($"§ASSIGN {originalTarget} {variableName}");
         }
@@ -2189,72 +2178,125 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private void EmitMultiDimArrayCreationWithName(MultiDimArrayCreationNode node, string variableName, string? typeName)
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
-        var mappedType = typeName != null ? TypeMapper.CSharpToCalor(typeName) : $"{elementType}[{new string(',', Math.Max(node.Rank - 1, 0))}]";
+        var mappedType = typeName != null ? TypeMapper.CSharpToCalor(typeName) : ArrayOf(elementType, $"[{new string(',', Math.Max(node.Rank - 1, 0))}]");
 
         // Sanitize variable names containing section markers
         var originalTarget = variableName;
         if (ContainsSectionMarker(variableName))
-            variableName = $"_hoist{_hoistCounter++:D3}";
+            variableName = FreshTemp("_hoist");
 
-        if (node.DimensionSizes.Count > 0)
+        if (node.Initializer.Count > 0)
         {
-            // Hoist dimension sizes that contain section markers, parens, colons, or commas
-            var evalDims = node.DimensionSizes.Select(d =>
-            {
-                var val = d.Accept(this);
-                if (ContainsSectionMarker(val) || val.Contains('(') || val.Contains(',') || val.Contains(':'))
-                    val = HoistToTempVar(val);
-                return val;
-            }).ToList();
-            var dims = string.Join(":", evalDims);
-            AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}:{dims}}}");
+            // Review N1: pre-evaluate every row BEFORE the §ARR2D opener so hoisted
+            // bindings land ahead of it; the §ARR2D body accepts only §ROW (Calor0100).
+            // #1132: the sized form carries the rank (and shape) of a rank-3+ or sized
+            // initializer; the rows are its innermost vectors in source order.
+            var dims = node.DimensionSizes.Count > 0
+                ? ":" + string.Join(":", node.DimensionSizes.Select(d => d.Accept(this)))
+                : "";
+            var rows = RenderMultiDimRows(node);
+            AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}{dims}}}");
+            Indent();
+            foreach (var row in rows)
+                AppendLine($"§ROW {row}");
+            Dedent();
+            EmitBlockEnd($"§/ARR2D{{{node.Id}}}");
             if (originalTarget != variableName)
                 AppendLine($"§ASSIGN {originalTarget} {variableName}");
         }
-        else if (node.Initializer.Count > 0)
+        else if (node.DimensionSizes.Count > 0)
         {
-            // Review N1: pre-evaluate every row BEFORE the §ARR2D opener and emit
-            // any hoisted bindings ahead of it — exactly as Visit(ListNode) does.
-            // Flushing them from inside the block would put §B{~_hoistNNN} lines
-            // into the §ARR2D body, which accepts only §ROW (Calor0100).
-            var evaluatedRows = new List<List<string>>();
-            var allHoisted = new List<string>();
-            foreach (var row in node.Initializer)
-            {
-                var rowValues = new List<string>();
-                foreach (var element in row)
-                {
-                    var value = AcceptInInlineSibling(element);
-                    // A multi-line element (an object initializer) cannot sit on a
-                    // §ROW line; it becomes a temp bound BEFORE the array (the
-                    // hoists are flushed above the opener, never into the §ARR2D
-                    // body, which accepts only §ROW - review N1).
-                    if (value.Contains('\n'))
-                        value = HoistToTempVar(value);
-                    rowValues.Add(value);
-                }
-                if (_pendingHoistedLines.Count > 0)
-                {
-                    allHoisted.AddRange(_pendingHoistedLines);
-                    _pendingHoistedLines.Clear();
-                }
-                evaluatedRows.Add(rowValues);
-            }
-
-            foreach (var hoisted in allHoisted)
-                AppendLine(hoisted);
-
-            AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}}}");
-            Indent();
-            foreach (var rowValues in evaluatedRows)
-                AppendLine($"§ROW {string.Join(" ", rowValues)}");
-            Dedent();
-            EmitBlockEnd($"§/ARR2D{{{node.Id}}}");
+            // #1132: complex sizes are quoted in place, in order; hoisting only some of
+            // them ran a call before an earlier size was read (`new int[n, Next()]`).
+            var dims = string.Join(":", node.DimensionSizes.Select(EmitSizeAttribute));
+            AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}:{dims}}}");
+            if (originalTarget != variableName)
+                AppendLine($"§ASSIGN {originalTarget} {variableName}");
         }
         else
         {
             var zeros = string.Join(":", Enumerable.Repeat("0", node.Rank));
             AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}:{zeros}}}");
+        }
+    }
+
+    /// <summary>
+    /// #1132: the type of an array of <paramref name="elementType"/>. The new array's own
+    /// rank comes first, as in C# source: a 2-D array of i32[] is i32[,][], not i32[][,].
+    /// </summary>
+    private static string ArrayOf(string elementType, string rank)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(elementType, @"^(.+?)((?:\[,*\])+)$");
+        return match.Success ? match.Groups[1].Value + rank + match.Groups[2].Value : elementType + rank;
+    }
+
+    /// <summary>
+    /// #1132: renders elements (or arguments) left to right, object initializers on one line.
+    /// If any must leave its line, every non-literal one is bound in source order, so none
+    /// runs ahead of an earlier sibling; the bindings stay queued for the caller.
+    /// </summary>
+    private List<string> RenderArrayElements(
+        IEnumerable<ExpressionNode> elements, bool hoistSectionMarkers, bool inlineSibling = true)
+    {
+        var queued = _pendingHoistedLines.ToList();
+        _pendingHoistedLines.Clear();
+        var rendered = new List<(ExpressionNode Node, string Value, List<string> Hoisted)>();
+        _inlineObjectInitializers++;
+        try
+        {
+            foreach (var element in elements)
+            {
+                var value = inlineSibling ? AcceptInInlineSibling(element) : element.Accept(this);
+                rendered.Add((element, value, _pendingHoistedLines.ToList()));
+                _pendingHoistedLines.Clear();
+            }
+        }
+        finally
+        {
+            _inlineObjectInitializers--;
+            _pendingHoistedLines.InsertRange(0, queued);
+        }
+
+        var hoistAll = rendered.Any(r => r.Hoisted.Count > 0 || r.Value.Contains('\n')
+            || hoistSectionMarkers && ContainsSectionMarker(r.Value));
+        var values = new List<string>(rendered.Count);
+        foreach (var (node, value, hoisted) in rendered)
+        {
+            _pendingHoistedLines.AddRange(hoisted);
+            var literal = node is IntLiteralNode or StringLiteralNode or BoolLiteralNode
+                or FloatLiteralNode or DecimalLiteralNode
+                // `null`/`default` take their type from the target; a temp would lose it.
+                or ReferenceNode { Name: "null" or "default" };
+            values.Add(hoistAll && !literal ? HoistToTempVar(value) : value);
+        }
+        return values;
+    }
+
+    /// <summary>The §ROW lines (innermost vectors, row-major).</summary>
+    private List<string> RenderMultiDimRows(MultiDimArrayCreationNode node)
+    {
+        var values = RenderInPlace(node.Initializer.SelectMany(row => row));
+        var rows = new List<string>(node.Initializer.Count);
+        var next = 0;
+        foreach (var row in node.Initializer)
+        {
+            rows.Add(string.Join(" ", values.Skip(next).Take(row.Count)));
+            next += row.Count;
+        }
+        return rows;
+    }
+
+    /// <summary>#1132: array elements, never hoisted (a hoist ran an element or its conversion early).</summary>
+    private List<string> RenderInPlace(IEnumerable<ExpressionNode> elements)
+    {
+        _conditionalExpressionDepth++;
+        try
+        {
+            return RenderArrayElements(elements, hoistSectionMarkers: false);
+        }
+        finally
+        {
+            _conditionalExpressionDepth--;
         }
     }
 
@@ -2277,7 +2319,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Value is ListCreationNode or DictionaryCreationNode or SetCreationNode
                        or ArrayCreationNode or MultiDimArrayCreationNode)
         {
-            var temp = $"_reassign{_hoistCounter++:D3}";
+            var temp = FreshTemp("_reassign");
             switch (node.Value)
             {
                 case ListCreationNode listNode: EmitListCreationWithName(listNode, temp); break;
@@ -3014,15 +3056,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     private string EmitSizeAttribute(ExpressionNode expression)
     {
-        var size = expression.Accept(this);
+        // #1132: an expression-position size is never hoisted (that ran it before the
+        // earlier parts of its statement); a complex one is quoted and re-parsed in place.
+        var size = AcceptInConditionalRegion(expression);
         if (!ContainsSectionMarker(size) && !size.Contains('(') && !size.Contains(',')
             && !size.Contains(':') && !size.Contains("0x"))
             return size;
 
-        size = HoistToTempVar(size);
-        return _memberBodyDepth == 0 || _conditionalExpressionDepth > 0
-            ? new StringLiteralNode(expression.Span, size).Accept(this)
-            : size;
+        return new StringLiteralNode(expression.Span, size).Accept(this);
     }
 
     private string AcceptInConditionalRegion(ExpressionNode expression)
@@ -3096,9 +3137,21 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (_memberBodyDepth == 0 || _conditionalExpressionDepth > 0)
             return expr;
 
-        var varName = $"_hoist{_hoistCounter++:D3}";
+        var varName = FreshTemp("_hoist");
         _pendingHoistedLines.Add($"§B{{~{varName}}} {expr}");
         return varName;
+    }
+
+    /// <summary>#1132: a generated temp name not spelled in the source (a user `_hoist000` was rebound).</summary>
+    private string FreshTemp(string prefix)
+    {
+        string name;
+        do
+        {
+            name = $"{prefix}{_hoistCounter++:D3}";
+        }
+        while (_context.IsReservedName(name));
+        return name;
     }
 
     public string Visit(ReferenceNode node)
@@ -3147,6 +3200,20 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     public string Visit(FieldAccessNode node)
     {
+        // #1132: `(§IDX2D g 0 1).F`; bare, `.F` bound to the last index (CS1061).
+        if (!_inInterpolation && node.Target is ArrayAccessNode or MultiDimArrayAccessNode)
+        {
+            var element = AcceptInConditionalRegion(node.Target);
+            return $"({element}).{(node.FieldName.StartsWith('@') ? node.FieldName[1..] : node.FieldName)}";
+        }
+        // `new T[,] { … }.Length` in place: the inline creation ends at its closer.
+        if (!_inInterpolation && node.Target is ArrayCreationNode { Initializer.Count: > 0 }
+                or MultiDimArrayCreationNode { Initializer.Count: > 0 })
+        {
+            var creation = AcceptInConditionalRegion(node.Target);
+            return $"{creation}.{(node.FieldName.StartsWith('@') ? node.FieldName[1..] : node.FieldName)}";
+        }
+
         var conditional = IsConditionalCallTarget(node.Target);
         var target = conditional ? AcceptInConditionalRegion(node.Target) : node.Target.Accept(this);
         if (node.Target is ThisExpressionNode)
@@ -3179,13 +3246,9 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Use AcceptInInlineSibling so nested zero-arg §C{...} keeps explicit §/C —
         // the v0.6.1 emitter default would otherwise let the next §A be absorbed
         // as the nested call's inline argument (silent AST corruption).
-        var args = node.Arguments.Select(a =>
-        {
-            var val = AcceptInInlineSibling(a);
-            if (ContainsSectionMarker(val))
-                val = HoistToTempVar(val);
-            return $"§A {val}";
-        });
+        // #1132: if one argument is hoisted, every non-literal argument is, in order
+        // (`new Cell(x, Next())` read x after Next() ran).
+        var args = RenderArrayElements(node.Arguments, hoistSectionMarkers: true).Select(val => $"§A {val}");
         var argsStr = node.Arguments.Count > 0 ? $" {string.Join(" ", args)}" : "";
 
         // Handle object initializers (multi-line block format)
@@ -3198,6 +3261,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
                 var valueStr = init.Value.Accept(this);
                 if (!string.IsNullOrWhiteSpace(valueStr))
                     evalInits.Add((init.PropertyName, valueStr));
+            }
+
+            // #1132: an array element stays on its line (`§NEW{T} A = x §/NEW`), not hoisted early.
+            if (_inlineObjectInitializers > 0 && evalInits.All(i => !i.Value.Contains('\n')))
+            {
+                var inits = string.Concat(evalInits.Select(i =>
+                    $" {(i.PropName.StartsWith('@') ? i.PropName[1..] : i.PropName)} = {i.Value}"));
+                return $"§NEW{{{node.TypeName}{typeArgs}}}{argsStr}{inits} §/NEW";
             }
 
             var indent = new string(' ', _indentLevel * 2);
@@ -3549,13 +3620,14 @@ public sealed class CalorEmitter : IAstVisitor<string>
             // Visit elements in inline-sibling context so that nested zero-arg
             // calls keep explicit §/C (otherwise `§ARR{...} §C{A} §C{B}` would
             // parse as ONE element `A(B())` instead of TWO `A(), B()`).
-            var elements = string.Join(" ", node.Initializer.Select(e => AcceptInInlineSibling(e)));
+            var elements = string.Join(" ", RenderInPlace(node.Initializer));
             return $"§ARR{{{id}:{elementType}}} {elements} §/ARR{{{id}}}";
         }
         else if (node.Size != null)
         {
             var size = EmitSizeAttribute(node.Size);
-            return $"§ARR{{{elementType}:{id}:{size}}}";
+            // #1132: closed, so a sized element cannot take its enclosing §ARR's closer.
+            return $"§ARR{{{elementType}:{id}:{size}}} §/ARR{{{id}}}";
         }
         else
         {
@@ -3632,7 +3704,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             // the in-place block form below, which stays inside the body.
             if (_memberBodyDepth > 0 && _lambdaBodyDepth == 0)
             {
-                var name = $"_hoistLam{_hoistCounter++:D3}";
+                var name = FreshTemp("_hoistLam");
                 _pendingHoistedLines.AddRange(
                     BuildBlockLambdaLines($"§B{{{name}}} ", header, lambdaRow, node.Id, stmts));
                 return name;
@@ -5168,75 +5240,31 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return $"§SIZEOF{{{typeName}}}";
     }
 
-    /// <summary>
-    /// The variable name an expression-position <c>§ARR2D</c> block binds its rows
-    /// to. Shared so a reference to the block cannot drift from the block itself.
-    /// </summary>
-    private static string MultiDimVariableName(MultiDimArrayCreationNode node)
-        => string.IsNullOrEmpty(node.Name) ? "_arr2d" : node.Name;
-
     public string Visit(MultiDimArrayCreationNode node)
     {
         var elementType = TypeMapper.CSharpToCalor(node.ElementType);
 
-        if (node.DimensionSizes.Count > 0)
+        if (node.Initializer.Count > 0)
         {
-            var evalDims = node.DimensionSizes.Select(d =>
-            {
-                var val = d.Accept(this);
-                if (ContainsSectionMarker(val) || val.Contains('(') || val.Contains(',') || val.Contains(':'))
-                    val = HoistToTempVar(val);
-                return val;
-            }).ToList();
-            var dims = string.Join(":", evalDims);
-            return $"§ARR2D{{{node.Id}:{node.Name}:{elementType}:{dims}}}";
+            // #1132: inline, where the C# had it. The old block bound an undeclared name
+            // (CS0103/CS0201) and ran hoisted elements early, even in an unselected branch.
+            var dims = node.DimensionSizes.Count > 0
+                ? ":" + string.Join(":", node.DimensionSizes.Select(d => d.Accept(this)))
+                : "";
+            var rows = RenderMultiDimRows(node);
+            return $"§ARR2D{{{node.Id}:{node.Id}:{elementType}{dims}}} "
+                + string.Concat(rows.Select(row => $"§ROW {row} "))
+                + $"§/ARR2D{{{node.Id}}}";
         }
-        else if (node.Initializer.Count > 0)
+        else if (node.DimensionSizes.Count > 0)
         {
-            var id = MultiDimVariableName(node);
-            // Review N1: pre-evaluate every row BEFORE the §ARR2D opener and emit
-            // any hoisted bindings ahead of it — exactly as Visit(ListNode) does.
-            // Flushing them from inside the block would put §B{~_hoistNNN} lines
-            // into the §ARR2D body, which accepts only §ROW (Calor0100).
-            var evaluatedRows = new List<List<string>>();
-            var allHoisted = new List<string>();
-            foreach (var row in node.Initializer)
-            {
-                var rowValues = new List<string>();
-                foreach (var element in row)
-                {
-                    var value = AcceptInInlineSibling(element);
-                    // A multi-line element (an object initializer) cannot sit on a
-                    // §ROW line; it becomes a temp bound BEFORE the array (the
-                    // hoists are flushed above the opener, never into the §ARR2D
-                    // body, which accepts only §ROW - review N1).
-                    if (value.Contains('\n'))
-                        value = HoistToTempVar(value);
-                    rowValues.Add(value);
-                }
-                if (_pendingHoistedLines.Count > 0)
-                {
-                    allHoisted.AddRange(_pendingHoistedLines);
-                    _pendingHoistedLines.Clear();
-                }
-                evaluatedRows.Add(rowValues);
-            }
-
-            foreach (var hoisted in allHoisted)
-                AppendLine(hoisted);
-
-            AppendLine($"§ARR2D{{{node.Id}:{id}:{elementType}}}");
-            Indent();
-            foreach (var rowValues in evaluatedRows)
-                AppendLine($"§ROW {string.Join(" ", rowValues)}");
-            Dedent();
-            EmitBlockEnd($"§/ARR2D{{{node.Id}}}");
-            return "";
+            var dims = string.Join(":", node.DimensionSizes.Select(EmitSizeAttribute));
+            return $"§ARR2D{{{node.Id}:{node.Name}:{elementType}:{dims}}} §/ARR2D{{{node.Id}}}";
         }
         else
         {
             var zeros = string.Join(":", Enumerable.Repeat("0", node.Rank));
-            return $"§ARR2D{{{node.Id}:{node.Name}:{elementType}:{zeros}}}";
+            return $"§ARR2D{{{node.Id}:{node.Name}:{elementType}:{zeros}}} §/ARR2D{{{node.Id}}}";
         }
     }
 

@@ -3531,6 +3531,15 @@ public sealed class Parser
             return inner;
         }
 
+        // #1132: `(§IDX a i)` / `(§IDX2D g i j)` group an element access so a trailing
+        // `.Member` applies to the element, not to the last index (`g[i, j].Member`).
+        if (Check(TokenKind.Index) || Check(TokenKind.Index2D))
+        {
+            var element = ParseExpression();
+            Expect(TokenKind.CloseParen);
+            return element;
+        }
+
         // Get the operator
         var (opKind, opText, opSpan) = ParseLispOperator();
 
@@ -7884,7 +7893,8 @@ public sealed class Parser
         return new BindStatementNode(
             arrNode.Span,
             arrNode.Name,
-            $"{arrNode.ElementType}[]",
+            // #1132: the created rank comes first: an array of i32[,] is i32[][,].
+            System.Text.RegularExpressions.Regex.Replace(arrNode.ElementType, @"^(.+?)((?:\[,*\])*)$", "$1[]$2"),
             isMutable: false,
             arrNode,
             new AttributeCollection());
@@ -15051,12 +15061,19 @@ public sealed class Parser
                 if (posN == null) break;
                 if (int.TryParse(posN, out var d))
                     dimensionSizes.Add(new IntLiteralNode(startToken.Span, d));
-                else
+                else if (posN.All(c => char.IsLetterOrDigit(c) || c is '_' or '.'))
                     dimensionSizes.Add(new ReferenceNode(startToken.Span, posN));
+                else
+                    // #1132: like §ARR, a quoted size is an embedded expression, kept in place.
+                    dimensionSizes.Add(ParseEmbeddedExpression(posN, startToken.Span));
             }
             rank = dimensionSizes.Count;
         }
-        else
+
+        // #1132: the sized form may carry §ROW lines too (`new T[2, 1, 2] { … }`): the
+        // rows are the innermost vectors in row-major order, which is how a rank-3+
+        // initializer is written. An expression-position sized form ends with §/ARR2D.
+        if (pos3 == null || Check(TokenKind.Row) || Check(TokenKind.EndArray2D) || Check(TokenKind.Indent) && Peek(1).Kind == TokenKind.Row)
         {
             // Initializer form: parse §ROW elements until §/ARR2D
             while (!IsAtEnd && !IsBlockEnd(TokenKind.EndArray2D))
@@ -15081,7 +15098,8 @@ public sealed class Parser
                 ExpectBlockEnd(TokenKind.EndArray2D);
                 ParseAttributes(); // consume optional {id} on closing tag
             }
-            rank = initializer.Count > 0 ? 2 : rank;
+            if (dimensionSizes.Count == 0 && initializer.Count > 0)
+                rank = 2;
         }
 
         return new MultiDimArrayCreationNode(

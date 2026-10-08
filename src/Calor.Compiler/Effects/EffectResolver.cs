@@ -50,6 +50,41 @@ public sealed class EffectResolver
         _initialized = true;
     }
 
+    // #1132: System.Array's instance members, for an array receiver: effects, argument
+    // count range, and the first argument that must be an integer index. GetValue and
+    // SetValue box through object; Clone, GetEnumerator and ToString allocate. A call
+    // that fits none of these (an extension, Initialize) stays unknown.
+    private static readonly Dictionary<(EffectMemberKind, string), (string[] Effects, int Min, int Max, int IntFrom)> ArrayInstanceMembers = new()
+    {
+        [(EffectMemberKind.Method, "GetLength")] = ([], 1, 1, 0),
+        [(EffectMemberKind.Method, "GetLongLength")] = ([], 1, 1, 0),
+        [(EffectMemberKind.Method, "GetLowerBound")] = ([], 1, 1, 0),
+        [(EffectMemberKind.Method, "GetUpperBound")] = ([], 1, 1, 0),
+        [(EffectMemberKind.Method, "GetHashCode")] = ([], 0, 0, 0),
+        [(EffectMemberKind.Method, "GetType")] = ([], 0, 0, 0),
+        [(EffectMemberKind.Method, "Equals")] = ([], 1, 1, 1),
+        [(EffectMemberKind.Method, "GetValue")] = (["alloc"], 1, 3, 0),
+        [(EffectMemberKind.Method, "SetValue")] = (["mut", "alloc"], 2, 4, 1),
+        [(EffectMemberKind.Method, "CopyTo")] = (["mut"], 2, 2, 1),
+        [(EffectMemberKind.Method, "Clone")] = (["alloc"], 0, 0, 0),
+        [(EffectMemberKind.Method, "GetEnumerator")] = (["alloc"], 0, 0, 0),
+        [(EffectMemberKind.Method, "ToString")] = (["alloc"], 0, 0, 0),
+        [(EffectMemberKind.Getter, "Length")] = ([], 0, 0, 0),
+        [(EffectMemberKind.Getter, "LongLength")] = ([], 0, 0, 0),
+        [(EffectMemberKind.Getter, "Rank")] = ([], 0, 0, 0),
+    };
+
+    private static bool IsArrayInstanceMember(EffectResolverKey key, out string[] effects)
+    {
+        effects = [];
+        if (!ArrayInstanceMembers.TryGetValue((key.Kind, key.MemberName), out var member))
+            return false;
+        var args = key.ParameterTypes ?? [];
+        effects = member.Effects;
+        return args.Count >= member.Min && args.Count <= member.Max
+            && args.Skip(member.IntFrom).All(arg => arg is "Int32" or "Int64" or "Int16" or "UInt16" or "Byte" or "SByte" or "Char");
+    }
+
     /// <summary>
     /// v0.15 E1 slice 2c — THE resolution entry point. One method, one
     /// argument, and that argument is a symbol identity
@@ -79,6 +114,18 @@ public sealed class EffectResolver
             _keysFromStringFallback++;
         else
             _keysFromBoundReceiver++;
+
+        // #1132: an array receiver ("i32[,]", "Cell[]"). Only System.Array's own instance
+        // members answer here; anything else (an extension such as LINQ or a user's
+        // `this int[]` method, Initialize which runs element constructors) stays
+        // unknown so extension resolution and unknown-call charging still apply.
+        if (key.Kind is EffectMemberKind.Method or EffectMemberKind.Getter
+            && System.Text.RegularExpressions.Regex.IsMatch(key.DeclaringType, @"^([^\[\]]+(\[,*\])+|\[[^\[\]]+\])$")
+            && IsArrayInstanceMember(key, out var arrayEffects))
+            return new EffectResolution(EffectResolutionStatus.Resolved, EffectSet.From(arrayEffects), "System.Array");
+        // Array.Initialize runs element constructors; System.Array's pure default must not answer.
+        if (key.DeclaringType == "System.Array" && key.MemberName == "Initialize")
+            return new EffectResolution(EffectResolutionStatus.Unknown, EffectSet.Unknown, "unknown");
 
         // Extension resolution is deliberately UNCACHED, as it was before this
         // slice. Its answer depends on ReceiverInterfaces, which is outside key
