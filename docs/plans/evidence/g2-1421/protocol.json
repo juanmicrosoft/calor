@@ -530,8 +530,8 @@
       },
       {
         "version": "1.4.0",
-        "timestampUtc": "2026-10-08T16:00:00Z",
-        "pr": 0,
+        "timestampUtc": "2026-10-08T15:23:53Z",
+        "pr": 1533,
         "afterDecisionBearingExecution": true,
         "justification": "Registers the tests added since registration, for #1424's execution on the second #1423 candidate (C2 regeneration 1, PR #1517, cause 1). Additions only. verification: the 62 tests the S2 (#1413) repairs added to Calor.Verification.Tests (411 -> 473; 407 -> 469 distinct names), exactly the extraNames of docs/plans/evidence/c2-1424/determinism-registry-drift.json. compiler-verifier: 1 test added in a registered class, KInductionTests.KInductionProver_RefusesUnrepresentableBoundsAndSteps (554 -> 555). C2's drift record did not check this group. S2 PR #1502 had also renamed the 3 registered rows of ProductionOverflowRuntimeTests.GuardedArithmetic_ProvesWithoutEvaluatingUnselectedOverflow to GuardedArithmetic_IsAssumedWithoutEvaluatingUnselectedOverflow; a rename removes registered cases, which D016 forbids, so the test method takes back its registered name (the body is unchanged). Both groups were re-listed with the registered command (dotnet test <project> -c Release --no-build --list-tests, osx-arm64, SDK 10.0.401) on the amendment's tree; every registered name keeps its multiplicity. compilerClasses, cells, artifacts, profiles, environments, attempts, determinism rows, gates, agreement and failure rules, record formats, the harness, and the budget are unchanged. Follows decision-bearing executions g3-exec-1 and g3-exec-2, so per this rule a complete new execution on a new commit follows: #1424's execution on the re-frozen candidate."
       }
