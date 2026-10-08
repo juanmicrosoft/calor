@@ -20,6 +20,20 @@ All notable changes to this project will be documented in this file.
   since the candidate. Two runs on one candidate write identical files, which lets the release
   check compare them with the adjudicated hashes. No benchmark results are published by this change.
 
+- **Name binding no longer copies module-wide tables at every loop.** Since 0.22.0, the
+  binder made two kinds of module-wide copies. Before each loop, it copied the whole symbol table
+  and its declaration counters so it could undo a trial pass over the loop body. At each loop,
+  branch, and lambda, it copied the callable-state map (which tracks what each stored lambda may
+  mutate), and that map held an entry for every initialized local in the module. Binding time
+  therefore grew with the square of the module size. On a synthetic module of 200 functions
+  with 200 statements each, binding took 14.5 s; it now takes 0.2 s, as it did before 0.22.0.
+  The binder now undoes only what each trial pass added, and it no longer stores the empty
+  callable state. The bound tree, diagnostics, symbol ids and their order, and the generated C#
+  are unchanged. This also fixes the failing `Binding_MediumModule_Under500ms` performance
+  test, which skipped the 0.22.0 NuGet publish. Two smaller module-wide costs remain: locals
+  that hold lambdas still stay in the callable-state map, and nominal type lookups scan all
+  symbols.
+
 ## [0.24.0] - 2026-10-07
 
 Calor 0.24 is a soundness release. It repairs verifier defects found by a registered soundness
@@ -30,8 +44,8 @@ but the NuGet publish for 0.22.0 was skipped after its performance tests failed,
 reached NuGet. Milestone 0.23 was planning-only and shipped no code. If you upgrade from 0.21.0,
 read the 0.22.0 entry below as well: its changes are part of this release.
 
-The 0.24 evidence is adjudicated by the maintainer who directed and merged the repairs. It is not
-independently adjudicated or independently verified, so every 0.24 evidence claim is at most
+The 0.24 evidence is adjudicated by the maintainer who directed and merged the repairs. No independent party
+adjudicated or verified it, so every 0.24 evidence claim is at most
 *bounded*. No benchmark results are published with this release.
 
 ### Advisory: false proofs in 0.21.0 (and the unpublished 0.22.0)

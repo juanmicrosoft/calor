@@ -213,6 +213,45 @@ public class VerificationPerformanceTests
             $"Medium module binding took {sw.ElapsedMilliseconds}ms, expected < 500ms");
     }
 
+    /// <summary>
+    /// Binding cost must grow linearly with the number of functions. The 0.22
+    /// regression (loop discovery copying the module-wide symbol table at every
+    /// loop, and callable-state snapshots at every loop, branch, and lambda
+    /// copying an entry for every local in the module) made it quadratic: 8x the
+    /// functions cost about 64x the time. The ratio is far less load-sensitive
+    /// than an absolute threshold; linear scaling gives about 8x.
+    /// </summary>
+    [Fact]
+    public void Binding_ScalesLinearlyWithFunctionCount()
+    {
+        static double BestBindMs(int functions)
+        {
+            var source = SyntheticCodeGenerator.Generate(functions: functions, statementsPerFunction: 100);
+            var best = double.MaxValue;
+            for (var run = 0; run < 3; run++)
+            {
+                var diagnostics = new DiagnosticBag();
+                var tokens = new Lexer(source, diagnostics).TokenizeAllForParser();
+                var ast = new Parser(tokens, diagnostics).Parse();
+                Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.Message)));
+                var sw = Stopwatch.StartNew();
+                new Binder(diagnostics).Bind(ast);
+                sw.Stop();
+                best = Math.Min(best, sw.Elapsed.TotalMilliseconds);
+            }
+            return best;
+        }
+
+        BestBindMs(10); // JIT warmup
+        var small = BestBindMs(40);
+        var large = BestBindMs(320);
+        var ratio = large / Math.Max(small, 1.0);
+        _output.WriteLine($"Binding 40 functions: {small:F1}ms, 320 functions: {large:F1}ms, ratio {ratio:F2}x");
+
+        Assert.True(ratio < 24,
+            $"Binding scaling is superlinear: 8x the functions took {ratio:F2}x the time (linear is ~8x, quadratic ~64x)");
+    }
+
     #endregion
 
     #region Analysis Performance Tests
