@@ -533,7 +533,7 @@
         "timestampUtc": "2026-10-08T15:23:53Z",
         "pr": 1533,
         "afterDecisionBearingExecution": true,
-        "justification": "Registers the tests added since registration, for #1424's execution on the second #1423 candidate (C2 regeneration 1, PR #1517, cause 1). Additions only. verification: the 62 tests the S2 (#1413) repairs added to Calor.Verification.Tests (411 -> 473; 407 -> 469 distinct names), exactly the extraNames of docs/plans/evidence/c2-1424/determinism-registry-drift.json. compiler-verifier: 1 test added in a registered class, KInductionTests.KInductionProver_RefusesUnrepresentableBoundsAndSteps (554 -> 555). C2's drift record did not check this group. S2 PR #1502 had also renamed the 3 registered rows of ProductionOverflowRuntimeTests.GuardedArithmetic_ProvesWithoutEvaluatingUnselectedOverflow to GuardedArithmetic_IsAssumedWithoutEvaluatingUnselectedOverflow; a rename removes registered cases, which D016 forbids, so the test method takes back its registered name (the body is unchanged). Both groups were re-listed with the registered command (dotnet test <project> -c Release --no-build --list-tests, osx-arm64, SDK 10.0.401) on the amendment's tree; every registered name keeps its multiplicity. compilerClasses, cells, artifacts, profiles, environments, attempts, determinism rows, gates, agreement and failure rules, record formats, the harness, and the budget are unchanged. Follows decision-bearing executions g3-exec-1 and g3-exec-2, so per this rule a complete new execution on a new commit follows: #1424's execution on the re-frozen candidate."
+        "justification": "Registers the tests added since registration, for #1424's execution on the second #1423 candidate (C2 regeneration 1, PR #1517, cause 1). Additions only. verification: the 62 tests the S2 (#1413) repairs added to Calor.Verification.Tests (411 -> 473; 407 -> 469 distinct names), exactly the extraNames of docs/plans/evidence/c2-1424/determinism-registry-drift.json. compiler-verifier: 1 test added in a registered class, KInductionTests.KInductionProver_RefusesUnrepresentableBoundsAndSteps (554 -> 555). C2's drift record did not check this group. S2 PR #1502 had also renamed the 3 registered rows of ProductionOverflowRuntimeTests.GuardedArithmetic_ProvesWithoutEvaluatingUnselectedOverflow to GuardedArithmetic_IsAssumedWithoutEvaluatingUnselectedOverflow; a rename removes registered cases, which D016 forbids, so the test method takes back its registered name (the body is unchanged). Both groups were re-listed with the registered command (dotnet test <project> -c Release --no-build --list-tests, osx-arm64, SDK 10.0.401) on the amendment's tree; every registered name keeps its multiplicity. compilerClasses, cells, artifacts, profiles, environments, attempts, determinism rows, gates, agreement and failure rules, record formats, the harness, and the budget are unchanged. scope.covered now names the 18 registered compiler classes, and scope.notCovered lists the six S2 Calor.Compiler.Tests classes that construct the verifier or Z3 but were added after registration. Follows decision-bearing executions g3-exec-1 and g3-exec-2, so per this rule a complete new execution on a new commit follows: #1424's execution on the re-frozen candidate."
       }
     ]
   },
@@ -547,7 +547,7 @@
     "Amendment 1.3.0: an invocation cut by the harness's own job-deadline stop yields Timeout values that the decider compares (runPlan.harnessCutInconsistency); job timeouts are sized so this does not happen, but if it does, a case another attempt observed differently reads DISAGREE (NON-DETERMINISTIC) rather than INCOMPLETE."
   ],
   "scope": {
-    "covered": "The release-critical verifier test host (every Calor.Verification.Tests case), the F-4 oracle alone and its 1,170 cells and 2 reports, the translator fixture, and the Calor.Compiler.Tests classes that construct the verifier or Z3 directly (linux-x64).",
+    "covered": "The release-critical verifier test host (every Calor.Verification.Tests case), the F-4 oracle alone and its 1,170 cells and 2 reports, the translator fixture, and the 18 Calor.Compiler.Tests classes listed in cases.json groups.compiler-verifier.classes (those that constructed the verifier or Z3 directly at the registration base; linux-x64).",
     "notCovered": [
       {
         "subject": "Calor.Tasks.Tests VerifyGate_* (CompileCalorIntegrationTests)",
@@ -560,6 +560,10 @@
       {
         "subject": ".github/scripts/test-sdk-package.sh packaged-SDK verifier canary",
         "reason": "A package-consumer probe of publication, owned by #1410/#1424; it runs on a packed SDK, not on the tree."
+      },
+      {
+        "subject": "Calor.Compiler.Tests S2 classes added after registration",
+        "reason": "S2CacheLiteralWidthTests, S2ImplicationDefinednessTests, S2NestedQuantifierChannelTests, S2NumericDeterminismTests, S2ObligationResidualTests, and S2ObligationStateTests construct the verifier or Z3 directly but were added by the S2 (#1413) repairs after registration. The class list is derived at the registration base, and amendment 1.4.0 does not extend it. Ordinary CI runs them once per change."
       }
     ],
     "rule": "Determinism is established only for covered subjects. #1424 and #1408 may not cite this protocol for a notCovered subject; such a subject's single-run result is not established determinism. Adding a subject is an amendment."
