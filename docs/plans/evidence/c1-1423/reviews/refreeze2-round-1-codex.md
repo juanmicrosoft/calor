@@ -1,7 +1,7 @@
 # C1 #1423 PR 2 (second re-freeze, PR #1534), review round 1 (Codex)
 
 Reviewer: Codex (`codex exec -s read-only --ephemeral -c model_reasoning_effort="high"`), given
-`git diff origin/main...HEAD` at `ae0b5e1b`. It had read-only repository access, with
+`git diff origin/main...HEAD` at `b009fe93`. It had read-only repository access, with
 `origin/main` at the new candidate `5e52d8ab` and `evidence/g3-1135-exec-2` fetched. Under the
 contract §9 independence deviation, this is an adversarial tool review, not an independent review.
 
