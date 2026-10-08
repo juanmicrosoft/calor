@@ -2583,6 +2583,16 @@ public sealed class EffectEnforcementPass
         {
             switch (expression)
             {
+                // 0.25 F3 (#847): either branch may be returned; a branch that is
+                // not a nameable function value is Unknown (#847 review round 2).
+                case ConditionalExpressionNode conditional
+                    when SourceRow(conditional.WhenTrue) is var whenTrue
+                        && SourceRow(conditional.WhenFalse) is var whenFalse
+                        && (whenTrue != null || whenFalse != null):
+                    return new RowSource(
+                        PolyRow.Join(whenTrue?.Row ?? PolyRow.Unknown, whenFalse?.Row ?? PolyRow.Unknown),
+                        "conditional value");
+
                 case LambdaExpressionNode lambda:
                     // §5 — the §LAM's §E IS the lambda's declared row, and the
                     // DECLARATION BOUNDARY makes it Concrete. With no annotation
@@ -3451,15 +3461,28 @@ public sealed class EffectEnforcementPass
             TextSpan? referenceSpan = null)
         {
             // 0.25 F3 (#847): the binder decides; without binder data a possible
-            // local-function call is Unknown, never a same-named member.
+            // local-function call is Unknown, never a same-named member. A call
+            // the binder did not attribute (e.g. `§C Help …`) that may still name a
+            // local function is charged both ways.
             switch (_context.CallGraph.IsLocalFunctionCall(_context.CurrentFunctionId, span))
             {
                 case true:
                     return LocalFunctionUseCharge();
                 case null when IsLocalFunctionName(target):
                     return EffectSet.Unknown;
+                case false when IsLocalFunctionName(target):
+                    return LocalFunctionUseCharge().Union(
+                        InferFromCallTargetCore(target, span, arguments, referenceSpan));
             }
+            return InferFromCallTargetCore(target, span, arguments, referenceSpan);
+        }
 
+        private EffectSet InferFromCallTargetCore(
+            string target,
+            TextSpan span,
+            IReadOnlyList<ExpressionNode>? arguments,
+            TextSpan? referenceSpan)
+        {
             var exactInternalIds = _context.CallGraph.ResolveCallSites(
                 _context.CurrentFunctionId,
                 target,
