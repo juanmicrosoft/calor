@@ -99,10 +99,16 @@ class RegistrationTests(unittest.TestCase):
         self.assertEqual(set(), codes(baseline=(PROTOCOL, CASES, HASHES)))
 
     def test_case_registry_shape(self) -> None:
-        self.assertEqual((411, 554, 1170), (CASES["groups"]["verification"]["count"], CASES["groups"]["compiler-verifier"]["count"],
+        # Amendment 1.4.0: + 62 verification tests (S2 repairs) and + 1 compiler-verifier test.
+        self.assertEqual((473, 555, 1170), (CASES["groups"]["verification"]["count"], CASES["groups"]["compiler-verifier"]["count"],
                                             CASES["cells"]["count"]))
         names = {t["name"] for t in CASES["groups"]["verification"]["tests"]}
         self.assertTrue({ORACLE, STRING_ROW} <= names)
+        for s2 in ("S2ImplicationProverDefinednessTests", "S2NestedQuantifierTests", "S2NumericRefusalTests", "S2Z3TextEncodingTests"):
+            self.assertTrue(any(n.startswith(f"Calor.Verification.Tests.{s2}.") for n in names), s2)
+        compiler = {t["name"] for t in CASES["groups"]["compiler-verifier"]["tests"]}
+        self.assertIn("Calor.Compiler.Tests.Analysis.KInductionTests.KInductionProver_RefusesUnrepresentableBoundsAndSteps", compiler)
+        self.assertEqual(3, sum(n.startswith("Calor.Compiler.Tests.ProductionOverflowRuntimeTests.GuardedArithmetic_Proves") for n in compiler))
 
     def test_worst_case_fits_the_accepted_ceiling(self) -> None:
         self.assertEqual((655, 115, 1965), dp.worst_case(PROTOCOL))  # amendment 1.3.0: Windows 75 min, no control run

@@ -4,62 +4,6 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Fixed
-
-- **The benchmark publication gate no longer refuses a release candidate over unrelated test
-  files (#1422).** The gate (`scripts/benchmark_publication_gate.py`) refused with `B2-08` whenever
-  any file in `tests/Calor.Compiler.Tests/EvidenceContract/` differed between the candidate and
-  `main`. Its freshness check now covers only the inputs of the headline: the registered B1 packet
-  and results, the contract, the sealed files the gate's seal check reads (for example the B1
-  registration document), the 452 registered pair files and the benchmark corpus, the generator
-  (`tests/Calor.Evaluation`), the 6 validator source files plus their project file, and the gate
-  itself. A change to any of these on `main` after the candidate still refuses.
-- **The headline bytes now depend only on the candidate.** The gate used to compare against the
-  headline on `main`, so the same candidate could write different bytes after `main` moved. It now
-  compares against the headline in the candidate. It refuses if `main` gained a different headline
-  since the candidate. Two runs on one candidate write identical files, which lets the release
-  check compare them with the adjudicated hashes. No benchmark results are published by this change.
-
-- **The NuGet packages and the website now build byte-for-byte the same from the same
-  commit.** The release gate rebuilds both at publication and compares SHA-256 hashes with the
-  recorded ones, so before this fix no release could pass it. Two builds of one commit, in
-  fresh clones at different paths, now give identical hashes for both packages, every package
-  entry, the release metadata, and every website file. One macOS and one Linux build also
-  matched. This holds when both builds use the same .NET SDK build: Homebrew's source-built SDK
-  10.0.401 gives different package bytes than Microsoft's 10.0.401. The site also still
-  downloads its fonts from Google Fonts at build time, so a font update there would change it.
-  The files each package contains are the same as before; only timestamps and embedded paths
-  change. Six causes were fixed:
-  - Each `.nupkg` zip entry carried the time of packing. Packing now uses a fixed timestamp
-    (NuGet's `DeterministicTimestamp`).
-  - Release builds of the shipped projects embedded the absolute checkout path in DLLs and
-    PDBs. They now map it to `/_/` (MSBuild's `DeterministicSourcePaths`).
-  - Next.js picked a random build ID for every build. It is now the site version plus the first
-    12 characters of the commit, for example `calor-0.24.0-296c618e30f7`.
-  - webpack module IDs in the site's JavaScript were hashed from strings that held absolute
-    paths. A small webpack plugin now hashes them with the checkout path removed.
-  - The site's entry scripts were named by a hash of their build inputs, which also held
-    absolute paths. They are now named by a hash of their bytes (`[contenthash]`).
-  - The docs pages were listed in file-system order, which differs between macOS and Linux. They
-    are now sorted, so the sitemap and the search index have one fixed order.
-
-  A new CI workflow, `reproducible-builds.yml`, builds both surfaces twice and fails on any
-  byte difference.
-
-- **Name binding no longer copies module-wide tables at every loop.** Since 0.22.0, the
-  binder made two kinds of module-wide copies. Before each loop, it copied the whole symbol table
-  and its declaration counters so it could undo a trial pass over the loop body. At each loop,
-  branch, and lambda, it copied the callable-state map (which tracks what each stored lambda may
-  mutate), and that map held an entry for every initialized local in the module. Binding time
-  therefore grew with the square of the module size. On a synthetic module of 200 functions
-  with 200 statements each, binding took 14.5 s; it now takes 0.2 s, as it did before 0.22.0.
-  The binder now undoes only what each trial pass added, and it no longer stores the empty
-  callable state. The bound tree, diagnostics, symbol ids and their order, and the generated C#
-  are unchanged. This also fixes the failing `Binding_MediumModule_Under500ms` performance
-  test, which skipped the 0.22.0 NuGet publish. Two smaller module-wide costs remain: locals
-  that hold lambdas still stay in the callable-state map, and nominal type lookups scan all
-  symbols.
-
 ## [0.24.0] - 2026-10-07
 
 Calor 0.24 is a soundness release. It repairs verifier defects found by a registered soundness
@@ -155,7 +99,37 @@ give the details.
 
   A failed run tries to close open benchmark-results pull requests. Across different
   methods it prints no delta. The `allow_weaker_methodology` override is removed. Adjudication
-  of what is published is a separate gate (#1410).
+  of what is published is a separate gate (#1410). The gate's freshness check covers only the
+  headline's inputs: the B1 packet and results, the contract, the sealed files its seal check
+  reads, the 452 registered pair files and the benchmark corpus, the generator
+  (`tests/Calor.Evaluation`), the validator, and the gate itself. A change to one of these on
+  `main` after the release commit refuses; an unrelated change does not. The headline bytes
+  depend only on the release commit, so two runs write identical files.
+- **The NuGet packages and the website build byte-for-byte the same from the same commit.**
+  The release gate (#1410) rebuilds both at publication and compares their SHA-256 hashes with
+  the adjudicated ones, so the builds must be reproducible. Two builds of one commit, in fresh
+  clones at different paths, give identical hashes for both packages, every package entry, the
+  release metadata, and every website file. One macOS and one Linux build also matched. This
+  holds when both builds use the same .NET SDK build: Homebrew's source-built SDK 10.0.401 gives
+  different package bytes than Microsoft's 10.0.401. The site still downloads its fonts from
+  Google Fonts at build time, so a font update there would change it. The files each package
+  contains are unchanged; only timestamps and embedded paths differ from earlier builds. Six
+  causes were fixed:
+  - Each `.nupkg` zip entry carried the time of packing. Packing now uses a fixed timestamp
+    (NuGet's `DeterministicTimestamp`).
+  - Release builds of the shipped projects embedded the absolute checkout path in DLLs and
+    PDBs. They now map it to `/_/` (MSBuild's `DeterministicSourcePaths`).
+  - Next.js picked a random build ID for every build. It is now the site version plus the first
+    12 characters of the commit, for example `calor-0.24.0-296c618e30f7`.
+  - webpack module IDs in the site's JavaScript were hashed from strings that held absolute
+    paths. A small webpack plugin now hashes them with the checkout path removed.
+  - The site's entry scripts were named by a hash of their build inputs, which also held
+    absolute paths. They are now named by a hash of their bytes (`[contenthash]`).
+  - The docs pages were listed in file-system order, which differs between macOS and Linux. They
+    are now sorted, so the sitemap and the search index have one fixed order.
+
+  A new CI workflow, `reproducible-builds.yml`, builds both surfaces twice and fails on any
+  byte difference.
 - **The agent refactoring job no longer commits to `main`.** It uploads its results and fails
   when it cannot read a pass rate, instead of recording 0.
 - **Older website benchmark numbers are labeled historical.** They stay published, marked as not
@@ -342,6 +316,19 @@ give the details.
   edit-script fixture used to swallow the module's only function. A tolerated
   explicit closer such as `§/TR{id}` still ends a body written at the
   opener's own column.
+
+- **Name binding no longer grows with the square of the module size.** Since 0.22.0, the
+  binder made two kinds of module-wide copies. Before each loop, it copied the whole symbol table
+  and its declaration counters so it could undo a trial pass over the loop body. At each loop,
+  branch, and lambda, it copied the callable-state map (which tracks what each stored lambda may
+  mutate), and that map held an entry for every initialized local in the module. On a synthetic
+  module of 200 functions with 200 statements each, binding took 14.5 s; it now takes 0.2 s, as
+  it did before 0.22.0. The binder now undoes only what each trial pass added, and it no longer
+  stores the empty callable state. The bound tree, diagnostics, symbol ids and their order, and
+  the generated C# are unchanged. This also fixes the failing `Binding_MediumModule_Under500ms`
+  performance test, which skipped the 0.22.0 NuGet publish. Two smaller module-wide costs
+  remain: locals that hold lambdas still stay in the callable-state map, and nominal type
+  lookups scan all symbols.
 
 ## [0.22.0] - 2026-09-15
 
