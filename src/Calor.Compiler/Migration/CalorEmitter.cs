@@ -2145,12 +2145,12 @@ public sealed class CalorEmitter : IAstVisitor<string>
         if (node.Initializer.Count > 0)
         {
             // Pre-evaluate elements so hoisted bindings land before the §ARR block
-            var evalElements = RenderArrayElements(node.Initializer, hoistSectionMarkers: false);
+            var evalElements = RenderInPlace(node.Initializer);
             AppendLine($"§ARR{{{variableName}:{elementType}}}");
             Indent();
             foreach (var val in evalElements)
             {
-                AppendLine(val);
+                AppendLine(val.Replace("\n", "\n  ")); // a multi-line element moves with its line
             }
             Dedent();
             EmitBlockEnd($"§/ARR{{{variableName}}}");
@@ -2194,7 +2194,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             var dims = node.DimensionSizes.Count > 0
                 ? ":" + string.Join(":", node.DimensionSizes.Select(d => d.Accept(this)))
                 : "";
-            var rows = RenderMultiDimRows(node, hoist: true);
+            var rows = RenderMultiDimRows(node);
             AppendLine($"§B{{{mappedType}:{variableName}}} §ARR2D{{{node.Id}:{variableName}:{elementType}{dims}}}");
             Indent();
             foreach (var row in rows)
@@ -2272,19 +2272,10 @@ public sealed class CalorEmitter : IAstVisitor<string>
         return values;
     }
 
-    /// <summary>The §ROW lines (innermost vectors, row-major); expression position hoists nothing.</summary>
-    private List<string> RenderMultiDimRows(MultiDimArrayCreationNode node, bool hoist)
+    /// <summary>The §ROW lines (innermost vectors, row-major).</summary>
+    private List<string> RenderMultiDimRows(MultiDimArrayCreationNode node)
     {
-        if (!hoist) _conditionalExpressionDepth++;
-        List<string> values;
-        try
-        {
-            values = RenderArrayElements(node.Initializer.SelectMany(row => row), hoistSectionMarkers: false);
-        }
-        finally
-        {
-            if (!hoist) _conditionalExpressionDepth--;
-        }
+        var values = RenderInPlace(node.Initializer.SelectMany(row => row));
         var rows = new List<string>(node.Initializer.Count);
         var next = 0;
         foreach (var row in node.Initializer)
@@ -2293,6 +2284,20 @@ public sealed class CalorEmitter : IAstVisitor<string>
             next += row.Count;
         }
         return rows;
+    }
+
+    /// <summary>#1132: array elements, never hoisted (a hoist ran an element or its conversion early).</summary>
+    private List<string> RenderInPlace(IEnumerable<ExpressionNode> elements)
+    {
+        _conditionalExpressionDepth++;
+        try
+        {
+            return RenderArrayElements(elements, hoistSectionMarkers: false);
+        }
+        finally
+        {
+            _conditionalExpressionDepth--;
+        }
     }
 
     public string Visit(AssignmentStatementNode node)
@@ -3615,17 +3620,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             // Visit elements in inline-sibling context so that nested zero-arg
             // calls keep explicit §/C (otherwise `§ARR{...} §C{A} §C{B}` would
             // parse as ONE element `A(B())` instead of TWO `A(), B()`).
-            // #1132: nothing is hoisted out of an expression-position array.
-            _conditionalExpressionDepth++;
-            string elements;
-            try
-            {
-                elements = string.Join(" ", RenderArrayElements(node.Initializer, hoistSectionMarkers: false));
-            }
-            finally
-            {
-                _conditionalExpressionDepth--;
-            }
+            var elements = string.Join(" ", RenderInPlace(node.Initializer));
             return $"§ARR{{{id}:{elementType}}} {elements} §/ARR{{{id}}}";
         }
         else if (node.Size != null)
@@ -5256,7 +5251,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             var dims = node.DimensionSizes.Count > 0
                 ? ":" + string.Join(":", node.DimensionSizes.Select(d => d.Accept(this)))
                 : "";
-            var rows = RenderMultiDimRows(node, hoist: false);
+            var rows = RenderMultiDimRows(node);
             return $"§ARR2D{{{node.Id}:{node.Id}:{elementType}{dims}}} "
                 + string.Concat(rows.Select(row => $"§ROW {row} "))
                 + $"§/ARR2D{{{node.Id}}}";

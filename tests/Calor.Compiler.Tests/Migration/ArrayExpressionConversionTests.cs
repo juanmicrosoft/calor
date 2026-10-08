@@ -387,13 +387,19 @@ public class ArrayExpressionConversionTests
     // Codex round 3 reproductions that must stay native: an implicit conversion inside
     // each element stays with its element (no hoisting), `g[n, n++]` reads its indices in
     // order, a 1-D array of rectangular arrays, written sizes behind an empty level that
-    // are constant expressions, and an implicitly typed rectangular array.
+    // are constant expressions, an implicitly typed rectangular array; and (verification
+    // pass) a constructor argument and a multi-line anonymous object in statement elements.
     private const string Round3 = """
         using System;
 
         public struct X
         {
             public int V;
+
+            public X(int v)
+            {
+                V = v;
+            }
 
             public static implicit operator int(X x)
             {
@@ -406,10 +412,16 @@ public class ArrayExpressionConversionTests
         {
             public static string log = "";
 
+            public static int T(int v)
+            {
+                log = log + "t";
+                return v;
+            }
+
             public static X S(int v)
             {
                 log = log + "s";
-                return new X { V = v };
+                return new X(v);
             }
 
         }
@@ -426,7 +438,9 @@ public class ArrayExpressionConversionTests
                 var mr = new int[][,] { new int[,] { { 1 } } };
                 var cs = new int[1, 1 + 1, 0] { { { }, { } } };
                 var imp = new[,] { { 1, 2 }, { 3, 4 } };
-                return a[0] + a[1] + "," + picked + "," + mr[0][0, 0] + cs.GetLength(1) + imp[1, 0] + "|" + L.log;
+                int[] cv = { L.S(5), new X(L.T(6)) };
+                object[] an = { new { A = 7 } };
+                return a[0] + a[1] + "," + picked + "," + mr[0][0, 0] + cs.GetLength(1) + imp[1, 0] + "," + (cv[0] + cv[1]) + an.Length + "|" + L.log;
             }
         }
         """;
@@ -517,7 +531,7 @@ public class ArrayExpressionConversionTests
             data.Add("placement", "3,11,36,357|123456", surface);
             data.Add("shapes", "3|001|1236|1|33|True|27|False02|12346", surface);
             data.Add("round2", "2,0,42|112|True|1002,3", surface);
-            data.Add("round3", "3,10,123|scsc|", surface);
+            data.Add("round3", "3,10,123,111|scsc|sctc", surface);
         }
         return data;
     }
@@ -681,20 +695,30 @@ public class ArrayExpressionConversionTests
     }
 
     [Fact]
-    public void ArrayExtensionCall_IsNotCertifiedPure()
+    public void ArrayExtensionCalls_AndInitialize_AreNotCertifiedPure()
     {
-        // Codex round 3: only System.Array's own members answer for an array receiver;
-        // a user extension on int[] stays an unknown call.
+        // Codex round 3 and verification: only System.Array's own members, with their own
+        // argument shapes, answer for an array receiver. An extension (even one named
+        // GetLength) and Initialize (element constructors) stay unknown calls.
         const string calor = """
             §M{m1:T}
-              §CSHARP{public static class Extensions { public static int Touch(this int[] xs) { System.Console.WriteLine("side"); return xs.Length; } }}§/CSHARP
+              §CSHARP{public static class Extensions { public static int Touch(this int[] xs) { System.Console.WriteLine("t"); return xs.Length; } public static int GetLength(this int[] xs, string s) { System.Console.WriteLine(s); return xs.Length; } }}§/CSHARP
               §CL{c1:G:pub:stat}
                 §MT{m2:Go:pub:stat} (i32[]:xs) -> i32
                   §E{}
-                  §R §C{xs.Touch} §/C
+                  §R (+ §C{xs.Touch} §/C §C{xs.GetLength} §A "a" §/C)
+                §MT{m3:Ok:pub:stat} (i32[,]:g, i32:k) -> i32
+                  §E{}
+                  §R (+ §C{g.GetLength} §A k §/C §C{g.GetLength} §A 0 §/C)
+                §MT{m4:Init:pub:stat} (System.Array:a) -> void
+                  §E{}
+                  §C{a.Initialize} §/C
             """;
         var compilation = Program.Compile(calor, "extension.calr", new CompilationOptions { StatusWriter = TextWriter.Null });
-        Assert.Contains(compilation.Diagnostics.Errors, d => d.Code == "Calor0410");
+        var undeclared = compilation.Diagnostics.Errors.Where(d => d.Code == "Calor0410").Select(d => d.Message).ToList();
+        Assert.Equal(2, undeclared.Count);
+        Assert.Contains(undeclared, m => m.Contains("'Go'"));
+        Assert.Contains(undeclared, m => m.Contains("'Init'"));
     }
 
     [Fact]
