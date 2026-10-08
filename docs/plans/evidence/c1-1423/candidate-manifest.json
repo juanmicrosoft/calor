@@ -994,7 +994,7 @@
       "closureStatus": "Release gate; merged last, immediately before C1 (amendment 1.1.0)."
     }
   ],
-  "issueStatesObservedVia": "gh issue list -R juanmicrosoft/calor --milestone 0.24 --state all, run by the C1 agent at the freeze (2026-10-07)",
+  "issueStatesObservedVia": "gh issue list -R juanmicrosoft/calor --milestone 0.24 --state all, re-run by the C1 agent at the second re-freeze (2026-10-08T17:04Z); every state equals the first freeze's observation (2026-10-07)",
   "additionalMerged": [
     {
       "issue": 1485,

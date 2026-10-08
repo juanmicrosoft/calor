@@ -583,7 +583,7 @@
     }
   ],
   "issueStatesAtFreeze": {
-    "observedVia": "gh issue list -R juanmicrosoft/calor --milestone 0.24 --state all, run by the C1 agent at the freeze (2026-10-07)",
+    "observedVia": "gh issue list -R juanmicrosoft/calor --milestone 0.24 --state all, re-run by the C1 agent at the second re-freeze (2026-10-08T17:04Z); every state equals the first freeze's observation (2026-10-07)",
     "states": {
       "1407": "OPEN",
       "1419": "OPEN",
