@@ -73,10 +73,9 @@ public sealed class LosslessConversionContractTests
         const string source = """
             public class Example
             {
-                public int Get(int k)
+                public int Get()
                 {
-                    // 0.25 F3 (#847): capturing, so outside the native slice.
-                    int Local() => 42 + k;
+                    int Local() => 42;
                     return Local();
                 }
             }
@@ -89,7 +88,7 @@ public sealed class LosslessConversionContractTests
 
         Assert.True(result.Success, string.Join(Environment.NewLine, result.Issues));
         Assert.Contains("§CSHARP", result.CalorSource);
-        Assert.Contains("int Local() => 42 + k;", result.CalorSource);
+        Assert.Contains("int Local() => 42;", result.CalorSource);
         Assert.Equal(1, result.InteropPreservationCount);
         Assert.Equal(0, result.LossySubstitutionCount);
         Assert.Equal(0, result.DropCount);
@@ -189,7 +188,7 @@ public sealed class LosslessConversionContractTests
         await File.WriteAllTextAsync(nativePath, "public class Native { public int Get() => 1; }");
         await File.WriteAllTextAsync(
             interopPath,
-            "public class Interop { public int Get(int k) { int Local() => k; return Local(); } }");
+            "public class Interop { public int Get() { int Local() => 2; return Local(); } }");
 
         var plan = new MigrationPlan
         {

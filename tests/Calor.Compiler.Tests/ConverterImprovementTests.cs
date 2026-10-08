@@ -1786,21 +1786,14 @@ public class ConverterImprovementTests
 
     #region Target-Typed New in Return/Arrow Contexts (InferTargetType Case 3)
 
-    // #777 (WS-W4 D4): local functions are never hoisted to a module-level §F (the
+    // #777 (WS-W4 D4): a member containing a local function is preserved verbatim as
+    // §CSHARP interop — hoisting to a module-level §F function is unsound (the
     // orphaned call site build-breaks, or silently rebinds to a same-named member).
-    // 0.25 F3 (#847): a non-capturing one converts in place to a nested §F, and
-    // target-typed `new()` in it takes the LOCAL function's return type.
-
-    private static NewExpressionNode LocalReturnedNew(ConversionResult result)
-    {
-        var method = Assert.Single(Assert.Single(result.Ast!.Classes).Methods);
-        var local = Assert.IsType<LocalFunctionStatementNode>(method.Body[0]);
-        var ret = Assert.IsType<ReturnStatementNode>(Assert.Single(local.Function.Body));
-        return Assert.IsType<NewExpressionNode>(ret.Expression);
-    }
+    // Target-typed-new inference on ordinary methods stays covered by the
+    // Migration_TargetTypedNew_InMethod*/_AsyncMethod tests below.
 
     [Fact]
-    public void Migration_LocalFunctionArrow_ConvertsInPlace_WithLocalTargetType()
+    public void Migration_LocalFunctionArrow_EscalatesToInterop()
     {
         var csharp = """
             public class Example
@@ -1817,12 +1810,12 @@ public class ConverterImprovementTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == "Local");
-        Assert.DoesNotContain(result.Context.Losses, l => l.Kind == ConversionLossKind.InteropPreserved);
-        Assert.Equal("str", LocalReturnedNew(result).TypeName);
+        Assert.Contains(result.Context.Losses, l => l.Kind == ConversionLossKind.InteropPreserved);
+        Assert.Contains("§CSHARP", result.CalorSource!);
     }
 
     [Fact]
-    public void Migration_LocalFunctionReturnStatement_ConvertsInPlace_WithLocalTargetType()
+    public void Migration_LocalFunctionReturnStatement_EscalatesToInterop()
     {
         var csharp = """
             using System.Collections.Generic;
@@ -1843,8 +1836,8 @@ public class ConverterImprovementTests
 
         Assert.True(result.Success, GetErrorMessage(result));
         Assert.DoesNotContain(result.Ast!.Functions, f => f.Name == "Local");
-        Assert.DoesNotContain(result.Context.Losses, l => l.Kind == ConversionLossKind.InteropPreserved);
-        Assert.Equal("List<i32>", LocalReturnedNew(result).TypeName);
+        Assert.Contains(result.Context.Losses, l => l.Kind == ConversionLossKind.InteropPreserved);
+        Assert.Contains("§CSHARP", result.CalorSource!);
     }
 
     [Fact]

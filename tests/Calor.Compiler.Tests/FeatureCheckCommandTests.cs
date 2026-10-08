@@ -48,7 +48,6 @@ public class FeatureCheckCommandTests
     [InlineData("dynamic", SupportLevel.Partial)]
     [InlineData("interface", SupportLevel.Partial)]
     [InlineData("linq-query", SupportLevel.Partial)]
-    [InlineData("local-function", SupportLevel.Partial)] // 0.25 F3 (#847): the non-capturing slice
     public void FeatureCheck_PartiallySupported_ReturnsPartialLevel(string feature, SupportLevel expected)
     {
         var info = FeatureSupport.GetFeatureInfo(feature);
@@ -63,6 +62,7 @@ public class FeatureCheckCommandTests
     [InlineData("await-foreach", SupportLevel.NotSupported)]
     [InlineData("file-scoped-type", SupportLevel.NotSupported)]
     [InlineData("record", SupportLevel.NotSupported)]
+    [InlineData("local-function", SupportLevel.NotSupported)]
     [InlineData("scoped-parameter", SupportLevel.NotSupported)]
     [InlineData("using-declaration", SupportLevel.NotSupported)]
     [InlineData("standalone-block", SupportLevel.NotSupported)]

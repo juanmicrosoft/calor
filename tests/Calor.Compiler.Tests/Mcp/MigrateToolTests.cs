@@ -241,7 +241,7 @@ public class MigrateToolTests
         Directory.CreateDirectory(tempDir);
         await File.WriteAllTextAsync(
             Path.Combine(tempDir, "Interop.cs"),
-            "public class Interop { public int Get(int k) { int Local() => k; return Local(); } }");
+            "public class Interop { public int Get() { int Local() => 42; return Local(); } }");
 
         try
         {
