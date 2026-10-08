@@ -1,0 +1,22 @@
+§M{m001:Custom:overflow=unchecked}
+  §U{System.Threading.Tasks}
+
+  §CL{c001:Probe:pub:stat}
+    §MT{m002:Run:pub:stat} () -> str
+      §B{~_hoist000} §C{Compute}
+      §B{i32:value} _hoist000.Result
+      §R (+ "" value)
+
+    §CSHARP{
+    private static async Task<int> Compute()
+    {
+        async Task<int> Inner()
+        {
+            await Task.Yield();
+            return 41;
+        }
+        return await Inner() + 1;
+    }
+    }§/CSHARP
+
+
