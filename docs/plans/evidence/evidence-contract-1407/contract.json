@@ -3,7 +3,7 @@
   "issue": 1407,
   "epic": 1409,
   "milestone": "0.24",
-  "contractVersion": "1.3.2",
+  "contractVersion": "1.4.0",
   "status": "FROZEN",
   "statusNote": "Proposed in the R0 pull request. The contract is frozen at the commit that merges it to main. Capacity ceilings are PROPOSED until the maintainer accepts them by merging; the R0 gate is NOT MET before that merge.",
   "gateStatus": "MET",
@@ -521,6 +521,31 @@
         "Raises review-rounds-per-pr for PR #1502 (R-NUM) from 5 (amendment 1.3.1) to 6. This allows one more change after the review ceiling and after R-NUM was BLOCKED under 1.3.1 condition 5, and one more verification-only pass that must APPROVE. The change replaces new logic (part (b)) that was itself added after the ceiling. Without this amendment, R-NUM stays BLOCKED and D-NUM-WHILE-BOUND is MILESTONE-FAILED.",
         "The 1.3.1 text of part (b) was self-contradictory: it required both a solver consultation and a decision that depends only on operand types and literal values. This amendment records the error and resolves it by removing the solver. Relative to commit bdb430db1c1dfdbcd578c5b1b74110841be95a2d, a postcondition whose overflow freedom the solver proved but the width rule cannot show moves from Proven to at most Assumed. One whose probe returned unknown moves from Unsupported to at most Assumed (checked-arithmetic), a conditional claim with the runtime check kept, where the base made no claim.",
         "Under option A (2026-10-06), #1502's single commit may change G3 (#1135) artifacts after G3's DETERMINISTIC execution on d42d031352f2d8d5c1df56fffc19d901186bb94d. It adds a per-position checked-arithmetic allowance to the differential gate for exactly the 12 provable postcondition cells of scalar-type:i64, scalar-type:u64, array-element-type:i64, and array-element-type:u64. Of those 12 cells, the 6 scalar-type cells change from Proven to Assumed (checked-arithmetic); the 6 array-element-type cells were already Assumed (reference-model) and now carry both assumptions. It regenerates bench/phase0-agent-native/verifier-runtime-differential.json and .md with the oracle generator, moving the totals from 435 Proven and 150 Assumed to 429 and 156 (585 Refuted unchanged), with elision coverage dropping for those 4 forms. It also changes 3 rows of ProductionOverflowRuntimeTests from Proven to Assumed (checked-arithmetic). This is a demotion only: no outcome becomes stronger and the runtime checks are kept. G3's recorded execution is not re-labelled; C2 (#1424) re-runs the determinism protocol on the candidate, which covers the changed artifacts."
+      ],
+      "removedRows": []
+    },
+    {
+      "version": "1.4.0",
+      "justification": "Maintainer decision approved 2026-10-08 by @juanmicrosoft (\"Contract amendment 1.4.0: APPROVED as proposed\"), on the C1 (#1423) re-freeze path after C2 regeneration 1 (PR #1517). reclassificationRule lets a repaired stale artifact change classification only through a versioned amendment that names the repairing PR. The 9 artifacts still classified stale could only be adjudicated BLOCKED (section 8, T003; the R2 gate's G008), so no terminal record could succeed. This amendment reclassifies them and names the repairs: tier1-verification and tier2-corpus-verification become authoritative (G4 PR #1481; tier2 authoritative against its registered expectations list eng/tier2-fixture-expectations.json, with its 30 known failures kept as failures); benchmark-results, benchmark-provenance, benchmark-results-md, website-benchmark-pages, and benchmark-publication-pr become historical-only (0.24.0 publishes no benchmark results; the B1 packet under the #1422 gate, PRs #1487 and #1527, is the only publishable source; PR #1226 closed unmerged); benchmark-workflow-output becomes derived, redefined as the B2 headline the gate writes (PRs #1487, #1527); website-deployment becomes derived (R2 PRs #1474 and #1475; byte-reproducible by #1526). openDefects stay as recorded at the cutoff; defectResolutions name the resolving PR where a defect is resolved, and the historical-only benchmark files keep their defects open. No ceiling, rule, row, vocabulary, child, or determinism row changes, and nothing is removed.",
+      "reviewedInPr": 1533,
+      "timestampUtc": "2026-10-08T18:00:00Z",
+      "afterDecisionBearingInspection": true,
+      "inspectionStatement": "The decision follows decision-bearing inspection: the maintainer and this amendment's author inspected C2 regeneration 1's results (PR #1517), which recorded these 9 artifacts as STALE-CLASSIFICATION and listed their reclassification as open decision 5. It is admissible nonetheless. Each authoritative or derived reclassification names a merged repair that predates those results (#1481, #1474, #1475, #1487) or a fix for a cause regeneration 1 found (#1526, #1527), and the artifacts are regenerated anew by #1424 on the re-frozen candidate; no result of regeneration 1 is relabelled. Each historical-only reclassification withdraws the artifact from evidence: it can never establish a 0.24 claim. Tier 2's known failures stay failures. The amendment is made before the #1424 raw-artifact freeze, outside the window in which amendment authority is not exercised, and it becomes part of the re-frozen candidate (the R2 gate's G005 requires the same contract packet at the candidate and at adjudication).",
+      "reclassified": [
+        { "artifact": "tier1-verification", "from": "stale", "to": "authoritative", "repairingPrs": [1481] },
+        { "artifact": "tier2-corpus-verification", "from": "stale", "to": "authoritative", "repairingPrs": [1481] },
+        { "artifact": "benchmark-results", "from": "stale", "to": "historical-only", "repairingPrs": [1487] },
+        { "artifact": "benchmark-provenance", "from": "stale", "to": "historical-only", "repairingPrs": [1487] },
+        { "artifact": "benchmark-results-md", "from": "stale", "to": "historical-only", "repairingPrs": [1487] },
+        { "artifact": "website-benchmark-pages", "from": "stale", "to": "historical-only", "repairingPrs": [1487] },
+        { "artifact": "benchmark-workflow-output", "from": "stale", "to": "derived", "repairingPrs": [1487, 1527] },
+        { "artifact": "benchmark-publication-pr", "from": "stale", "to": "historical-only", "repairingPrs": [1487] },
+        { "artifact": "website-deployment", "from": "stale", "to": "derived", "repairingPrs": [1474, 1475, 1526] }
+      ],
+      "weakens": [
+        "tier1-verification and tier2-corpus-verification may now be adjudicated other than BLOCKED; tier2's overall verdict is FAIL by design, and it is authoritative only against its registered expectations list.",
+        "benchmark-workflow-output and website-deployment may now be adjudicated other than BLOCKED.",
+        "Five benchmark artifacts may now be adjudicated HISTORICAL-ONLY instead of BLOCKED. That withdraws them from evidence; it does not validate their numbers."
       ],
       "removedRows": []
     }

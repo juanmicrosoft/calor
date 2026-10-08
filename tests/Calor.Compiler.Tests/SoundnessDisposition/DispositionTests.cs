@@ -176,7 +176,11 @@ public sealed class DispositionTests
     public void CommittedRecord_IsNotAnOpenRecord()
     {
         // A closed record cannot pass as open: open validation requires status OPEN with no result.
-        var violations = Validate(Record(), closingOverride: false);
+        // The record states the contract version it closed under (1.3.2); state the current one so
+        // that only D010 is under test (D017 has its own controls).
+        var record = Record();
+        record["contractVersion"] = CurrentContractVersion();
+        var violations = Validate(record, closingOverride: false);
         AssertCodes(violations, "D010");
         Assert.Contains(violations, v => v.Message.Contains("must say closure.status OPEN"));
     }
@@ -484,8 +488,12 @@ public sealed class DispositionTests
     {
         var record = Record();
         record["closure"]!["status"] = "CLOSED";
+        record["contractVersion"] = CurrentContractVersion();
         AssertCodes(Validate(record, closingOverride: false), "D010");
     }
+
+    private static string CurrentContractVersion()
+        => Load("docs/plans/evidence/evidence-contract-1407/contract.json")["contractVersion"]!.GetValue<string>();
 
     [Fact]
     public void D010_InventedMergeEvidence_DoesNotClose()

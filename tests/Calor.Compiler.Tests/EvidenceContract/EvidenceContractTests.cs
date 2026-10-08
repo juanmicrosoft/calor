@@ -263,8 +263,8 @@ public class EvidenceContractTests
     // ------------------------------------------------------------------
 
     [Theory]
-    [InlineData("benchmark-results")]          // stale in the committed inventory
-    [InlineData("tier2-corpus-verification")]  // stale in the committed inventory
+    [InlineData("benchmark-results")]          // historical-only (stale until amendment 1.4.0)
+    [InlineData("benchmark-workflow-output")]  // derived (stale until amendment 1.4.0)
     [InlineData("llm-and-agent-results")]      // historical-only in the committed inventory
     [InlineData("roundtrip-reports")]          // derived in the committed inventory
     public void NonAuthoritativeArtifactUsedAsAuthoritativeFails(string artifact)
@@ -760,7 +760,10 @@ public class EvidenceContractTests
     public void ArtifactDerivedFromStaleInputMustBeStale()
     {
         var inventory = Inventory();
+        // No artifact is stale after amendment 1.4.0; the control makes the input stale again.
+        Artifact(inventory, "benchmark-results")["classification"] = "stale";
         Artifact(inventory, "benchmark-results-md")["classification"] = "derived";
+        Artifact(inventory, "benchmark-results-md")["regeneration"] = new JsonObject { ["command"] = "node scripts/generate-results-md.js" };
         AssertViolation(EvidenceContractValidator.ValidateInventory(Contract(), inventory), "I010");
     }
 
@@ -1616,10 +1619,11 @@ public class EvidenceContractTests
             && c.Contains(WhileBoundFinding + " is MILESTONE-FAILED", StringComparison.Ordinal));
         Assert.Contains("REQUEST-CHANGES with one MAJOR", exception["scope"]!.GetValue<string>(), StringComparison.Ordinal);
 
-        var entry = contract["amendmentLog"]!.AsArray().Last()!;
-        Assert.Equal("1.3.2", entry["version"]!.GetValue<string>());
-        Assert.Equal("1.3.2", contract["contractVersion"]!.GetValue<string>());
-        Assert.Equal("1.3.2", Inventory()["contractVersion"]!.GetValue<string>());
+        var log = contract["amendmentLog"]!.AsArray();
+        var entry = log.Single(a => a!["version"]!.GetValue<string>() == "1.3.2")!;
+        // Later amendments (1.4.0) may follow; the contract and inventory name the latest one.
+        Assert.Equal(log.Last()!["version"]!.GetValue<string>(), contract["contractVersion"]!.GetValue<string>());
+        Assert.Equal(contract["contractVersion"]!.GetValue<string>(), Inventory()["contractVersion"]!.GetValue<string>());
         Assert.True(entry["afterDecisionBearingInspection"]!.GetValue<bool>());
         Assert.True(entry["reviewedInPr"]!.GetValue<int>() > 1504);
         Assert.Empty(entry["removedRows"]!.AsArray());
@@ -1704,6 +1708,58 @@ public class EvidenceContractTests
         Assert.Contains(violations, v => v.Code == "C011" && v.Subject == "exception review-rounds-per-pr #1502");
     }
 
+    // ------------------------------------------------------------------
+    // Amendment 1.4.0: the stale artifacts are reclassified by named repairs (reclassificationRule)
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void Amendment140ReclassifiesEveryStaleArtifactByANamedRepair()
+    {
+        // Maintainer decision 2026-10-08 ("Contract amendment 1.4.0: APPROVED as proposed").
+        var contract = Contract();
+        var inventory = Inventory();
+        var entry = contract["amendmentLog"]!.AsArray().Single(a => a!["version"]!.GetValue<string>() == "1.4.0")!;
+        Assert.True(entry["afterDecisionBearingInspection"]!.GetValue<bool>());
+        Assert.Empty(entry["removedRows"]!.AsArray());
+        var expected = new Dictionary<string, (string To, int[] Prs)>
+        {
+            ["tier1-verification"] = ("authoritative", [1481]),
+            ["tier2-corpus-verification"] = ("authoritative", [1481]),
+            ["benchmark-results"] = ("historical-only", [1487]),
+            ["benchmark-provenance"] = ("historical-only", [1487]),
+            ["benchmark-results-md"] = ("historical-only", [1487]),
+            ["website-benchmark-pages"] = ("historical-only", [1487]),
+            ["benchmark-workflow-output"] = ("derived", [1487, 1527]),
+            ["benchmark-publication-pr"] = ("historical-only", [1487]),
+            ["website-deployment"] = ("derived", [1474, 1475, 1526]),
+        };
+        var logged = entry["reclassified"]!.AsArray();
+        Assert.Equal(expected.Keys.Order(StringComparer.Ordinal),
+            logged.Select(r => r!["artifact"]!.GetValue<string>()).Order(StringComparer.Ordinal));
+        foreach (var record in logged)
+        {
+            var id = record!["artifact"]!.GetValue<string>();
+            var (to, prs) = expected[id];
+            Assert.Equal("stale", record["from"]!.GetValue<string>());
+            Assert.Equal(to, record["to"]!.GetValue<string>());
+            Assert.Equal(prs, record["repairingPrs"]!.AsArray().Select(p => p!.GetValue<int>()));
+            var artifact = Artifact(inventory, id);
+            Assert.Equal(to, artifact["classification"]!.GetValue<string>());
+            var reason = artifact["reason"]!.GetValue<string>();
+            Assert.StartsWith("Reclassified by contract amendment 1.4.0", reason, StringComparison.Ordinal);
+            Assert.Contains("Cutoff reason: ", reason, StringComparison.Ordinal);
+            foreach (var pr in prs)
+                Assert.Contains($"#{pr}", reason, StringComparison.Ordinal);
+        }
+        // reclassificationRule: nothing is stale any more, and openDefects keep their cutoff text.
+        Assert.DoesNotContain(inventory["artifacts"]!.AsArray(), a => a!["classification"]!.GetValue<string>() == "stale");
+        Assert.Equal(["#1241"], Artifact(inventory, "tier2-corpus-verification")["openDefects"]!.AsArray().Select(d => d!.GetValue<string>()));
+        Assert.Equal(["#1276", "#1422"], Artifact(inventory, "benchmark-results")["openDefects"]!.AsArray().Select(d => d!.GetValue<string>()));
+        Assert.Null(Artifact(inventory, "benchmark-results")["defectResolutions"]);
+        Assert.Empty(EvidenceContractValidator.ValidateContract(contract));
+        Assert.Empty(EvidenceContractValidator.ValidateInventory(contract, inventory));
+    }
+
     [Fact]
     public void Amendment132TextWithoutAmendment132InTheLogFails()
     {
@@ -1711,7 +1767,7 @@ public class EvidenceContractTests
         var contract = Contract();
         var log = contract["amendmentLog"]!.AsArray();
         log.Remove(log.Single(a => a!["version"]!.GetValue<string>() == "1.3.2"));
-        contract["contractVersion"] = "1.3.1";
+        contract["contractVersion"] = log.Last()!["version"]!.DeepClone();
         var violations = EvidenceContractValidator.ValidateContract(contract);
         AssertViolation(violations, "C011");
         Assert.Contains(violations, v => v.Subject == "exception review-rounds-per-pr #1502"

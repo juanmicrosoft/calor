@@ -7,7 +7,7 @@
     1135,
     1424
   ],
-  "protocolVersion": "1.3.0",
+  "protocolVersion": "1.4.0",
   "status": "FROZEN-AT-MERGE",
   "freeze": {
     "event": "The merge commit on main of the PR that adds this file. Every execution record names protocolVersion and the SHA-256 of this file; the decider rejects a record made under any other protocol bytes.",
@@ -527,6 +527,13 @@
         "pr": 1500,
         "afterDecisionBearingExecution": true,
         "justification": "After execution g3-exec-1 (run 37177387101, commit 0142438f, NON-DETERMINISTIC, complete false). Two machinery defects, not verifier findings: (1) the Linux and macOS jobs (6 of 10) ran every attempt, but upload-artifact rejected their output directories because the home probe's and the invocations' NuGet HTTP caches hold file names with ':'; (2) the Windows jobs needed more than the 45 minutes the harness allows under a 50-minute job timeout, and the cut invocations' Timeout values made 1,580 cases DISAGREE. Every value a completed Windows invocation observed equals the pass value. Repairs: homes are removed before upload and checked by fill-missing; the probe builds beside the output directory; win-x64 and win-arm64 jobTimeoutMinutes 50 -> 75; maxDispatchedControlRuns 2 -> 0 so the worst case (3 x 655 = 1,965) stays under the 2,000 ceiling. The decider's treatment of harness-cut invocations is unchanged and recorded as a known inconsistency (runPlan.harnessCutInconsistency). No case, environment, attempt count, determinism row, gate, agreement rule, or record format changes. Per the amendments rule, a complete new execution on a new commit follows."
+      },
+      {
+        "version": "1.4.0",
+        "timestampUtc": "2026-10-08T15:23:53Z",
+        "pr": 1533,
+        "afterDecisionBearingExecution": true,
+        "justification": "Registers tests added since registration, for #1424's execution on the second #1423 candidate (C2 regeneration 1, PR #1517, cause 1), and extends compiler-verifier by the maintainer's decision of 2026-10-08. Additions only. verification: the 62 tests the S2 (#1413) repairs added to Calor.Verification.Tests (411 -> 473; 407 -> 469 distinct names), exactly the extraNames of docs/plans/evidence/c2-1424/determinism-registry-drift.json. compiler-verifier (554 -> 662; 24 classes): 1 test added in a registered class, KInductionTests.KInductionProver_RefusesUnrepresentableBoundsAndSteps, which C2's drift record did not check; and the 6 classes the S2 repairs added that construct the verifier or Z3 directly (S2CacheLiteralWidthTests, S2ImplicationDefinednessTests, S2NestedQuantifierChannelTests, S2NumericDeterminismTests, S2ObligationResidualTests, S2ObligationStateTests; 107 tests), with scope.covered updated to match. S2 PR #1502 had also renamed the 3 registered rows of ProductionOverflowRuntimeTests.GuardedArithmetic_ProvesWithoutEvaluatingUnselectedOverflow to GuardedArithmetic_IsAssumedWithoutEvaluatingUnselectedOverflow; a rename removes registered cases, which D016 forbids, so the test method takes back its registered name (body unchanged; maintainer-accepted, with the rename deferred until after 0.24). Both groups were re-listed with the registered command (dotnet test <project> -c Release --no-build --list-tests, osx-arm64, SDK 10.0.401) on the amendment's tree; every registered name keeps its multiplicity. Cells, artifacts, profiles, environments, attempts, determinism rows, gates, agreement and failure rules, record formats, the harness, and the budget are unchanged. Follows decision-bearing executions g3-exec-1 and g3-exec-2, so per this rule a complete new execution on a new commit follows: #1424's execution on the re-frozen candidate."
       }
     ]
   },
@@ -540,7 +547,7 @@
     "Amendment 1.3.0: an invocation cut by the harness's own job-deadline stop yields Timeout values that the decider compares (runPlan.harnessCutInconsistency); job timeouts are sized so this does not happen, but if it does, a case another attempt observed differently reads DISAGREE (NON-DETERMINISTIC) rather than INCOMPLETE."
   ],
   "scope": {
-    "covered": "The release-critical verifier test host (every Calor.Verification.Tests case), the F-4 oracle alone and its 1,170 cells and 2 reports, the translator fixture, and the Calor.Compiler.Tests classes that construct the verifier or Z3 directly (linux-x64).",
+    "covered": "The release-critical verifier test host (every Calor.Verification.Tests case), the F-4 oracle alone and its 1,170 cells and 2 reports, the translator fixture, and the 24 Calor.Compiler.Tests classes listed in cases.json groups.compiler-verifier.classes: the 18 that constructed the verifier or Z3 directly at the registration base and the 6 such classes the S2 (#1413) repairs added, registered by amendment 1.4.0 (linux-x64).",
     "notCovered": [
       {
         "subject": "Calor.Tasks.Tests VerifyGate_* (CompileCalorIntegrationTests)",
