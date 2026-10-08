@@ -316,6 +316,8 @@ public class ProductionOverflowRuntimeTests
     // The name is a registered case identity of the #1421 determinism protocol (cases.json,
     // compiler-verifier) and of contract amendment 1.3.2, so it keeps "Proves" although the test
     // now asserts Assumed: the protocol never removes a registered case, and a rename would.
+    // TODO(after 0.24): rename to GuardedArithmetic_IsAssumedWithoutEvaluatingUnselectedOverflow
+    // under a new determinism registration (maintainer decision, 2026-10-08).
     public void GuardedArithmetic_ProvesWithoutEvaluatingUnselectedOverflow(string predicate)
     {
         var source = $$"""

@@ -4,9 +4,9 @@
  "protocolVersion": "1.0.0",
  "derivation": {
   "tests": "dotnet test <project> -c Release --no-build --list-tests at registrationBase.commit plus the G2 change (osx-arm64, SDK 10.0.401). The listed names, as a multiset, equal the testName fields of the ordinary-CI TRX files of run 37137354219 (linux-x64) for the same projects, before G2 added one test. Regenerate: dotnet test <project> -c Release --no-build --list-tests; take every line indented by four spaces; count repeats as multiplicity; sort names by UTF-8 bytes. compiler-verifier keeps only names under its classes.",
-  "compilerClasses": "Calor.Compiler.Tests classes in files that construct the verifier or Z3 directly (Z3ContextFactory, VerifyContracts = true, ContractVerificationPass, ObligationSolver, Z3ImplicationProver, Z3.IsAvailable) at the registration base.",
+  "compilerClasses": "Calor.Compiler.Tests classes in files that construct the verifier or Z3 directly (Z3ContextFactory, VerifyContracts = true, ContractVerificationPass, ObligationSolver, Z3ImplicationProver, Z3.IsAvailable) at the registration base. Amendment 1.4.0 adds the 6 classes the S2 (#1413) repairs added that meet the same criterion (S2CacheLiteralWidthTests, S2ImplicationDefinednessTests, S2NestedQuantifierChannelTests, S2NumericDeterminismTests, S2ObligationResidualTests, S2ObligationStateTests).",
   "cells": "derive_cells over bench/phase0-agent-native/verifier-runtime-differential.json: applicable forms in report order x positions (precondition, postcondition, obligation) x depth 1..3 x polarity (provable, refutable), numbered case-000001 upward exactly as DifferentialGate.GenerateCases numbers them.",
-  "amendment140": "Protocol amendment 1.4.0 (additions only). Both groups were re-listed with the same command on the amendment's base commit (osx-arm64, SDK 10.0.401): verification gains the 62 tests the S2 (#1413) repairs added (411 -> 473); compiler-verifier gains 1 test in its registered classes (KInductionTests.KInductionProver_RefusesUnrepresentableBoundsAndSteps; 554 -> 555). Every registered name keeps its multiplicity. compilerClasses is unchanged."
+  "amendment140": "Protocol amendment 1.4.0 (additions only). Both groups were re-listed with the same command on the amendment's base commit (osx-arm64, SDK 10.0.401): verification gains the 62 tests the S2 (#1413) repairs added (411 -> 473); compiler-verifier gains 1 test in its registered classes (KInductionTests.KInductionProver_RefusesUnrepresentableBoundsAndSteps) and the 6 classes the S2 repairs added that construct the verifier or Z3 directly (S2CacheLiteralWidthTests, S2ImplicationDefinednessTests, S2NestedQuantifierChannelTests, S2NumericDeterminismTests, S2ObligationResidualTests, S2ObligationStateTests; 107 tests), so 554 -> 662 in 24 classes (maintainer decision 2026-10-08). Every registered name keeps its multiplicity. compilerClasses: the 18 classes at the registration base plus these 6."
  },
  "groups": {
   "verification": {
@@ -1893,7 +1893,7 @@
   },
   "compiler-verifier": {
    "project": "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
-   "count": 555,
+   "count": 662,
    "classes": [
     "Calor.Compiler.Tests.AgentGuidanceTests",
     "Calor.Compiler.Tests.Analysis.BugPatternTests",
@@ -1912,6 +1912,12 @@
     "Calor.Compiler.Tests.ObligationTests",
     "Calor.Compiler.Tests.ProductionOverflowRuntimeTests",
     "Calor.Compiler.Tests.RunTestCommandTests",
+    "Calor.Compiler.Tests.S2CacheLiteralWidthTests",
+    "Calor.Compiler.Tests.S2ImplicationDefinednessTests",
+    "Calor.Compiler.Tests.S2NestedQuantifierChannelTests",
+    "Calor.Compiler.Tests.S2NumericDeterminismTests",
+    "Calor.Compiler.Tests.S2ObligationResidualTests",
+    "Calor.Compiler.Tests.S2ObligationStateTests",
     "Calor.Compiler.Tests.VerificationCacheTests"
    ],
    "tests": [
@@ -3973,6 +3979,422 @@
     },
     {
      "name": "Calor.Compiler.Tests.RunTestCommandTests.TopLevelCompile_PermissiveEffects_WarningVisibleOnSuccess",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2CacheLiteralWidthTests.CacheKey_UnpairedSurrogateDoesNotCollideWithReplacementCharacter",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2CacheLiteralWidthTests.CanonicalKey_DistinguishesLiteralTyping(left: \"INT:1\", right: \"LONG:1\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2CacheLiteralWidthTests.CanonicalKey_DistinguishesLiteralTyping(left: \"INT:1\", right: \"UINT:1\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2CacheLiteralWidthTests.CanonicalKey_DistinguishesLiteralTyping(left: \"LONG:1\", right: \"ULONG:1\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2CacheLiteralWidthTests.CanonicalKey_DistinguishesLiteralTyping(left: \"UINT:1\", right: \"ULONG:1\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2CacheLiteralWidthTests.CanonicalKey_DistinguishesLiteralTyping(left: \"ULONG:18446744073709551615\", right: \"LONG:-1\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2CacheLiteralWidthTests.CanonicalKey_DistinguishesRealLiteralTyping",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2CacheLiteralWidthTests.ColdVerdicts_DifferByLiteralWidth",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2CacheLiteralWidthTests.FormatVersion_EvictsPreFixEntries",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2CacheLiteralWidthTests.PostconditionKey_InferredBindingTypeDiffersFromQuestionMarkSpelling",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2CacheLiteralWidthTests.PostconditionKey_OutputTypeCannotForgeDelimiters",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2CacheLiteralWidthTests.PreBumpEntries_AreNotServed(stampOldFormat: False)",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2CacheLiteralWidthTests.PreBumpEntries_AreNotServed(stampOldFormat: True)",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2CacheLiteralWidthTests.WarmCache_PrimedWithIntLiteral_DoesNotRefuteLongLiteral",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2CacheLiteralWidthTests.WarmCache_PrimedWithLongLiteral_DoesNotProveIntLiteral",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ImplicationDefinednessTests.CheckedOverflowInImplementerPrecondition_IsRefuted",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ImplicationDefinednessTests.ConditionalDivisor_NoProofAndNoHeuristicValidityClaim",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ImplicationDefinednessTests.Control_DivisionWhoseDivisorTheInterfaceRulesOut_StillProven",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ImplicationDefinednessTests.Control_IntegerWeakening_StillProven",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ImplicationDefinednessTests.IdenticalContracts_WithAPartialInterfacePrecondition_AreNotAViolation",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ImplicationDefinednessTests.IdenticalQuantifiedContracts_AreValid",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ImplicationDefinednessTests.IncompatibleInheritedGuarantees_StillReportedWithAStringParameter",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ImplicationDefinednessTests.ModuloByPossiblyZeroDivisor_IsRefutedAtTheThrowingInput",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ImplicationDefinednessTests.NullCompatibleInheritedGuarantees_AreNotReportedIncompatible",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ImplicationDefinednessTests.NullableStringPrecondition_IsAssumedNotProven(implementerPrecondition: \"(>= (len s) INT:0)\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ImplicationDefinednessTests.NullableStringPrecondition_IsAssumedNotProven(implementerPrecondition: \"(|| (! (isempty s)) (== s STR:\\\"\\\"))\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ImplicationDefinednessTests.QuantifiedInterfacePrecondition_DefinednessDoesNotRestrictTheAssumption",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ImplicationDefinednessTests.ThrowingInterfacePrecondition_DoesNotYieldAFalseRefutation",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ImplicationDefinednessTests.UncheckedModule_WrappingArithmetic_StillProven",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ImplicationDefinednessTests.UndecidedInheritedConflict_IsVisibleAndNotClaimedValid",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ImplicationDefinednessTests.UnusedStringParameter_DoesNotDemoteAnIntegerImplication",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ImplicationDefinednessTests.WeakeningCheck_DifferentOverflowPolicies_AreIndeterminate",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ImplicationDefinednessTests.WithoutTheSolver_HeuristicNeverClaimsValidityAndInequalityIsNotWeaker",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2NestedQuantifierChannelTests.KInduction_UnparsableConjunct_IsNotDropped",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2NestedQuantifierChannelTests.NestedFactOutOfScope_DoesNotBlockAnUnrelatedObligation",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2NestedQuantifierChannelTests.NestedQuantifierPrecondition_DoesNotDischargeAnObligation",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2NumericDeterminismTests.OverflowSensitivePostcondition_IsAssumedByRule(type: \"i32\", arithmetic: \"(+ x y)\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2NumericDeterminismTests.OverflowSensitivePostcondition_IsAssumedByRule(type: \"i64\", arithmetic: \"(* x y)\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2NumericDeterminismTests.OverflowSensitivity_IsDecidedByRule_WithoutTheSolver(leftType: \"i32\", rightType: \"i32\", arithmetic: \"(* x y)\", sensitive: True)",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2NumericDeterminismTests.OverflowSensitivity_IsDecidedByRule_WithoutTheSolver(leftType: \"i32\", rightType: \"i32\", arithmetic: \"(+ x y)\", sensitive: True)",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2NumericDeterminismTests.OverflowSensitivity_IsDecidedByRule_WithoutTheSolver(leftType: \"i32\", rightType: \"u32\", arithmetic: \"(* x y)\", sensitive: False)",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2NumericDeterminismTests.OverflowSensitivity_IsDecidedByRule_WithoutTheSolver(leftType: \"i64\", rightType: \"i64\", arithmetic: \"(* x y)\", sensitive: True)",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2NumericDeterminismTests.OverflowSensitivity_IsDecidedByRule_WithoutTheSolver(leftType: \"u32\", rightType: \"i32\", arithmetic: \"(- x y)\", sensitive: False)",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2NumericDeterminismTests.WhileLoopWithAnOutOfRangeBound_IsUnsupported(condition: \"(&& (<= i INT:-4294967296) (>= i INT:1))\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2NumericDeterminismTests.WhileLoopWithAnOutOfRangeBound_IsUnsupported(condition: \"(&& (<= i INT:3000000000) (>= i INT:0))\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.ComparisonsAfterOperatorOverloads_CountAsPossiblyThrowing",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.Control_NonThrowingPredecessor_StillRefutedWithAReachingModel",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.Control_ProofReadingAField_StillRefuted",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.EntryRefinementAfterAThrowingPrecondition_IsWithheld",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.EntryRefinementReadingAProperty_IsNotRefuted",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.MigratedOperatorMethods_CountAsOperatorOverloads",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.ObligationAfterAThrowingOperandInTheSameStatement_IsWithheld",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.ObligationInsideAFoldedMultiOperandOperation_IsWithheld",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.ProofAfterAConversionWithAUserDefinedConversionInTheModule_IsWithheld",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.ProofAfterALengthOfADefaultNullLocal_IsWithheld",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.ProofAfterAMutableRebindOfARefinedParameter_IsWithheld",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.ProofAfterAPreconditionThatMayThrow_IsWithheld",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.ProofAfterARefinedBindingGuard_IsWithheld",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.ProofAfterAStatementThatThrowsOnTheModel_IsWithheld",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.ProofAfterAThrowingConstructorInitializer_IsWithheld",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.ProofAfterAnEarlierProofGuard_IsWithheld",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.ProofReadingALengthProperty_IsWithheld",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.ProofReadingANestedClassProperty_IsWithheld",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.ProofReadingAPropertyThatHidesAField_IsWithheld",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.ProofWithRawCSharpMembersInTheModule_IsWithheld",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationResidualTests.ThenBodyIgnoresALaterThrowingElseIfCondition",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.AliasedRefParameterWriteKillsPreconditionFact",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.ArrayElementStoreKillsPreconditionFact",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.ConstructorNamedRefinementParameter_IsAnEntryFact",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.Control_GenuineSubtypeViolation_StillRefuted",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.Control_UnassignedPreconditionFact_StillDischarges",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.DroppedParameterRefinement_MakesTheStateInexact",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.DroppedRefinement_ReachedThroughARetainedPrecondition_IsNotFailed",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.ElseBranch_HoldingClaim_IsDischarged",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.ElseBranch_ViolatedClaim_IsRefutedWithAReachingModel",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.ElseFact_KilledWhenElseBodyReassigns",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.ElseIfBranch_UsesEarlierNegations",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.GetterReadInASubtypeInitializer_IsNotRefuted",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.GuardAfterEarlyExit_StillUsedAsAFact",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.IndirectWrite_KillsFacts(source: \"§M{m1:M}\\n  §CL{c1:Box:pub}\\n    §FLD{i32:Value:pu\"···)",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.IndirectWrite_KillsFacts(source: \"§M{m1:M}\\n  §F{f1:Probe:priv} (i32:x) -> i32\\n    \"···)",
+     "multiplicity": 4
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.IndirectWrite_KillsFacts(source: \"§M{m1:M}\\n  §F{f1:Probe:priv} (i32:x:ref, i32:y:re\"···)",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.NamedRefinementFactKilledByAssignment_IsNotDischarged",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.NamedRefinementParameter_IsAnEntryFact(refinement: \"§RTYPE{r1:Ref:i32} (> (- # INT:403639039) INT:6084\"···, _: \"i32\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.NamedRefinementParameter_IsAnEntryFact(refinement: \"§RTYPE{r1:Ref:i32} (>= (& # INT:-1200624532) INT:-\"···, _: \"i32\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.NamedRefinementParameter_IsAnEntryFact(refinement: \"§RTYPE{r1:Ref:i32} (>= (& # INT:2147483647) INT:21\"···, _: \"i32\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.NamedRefinementParameter_IsAnEntryFact(refinement: \"§RTYPE{r1:Ref:i64} (< (- # LONG:-92233720368547758\"···, _: \"i64\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.NamedRefinementParameter_IsAnEntryFact(refinement: \"§RTYPE{r1:Ref:i64} (>= (+ # INT:-2147483648) LONG:\"···, _: \"i64\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.NamedRefinementParameter_SubtypeIsDischarged",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.ObligationAfterEarlyReturn_IsNotRefutedWithAnUnreachableModel",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.ObligationAfterLoop_IsNotRefutedWithANonExitingModel",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.ParameterNamedResult_DoesNotDischargeTheRefinedReturn",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.PreconditionFactKilledByAssignment_IsNotDischarged(predicate: \"(== x INT:2147483647)\", assigned: \"INT:0\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.PreconditionFactKilledByAssignment_IsNotDischarged(predicate: \"(> x INT:-1)\", assigned: \"INT:-408872766\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.PropertyGetterReadInAnEarlierProof_KillsAliasedRefParameterFact",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.PropertyGetterRead_KillsAliasedRefParameterFact",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.RawCSharpInAParameterRefinement_KillsEntryFacts",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.RawCSharpKillsPreconditionFact",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.ReassignedVariable_IsNotRefutedWithAnUnreachableModel(guard: \"(!= x INT:2147483647)\", assigned: \"INT:-936965578\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.ReassignedVariable_IsNotRefutedWithAnUnreachableModel(guard: \"(< x INT:2147483647)\", assigned: \"INT:-2147483648\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.ReassignedVariable_IsNotRefutedWithAnUnreachableModel(guard: \"(== x INT:2)\", assigned: \"INT:1457976674\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.ReassignedVariable_IsNotRefutedWithAnUnreachableModel(guard: \"(>= x INT:2)\", assigned: \"INT:315807369\")",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.RefArgumentKillsPreconditionFact",
+     "multiplicity": 1
+    },
+    {
+     "name": "Calor.Compiler.Tests.S2ObligationStateTests.RefinedReturn_UnboundResult_IsNotRefuted",
      "multiplicity": 1
     },
     {
