@@ -61,6 +61,12 @@ internal sealed class GateRepo : IDisposable
                 if (artifact!["classification"]!.GetValue<string>() == "stale")
                     artifact["classification"] = "authoritative";
         }
+        else
+        {
+            // Contract amendment 1.4.0 left no artifact stale; the control puts one back.
+            inventoryNode["artifacts"]!.AsArray()
+                .Single(a => a!["id"]!.GetValue<string>() == "tier2-corpus-verification")!["classification"] = "stale";
+        }
         repo.Contract = contractNode;
         repo.Inventory = inventoryNode;
         repo.Write("docs/plans/v0.24-evidence-contract.md", File.ReadAllText(Path.Combine(source, "docs/plans/v0.24-evidence-contract.md")));
