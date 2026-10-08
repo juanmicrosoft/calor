@@ -658,58 +658,58 @@
   },
   "observedEnvironment": {
     "status": "OBSERVED, NOT PINNED (maintainer decision ENVIRONMENT-OBSERVED-NOT-PINNED, 2026-10-07)",
-    "source": "Tests workflow run 37624076834 (push of the candidate 696ab824 to main); \"Set up job\" and \"Setup .NET\" log lines read with gh run view --job <id> --log at the re-freeze",
+    "source": "Tests workflow run 37813486913 (push of the candidate 5e52d8ab to main); \"Set up job\" and \"Setup .NET\" log lines read with gh run view --job <id> --log at the second re-freeze",
     "dotnet": {
       "sdk": "10.0.401",
       "runtime": "10.0.12",
-      "jobs": "all six jobs below report the same SDK and runtime"
+      "jobs": "all six jobs below report the same SDK and runtime (preinstalled on five; installed by setup-dotnet on macos-14)"
     },
     "images": [
       {
         "label": "ubuntu-latest",
         "image": "ubuntu-24.04",
-        "version": "20260927.320.1",
-        "provisioner": "20260901.588",
-        "job": "test 112801277007"
+        "version": "20261004.327.1",
+        "provisioner": "20261002.596",
+        "job": "test 113436034568"
       },
       {
         "label": "ubuntu-latest",
         "image": "ubuntu-24.04",
         "version": "20261004.327.1",
         "provisioner": "20261002.596",
-        "job": "tests (compiler) 112801277346"
+        "job": "tests (compiler) 113436035037"
       },
       {
         "label": "windows-latest",
         "image": "windows-2025-vs2026",
         "version": "20260925.250.1",
         "provisioner": "20260901.588",
-        "job": "z3-consumer-matrix (win-x64) 112801277042"
+        "job": "z3-consumer-matrix (win-x64) 113436034483"
       },
       {
         "label": "windows-11-arm",
         "image": "windows-11-vs2026-arm64",
         "version": "20261004.176.1",
         "provisioner": "20261002.596",
-        "job": "z3-consumer-matrix (win-arm64) 112801277160"
+        "job": "z3-consumer-matrix (win-arm64) 113436034950"
       },
       {
         "label": "macos-14",
         "image": "macos-14-arm64",
         "version": "20260831.0302.1",
         "provisioner": "20260828.587",
-        "job": "z3-consumer-matrix (osx-arm64) 112801276943"
+        "job": "z3-consumer-matrix (osx-arm64) 113436035005"
       },
       {
         "label": "ubuntu-24.04-arm",
         "image": "ubuntu-24.04-arm",
         "version": "20261004.142.1",
         "provisioner": "20261002.596",
-        "job": "z3-consumer-matrix (linux-arm64) 112801277417"
+        "job": "z3-consumer-matrix (linux-arm64) 113436034745"
       }
     ],
     "binding": "Accepted as observed, not pinned (maintainer decision ENVIRONMENT-OBSERVED-NOT-PINNED, 2026-10-07; no amendment). The git-based classifier cannot see environment drift. C2 records the SDK, runtime, ImageOS, and ImageVersion each regeneration used.",
-    "note": "The same label (ubuntu-latest) resolved to two image versions within this one run, which is why exact image equality is not a usable requirement."
+    "note": "At the first freeze (run 37624076834) the ubuntu-latest label resolved to two image versions within one run; in this run both ubuntu-latest jobs got 20261004.327.1. Exact image equality is still not a usable requirement."
   },
   "releasability": {
     "status": "RELEASABLE VERSION (no conflicting tag at the freeze)",
