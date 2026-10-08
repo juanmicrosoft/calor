@@ -1,0 +1,129 @@
+{
+ "note": "Per-job invocation durations ('seconds' field of each attempt record), all profiles; job setup time is not included.",
+ "jobs": {
+  "linux-arm64-j1": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "oracle-isolated": 21.1,
+    "verification-full": 58.5
+   },
+   "sumSecondsAllProfiles": 1194.5,
+   "invocationsByProfile": {
+    "oracle-isolated": 15,
+    "verification-full": 15
+   }
+  },
+  "linux-arm64-j2": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "oracle-isolated": 21.1,
+    "verification-full": 57.0
+   },
+   "sumSecondsAllProfiles": 1170.7,
+   "invocationsByProfile": {
+    "oracle-isolated": 15,
+    "verification-full": 15
+   }
+  },
+  "linux-x64-j1": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "compiler-verifier": 84.0,
+    "oracle-isolated": 18.7,
+    "verification-full": 55.8
+   },
+   "sumSecondsAllProfiles": 2377.4,
+   "invocationsByProfile": {
+    "compiler-verifier": 15,
+    "oracle-isolated": 15,
+    "verification-full": 15
+   }
+  },
+  "linux-x64-j2": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "compiler-verifier": 52.9,
+    "oracle-isolated": 12.2,
+    "verification-full": 37.5
+   },
+   "sumSecondsAllProfiles": 1540.9,
+   "invocationsByProfile": {
+    "compiler-verifier": 15,
+    "oracle-isolated": 15,
+    "verification-full": 15
+   }
+  },
+  "osx-arm64-j1": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "oracle-isolated": 23.5,
+    "verification-full": 111.3
+   },
+   "sumSecondsAllProfiles": 2132.8,
+   "invocationsByProfile": {
+    "oracle-isolated": 15,
+    "verification-full": 15
+   }
+  },
+  "osx-arm64-j2": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "oracle-isolated": 21.6,
+    "verification-full": 103.9
+   },
+   "sumSecondsAllProfiles": 2039.9,
+   "invocationsByProfile": {
+    "oracle-isolated": 15,
+    "verification-full": 15
+   }
+  },
+  "win-arm64-j1": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "oracle-isolated": 31.8,
+    "verification-full": 145.6
+   },
+   "sumSecondsAllProfiles": 2690.4,
+   "invocationsByProfile": {
+    "oracle-isolated": 15,
+    "verification-full": 15
+   }
+  },
+  "win-arm64-j2": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "oracle-isolated": 30.4,
+    "verification-full": 136.6
+   },
+   "sumSecondsAllProfiles": 2541.1,
+   "invocationsByProfile": {
+    "oracle-isolated": 15,
+    "verification-full": 15
+   }
+  },
+  "win-x64-j1": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "oracle-isolated": 40.2,
+    "verification-full": 233.0
+   },
+   "sumSecondsAllProfiles": 4117.3,
+   "invocationsByProfile": {
+    "oracle-isolated": 14,
+    "verification-full": 15
+   }
+  },
+  "win-x64-j2": {
+   "attempts": 15,
+   "medianSecondsByProfile": {
+    "oracle-isolated": 32.6,
+    "verification-full": 149.5
+   },
+   "sumSecondsAllProfiles": 2816.5,
+   "invocationsByProfile": {
+    "oracle-isolated": 15,
+    "verification-full": 15
+   }
+  }
+ }
+}
