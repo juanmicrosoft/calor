@@ -44,7 +44,14 @@ on:
       # #1422: a change to any gate input re-runs the gate (and its cleanup).
       - 'docs/plans/evidence/b1-1276/**'
       - 'docs/plans/evidence/evidence-contract-1407/**'
-      - 'tests/Calor.Compiler.Tests/EvidenceContract/**'
+      # Sealed documents the gate's seal check reads (B2-01), so also freshness inputs.
+      - 'docs/plans/b1-1276-benchmark-registration.md'
+      - 'docs/plans/v0.24-evidence-contract.md'
+      # The B1 validator files only (INPUT_PATHS in the gate), not other EvidenceContract tests.
+      - 'tests/Calor.Compiler.Tests/EvidenceContract/Benchmark*.cs'
+      - 'tests/Calor.Compiler.Tests/EvidenceContract/EvidenceContractValidator.cs'
+      - 'tests/Calor.Compiler.Tests/EvidenceContract/EvidenceContractTests.cs'
+      - 'tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj'
       - 'scripts/benchmark_publication_gate.py'
 
 env:

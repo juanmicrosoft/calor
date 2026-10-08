@@ -6,6 +6,20 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **The benchmark publication gate no longer refuses a release candidate over unrelated test
+  files (#1422).** The gate (`scripts/benchmark_publication_gate.py`) refused with `B2-08` whenever
+  any file in `tests/Calor.Compiler.Tests/EvidenceContract/` differed between the candidate and
+  `main`. Its freshness check now covers only the inputs of the headline: the registered B1 packet
+  and results, the contract, the sealed files the gate's seal check reads (for example the B1
+  registration document), the 452 registered pair files and the benchmark corpus, the generator
+  (`tests/Calor.Evaluation`), the 6 validator source files plus their project file, and the gate
+  itself. A change to any of these on `main` after the candidate still refuses.
+- **The headline bytes now depend only on the candidate.** The gate used to compare against the
+  headline on `main`, so the same candidate could write different bytes after `main` moved. It now
+  compares against the headline in the candidate. It refuses if `main` gained a different headline
+  since the candidate. Two runs on one candidate write identical files, which lets the release
+  check compare them with the adjudicated hashes. No benchmark results are published by this change.
+
 - **The NuGet packages and the website now build byte-for-byte the same from the same
   commit.** The release gate rebuilds both at publication and compares SHA-256 hashes with the
   recorded ones, so before this fix no release could pass it. Two builds of one commit, in

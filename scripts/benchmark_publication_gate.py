@@ -14,10 +14,13 @@ durable provenance identity (contract section 6). It refuses (exit 1, nothing wr
   B2-06  the comparability key is neither the registered one nor authorized by a #1407
          amendment merged before the results (a method change: metric set, run count,
          aggregation, generator, ...);
-  B2-07  the headline published on origin/main has another key and no prior amendment
-         supersedes it, or it has the same key and different numbers;
+  B2-07  the headline published at the candidate has another key and no prior amendment
+         supersedes it, or it has the same key and different numbers; or origin/main's published
+         headline (or its stamp-index entry) changed since the candidate to anything other than
+         exactly the bytes this run writes;
   B2-08  the provenance commit is not a full SHA, not HEAD, not on fetched origin/main, or the
-         clone is shallow;
+         clone is shallow; or a headline input (INPUT_PATHS, every file the three seals name,
+         and every registered pair file) differs between the candidate and origin/main;
   B2-09  the working tree has changes other than the gate's own outputs;
   B2-10  the regenerated packet (pair-metrics twice, then pair-results) is missing or differs;
   B2-11  the results packet does not carry the registered population, sampling unit, and label.
@@ -26,8 +29,19 @@ There is no override option. A method change is authorized only by a contract.js
 entry with a structured ``benchmarkMethodAuthorization`` {comparabilityKeySha256,
 supersedesComparabilityKeySha256: [...], registrationCommit?}, present in the contract on main
 before the first-parent commit that landed results.json there, and still present and not withdrawn.
-Mentions of a hash in prose authorize nothing. An older checkout publishes only if its inputs equal
-origin/main's. Exit 2 is a usage error.
+Mentions of a hash in prose authorize nothing.
+
+Freshness (#1422 PR 2). The checked-out HEAD is the candidate (the workflow checks out the
+adjudicated candidate). It may publish while origin/main has moved on, but only if main changed
+none of the headline's inputs since the candidate: the registered B1 packet and results packet,
+the contract that authorizes methods, the three seals and every file they name (B2-01), every
+registered pair file and the benchmark corpus, the
+registered generator (tests/Calor.Evaluation), B1's C# validator files, and this gate. Other files
+(for example unrelated tests next to the validator) do not count. The written bytes are a function
+of the candidate alone: the comparison is with the headline published at the candidate, and the
+stamp index is the candidate's plus this entry. Nothing depends on the clock or on main's later
+state, so an adjudicated hash taken at the candidate matches a later publish-time run. Exit 2 is a
+usage error.
 
   python3 scripts/benchmark_publication_gate.py check --commit <40-hex> --regenerated <dir>
 """
@@ -58,9 +72,23 @@ PAIR_FIELDS = ("pairId", "source", "calorPath", "calorSha256", "csharpPath", "cs
                "taskStatementSha256", "inputSet", "expectedOutputs", "failureBehavior")
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 AUTHORIZATION = "benchmarkMethodAuthorization"
-FRESHNESS_PATHS = ("docs/plans/evidence/b1-1276", "tests/TestData/Benchmarks", "tests/Calor.Evaluation", CONTRACT,
-                   "tests/Calor.Compiler.Tests/EvidenceContract",
-                   "scripts/benchmark_publication_gate.py")
+VALIDATOR = "tests/Calor.Compiler.Tests/EvidenceContract"
+# The inputs that determine or validate the headline (#1422 PR 2). Each must be the same at the
+# candidate (HEAD) and on origin/main; every registered pair path is added at run time. The B1
+# validator is the workflow's BenchmarkResultsTests|BenchmarkRegistrationTests filter: those two
+# classes, the partial validator they call, the helpers they use (EvidenceContractTests.RepoRoot,
+# Contract), and the project file that compiles them. Other files in that directory (C1's candidate
+# tests, for example) are not benchmark inputs. src/ is not an input: the metric is computed by
+# tests/Calor.Evaluation alone, B2-10 re-runs the generator at the candidate, and the headline
+# records the candidate's src tree hash.
+SEALS = (f"{REGISTRATION}/sha256.json", f"{RESULTS}/sha256.json", CONTRACT_SEAL)
+INPUT_PATHS = (REGISTRATION, RESULTS, CONTRACT, CONTRACT_SEAL, "tests/TestData/Benchmarks", "tests/Calor.Evaluation",
+               f"{VALIDATOR}/BenchmarkRegistrationTests.cs", f"{VALIDATOR}/BenchmarkRegistrationValidator.cs",
+               f"{VALIDATOR}/BenchmarkResultsTests.cs", f"{VALIDATOR}/BenchmarkResultsValidator.cs",
+               f"{VALIDATOR}/EvidenceContractValidator.cs", f"{VALIDATOR}/EvidenceContractTests.cs",
+               "tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj",
+               "scripts/benchmark_publication_gate.py")
+STAMP_KEY = (HEADLINE, "/provenance/commit")
 # The B1 registration merge commit (PR #1473, contract section 5). Any other registration needs a
 # prior amendment whose benchmarkMethodAuthorization names its registrationCommit.
 ACCEPTED_REGISTRATION_COMMITS = ("f0e0eb682a8658364170ad49aff2d2c433d570f8",)
@@ -115,10 +143,15 @@ def git(root: Path, *args: str, check: bool = False) -> str | None:
     return run.stdout.strip()
 
 
+def blob(root: Path, spec: str) -> bytes | None:
+    """The exact bytes of a committed file (None when absent)."""
+    run = subprocess.run(["git", "cat-file", "blob", spec], cwd=root, capture_output=True)
+    return run.stdout if run.returncode == 0 else None
+
+
 def check_seals(root: Path, findings: list) -> None:
     """B2-01: every file each seal lists has the sealed bytes (results raw; the others LF-normalized)."""
-    for seal_path, normalize in ((f"{REGISTRATION}/sha256.json", lf_sha256), (f"{RESULTS}/sha256.json", sha256),
-                                 (CONTRACT_SEAL, lf_sha256)):
+    for seal_path, normalize in zip(SEALS, (lf_sha256, sha256, lf_sha256)):
         seal = load(root, seal_path)
         files = seal.get("files") or {}
         if not files:
@@ -303,10 +336,67 @@ def check_provenance(root: Path, commit: str, findings: list) -> None:
         findings.append(("B2-08", f"provenance commit {commit} is not the checked-out HEAD"))
     if git(root, "merge-base", "--is-ancestor", commit, MAIN_REF) is None:
         findings.append(("B2-08", f"{commit} is not an ancestor of {MAIN_REF}"))
-    # Freshness: an older checkout may publish only if every input equals main's.
-    for path in FRESHNESS_PATHS:
-        if git(root, "rev-parse", f"HEAD:{path}") != git(root, "rev-parse", f"{MAIN_REF}:{path}"):
-            findings.append(("B2-08", f"{path} at HEAD differs from {MAIN_REF}; only inputs equal to main's may publish"))
+    check_inputs_fresh(root, findings)
+
+
+def input_paths(root: Path) -> list:
+    """INPUT_PATHS, every file the candidate's three seals name (B2-01 checks them: the B1 registration
+    document, the contract document, the artifact inventory, ...), and every registered pair file."""
+    paths = list(INPUT_PATHS)
+    for seal in SEALS:
+        try:
+            files = json.loads(git(root, "show", f"HEAD:{seal}") or "{}").get("files") or {}
+        except (ValueError, AttributeError):
+            files = {}
+        for path in sorted(files) if isinstance(files, dict) else []:
+            if path not in paths:
+                paths.append(path)
+    try:
+        pairs = json.loads(git(root, "show", f"HEAD:{REGISTRATION}/pairs.json") or "{}").get("pairs") or []
+    except (ValueError, AttributeError):
+        pairs = []
+    for pair in pairs if isinstance(pairs, list) else []:
+        for side in ("calorPath", "csharpPath"):
+            if isinstance(pair, dict) and isinstance(pair.get(side), str) and pair[side] not in paths:
+                paths.append(pair[side])
+    for path in partial_validator_files(root):
+        if path not in paths:
+            paths.append(path)
+    return paths
+
+
+# Verification pass: a new file declaring another part of a validator class can change which
+# overload an unchanged caller binds to (C# picks the better overload across all parts), so every
+# file declaring a part of these classes, at HEAD or on main, is an input. One added only on main
+# is absent at HEAD and therefore differs.
+VALIDATOR_PARTIALS = r"partial[[:space:]]+(class|struct|record)[[:space:]]+(EvidenceContractValidator|EvidenceContractTests|BenchmarkResultsTests|BenchmarkRegistrationTests)([^A-Za-z0-9_]|$)"
+VALIDATOR_PROJECT = "tests/Calor.Compiler.Tests"
+
+
+def partial_validator_files(root: Path) -> list:
+    """Every .cs file under the validator's project, at HEAD or on main, declaring a part of a validator class."""
+    found = set()
+    for rev in ("HEAD", MAIN_REF):
+        out = git(root, "grep", "-l", "-E", VALIDATOR_PARTIALS, rev, "--", f"{VALIDATOR_PROJECT}/*.cs")
+        for line in (out or "").splitlines():
+            found.add(line.split(":", 1)[1] if line.startswith(f"{rev}:") else line)
+    return sorted(found)
+
+
+def check_inputs_fresh(root: Path, findings: list) -> None:
+    """B2-08 freshness: main changed no headline input since the candidate (HEAD).
+
+    The whole tree entry (mode, type, object id) is compared, so a file or directory counts as
+    changed if any byte, mode, or entry differs (a regular file replaced by a symlink with the same
+    bytes included), and an input missing on one side differs from one present on the other.
+    RealPacketTests requires every input to exist, so none is absent on both sides by a rename."""
+    def entry(rev: str, path: str) -> str | None:
+        return git(root, "ls-tree", "--full-tree", rev, "--", path)
+
+    for path in input_paths(root):
+        if entry("HEAD", path) != entry(MAIN_REF, path):
+            findings.append(("B2-08", f"{path} at HEAD differs from {MAIN_REF}; main changed a headline input "
+                                      "since the candidate, so the candidate's headline would be stale"))
 
 
 def check_worktree(root: Path, outputs: tuple, findings: list) -> None:
@@ -330,8 +420,9 @@ def check_worktree(root: Path, outputs: tuple, findings: list) -> None:
 
 
 def check_published(root: Path, key: dict, key_hash: str, amendments: list, metric: dict, findings: list) -> dict:
-    """B2-07: compare with the headline published on origin/main. No delta is ever computed across keys."""
-    text = git(root, "show", f"{MAIN_REF}:{HEADLINE}")
+    """B2-07: compare with the headline published at the candidate (HEAD), so the written bytes do
+    not depend on main's later state; check_main_publication fences main. No delta across keys."""
+    text = git(root, "show", f"HEAD:{HEADLINE}")
     if text is None:
         return {"comparableWithPublished": None,
                 "comparison": "no headline is published yet; nothing is compared"}
@@ -415,13 +506,47 @@ def index_entry(root: Path, commit: str) -> dict:
     }
 
 
-def write_index(root: Path, entry: dict) -> None:
-    path = root / STAMP_INDEX
-    index = json.loads(path.read_text(encoding="utf-8"))
-    stamps = [s for s in index["publicationStamps"]
-              if (s.get("path"), s.get("stampPointer")) != (entry["path"], entry["stampPointer"])]
+def render(doc: dict) -> bytes:
+    return (json.dumps(doc, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+
+
+def stamp_entries(index_text: str | None) -> object:
+    """Every headline entry in a stamp index, in order ([] when the index is absent). An index that is
+    not a JSON object with a publicationStamps list is the marker "<unreadable>", which equals no
+    readable index, so it can never pass as unchanged or as this run's entry."""
+    if index_text is None:
+        return []
+    try:
+        stamps = json.loads(index_text).get("publicationStamps")
+    except (ValueError, AttributeError):
+        return "<unreadable>"
+    if not isinstance(stamps, list):
+        return "<unreadable>"
+    return [s for s in stamps if not isinstance(s, dict) or (s.get("path"), s.get("stampPointer")) == STAMP_KEY]
+
+
+def render_index(root: Path, entry: dict) -> bytes:
+    """The candidate's committed stamp index (never the work tree) with this entry replacing the headline's."""
+    index = json.loads(git(root, "show", f"HEAD:{STAMP_INDEX}", check=True))
+    stamps = [s for s in index["publicationStamps"] if (s.get("path"), s.get("stampPointer")) != STAMP_KEY]
     index["publicationStamps"] = stamps + [entry]
-    path.write_text(json.dumps(index, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return render(index)
+
+
+def check_main_publication(root: Path, outputs: dict, findings: list) -> None:
+    """B2-07: main's published headline and its stamp entry are unchanged since the candidate, or are
+    exactly what this run writes (this candidate's headline already merged). Anything else means a
+    different headline reached main after the candidate, and publishing this one would be stale."""
+    head, main = blob(root, f"HEAD:{HEADLINE}"), blob(root, f"{MAIN_REF}:{HEADLINE}")
+    if main != head and main != outputs[HEADLINE]:
+        findings.append(("B2-07", f"{HEADLINE} on {MAIN_REF} changed since the candidate and is not this run's "
+                                  "headline; a newer publication reached main, so this candidate is stale"))
+    head_entries = stamp_entries(git(root, "show", f"HEAD:{STAMP_INDEX}"))
+    main_entries = stamp_entries(git(root, "show", f"{MAIN_REF}:{STAMP_INDEX}"))
+    ours_entries = stamp_entries(outputs[STAMP_INDEX].decode("utf-8"))
+    if main_entries != head_entries and main_entries != ours_entries:
+        findings.append(("B2-07", f"the {HEADLINE} entries of {STAMP_INDEX} on {MAIN_REF} changed since the "
+                                  "candidate (added, removed, duplicated, or unreadable) and are not this run's entry"))
 
 
 def report(findings: list, candidate: dict | None) -> str:
@@ -461,8 +586,13 @@ def run_check(root: Path, commit: str, regenerated: Path) -> tuple:
     check_regenerated(root, regenerated, findings)
     comparison = check_published(root, key, key_hash, amendments, results.get("metric"), findings)
     if findings:
-        return findings, None
-    return findings, build_candidate(root, commit, key, key_hash, results, manifest, included, comparison)
+        return findings, None, None
+    candidate = build_candidate(root, commit, key, key_hash, results, manifest, included, comparison)
+    outputs = {HEADLINE: render(candidate), STAMP_INDEX: render_index(root, index_entry(root, commit))}
+    check_main_publication(root, outputs, findings)
+    if findings:
+        return findings, None, None
+    return findings, candidate, outputs
 
 
 def main(argv: list | None = None) -> int:
@@ -478,13 +608,13 @@ def main(argv: list | None = None) -> int:
 
     root = args.repo.resolve()
     try:
-        findings, candidate = run_check(root, args.commit, args.regenerated)
+        findings, candidate, outputs = run_check(root, args.commit, args.regenerated)
     except (Refusal, OSError, ValueError, KeyError, TypeError, subprocess.CalledProcessError) as error:
-        findings, candidate = [("B2-00", f"the packet could not be checked: {error}")], None
+        findings, candidate, outputs = [("B2-00", f"the packet could not be checked: {error}")], None, None
     text = report(findings, candidate)
     if candidate is not None:
-        (root / HEADLINE).write_text(json.dumps(candidate, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        write_index(root, index_entry(root, args.commit))
+        for relative, data in outputs.items():
+            (root / relative).write_bytes(data)
     if args.report:
         args.report.write_text(text, encoding="utf-8")
     (sys.stderr if findings else sys.stdout).write(text)

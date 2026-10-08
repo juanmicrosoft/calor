@@ -1,0 +1,34 @@
+== A-main-at-candidate: exit 0
+OK: comparabilityKeySha256 35ee7f8e33a8ef176728ead7b56dc0c64153b59a5db9f06fa87b7acda052104e
+   website/public/data/benchmark-headline.json b2d297d217f8dbf640535f66d2ebff4a48c757f667b1ebf9e80128b6a66e1d97
+   bench/phase0-agent-native/commit-stamp-index.json 8b6c1097f89f2b8e419786c508e01d60f702f01b3ebdfed1393d0fce6495b8d6
+== A2-second-run: exit 0
+OK: comparabilityKeySha256 35ee7f8e33a8ef176728ead7b56dc0c64153b59a5db9f06fa87b7acda052104e
+   website/public/data/benchmark-headline.json b2d297d217f8dbf640535f66d2ebff4a48c757f667b1ebf9e80128b6a66e1d97
+   bench/phase0-agent-native/commit-stamp-index.json 8b6c1097f89f2b8e419786c508e01d60f702f01b3ebdfed1393d0fce6495b8d6
+== B-unrelated-test-on-main: exit 0
+OK: comparabilityKeySha256 35ee7f8e33a8ef176728ead7b56dc0c64153b59a5db9f06fa87b7acda052104e
+   website/public/data/benchmark-headline.json b2d297d217f8dbf640535f66d2ebff4a48c757f667b1ebf9e80128b6a66e1d97
+   bench/phase0-agent-native/commit-stamp-index.json 8b6c1097f89f2b8e419786c508e01d60f702f01b3ebdfed1393d0fce6495b8d6
+== B-prime-pre-PR-2-gate: exit 1
+0.24 B2 (#1422) benchmark publication gate
+REFUSED: 1 problem(s). No headline is written and nothing may be published.
+  B2-08 tests/Calor.Compiler.Tests/EvidenceContract at HEAD differs from refs/remotes/origin/main; only inputs equal to main's may publish
+== C-generator-changed-on-main: exit 1
+0.24 B2 (#1422) benchmark publication gate
+REFUSED: 1 problem(s). No headline is written and nothing may be published.
+  B2-08 tests/Calor.Evaluation at HEAD differs from refs/remotes/origin/main; main changed a headline input since the candidate, so the candidate's headline would be stale
+== D-registered-pair-changed-on-main: exit 1
+0.24 B2 (#1422) benchmark publication gate
+REFUSED: 2 problem(s). No headline is written and nothing may be published.
+  B2-08 tests/TestData/Benchmarks at HEAD differs from refs/remotes/origin/main; main changed a headline input since the candidate, so the candidate's headline would be stale
+  B2-08 tests/TestData/Benchmarks/TokenEconomics/HelloWorld.calr at HEAD differs from refs/remotes/origin/main; main changed a headline input since the candidate, so the candidate's headline would be stale
+== E-candidate-headline-already-on-main: exit 0
+OK: comparabilityKeySha256 35ee7f8e33a8ef176728ead7b56dc0c64153b59a5db9f06fa87b7acda052104e
+   website/public/data/benchmark-headline.json b2d297d217f8dbf640535f66d2ebff4a48c757f667b1ebf9e80128b6a66e1d97
+   bench/phase0-agent-native/commit-stamp-index.json 8b6c1097f89f2b8e419786c508e01d60f702f01b3ebdfed1393d0fce6495b8d6
+== E-prime-pre-PR-2-gate: exit 0
+OK: comparabilityKeySha256 35ee7f8e33a8ef176728ead7b56dc0c64153b59a5db9f06fa87b7acda052104e
+   website/public/data/benchmark-headline.json 6cc3cf87ac70895919a469b04acf077ca5164b3ac0ebf92f7a0510fa836f6052
+   bench/phase0-agent-native/commit-stamp-index.json 8b6c1097f89f2b8e419786c508e01d60f702f01b3ebdfed1393d0fce6495b8d6
+ALL SCENARIOS AS EXPECTED
