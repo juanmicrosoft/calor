@@ -84,6 +84,16 @@ After Codex round 3 (REQUEST-CHANGES, `reviews/round-3.md`, the last review roun
 - An empty level leaves no elements: the creation is its sizes (constant expressions included).
 - `new[,] { … }` converts as a rectangular array (created type from Roslyn; preserved if unknown).
 
+After the Codex verification pass (REQUEST-CHANGES, `reviews/verification.md`; the review budget
+is now spent, so these last changes are **not** Codex-reviewed):
+
+- Array elements are never hoisted, in statement position too (a hoisted constructor argument ran
+  ahead of an earlier element's implicit conversion); a multi-line statement element is re-indented
+  with its line. The round-1 "hoist every non-literal element" rule now applies only to call and
+  constructor arguments.
+- The array-member table also matches argument count and integer index types, so an extension named
+  like an array member stays unknown; `System.Array.Initialize` is unknown again.
+
 Statement-position output (F5-ARRAY-03) is byte-identical to the R0 baseline.
 
 ## F5-ARRAY-06: declared boundary

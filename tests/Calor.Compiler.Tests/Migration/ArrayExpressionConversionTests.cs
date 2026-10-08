@@ -388,7 +388,8 @@ public class ArrayExpressionConversionTests
     // each element stays with its element (no hoisting), `g[n, n++]` reads its indices in
     // order, a 1-D array of rectangular arrays, written sizes behind an empty level that
     // are constant expressions, an implicitly typed rectangular array; and (verification
-    // pass) a constructor argument and a multi-line anonymous object in statement elements.
+    // pass) a constructor argument and a multi-line anonymous object in statement elements,
+    // and a declared int[][,] with a bare initializer.
     private const string Round3 = """
         using System;
 
@@ -440,7 +441,8 @@ public class ArrayExpressionConversionTests
                 var imp = new[,] { { 1, 2 }, { 3, 4 } };
                 int[] cv = { L.S(5), new X(L.T(6)) };
                 object[] an = { new { A = 7 } };
-                return a[0] + a[1] + "," + picked + "," + mr[0][0, 0] + cs.GetLength(1) + imp[1, 0] + "," + (cv[0] + cv[1]) + an.Length + "|" + L.log;
+                int[][,] dj = { new int[,] { { 8 } } };
+                return a[0] + a[1] + "," + picked + "," + mr[0][0, 0] + cs.GetLength(1) + imp[1, 0] + "," + (cv[0] + cv[1]) + an.Length + dj[0][0, 0] + "|" + L.log;
             }
         }
         """;
@@ -531,7 +533,7 @@ public class ArrayExpressionConversionTests
             data.Add("placement", "3,11,36,357|123456", surface);
             data.Add("shapes", "3|001|1236|1|33|True|27|False02|12346", surface);
             data.Add("round2", "2,0,42|112|True|1002,3", surface);
-            data.Add("round3", "3,10,123,111|scsc|sctc", surface);
+            data.Add("round3", "3,10,123,1118|scsc|sctc", surface);
         }
         return data;
     }
