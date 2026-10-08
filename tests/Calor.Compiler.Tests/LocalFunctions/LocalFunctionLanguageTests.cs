@@ -418,6 +418,70 @@ public class LocalFunctionLanguageTests
         Assert.Contains(compilation.Diagnostics.Errors, d => d.Code == "Calor0424");
     }
 
+    // ---- Codex review round 3 regressions ----
+
+    [Theory]
+    // An expression-call argument, a null-coalescing operand, a qualified store:
+    // positions with no checked effect row (Codex round 3, findings 1-3).
+    [InlineData("§R §LAM{l001:x:i32} §C Take §A Help §/C §/LAM{l001}")]
+    [InlineData("§R (?? f Help)")]
+    [InlineData("§ASSIGN Probe.Saved Help\n      §R f")]
+    public void Review3_LocalFunctionValueInAnUncheckedPosition_IsCalor0211(string body)
+    {
+        var source = "§M{m001:Escape}\n  §CL{c001:Probe:pub:stat}\n"
+            + "    §FLD{Func<i32, i32>:Saved:pub:stat} §E{}\n"
+            + "    §MT{m001:Take:pub:stat} (Func<i32, i32>:g §E{}) -> i32\n      §E{}\n      §R §C{g} §A 1 §/C\n"
+            + "    §MT{m002:Get:pub:stat} (Func<i32, i32>:f) -> Func<i32, i32> §E{}\n      §E{cw,mut}\n      "
+            + body + "\n      §F{f001:Help} (i32:x) -> i32\n        §P \"hidden\"\n        §R x\n";
+        var compilation = Program.Compile(source, "r3.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(compilation.Diagnostics.Errors,
+            d => d.Code == "Calor0211" && d.Message.Contains("used as a value"));
+    }
+
+    [Fact]
+    public void Review3_BindValidation_DoesNotUseAShadowedModuleSignature()
+    {
+        var source = """
+            §M{m001:Shadow}
+              §U{System.Collections.Generic}
+              §F{f001:Add:pub} (List<i32>:xs) -> [i32]
+                §E{alloc}
+                §R §ARR{i32:a:0}
+              §F{f002:Use:pub} (List<i32>:xs) -> List<i32>
+                §B{List<i32>:y} §C{Add} §A xs §/C
+                §R y
+                §F{f003:Add} (List<i32>:xs) -> List<i32>
+                  §R xs
+            """;
+        var compilation = Program.Compile(source, "r3e.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.DoesNotContain(compilation.Diagnostics.Errors, d => d.Code == "Calor0254");
+    }
+
+    [Fact]
+    public void Review3_AnOutOfScopeEnclosingName_FailsLoudlyNotSilently()
+    {
+        // Known limitation (Codex round 3, finding 4): any name the enclosing callable
+        // declares stays bare inside a local function, even when out of scope there.
+        // The result is a C# compile error, never a call to the wrong function.
+        var source = """
+            §M{m001:Shadow}
+              §F{f001:Add:pub} (i32:x) -> i32
+                §R (+ x 1000)
+              §CL{c001:Probe:pub:stat}
+                §MT{m002:Get:pub:stat} () -> i32
+                  §L{l001:Add:0:1:1}
+                    §B{i32:t} Add
+                  §F{f002:L} () -> i32
+                    §R §C{Add} §A 1 §/C
+                  §R §C{L} §/C
+            """;
+        var compilation = Program.Compile(source, "r3d.calr",
+            new CompilationOptions { StatusWriter = TextWriter.Null });
+        Assert.Contains(compilation.Diagnostics.Errors, d => d.Code == "Calor1002");
+    }
+
     [Fact]
     public void NativeLocal_RoundTripsThroughTheCalorEmitter()
     {

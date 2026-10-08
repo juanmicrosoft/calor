@@ -144,8 +144,10 @@ public sealed class BindValidationPass
 
         foreach (var func in module.Functions)
         {
+            _localFunctionNames = LocalFunctionNames(func.Body);
             CheckBody(func.Body, func.Output?.TypeName, func.Parameters, fields: null, className: null);
             CheckLocalFunctions(func.Body, fields: null, className: null);
+            _localFunctionNames = [];
         }
 
         foreach (var cls in module.Classes)
@@ -159,8 +161,10 @@ public sealed class BindValidationPass
 
             foreach (var method in cls.Methods)
             {
+                _localFunctionNames = LocalFunctionNames(method.Body);
                 CheckBody(method.Body, method.Output?.TypeName, method.Parameters, fields, cls.Name);
                 CheckLocalFunctions(method.Body, fields, cls.Name);
+                _localFunctionNames = [];
             }
 
             foreach (var prop in cls.Properties)
@@ -923,6 +927,9 @@ public sealed class BindValidationPass
     // callee is unknown (BCL / cross-module): a conservative false negative.
     private bool TryResolveReturnType(CallExpressionNode call, out string returnType)
     {
+        returnType = string.Empty;
+        if (_localFunctionNames.Contains(call.Target))
+            return false;
         if (TryResolveExactSignature(
                 call.Target,
                 call.Arguments,
@@ -960,6 +967,9 @@ public sealed class BindValidationPass
 
     private bool TryResolveParamTypes(string target, int arity, out List<string> paramTypes)
     {
+        paramTypes = [];
+        if (_localFunctionNames.Contains(target))
+            return false;
         if (_currentClassName != null)
         {
             var qualified = $"{_currentClassName}.{target}/{arity}";
@@ -1084,6 +1094,13 @@ public sealed class BindValidationPass
             returnType));
     }
 
+    // 0.25 F3 (#847): a bare call to one of these names is the local function,
+    // whose signature is not in _userSignatures; it is left unchecked.
+    private HashSet<string> _localFunctionNames = [];
+
+    private static HashSet<string> LocalFunctionNames(IReadOnlyList<StatementNode> body) =>
+        body.OfType<LocalFunctionStatementNode>().Select(local => local.Function.Name).ToHashSet(StringComparer.Ordinal);
+
     private bool TryResolveExactSignature(
         string target,
         IReadOnlyList<ExpressionNode> arguments,
@@ -1091,6 +1108,11 @@ public sealed class BindValidationPass
         IReadOnlyList<string?>? argumentModifiers,
         out UserCallableSignature signature)
     {
+        if (_localFunctionNames.Contains(target))
+        {
+            signature = null!;
+            return false;
+        }
         var argumentTypes = new string[arguments.Count];
         for (var index = 0; index < arguments.Count; index++)
         {

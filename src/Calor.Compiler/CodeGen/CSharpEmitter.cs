@@ -2998,35 +2998,18 @@ public sealed class CSharpEmitter : IAstVisitor<string>
     public string Visit(LocalFunctionStatementNode node)
     {
         var function = node.Function;
-        var savedFunctionId = _currentFunctionId;
-        var savedPostconditionIndex = _currentPostconditionIndex;
-        var savedInlineReturnRefinement = _currentInlineReturnRefinement;
-        var savedYieldRefinement = _currentYieldRefinement;
-        var savedInlineReturnGuardCounter = _inlineReturnGuardCounter;
-        var savedReturnLowering = _currentReturnLowering;
-        var savedParameterTypes = _parameterTypes;
         var savedCaptured = _capturedParameterNames.ToArray();
-        var savedDeclScopes = _declScopes;
-        var savedRefinementScopes = _refinementDeclScopes;
-        var savedIndexedScopes = _indexedBoundScopes;
-        var savedOutParameters = _outParameterNames;
-        var savedIndexGuardCounter = _indexGuardCounter;
-        var savedMutationGuardCounter = _mutationGuardCounter;
-        var savedStatementDepth = _statementDepth;
-        var savedResultShadowDepth = _postconditionResultShadowDepth;
+        var saved = (_currentFunctionId, _currentPostconditionIndex, _currentInlineReturnRefinement,
+            _currentYieldRefinement, _inlineReturnGuardCounter, _currentReturnLowering, _parameterTypes,
+            _declScopes, _refinementDeclScopes, _indexedBoundScopes, _outParameterNames, _indexGuardCounter,
+            _mutationGuardCounter, _statementDepth, _postconditionResultShadowDepth);
         try
         {
-            _currentFunctionId = function.Id;
-            _currentPostconditionIndex = 0;
-            _currentInlineReturnRefinement = null;
-            _currentReturnLowering = null;
-            _parameterTypes = new Dictionary<string, string>(StringComparer.Ordinal);
-            _declScopes = [];
-            _refinementDeclScopes = [];
-            _indexedBoundScopes = [];
-            _outParameterNames = new HashSet<string>(StringComparer.Ordinal);
-            _statementDepth = 0;
-            _postconditionResultShadowDepth = 0;
+            (_currentFunctionId, _currentPostconditionIndex, _currentInlineReturnRefinement, _currentReturnLowering) =
+                (function.Id, 0, null, null);
+            (_parameterTypes, _declScopes, _refinementDeclScopes, _indexedBoundScopes, _outParameterNames) =
+                (new(StringComparer.Ordinal), [], [], [], new(StringComparer.Ordinal));
+            (_statementDepth, _postconditionResultShadowDepth) = (0, 0);
             ResetDeclScopes(function.Parameters, function);
 
             var returnType = function.Output?.TypeName ?? "void";
@@ -3048,23 +3031,12 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         }
         finally
         {
-            _currentFunctionId = savedFunctionId;
-            _currentPostconditionIndex = savedPostconditionIndex;
-            _currentInlineReturnRefinement = savedInlineReturnRefinement;
-            _currentYieldRefinement = savedYieldRefinement;
-            _inlineReturnGuardCounter = savedInlineReturnGuardCounter;
-            _currentReturnLowering = savedReturnLowering;
-            _parameterTypes = savedParameterTypes;
+            (_currentFunctionId, _currentPostconditionIndex, _currentInlineReturnRefinement,
+                _currentYieldRefinement, _inlineReturnGuardCounter, _currentReturnLowering, _parameterTypes,
+                _declScopes, _refinementDeclScopes, _indexedBoundScopes, _outParameterNames, _indexGuardCounter,
+                _mutationGuardCounter, _statementDepth, _postconditionResultShadowDepth) = saved;
             _capturedParameterNames.Clear();
             _capturedParameterNames.UnionWith(savedCaptured);
-            _declScopes = savedDeclScopes;
-            _refinementDeclScopes = savedRefinementScopes;
-            _indexedBoundScopes = savedIndexedScopes;
-            _outParameterNames = savedOutParameters;
-            _indexGuardCounter = savedIndexGuardCounter;
-            _mutationGuardCounter = savedMutationGuardCounter;
-            _statementDepth = savedStatementDepth;
-            _postconditionResultShadowDepth = savedResultShadowDepth;
         }
     }
 

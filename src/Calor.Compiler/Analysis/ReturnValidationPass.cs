@@ -91,6 +91,34 @@ public sealed class ReturnValidationPass
     private readonly HashSet<FunctionNode> _localFunctionNodes = new(ReferenceEqualityComparer.Instance);
     private HashSet<string> _typeNamesWithFacts = new(StringComparer.Ordinal);
 
+    /// <summary>0.25 F3 (#847): a local function value must reach a row-checked position.</summary>
+    private void CheckValueUses(AstNode node, HashSet<string> names, bool allowed, bool inLambda)
+    {
+        if (node is ReferenceNode reference && names.Contains(reference.Name) && !allowed)
+            _diagnostics.ReportError(reference.Span, DiagnosticCode.UnsupportedLocalFunction,
+                $"Local function '{reference.Name}' can be used as a value only directly in a §B initializer, " +
+                "a §R, a simple §ASSIGN or a ?: branch of those (outside lambdas), or as a §C{…} argument.");
+        var children = node is LocalFunctionStatementNode local
+            ? [new RecursiveAstWalker.ChildEdge(local.Function, null!)]
+            : RecursiveAstWalker.GetAllChildEdges(node);
+        foreach (var edge in children)
+        {
+            var child = edge.Node;
+            var direct = node switch
+            {
+                BindStatementNode bind => !inLambda && ReferenceEquals(child, bind.Initializer),
+                ReturnStatementNode => !inLambda,
+                AssignmentStatementNode { Target: ReferenceNode target } assign =>
+                    !inLambda && !target.Name.Contains('.') && ReferenceEquals(child, assign.Value),
+                CallStatementNode or CallExpressionNode => edge.Property?.Name == "Arguments",
+                ExpressionCallNode call => ReferenceEquals(child, call.TargetExpression), // a call, not a value
+                ConditionalExpressionNode conditional => allowed && !ReferenceEquals(child, conditional.Condition),
+                _ => false,
+            };
+            CheckValueUses(child, names, direct, inLambda || node is LambdaExpressionNode);
+        }
+    }
+
     private void CheckLocalFunction(LocalFunctionStatementNode local)
     {
         var function = local.Function;
@@ -142,7 +170,11 @@ public sealed class ReturnValidationPass
                     MethodNode method => method.Body,
                     _ => [],
                 };
-                _placedLocalFunctions.UnionWith(body.OfType<LocalFunctionStatementNode>());
+                var locals = body.OfType<LocalFunctionStatementNode>().ToArray();
+                _placedLocalFunctions.UnionWith(locals);
+                var names = locals.Select(local => local.Function.Name).ToHashSet(StringComparer.Ordinal);
+                foreach (var statement in names.Count > 0 ? body : [])
+                    CheckValueUses(statement, names, allowed: false, inLambda: false);
                 break;
             case ReturnStatementNode ret:
                 CheckReturn(ret, context);
