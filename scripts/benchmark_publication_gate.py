@@ -359,7 +359,28 @@ def input_paths(root: Path) -> list:
         for side in ("calorPath", "csharpPath"):
             if isinstance(pair, dict) and isinstance(pair.get(side), str) and pair[side] not in paths:
                 paths.append(pair[side])
+    for path in partial_validator_files(root):
+        if path not in paths:
+            paths.append(path)
     return paths
+
+
+# Verification pass: a new file declaring another part of a validator class can change which
+# overload an unchanged caller binds to (C# picks the better overload across all parts), so every
+# file declaring a part of these classes, at HEAD or on main, is an input. One added only on main
+# is absent at HEAD and therefore differs.
+VALIDATOR_PARTIALS = r"partial[[:space:]]+(class|struct|record)[[:space:]]+(EvidenceContractValidator|EvidenceContractTests|BenchmarkResultsTests|BenchmarkRegistrationTests)([^A-Za-z0-9_]|$)"
+VALIDATOR_PROJECT = "tests/Calor.Compiler.Tests"
+
+
+def partial_validator_files(root: Path) -> list:
+    """Every .cs file under the validator's project, at HEAD or on main, declaring a part of a validator class."""
+    found = set()
+    for rev in ("HEAD", MAIN_REF):
+        out = git(root, "grep", "-l", "-E", VALIDATOR_PARTIALS, rev, "--", f"{VALIDATOR_PROJECT}/*.cs")
+        for line in (out or "").splitlines():
+            found.add(line.split(":", 1)[1] if line.startswith(f"{rev}:") else line)
+    return sorted(found)
 
 
 def check_inputs_fresh(root: Path, findings: list) -> None:

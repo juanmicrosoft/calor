@@ -525,6 +525,23 @@ class GateTests(unittest.TestCase):
         self.f.git("checkout", "-q", "--detach", candidate)
         self.assertIn(f"  B2-08 {gate.CONTRACT_SEAL} at HEAD differs", self.assertRefused("B2-08"))
 
+    def test_a_new_validator_partial_class_file_on_main_is_refused(self) -> None:
+        """Verification pass: a new part of the validator class can rebind an unchanged call to a
+        better overload, so a file declaring one, anywhere in the test project, is an input."""
+        for path in (f"{gate.VALIDATOR}/BenchmarkOverloads.cs", "tests/Calor.Compiler.Tests/Other/More.cs"):
+            with self.subTest(path=path):
+                self.f.git("checkout", "-q", "-f", "main")
+                self.f.git("reset", "-q", "--hard", "origin/main")
+                base = self.f.git("rev-parse", "HEAD")
+                self._candidate_then_main_moves({path: "namespace N;\ninternal static partial class EvidenceContractValidator\n"
+                                                       "{\n    public static int ValidateBenchmarkResults(object a) => 0;\n}\n"})
+                text = self.assertRefused("B2-08")
+                self.assertIn(f"  B2-08 {path} at HEAD differs", text)
+                self.f.git("checkout", "-q", "-f", "main")
+                self.f.git("reset", "-q", "--hard", base)
+                self.f.git("push", "-q", "-f", "origin", "HEAD:refs/heads/main")
+                self.f.git("fetch", "-q", "origin", "+refs/heads/main:refs/remotes/origin/main")
+
     def test_a_duplicate_headline_stamp_entry_on_main_is_refused(self) -> None:
         """Review round 1, finding 2: a second headline entry appended on main is a change."""
         code, text = self.f.check()
