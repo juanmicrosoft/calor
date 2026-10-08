@@ -1,7 +1,7 @@
 {
   "candidate": {
-    "commit": "696ab82470626164979a07792ed74932ab88d9e6",
-    "freezeObservedUtc": "2026-10-07T12:55:16Z",
+    "commit": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
+    "freezeObservedUtc": "2026-10-08T17:03:41Z",
     "version": "0.24.0"
   },
   "note": "Hand-recorded inputs to generate_candidate_manifest.py (merge commits from the GitHub API at the freeze; every one is re-verified against git by the generator and by CandidateManifestTests).",
@@ -171,9 +171,44 @@
       "mergedAtUtc": "2026-10-06T15:01:41Z",
       "mergedViaPr": null
     },
+    "1508": {
+      "mergeCommit": "fd34f41f0d5600b92b5868392e1ea3e1d1c197ff",
+      "mergedAtUtc": "2026-10-07T14:50:29Z",
+      "mergedViaPr": null
+    },
     "1509": {
       "mergeCommit": "696ab82470626164979a07792ed74932ab88d9e6",
       "mergedAtUtc": "2026-10-07T12:51:39Z",
+      "mergedViaPr": null
+    },
+    "1517": {
+      "mergeCommit": "d2288bf934dcda609e8719856dc6ed9e0a9cca3b",
+      "mergedAtUtc": "2026-10-08T14:20:40Z",
+      "mergedViaPr": null
+    },
+    "1523": {
+      "mergeCommit": "7d6a60bf7ac478c70df476870e311a96f953ba09",
+      "mergedAtUtc": "2026-10-07T20:49:13Z",
+      "mergedViaPr": null
+    },
+    "1525": {
+      "mergeCommit": "5e6ae3d3bf3af8f4dd4ef836690a36d7d0cba964",
+      "mergedAtUtc": "2026-10-08T13:25:36Z",
+      "mergedViaPr": null
+    },
+    "1526": {
+      "mergeCommit": "572e4ce049f598ccfbbb297e605de42af1778f9b",
+      "mergedAtUtc": "2026-10-08T14:12:54Z",
+      "mergedViaPr": null
+    },
+    "1527": {
+      "mergeCommit": "b48abb39b9272b669714a2fd233138f1171fa5f3",
+      "mergedAtUtc": "2026-10-08T14:58:48Z",
+      "mergedViaPr": null
+    },
+    "1533": {
+      "mergeCommit": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
+      "mergedAtUtc": "2026-10-08T17:02:32Z",
       "mergedViaPr": null
     }
   },
@@ -190,10 +225,11 @@
         1488,
         1501,
         1504,
-        1507
+        1507,
+        1533
       ],
       "evidence": "docs/plans/evidence/evidence-contract-1407/",
-      "closureStatus": "FROZEN, gate MET (contract.json gateStatus); contract 1.3.2."
+      "closureStatus": "FROZEN, gate MET (contract.json gateStatus); contract 1.4.0 (amendment 1.4.0 reviewed in prep PR #1533)."
     },
     {
       "gate": "R1",
@@ -246,7 +282,7 @@
         1486
       ],
       "evidence": "docs/plans/evidence/g2-1421/",
-      "closureStatus": "Protocol 1.3.0 FROZEN-AT-MERGE."
+      "closureStatus": "Protocol 1.4.0 FROZEN-AT-MERGE. Amendment 1.4.0 (registers the 62 S2 Verification tests, 1 test in a registered compiler class, and the 6 S2 compiler classes) was made by prep PR #1533, not a G2 PR (maintainer decision PREP-PR-ACCOUNTING)."
     },
     {
       "gate": "G3",
@@ -256,7 +292,7 @@
         1500
       ],
       "evidence": "docs/plans/evidence/g3-1135/",
-      "closureStatus": "NOT CLOSED on the candidate: README says \"Status: not closed\"; execution 1 NON-DETERMINISTIC; execution 2 (DETERMINISTIC, commit d42d0313) is parked on branch evidence/g3-1135-exec-2 for C2 to commit."
+      "closureStatus": "NOT CLOSED on the candidate. Execution 1 NON-DETERMINISTIC; execution 2 (DETERMINISTIC, commit d42d0313, protocol 1.3.0) predates the S2 repairs and protocol 1.4.0, so it establishes nothing here. Its records are committed by C2 (#1517) under docs/plans/evidence/c2-1424/g3-exec-2/ and stay parked on branch evidence/g3-1135-exec-2. C2 regeneration 2 runs the protocol on this candidate."
     },
     {
       "gate": "G4",
@@ -290,10 +326,11 @@
       "gate": "B2",
       "issue": 1422,
       "prs": [
-        1487
+        1487,
+        1527
       ],
       "evidence": "docs/plans/evidence/b2-1422/",
-      "closureStatus": "Refusal gate scripts/benchmark_publication_gate.py."
+      "closureStatus": "Refusal gate scripts/benchmark_publication_gate.py; PR 2 (#1527) scopes freshness to the headline's inputs and makes the headline bytes depend only on the candidate."
     },
     {
       "gate": "R2",
@@ -324,6 +361,30 @@
       "pr": 1509,
       "title": "Release prep: Calor 0.24.0 (version bump and release notes; no release cut)",
       "evidence": "docs/plans/evidence/release-0.24.0/"
+    },
+    {
+      "issue": null,
+      "pr": 1523,
+      "title": "0.24.0 notes: avoid R2's forbidden independence wording (C2 regeneration 1 cause 2)",
+      "evidence": null
+    },
+    {
+      "issue": null,
+      "pr": 1525,
+      "title": "Fix binding performance regression (Binding_MediumModule_Under500ms; C2 regeneration 1 cause 4)",
+      "evidence": "docs/plans/evidence/fix-perf-binding/"
+    },
+    {
+      "issue": null,
+      "pr": 1526,
+      "title": "Make NuGet packages and the website build byte-reproducible (C2 regeneration 1 cause 5)",
+      "evidence": "docs/plans/evidence/deterministic-builds/"
+    },
+    {
+      "issue": 1423,
+      "pr": 1533,
+      "title": "0.24 C1 prep: determinism protocol 1.4.0, contract amendment 1.4.0, final 0.24.0 notes (the candidate)",
+      "evidence": "docs/plans/evidence/c1-1423/reviews/"
     }
   ],
   "openItems": [
@@ -343,7 +404,7 @@
       "id": "R2-BYTE-REPRODUCIBILITY",
       "source": "release-gate.md §8; reviews/refresh-codex.md",
       "owner": "C2",
-      "item": "The release gate compares rebuilt bytes with C2-recorded hashes and fails closed where a build is not byte-reproducible (the benchmark generator stamps the run time). C2 must make these builds reproducible or retain the candidate bytes durably. B2's headline embeds its comparison with the headline on main, so its adjudicated hash must be computed against main as it will be at publication. Bot PR #1505 (benchmark headline) was closed unmerged (coordinator, 2026-10-07)."
+      "item": "The release gate compares rebuilt bytes with C2-recorded hashes and fails closed where a build is not byte-reproducible. #1526 makes both NuGet packages, the release metadata, and the website byte-reproducible, and #1527 makes the B2 headline depend only on the candidate. Residuals recorded by #1526: rebuilds must use the same .NET SDK build (a source-built SDK 10.0.401 packs different bytes), and the site downloads Google Fonts at build time. C2 regeneration 2 must show that rebuilt bytes equal its recorded hashes."
     },
     {
       "id": "R2-BRANCH-PROTECTION",
@@ -355,7 +416,7 @@
       "id": "G3-NOT-CLOSED",
       "source": "docs/plans/evidence/g3-1135/README.md",
       "owner": "C2",
-      "item": "G3 is not closed on the candidate. Execution 2 (DETERMINISTIC, 2,137 AGREE-PASS) ran on d42d0313, before the S2 repairs changed the verifier and the committed oracle reports, so it establishes nothing for this candidate. C2 commits the parked records (branch evidence/g3-1135-exec-2, verified here against their ledger entry) and runs the protocol on the candidate, charged to regeneration-compute (amendment 1.2.0)."
+      "item": "G3 is not closed on the candidate. Execution 2 (DETERMINISTIC, 2,137 AGREE-PASS) ran on d42d0313 under protocol 1.3.0, before the S2 repairs and protocol amendment 1.4.0, so it establishes nothing for this candidate. C2 (#1517) committed its records. C2 regeneration 2 runs protocol 1.4.0 on the candidate (the last of 3 executions; charged to regeneration-compute, contract amendment 1.2.0)."
     },
     {
       "id": "CHILD-ISSUES-OPEN",
@@ -374,7 +435,7 @@
       "id": "C1-TEST-COUNT-DELTA",
       "source": "this manifest invalidation.c1OwnedPaths",
       "owner": "C2",
-      "item": "C1 adds 86 tests to Calor.Compiler.Tests (eng/test-manifest.json expectedTotal 12,947 -> 13,033). The release-test-suites artifact for the candidate is the candidate's own suite (12,947 tests, 3 skipped); a run at a later commit includes the C1 tests and must say so."
+      "item": "The candidate's eng/test-manifest.json is the reference: Calor.Compiler.Tests expectedTotal 13,036 (3 skipped), which already includes C1 PR 1's 86 tests. C1 PR 2 adds 1 test (a supersession tamper control) after the candidate; a suite run at a later commit includes it and must say so."
     },
     {
       "id": "CLASSIFIER-NOT-A-TRIPWIRE",
@@ -441,7 +502,7 @@
     {
       "id": "determinism-runner",
       "title": "G2 determinism protocol runner and decider (#1421)",
-      "version": "protocolVersion 1.3.0",
+      "version": "protocolVersion 1.4.0",
       "directory": null,
       "files": [
         "scripts/determinism_protocol.py",
@@ -483,7 +544,7 @@
     {
       "id": "evidence-contract-validator",
       "title": "R0 validator (#1407)",
-      "version": "contract 1.3.2",
+      "version": "contract 1.4.0",
       "directory": "tests/Calor.Compiler.Tests/EvidenceContract/",
       "files": []
     },
@@ -522,7 +583,7 @@
     }
   ],
   "issueStatesAtFreeze": {
-    "observedVia": "gh issue list -R juanmicrosoft/calor --milestone 0.24 --state all, run by the C1 agent at the freeze (2026-10-07)",
+    "observedVia": "gh issue list -R juanmicrosoft/calor --milestone 0.24 --state all, re-run by the C1 agent at the second re-freeze (2026-10-08T17:04Z); every state equals the first freeze's observation (2026-10-07)",
     "states": {
       "1407": "OPEN",
       "1419": "OPEN",
@@ -540,7 +601,7 @@
   },
   "notes": {
     "statusNote": "The candidate is the commit below. This manifest lands after it, in the C1 pull request; the invalidation classifier (tests/Calor.Compiler.Tests/EvidenceContract/CandidateInvalidation.cs) decides whether any later commit invalidates it. Freezing is recorded, not authorized publication: nothing here publishes or releases.",
-    "mergeOf": "PR #1509 (release preparation for 0.24.0: version bump and notes with the N1 advisory), merged on top of #1475 (R2, the last child gate). Re-freeze of PR #1508 after maintainer decision RELEASE-VERSION-0.24.0.",
+    "mergeOf": "PR #1533 (preparation for the second re-freeze: determinism protocol 1.4.0, contract amendment 1.4.0, and the final 0.24.0 notes), merged on top of #1527 (B2 PR 2). Second re-freeze (C1 PR 2): supersedes 696ab824 after C2 regeneration 1 (see supersedes).",
     "reachabilityRule": "Contract §6 / P1 DurableProvenance: full 40-hex SHA, ancestor of explicitly fetched refs/remotes/origin/main; shallow clone fails. Re-checked by CandidateManifestTests through DurableProvenance.Verify.",
     "freezeObservation": "git fetch origin; git rev-parse refs/remotes/origin/main returned the candidate when C1 started.",
     "submodulesSource": "git ls-tree <candidate> (every gitlink; .gitmodules URLs in inputContentHashes)",
@@ -597,62 +658,62 @@
   },
   "observedEnvironment": {
     "status": "OBSERVED, NOT PINNED (maintainer decision ENVIRONMENT-OBSERVED-NOT-PINNED, 2026-10-07)",
-    "source": "Tests workflow run 37624076834 (push of the candidate 696ab824 to main); \"Set up job\" and \"Setup .NET\" log lines read with gh run view --job <id> --log at the re-freeze",
+    "source": "Tests workflow run 37813486913 (push of the candidate 5e52d8ab to main); \"Set up job\" and \"Setup .NET\" log lines read with gh run view --job <id> --log at the second re-freeze",
     "dotnet": {
       "sdk": "10.0.401",
       "runtime": "10.0.12",
-      "jobs": "all six jobs below report the same SDK and runtime"
+      "jobs": "all six jobs below report the same SDK and runtime (preinstalled on five; installed by setup-dotnet on macos-14)"
     },
     "images": [
       {
         "label": "ubuntu-latest",
         "image": "ubuntu-24.04",
-        "version": "20260927.320.1",
-        "provisioner": "20260901.588",
-        "job": "test 112801277007"
+        "version": "20261004.327.1",
+        "provisioner": "20261002.596",
+        "job": "test 113436034568"
       },
       {
         "label": "ubuntu-latest",
         "image": "ubuntu-24.04",
         "version": "20261004.327.1",
         "provisioner": "20261002.596",
-        "job": "tests (compiler) 112801277346"
+        "job": "tests (compiler) 113436035037"
       },
       {
         "label": "windows-latest",
         "image": "windows-2025-vs2026",
         "version": "20260925.250.1",
         "provisioner": "20260901.588",
-        "job": "z3-consumer-matrix (win-x64) 112801277042"
+        "job": "z3-consumer-matrix (win-x64) 113436034483"
       },
       {
         "label": "windows-11-arm",
         "image": "windows-11-vs2026-arm64",
         "version": "20261004.176.1",
         "provisioner": "20261002.596",
-        "job": "z3-consumer-matrix (win-arm64) 112801277160"
+        "job": "z3-consumer-matrix (win-arm64) 113436034950"
       },
       {
         "label": "macos-14",
         "image": "macos-14-arm64",
         "version": "20260831.0302.1",
         "provisioner": "20260828.587",
-        "job": "z3-consumer-matrix (osx-arm64) 112801276943"
+        "job": "z3-consumer-matrix (osx-arm64) 113436035005"
       },
       {
         "label": "ubuntu-24.04-arm",
         "image": "ubuntu-24.04-arm",
         "version": "20261004.142.1",
         "provisioner": "20261002.596",
-        "job": "z3-consumer-matrix (linux-arm64) 112801277417"
+        "job": "z3-consumer-matrix (linux-arm64) 113436034745"
       }
     ],
     "binding": "Accepted as observed, not pinned (maintainer decision ENVIRONMENT-OBSERVED-NOT-PINNED, 2026-10-07; no amendment). The git-based classifier cannot see environment drift. C2 records the SDK, runtime, ImageOS, and ImageVersion each regeneration used.",
-    "note": "The same label (ubuntu-latest) resolved to two image versions within this one run, which is why exact image equality is not a usable requirement."
+    "note": "At the first freeze (run 37624076834) the ubuntu-latest label resolved to two image versions within one run; in this run both ubuntu-latest jobs got 20261004.327.1. Exact image equality is still not a usable requirement."
   },
   "releasability": {
     "status": "RELEASABLE VERSION (no conflicting tag at the freeze)",
-    "history": "The first freeze (5ebdbee2, PR #1508 as first pushed) declared 0.22.0, already tagged at 72a0a855, so the R2 gate would fail G009. Maintainer decision RELEASE-VERSION-0.24.0: release prep PR #1509 merged first; this re-freeze names its merge commit.",
+    "history": "The first freeze (5ebdbee2, PR #1508 as first pushed) declared 0.22.0, already tagged at 72a0a855, so the R2 gate would fail G009. Maintainer decision RELEASE-VERSION-0.24.0: release prep PR #1509 merged first, and PR #1508 froze its merge 696ab824. C2 regeneration 1 (#1517) then found five causes that need candidate changes; after the fixes (#1523, #1525, #1526, #1527) and the prep PR #1533, C1 PR 2 re-freezes on the #1533 merge 5e52d8ab, still version 0.24.0 with no v0.24.0 tag.",
     "rule": "The generator fails unless the candidate declares the decided version and tag v<version> is absent or points at the candidate. A tag created later at another commit, or any version or notes change, invalidates the freeze."
   },
   "maintainerDecisions": [
@@ -667,6 +728,36 @@
       "date": "2026-10-07",
       "by": "@juanmicrosoft (relayed to the C1 agent by the coordinating agent)",
       "decision": "Environment binding is accepted as observed, not pinned. No #1407 amendment. C2 records the SDK, runtime, ImageOS, and ImageVersion each regeneration used."
+    },
+    {
+      "id": "FIX-ALL-5-REFREEZE-REGENERATE",
+      "date": "2026-10-07",
+      "by": "@juanmicrosoft (relayed to the agents by the coordinating agent)",
+      "decision": "\"Fix all 5, re-freeze, regenerate\": fix PRs for the five causes of C2 regeneration 1 (#1517), a second C1 freeze, then C2 regeneration 2, the last one allowed."
+    },
+    {
+      "id": "CONTRACT-AMENDMENT-1.4.0",
+      "date": "2026-10-08",
+      "by": "@juanmicrosoft (relayed by the coordinating agent)",
+      "decision": "Contract amendment 1.4.0 approved as proposed: the 9 stale inventory artifacts are reclassified by named repairs (tier1/tier2 authoritative; five benchmark artifacts historical-only; benchmark-workflow-output and website-deployment derived). Tier2 is authoritative against its registered expectations list."
+    },
+    {
+      "id": "REGISTER-S2-COMPILER-CLASSES",
+      "date": "2026-10-08",
+      "by": "@juanmicrosoft (relayed by the coordinating agent)",
+      "decision": "Register the six S2 Calor.Compiler.Tests classes in determinism protocol 1.4.0, additions only."
+    },
+    {
+      "id": "RENAME-BACK-ACCEPTED",
+      "date": "2026-10-08",
+      "by": "@juanmicrosoft (relayed by the coordinating agent)",
+      "decision": "ProductionOverflowRuntimeTests.GuardedArithmetic_ProvesWithoutEvaluatingUnselectedOverflow keeps its registered name; renaming it is deferred until after 0.24."
+    },
+    {
+      "id": "PREP-PR-ACCOUNTING",
+      "date": "2026-10-08",
+      "by": "@juanmicrosoft (relayed by the coordinating agent)",
+      "decision": "#1533 is a release-preparation PR under FIX-ALL-5-REFREEZE-REGENERATE, not charged to G2 or C1."
     }
   ],
   "resolvedOpenItems": [
@@ -677,6 +768,43 @@
     {
       "id": "N1-ADVISORY-NOT-IN-CANDIDATE",
       "resolvedBy": "CHANGELOG.md [0.24.0] section of the candidate carries the advisory (\"Advisory: false proofs in 0.21.0 (and the unpublished 0.22.0)\")."
+    },
+    {
+      "id": "DETERMINISM-REGISTRY-DRIFT",
+      "resolvedBy": "Protocol amendment 1.4.0 (#1533): verification 411 -> 473 and compiler-verifier 554 -> 662 (24 classes); C2 regeneration 1 cause 1."
+    },
+    {
+      "id": "NOTES-G012-WORDING",
+      "resolvedBy": "#1523, and the final notes of #1533 pass R2's G012 scan; C2 regeneration 1 cause 2."
+    },
+    {
+      "id": "B2-FRESHNESS-AND-HEADLINE-BYTES",
+      "resolvedBy": "#1527; C2 regeneration 1 cause 3."
+    },
+    {
+      "id": "PERFORMANCE-RATCHET",
+      "resolvedBy": "#1525 (binding no longer copies the module-wide symbol table at every loop); C2 regeneration 1 cause 4."
+    },
+    {
+      "id": "STALE-INVENTORY-ARTIFACTS",
+      "resolvedBy": "Contract amendment 1.4.0 (#1533): no inventory artifact is stale, so R2's G008 no longer rejects every terminal record."
     }
-  ]
+  ],
+  "supersedes": {
+    "commit": "696ab82470626164979a07792ed74932ab88d9e6",
+    "frozenBy": "C1 PR 1 (#1508), landed at fd34f41f0d5600b92b5868392e1ea3e1d1c197ff",
+    "manifestAtLanding": "fd34f41f0d5600b92b5868392e1ea3e1d1c197ff:docs/plans/evidence/c1-1423/candidate-manifest.json",
+    "reason": "C2 regeneration 1 (#1517) on 696ab824 was INCOMPLETE with 7 BLOCKED rows from 5 causes, each of which needs a candidate change: (1) the determinism protocol registered 411 Verification tests, the candidate has 473; (2) the 0.24.0 notes failed R2's G012 wording scan; (3) the B2 gate refused the candidate with B2-08 after C1's tests landed on main; (4) the performance ratchet Binding_MediumModule_Under500ms failed; (5) the packages and the website were not byte-reproducible. The review of the prep PR found a sixth: 9 inventory artifacts were still stale, so R2's G008 rejected every terminal record.",
+    "decision": "FIX-ALL-5-REFREEZE-REGENERATE (2026-10-07)",
+    "changesSince": [
+      "#1508 C1 PR 1 (manifest and classifier for 696ab824)",
+      "#1523 notes wording (cause 2)",
+      "#1525 binding performance (cause 4)",
+      "#1526 byte-reproducible packages and website (cause 5)",
+      "#1517 C2 regeneration 1 records",
+      "#1527 B2 freshness scope and deterministic headline (cause 3)",
+      "#1533 protocol 1.4.0 (cause 1), contract amendment 1.4.0 (the stale inventory), final 0.24.0 notes"
+    ],
+    "consequence": "Stopping rule 4: every result of C2 regeneration 1 is invalid for the new candidate and stays on record as history (docs/plans/evidence/c2-1424/). C2 runs regeneration 2, the last one allowed (contract §9, counted as the maintainer instructed). The 696ab824 manifest stays in git history at the C1 PR 1 landing."
+  }
 }
