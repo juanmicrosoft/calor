@@ -313,6 +313,10 @@ public class LocalFunctionConversionTests
     [InlineData("public int M() { int v = 1; int L(ref int x) => x; return L(ref v); }")]
     [InlineData("public int M() { static T L<T>(T x) => x; return L(1); }")]
     [InlineData("public C() { int L() => 1; L(); }")]
+    // Method-group uses where Calor does not check the effect row (Codex round 3).
+    [InlineData("public System.Func<int, int>[] M() { int L(int x) => x; return new System.Func<int, int>[] { L }; }")]
+    [InlineData("public System.Func<int, int> M(System.Func<int, int> f) { int L(int x) => x; return f ?? L; }")]
+    [InlineData("public static System.Func<int, int> S; public void M() { int L(int x) => x; C.S = L; }")]
     public void CapturingOrUnsupportedShapes_PreserveTheMember(string members)
     {
         var result = new CSharpToCalorConverter().Convert("public class C\n{\n" + members + "\n}\n");

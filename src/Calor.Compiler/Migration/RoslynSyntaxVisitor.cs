@@ -4561,7 +4561,31 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             || local.DescendantNodes().Any(node =>
                 node is YieldStatementSyntax or LocalFunctionStatementSyntax))
             return false;
-        return !CapturesEnclosingState(local);
+        return !CapturesEnclosingState(local) && HasOnlyCheckedValueUses(local);
+    }
+
+    /// <summary>0.25 F3 (#847): method-group uses only where Calor checks the row (Calor0211).</summary>
+    private static bool HasOnlyCheckedValueUses(LocalFunctionStatementSyntax local)
+    {
+        var body = (BlockSyntax)local.Parent!;
+        foreach (var use in body.DescendantNodes().OfType<IdentifierNameSyntax>()
+                     .Where(name => name.Identifier.ValueText == local.Identifier.ValueText
+                         && !IsQualifiedMemberName(name) && name.Parent is not NameColonSyntax))
+        {
+            var inLambda = use.Ancestors().TakeWhile(node => node != body).OfType<AnonymousFunctionExpressionSyntax>().Any();
+            var allowed = use.Parent switch
+            {
+                InvocationExpressionSyntax invocation => invocation.Expression == use,
+                ArgumentSyntax { Parent.Parent: InvocationExpressionSyntax { Expression: IdentifierNameSyntax or MemberAccessExpressionSyntax } } => true,
+                EqualsValueClauseSyntax { Parent: VariableDeclaratorSyntax } or ReturnStatementSyntax => !inLambda,
+                AssignmentExpressionSyntax { RawKind: (int)SyntaxKind.SimpleAssignmentExpression, Left: IdentifierNameSyntax, Parent: ExpressionStatementSyntax } assignment
+                    => !inLambda && assignment.Right == use,
+                _ => false,
+            };
+            if (!allowed)
+                return false;
+        }
+        return true;
     }
 
     /// <summary>Whether a local function uses an enclosing local or parameter, or
