@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "warmupRuns": 1,
   "measuredRuns": 3,
-  "expectedTestCount": 25,
-  "expectedTestCountNote": "#1420: 21 -> 25, the four Z3ConsumerGuardTests facts linked into every registered test host. They hash two small files and load Z3 once (milliseconds), so the timed-suite ceiling below is unchanged.",
+  "expectedTestCount": 26,
+  "expectedTestCountNote": "#1420: 21 -> 25, the four Z3ConsumerGuardTests facts linked into every registered test host. They hash two small files and load Z3 once (milliseconds), so the timed-suite ceiling below is unchanged. fix/perf-binding-medium-module: 25 -> 26, Binding_ScalesLinearlyWithFunctionCount (about 1 s; a 40-vs-320-function binding ratio guard). The ceiling below is unchanged: the same change removed a quadratic binding cost that had pushed the local suite to about 45 s.",
   "metrics": {
     "performance-suite-seconds": {
       "maximumMedian": 24.0,

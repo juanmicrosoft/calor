@@ -222,7 +222,7 @@ for (const width of [1366, 390]) {
       'The published 0.21.0 package is not changed',
       'not a proof that the verifier is sound',
       'Whole-compiler soundness is not established',
-      'It is not independently adjudicated or independently verified',
+      'No independent party adjudicated or verified it',
       'No benchmark results are published with this release',
       'never reached NuGet']) {
       await expect(article).toContainText(text);
