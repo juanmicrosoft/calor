@@ -3,8 +3,8 @@
   "commitHash": "fb18fe7d",
   "version": "1.0",
   "total": 100,
-  "fullyConverted": 93,
-  "partiallyConverted": 7,
+  "fullyConverted": 94,
+  "partiallyConverted": 6,
   "blocked": 0,
   "crashed": 0,
   "roundTripPassing": 97,
@@ -26,8 +26,8 @@
     },
     "4": {
       "total": 20,
-      "passed": 19,
-      "rate": 0.95
+      "passed": 20,
+      "rate": 1
     },
     "5": {
       "total": 20,
@@ -743,8 +743,8 @@
     },
     "local_function": {
       "total": 1,
-      "passed": 0,
-      "rate": 0
+      "passed": 1,
+      "rate": 1
     },
     "extension_method": {
       "total": 1,
@@ -2969,16 +2969,11 @@
       "features": [
         "local_function"
       ],
-      "status": "PartiallyConverted",
+      "status": "FullyConverted",
       "conversionSuccess": true,
       "conversionErrors": 0,
-      "conversionWarnings": 2,
-      "conversionIssues": [
-        "Warning [local-function] (line 7): Unsupported feature [local-function] escalated to \u00A7CSHARP interop preservation: int Add(int a, int b)\n            {\n                return a \u002B b;\n            }",
-        "Info [method] (line 5): C# interop block preserved for [method]",
-        "Warning [local-function] (line 24): Unsupported feature [local-function] escalated to \u00A7CSHARP interop preservation: int FactorialInternal(int num)\n            {\n                if (num \u003C= 1)\n  ...",
-        "Info [method] (line 22): C# interop block preserved for [method]"
-      ],
+      "conversionWarnings": 0,
+      "conversionIssues": [],
       "compilationSuccess": true,
       "compilationErrors": 0,
       "compilationDiagnostics": [],
@@ -2988,11 +2983,8 @@
       "compilationDuration": "00:00:00.0030545",
       "semanticLossCount": 0,
       "semanticLossDiagnostics": [],
-      "interopPreservationCount": 2,
-      "interopPreservationDiagnostics": [
-        "[InteropPreserved] Level4_Methods/074_LocalFunctions.cs:5 [method] Method preserved as \u00A7CSHARP interop: public static int Calculate(int x, int y)\n        {\n            int Add(int a...",
-        "[InteropPreserved] Level4_Methods/074_LocalFunctions.cs:22 [method] Method preserved as \u00A7CSHARP interop: public static int Factorial(int n)\n        {\n            int FactorialInterna..."
-      ],
+      "interopPreservationCount": 0,
+      "interopPreservationDiagnostics": [],
       "roundTripSuccess": true
     },
     {

@@ -1,0 +1,863 @@
+{
+  "schema": "v0.25-f3-847-results/1",
+  "measuredCommit": "8988c8cd575e9745964af85cc07e842be41df515",
+  "srcTree": "6bb57640f550d8bb76db4230f2bc2bc4a9d3f537",
+  "environment": {
+    "dotnetSdk": "10.0.401",
+    "platform": "Darwin arm64",
+    "compiler": "src/Calor.Compiler/bin/Release/net10.0/calor.dll",
+    "compilerConfiguration": "Release"
+  },
+  "cases": [
+    {
+      "case": "F3-LOCAL-01",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-01.cs.txt",
+      "fixtureSha256": "f323c3f90e8936fe5fec785a5083e5033ed2d0e0e50f83ca81020665379f1f4e",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 8,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 2,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-01.cli-default.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "3|120",
+            "exception": null,
+            "compileMode": "default",
+            "matchesOriginal": true
+          },
+          "outcome": "native-match"
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 8,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 2,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-01.cli-passthrough.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "3|120",
+            "exception": null,
+            "compileMode": "default",
+            "matchesOriginal": true
+          },
+          "outcome": "native-match"
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 2,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-01.mcp-default.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "3|120",
+            "exception": null,
+            "compileMode": "default",
+            "matchesOriginal": true
+          },
+          "outcome": "native-match"
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 2,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-01.mcp-passthroughOnError.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "3|120",
+            "exception": null,
+            "compileMode": "default",
+            "matchesOriginal": true
+          },
+          "outcome": "native-match"
+        },
+        "mcp-passthroughOnError-moduleName": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 2,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-01.mcp-passthroughOnError-moduleName.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "3|120",
+            "exception": null,
+            "compileMode": "default",
+            "matchesOriginal": true
+          },
+          "outcome": "native-match"
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "3|120",
+        "exception": null
+      }
+    },
+    {
+      "case": "F3-LOCAL-02",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-02.cs.txt",
+      "fixtureSha256": "1b7d5a367c5f8e3e30045d11b9bfdb55e28ed3bbf19cda346131b633adbbbddd",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 7,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 1,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-02.cli-default.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "3|1002",
+            "exception": null,
+            "compileMode": "default",
+            "matchesOriginal": true
+          },
+          "outcome": "native-match"
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 7,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 1,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-02.cli-passthrough.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "3|1002",
+            "exception": null,
+            "compileMode": "default",
+            "matchesOriginal": true
+          },
+          "outcome": "native-match"
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 1,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-02.mcp-default.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "3|1002",
+            "exception": null,
+            "compileMode": "default",
+            "matchesOriginal": true
+          },
+          "outcome": "native-match"
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 1,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-02.mcp-passthroughOnError.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "3|1002",
+            "exception": null,
+            "compileMode": "default",
+            "matchesOriginal": true
+          },
+          "outcome": "native-match"
+        },
+        "mcp-passthroughOnError-moduleName": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 1,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-02.mcp-passthroughOnError-moduleName.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "3|1002",
+            "exception": null,
+            "compileMode": "default",
+            "matchesOriginal": true
+          },
+          "outcome": "native-match"
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "3|1002",
+        "exception": null
+      }
+    },
+    {
+      "case": "F3-LOCAL-03",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-03.cs.txt",
+      "fixtureSha256": "677a392baa87e118ce915adf7fcec4c6983f3a4ba874c525674bbacfecfb8326",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 18,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 3,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-03.cli-default.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "6|5|60|3000|502",
+            "exception": null,
+            "compileMode": "default",
+            "matchesOriginal": true
+          },
+          "outcome": "native-match"
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 18,
+          "interopPreservationCount": 0,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [],
+          "errorCodes": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 3,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-03.cli-passthrough.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "6|5|60|3000|502",
+            "exception": null,
+            "compileMode": "default",
+            "matchesOriginal": true
+          },
+          "outcome": "native-match"
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 3,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-03.mcp-default.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "6|5|60|3000|502",
+            "exception": null,
+            "compileMode": "default",
+            "matchesOriginal": true
+          },
+          "outcome": "native-match"
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 3,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-03.mcp-passthroughOnError.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "6|5|60|3000|502",
+            "exception": null,
+            "compileMode": "default",
+            "matchesOriginal": true
+          },
+          "outcome": "native-match"
+        },
+        "mcp-passthroughOnError-moduleName": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [],
+          "csharpInteropBlocks": 0,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 3,
+          "compile": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-03.mcp-passthroughOnError-moduleName.g.cs",
+          "execution": {
+            "compiled": true,
+            "result": "6|5|60|3000|502",
+            "exception": null,
+            "compileMode": "default",
+            "matchesOriginal": true
+          },
+          "outcome": "native-match"
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "6|5|60|3000|502",
+        "exception": null
+      }
+    },
+    {
+      "case": "F3-LOCAL-04",
+      "fixture": "docs/plans/evidence/v0.25-r0-1426/fixtures/F3-LOCAL-04.cs.txt",
+      "fixtureSha256": "535b0d42cd66296e5711ab8a6f698c9dbf8322ec06cf5766edb4299c65cde837",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 3,
+          "interopPreservationCount": 3,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "method"
+          ],
+          "errorCodes": [],
+          "csharpInteropBlocks": 3,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 7
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-04.cli-default.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "5|g3|2",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "matchesOriginal": true
+          },
+          "outcome": "preserved-match@permissive-effects"
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 3,
+          "interopPreservationCount": 3,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "method"
+          ],
+          "errorCodes": [],
+          "csharpInteropBlocks": 3,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 7
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-04.cli-passthrough.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "5|g3|2",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "matchesOriginal": true
+          },
+          "outcome": "preserved-match@permissive-effects"
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "method"
+          ],
+          "csharpInteropBlocks": 3,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 7
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-04.mcp-default.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "5|g3|2",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "matchesOriginal": true
+          },
+          "outcome": "preserved-match@permissive-effects"
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "method"
+          ],
+          "csharpInteropBlocks": 3,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 7
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-04.mcp-passthroughOnError.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "5|g3|2",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "matchesOriginal": true
+          },
+          "outcome": "preserved-match@permissive-effects"
+        },
+        "mcp-passthroughOnError-moduleName": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "method"
+          ],
+          "csharpInteropBlocks": 3,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 6
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-04.mcp-passthroughOnError-moduleName.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "5|g3|2",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "matchesOriginal": true
+          },
+          "outcome": "preserved-match@permissive-effects"
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "5|g3|2",
+        "exception": null
+      }
+    },
+    {
+      "case": "F3-LOCAL-05",
+      "fixture": "docs/plans/evidence/v0.25-f3-847/fixtures/F3-LOCAL-05.cs.txt",
+      "fixtureSha256": "031f5611bfb00c9d09b0d0248246e9808c2b769b296180d76ba31e5a6e8b7ac6",
+      "surfaces": {
+        "cli-default": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 4,
+          "interopPreservationCount": 1,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "method"
+          ],
+          "errorCodes": [],
+          "csharpInteropBlocks": 1,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 6
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-05.cli-default.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "42",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "matchesOriginal": true
+          },
+          "outcome": "preserved-match@permissive-effects"
+        },
+        "cli-passthrough": {
+          "convertExit": 0,
+          "success": true,
+          "nativeConversionCount": 4,
+          "interopPreservationCount": 1,
+          "lossySubstitutionCount": 0,
+          "dropCount": 0,
+          "lossFeatures": [
+            "method"
+          ],
+          "errorCodes": [],
+          "csharpInteropBlocks": 1,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 6
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-05.cli-passthrough.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "42",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "matchesOriginal": true
+          },
+          "outcome": "preserved-match@permissive-effects"
+        },
+        "mcp-default": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "method"
+          ],
+          "csharpInteropBlocks": 1,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 6
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-05.mcp-default.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "42",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "matchesOriginal": true
+          },
+          "outcome": "preserved-match@permissive-effects"
+        },
+        "mcp-passthroughOnError": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "method"
+          ],
+          "csharpInteropBlocks": 1,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 6
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-05.mcp-passthroughOnError.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "42",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "matchesOriginal": true
+          },
+          "outcome": "preserved-match@permissive-effects"
+        },
+        "mcp-passthroughOnError-moduleName": {
+          "isError": false,
+          "success": true,
+          "lossFeatures": [
+            "method"
+          ],
+          "csharpInteropBlocks": 1,
+          "inlineInteropExpressions": 0,
+          "nestedLocalFunctions": 0,
+          "compile": {
+            "exit": 1,
+            "errorCodes": [
+              "Calor0410"
+            ],
+            "warningCodes": [
+              "Calor0411"
+            ],
+            "firstError": "Function 'Run' uses effect 'unknown' but does not declare it",
+            "firstErrorLine": 5
+          },
+          "compilePermissiveEffects": {
+            "exit": 0,
+            "errorCodes": [],
+            "warningCodes": [],
+            "firstError": null,
+            "firstErrorLine": null
+          },
+          "generated": "docs/plans/evidence/v0.25-f3-847/generated/F3-LOCAL-05.mcp-passthroughOnError-moduleName.g.cs",
+          "generatedMode": "permissive-effects",
+          "execution": {
+            "compiled": true,
+            "result": "42",
+            "exception": null,
+            "compileMode": "permissive-effects",
+            "matchesOriginal": true
+          },
+          "outcome": "preserved-match@permissive-effects"
+        }
+      },
+      "original": {
+        "compiled": true,
+        "result": "42",
+        "exception": null
+      }
+    }
+  ]
+}
