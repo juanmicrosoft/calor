@@ -19,3 +19,4 @@ P17 the contract seal is not an input: KILLED :: test_an_input_replaced_by_a_sym
 P18 only the first headline stamp entry is compared: KILLED :: test_a_duplicate_headline_stamp_entry_on_main_is_refused
 P19 an unreadable index counts as absent: KILLED :: test_an_unreadable_stamp_index_on_main_is_refused
 P20 push paths: sealed contract document trigger removed: KILLED :: test_every_headline_input_exists
+P22 new validator partial-class files are not inputs: KILLED :: test_a_new_validator_partial_class_file_on_main_is_refused

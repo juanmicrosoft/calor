@@ -131,6 +131,7 @@ three seals name, and every `calorPath`/`csharpPath` in the candidate's `registr
 | `tests/TestData/Benchmarks` and each registered pair file | the corpus the registration names (B2-03) |
 | `tests/Calor.Evaluation` | the registered generator (`pair-metrics`, `pair-results`; the metric uses no `src/` code) |
 | `EvidenceContract/Benchmark{Registration,Results}{Tests,Validator}.cs`, `EvidenceContractValidator.cs`, `EvidenceContractTests.cs`, `tests/Calor.Compiler.Tests/Calor.Compiler.Tests.csproj` | B1's validator as the workflow runs it: the two filtered test classes, the partial validator class they call, the helpers they use (`RepoRoot`, `Contract`), and the project that compiles them |
+| every `.cs` file under `tests/Calor.Compiler.Tests` that declares a part of `EvidenceContractValidator`, `EvidenceContractTests`, `BenchmarkResultsTests`, or `BenchmarkRegistrationTests`, at HEAD or on main | a new part can rebind an unchanged call to a better overload (verification pass) |
 | `scripts/benchmark_publication_gate.py` | the gate that writes the headline |
 
 Not inputs: other files in `EvidenceContract/` (C1's `CandidateInvalidation*.cs`,
@@ -159,7 +160,7 @@ written as exact UTF-8 bytes (`write_bytes`, LF). Nothing reads the clock or mai
 R2 needs no change: `verify_release_adjudication.py --benchmark-worktree` still compares the two
 files' sha256 with the adjudicated hashes. Those hashes now stay valid after main moves on.
 
-### Tests (`scripts/test_benchmark_publication_gate.py`, 63 = 50 + 13)
+### Tests (`scripts/test_benchmark_publication_gate.py`, 64 = 50 + 14)
 
 Changed because the rule changed:
 - `test_an_older_checkout_is_compared_with_the_headline_on_main` is replaced by
@@ -188,8 +189,10 @@ New:
   `test_a_different_headline_published_on_main_after_the_candidate_is_refused` (B2-07),
   `test_a_changed_headline_stamp_entry_on_main_is_refused` (B2-07),
   `test_a_duplicate_headline_stamp_entry_on_main_is_refused` (B2-07),
-  `test_an_unreadable_stamp_index_on_main_is_refused` (B2-07, 3 shapes), and
-  `test_a_registered_pair_file_outside_the_corpus_directory_is_an_input`.
+  `test_an_unreadable_stamp_index_on_main_is_refused` (B2-07, 3 shapes),
+  `test_a_registered_pair_file_outside_the_corpus_directory_is_an_input`, and
+  `test_a_new_validator_partial_class_file_on_main_is_refused` (verification pass; one file in
+  `EvidenceContract/` and one elsewhere in the test project).
 - Determinism: `test_two_runs_write_identical_bytes` (a second run over the first run's outputs, and
   a third run from a clean tree) and `test_the_bytes_depend_on_the_committed_stamp_index_not_the_work_tree`.
 - Real repository: `RealPacketTests.test_every_headline_input_exists`. Every input exists, so a
@@ -199,10 +202,10 @@ New:
 
 ### Mutation check (`mutation-check-pr2.txt`)
 
-The script is `mutation-check-pr2.py`. It makes 21 mutations, each disabling or weakening one new
-guard, and runs the full suite after each one. All 21 are killed:
-- the registered pair paths, the files the seals name, the contract seal, one validator file, the
-  generator, or the gate itself dropped from the inputs;
+The script is `mutation-check-pr2.py`. It makes 22 mutations, each disabling or weakening one new
+guard, and runs the full suite after each one. All 22 are killed:
+- the registered pair paths, the files the seals name, the contract seal, one validator file, files
+  declaring a validator partial class, the generator, or the gate itself dropped from the inputs;
 - the freshness check disabled, or comparing object ids only so modes are ignored;
 - the whole `EvidenceContract` directory made an input again;
 - the comparison read from main's headline;
@@ -217,19 +220,20 @@ guard, and runs the full suite after each one. All 21 are killed:
 
 The generator re-run is byte-identical to the committed packet, and B1's validator and R2's
 workflow-gate tests pass (79 of 79). With main simulated in local clones, the candidate writes the
-same headline (`c81adaed…`) and stamp index (`ea03d566…`) in four cases: main at the candidate, a
+same headline (`b2d297d2…`) and stamp index (`8b6c1097…`) in four cases: main at the candidate, a
 second run, main with an unrelated `EvidenceContract/` test added (the C2 case), and main with this
 candidate's headline already merged. The pre-PR-2 gate refuses the C2 case with B2-08. In the
-merged case it writes a different headline (`6e79d9fb…`), which is the nondeterminism removed here.
+merged case it writes a different headline (`6cc3cf87…`), which is the nondeterminism removed here.
 Main changing the generator or a registered pair file refuses with B2-08.
 
 ### Reviews (`reviews/pr2-*.md`)
 
 Codex, read-only, reasoning effort high. Round 1: REQUEST-CHANGES (sealed files were not inputs;
 only the first stamp entry was compared). Round 2: REQUEST-CHANGES (object ids ignored file modes).
-Round 3: APPROVE. The verification pass over the final diff (records and evidence added after
-round 3; no code change) has **not run yet**: Codex hit its usage limit on 2026-10-07 at 19:02
-(reset 22:57). It is to be recorded as `reviews/pr2-verification-pass-codex.md`.
+Round 3: APPROVE. Verification pass (2026-10-08, after a Codex usage-limit wait): REQUEST-CHANGES,
+1 MAJOR, no BLOCKING. A new file declaring another part of `EvidenceContractValidator` could rebind
+an unchanged call to a better overload, and the README's limit said otherwise. Fixed in
+`bca13caf`, with no further review round (`reviews/pr2-verification-pass-codex.md`).
 
 ### Limits
 
@@ -238,8 +242,12 @@ round 3; no code change) has **not run yet**: Codex hit its usage limit on 2026-
   refuses an older candidate. This errs toward refusing.
 - `src/`, `Directory.Build.props`, and `global.json` are not inputs. The B1 metric does not call the
   compiler, and B2-10 re-runs the generator at the candidate.
-- A new partial-class file that main adds under `EvidenceContract/` is not an input unless a listed
-  file changes to use it. Such a file can only add members, which the listed files would have to
-  call, so a listed file changes too.
-- The end-to-end hashes are for the code commit `f2696b94`. The re-frozen 0.24 candidate gets its
+- Validator partial classes. Some `.cs` files under `tests/Calor.Compiler.Tests` declare a part of
+  `EvidenceContractValidator`, `EvidenceContractTests`, `BenchmarkResultsTests`, or
+  `BenchmarkRegistrationTests`; `partial_validator_files` finds them with `git grep`. Every such
+  file, at HEAD or on main, is an input, so a part added only on main refuses. The match is
+  textual. A part declared through unusual formatting is missed, for example a comment between
+  `partial` and `class`, or a fully qualified name. A non-partial type cannot change those calls:
+  they are static calls on these classes, and extension methods never apply to a static call.
+- The end-to-end hashes are for the code commit `bca13caf`. The re-frozen 0.24 candidate gets its
   own hashes, which A1 adjudicates. No workflow was run on GitHub, and nothing was published.

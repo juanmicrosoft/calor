@@ -60,6 +60,8 @@ MUTATIONS = [
      '        return "<unreadable>"\n    if not', '        return []\n    if not'),
     ("P20 push paths: sealed contract document trigger removed", WORKFLOW,
      "      - 'docs/plans/v0.24-evidence-contract.md'\n", ""),
+    ("P22 new validator partial-class files are not inputs", GATE,
+     '    for path in partial_validator_files(root):\n', '    for path in []:\n'),
 ]
 
 ONLY = set(sys.argv[2:])
