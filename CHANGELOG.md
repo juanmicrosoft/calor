@@ -6,6 +6,32 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **The NuGet packages and the website now build byte-for-byte the same from the same
+  commit.** The release gate rebuilds both at publication and compares SHA-256 hashes with the
+  recorded ones, so before this fix no release could pass it. Two builds of one commit, in
+  fresh clones at different paths, now give identical hashes for both packages, every package
+  entry, the release metadata, and every website file. One macOS and one Linux build also
+  matched. This holds when both builds use the same .NET SDK build: Homebrew's source-built SDK
+  10.0.401 gives different package bytes than Microsoft's 10.0.401. The site also still
+  downloads its fonts from Google Fonts at build time, so a font update there would change it.
+  The files each package contains are the same as before; only timestamps and embedded paths
+  change. Six causes were fixed:
+  - Each `.nupkg` zip entry carried the time of packing. Packing now uses a fixed timestamp
+    (NuGet's `DeterministicTimestamp`).
+  - Release builds of the shipped projects embedded the absolute checkout path in DLLs and
+    PDBs. They now map it to `/_/` (MSBuild's `DeterministicSourcePaths`).
+  - Next.js picked a random build ID for every build. It is now the site version plus the first
+    12 characters of the commit, for example `calor-0.24.0-296c618e30f7`.
+  - webpack module IDs in the site's JavaScript were hashed from strings that held absolute
+    paths. A small webpack plugin now hashes them with the checkout path removed.
+  - The site's entry scripts were named by a hash of their build inputs, which also held
+    absolute paths. They are now named by a hash of their bytes (`[contenthash]`).
+  - The docs pages were listed in file-system order, which differs between macOS and Linux. They
+    are now sorted, so the sitemap and the search index have one fixed order.
+
+  A new CI workflow, `reproducible-builds.yml`, builds both surfaces twice and fails on any
+  byte difference.
+
 - **Name binding no longer copies module-wide tables at every loop.** Since 0.22.0, the
   binder made two kinds of module-wide copies. Before each loop, it copied the whole symbol table
   and its declaration counters so it could undo a trial pass over the loop body. At each loop,
