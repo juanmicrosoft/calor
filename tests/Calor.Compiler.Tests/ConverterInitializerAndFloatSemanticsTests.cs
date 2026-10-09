@@ -26,6 +26,7 @@ public sealed class ConverterInitializerAndFloatSemanticsTests
         {
             public P() { Migrated.Trace += "k"; L.Add(0); }
             public P(int seed) { Migrated.Trace += "k" + seed; }
+            public P(List<int> l) { Migrated.Trace += "kl"; L = l; }
             public int A { get; set; }
             public int B;
             public Inner Inner { get; } = new Inner();
@@ -37,6 +38,10 @@ public sealed class ConverterInitializerAndFloatSemanticsTests
         public class PI { public PI() { Migrated.Counter = 10; } public int A; }
         public class V { public static implicit operator V(int n) { Migrated.Trace += "v"; return new V(); } }
         public class PV { public PV() { Migrated.Trace += "k"; } public List<V>? L; }
+        public class Q2 { public Q2() { Migrated.Trace += "q"; } public int A = 5; }
+        public static int Ignored, Ci, Cj;
+        public class PF { public Func<int>? F; public int A, B; }
+        private static int UseF(int x, int y, object p) => 100 * Ci + 10 * Cj + ((PF)p).A;
         """;
 
     private const string Holder = """
@@ -67,6 +72,12 @@ public sealed class ConverterInitializerAndFloatSemanticsTests
         { "Counter = 0; var p = new PI { A = Counter++ }; return p.A + \":\" + Counter;", "10:11", true },
         { "var p = new PV { L = new List<V> { 1 } }; return Trace + p.L!.Count;", "kv1", true },
         { "var q = new P(7); q = new() { L = (new List<int> { 5 }) }; return Trace + string.Join(\",\", q.L);", "k7k5", true },
+        // Rollback restores the hoist queue even after a block lambda cleared it.
+        { "Ci = 0; Cj = 0; return UseF(Ignored = 0, Ignored = 0, new PF { F = () => { return 0; }, A = Ci++, B = Cj++ });", "110", true },
+        // The Calor emitter would hoist the receiver `new Q2()` ahead of P's constructor.
+        { "var p = new P { A = new Q2().A }; return Trace + p.A;", "kq5", true },
+        // A collection constructor argument would lose its elements (new List<int>(5)).
+        { "var q = new P(7); q = new(new List<int> { 5 }) { A = 1 }; return Trace + q.L.Count + q.A;", "k7kl11", true },
     };
 
     [Theory]
@@ -76,7 +87,8 @@ public sealed class ConverterInitializerAndFloatSemanticsTests
         var conversion = AssertEquivalent(body, expected);
         var initializerLosses = conversion.Losses.Where(loss => loss.Feature == "object-initializer").ToList();
         if (preserved)
-            Assert.Contains(initializerLosses, loss => loss.Kind == ConversionLossKind.InteropPreserved);
+            Assert.Contains(initializerLosses, loss =>
+                loss.Kind is ConversionLossKind.InteropPreserved or ConversionLossKind.EmitterFallback);
         else
             Assert.Empty(initializerLosses);
     }
@@ -91,6 +103,14 @@ public sealed class ConverterInitializerAndFloatSemanticsTests
             "kk923", Types + Holder);
         Assert.DoesNotContain("_objInit", conversion.CalorSource);
         Assert.DoesNotContain(conversion.Losses, loss => loss.Feature == "object-initializer");
+    }
+
+    [Fact]
+    public void CollectionConstructorArgument_IsPreservedNotTruncated()
+    {
+        var conversion = AssertEquivalent("var q = new P(new List<int> { 5 }); return Trace + q.L.Count;", "kl1");
+        Assert.Contains(conversion.Losses, loss =>
+            loss.Kind == ConversionLossKind.InteropPreserved && loss.Feature == "collection-initializer");
     }
 
     [Fact]

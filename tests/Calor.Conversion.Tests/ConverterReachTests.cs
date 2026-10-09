@@ -811,15 +811,16 @@ public class ConverterReachTests
     /// <c>_lambdaBodyDepth</c> (deliberately — gating it would move
     /// currently-parsing output and the ledgers), so the block leaves the
     /// enclosing lambdas' scope, the output still PARSES, and the round trip
-    /// fails. Under <c>RescueUnusableMembers</c> the member is preserved as
-    /// §CSHARP and the conversion still yields output.
+    /// fails. Under <c>RescueUnusableMembers</c> the member was preserved as
+    /// §CSHARP and the conversion still yielded output.
     ///
-    /// <para>This is the honest boundary of the landing state: the lambda hoist
-    /// is closed at any depth, while the object-initializer and collection-element
-    /// hoists are CONTAINED by the rescue rather than fixed.</para>
+    /// <para>#1524 closed the object-initializer hoist: the hoist also ran the inner
+    /// creation before the outer constructor, so the Calor emitter now keeps the
+    /// outer creation as its original C# (<c>§CS{...}</c>, an <c>object-initializer</c>
+    /// loss) instead of hoisting. No member rescue is needed any more.</para>
     /// </summary>
     [Fact]
-    public void M13_TripleNestedLambda_WithTrailingMemberAccess_IsRescuedNotNative()
+    public void M13_TripleNestedLambda_WithTrailingMemberAccess_IsPreservedNotHoisted()
     {
         const string csharp = """
             using System;
@@ -876,10 +877,12 @@ public class ConverterReachTests
         Assert.False(diagnostics.HasErrors,
             string.Join("\n", diagnostics.Errors.Select(d => $"{d.Code}: {d.Message}")));
 
-        // ...and it is RESCUED, not native: this pins the boundary, so a later
-        // change that closed the object-initializer hoist would fail here and be
-        // recorded rather than sliding by.
-        Assert.Contains("§CSHARP", result.CalorSource);
+        // ...and the outer creation is preserved in place, not hoisted out of the
+        // lambdas and not rescued (#1524).
+        Assert.Contains("§CS{new Node", result.CalorSource);
+        Assert.DoesNotContain("§B{~_hoist", result.CalorSource);
+        Assert.DoesNotContain("§CSHARP", result.CalorSource);
+        Assert.Contains(result.Losses, loss => loss.Feature == "object-initializer");
     }
 
     // ----- review N1: hoists must land before the §ARR2D opener --------------

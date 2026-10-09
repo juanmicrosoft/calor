@@ -19,6 +19,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
     private int _ternaryCounter;
     private int _hoistCounter;
     private int _conditionalExpressionDepth;
+    private int _tempHoistCount;
     private int _memberBodyDepth;
 
     // How many lambda bodies deep we are emitting. A block lambda nested inside
@@ -3103,6 +3104,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
             return expr;
 
         var varName = $"_hoist{_hoistCounter++:D3}";
+        _tempHoistCount++;
         _pendingHoistedLines.Add($"§B{{~{varName}}} {expr}");
         return varName;
     }
@@ -3185,6 +3187,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
         // Use AcceptInInlineSibling so nested zero-arg §C{...} keeps explicit §/C —
         // the v0.6.1 emitter default would otherwise let the next §A be absorbed
         // as the nested call's inline argument (silent AST corruption).
+        var hoistedLinesBefore = _pendingHoistedLines.Count;
         var args = node.Arguments.Select(a =>
         {
             var val = AcceptInInlineSibling(a);
@@ -3199,11 +3202,24 @@ public sealed class CalorEmitter : IAstVisitor<string>
         {
             // Pre-evaluate initializer values to collect hoisted bindings
             var evalInits = new List<(string PropName, string Value)>();
+            var tempHoistsBefore = _tempHoistCount;
             foreach (var init in node.Initializers)
             {
                 var valueStr = init.Value.Accept(this);
                 if (!string.IsNullOrWhiteSpace(valueStr))
                     evalInits.Add((init.PropertyName, valueStr));
+            }
+
+            // #1524: a value hoisted to a §B line ahead of the statement would run before
+            // the constructor. Fall back to the original C#, dropping this creation's
+            // hoisted lines so nothing is evaluated twice. (Hoisted lambdas only allocate.)
+            if (_tempHoistCount != tempHoistsBefore && node.CSharpSource != null)
+            {
+                _pendingHoistedLines.RemoveRange(
+                    hoistedLinesBefore, _pendingHoistedLines.Count - hoistedLinesBefore);
+                RecordEmitterFallback(node, "object-initializer",
+                    "Object creation whose initializer value would be hoisted ahead of the constructor preserved verbatim");
+                return $"§CS{{{node.CSharpSource}}}";
             }
 
             var indent = new string(' ', _indentLevel * 2);

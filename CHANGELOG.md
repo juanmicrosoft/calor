@@ -10,13 +10,16 @@ All notable changes to this project will be documented in this file.
   object initializer. Simple `Name = value` initializers convert to a `§NEW` block (Calor's
   object-creation form), including on `StringBuilder` and on `List<T>` (`Capacity = 20`), which
   used to lose them or treat them as list elements. Some forms cannot run in C# order inside
-  `§NEW`. These are kept as inline C# (`§CS{...}`) and reported as an `object-initializer` loss:
+  `§NEW`. These are kept as inline C# (`§CS{...}`) and reported as a conversion loss
+  (`object-initializer`, or `collection-initializer` for constructor arguments):
   - collection-initializer elements, such as `new List<int>(4) { 1, 2 }`;
   - nested initializers, such as `Inner = { X = 7 }`;
   - target-typed `new() { ... }` without a known type;
   - interpolated strings with an object initializer inside a hole;
-  - values that the converter would move before the constructor, such as `A = i++` or
-    `L = new List<int> { 1, 2 }`.
+  - values that the converter would move before the constructor, such as `A = i++`,
+    `A = new Q().A`, or `L = new List<int> { 1, 2 }`;
+  - collection arguments to a constructor, such as `new P(new List<int> { 5 })`. These used to
+    become `new List<int>(5)`, an empty list with capacity 5.
 
   Auto-property defaults such as `P Prop { get; } = new P { A = 1 };` now stay one object. Before,
   the getter built a new object on every read and did not compile.

@@ -240,6 +240,13 @@ public static class FeatureSupport
             Support = SupportLevel.Full,
             Description = "List initializers are converted to Calor §LIST nodes"
         },
+        ["collection-initializer"] = new FeatureInfo
+        {
+            Name = "collection-initializer",
+            Support = SupportLevel.Partial,
+            Description = "A constructor argument that is a non-empty collection initializer (new P(new List<int> { 5 })) has no inline Calor form; the enclosing creation is preserved as inline C# interop with a reported loss.",
+            Workaround = "The creation is kept as §CS{...}; bind the collection to a local first to convert it natively."
+        },
         ["hashset-initializer"] = new FeatureInfo
         {
             Name = "hashset-initializer",

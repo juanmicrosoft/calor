@@ -10328,8 +10328,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (implicitNew.Initializer?.Expressions.Count > 0
             && (inferredType == null || RequiresVerbatimObjectInitializer(implicitNew)))
             return PreserveObjectInitializer(implicitNew);
-        var pendingBefore = _pendingStatements.Count;
+        var pendingBefore = SnapshotPendingStatements();
         var initializerLosesElements = false;
+        var argumentLosesElements = false;
 
         // Convert target-typed new: new() or new(args)
         if (implicitNew.ArgumentList == null || implicitNew.ArgumentList.Arguments.Count == 0)
@@ -10353,10 +10354,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                                 assignment.Left.ToString(), val));
                         }
                     }
-                    if (initializerLosesElements || _pendingStatements.Count > pendingBefore)
+                    if (initializerLosesElements || PendingStatementsChanged(pendingBefore))
                         return RollBackAndPreserveObjectInitializer(implicitNew, pendingBefore);
                 }
-                return new NewExpressionNode(GetTextSpan(implicitNew), inferredType, new List<string>(), new List<ExpressionNode>(), inits);
+                return new NewExpressionNode(GetTextSpan(implicitNew), inferredType, new List<string>(), new List<ExpressionNode>(), inits)
+                {
+                    CSharpSource = inits.Count > 0 ? implicitNew.ToString() : null
+                };
             }
             return new ReferenceNode(GetTextSpan(implicitNew), "default");
         }
@@ -10368,11 +10372,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             .Select(a =>
             {
                 var expr = ConvertExpression(a.Expression);
-                // Convert block-level collections to inline for constructor args
+                // #1524: ConvertBlockLevelCollectionToNew would turn the elements into
+                // constructor arguments (new List<int> { 5 } -> new List<int>(5)).
                 if (IsBlockLevelCollection(expr))
-                    expr = ConvertBlockLevelCollectionToNew(expr, ExtractTypeHint(a.Expression));
+                    argumentLosesElements = true;
                 return expr;
             }).ToList();
+        if (argumentLosesElements)
+            return RollBackAndPreserveObjectInitializer(implicitNew, pendingBefore,
+                implicitNew.Initializer?.Expressions.Count > 0 ? "object-initializer" : "collection-initializer");
         var initializers = new List<ObjectInitializerAssignment>();
         if (implicitNew.Initializer != null)
         {
@@ -10388,10 +10396,13 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         assignment.Left.ToString(), val));
                 }
             }
-            if (initializerLosesElements || _pendingStatements.Count > pendingBefore)
+            if (initializerLosesElements || PendingStatementsChanged(pendingBefore))
                 return RollBackAndPreserveObjectInitializer(implicitNew, pendingBefore);
         }
-        return new NewExpressionNode(GetTextSpan(implicitNew), typeName, new List<string>(), args, initializers);
+        return new NewExpressionNode(GetTextSpan(implicitNew), typeName, new List<string>(), args, initializers)
+        {
+            CSharpSource = initializers.Count > 0 ? implicitNew.ToString() : null
+        };
     }
 
     /// <summary>
@@ -11890,18 +11901,23 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // #1524: initializer forms that §NEW cannot express faithfully are kept as C#.
         if (RequiresVerbatimObjectInitializer(objCreation))
             return PreserveObjectInitializer(objCreation);
-        var pendingBefore = _pendingStatements.Count;
+        var pendingBefore = SnapshotPendingStatements();
 
+        var argumentLosesElements = false;
         var args = objCreation.ArgumentList?.Arguments
             .Select(a =>
             {
                 var expr = ConvertExpression(a.Expression);
-                // Convert block-level collections to inline for constructor args
+                // #1524: ConvertBlockLevelCollectionToNew would turn the elements into
+                // constructor arguments (new List<int> { 5 } -> new List<int>(5)).
                 if (IsBlockLevelCollection(expr))
-                    expr = ConvertBlockLevelCollectionToNew(expr, ExtractTypeHint(a.Expression));
+                    argumentLosesElements = true;
                 return expr;
             })
             .ToList() ?? new List<ExpressionNode>();
+        if (argumentLosesElements)
+            return RollBackAndPreserveObjectInitializer(objCreation, pendingBefore,
+                objCreation.Initializer?.Expressions.Count > 0 ? "object-initializer" : "collection-initializer");
 
         // Hoist §NEW arguments to temp bindings — parser cannot handle §NEW nested inside §NEW
         HoistComplexArguments(args);
@@ -11959,11 +11975,14 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
             // #1524: a value that needed a hoisted statement (i++, an assignment, a
             // block-level collection, ...) would run before the constructor. Undo the
             // hoists, including the arguments', and keep the creation as C#.
-            if (_pendingStatements.Count > pendingBefore)
+            if (PendingStatementsChanged(pendingBefore))
                 return RollBackAndPreserveObjectInitializer(objCreation, pendingBefore);
         }
 
-        return new NewExpressionNode(GetTextSpan(objCreation), typeName, typeArgs, args, initializers);
+        return new NewExpressionNode(GetTextSpan(objCreation), typeName, typeArgs, args, initializers)
+        {
+            CSharpSource = initializers.Count > 0 ? objCreation.ToString() : null
+        };
     }
 
     private AnonymousObjectCreationNode ConvertAnonymousObjectCreation(AnonymousObjectCreationExpressionSyntax anonObj)
@@ -12400,18 +12419,27 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return false;
     }
 
+    // A snapshot, not a count: converting a block lambda clears the queue (ConvertBlock),
+    // so the queue is not append-only while a creation is converted.
+    private StatementNode[] SnapshotPendingStatements() => _pendingStatements.ToArray();
+
+    private bool PendingStatementsChanged(StatementNode[] snapshot) =>
+        !_pendingStatements.SequenceEqual(snapshot, ReferenceEqualityComparer.Instance);
+
     private ExpressionNode RollBackAndPreserveObjectInitializer(
-        BaseObjectCreationExpressionSyntax creation, int pendingBefore)
+        BaseObjectCreationExpressionSyntax creation, StatementNode[] pendingBefore,
+        string feature = "object-initializer")
     {
-        _pendingStatements.RemoveRange(pendingBefore, _pendingStatements.Count - pendingBefore);
-        return PreserveObjectInitializer(creation);
+        _pendingStatements.Clear();
+        _pendingStatements.AddRange(pendingBefore);
+        return PreserveObjectInitializer(creation, feature);
     }
 
-    private ExpressionNode PreserveObjectInitializer(ExpressionSyntax creation)
+    private ExpressionNode PreserveObjectInitializer(ExpressionSyntax creation, string feature = "object-initializer")
     {
-        _context.RecordFeatureUsage("object-initializer");
-        _context.RecordLoss(ConversionLossKind.InteropPreserved, "object-initializer",
-            "Object initializer that §NEW cannot express preserved verbatim with its enclosing expression",
+        _context.RecordFeatureUsage(feature);
+        _context.RecordLoss(ConversionLossKind.InteropPreserved, feature,
+            "Object creation that §NEW cannot express in C# evaluation order preserved verbatim",
             creation.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
         return new RawCSharpExpressionNode(GetTextSpan(creation), creation.ToString());
     }
