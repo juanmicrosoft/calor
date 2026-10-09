@@ -6,19 +6,25 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- **C# → Calor conversion kept dropping object initializers (#1524).** The converter now keeps
-  every object initializer. Simple `Name = value` initializers convert to a `§NEW` block (Calor's
-  object-creation form), including on `StringBuilder`, which used to lose them. Forms that `§NEW`
-  cannot express are kept as inline C# (`§CS{...}`) and reported as an `object-initializer` loss:
-  collection-initializer elements such as `new List<int>(4) { 1, 2 }`, nested initializers such
-  as `Inner = { X = 7 }`, target-typed `new() { ... }` without a known type, initializers inside
-  interpolated strings, and collection values whose evaluation would otherwise move ahead of the
-  constructor. Auto-property defaults such as `P Prop { get; } = new P { A = 1 };` now stay one
-  object; before, the getter built a new object on every read and did not compile.
+- **C# → Calor conversion dropped object initializers (#1524).** The converter now keeps every
+  object initializer. Simple `Name = value` initializers convert to a `§NEW` block (Calor's
+  object-creation form), including on `StringBuilder` and on `List<T>` (`Capacity = 20`), which
+  used to lose them or treat them as list elements. Some forms cannot run in C# order inside
+  `§NEW`. These are kept as inline C# (`§CS{...}`) and reported as an `object-initializer` loss:
+  - collection-initializer elements, such as `new List<int>(4) { 1, 2 }`;
+  - nested initializers, such as `Inner = { X = 7 }`;
+  - target-typed `new() { ... }` without a known type;
+  - interpolated strings with an object initializer inside a hole;
+  - values that the converter would move before the constructor, such as `A = i++` or
+    `L = new List<int> { 1, 2 }`.
+
+  Auto-property defaults such as `P Prop { get; } = new P { A = 1 };` now stay one object. Before,
+  the getter built a new object on every read and did not compile.
 - **C# → Calor conversion turned whole-number `double` literals into integers (#1528).**
   `double r = n / 2.0;` converted to `(/ n 2)`, which is integer division when `n` is an `int`.
-  The converter now writes `2.0`, so the division stays floating-point. `float` literals were
-  already kept as `SINGLE:2`, and `decimal` literals as `DEC:2`.
+  The converter now writes `2.0`, so the division stays floating-point. The same fix covers
+  attribute arguments (`[Kind(2.0)]` no longer picks an `int` overload) and keeps
+  `default(float)` and `default(decimal)` at their own width (`SINGLE:0`, `DEC:0`).
 
 ## [0.24.0] - 2026-10-07
 

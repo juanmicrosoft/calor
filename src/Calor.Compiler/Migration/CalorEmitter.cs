@@ -4637,7 +4637,7 @@ public sealed class CalorEmitter : IAstVisitor<string>
 
     private static string FormatAttributeArgument(CalorAttributeArgument arg)
     {
-        var value = arg.GetFormattedValue();
+        var value = arg.GetCalorFormattedValue();
 
         if (arg.IsNamed)
         {

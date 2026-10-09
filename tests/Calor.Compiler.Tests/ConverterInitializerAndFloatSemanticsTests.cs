@@ -32,6 +32,11 @@ public sealed class ConverterInitializerAndFloatSemanticsTests
             public Inner? Other { get; set; }
             public List<int> L { get; set; } = new List<int>();
         }
+        public static int Counter;
+        public static int Capacity;
+        public class PI { public PI() { Migrated.Counter = 10; } public int A; }
+        public class V { public static implicit operator V(int n) { Migrated.Trace += "v"; return new V(); } }
+        public class PV { public PV() { Migrated.Trace += "k"; } public List<V>? L; }
         """;
 
     private const string Holder = """
@@ -42,11 +47,12 @@ public sealed class ConverterInitializerAndFloatSemanticsTests
     {
         // Native §NEW: constructor argument, constructor body, then members in source order.
         { "var p = new P(T(\"c\", 1)) { A = T(\"a\", 2), B = T(\"b\", 3) }; return Trace + p.A + p.B;", "ck1ab23", false },
-        { "var p = new P { L = new List<int> { 1, 2 } }; return Trace + string.Join(\",\", p.L);", "k1,2", false },
         { "var p = new P(T(\"c\", 1)) { Other = new Inner { X = T(\"x\", 3) } }; return Trace + p.Other!.X;", "ck1x3", false },
         { "var sb = new StringBuilder { Capacity = 20 }; return sb.Capacity;", "20", false },
         { "var sb = new StringBuilder(\"ab\") { Capacity = 20 }; return sb.Capacity + sb.ToString();", "20ab", false },
         { "return Use(new() { A = T(\"a\", 4) });", "ka4", false },
+        // An object initializer on List<T> sets members; it is not a collection initializer.
+        { "var l = new List<int> { Capacity = 20 }; return l.Count + \":\" + l.Capacity + \":\" + Capacity;", "0:20:0", false },
         // Kept as C#: forms §NEW cannot express.
         { "var l = new List<int>(4) { T(\"x\", 1), 2 }; return Trace + l.Count + l[0];", "x21", true },
         { "List<int> l = new() { 1, 2 }; return l.Count;", "2", true },
@@ -55,6 +61,12 @@ public sealed class ConverterInitializerAndFloatSemanticsTests
         { "var p = new P(T(\"c\", 1)) { L = new List<int> { T(\"l\", 5) } }; return Trace + p.L[0];", "ck1l5", true },
         { "var q = new P(7); q = new() { L = new List<int> { 5 } }; return Trace + string.Join(\",\", q.L);", "k7k5", true },
         { "return X() + \"|\" + $\"{Y()}{new P { A = A5() }.A}\" + Trace;", "1|25xyka", true },
+        { "var text = $\"{X()}{new P { A = 5 }.A}\"; return text + Trace;", "15xk", true },
+        // Values that need a hoisted statement would run before the constructor.
+        { "var p = new P { L = new List<int> { 1, 2 } }; return Trace + string.Join(\",\", p.L);", "k1,2", true },
+        { "Counter = 0; var p = new PI { A = Counter++ }; return p.A + \":\" + Counter;", "10:11", true },
+        { "var p = new PV { L = new List<V> { 1 } }; return Trace + p.L!.Count;", "kv1", true },
+        { "var q = new P(7); q = new() { L = (new List<int> { 5 }) }; return Trace + string.Join(\",\", q.L);", "k7k5", true },
     };
 
     [Theory]
@@ -98,23 +110,46 @@ public sealed class ConverterInitializerAndFloatSemanticsTests
 
     public static TheoryData<string, string> FloatCases => new()
     {
-        { "int n = 5; return n / 2.0;", "2.5" },
-        { "return 1 / 2.0;", "0.5" },
-        { "return default(double) + 1 / 2.0;", "0.5" },
-        { "int n = 5; return n / 1e2;", "0.05" },
-        { "int n = -3; return n / -2.0;", "1.5" },
-        { "int n = 1; return n / 1e20;", "1E-20" },
-        { "int n = 5; return n / 2f;", "2.5" },
-        { "int n = 5; return n / 2.0m;", "2.5" },
-        { "int n = 5; return $\"{n / 2.0}\";", "2.5" },
+        { "int n = 5; return n / 2.0;", "Double:2.5" },
+        { "return 1 / 2.0;", "Double:0.5" },
+        { "return default(double) + 1 / 2.0;", "Double:0.5" },
+        { "return default(float) + 2f;", "Single:2" },
+        { "return default(decimal) + 2m;", "Decimal:2" },
+        { "int n = 5; return n / 1e2;", "Double:0.05" },
+        { "int n = -3; return n / -2.0;", "Double:1.5" },
+        { "int n = 1; return n / 1e20;", "Double:1E-20" },
+        { "int n = 1; return n / 3f;", "Single:0.33333334" },
+        { "int n = 5; return n / 2.0m;", "Decimal:2.5" },
+        { "int n = 5; return $\"{n / 2.0}\";", "String:2.5" },
         // Negative control: an integer literal keeps integer division.
-        { "int n = 5; return n / 2;", "2" },
+        { "int n = 5; return n / 2;", "Int32:2" },
     };
 
     [Theory]
     [MemberData(nameof(FloatCases))]
     public void WholeNumberFloatLiterals_KeepFloatingDivision(string body, string expected) =>
-        AssertEquivalent(body, expected, types: "");
+        AssertEquivalent(body, expected, types: "", typed: true);
+
+    [Fact]
+    public void AttributeFloatArguments_KeepTheirOverload()
+    {
+        const string attributes = """
+            public class KindAttribute : Attribute
+            {
+                private readonly string _value;
+                public KindAttribute(int x) { _value = "int"; }
+                public KindAttribute(double x) { _value = "double"; }
+                public KindAttribute(float x) { _value = "float"; }
+                public override string ToString() => _value;
+            }
+            [Kind(2.0)] public class MD { }
+            [Kind(2f)] public class MF { }
+            [Kind(2)] public class MI { }
+            """;
+        AssertEquivalent(
+            "return typeof(MD).GetCustomAttributes(false)[0] + \",\" + typeof(MF).GetCustomAttributes(false)[0] + \",\" + typeof(MI).GetCustomAttributes(false)[0];",
+            "double,float,int", types: attributes);
+    }
 
     [Theory]
     [InlineData(2.0, false, "2.0")]
@@ -157,7 +192,8 @@ public sealed class ConverterInitializerAndFloatSemanticsTests
         Assert.Equal(BitConverter.DoubleToInt64Bits(value), BitConverter.DoubleToInt64Bits(literal));
     }
 
-    private static ConversionResult AssertEquivalent(string body, string expected, string types = Types)
+    private static ConversionResult AssertEquivalent(
+        string body, string expected, string types = Types, bool typed = false)
     {
         var source = $$"""
             using System;
@@ -188,12 +224,12 @@ public sealed class ConverterInitializerAndFloatSemanticsTests
         });
         Assert.False(compiled.HasErrors,
             string.Join("; ", compiled.Diagnostics.Errors) + "\n" + conversion.CalorSource);
-        Assert.Equal(expected, Observe(source));
-        Assert.Equal(expected, Observe(compiled.GeneratedCode));
+        Assert.Equal(expected, Observe(source, typed));
+        Assert.Equal(expected, Observe(compiled.GeneratedCode, typed));
         return conversion;
     }
 
-    private static string Observe(string source)
+    private static string Observe(string source, bool typed)
     {
         var compilation = CSharpCompilation.Create("InitializerOracle_" + Guid.NewGuid().ToString("N"),
             [CSharpSyntaxTree.ParseText(GeneratedCSharpCompiler.GlobalUsingsPreamble + source)],
@@ -204,6 +240,7 @@ public sealed class ConverterInitializerAndFloatSemanticsTests
         Assert.True(emit.Success, string.Join("; ", emit.Diagnostics) + "\n" + source);
         var value = Assembly.Load(image.ToArray()).GetTypes().Single(type => type.Name == "Migrated")
             .GetMethod("Probe")!.Invoke(null, null)!;
-        return Convert.ToString(value, CultureInfo.InvariantCulture)!;
+        var text = Convert.ToString(value, CultureInfo.InvariantCulture)!;
+        return typed ? value.GetType().Name + ":" + text : text;
     }
 }

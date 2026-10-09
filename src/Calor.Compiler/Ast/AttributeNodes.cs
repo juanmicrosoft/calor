@@ -91,6 +91,18 @@ public sealed class CalorAttributeArgument
     /// </summary>
     public string GetFormattedValue() => FormatSingleValue(Value);
 
+    /// <summary>
+    /// Gets the value formatted for Calor source. #1528: fractional literals keep
+    /// their type through the Calor lexer (2.0, SINGLE:2, DEC:2), where C# uses 2f and 2m.
+    /// </summary>
+    public string GetCalorFormattedValue() => Value switch
+    {
+        float f => "SINGLE:" + FormatInvariant(f),
+        FloatLiteralInfo { IsSingle: true } single => "SINGLE:" + FormatInvariant((float)single.Value),
+        decimal m => "DEC:" + m.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        _ => FormatSingleValue(Value)
+    };
+
     internal static string FormatSingleValue(object value)
     {
         return value switch
@@ -99,8 +111,12 @@ public sealed class CalorAttributeArgument
             bool b => b ? "true" : "false",
             int i => i.ToString(),
             long l => l.ToString(),
-            double d => d.ToString(),
-            float f => f.ToString(),
+            // #1528: a whole-number double printed as "2" would select an int overload.
+            double d => FormatDouble(d),
+            float f => FormatInvariant(f) + "f",
+            FloatLiteralInfo { IsSingle: true } single => FormatInvariant((float)single.Value) + "f",
+            FloatLiteralInfo floating => FormatDouble(floating.Value),
+            decimal m => m.ToString(System.Globalization.CultureInfo.InvariantCulture) + "m",
             // Type reference (typeof)
             Type t => $"typeof({t.Name})",
             // For type name strings that represent typeof expressions
@@ -117,6 +133,15 @@ public sealed class CalorAttributeArgument
             // Default: treat as identifier/enum value
             _ => value?.ToString() ?? "null"
         };
+    }
+
+    private static string FormatInvariant(float value) =>
+        value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string FormatDouble(double value)
+    {
+        var text = value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return double.IsFinite(value) && text.IndexOfAny(['.', 'E', 'e']) < 0 ? text + ".0" : text;
     }
 
     private static string FormatBitwiseBinary(BitwiseBinaryExpression expr)

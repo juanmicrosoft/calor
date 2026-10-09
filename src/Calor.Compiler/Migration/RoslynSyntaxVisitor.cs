@@ -9332,6 +9332,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 ElementAccessExpressionSyntax elementAccess => ConvertElementAccess(elementAccess),
                 LambdaExpressionSyntax lambda => ConvertLambdaExpression(lambda),
                 AwaitExpressionSyntax awaitExpr => ConvertAwaitExpression(awaitExpr),
+                // #1524: hoisting a hole's creation would run it before the earlier holes.
+                InterpolatedStringExpressionSyntax interpolated
+                    when interpolated.Contents.OfType<InterpolationSyntax>().Any(hole =>
+                        hole.Expression.DescendantNodesAndSelf().OfType<BaseObjectCreationExpressionSyntax>()
+                            .Any(creation => creation.Initializer?.Expressions.Count > 0))
+                    => PreserveObjectInitializer(interpolated),
                 InterpolatedStringExpressionSyntax interpolated => ConvertInterpolatedString(interpolated),
                 ConditionalAccessExpressionSyntax condAccess =>
                     ConvertConditionalRegion(condAccess, () => ConvertConditionalAccess(condAccess)),
@@ -10322,6 +10328,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         if (implicitNew.Initializer?.Expressions.Count > 0
             && (inferredType == null || RequiresVerbatimObjectInitializer(implicitNew)))
             return PreserveObjectInitializer(implicitNew);
+        var pendingBefore = _pendingStatements.Count;
+        var initializerLosesElements = false;
 
         // Convert target-typed new: new() or new(args)
         if (implicitNew.ArgumentList == null || implicitNew.ArgumentList.Arguments.Count == 0)
@@ -10338,13 +10346,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                         if (expr is AssignmentExpressionSyntax assignment)
                         {
                             var val = ConvertExpression(assignment.Right);
-                            // Convert block-level collections to inline for initializer values
+                            // A block-level collection cannot stay inline here (#1524).
                             if (IsBlockLevelCollection(val))
-                                val = ConvertBlockLevelCollectionToNew(val, ExtractTypeHint(assignment.Right));
+                                initializerLosesElements = true;
                             inits.Add(new ObjectInitializerAssignment(
                                 assignment.Left.ToString(), val));
                         }
                     }
+                    if (initializerLosesElements || _pendingStatements.Count > pendingBefore)
+                        return RollBackAndPreserveObjectInitializer(implicitNew, pendingBefore);
                 }
                 return new NewExpressionNode(GetTextSpan(implicitNew), inferredType, new List<string>(), new List<ExpressionNode>(), inits);
             }
@@ -10371,13 +10381,15 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 if (expr is AssignmentExpressionSyntax assignment)
                 {
                     var val = ConvertExpression(assignment.Right);
-                    // Convert block-level collections to inline for initializer values
+                    // A block-level collection cannot stay inline here (#1524).
                     if (IsBlockLevelCollection(val))
-                        val = ConvertBlockLevelCollectionToNew(val, ExtractTypeHint(assignment.Right));
+                        initializerLosesElements = true;
                     initializers.Add(new ObjectInitializerAssignment(
                         assignment.Left.ToString(), val));
                 }
             }
+            if (initializerLosesElements || _pendingStatements.Count > pendingBefore)
+                return RollBackAndPreserveObjectInitializer(implicitNew, pendingBefore);
         }
         return new NewExpressionNode(GetTextSpan(implicitNew), typeName, new List<string>(), args, initializers);
     }
@@ -10722,7 +10734,10 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return typeName switch
         {
             "int" or "Int32" or "long" or "Int64" or "short" or "byte" => new IntLiteralNode(GetTextSpan(defaultExpr), 0),
-            "double" or "float" or "decimal" or "Double" or "Single" => new FloatLiteralNode(GetTextSpan(defaultExpr), 0.0),
+            // #1528: keep the literal's width; a plain 0.0 is a double.
+            "double" or "Double" => new FloatLiteralNode(GetTextSpan(defaultExpr), 0.0),
+            "float" or "Single" => new FloatLiteralNode(GetTextSpan(defaultExpr), 0.0) { IsSingle = true },
+            "decimal" or "Decimal" => new DecimalLiteralNode(GetTextSpan(defaultExpr), 0m),
             "bool" or "Boolean" => new BoolLiteralNode(GetTextSpan(defaultExpr), false),
             "string" or "String" => new ReferenceNode(GetTextSpan(defaultExpr), "null"),
             _ => new ReferenceNode(GetTextSpan(defaultExpr), "default")
@@ -11855,7 +11870,9 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
 
             // Only convert to block-level collection nodes if there ARE initializer elements.
             // Empty collections (new List<T>(), new HashSet<T>()) should stay as §NEW for inline use.
-            var hasInitializer = objCreation.Initializer?.Expressions.Count > 0;
+            // #1524: `new List<int> { Capacity = 20 }` is an object initializer, not elements.
+            var hasInitializer = objCreation.Initializer?.Expressions.Count > 0
+                && objCreation.Initializer.IsKind(SyntaxKind.CollectionInitializerExpression);
             if (typeName == "List" && typeArgs.Count == 1 && !hasCtorArgs && hasInitializer == true)
             {
                 return ConvertListCreation(objCreation, typeArgs[0]);
@@ -11873,6 +11890,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         // #1524: initializer forms that §NEW cannot express faithfully are kept as C#.
         if (RequiresVerbatimObjectInitializer(objCreation))
             return PreserveObjectInitializer(objCreation);
+        var pendingBefore = _pendingStatements.Count;
 
         var args = objCreation.ArgumentList?.Arguments
             .Select(a =>
@@ -11937,6 +11955,12 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                     initializers.Add(new ObjectInitializerAssignment($"_item{initializers.Count}", value));
                 }
             }
+
+            // #1524: a value that needed a hoisted statement (i++, an assignment, a
+            // block-level collection, ...) would run before the constructor. Undo the
+            // hoists, including the arguments', and keep the creation as C#.
+            if (_pendingStatements.Count > pendingBefore)
+                return RollBackAndPreserveObjectInitializer(objCreation, pendingBefore);
         }
 
         return new NewExpressionNode(GetTextSpan(objCreation), typeName, typeArgs, args, initializers);
@@ -12357,9 +12381,8 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     /// collection-initializer elements, indexer or nested-member targets,
     /// nested initializers (<c>Prop = { ... }</c> mutates the existing member),
     /// creations inside interpolation holes (whose inline form has no initializer
-    /// slot), collection values that would be hoisted ahead of the constructor while
-    /// they contain non-constant operands or sit outside a simple statement, and any
-    /// such collection value under target-typed new (rewritten without its elements).
+    /// slot). Values that need a hoisted statement are detected after conversion
+    /// (see <see cref="RollBackAndPreserveObjectInitializer"/>).
     /// </summary>
     private bool RequiresVerbatimObjectInitializer(BaseObjectCreationExpressionSyntax creation)
     {
@@ -12373,72 +12396,22 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 || !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression)
                 || assignment.Right is InitializerExpressionSyntax)
                 return true;
-            if (IsHoistedCollectionValue(assignment.Right)
-                && (creation is ImplicitObjectCreationExpressionSyntax
-                    || !HasOnlyConstantOperands(assignment.Right)
-                    || !IsInSimpleStatement(creation)))
-                return true;
         }
         return false;
     }
 
-    // A hoisted temp binding lands just before the enclosing statement. That keeps
-    // per-evaluation semantics only for simple statements outside lambdas and local
-    // functions; member initializers have no statement to hoist into.
-    private static bool IsInSimpleStatement(SyntaxNode node) =>
-        node.Ancestors().FirstOrDefault(ancestor => ancestor is StatementSyntax
-                or AnonymousFunctionExpressionSyntax or MemberDeclarationSyntax)
-            is LocalDeclarationStatementSyntax or ExpressionStatementSyntax or ReturnStatementSyntax;
-
-    // Values ConvertObjectCreation turns into block-level §LIST/§SET/§ARR2D nodes
-    // (IsBlockLevelCollection). The explicit-new path hoists them into a temp binding
-    // before the enclosing statement; the target-typed path rewrites them with
-    // ConvertBlockLevelCollectionToNew, which keeps only empty collections intact.
-    // Other creations either stay inline or are preserved verbatim on their own.
-    private static bool IsHoistedCollectionValue(ExpressionSyntax value) => value switch
+    private ExpressionNode RollBackAndPreserveObjectInitializer(
+        BaseObjectCreationExpressionSyntax creation, int pendingBefore)
     {
-        ObjectCreationExpressionSyntax
-        {
-            Type: GenericNameSyntax { Identifier.ValueText: "List" or "HashSet", TypeArgumentList.Arguments.Count: 1 },
-            Initializer.Expressions.Count: > 0
-        } creation => creation.ArgumentList?.Arguments.Count is not > 0,
-        ArrayCreationExpressionSyntax { Initializer: not null } array =>
-            array.Type.RankSpecifiers.Any(rank => rank.Rank > 1),
-        ImplicitArrayCreationExpressionSyntax implicitArray => implicitArray.Commas.Count > 0,
-        _ => false
-    };
+        _pendingStatements.RemoveRange(pendingBefore, _pendingStatements.Count - pendingBefore);
+        return PreserveObjectInitializer(creation);
+    }
 
-    // A hoisted value may move ahead of the constructor and earlier initializer
-    // values only when evaluating it has no observable effect or input: the
-    // collection's own creation with constant operands. A nested creation runs
-    // a constructor, so it is not constant.
-    private bool HasOnlyConstantOperands(ExpressionSyntax value, bool topLevel = true) => value switch
-    {
-        BaseObjectCreationExpressionSyntax when !topLevel => false,
-        BaseObjectCreationExpressionSyntax creation =>
-            (creation.ArgumentList?.Arguments.All(argument =>
-                argument.RefKindKeyword.IsKind(SyntaxKind.None)
-                && HasOnlyConstantOperands(argument.Expression, false)) ?? true)
-            && (creation.Initializer == null || HasOnlyConstantOperands(creation.Initializer, false)),
-        ArrayCreationExpressionSyntax array =>
-            array.Type.RankSpecifiers.SelectMany(rank => rank.Sizes)
-                .All(size => size is OmittedArraySizeExpressionSyntax || HasOnlyConstantOperands(size, false))
-            && (array.Initializer == null || HasOnlyConstantOperands(array.Initializer, false)),
-        ImplicitArrayCreationExpressionSyntax implicitArray => HasOnlyConstantOperands(implicitArray.Initializer, false),
-        InitializerExpressionSyntax initializer => initializer.Expressions.All(element => HasOnlyConstantOperands(element, false)),
-        CollectionExpressionSyntax collection => collection.Elements.All(element =>
-            element is ExpressionElementSyntax expressionElement
-            && HasOnlyConstantOperands(expressionElement.Expression, false)),
-        AssignmentExpressionSyntax { Left: IdentifierNameSyntax } member
-            when member.IsKind(SyntaxKind.SimpleAssignmentExpression) => HasOnlyConstantOperands(member.Right, false),
-        _ => _semanticModel?.GetConstantValue(value).HasValue ?? value is LiteralExpressionSyntax
-    };
-
-    private ExpressionNode PreserveObjectInitializer(BaseObjectCreationExpressionSyntax creation)
+    private ExpressionNode PreserveObjectInitializer(ExpressionSyntax creation)
     {
         _context.RecordFeatureUsage("object-initializer");
         _context.RecordLoss(ConversionLossKind.InteropPreserved, "object-initializer",
-            "Object creation with an initializer that §NEW cannot express preserved verbatim",
+            "Object initializer that §NEW cannot express preserved verbatim with its enclosing expression",
             creation.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
         return new RawCSharpExpressionNode(GetTextSpan(creation), creation.ToString());
     }
