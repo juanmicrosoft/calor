@@ -1,7 +1,7 @@
 {
   "candidate": {
-    "commit": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
-    "freezeObservedUtc": "2026-10-08T17:03:41Z",
+    "commit": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
+    "freezeObservedUtc": "2026-10-09T15:33:00Z",
     "version": "0.24.0"
   },
   "note": "Hand-recorded inputs to generate_candidate_manifest.py (merge commits from the GitHub API at the freeze; every one is re-verified against git by the generator and by CandidateManifestTests).",
@@ -210,6 +210,16 @@
       "mergeCommit": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
       "mergedAtUtc": "2026-10-08T17:02:32Z",
       "mergedViaPr": null
+    },
+    "1534": {
+      "mergeCommit": "7eca486822ce81871df0cfb0a6e0ae16cf5ce7b9",
+      "mergedAtUtc": "2026-10-08T18:42:38Z",
+      "mergedViaPr": null
+    },
+    "1537": {
+      "mergeCommit": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
+      "mergedAtUtc": "2026-10-09T15:32:39Z",
+      "mergedViaPr": null
     }
   },
   "gates": [
@@ -226,10 +236,11 @@
         1501,
         1504,
         1507,
-        1533
+        1533,
+        1537
       ],
       "evidence": "docs/plans/evidence/evidence-contract-1407/",
-      "closureStatus": "FROZEN, gate MET (contract.json gateStatus); contract 1.4.0 (amendment 1.4.0 reviewed in prep PR #1533)."
+      "closureStatus": "FROZEN, gate MET (contract.json gateStatus); contract 1.5.0 (amendment 1.4.0 reviewed in prep PR #1533, amendment 1.5.0 in prep PR #1537)."
     },
     {
       "gate": "R1",
@@ -282,7 +293,7 @@
         1486
       ],
       "evidence": "docs/plans/evidence/g2-1421/",
-      "closureStatus": "Protocol 1.4.0 FROZEN-AT-MERGE. Amendment 1.4.0 (registers the 62 S2 Verification tests, 1 test in a registered compiler class, and the 6 S2 compiler classes) was made by prep PR #1533, not a G2 PR (maintainer decision PREP-PR-ACCOUNTING)."
+      "closureStatus": "Protocol 1.5.0 FROZEN-AT-MERGE. Amendment 1.4.0 (prep PR #1533) registered the S2 tests and classes; amendment 1.5.0 (prep PR #1537) added the harness-cut rule, Windows jobs of 110 minutes, and a fourth execution bound to the #1537 merge commit. Neither is a G2 PR (maintainer decisions PREP-PR-ACCOUNTING, AMEND-AND-3RD-FREEZE)."
     },
     {
       "gate": "G3",
@@ -292,7 +303,7 @@
         1500
       ],
       "evidence": "docs/plans/evidence/g3-1135/",
-      "closureStatus": "NOT CLOSED on the candidate. Execution 1 NON-DETERMINISTIC; execution 2 (DETERMINISTIC, commit d42d0313, protocol 1.3.0) predates the S2 repairs and protocol 1.4.0, so it establishes nothing here. Its records are committed by C2 (#1517) under docs/plans/evidence/c2-1424/g3-exec-2/ and stay parked on branch evidence/g3-1135-exec-2. C2 regeneration 2 runs the protocol on this candidate."
+      "closureStatus": "NOT CLOSED on the candidate. Execution 1 NON-DETERMINISTIC; execution 2 (DETERMINISTIC, d42d0313, protocol 1.3.0) predates the S2 repairs; execution 3 (c2-1424-regen-2, 5e52d8ab, protocol 1.4.0) was NON-DETERMINISTIC only through one harness-cut attempt (C2 PR #1535, unmerged). C2 regeneration 3 runs the fourth and last execution, protocol 1.5.0, on this candidate."
     },
     {
       "gate": "G4",
@@ -385,6 +396,12 @@
       "pr": 1533,
       "title": "0.24 C1 prep: determinism protocol 1.4.0, contract amendment 1.4.0, final 0.24.0 notes (the candidate)",
       "evidence": "docs/plans/evidence/c1-1423/reviews/"
+    },
+    {
+      "issue": null,
+      "pr": 1537,
+      "title": "0.24: contract and determinism protocol amendment 1.5.0 (harness-cut rule; 3rd freeze) (the candidate)",
+      "evidence": "docs/plans/evidence/g2-1421/"
     }
   ],
   "openItems": [
@@ -416,7 +433,7 @@
       "id": "G3-NOT-CLOSED",
       "source": "docs/plans/evidence/g3-1135/README.md",
       "owner": "C2",
-      "item": "G3 is not closed on the candidate. Execution 2 (DETERMINISTIC, 2,137 AGREE-PASS) ran on d42d0313 under protocol 1.3.0, before the S2 repairs and protocol amendment 1.4.0, so it establishes nothing for this candidate. C2 (#1517) committed its records. C2 regeneration 2 runs protocol 1.4.0 on the candidate (the last of 3 executions; charged to regeneration-compute, contract amendment 1.2.0)."
+      "item": "G3 is not closed on the candidate. Executions 1-3 establish nothing for it: execution 1 was NON-DETERMINISTIC, execution 2 ran on d42d0313 before the S2 repairs, and execution 3 (c2-1424-regen-2 on 5e52d8ab) was NON-DETERMINISTIC through one harness-cut attempt. C2 regeneration 3 runs protocol 1.5.0 on this candidate: the fourth and last execution, allowed only on this merge commit (budget.extraExecution), within the 3,200 determinism-compute ceiling (contract 1.5.0). A further failure is MILESTONE-FAILED."
     },
     {
       "id": "CHILD-ISSUES-OPEN",
@@ -435,7 +452,7 @@
       "id": "C1-TEST-COUNT-DELTA",
       "source": "this manifest invalidation.c1OwnedPaths",
       "owner": "C2",
-      "item": "The candidate's eng/test-manifest.json is the reference: Calor.Compiler.Tests expectedTotal 13,036 (3 skipped), which already includes C1 PR 1's 86 tests. C1 PR 2 adds 1 test (a supersession tamper control) after the candidate; a suite run at a later commit includes it and must say so."
+      "item": "The candidate's eng/test-manifest.json is the reference: Calor.Compiler.Tests expectedTotal 13,038 (3 skipped), which includes every C1 test so far. C1 PR 3 adds none; a suite run at a later commit must say whether it includes later tests."
     },
     {
       "id": "CLASSIFIER-NOT-A-TRIPWIRE",
@@ -502,7 +519,7 @@
     {
       "id": "determinism-runner",
       "title": "G2 determinism protocol runner and decider (#1421)",
-      "version": "protocolVersion 1.4.0",
+      "version": "protocolVersion 1.5.0",
       "directory": null,
       "files": [
         "scripts/determinism_protocol.py",
@@ -544,7 +561,7 @@
     {
       "id": "evidence-contract-validator",
       "title": "R0 validator (#1407)",
-      "version": "contract 1.4.0",
+      "version": "contract 1.5.0",
       "directory": "tests/Calor.Compiler.Tests/EvidenceContract/",
       "files": []
     },
@@ -601,7 +618,7 @@
   },
   "notes": {
     "statusNote": "The candidate is the commit below. This manifest lands after it, in the C1 pull request; the invalidation classifier (tests/Calor.Compiler.Tests/EvidenceContract/CandidateInvalidation.cs) decides whether any later commit invalidates it. Freezing is recorded, not authorized publication: nothing here publishes or releases.",
-    "mergeOf": "PR #1533 (preparation for the second re-freeze: determinism protocol 1.4.0, contract amendment 1.4.0, and the final 0.24.0 notes), merged on top of #1527 (B2 PR 2). Second re-freeze (C1 PR 2): supersedes 696ab824 after C2 regeneration 1 (see supersedes).",
+    "mergeOf": "PR #1537 (contract and determinism protocol amendment 1.5.0: the harness-cut rule, Windows jobs of 110 minutes, a fourth execution on this commit, determinism-compute 3,200, a third C1 freeze and a third C2 regeneration), merged on top of #1534 (C1 PR 2). Third freeze (C1 PR 3): supersedes 5e52d8ab (see supersedes).",
     "reachabilityRule": "Contract §6 / P1 DurableProvenance: full 40-hex SHA, ancestor of explicitly fetched refs/remotes/origin/main; shallow clone fails. Re-checked by CandidateManifestTests through DurableProvenance.Verify.",
     "freezeObservation": "git fetch origin; git rev-parse refs/remotes/origin/main returned the candidate when C1 started.",
     "submodulesSource": "git ls-tree <candidate> (every gitlink; .gitmodules URLs in inputContentHashes)",
@@ -713,7 +730,7 @@
   },
   "releasability": {
     "status": "RELEASABLE VERSION (no conflicting tag at the freeze)",
-    "history": "The first freeze (5ebdbee2, PR #1508 as first pushed) declared 0.22.0, already tagged at 72a0a855, so the R2 gate would fail G009. Maintainer decision RELEASE-VERSION-0.24.0: release prep PR #1509 merged first, and PR #1508 froze its merge 696ab824. C2 regeneration 1 (#1517) then found five causes that need candidate changes; after the fixes (#1523, #1525, #1526, #1527) and the prep PR #1533, C1 PR 2 re-freezes on the #1533 merge 5e52d8ab, still version 0.24.0 with no v0.24.0 tag.",
+    "history": "The first freeze (5ebdbee2, PR #1508 as first pushed) declared 0.22.0, already tagged at 72a0a855, so the R2 gate would fail G009. Maintainer decision RELEASE-VERSION-0.24.0: release prep PR #1509 merged first, and PR #1508 froze its merge 696ab824. C2 regeneration 1 (#1517) then found five causes that need candidate changes; after the fixes (#1523, #1525, #1526, #1527) and the prep PR #1533, C1 PR 2 re-freezes on the #1533 merge 5e52d8ab, still version 0.24.0 with no v0.24.0 tag. C2 regeneration 2 (#1535, unmerged) then failed only the determinism row, through one harness-cut attempt; after amendment 1.5.0 (#1537), C1 PR 3 re-freezes on the #1537 merge 04e61f18, still version 0.24.0 with no v0.24.0 tag.",
     "rule": "The generator fails unless the candidate declares the decided version and tag v<version> is absent or points at the candidate. A tag created later at another commit, or any version or notes change, invalidates the freeze."
   },
   "maintainerDecisions": [
@@ -758,6 +775,18 @@
       "date": "2026-10-08",
       "by": "@juanmicrosoft (relayed by the coordinating agent)",
       "decision": "#1533 is a release-preparation PR under FIX-ALL-5-REFREEZE-REGENERATE, not charged to G2 or C1."
+    },
+    {
+      "id": "AMEND-AND-3RD-FREEZE",
+      "date": "2026-10-08",
+      "by": "@juanmicrosoft (relayed by the coordinating agent)",
+      "decision": "\"Amend + 3rd freeze\": contract and protocol amendment 1.5.0 (harness-cut rule; one more protocol execution on the new candidate only), a third C1 freeze, and a third C2 regeneration; a further failure is MILESTONE-FAILED."
+    },
+    {
+      "id": "DETERMINISM-CEILING-3200",
+      "date": "2026-10-08",
+      "by": "@juanmicrosoft (relayed by the coordinating agent)",
+      "decision": "Raise the determinism-compute ceiling from 2,000 to 3,200 runner-minutes, with Windows job timeouts of 110 minutes (protocol worst case 4 x 795 = 3,180)."
     }
   ],
   "resolvedOpenItems": [
@@ -788,23 +817,41 @@
     {
       "id": "STALE-INVENTORY-ARTIFACTS",
       "resolvedBy": "Contract amendment 1.4.0 (#1533): no inventory artifact is stale, so R2's G008 no longer rejects every terminal record."
+    },
+    {
+      "id": "HARNESS-CUT-DISAGREEMENT",
+      "resolvedBy": "Protocol amendment 1.5.0 (#1537): a harness-cut invocation's filled values are no longer compared, so a cut gives INCOMPLETE, not DISAGREE; Windows jobs get 110 minutes. C2 regeneration 2's determinism failure stays reported as decided."
     }
   ],
   "supersedes": {
-    "commit": "696ab82470626164979a07792ed74932ab88d9e6",
-    "frozenBy": "C1 PR 1 (#1508), landed at fd34f41f0d5600b92b5868392e1ea3e1d1c197ff",
-    "manifestAtLanding": "fd34f41f0d5600b92b5868392e1ea3e1d1c197ff:docs/plans/evidence/c1-1423/candidate-manifest.json",
-    "reason": "C2 regeneration 1 (#1517) on 696ab824 was INCOMPLETE with 7 BLOCKED rows from 5 causes, each of which needs a candidate change: (1) the determinism protocol registered 411 Verification tests, the candidate has 473; (2) the 0.24.0 notes failed R2's G012 wording scan; (3) the B2 gate refused the candidate with B2-08 after C1's tests landed on main; (4) the performance ratchet Binding_MediumModule_Under500ms failed; (5) the packages and the website were not byte-reproducible. The review of the prep PR found a sixth: 9 inventory artifacts were still stale, so R2's G008 rejected every terminal record.",
-    "decision": "FIX-ALL-5-REFREEZE-REGENERATE (2026-10-07)",
+    "commit": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
+    "frozenBy": "C1 PR 2 (#1534), landed at 7eca486822ce81871df0cfb0a6e0ae16cf5ce7b9",
+    "manifestAtLanding": "7eca486822ce81871df0cfb0a6e0ae16cf5ce7b9:docs/plans/evidence/c1-1423/candidate-manifest.json",
+    "reason": "C2 regeneration 2 (PR #1535, open and unmerged) on 5e52d8ab passed every row except the determinism protocol. Its execution (run 37826943308) was NON-DETERMINISTIC (660 AGREE-PASS, 470 DISAGREE, 1,174 INCOMPLETE; 149 completed attempts and 1 invalid) only because the harness's own 75-minute job deadline cut the 15th attempt of win-x64 job 1, a slow runner, and the 1.4.0 decider compared that attempt's filled-in Timeout values; no two observed values differed. The candidate's frozen protocol refused a fourth execution, so the row would stay BLOCKED. Contract and protocol amendment 1.5.0 (#1537) fixed the rule, gave Windows jobs 110 minutes, and allowed one more execution on the new candidate, which changes the candidate.",
+    "decision": "AMEND-AND-3RD-FREEZE and DETERMINISM-CEILING-3200 (2026-10-08)",
     "changesSince": [
-      "#1508 C1 PR 1 (manifest and classifier for 696ab824)",
-      "#1523 notes wording (cause 2)",
-      "#1525 binding performance (cause 4)",
-      "#1526 byte-reproducible packages and website (cause 5)",
-      "#1517 C2 regeneration 1 records",
-      "#1527 B2 freshness scope and deterministic headline (cause 3)",
-      "#1533 protocol 1.4.0 (cause 1), contract amendment 1.4.0 (the stale inventory), final 0.24.0 notes"
+      "#1534 C1 PR 2 (manifest for 5e52d8ab)",
+      "#1537 contract and protocol amendment 1.5.0"
     ],
-    "consequence": "Stopping rule 4: every result of C2 regeneration 1 is invalid for the new candidate and stays on record as history (docs/plans/evidence/c2-1424/). C2 runs regeneration 2, the last one allowed (contract §9, counted as the maintainer instructed). The 696ab824 manifest stays in git history at the C1 PR 1 landing."
+    "consequence": "Stopping rule 4: every result of C2 regeneration 2 is invalid for the new candidate. Its records stay in PR #1535 as history if it merges, and its determinism result stays reported as decided (NON-DETERMINISTIC). C2 runs regeneration 3, the last one allowed (contract 1.5.0 exception for #1424). A further failure is MILESTONE-FAILED. The 5e52d8ab manifest stays in git at the C1 PR 2 landing.",
+    "previous": [
+      {
+        "commit": "696ab82470626164979a07792ed74932ab88d9e6",
+        "frozenBy": "C1 PR 1 (#1508), landed at fd34f41f0d5600b92b5868392e1ea3e1d1c197ff",
+        "manifestAtLanding": "fd34f41f0d5600b92b5868392e1ea3e1d1c197ff:docs/plans/evidence/c1-1423/candidate-manifest.json",
+        "reason": "C2 regeneration 1 (#1517) on 696ab824 was INCOMPLETE with 7 BLOCKED rows from 5 causes, each of which needs a candidate change: (1) the determinism protocol registered 411 Verification tests, the candidate has 473; (2) the 0.24.0 notes failed R2's G012 wording scan; (3) the B2 gate refused the candidate with B2-08 after C1's tests landed on main; (4) the performance ratchet Binding_MediumModule_Under500ms failed; (5) the packages and the website were not byte-reproducible. The review of the prep PR found a sixth: 9 inventory artifacts were still stale, so R2's G008 rejected every terminal record.",
+        "decision": "FIX-ALL-5-REFREEZE-REGENERATE (2026-10-07)",
+        "changesSince": [
+          "#1508 C1 PR 1 (manifest and classifier for 696ab824)",
+          "#1523 notes wording (cause 2)",
+          "#1525 binding performance (cause 4)",
+          "#1526 byte-reproducible packages and website (cause 5)",
+          "#1517 C2 regeneration 1 records",
+          "#1527 B2 freshness scope and deterministic headline (cause 3)",
+          "#1533 protocol 1.4.0 (cause 1), contract amendment 1.4.0 (the stale inventory), final 0.24.0 notes"
+        ],
+        "consequence": "Stopping rule 4: every result of C2 regeneration 1 is invalid for the new candidate and stays on record as history (docs/plans/evidence/c2-1424/). C2 runs regeneration 2, the last one allowed (contract §9, counted as the maintainer instructed). The 696ab824 manifest stays in git history at the C1 PR 1 landing."
+      }
+    ]
   }
 }

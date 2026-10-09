@@ -143,7 +143,7 @@ def build():
     check(len(submodules) == 3, f'expected 3 gitlinks (the corpus submodules), found {len(submodules)}')
 
     contract = jload('docs/plans/evidence/evidence-contract-1407/contract.json')
-    check(contract.get('contractVersion') == '1.4.0', 'contractVersion is not 1.4.0')
+    check(contract.get('contractVersion') == '1.5.0', 'contractVersion is not 1.5.0')
     check(contract.get('status') == 'FROZEN' and contract.get('gateStatus') == 'MET', 'contract not FROZEN/MET')
     pr_of_amendment = {a['version']: a['reviewedInPr'] for a in contract.get('amendmentLog', [])}
     amendments = []
@@ -153,7 +153,7 @@ def build():
         check(merge is not None and ancestor(merge), f'amendment {a["version"]} PR #{pr} merge is not an ancestor')
         amendments.append({'version': a['version'], 'timestampUtc': a['timestampUtc'], 'reviewedInPr': pr,
                            'mergeCommit': merge, 'afterDecisionBearingInspection': a['afterDecisionBearingInspection']})
-    check([a['version'] for a in amendments] == ['1.0.1', '1.1.0', '1.1.1', '1.2.0', '1.2.1', '1.3.0', '1.3.1', '1.3.2', '1.4.0'],
+    check([a['version'] for a in amendments] == ['1.0.1', '1.1.0', '1.1.1', '1.2.0', '1.2.1', '1.3.0', '1.3.1', '1.3.2', '1.4.0', '1.5.0'],
           f'amendment versions differ: {list(pr_of_amendment)}')
     log_bytes = ''.join(f'{a["version"]}|{a["timestampUtc"]}|{a["reviewedInPr"]}|'
                         f'{str(a["afterDecisionBearingInspection"]).lower()}|{a["mergeCommit"]}\n' for a in amendments).encode()
@@ -205,7 +205,7 @@ def build():
     check(not open_findings, f'S2 findings without an accepted disposition: {open_findings}')
 
     protocol = jload('docs/plans/evidence/g2-1421/protocol.json')
-    check(protocol.get('protocolVersion') == '1.4.0', 'G2 protocolVersion is not 1.4.0')
+    check(protocol.get('protocolVersion') == '1.5.0', 'G2 protocolVersion is not 1.5.0')
     inventory = jload('docs/plans/evidence/evidence-contract-1407/artifact-inventory.json')
     stale = [a['id'] for a in inventory.get('artifacts', []) if a.get('classification') == 'stale']
     check(not stale, f'inventory artifacts still stale (R2 G008 would reject every terminal record): {stale}')

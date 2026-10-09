@@ -22,12 +22,13 @@ public class CandidateManifestTests
     [Fact]
     public void CandidateIsTheReleasePrepMergeAndDeclaresTheReleaseVersion()
     {
-        // Second re-freeze (C1 PR 2): the candidate is the merge of prep PR #1533 and supersedes 696ab824.
+        // Third freeze (C1 PR 3): the candidate is the merge of amendment PR #1537 and supersedes 5e52d8ab (which superseded 696ab824).
         var manifest = Manifest();
         var candidate = Str(manifest["candidate"]!["commit"]);
         Assert.Matches("^[0-9a-f]{40}$", candidate);
-        Assert.Contains(manifest["additionalMerged"]!.AsArray(), p => Str(p!["mergeCommit"]) == candidate && p["pr"]!.GetValue<int>() == 1533);
-        Assert.Equal("696ab82470626164979a07792ed74932ab88d9e6", Str(manifest["supersedes"]!["commit"]));
+        Assert.Contains(manifest["additionalMerged"]!.AsArray(), p => Str(p!["mergeCommit"]) == candidate && p["pr"]!.GetValue<int>() == 1537);
+        Assert.Equal("5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d", Str(manifest["supersedes"]!["commit"]));
+        Assert.Equal("696ab82470626164979a07792ed74932ab88d9e6", Str(manifest["supersedes"]!["previous"]![0]!["commit"]));
         var props = System.Text.Encoding.UTF8.GetString(Git().ReadBlob($"{candidate}:Directory.Build.props")!);
         Assert.Contains($"<Version>{Str(manifest["releasability"]!["versionAtCandidate"])}</Version>", props);
         Assert.Equal("0.24.0", Str(manifest["releasability"]!["versionAtCandidate"]));
@@ -115,7 +116,7 @@ public class CandidateManifestTests
     /// <summary>The accepted child set: every merged PR of every gate, as reviewed in C1.</summary>
     private static readonly Dictionary<string, int[]> GatePrs = new()
     {
-        ["R0"] = [1466, 1470, 1477, 1478, 1484, 1488, 1501, 1504, 1507, 1533], ["R1"] = [1476], ["S1"] = [1480],
+        ["R0"] = [1466, 1470, 1477, 1478, 1484, 1488, 1501, 1504, 1507, 1533, 1537], ["R1"] = [1476], ["S1"] = [1480],
         ["S2"] = [1494, 1495, 1496, 1497, 1498, 1502, 1503, 1499], ["G1"] = [1471], ["G2"] = [1479, 1486],
         ["G3"] = [1492, 1500], ["G4"] = [1481], ["P1"] = [1472], ["B1"] = [1473, 1482], ["B2"] = [1487, 1527], ["R2"] = [1474, 1475],
     };

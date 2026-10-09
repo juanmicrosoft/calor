@@ -3,30 +3,30 @@
   "issue": 1423,
   "gate": "C1",
   "epic": 1409,
-  "contractVersion": "1.4.0",
+  "contractVersion": "1.5.0",
   "status": "FROZEN-AT-MERGE",
   "statusNote": "The candidate is the commit below. This manifest lands after it, in the C1 pull request; the invalidation classifier (tests/Calor.Compiler.Tests/EvidenceContract/CandidateInvalidation.cs) decides whether any later commit invalidates it. Freezing is recorded, not authorized publication: nothing here publishes or releases.",
   "candidate": {
-    "commit": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
-    "committedUtc": "2026-10-08T17:02:32Z",
-    "mergeOf": "PR #1533 (preparation for the second re-freeze: determinism protocol 1.4.0, contract amendment 1.4.0, and the final 0.24.0 notes), merged on top of #1527 (B2 PR 2). Second re-freeze (C1 PR 2): supersedes 696ab824 after C2 regeneration 1 (see supersedes).",
+    "commit": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
+    "committedUtc": "2026-10-09T15:32:39Z",
+    "mergeOf": "PR #1537 (contract and determinism protocol amendment 1.5.0: the harness-cut rule, Windows jobs of 110 minutes, a fourth execution on this commit, determinism-compute 3,200, a third C1 freeze and a third C2 regeneration), merged on top of #1534 (C1 PR 2). Third freeze (C1 PR 3): supersedes 5e52d8ab (see supersedes).",
     "durableIdentity": {
       "status": "complete",
-      "commit": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
+      "commit": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
       "resolvedVia": "refs/remotes/origin/main",
       "treeHashes": {
-        "/": "98bfaf4de78869d621f19859f3603f6e70162439",
+        "/": "2191429e4515ce595d9db561e0985c1538ada894",
         "src": "59eb742f856a91be2dc7c4966907f407b66a198f",
-        "tests": "bdc8e72551def7d363a9434c01bd9313a53a615a",
+        "tests": "a374fa8d7531a93fe76e722ecf849c66b45e6d93",
         "tools": "bada36343814a4f660e14e15dac3d53e22c9b063",
         "bench": "baba5ad9744c2ef9f7f1f7775605653f225221c6",
-        "eng": "c0eaeb87c88b2624df9c26eaabd7ecd2927a64e7",
-        "scripts": "23be1bfd313b92f5b948ea5cbe57d9711b6bf9ab",
+        "eng": "dde2351f5cecee4405640fe260b73c022aec9764",
+        "scripts": "5a62eef6fb8fbac46a4dec1536a6291f951a7db8",
         ".github": "43f418296f245873e89e5300d197b7c102c49b0a",
         ".claude": "52dd3dd9cf6eaf18533a143fa9023a713242757e",
         "website": "edda1fbff3924f30c82dd6a3373c30d6e70fe7a8",
         "samples": "a0d11f5e4f8b2f7403db9e510be3bb895a221eb4",
-        "docs": "516c0c0eb6fcee60dab7b23b10028267b060ba93"
+        "docs": "9526068974a996931f34169b47bb7142dfacc4fa"
       },
       "inputContentHashes": {
         "global.json": "227cbaa2d0d270b2046476fb1a021c49f8ae144a67843a727e34bcdb8e527d97",
@@ -36,7 +36,7 @@
         ".github/z3-binaries-4.15.7.sha256": "51849255fe9a63dc8f606c1762964c028f493c90f0d98ab61a0ab141b2af23e2",
         "src/Calor.Compiler/scripts/z3-upstream-4.15.7.sha256": "31dff6fce97fb568abb7ea3f691321df1e6312a3ea5a61dfb9258ce051a1e749",
         "eng/z3-consumers.json": "f79a69336939e1183398bdfbfc4147ceee9067b0070dcb60736c2efd8608ade2",
-        "eng/test-manifest.json": "4354d41eb82c3626248712ffdd2e92dd4e67200c2a6128d8921a7926f8440b0b",
+        "eng/test-manifest.json": "5225533d11ce7433454a5b26c0e003eae985f8b2549ee225a6b09e14a0644f29",
         "eng/tier2-fixture-expectations.json": "af631574b775030ec34ab568118a919260c195a6e8f1a63ae25f0b9b4ca88e8b",
         ".github/actions/bootstrap-z3/action.yml": "0c6a297b22a2a2fdb15291fd94e811974117f4bca4e405f632ba9468a859d207",
         "src/Calor.Compiler/scripts/download-z3.sh": "217e48e279736e4244a48e0df0d5d25433499735851c6aaafb1aecfa32813f23",
@@ -51,8 +51,8 @@
     },
     "reachability": {
       "rule": "Contract §6 / P1 DurableProvenance: full 40-hex SHA, ancestor of explicitly fetched refs/remotes/origin/main; shallow clone fails. Re-checked by CandidateManifestTests through DurableProvenance.Verify.",
-      "originMainAtFreeze": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
-      "freezeObservedUtc": "2026-10-08T17:03:41Z",
+      "originMainAtFreeze": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
+      "freezeObservedUtc": "2026-10-09T15:33:00Z",
       "freezeObservation": "git fetch origin; git rev-parse refs/remotes/origin/main returned the candidate when C1 started."
     }
   },
@@ -311,7 +311,7 @@
           "oracle-isolated"
         ],
         "memoryGiB": 16,
-        "jobTimeoutMinutes": 75
+        "jobTimeoutMinutes": 110
       },
       {
         "id": "win-arm64",
@@ -325,7 +325,7 @@
           "oracle-isolated"
         ],
         "memoryGiB": 16,
-        "jobTimeoutMinutes": 75
+        "jobTimeoutMinutes": 110
       }
     ],
     "runnerImages": {
@@ -472,11 +472,11 @@
     {
       "id": "determinism-runner",
       "title": "G2 determinism protocol runner and decider (#1421)",
-      "version": "protocolVersion 1.4.0",
+      "version": "protocolVersion 1.5.0",
       "files": {
         ".github/workflows/determinism-protocol.yml": "5720d942bc0ff57d3e7e66f2470856177aceb6ae8c45ad05d76ff52dcbce9cf3",
-        "scripts/determinism_protocol.py": "3e743d9de4d937f9c7ece6b7b42bc76126e62f3a158a5594a3a065a045a97851",
-        "scripts/determinism_runner.py": "38688b19a99a851a9a840de7433b6f9f0ddc07b374ffb4abb342d1df5a817ba0",
+        "scripts/determinism_protocol.py": "fae372a4a674eb7ca9f0a7c265bbc8d19c6c0d9976e4a6cbcf989d3ca5f7c216",
+        "scripts/determinism_runner.py": "b201f5a1a058557fba7a2c51d510ffc05b43b8866666dc765d2595c1e070239b",
         "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DeterminismRecord.cs": "843ca71153522985c90010fe71ff3a2e6d94ff1d2bb48535c3cfd7de9d3a9498",
         "tests/Calor.Verification.Tests/VerifierRuntimeDifferential/DifferentialModels.cs": "d1d74423a8b28d4b2d2ae35b38a65cad4994797646ff3509a497d9b6e5ec53dc"
       }
@@ -510,7 +510,7 @@
     {
       "id": "evidence-contract-validator",
       "title": "R0 validator (#1407)",
-      "version": "contract 1.4.0",
+      "version": "contract 1.5.0",
       "files": {
         "tests/Calor.Compiler.Tests/EvidenceContract/BenchmarkRegistrationTests.cs": "b7368ebf71c9740b60c3d8cd70f86c8733a5630137046f765fce97507dca0bdc",
         "tests/Calor.Compiler.Tests/EvidenceContract/BenchmarkRegistrationValidator.cs": "f7c952797c03e3ea36b8d879c1e6019a767583fc3690f377638c17f9e5bdd536",
@@ -518,9 +518,9 @@
         "tests/Calor.Compiler.Tests/EvidenceContract/BenchmarkResultsValidator.cs": "39bdb6b45bec71683a4d34087341b7179334e858bb260bc3fbbe90c3d328c0cf",
         "tests/Calor.Compiler.Tests/EvidenceContract/CandidateInvalidation.cs": "9af12def535e5f855425bf4a0e3f88fedbdf056cfe8013316149f6f5fbee180f",
         "tests/Calor.Compiler.Tests/EvidenceContract/CandidateInvalidationTests.cs": "80e980fb12886be93b169ecf18d13646c3a7a08a39db40e5153244c64e13f62a",
-        "tests/Calor.Compiler.Tests/EvidenceContract/CandidateManifestTests.cs": "91f1f2fb564125f570093413fd08e0608e74864c31dc2eabd7bbe6fc1cdecffb",
-        "tests/Calor.Compiler.Tests/EvidenceContract/EvidenceContractTests.cs": "76cab0cb45aee037d892287ed950e22558217ba92581b16974c6bb93060c045b",
-        "tests/Calor.Compiler.Tests/EvidenceContract/EvidenceContractValidator.cs": "2d458fe18dba3876d86dfad3674b90b47a013ccef66c6da537546eaebbf94f84"
+        "tests/Calor.Compiler.Tests/EvidenceContract/CandidateManifestTests.cs": "ad9c0ab16a97e6ce9ce72ee2609a3c80b874fc554b8284fc82b4ac66b64dd01e",
+        "tests/Calor.Compiler.Tests/EvidenceContract/EvidenceContractTests.cs": "023285b6ab14feb86ff5bc053e564275d37b517ab28353d1e979f3e4cebb0832",
+        "tests/Calor.Compiler.Tests/EvidenceContract/EvidenceContractValidator.cs": "4bbb22301fc29fe54b414bac53eaaeb3b67dcd8e622a6bc1db89c79c8abfe586"
       }
     },
     {
@@ -536,14 +536,14 @@
   "contractPacket": {
     "sha256Json": {
       "path": "docs/plans/evidence/evidence-contract-1407/sha256.json",
-      "sha256": "f822414fcff3d21462cdcbd39c1177981e276cc7d0614a6c99ae7673a6b6aa65",
+      "sha256": "129fc1b74d5cc5ee23a6d876e1d25a95707468ec2042bf695c8c3fe96795bafd",
       "files": {
-        "docs/plans/v0.24-evidence-contract.md": "b71f62cbd0baaf70e5edbfd109b4254604f30170e6e631472f6371bf7bc09406",
-        "docs/plans/evidence/evidence-contract-1407/contract.json": "f225e6bb67e8b0434a53f6ae45041505097645d98cfdc474b2d22d9116e3dee6",
-        "docs/plans/evidence/evidence-contract-1407/artifact-inventory.json": "ecddbf28fd5bca58c95ab6eb350fc85adcbde184f8f61b1cde15df329562dc08"
+        "docs/plans/v0.24-evidence-contract.md": "38b9303115d058977cd03216e7e9d0a6d77dc7d51a3d627724f1dba444a0adc4",
+        "docs/plans/evidence/evidence-contract-1407/contract.json": "91bcfff0f21bd04437de90bd7cd7cc221e3982051007b47b52985ca7b32ebfb8",
+        "docs/plans/evidence/evidence-contract-1407/artifact-inventory.json": "db013ef25998dc0b571b490209dc59591180763e2d310adfaaa493688c719155"
       }
     },
-    "contractVersion": "1.4.0",
+    "contractVersion": "1.5.0",
     "status": "FROZEN",
     "gateStatus": "MET",
     "acceptance": {
@@ -614,17 +614,24 @@
         "reviewedInPr": 1533,
         "mergeCommit": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
         "afterDecisionBearingInspection": true
+      },
+      {
+        "version": "1.5.0",
+        "timestampUtc": "2026-10-09T14:19:51Z",
+        "reviewedInPr": 1537,
+        "mergeCommit": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
+        "afterDecisionBearingInspection": true
       }
     ],
-    "amendmentLogSha256": "1686c1120906fae1683008ad25d87c65d841edbbb7047cb4dc3514ac73a58090",
+    "amendmentLogSha256": "01ee052621f6ba00d1dea848bc6949a89912311fe46f3c5387387debeeb1bc59",
     "amendmentLogHashRule": "SHA-256 over one UTF-8 line per entry, \"version|timestampUtc|reviewedInPr|afterDecisionBearingInspection|mergeCommit\\n\". The full log text (justifications, inspection statements) is bound by the contract.json hash in sha256Json.files."
   },
   "registeredManifests": {
     "packets": [
       {
         "path": "docs/plans/evidence/evidence-contract-1407/sha256.json",
-        "sha256": "f822414fcff3d21462cdcbd39c1177981e276cc7d0614a6c99ae7673a6b6aa65",
-        "sha256LF": "f822414fcff3d21462cdcbd39c1177981e276cc7d0614a6c99ae7673a6b6aa65",
+        "sha256": "129fc1b74d5cc5ee23a6d876e1d25a95707468ec2042bf695c8c3fe96795bafd",
+        "sha256LF": "129fc1b74d5cc5ee23a6d876e1d25a95707468ec2042bf695c8c3fe96795bafd",
         "normalization": "LF",
         "fileCount": 3,
         "verifiedAtCandidate": true
@@ -647,8 +654,8 @@
       },
       {
         "path": "docs/plans/evidence/g2-1421/sha256.json",
-        "sha256": "5ebe95dba27444fa4d9906420f63ce95e85d1c33f04a81449e061a334fc90a06",
-        "sha256LF": "5ebe95dba27444fa4d9906420f63ce95e85d1c33f04a81449e061a334fc90a06",
+        "sha256": "bb29e2d496065bc94e1f45c50becd9ab24873265aa9c7f2f8a128ae87436f18d",
+        "sha256LF": "bb29e2d496065bc94e1f45c50becd9ab24873265aa9c7f2f8a128ae87436f18d",
         "normalization": "LF",
         "fileCount": 9,
         "verifiedAtCandidate": true
@@ -671,7 +678,7 @@
       }
     ],
     "files": {
-      "docs/plans/evidence/g2-1421/protocol.json": "d52ba29c617e58fe8a169c44793af17c74893f5554d3807a611ae703c93a16f6",
+      "docs/plans/evidence/g2-1421/protocol.json": "c360412f603df5930d0330c948c3f4425a4d3229040fa41fa2b5e7190f8f700e",
       "docs/plans/evidence/g2-1421/cases.json": "00c8a7153f2502704ffa573b6c7778b07dc18a13c12350d7ca6a8f7368c15b5b",
       "docs/plans/evidence/r1-1419/registration.json": "e77db9643cbefa02169b854be31cbd6595764eb162cbae824a366518ea34c9f9",
       "docs/plans/evidence/r1-1419/manifest-B1.json": "eef324d77f1980670e3ad7c9b09ecd28166febbdd39596ccbf3a880fe5ea749f",
@@ -680,9 +687,9 @@
       "docs/plans/evidence/b1-1276/results/pair-manifest.json": "eec09eab95c60c18b650bd70ee7ad4f807d649cf2f2800665a4f9589a6fe1813",
       "docs/plans/evidence/s2-1413/dispositions.json": "d87c881a00c4bb3d3450f6a8c6fdd2b313423c0835670c83a857d43fbbdf10cb",
       "docs/plans/evidence/g3-1135/ledger.json": "0239b926aaa49288dcd4e96d25f6c7debfb16be40732b346069214d8abcbc574",
-      "docs/plans/evidence/evidence-contract-1407/artifact-inventory.json": "ecddbf28fd5bca58c95ab6eb350fc85adcbde184f8f61b1cde15df329562dc08"
+      "docs/plans/evidence/evidence-contract-1407/artifact-inventory.json": "db013ef25998dc0b571b490209dc59591180763e2d310adfaaa493688c719155"
     },
-    "g2ProtocolVersion": "1.4.0"
+    "g2ProtocolVersion": "1.5.0"
   },
   "acceptedChildren": [
     {
@@ -748,11 +755,17 @@
           "mergeCommit": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
           "mergedAtUtc": "2026-10-08T17:02:32Z",
           "ancestorOfCandidate": true
+        },
+        {
+          "pr": 1537,
+          "mergeCommit": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
+          "mergedAtUtc": "2026-10-09T15:32:39Z",
+          "ancestorOfCandidate": true
         }
       ],
       "evidence": "docs/plans/evidence/evidence-contract-1407/",
       "issueStateAtFreeze": "OPEN",
-      "closureStatus": "FROZEN, gate MET (contract.json gateStatus); contract 1.4.0 (amendment 1.4.0 reviewed in prep PR #1533)."
+      "closureStatus": "FROZEN, gate MET (contract.json gateStatus); contract 1.5.0 (amendment 1.4.0 reviewed in prep PR #1533, amendment 1.5.0 in prep PR #1537)."
     },
     {
       "gate": "R1",
@@ -875,7 +888,7 @@
       ],
       "evidence": "docs/plans/evidence/g2-1421/",
       "issueStateAtFreeze": "OPEN",
-      "closureStatus": "Protocol 1.4.0 FROZEN-AT-MERGE. Amendment 1.4.0 (registers the 62 S2 Verification tests, 1 test in a registered compiler class, and the 6 S2 compiler classes) was made by prep PR #1533, not a G2 PR (maintainer decision PREP-PR-ACCOUNTING)."
+      "closureStatus": "Protocol 1.5.0 FROZEN-AT-MERGE. Amendment 1.4.0 (prep PR #1533) registered the S2 tests and classes; amendment 1.5.0 (prep PR #1537) added the harness-cut rule, Windows jobs of 110 minutes, and a fourth execution bound to the #1537 merge commit. Neither is a G2 PR (maintainer decisions PREP-PR-ACCOUNTING, AMEND-AND-3RD-FREEZE)."
     },
     {
       "gate": "G3",
@@ -896,7 +909,7 @@
       ],
       "evidence": "docs/plans/evidence/g3-1135/",
       "issueStateAtFreeze": "OPEN",
-      "closureStatus": "NOT CLOSED on the candidate. Execution 1 NON-DETERMINISTIC; execution 2 (DETERMINISTIC, commit d42d0313, protocol 1.3.0) predates the S2 repairs and protocol 1.4.0, so it establishes nothing here. Its records are committed by C2 (#1517) under docs/plans/evidence/c2-1424/g3-exec-2/ and stay parked on branch evidence/g3-1135-exec-2. C2 regeneration 2 runs the protocol on this candidate."
+      "closureStatus": "NOT CLOSED on the candidate. Execution 1 NON-DETERMINISTIC; execution 2 (DETERMINISTIC, d42d0313, protocol 1.3.0) predates the S2 repairs; execution 3 (c2-1424-regen-2, 5e52d8ab, protocol 1.4.0) was NON-DETERMINISTIC only through one harness-cut attempt (C2 PR #1535, unmerged). C2 regeneration 3 runs the fourth and last execution, protocol 1.5.0, on this candidate."
     },
     {
       "gate": "G4",
@@ -1058,6 +1071,15 @@
       "mergedAtUtc": "2026-10-08T17:02:32Z",
       "ancestorOfCandidate": true,
       "evidence": "docs/plans/evidence/c1-1423/reviews/"
+    },
+    {
+      "issue": null,
+      "pr": 1537,
+      "title": "0.24: contract and determinism protocol amendment 1.5.0 (harness-cut rule; 3rd freeze) (the candidate)",
+      "mergeCommit": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
+      "mergedAtUtc": "2026-10-09T15:32:39Z",
+      "ancestorOfCandidate": true,
+      "evidence": "docs/plans/evidence/g2-1421/"
     }
   ],
   "s2Closure": {
@@ -1168,7 +1190,7 @@
   },
   "releasability": {
     "status": "RELEASABLE VERSION (no conflicting tag at the freeze)",
-    "history": "The first freeze (5ebdbee2, PR #1508 as first pushed) declared 0.22.0, already tagged at 72a0a855, so the R2 gate would fail G009. Maintainer decision RELEASE-VERSION-0.24.0: release prep PR #1509 merged first, and PR #1508 froze its merge 696ab824. C2 regeneration 1 (#1517) then found five causes that need candidate changes; after the fixes (#1523, #1525, #1526, #1527) and the prep PR #1533, C1 PR 2 re-freezes on the #1533 merge 5e52d8ab, still version 0.24.0 with no v0.24.0 tag.",
+    "history": "The first freeze (5ebdbee2, PR #1508 as first pushed) declared 0.22.0, already tagged at 72a0a855, so the R2 gate would fail G009. Maintainer decision RELEASE-VERSION-0.24.0: release prep PR #1509 merged first, and PR #1508 froze its merge 696ab824. C2 regeneration 1 (#1517) then found five causes that need candidate changes; after the fixes (#1523, #1525, #1526, #1527) and the prep PR #1533, C1 PR 2 re-freezes on the #1533 merge 5e52d8ab, still version 0.24.0 with no v0.24.0 tag. C2 regeneration 2 (#1535, unmerged) then failed only the determinism row, through one harness-cut attempt; after amendment 1.5.0 (#1537), C1 PR 3 re-freezes on the #1537 merge 04e61f18, still version 0.24.0 with no v0.24.0 tag.",
     "rule": "The generator fails unless the candidate declares the decided version and tag v<version> is absent or points at the candidate. A tag created later at another commit, or any version or notes change, invalidates the freeze.",
     "versionAtCandidate": "0.24.0",
     "tagAtFreeze": null
@@ -1215,6 +1237,18 @@
       "date": "2026-10-08",
       "by": "@juanmicrosoft (relayed by the coordinating agent)",
       "decision": "#1533 is a release-preparation PR under FIX-ALL-5-REFREEZE-REGENERATE, not charged to G2 or C1."
+    },
+    {
+      "id": "AMEND-AND-3RD-FREEZE",
+      "date": "2026-10-08",
+      "by": "@juanmicrosoft (relayed by the coordinating agent)",
+      "decision": "\"Amend + 3rd freeze\": contract and protocol amendment 1.5.0 (harness-cut rule; one more protocol execution on the new candidate only), a third C1 freeze, and a third C2 regeneration; a further failure is MILESTONE-FAILED."
+    },
+    {
+      "id": "DETERMINISM-CEILING-3200",
+      "date": "2026-10-08",
+      "by": "@juanmicrosoft (relayed by the coordinating agent)",
+      "decision": "Raise the determinism-compute ceiling from 2,000 to 3,200 runner-minutes, with Windows job timeouts of 110 minutes (protocol worst case 4 x 795 = 3,180)."
     }
   ],
   "knownOpenItems": [
@@ -1246,7 +1280,7 @@
       "id": "G3-NOT-CLOSED",
       "source": "docs/plans/evidence/g3-1135/README.md",
       "owner": "C2",
-      "item": "G3 is not closed on the candidate. Execution 2 (DETERMINISTIC, 2,137 AGREE-PASS) ran on d42d0313 under protocol 1.3.0, before the S2 repairs and protocol amendment 1.4.0, so it establishes nothing for this candidate. C2 (#1517) committed its records. C2 regeneration 2 runs protocol 1.4.0 on the candidate (the last of 3 executions; charged to regeneration-compute, contract amendment 1.2.0)."
+      "item": "G3 is not closed on the candidate. Executions 1-3 establish nothing for it: execution 1 was NON-DETERMINISTIC, execution 2 ran on d42d0313 before the S2 repairs, and execution 3 (c2-1424-regen-2 on 5e52d8ab) was NON-DETERMINISTIC through one harness-cut attempt. C2 regeneration 3 runs protocol 1.5.0 on this candidate: the fourth and last execution, allowed only on this merge commit (budget.extraExecution), within the 3,200 determinism-compute ceiling (contract 1.5.0). A further failure is MILESTONE-FAILED."
     },
     {
       "id": "CHILD-ISSUES-OPEN",
@@ -1265,7 +1299,7 @@
       "id": "C1-TEST-COUNT-DELTA",
       "source": "this manifest invalidation.c1OwnedPaths",
       "owner": "C2",
-      "item": "The candidate's eng/test-manifest.json is the reference: Calor.Compiler.Tests expectedTotal 13,036 (3 skipped), which already includes C1 PR 1's 86 tests. C1 PR 2 adds 1 test (a supersession tamper control) after the candidate; a suite run at a later commit includes it and must say so."
+      "item": "The candidate's eng/test-manifest.json is the reference: Calor.Compiler.Tests expectedTotal 13,038 (3 skipped), which includes every C1 test so far. C1 PR 3 adds none; a suite run at a later commit must say whether it includes later tests."
     },
     {
       "id": "CLASSIFIER-NOT-A-TRIPWIRE",
@@ -1302,24 +1336,42 @@
     {
       "id": "STALE-INVENTORY-ARTIFACTS",
       "resolvedBy": "Contract amendment 1.4.0 (#1533): no inventory artifact is stale, so R2's G008 no longer rejects every terminal record."
+    },
+    {
+      "id": "HARNESS-CUT-DISAGREEMENT",
+      "resolvedBy": "Protocol amendment 1.5.0 (#1537): a harness-cut invocation's filled values are no longer compared, so a cut gives INCOMPLETE, not DISAGREE; Windows jobs get 110 minutes. C2 regeneration 2's determinism failure stays reported as decided."
     }
   ],
   "supersedes": {
-    "commit": "696ab82470626164979a07792ed74932ab88d9e6",
-    "frozenBy": "C1 PR 1 (#1508), landed at fd34f41f0d5600b92b5868392e1ea3e1d1c197ff",
-    "manifestAtLanding": "fd34f41f0d5600b92b5868392e1ea3e1d1c197ff:docs/plans/evidence/c1-1423/candidate-manifest.json",
-    "reason": "C2 regeneration 1 (#1517) on 696ab824 was INCOMPLETE with 7 BLOCKED rows from 5 causes, each of which needs a candidate change: (1) the determinism protocol registered 411 Verification tests, the candidate has 473; (2) the 0.24.0 notes failed R2's G012 wording scan; (3) the B2 gate refused the candidate with B2-08 after C1's tests landed on main; (4) the performance ratchet Binding_MediumModule_Under500ms failed; (5) the packages and the website were not byte-reproducible. The review of the prep PR found a sixth: 9 inventory artifacts were still stale, so R2's G008 rejected every terminal record.",
-    "decision": "FIX-ALL-5-REFREEZE-REGENERATE (2026-10-07)",
+    "commit": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
+    "frozenBy": "C1 PR 2 (#1534), landed at 7eca486822ce81871df0cfb0a6e0ae16cf5ce7b9",
+    "manifestAtLanding": "7eca486822ce81871df0cfb0a6e0ae16cf5ce7b9:docs/plans/evidence/c1-1423/candidate-manifest.json",
+    "reason": "C2 regeneration 2 (PR #1535, open and unmerged) on 5e52d8ab passed every row except the determinism protocol. Its execution (run 37826943308) was NON-DETERMINISTIC (660 AGREE-PASS, 470 DISAGREE, 1,174 INCOMPLETE; 149 completed attempts and 1 invalid) only because the harness's own 75-minute job deadline cut the 15th attempt of win-x64 job 1, a slow runner, and the 1.4.0 decider compared that attempt's filled-in Timeout values; no two observed values differed. The candidate's frozen protocol refused a fourth execution, so the row would stay BLOCKED. Contract and protocol amendment 1.5.0 (#1537) fixed the rule, gave Windows jobs 110 minutes, and allowed one more execution on the new candidate, which changes the candidate.",
+    "decision": "AMEND-AND-3RD-FREEZE and DETERMINISM-CEILING-3200 (2026-10-08)",
     "changesSince": [
-      "#1508 C1 PR 1 (manifest and classifier for 696ab824)",
-      "#1523 notes wording (cause 2)",
-      "#1525 binding performance (cause 4)",
-      "#1526 byte-reproducible packages and website (cause 5)",
-      "#1517 C2 regeneration 1 records",
-      "#1527 B2 freshness scope and deterministic headline (cause 3)",
-      "#1533 protocol 1.4.0 (cause 1), contract amendment 1.4.0 (the stale inventory), final 0.24.0 notes"
+      "#1534 C1 PR 2 (manifest for 5e52d8ab)",
+      "#1537 contract and protocol amendment 1.5.0"
     ],
-    "consequence": "Stopping rule 4: every result of C2 regeneration 1 is invalid for the new candidate and stays on record as history (docs/plans/evidence/c2-1424/). C2 runs regeneration 2, the last one allowed (contract §9, counted as the maintainer instructed). The 696ab824 manifest stays in git history at the C1 PR 1 landing."
+    "consequence": "Stopping rule 4: every result of C2 regeneration 2 is invalid for the new candidate. Its records stay in PR #1535 as history if it merges, and its determinism result stays reported as decided (NON-DETERMINISTIC). C2 runs regeneration 3, the last one allowed (contract 1.5.0 exception for #1424). A further failure is MILESTONE-FAILED. The 5e52d8ab manifest stays in git at the C1 PR 2 landing.",
+    "previous": [
+      {
+        "commit": "696ab82470626164979a07792ed74932ab88d9e6",
+        "frozenBy": "C1 PR 1 (#1508), landed at fd34f41f0d5600b92b5868392e1ea3e1d1c197ff",
+        "manifestAtLanding": "fd34f41f0d5600b92b5868392e1ea3e1d1c197ff:docs/plans/evidence/c1-1423/candidate-manifest.json",
+        "reason": "C2 regeneration 1 (#1517) on 696ab824 was INCOMPLETE with 7 BLOCKED rows from 5 causes, each of which needs a candidate change: (1) the determinism protocol registered 411 Verification tests, the candidate has 473; (2) the 0.24.0 notes failed R2's G012 wording scan; (3) the B2 gate refused the candidate with B2-08 after C1's tests landed on main; (4) the performance ratchet Binding_MediumModule_Under500ms failed; (5) the packages and the website were not byte-reproducible. The review of the prep PR found a sixth: 9 inventory artifacts were still stale, so R2's G008 rejected every terminal record.",
+        "decision": "FIX-ALL-5-REFREEZE-REGENERATE (2026-10-07)",
+        "changesSince": [
+          "#1508 C1 PR 1 (manifest and classifier for 696ab824)",
+          "#1523 notes wording (cause 2)",
+          "#1525 binding performance (cause 4)",
+          "#1526 byte-reproducible packages and website (cause 5)",
+          "#1517 C2 regeneration 1 records",
+          "#1527 B2 freshness scope and deterministic headline (cause 3)",
+          "#1533 protocol 1.4.0 (cause 1), contract amendment 1.4.0 (the stale inventory), final 0.24.0 notes"
+        ],
+        "consequence": "Stopping rule 4: every result of C2 regeneration 1 is invalid for the new candidate and stays on record as history (docs/plans/evidence/c2-1424/). C2 runs regeneration 2, the last one allowed (contract §9, counted as the maintainer instructed). The 696ab824 manifest stays in git history at the C1 PR 1 landing."
+      }
+    ]
   },
   "invalidation": {
     "classifier": "tests/Calor.Compiler.Tests/EvidenceContract/CandidateInvalidation.cs",
