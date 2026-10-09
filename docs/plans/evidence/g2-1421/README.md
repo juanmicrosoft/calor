@@ -396,8 +396,8 @@ rows, gates, the agreement rate, and record formats. The result gains the `harne
   - in a profile that completed before the cut;
   - in the cut invocation's own observed test outcome, cell, or artifact;
   - in a partly observed theory row.
-- A wrong reason, a run as long as the process timeout, or a non-timeout invocation is not
-  treated as a harness cut.
+- A wrong reason, an invocation given the process-timeout bound, or a non-timeout invocation
+  is not treated as a harness cut.
 - The runner decides a cut from the bound the invocation was given, not from its duration. The
   controls cover a deadline 0.5 s before the process timeout with a late kill, an ordinary cut, and
   the process-timeout bound (both a late and an early end). The cut is recorded with the
