@@ -1,0 +1,56 @@
+{
+ "schema": "c2-1424/archives/1",
+ "issue": 1424,
+ "regeneration": 3,
+ "candidate": "04e61f188e85a710a91242e1ddbf35fcd50e329e",
+ "branch": "evidence/v0.24-archives",
+ "commit": "ca4e8df148100f8fe0a0ce02fd6ff5b24cd831be",
+ "rule": "Maintainer decision 2026-10-08: evidence files over about 1 MB live on the orphan branch evidence/v0.24-archives (never merged), at the same relative paths; main carries this index instead.",
+ "verify": "git fetch origin evidence/v0.24-archives && git show <commit>:<path> | shasum -a 256",
+ "files": {
+  "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/quality-ratchet-reports.tar.gz": {
+   "sha256": "5f8845de76f7992aa2bc9c71970af9714d86f2b35cff0012ed2e00b3c8dd1df1",
+   "size": 19218225
+  },
+  "docs/plans/evidence/c2-1424/regeneration-3/ci/artifacts-37965086841/test-report-compiler.tar.gz": {
+   "sha256": "0bdd073bbc6820f5722e794c9301a84899356780abc6aa520fed6cee636da856",
+   "size": 3432865
+  },
+  "docs/plans/evidence/c2-1424/regeneration-3/ci/logs-37965086841/113937312612-test.log.gz": {
+   "sha256": "3bb9ad0cf0b0bd5b7fd90e80b4e07c9782ef4bd04d92d6e43909a68acf3babef",
+   "size": 1085326
+  },
+  "docs/plans/evidence/c2-1424/regeneration-3/ci/logs-37965086841/113937313270-tests_verification_.log.gz": {
+   "sha256": "ba71cfd070cbb9a07dc4ed15aa2decfc74e5db94acfdf7a4db8684b2a33cce9a",
+   "size": 3235993
+  },
+  "docs/plans/evidence/c2-1424/regeneration-3/ci/logs-37965086841/113937313504-tests_compiler_.log.gz": {
+   "sha256": "363c3a186ae768986bbc09717e8eb2636fccb71f30549eeede822bb0f4cf2352",
+   "size": 2215725
+  },
+  "docs/plans/evidence/c2-1424/regeneration-3/determinism/attempts.tar.gz": {
+   "sha256": "cebc738985a082ad226116e4320c268f3ef539745993f73d0fc2c6fb0bb27dad",
+   "size": 10018027
+  },
+  "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/tests/vrd-check.trx": {
+   "sha256": "a61c0b12901dde68248ed867012269bd74bb4609ee30dbe94eaff7c1c9bd8b44",
+   "size": 2495766
+  },
+  "docs/plans/evidence/c2-1424/regeneration-3/local/clone-a/tests/vrd-regen.trx": {
+   "sha256": "551a4fadc0d1f7ac310b52468e430079a4fcbc0d28b100f47885b95c52981b20",
+   "size": 2495766
+  },
+  "docs/plans/evidence/c2-1424/regeneration-3/local/clone-b/tests/vrd-check.trx": {
+   "sha256": "219ce22edc64845dc9b6329df3f92106d195d64f8ff1c2d0f21aead398224c97",
+   "size": 2495796
+  },
+  "docs/plans/evidence/c2-1424/regeneration-3/local/clone-b/tests/vrd-regen.trx": {
+   "sha256": "03713f37f7056a9be0ab7ed68d5e6398167479691dfb581226d005b67e043306",
+   "size": 2495796
+  },
+  "docs/plans/evidence/c2-1424/regeneration-3/release-quality/artifacts.tar.gz": {
+   "sha256": "dffb1491e7f0569664e505e03ace33dac912baac9a7b86d879dff6358f8d52a9",
+   "size": 30874206
+  }
+ }
+}

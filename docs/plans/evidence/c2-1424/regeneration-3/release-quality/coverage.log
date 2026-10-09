@@ -1,0 +1,58 @@
+coverage host: /opt/homebrew/bin/dotnet 10.0.401
+Test run for /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Compiler.Tests/bin/Release/net10.0/Calor.Compiler.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+Results File: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/artifacts/coverage/raw/Calor.Compiler.Tests/Calor.Compiler.Tests-1.trx
+
+Passed!  - Failed:     0, Passed:  7358, Skipped:     2, Total:  7360, Duration: 9 m 50 s - Calor.Compiler.Tests.dll (net10.0)
+
+Attachments:
+  /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/artifacts/coverage/raw/Calor.Compiler.Tests/a6a73f1a-7cfb-4227-ae8b-c13c407fc167/coverage.cobertura.xml
+Test run for /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Compiler.Tests/bin/Release/net10.0/Calor.Compiler.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+Results File: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/artifacts/coverage/raw/Calor.Compiler.Tests/Calor.Compiler.Tests-2.trx
+
+Passed!  - Failed:     0, Passed:  5677, Skipped:     1, Total:  5678, Duration: 5 m 47 s - Calor.Compiler.Tests.dll (net10.0)
+
+Attachments:
+  /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/artifacts/coverage/raw/Calor.Compiler.Tests/e75bdc6a-6822-4566-bc29-f9a0a64ae70b/coverage.cobertura.xml
+Test run for /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Conversion.Tests/bin/Release/net10.0/Calor.Conversion.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+Results File: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/artifacts/coverage/raw/Calor.Conversion.Tests/Calor.Conversion.Tests.trx
+
+Passed!  - Failed:     0, Passed:   476, Skipped:     0, Total:   476, Duration: 3 s - Calor.Conversion.Tests.dll (net10.0)
+
+Attachments:
+  /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/artifacts/coverage/raw/Calor.Conversion.Tests/d0a5612b-1974-4e76-ab7d-da469128eb0d/coverage.cobertura.xml
+Test run for /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Enforcement.Tests/bin/Release/net10.0/Calor.Enforcement.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+Results File: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/artifacts/coverage/raw/Calor.Enforcement.Tests/Calor.Enforcement.Tests.trx
+
+Passed!  - Failed:     0, Passed:   695, Skipped:     0, Total:   695, Duration: 34 s - Calor.Enforcement.Tests.dll (net10.0)
+
+Attachments:
+  /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/artifacts/coverage/raw/Calor.Enforcement.Tests/4f6b9b80-4590-4e32-b6a8-c2207b398c06/coverage.cobertura.xml
+Test run for /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Semantics.Tests/bin/Release/net10.0/Calor.Semantics.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+Results File: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/artifacts/coverage/raw/Calor.Semantics.Tests/Calor.Semantics.Tests.trx
+
+Passed!  - Failed:     0, Passed:    55, Skipped:     0, Total:    55, Duration: 870 ms - Calor.Semantics.Tests.dll (net10.0)
+
+Attachments:
+  /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/artifacts/coverage/raw/Calor.Semantics.Tests/77512e95-2a69-420e-b07d-6ff1e87e7081/coverage.cobertura.xml
+Test run for /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Verification.Tests/bin/Release/net10.0/Calor.Verification.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+Results File: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/artifacts/coverage/raw/Calor.Verification.Tests/Calor.Verification.Tests.trx
+
+Passed!  - Failed:     0, Passed:   473, Skipped:     0, Total:   473, Duration: 30 s - Calor.Verification.Tests.dll (net10.0)
+
+Attachments:
+  /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/artifacts/coverage/raw/Calor.Verification.Tests/0fea6336-ddfa-478f-b8e3-05aa1612e49a/coverage.cobertura.xml
+verifier: line 79.26%, branch 75.15%
+emitter: line 86.67%, branch 81.99%
+binder: line 93.46%, branch 86.09%
+migration: line 83.18%, branch 77.10%
+dataflow: line 83.59%, branch 73.89%
+taint: line 90.69%, branch 80.44%
+effects: line 67.37%, branch 61.33%
+parsing: line 84.67%, branch 75.87%
+typechecking: line 86.15%, branch 83.46%

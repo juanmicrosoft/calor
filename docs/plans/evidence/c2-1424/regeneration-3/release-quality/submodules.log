@@ -1,0 +1,9 @@
+Submodule 'bench/corpus/FluentValidation' (https://github.com/FluentValidation/FluentValidation.git) registered for path 'bench/corpus/FluentValidation'
+Submodule 'bench/corpus/MediatR' (https://github.com/jbogard/MediatR.git) registered for path 'bench/corpus/MediatR'
+Submodule 'bench/corpus/serilog' (https://github.com/serilog/serilog.git) registered for path 'bench/corpus/serilog'
+Cloning into '/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/bench/corpus/FluentValidation'...
+Cloning into '/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/bench/corpus/MediatR'...
+Cloning into '/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/bench/corpus/serilog'...
+Submodule path 'bench/corpus/FluentValidation': checked out '71b3c60cb5a16e02cb7957e478ec3fb6b983a73c'
+Submodule path 'bench/corpus/MediatR': checked out 'fb309026775ef953a64fb5339d074426c1ad2c37'
+Submodule path 'bench/corpus/serilog': checked out '0597ddfbd4ec594d9c42edd745fe728a2198bad9'

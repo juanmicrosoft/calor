@@ -1,0 +1,58 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="397bcfca-c9f9-4fb0-8782-a59a3a20d536" name="@Juans-Mac-Studio 2026-10-09 13:18:29" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-10-09T13:18:29.8665620-04:00" queuing="2026-10-09T13:18:29.8665620-04:00" start="2026-10-09T13:18:28.1975820-04:00" finish="2026-10-09T13:18:31.6888970-04:00" />
+  <TestSettings name="default" id="5d1f452d-a69d-4f82-9502-1699b7470b26">
+    <Deployment runDeploymentRoot="_Juans-Mac-Studio_2026-10-09_13_18_29" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="aeab0efe-1553-4420-b152-5e89ba18fe7a" testId="772da06f-e331-3404-07ad-8fa4a99c5251" testName="Calor.Compiler.Tests.LedgerCommitStampTests.EveryPublishedBenchmarkStampIsIndexed" computerName="Juans-Mac-Studio" duration="00:00:00.0132508" startTime="2026-10-09T13:18:28.8876660-04:00" endTime="2026-10-09T13:18:28.8876660-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="aeab0efe-1553-4420-b152-5e89ba18fe7a" />
+    <UnitTestResult executionId="c8338bfe-6247-4d49-b7ee-8adf99cc938b" testId="4e672ca1-edc2-a128-3897-97a9ac82a70e" testName="Calor.Compiler.Tests.LedgerCommitStampTests.EveryAuthoritativeIdentityResolvesFromProtectedMain" computerName="Juans-Mac-Studio" duration="00:00:02.7589223" startTime="2026-10-09T13:18:31.6678970-04:00" endTime="2026-10-09T13:18:31.6678970-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c8338bfe-6247-4d49-b7ee-8adf99cc938b" />
+    <UnitTestResult executionId="8c778b2c-bed5-44bd-90cf-d6b44620056d" testId="5b84653d-39fe-c613-c408-0b5313f15809" testName="Calor.Compiler.Tests.LedgerCommitStampTests.EveryLedgerThatStampsAMeasurementIsIndexed" computerName="Juans-Mac-Studio" duration="00:00:00.0211663" startTime="2026-10-09T13:18:28.9088680-04:00" endTime="2026-10-09T13:18:28.9088680-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8c778b2c-bed5-44bd-90cf-d6b44620056d" />
+    <UnitTestResult executionId="26abe808-3551-4142-86fc-10eb28faa9cf" testId="1711d0c3-4a02-d5f8-4cc8-746f6a6803a5" testName="Calor.Compiler.Tests.LedgerCommitStampTests.PendingIdentitiesAwaitLandingOrCompleteWithEqualTrees" computerName="Juans-Mac-Studio" duration="00:00:00.0035977" startTime="2026-10-09T13:18:28.8718420-04:00" endTime="2026-10-09T13:18:28.8718480-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="26abe808-3551-4142-86fc-10eb28faa9cf" />
+    <UnitTestResult executionId="3c872c94-94b5-4dba-928e-a2ca2ac8fd22" testId="a2400220-62db-d428-9e85-5e2bb19264fb" testName="Calor.Compiler.Tests.LedgerCommitStampTests.EveryIndexEntryStillMatchesItsArtifactsOwnStamp" computerName="Juans-Mac-Studio" duration="00:00:00.0026842" startTime="2026-10-09T13:18:28.8743820-04:00" endTime="2026-10-09T13:18:28.8743820-04:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="3c872c94-94b5-4dba-928e-a2ca2ac8fd22" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Calor.Compiler.Tests.LedgerCommitStampTests.PendingIdentitiesAwaitLandingOrCompleteWithEqualTrees" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/calor.compiler.tests/bin/release/net10.0/calor.compiler.tests.dll" id="1711d0c3-4a02-d5f8-4cc8-746f6a6803a5">
+      <Execution id="26abe808-3551-4142-86fc-10eb28faa9cf" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Compiler.Tests/bin/Release/net10.0/Calor.Compiler.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Compiler.Tests.LedgerCommitStampTests" name="PendingIdentitiesAwaitLandingOrCompleteWithEqualTrees" />
+    </UnitTest>
+    <UnitTest name="Calor.Compiler.Tests.LedgerCommitStampTests.EveryLedgerThatStampsAMeasurementIsIndexed" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/calor.compiler.tests/bin/release/net10.0/calor.compiler.tests.dll" id="5b84653d-39fe-c613-c408-0b5313f15809">
+      <Execution id="8c778b2c-bed5-44bd-90cf-d6b44620056d" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Compiler.Tests/bin/Release/net10.0/Calor.Compiler.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Compiler.Tests.LedgerCommitStampTests" name="EveryLedgerThatStampsAMeasurementIsIndexed" />
+    </UnitTest>
+    <UnitTest name="Calor.Compiler.Tests.LedgerCommitStampTests.EveryPublishedBenchmarkStampIsIndexed" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/calor.compiler.tests/bin/release/net10.0/calor.compiler.tests.dll" id="772da06f-e331-3404-07ad-8fa4a99c5251">
+      <Execution id="aeab0efe-1553-4420-b152-5e89ba18fe7a" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Compiler.Tests/bin/Release/net10.0/Calor.Compiler.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Compiler.Tests.LedgerCommitStampTests" name="EveryPublishedBenchmarkStampIsIndexed" />
+    </UnitTest>
+    <UnitTest name="Calor.Compiler.Tests.LedgerCommitStampTests.EveryAuthoritativeIdentityResolvesFromProtectedMain" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/calor.compiler.tests/bin/release/net10.0/calor.compiler.tests.dll" id="4e672ca1-edc2-a128-3897-97a9ac82a70e">
+      <Execution id="c8338bfe-6247-4d49-b7ee-8adf99cc938b" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Compiler.Tests/bin/Release/net10.0/Calor.Compiler.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Compiler.Tests.LedgerCommitStampTests" name="EveryAuthoritativeIdentityResolvesFromProtectedMain" />
+    </UnitTest>
+    <UnitTest name="Calor.Compiler.Tests.LedgerCommitStampTests.EveryIndexEntryStillMatchesItsArtifactsOwnStamp" storage="/private/tmp/claude-501/-users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/calor.compiler.tests/bin/release/net10.0/calor.compiler.tests.dll" id="a2400220-62db-d428-9e85-5e2bb19264fb">
+      <Execution id="3c872c94-94b5-4dba-928e-a2ca2ac8fd22" />
+      <TestMethod codeBase="/private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r3/cand/tests/Calor.Compiler.Tests/bin/Release/net10.0/Calor.Compiler.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="Calor.Compiler.Tests.LedgerCommitStampTests" name="EveryIndexEntryStillMatchesItsArtifactsOwnStamp" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="772da06f-e331-3404-07ad-8fa4a99c5251" executionId="aeab0efe-1553-4420-b152-5e89ba18fe7a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="4e672ca1-edc2-a128-3897-97a9ac82a70e" executionId="c8338bfe-6247-4d49-b7ee-8adf99cc938b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5b84653d-39fe-c613-c408-0b5313f15809" executionId="8c778b2c-bed5-44bd-90cf-d6b44620056d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="1711d0c3-4a02-d5f8-4cc8-746f6a6803a5" executionId="26abe808-3551-4142-86fc-10eb28faa9cf" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="a2400220-62db-d428-9e85-5e2bb19264fb" executionId="3c872c94-94b5-4dba-928e-a2ca2ac8fd22" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="5" executed="5" passed="5" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.4.1+b9eacec401 (64-bit .NET 10.0.12)
+[xUnit.net 00:00:00.06]   Discovering: Calor.Compiler.Tests
+[xUnit.net 00:00:00.49]   Discovered:  Calor.Compiler.Tests
+[xUnit.net 00:00:00.50]   Starting:    Calor.Compiler.Tests
+[xUnit.net 00:00:03.31]   Finished:    Calor.Compiler.Tests
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>
