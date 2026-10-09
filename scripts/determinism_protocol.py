@@ -17,6 +17,7 @@ Nothing here retries, normalizes a compared value, or converts a missing value t
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import hashlib
 import json
 import ntpath
@@ -337,6 +338,12 @@ PROFILE_KEYS = {"profile", "status", "exitCode", "seconds", "calorCacheExisted",
 FILL_VALUES = {"Missing", "Timeout", "Crash"}
 # Amendment 1.5.0: the reason the runner records when its own job deadline cut an invocation.
 HARNESS_CUT_REASON = "the job deadline cut an invocation"
+
+
+def cut_by_deadline(seconds, process_timeout_minutes) -> bool:
+    """Amendment 1.5.0: a timed-out invocation that ended before its process timeout was cut by the job deadline.
+    The runner applies this to the subprocess duration it records (seconds), and the decider to the same field."""
+    return isinstance(seconds, (int, float)) and not isinstance(seconds, bool) and seconds < process_timeout_minutes * 60 - 1
 CELL_VALUE = re.compile(r"^[0-9a-f]{32}\|[01]$")
 SHA = re.compile(r"^[0-9a-f]{64}$")
 
@@ -792,20 +799,21 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
         else:
             seen[key] = r
 
-    # Amendment 1.5.0 (harness-cut rule): an invocation that the harness's own job deadline cut is excluded from
-    # every comparison. It is the last profile of an invalid attempt whose reason is HARNESS_CUT_REASON, with status
-    # invalid, a 'timeout|' invocation, and less time than its process timeout. Its unobserved cases were filled
-    # (Timeout), not observed, so they never make a case DISAGREE. The attempt is invalid, so it never counts toward
-    # agreement either: every case it should have covered stays INCOMPLETE.
+    # Amendment 1.5.0 (harness-cut rule): an invocation that the harness's own job deadline cut is the last profile
+    # of an invalid attempt whose reason is HARNESS_CUT_REASON, with status invalid, a 'timeout|' invocation, and a
+    # recorded duration below its process timeout (cut_by_deadline). Only what the harness filled in for it is left
+    # out: its invocation value, every Missing/Timeout/Crash fill, and Malformed cells (a cells file cut mid-write).
+    # Every value it did observe is still compared, so an observed difference is DISAGREE. The attempt is invalid,
+    # so it never counts toward agreement: every case it should have covered stays INCOMPLETE.
     by_id = {p["id"]: p for p in profiles}
     harness_cut = set()
     for key, r in seen.items():
         last = r["profiles"][-1] if r.get("profiles") else None
         if r["status"] == "invalid" and r.get("reason") == HARNESS_CUT_REASON and last and last.get("status") == "invalid" \
                 and str(last.get("invocation")).startswith("timeout|") and last.get("profile") in by_id \
-                and isinstance(last.get("seconds"), (int, float)) and not isinstance(last.get("seconds"), bool) \
-                and last["seconds"] < by_id[last["profile"]]["processTimeoutMinutes"] * 60 - 0.5:
+                and cut_by_deadline(last.get("seconds"), by_id[last["profile"]]["processTimeoutMinutes"]):
             harness_cut.add(key + (last["profile"],))
+    partial: dict[str, list[tuple[str, list[str]]]] = {}
     expected: dict[str, int] = {}
     values: dict[str, list[tuple[str, str]]] = {}
     establishing: dict[str, int] = {}
@@ -819,8 +827,7 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
                     results = {x["profile"]: x for x in (r["profiles"] if r and r["status"] not in ("environment-violation", "infrastructure-failure") else [])}
                     for p in (p for p in profiles if mode == "control" or p["id"] in env["profiles"]):
                         res = results.get(p["id"]) if results.get(p["id"], {}).get("status") in VALUE_STATUSES | {"invalid"} else None
-                        if (eid, env_id, job, attempt, p["id"]) in harness_cut:
-                            res = None
+                        cut = (eid, env_id, job, attempt, p["id"]) in harness_cut
                         names = list(res["tests"]) if p["select"] == "observed" and res else []
                         for k in profile_keys(p, cases) + [f"test:control:{n}" for n in names]:
                             expected[k] = expected.get(k, 0) + (0 if k.startswith("test:control:") else 1)
@@ -828,7 +835,16 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
                                 kind, _, rest = k.partition(":")
                                 source = {"invocation": {rest: res["invocation"]}, "test": res["tests"], "cell": res["cells"],
                                           "artifact": res["artifacts"]}[kind]
-                                values.setdefault(k, []).append((env_id, source[rest.split(":", 1)[1] if kind == "test" else rest]))
+                                value = source[rest.split(":", 1)[1] if kind == "test" else rest]
+                                if cut:  # amendment 1.5.0: compare only what the cut invocation observed
+                                    parts = value.split(",") if kind == "test" else [value]
+                                    observed = sorted(x for x in parts if x not in FILL_VALUES and not (kind == "cell" and x == "Malformed"))
+                                    if kind == "invocation" or not observed:
+                                        continue
+                                    if len(observed) < len(parts):  # a partly observed theory row: checked as a sub-multiset
+                                        partial.setdefault(k, []).append((env_id, observed))
+                                        continue
+                                values.setdefault(k, []).append((env_id, value))
                                 establishing[k] = establishing.get(k, 0) + (r["status"] != "invalid" and res["status"] != "invalid")
     if mode == "control":  # an observed control name is expected from every attempt
         per = len(envs) * jobs * attempts * len(run_ids)
@@ -839,7 +855,12 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
         present = values.get(key, [])
         distinct = sorted({x for _, x in present})
         # Values from invalid attempts can reveal a disagreement but never count toward agreement.
-        klass = "DISAGREE" if len(distinct) > 1 else "INCOMPLETE" if establishing.get(key, 0) < expected[key] or not present else \
+        # Amendment 1.5.0: a partly observed theory row from a harness-cut invocation disagrees when its observed
+        # outcomes are not a sub-multiset of the one value every complete observation agrees on. With no complete
+        # observation there is nothing to compare it with (the case is INCOMPLETE anyway).
+        reference = Counter(distinct[0].split(",")) if len(distinct) == 1 else None
+        partial_conflict = reference is not None and any(Counter(obs) - reference for _, obs in partial.get(key, []))
+        klass = "DISAGREE" if len(distinct) > 1 or partial_conflict else "INCOMPLETE" if establishing.get(key, 0) < expected[key] or not present else \
             "AGREE-PASS" if _is_pass(key, distinct[0], expected_artifacts) else "AGREE-FAIL"
         counts[klass] += 1
         row = {"case": key, "class": klass, "contributions": establishing.get(key, 0), "expected": expected[key]}
@@ -848,6 +869,8 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
             for env_id, x in present:
                 by_env.setdefault(env_id, {})[x] = by_env.get(env_id, {}).get(x, 0) + 1
             row["valuesByEnvironment"] = by_env
+            if key in partial:
+                row["partialValuesByEnvironment"] = {e: [",".join(o) for x, o in partial[key] if x == e] for e in sorted({x for x, _ in partial[key]})}
             row["platformDependent"] = klass == "DISAGREE" and all(len(x) == 1 for x in by_env.values())
         rows_out.append(row)
     verdict = next(name for name, hit in (("INVALID", invalid), ("NON-DETERMINISTIC", counts["DISAGREE"]), ("FAILING", counts["AGREE-FAIL"]),

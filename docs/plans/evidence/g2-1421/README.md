@@ -334,22 +334,32 @@ inconsistency. No two observed values differed.
      - it is the last profile of an `invalid` attempt whose reason is "the job deadline cut an
        invocation";
      - its status is `invalid` and its invocation value starts `timeout|`;
-     - it ran for less than its process timeout.
-   - **What the decider does.** A cut invocation is excluded from every comparison, so its filled
-     values never make a case `DISAGREE`.
+     - its recorded duration is below its process timeout minus 1 s (`cut_by_deadline`). The runner
+       records the subprocess duration before it reads any result, and it decides the cut from that
+       same recorded value.
+   - **What the decider leaves out.** Only what the harness filled in for a cut invocation: its
+     invocation value, every `Missing`, `Timeout`, or `Crash` fill, and `Malformed` cells (a cells
+     file cut mid-write). Filled values therefore never make a case `DISAGREE`.
+   - **What it still compares.** Every value the cut invocation did observe (test outcomes, cells,
+     artifact hashes). An observed difference is `DISAGREE`. A theory row that was only partly
+     observed disagrees when its observed outcomes are not a sub-multiset of the value that the
+     complete observations agree on.
    - **Agreement is unchanged.** The attempt is invalid, so it never counts toward agreement, and
      every case it should have covered stays `INCOMPLETE`. The execution is then `INCOMPLETE`,
      never `DETERMINISTIC`.
-   - **What is still compared.** Profiles that completed earlier in the same attempt. A real
-     difference between observed values is still `DISAGREE`. A process timeout (status `timeout`)
-     is an observed value and is still compared.
+   - **Also still compared.** Profiles that completed earlier in the same attempt. A process
+     timeout (status `timeout`) is an observed value. One residual: if the kill truncated an artifact
+     mid-write, that artifact reads `DISAGREE`. This fails closed.
    - **Visibility.** The result lists every cut invocation in `harnessCut`.
 2. **Windows job time.** win-x64 and win-arm64 `jobTimeoutMinutes` go from 75 to 110. The slow job
    needed about 73 minutes for 15 attempts, plus setup and the harness's 5-minute stop margin. 110
    minutes leaves about 1.5 times that.
 3. **A fourth execution, on the new candidate only.** `maxExecutions` goes from 3 to 4. Under
    `budget.extraExecution`, the plan step allows the fourth execution only on the merge commit of
-   this amendment's PR, which is the re-frozen #1423 candidate. Every other guard still applies:
+   this amendment's PR, which is the re-frozen #1423 candidate. The dispatched SHA must equal the
+   `merge_commit_sha` that GitHub records for that PR merged into `main`. The plan reads it from the
+   same API as the run inventory. If the PR record is unreadable or the PR is not merged, the plan
+   refuses. Every other guard still applies:
    one execution per commit, a change outside `docs/` after a failure, and the budget.
 
 **Budget.**
@@ -370,7 +380,8 @@ inconsistency. No two observed values differed.
 | 1.5.0 | **`INCOMPLETE`** | 0 | 1,644 |
 
 The 1.5.0 decider moves exactly 470 cases from `DISAGREE` to `INCOMPLETE`, and its `harnessCut`
-list names one invocation: win-x64 job 1, attempt 15, `verification-full`. The replay is not
+list names one invocation: win-x64 job 1, attempt 15, `verification-full`. That invocation's observed
+cells and artifact hashes are still compared, and they equal every other observation. The replay is not
 evidence. The published `NON-DETERMINISTIC` result stays the result of that execution.
 
 **Unchanged:** cases, cells, artifacts, profiles, environments, the attempt count, determinism
@@ -380,11 +391,17 @@ rows, gates, the agreement rate, and record formats. The result gains the `harne
 
 - A cut attempt gives `INCOMPLETE`, not `DISAGREE`. Without the reason, the same records read
   `NON-DETERMINISTIC`.
-- An observed disagreement elsewhere, or in a profile that completed before the cut, is still
-  `DISAGREE`.
+- An observed disagreement is still `DISAGREE` in each of these places:
+  - elsewhere in the execution;
+  - in a profile that completed before the cut;
+  - in the cut invocation's own observed test outcome, cell, or artifact;
+  - in a partly observed theory row.
 - A wrong reason, a run as long as the process timeout, or a non-timeout invocation is not
   treated as a harness cut.
-- The fourth execution is refused on any commit other than the amendment PR's merge.
+- The runner's recorded duration is the one the cut was decided on, even after slow result
+  processing.
+- The fourth execution is refused on any commit other than the merge SHA in GitHub's PR record.
+  It is also refused when that record is unreadable, unmerged, or merged into another branch.
 - The budget controls are updated to 3,200 and 795.
 
 ## What G2 executed

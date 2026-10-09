@@ -371,6 +371,35 @@ class DecisionControls(unittest.TestCase):
         self.assertEqual("DISAGREE", self.klass(result, f"test:verification:{ORACLE}")["class"])
         self.assertEqual("oracle-isolated", result["harnessCut"][0]["profile"])
 
+    def test_harness_cut_keeps_every_value_it_observed(self) -> None:
+        # Round 1 of #1537: only filled values are left out. An observed test outcome, cell, or artifact of the cut
+        # invocation that differs from the others is still DISAGREE.
+        observed = [
+            (lambda p: p["tests"].update({ORACLE: "Failed"}), f"test:verification:{ORACLE}"),
+            (lambda p: p["cells"].update({"case-000007": "0" * 32 + "|1"}), "cell:case-000007"),
+            (lambda p: p["artifacts"].update({"translator-fixture": "c" * 64}), "artifact:translator-fixture"),
+        ]
+        for change, key in observed:
+            records = passing_records(self.protocol)
+            change(self.cut(records)["profiles"][0])
+            result = self.decide(records)
+            self.assertEqual(("NON-DETERMINISTIC", "DISAGREE"), (result["verdict"], self.klass(result, key)["class"]), key)
+        # An observed value equal to the others is kept, but it never establishes (the attempt is invalid).
+        records = passing_records(self.protocol)
+        self.cut(records)["profiles"][0]["tests"][ORACLE] = "Passed"
+        result = self.decide(records)
+        self.assertEqual(("INCOMPLETE", "INCOMPLETE"), (result["verdict"], self.klass(result, f"test:verification:{ORACLE}")["class"]))
+
+    def test_a_partly_observed_theory_row_is_checked_as_part_of_the_full_value(self) -> None:
+        name, multiplicity = next((n, m) for n, m in dp.selection(dp.profile_by_id(self.protocol)["verification-full"], CASES).items() if m > 1)
+        for observed, expected in (("Passed", "INCOMPLETE"), ("Failed", "DISAGREE")):
+            records = passing_records(self.protocol)
+            self.cut(records)["profiles"][0]["tests"][name] = ",".join([observed] + ["Timeout"] * (multiplicity - 1))
+            row = self.klass(self.decide(records), f"test:verification:{name}")
+            self.assertEqual(expected, row["class"], observed)
+            if expected == "DISAGREE":
+                self.assertEqual({"win-x64": [observed]}, row["partialValuesByEnvironment"])
+
     def test_only_a_genuine_harness_cut_is_excluded(self) -> None:
         for change in (lambda r: r.update(reason="the harness stopped before this attempt"),
                        lambda r: r["profiles"][-1].update(seconds=15 * 60.0),  # the process timeout, not the job deadline
@@ -483,11 +512,11 @@ class PlanGuards(unittest.TestCase):
     """Each guard the plan job applies before any attempt runs, from a synthetic API inventory."""
 
     def plan(self, inventory=(), mode="execution", execution_id="E9", env=None, paths=("src/Calor.Compiler/X.cs",), ledger=None,
-             current=True, subject=None) -> list[str]:
+             current=True, merge=None) -> list[str]:
         runs = list(inventory) + ([this_run(mode, execution_id)] if current else [])
         return dr.plan_problems(PROTOCOL, mode=mode, execution_id=execution_id, env=env or dispatch(), inventory=runs,
                                 ledger=ledger or {"entries": []}, changed_paths=lambda old, new: None if paths is None else list(paths),
-                                commit_subject=lambda sha: subject)
+                                pr_merge_commit=lambda pr: merge)
 
     def refused(self, needle: str, **kwargs) -> None:
         problems = self.plan(**kwargs)
@@ -506,13 +535,23 @@ class PlanGuards(unittest.TestCase):
         self.assertEqual({20}, {c["timeout"] for c in dr.matrix(PROTOCOL, "control")["include"]})
 
     def test_fourth_execution_runs_only_on_the_amendment_merge(self) -> None:
-        # Amendment 1.5.0 (budget.extraExecution): after 3 executions, one more, only on the merge commit of its PR.
-        pr = next(a["pr"] for a in PROTOCOL["amendments"]["amendmentLog"] if a["version"] == "1.5.0")
+        # Amendment 1.5.0 (budget.extraExecution): after 3 executions, one more, only on the merge commit GitHub recorded
+        # for the amendment's PR. A commit whose subject merely names that PR does not qualify.
         three = [past(i, f"determinism execution E{i}", sha=str(i) * 40, minutes=400) for i in (1, 2, 3)]
-        self.assertEqual([], self.plan(inventory=three, subject=f"Merge pull request #{pr} from juanmicrosoft/x"))
-        for subject in (None, f"Merge pull request #{pr + 1} from juanmicrosoft/x", "0.24: some other commit"):
-            self.refused("may run only on the merge commit", inventory=three, subject=subject)
-        self.assertEqual([], self.plan(inventory=three[:2], subject=None))  # the first three executions are not bound
+        self.assertEqual([], self.plan(inventory=three, merge=NEW))
+        for merge in (None, OLD, NEW[:12], "not a sha"):
+            self.refused("may run only on the merge commit", inventory=three, merge=merge)
+        self.assertEqual([], self.plan(inventory=three[:2], merge=None))  # the first three executions are not bound
+
+    def test_the_merge_commit_comes_from_githubs_record_of_a_merged_pr(self) -> None:
+        good = {"merged": True, "base": {"ref": "main"}, "merge_commit_sha": NEW}
+        self.assertEqual(NEW, dr.pr_merge_commit(REPO, "t", 1537, get=lambda path, token: good))
+        for data in (dict(good, merged=False), dict(good, base={"ref": "release"}), {}):
+            self.assertIsNone(dr.pr_merge_commit(REPO, "t", 1537, get=lambda path, token, d=data: d))
+
+        def boom(path, token):
+            raise OSError("network")
+        self.assertIsNone(dr.pr_merge_commit(REPO, "t", 1537, get=boom))
 
     def test_second_execution_of_a_commit_is_refused(self) -> None:
         self.refused("already executed", inventory=[past(1, "determinism execution E1", sha=NEW)])
@@ -830,6 +869,31 @@ class AttemptRunnerControls(unittest.TestCase):
         self.assertEqual(["environment-violation"] * 2, [r["status"] for r in self.records()])
         self.assertEqual([None, None], [self.problem(r) for r in self.records()])
         self.assertEqual([], self.lines())
+
+    def test_the_recorded_duration_is_the_one_the_cut_was_decided_on(self) -> None:
+        # Round 1 of #1537: a cut decided just under the process timeout must still read as a cut after slow result
+        # processing. The runner records the subprocess duration and decides the cut from that recorded value.
+        from unittest import mock
+        clock = [1000.0]
+        profile = PROTOCOL["control"]["profile"]
+        limit = profile["processTimeoutMinutes"] * 60
+
+        def run(cmd, env, seconds, log):
+            Path(log).write_text("", encoding="utf-8")
+            clock[0] += limit - 1.2  # killed 1.2 s before the process timeout: a job-deadline cut
+            return None, True
+
+        def slow_values(*args, **kwargs):
+            clock[0] += 0.9  # result processing after the kill
+            return original(*args, **kwargs)
+        original = dp.profile_values
+        with mock.patch.object(dr, "run_with_timeout", run), mock.patch.object(dp, "profile_values", slow_values), \
+                mock.patch.object(dr.time, "monotonic", lambda: clock[0]):
+            result = dr.run_profile(PROTOCOL, CASES, profile, dp.env_by_id(PROTOCOL)["linux-x64"], self.out / "inv", self.base,
+                                    self.base["NUGET_PACKAGES"], time.time() + 3600)
+        self.assertEqual(("invalid", round(limit - 1.2, 1)), (result["status"], result["seconds"]))
+        self.assertTrue(dp.cut_by_deadline(result["seconds"], profile["processTimeoutMinutes"]))
+        self.assertFalse(dp.cut_by_deadline(limit - 0.9, profile["processTimeoutMinutes"]))  # a process timeout is not a cut
 
     def test_the_job_deadline_stops_starting_invocations(self) -> None:
         self.assertEqual(1, self.run_job(JOB_STARTED=str(time.time() - 16 * 60)))

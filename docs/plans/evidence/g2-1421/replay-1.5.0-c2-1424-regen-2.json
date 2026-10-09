@@ -60,5 +60,5 @@
  "classChanges": {
   "DISAGREE -> INCOMPLETE": 470
  },
- "reading": "Every DISAGREE under 1.4.0 came from the one harness-cut invocation (win-x64 job 1, attempt 15, verification-full). Under 1.5.0 that invocation is excluded, no case is DISAGREE, and the cases it should have covered are INCOMPLETE, so the verdict is INCOMPLETE (complete false), never DETERMINISTIC."
+ "reading": "Every DISAGREE under 1.4.0 came from the one harness-cut invocation (win-x64 job 1, attempt 15, verification-full). Under 1.5.0 only the values the harness filled in for that invocation are left out (its observed cells and artifact hashes are compared and agree), no case is DISAGREE, and the cases it should have covered are INCOMPLETE, so the verdict is INCOMPLETE (complete false), never DETERMINISTIC."
 }

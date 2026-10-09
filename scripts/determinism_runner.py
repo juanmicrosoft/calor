@@ -97,11 +97,11 @@ def classify(run) -> str:
     return match.group(1) if match else "unknown"  # an unreadable title is charged and counted as an execution
 
 
-def plan_problems(protocol, *, mode, execution_id, env, inventory, ledger, changed_paths, commit_subject=None) -> list[str]:
+def plan_problems(protocol, *, mode, execution_id, env, inventory, ledger, changed_paths, pr_merge_commit=None) -> list[str]:
     """Guards before any attempt runs. inventory is every run of the workflow from the GitHub API
     (fetch_inventory); ledger is #1135's ledger (entries with runId, commit, mode, runnerMinutes);
-    changed_paths(old, new) lists changed paths, or None if git cannot tell; commit_subject(sha) gives that commit's
-    subject line, or None if git cannot tell (amendment 1.5.0)."""
+    changed_paths(old, new) lists changed paths, or None if git cannot tell; pr_merge_commit(pr) gives the full SHA
+    GitHub recorded as that PR's merge into main, or None if it cannot tell (amendment 1.5.0)."""
     problems = []
     if env.get("GITHUB_EVENT_NAME") != "workflow_dispatch":
         problems.append(f"event {env.get('GITHUB_EVENT_NAME')}: only a workflow_dispatch run may execute the protocol")
@@ -143,12 +143,13 @@ def plan_problems(protocol, *, mode, execution_id, env, inventory, ledger, chang
     extra = b.get("extraExecution")
     if mode == "execution" and extra and count >= extra["afterExecutions"]:
         # Amendment 1.5.0: an execution beyond the first afterExecutions runs only on the merge commit of the PR that
-        # recorded the named protocol amendment (the re-frozen #1423 candidate), never on any other commit.
+        # recorded the named protocol amendment (the re-frozen #1423 candidate): the dispatched SHA must equal the merge
+        # commit GitHub recorded for that PR into main. Anything unresolvable refuses.
         pr = next((a.get("pr") for a in protocol["amendments"]["amendmentLog"] if a.get("version") == extra["amendment"]), None)
-        subject = commit_subject(commit) if commit_subject else None
-        if not isinstance(pr, int) or pr <= 0 or subject is None or not subject.startswith(f"Merge pull request #{pr} from "):
+        merge = pr_merge_commit(pr) if pr_merge_commit and isinstance(pr, int) and pr > 0 else None
+        if not merge or not re.match(r"^[0-9a-f]{40}$", merge) or merge != commit:
             problems.append(f"execution {count + 1} may run only on the merge commit of PR #{pr} (protocol amendment "
-                            f"{extra['amendment']}); {commit} is {subject!r}")
+                            f"{extra['amendment']}): GitHub records {merge}, the dispatched commit is {commit}")
     if any((TITLE.match(r.get("title") or "") or [None, None, None])[2] == execution_id for r in prior):
         problems.append(f"execution id {execution_id} was already dispatched")
     if mode == "execution":
@@ -243,9 +244,14 @@ def changed_paths(old: str, new: str):
     return [p for p in result.stdout.decode("utf-8", "surrogateescape").split("\0") if p] if result.returncode == 0 else None
 
 
-def commit_subject(sha: str):
-    result = git("log", "-1", "--format=%s", sha)
-    return result.stdout.rstrip("\n") if result.returncode == 0 else None
+def pr_merge_commit(repo: str, token: str, pr: int, get=api):
+    """Amendment 1.5.0: the merge commit GitHub recorded for a PR merged into main, or None (fail closed)."""
+    try:
+        data = get(f"/repos/{repo}/pulls/{int(pr)}", token)
+    except Exception:  # noqa: BLE001 - any API failure refuses the run
+        return None
+    merged = data.get("merged") is True and (data.get("base") or {}).get("ref") == "main"
+    return data.get("merge_commit_sha") if merged else None
 
 
 def load_ledger(protocol) -> dict:
@@ -262,7 +268,8 @@ def cmd_plan(args, env=os.environ) -> int:
         problems.append(f"main's validator rejects this tree:\n{trusted.stdout}{trusted.stderr}")
     inventory = fetch_inventory(env["GITHUB_REPOSITORY"], env["GH_TOKEN"])
     problems += plan_problems(protocol, mode=args.mode, execution_id=args.execution_id, env=env, inventory=inventory,
-                              ledger=load_ledger(protocol), changed_paths=changed_paths, commit_subject=commit_subject)
+                              ledger=load_ledger(protocol), changed_paths=changed_paths,
+                              pr_merge_commit=lambda pr: pr_merge_commit(env["GITHUB_REPOSITORY"], env["GH_TOKEN"], pr))
     print(json.dumps({"inventory": inventory}, indent=1))
     if problems:
         print("\n".join(f"REFUSED: {p}" for p in problems))
@@ -451,7 +458,10 @@ def run_profile(protocol, cases, profile, env, invocation_dir: Path, base, nuget
     budget = profile["processTimeoutMinutes"] * 60
     code, timed_out = run_with_timeout(test_command(profile, cases, trx_dir), child, min(budget, deadline - time.time()),
                                        invocation_dir / "console.log")
-    cut = timed_out and time.monotonic() - started < budget - 1  # killed by the job deadline, not the process timeout
+    # Amendment 1.5.0: the recorded duration is the subprocess's, taken before any result is read, and the cut is
+    # decided from that recorded value by the same rule the decider applies (dp.cut_by_deadline).
+    seconds = round(time.monotonic() - started, 1)
+    cut = timed_out and dp.cut_by_deadline(seconds, profile["processTimeoutMinutes"])  # the job deadline, not the process timeout
     trx, outcomes, summary, broken = trx_dir / f"{profile['id']}.trx", None, "Missing", None
     if trx.exists():  # read even after a timeout: every observed value is kept
         try:
@@ -478,7 +488,7 @@ def run_profile(protocol, cases, profile, env, invocation_dir: Path, base, nuget
     fills = any(part in dp.FILL_VALUES for val in values["tests"].values() for part in val.split(","))
     status = "invalid" if cut or (broken and outcomes is not None) else "timeout" if timed_out else "crash" if fills else \
         "invalid" if outcomes is None else "completed"
-    result = {"profile": profile["id"], "status": status, "exitCode": code, "seconds": round(time.monotonic() - started, 1),
+    result = {"profile": profile["id"], "status": status, "exitCode": code, "seconds": seconds,
               "calorCacheExisted": existed, **values}
     # Amendment 1.3.0: the isolated home is scratch (its .calor state is recorded above). NuGet writes cache
     # files there whose names upload-artifact rejects (':'), which lost every Linux and macOS record of
