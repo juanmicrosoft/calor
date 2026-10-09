@@ -395,6 +395,16 @@ public sealed class FactCollector
         var rebound = CollectAssignedNames(_body, includeBinds: false);
         var resolved = new Dictionary<string, BindStatementNode>(StringComparer.Ordinal);
         var resolving = new HashSet<string>(StringComparer.Ordinal);
+        // The emitter sanitizes names (`a-b` and `ab` both become `ab`), so two Calor names can be
+        // one C# variable; a name sharing its C# identifier with another is never resolved.
+        var emittedNames = _body.SelectMany(DescendantsAndSelf).OfType<ReferenceNode>()
+            .Select(reference => reference.Name.Split('.')[0])
+            .Concat(binds.Keys).Concat(rebound).Concat(_assignedNames).Concat(_parameterNames).Concat(declared)
+            .Distinct(StringComparer.Ordinal)
+            .GroupBy(Calor.Compiler.CodeGen.CSharpEmitter.SanitizeIdentifier, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+        bool SharesEmittedName(string name)
+            => emittedNames.GetValueOrDefault(Calor.Compiler.CodeGen.CSharpEmitter.SanitizeIdentifier(name)) > 1;
         return Resolve(condition, proof);
 
         string? Resolve(ExpressionNode expression, AstNode site)
@@ -423,6 +433,8 @@ public sealed class FactCollector
             if (candidates.Count > 1)
                 return "is bound more than once, so its value at the proof is not known";
             var bind = candidates[0];
+            if (SharesEmittedName(name))
+                return "shares its C# name with another variable, so its value at the proof is not known";
             if (bind.IsMutable)
                 return "is mutable (§B{~...}), so its value at the proof is not modeled";
             if (rebound.Contains(name) || _parameterNames.Contains(name))
@@ -445,7 +457,8 @@ public sealed class FactCollector
                     if (reason != null)
                         return $"is defined from local '{read}', which {reason}";
                 }
-                else if (!_parameterNames.Contains(read) || _assignedNames.Contains(read) || !declared.Contains(read))
+                else if (!_parameterNames.Contains(read) || _assignedNames.Contains(read) || !declared.Contains(read)
+                         || SharesEmittedName(read))
                 {
                     return $"is defined from '{read}', whose value at the proof is not modeled";
                 }

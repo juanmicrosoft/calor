@@ -8226,7 +8226,7 @@ public sealed class CSharpEmitter : IAstVisitor<string>
         TraverseStatements(statements).Any(statement =>
             statement is YieldReturnStatementNode or YieldBreakStatementNode);
 
-    private static string SanitizeIdentifier(string name)
+    internal static string SanitizeIdentifier(string name)
     {
         return name.Contains('.') || name.Contains("::", StringComparison.Ordinal)
             ? SanitizeQualifiedName(name)
