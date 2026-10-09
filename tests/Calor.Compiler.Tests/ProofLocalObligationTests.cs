@@ -26,6 +26,12 @@ public sealed class ProofLocalObligationTests
                 §O{void}
             {{Indent(body)}}
             """;
+        return SolveModule(source, proofId);
+    }
+
+    private static Obligation SolveModule(string source, string? proofId = "p1")
+    {
+        Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
         var diagnostics = new DiagnosticBag();
         var module = new Parser(new Lexer(source, diagnostics).TokenizeAllForParser(), diagnostics).Parse();
         Assert.False(diagnostics.HasErrors, string.Join("\n", diagnostics.Select(d => d.ToString())));
@@ -207,6 +213,57 @@ public sealed class ProofLocalObligationTests
             §B{k:Pos} INT:1
             §PROOF{p1} (== k INT:1)
             """, prelude: "§RTYPE{r1:Pos:i32} (> # INT:0)").Status);
+
+    // Review round 3: the refinement guard reads a property, whose getter writes the storage the
+    // by-reference parameter x aliases.
+    [SkippableFact]
+    public void LocalWithGetterReadingRefinementGuard_IsRefused()
+        => AssertNotDischarged(SolveModule("""
+            §M{m1:Test}
+              §RTYPE{r1:Guard:i32} (== Heap.Next INT:1)
+              §CL{c1:Heap:pub}
+                §FLD{i32:State:pub:stat} INT:1
+                §PROP{pr1:Next:i32:pub:stat}
+                  §GET
+                    §ASSIGN State INT:2
+                    §R INT:1
+              §F{f1:Check:priv}
+                §I{i32:x:ref}
+                §O{void}
+                §B{saved:Guard} x
+                §PROOF{p1} (== saved x)
+            """), "refinement guards may change state");
+
+    // Review round 3: an `in` argument exposes the local's storage to the callee.
+    [SkippableFact]
+    public void LocalPassedAsInArgument_IsRefused()
+        => AssertNotDischarged(SolveProof("""
+            §B{k:i32} INT:1
+            §C{Mutate} §A{in} k §/C
+            §PROOF{p1} (== k INT:1)
+            """), "local 'k' is reassigned, passed by reference");
+
+    [SkippableFact]
+    public void LocalInModuleWithOperatorOverloads_IsRefused()
+        => AssertNotDischarged(SolveModule("""
+            §M{m1:Test}
+              §CL{c1:Probe:pub}
+                §OP{op1:==:pub}
+                  §I{Probe:a}
+                  §I{Probe:b}
+                  §O{bool}
+                  §R true
+                §OP{op2:!=:pub}
+                  §I{Probe:a}
+                  §I{Probe:b}
+                  §O{bool}
+                  §R false
+              §F{f1:Check:priv}
+                §I{i32:x}
+                §O{void}
+                §B{k:i32} INT:1
+                §PROOF{p1} (== k INT:1)
+            """), "operator overloads");
 
     [SkippableFact]
     public void LocalBoundTwice_IsRefused()

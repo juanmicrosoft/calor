@@ -158,11 +158,13 @@ public sealed class FactCollector
         // #1413 (D-OBL-THROWING-PREDECESSOR): a binding or assignment to a refined name runs a
         // compiler-inserted refinement guard, which throws.
         _refinedTypes.UnionWith(refinementPredicates?.Keys ?? []);
-        // #1516 review round 2: a refinement guard runs its predicate after a binding or assignment
-        // (and on entry); one that changes state (`(inc #)`) changes a variable outside the body.
+        // #1516 review rounds 2-3: a refinement guard runs its predicate after a binding or assignment
+        // (and on entry), outside the body this collector scans. Unless every predicate is plain
+        // (literals, operators, `#`, simple names), it may change state: an increment, a call, or a
+        // member read that runs a getter.
         _refinementChangesState = (refinementPredicates?.Values ?? [])
             .Concat(parameters.Select(p => p.InlineRefinement?.Predicate).OfType<ExpressionNode>())
-            .Any(predicate => IsOpaque(predicate) || DescendantsAndSelf(predicate).Any(node => IsIncrement(node) || IsHeapMutation(node)));
+            .Any(predicate => !DescendantsAndSelf(predicate).All(node => node is SelfRefNode || IsPlainDefinitionNode(node)));
         _parameterNames.UnionWith(parameters.Select(p => p.Name));
         _refinedNames.UnionWith(parameters
             .Where(p => p.InlineRefinement != null || _refinedTypes.Contains(p.TypeName))
@@ -399,6 +401,18 @@ public sealed class FactCollector
             .GroupBy(bind => bind.Name, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.Ordinal);
         var rebound = CollectAssignedNames(_body, includeBinds: false);
+        // #1516 review round 3: a variable passed by reference with any modifier, `in` included,
+        // exposes its storage to the callee (an `in` reference can be written through unsafe code).
+        foreach (var node in _body.SelectMany(DescendantsAndSelf))
+        {
+            if (node.GetType().GetProperty("ArgumentModifiers")?.GetValue(node) is IReadOnlyList<string?> modifiers
+                && node.GetType().GetProperty("Arguments")?.GetValue(node) is IReadOnlyList<ExpressionNode> arguments)
+            {
+                for (var index = 0; index < arguments.Count && index < modifiers.Count; index++)
+                    if (modifiers[index] != null && RootName(arguments[index]) is { } root)
+                        rebound.Add(root);
+            }
+        }
         var resolved = new Dictionary<string, BindStatementNode>(StringComparer.Ordinal);
         var resolving = new HashSet<string>(StringComparer.Ordinal);
         // The emitter sanitizes names (`a-b` and `ab` both become `ab`), so two Calor names can be
@@ -434,8 +448,11 @@ public sealed class FactCollector
         {
             if (HasOpaqueCode)
                 return "is in a body with raw C#, unsafe code, or a lambda, which the verifier cannot see and which may change it";
+            // An operator in a definition or refinement predicate may run a user-defined overload.
+            if (OperatorsMayBeOverloaded)
+                return "is in a module that declares operator overloads or raw C# members, whose effects are not modeled";
             if (_refinementChangesState)
-                return "is in a function whose refinement guards may change state, which the verifier does not model";
+                return "is in a function whose refinement guards may change state (a refinement predicate is not plain), which the verifier does not model";
             if (_hasJumps)
                 return "may be skipped by a goto, so its binding is not known to run before the proof";
             if (candidates.Count > 1)
@@ -465,7 +482,7 @@ public sealed class FactCollector
                     if (reason != null)
                         return $"is defined from local '{read}', which {reason}";
                 }
-                else if (!_parameterNames.Contains(read) || _assignedNames.Contains(read) || !declared.Contains(read)
+                else if (!_parameterNames.Contains(read) || _assignedNames.Contains(read) || rebound.Contains(read) || !declared.Contains(read)
                          || SharesEmittedName(read))
                 {
                     return $"is defined from '{read}', whose value at the proof is not modeled";
