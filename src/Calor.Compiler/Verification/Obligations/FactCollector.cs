@@ -416,15 +416,18 @@ public sealed class FactCollector
         var resolved = new Dictionary<string, BindStatementNode>(StringComparer.Ordinal);
         var resolving = new HashSet<string>(StringComparer.Ordinal);
         // The emitter sanitizes names (`a-b` and `ab` both become `ab`), so two Calor names can be
-        // one C# variable; a name sharing its C# identifier with another is never resolved.
+        // one C# variable; a name sharing its C# identifier with another is never resolved. The
+        // emitter only drops characters and adds `_` or `@`, so names whose letters and digits
+        // differ never collide: comparing letters and digits over-approximates its collisions.
         var emittedNames = _body.SelectMany(DescendantsAndSelf).OfType<ReferenceNode>()
             .Select(reference => reference.Name.Split('.')[0])
             .Concat(binds.Keys).Concat(rebound).Concat(_assignedNames).Concat(_parameterNames).Concat(declared)
             .Distinct(StringComparer.Ordinal)
-            .GroupBy(Calor.Compiler.CodeGen.CSharpEmitter.SanitizeIdentifier, StringComparer.Ordinal)
+            .GroupBy(LettersAndDigits, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
         bool SharesEmittedName(string name)
-            => emittedNames.GetValueOrDefault(Calor.Compiler.CodeGen.CSharpEmitter.SanitizeIdentifier(name)) > 1;
+            => emittedNames.GetValueOrDefault(LettersAndDigits(name)) > 1;
+        static string LettersAndDigits(string name) => string.Concat(name.Where(char.IsLetterOrDigit));
         return Resolve(condition, proof);
 
         string? Resolve(ExpressionNode expression, AstNode site)
@@ -458,7 +461,9 @@ public sealed class FactCollector
             if (candidates.Count > 1)
                 return "is bound more than once, so its value at the proof is not known";
             var bind = candidates[0];
-            if (SharesEmittedName(name))
+            // The emitter writes these references as C# keywords or literals, not as the local.
+            if (name is "null" or "true" or "false" or "default" or "this" or "base"
+                || SharesEmittedName(name))
                 return "shares its C# name with another variable, so its value at the proof is not known";
             if (bind.IsMutable)
                 return "is mutable (§B{~...}), so its value at the proof is not modeled";

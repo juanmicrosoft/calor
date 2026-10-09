@@ -18,6 +18,12 @@ All notable changes to this project will be documented in this file.
   - its definition uses only literals, operators, parameters the function never changes, and
     other locals that meet these rules.
 
+  The solver also refuses a local whose C# name collides with another variable (`a-b` and `ab`
+  both become `ab`). It refuses all locals in a function when a refinement predicate (a
+  `§RTYPE` or parameter refinement) does more than compare names and literals, or when the
+  module declares operator overloads. In these cases, code the solver cannot see could change
+  the local.
+
   Any other local still makes the proof `Unsupported`, and the runtime check stays. The message
   now says which local and why, for example "local 'm' is mutable". If the proof needs the
   local's definition to finish without integer overflow, it is reported `Assumed`, not

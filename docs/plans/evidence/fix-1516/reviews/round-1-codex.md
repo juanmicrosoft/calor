@@ -57,7 +57,8 @@ The consistency fallback in `src/Calor.Compiler/Verification/Obligations/Obligat
 
 - **Blocking (emitted-name collision): fixed.** `ResolveProofLocals` now maps every name in the
   function (references, bindings, assigned names, parameters, solver-declared names) through the
-  emitter's own `CSharpEmitter.SanitizeIdentifier` (made `internal`). A local, or a parameter its
+  emitter's own `CSharpEmitter.SanitizeIdentifier` (made `internal`; replaced after the
+  verification pass by a letters-and-digits key, see `verification-codex.md`). A local, or a parameter its
   definition reads, that shares its C# identifier with another name is not resolved. The proof is
   then Unsupported with "shares its C# name with another variable". This also closes the Failed
   variant: an unresolved local keeps the `IsStaleBefore` stale check. Test:
