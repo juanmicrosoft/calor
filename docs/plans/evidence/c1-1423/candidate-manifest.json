@@ -1007,7 +1007,7 @@
       "closureStatus": "Release gate; merged last, immediately before C1 (amendment 1.1.0)."
     }
   ],
-  "issueStatesObservedVia": "gh issue list -R juanmicrosoft/calor --milestone 0.24 --state all, re-run by the C1 agent at the second re-freeze (2026-10-08T17:04Z); every state equals the first freeze's observation (2026-10-07)",
+  "issueStatesObservedVia": "gh issue list -R juanmicrosoft/calor --milestone 0.24 --state all, re-run by the C1 agent at the third freeze (2026-10-09T15:33Z); every state equals the observations at the first and second freezes (2026-10-07, 2026-10-08)",
   "additionalMerged": [
     {
       "issue": 1485,
@@ -1268,7 +1268,7 @@
       "id": "R2-BYTE-REPRODUCIBILITY",
       "source": "release-gate.md §8; reviews/refresh-codex.md",
       "owner": "C2",
-      "item": "The release gate compares rebuilt bytes with C2-recorded hashes and fails closed where a build is not byte-reproducible. #1526 makes both NuGet packages, the release metadata, and the website byte-reproducible, and #1527 makes the B2 headline depend only on the candidate. Residuals recorded by #1526: rebuilds must use the same .NET SDK build (a source-built SDK 10.0.401 packs different bytes), and the site downloads Google Fonts at build time. C2 regeneration 2 must show that rebuilt bytes equal its recorded hashes."
+      "item": "The release gate compares rebuilt bytes with C2-recorded hashes and fails closed where a build is not byte-reproducible. #1526 makes both NuGet packages, the release metadata, and the website byte-reproducible, and #1527 makes the B2 headline depend only on the candidate. Residuals recorded by #1526: rebuilds must use the same .NET SDK build (a source-built SDK 10.0.401 packs different bytes), and the site downloads Google Fonts at build time. C2 regeneration 3 must show that rebuilt bytes equal its recorded hashes."
     },
     {
       "id": "R2-BRANCH-PROTECTION",
