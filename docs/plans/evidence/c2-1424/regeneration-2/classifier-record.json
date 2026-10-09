@@ -1,0 +1,19 @@
+{
+ "schema": "c2-1424/classifier-record/1",
+ "issue": 1424,
+ "regeneration": 2,
+ "candidate": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d",
+ "supplements": ["docs/plans/evidence/c2-1424/regeneration-2/ledger.json", "docs/plans/evidence/c2-1424/regeneration-2/raw-artifact-freeze.json"],
+ "classifier": {
+  "test": "Calor.Compiler.Tests.EvidenceContract.CandidateManifestTests.RangeFromTheCandidateIsNotInvalidated",
+  "anchor": "7eca486822ce81871df0cfb0a6e0ae16cf5ce7b9",
+  "anchorCheckout": "fresh clone of https://github.com/juanmicrosoft/calor.git, detached at the anchor",
+  "target": "1a306b52ff94488bca8a45ecb35e956a0d2de91f",
+  "originMainAtRun": "7eca486822ce81871df0cfb0a6e0ae16cf5ce7b9",
+  "landingFound": "7eca486822ce81871df0cfb0a6e0ae16cf5ce7b9",
+  "verdict": "NOT-INVALIDATED",
+  "output": {"path": "docs/plans/evidence/c2-1424/regeneration-2/classifier.txt", "sha256": "c436a1cb3b58e28481b0efec05753189efa25f444d32c60c0fc8930c32290466"},
+  "laterCommits": "The next commit adds only new data files under regeneration-2/ (this record, classifier.txt, r2-dry-run/, reviews/); the final branch head is classified again before push and its verdict is in the PR description.",
+  "earlierRuns": "Pre-push drafts 57d41927 and 7a546fda were also NOT-INVALIDATED; neither is on the branch."
+ }
+}

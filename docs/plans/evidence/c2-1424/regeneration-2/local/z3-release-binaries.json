@@ -1,0 +1,62 @@
+{
+ "pinFile": "cand/.github/z3-binaries-4.15.7.sha256",
+ "verdict": "MATCH",
+ "assets": [
+  {
+   "asset": "Microsoft.Z3.dll",
+   "sha256": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175",
+   "size": 260608,
+   "pinnedSha256": "59cb6de1d2e855fb44b4698616cc1f452249103989728da3700c4648b4426175",
+   "pinnedSize": 260608,
+   "result": "MATCH"
+  },
+  {
+   "asset": "libz3-linux-arm64.so",
+   "sha256": "7227ad08ae28b731be27a26f68680f627a4e513e2a134b2cbe1fc223a76ce3b5",
+   "size": 30884960,
+   "pinnedSha256": "7227ad08ae28b731be27a26f68680f627a4e513e2a134b2cbe1fc223a76ce3b5",
+   "pinnedSize": 30884960,
+   "result": "MATCH"
+  },
+  {
+   "asset": "libz3-linux-x64.so",
+   "sha256": "3e70217bc6b05b6204912698becf9f853a7a2f07bb5338dad84aef79aee9bec8",
+   "size": 34714776,
+   "pinnedSha256": "3e70217bc6b05b6204912698becf9f853a7a2f07bb5338dad84aef79aee9bec8",
+   "pinnedSize": 34714776,
+   "result": "MATCH"
+  },
+  {
+   "asset": "libz3-osx-arm64.dylib",
+   "sha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+   "size": 25891768,
+   "pinnedSha256": "8d1f54380a32e2c13b03b2e9afa8427908fa480c3f7d1285a1ae034793359ada",
+   "pinnedSize": 25891768,
+   "result": "MATCH"
+  },
+  {
+   "asset": "libz3-win-arm64.dll",
+   "sha256": "f28f1f6f4795ef82d6dc0fa856145b7ce6dcfee542c236110197ce5f535a7562",
+   "size": 17616896,
+   "pinnedSha256": "f28f1f6f4795ef82d6dc0fa856145b7ce6dcfee542c236110197ce5f535a7562",
+   "pinnedSize": 17616896,
+   "result": "MATCH"
+  },
+  {
+   "asset": "libz3-win-x64.dll",
+   "sha256": "d301fc1ba4c317d3293fccd784c2c3c0ba06139d21b9fc3a7cae37a244e85a56",
+   "size": 17730560,
+   "pinnedSha256": "d301fc1ba4c317d3293fccd784c2c3c0ba06139d21b9fc3a7cae37a244e85a56",
+   "pinnedSize": 17730560,
+   "result": "MATCH"
+  },
+  {
+   "asset": "libz3-win-x86.dll",
+   "sha256": "89d584e1e792961a5e5a9a8385f1416cf38251c48446bab8ba64f9a17000ebc9",
+   "size": 14245376,
+   "pinnedSha256": "89d584e1e792961a5e5a9a8385f1416cf38251c48446bab8ba64f9a17000ebc9",
+   "pinnedSize": 14245376,
+   "result": "MATCH"
+  }
+ ]
+}

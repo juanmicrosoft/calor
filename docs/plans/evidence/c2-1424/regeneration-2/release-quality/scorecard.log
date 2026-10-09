@@ -1,0 +1,22 @@
+Calor Conversion Scorecard
+=========================
+
+Test data: /private/tmp/claude-501/-Users-juanrivera-repos-juanmicrosoft-calor/98372634-e96e-40c2-8b28-3e5d5ca7761f/scratchpad/c2/r2/cand/tests/Calor.Evaluation/bin/Release/net10.0/TestData/CSharpImport
+Running scorecard...
+
+Total snippets:       100
+Fully converted:      93 (93%)
+Partially converted:  7 (7%)
+Blocked:              0 (0%)
+Crashed:              0 (0%)
+Round-trip verified:   97 (97%)
+
+By Level:
+  Level 1: 20/20 (100%)
+  Level 2: 20/20 (100%)
+  Level 3: 20/20 (100%)
+  Level 4: 19/20 (95%)
+  Level 5: 18/20 (90%)
+
+JSON report: artifacts/migration/conversion-scorecard.json
+Markdown report: artifacts/migration/conversion-scorecard.md

@@ -1,0 +1,160 @@
+{
+  "generatorVersion": "b1-1276-results-generator-v1",
+  "metricImplementationVersion": "calor-evaluation-static-metrics@72a0a855d8cd7f1e85c5bcd99474b83d1556d4e1",
+  "oracleResultSha256": "3773d284bbd5e8876bd378c0c849d2537adc9917912d5954a32bca0436a4b98c",
+  "pairs": [
+    {
+      "pairId": "ErrorHandling/BasicTryCatch",
+      "category": "ErrorHandling",
+      "metric": "CompositeTokenEconomics",
+      "calorSize": "33.23794954052678",
+      "csharpSize": "44.627543029210926",
+      "r": "1.3426683548814256",
+      "rBits": "3ff57b91d0197001"
+    },
+    {
+      "pairId": "PatternMatching/WildcardMatch",
+      "category": "PatternMatching",
+      "metric": "CompositeTokenEconomics",
+      "calorSize": "61.350751852756",
+      "csharpSize": "48.80220136983374",
+      "r": "0.795462156469749",
+      "rBits": "3fe9746d0d67c85a"
+    },
+    {
+      "pairId": "TokenEconomics/FormatHeader",
+      "category": "TokenEconomics",
+      "metric": "CompositeTokenEconomics",
+      "calorSize": "39.31845330732077",
+      "csharpSize": "56.22138132673705",
+      "r": "1.4298980910388224",
+      "rBits": "3ff6e0dcd219fe40"
+    },
+    {
+      "pairId": "TokenEconomics/GCD",
+      "category": "TokenEconomics",
+      "metric": "CompositeTokenEconomics",
+      "calorSize": "46.19201401166181",
+      "csharpSize": "52.01873092470561",
+      "r": "1.1261412180809602",
+      "rBits": "3ff204aca7655d81"
+    },
+    {
+      "pairId": "TokenEconomics/HelloWorld",
+      "category": "TokenEconomics",
+      "metric": "CompositeTokenEconomics",
+      "calorSize": "23.54706126753334",
+      "csharpSize": "37.09665500703622",
+      "r": "1.5754261045808309",
+      "rBits": "3ff934f200c7078e"
+    },
+    {
+      "pairId": "TokenEconomics/IsEven",
+      "category": "TokenEconomics",
+      "metric": "CompositeTokenEconomics",
+      "calorSize": "21.980699325848697",
+      "csharpSize": "35.49844600748995",
+      "r": "1.6149825572539798",
+      "rBits": "3ff9d6f7f33042ba"
+    },
+    {
+      "pairId": "TokenEconomics/IsOdd",
+      "category": "TokenEconomics",
+      "metric": "CompositeTokenEconomics",
+      "calorSize": "21.72946933032522",
+      "csharpSize": "35.283948649894484",
+      "r": "1.6237832647230324",
+      "rBits": "3ff9fb04291c70c8"
+    },
+    {
+      "pairId": "TokenEconomics/LeapYear",
+      "category": "TokenEconomics",
+      "metric": "CompositeTokenEconomics",
+      "calorSize": "50.93340018691978",
+      "csharpSize": "75.67264556721958",
+      "r": "1.4857175309229222",
+      "rBits": "3ff7c57fbee6866e"
+    },
+    {
+      "pairId": "TokenEconomics/LogPipeline",
+      "category": "TokenEconomics",
+      "metric": "CompositeTokenEconomics",
+      "calorSize": "42.42927105409816",
+      "csharpSize": "56.30740805677934",
+      "r": "1.3270887445835748",
+      "rBits": "3ff53bc1684e04b7"
+    },
+    {
+      "pairId": "TokenEconomics/MaxTwo",
+      "category": "TokenEconomics",
+      "metric": "CompositeTokenEconomics",
+      "calorSize": "39.17910173035031",
+      "csharpSize": "37.18461421007429",
+      "r": "0.9490930768652364",
+      "rBits": "3fee5ef871bfe0e8"
+    },
+    {
+      "pairId": "TokenEconomics/MinTwo",
+      "category": "TokenEconomics",
+      "metric": "CompositeTokenEconomics",
+      "calorSize": "39.17910173035031",
+      "csharpSize": "37.18461421007429",
+      "r": "0.9490930768652364",
+      "rBits": "3fee5ef871bfe0e8"
+    },
+    {
+      "pairId": "TokenEconomics/NamedConfig",
+      "category": "TokenEconomics",
+      "metric": "CompositeTokenEconomics",
+      "calorSize": "41.90454512546914",
+      "csharpSize": "55.37811088142445",
+      "r": "1.321529937041751",
+      "rBits": "3ff524fc934477d9"
+    },
+    {
+      "pairId": "TokenEconomics/PairLogger",
+      "category": "TokenEconomics",
+      "metric": "CompositeTokenEconomics",
+      "calorSize": "48.80248128564122",
+      "csharpSize": "59.76407352758375",
+      "r": "1.2246113712494302",
+      "rBits": "3ff3980217dd375e"
+    },
+    {
+      "pairId": "TokenEconomics/ParseAndDouble",
+      "category": "TokenEconomics",
+      "metric": "CompositeTokenEconomics",
+      "calorSize": "38.93524208235458",
+      "csharpSize": "55.234371752769135",
+      "r": "1.4186215058311222",
+      "rBits": "3ff6b2ac76cf26ae"
+    },
+    {
+      "pairId": "TokenEconomics/Sign",
+      "category": "TokenEconomics",
+      "metric": "CompositeTokenEconomics",
+      "calorSize": "36.241178987255154",
+      "csharpSize": "44.66416658861481",
+      "r": "1.2324148340847783",
+      "rBits": "3ff3b7f89df7fd7f"
+    },
+    {
+      "pairId": "TokenEconomics/TernaryChain",
+      "category": "TokenEconomics",
+      "metric": "CompositeTokenEconomics",
+      "calorSize": "111.93544323883145",
+      "csharpSize": "99.46278584415742",
+      "r": "0.8885727609255836",
+      "rBits": "3fec6f302489567e"
+    },
+    {
+      "pairId": "TokenEconomics/VoidSequence",
+      "category": "TokenEconomics",
+      "metric": "CompositeTokenEconomics",
+      "calorSize": "60.98378140889119",
+      "csharpSize": "69.4861694612061",
+      "r": "1.139420479607637",
+      "rBits": "3ff23b10f804eb42"
+    }
+  ]
+}
