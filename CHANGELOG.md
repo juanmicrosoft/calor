@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `§PROOF` can now refer to a `§B` local** (#1516). `§PROOF` states a fact the compiler
+  tries to prove; when it succeeds, the obligation is *discharged* and the runtime check is
+  removed. Before this fix, any `§PROOF` that named a local, such as
+  `§B{newBalance:i32} (- balance amount)` then `§PROOF{p1} (>= newBalance INT:0)`, was reported
+  `Unsupported` with "Unknown variable", even when it was easy to prove. The solver now uses the
+  local's defining expression, but only when that is exactly the local's value at the proof:
+  - the local is immutable (`§B`, not `§B{~...}`), bound once, and never reassigned or passed by `ref`;
+  - its binding runs on every path to the proof (it comes earlier in the same block, or in a block
+    that encloses the proof);
+  - its definition uses only literals, operators, parameters the function never changes, and
+    other locals that meet these rules.
+
+  Any other local still makes the proof `Unsupported`, and the runtime check stays. The message
+  now says which local and why, for example "local 'm' is mutable". If the proof needs the
+  local's definition to finish without integer overflow, it is reported `Assumed`, not
+  discharged, and the runtime check stays.
+
 ## [0.24.0] - 2026-10-07
 
 Calor 0.24 is a soundness release. It repairs verifier defects found by a registered soundness

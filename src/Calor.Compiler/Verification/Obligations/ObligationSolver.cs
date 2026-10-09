@@ -135,6 +135,42 @@ public sealed class ObligationSolver : IDisposable
             return;
         }
 
+        // #1516: a §PROOF may read immutable §B locals bound on every path to it; each is declared
+        // and constrained to its definition (over unchanged parameters), or the proof is refused
+        // with the reason that local's value at the proof is not known.
+        var localEquations = new List<BoolExpr>();
+        var localDefinitions = new List<ExpressionNode>();
+        var resolvedLocals = new HashSet<string>(StringComparer.Ordinal);
+        if (obligation.Kind == ObligationKind.ProofObligation)
+        {
+            var locals = new List<(string Name, string? TypeName, ExpressionNode Definition)>();
+            var refusal = info.Facts.ResolveProofLocals(
+                obligation.Condition, translator.Variables.Keys.ToHashSet(StringComparer.Ordinal), locals);
+            foreach (var (name, typeName, definition) in locals)
+            {
+                if (refusal != null)
+                    break;
+                var type = typeName == null ? null : ResolveRefinementBaseType(typeName, info.RefinementTypes);
+                if (translator.DeclareBoundLocal(name, type, definition, out var why) is { } equation)
+                {
+                    localEquations.Add(equation);
+                    localDefinitions.Add(definition);
+                    resolvedLocals.Add(name);
+                }
+                else
+                {
+                    refusal = $"local '{name}' {why}";
+                }
+            }
+            if (refusal != null)
+            {
+                obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
+                    refusal + ". Runtime check kept.")));
+                obligation.SolverDuration = sw.Elapsed;
+                return;
+            }
+        }
+
         // Refinement predicates use # for the constrained entry or return value.
         // so # in the predicate resolves to the parameter being checked
         if (obligation.Kind is ObligationKind.RefinementEntry
@@ -222,6 +258,10 @@ public sealed class ObligationSolver : IDisposable
                 }
             }
 
+            // #1516: each resolved local equals its definition at the proof.
+            foreach (var equation in localEquations)
+                solver.Assert(equation);
+
             // CONSISTENCY PRE-CHECK: an UNSAT assumption set would vacuously
             // discharge every obligation ("assume False, prove anything"). If the
             // assumptions are inconsistent, retry with preconditions only; if the
@@ -246,8 +286,13 @@ public sealed class ObligationSolver : IDisposable
                 }
             }
 
+            // #1516: a local's checked definition joins the condition's arithmetic safety, so a proof
+            // that needs it to complete without overflow is Assumed (guard kept), not Discharged.
             var arithmeticSafety = _checkIntegerOverflow
-                ? translator.GetCheckedArithmeticSafety(obligation.Condition) : _ctx.MkTrue();
+                ? localDefinitions.Prepend(obligation.Condition)
+                    .Select(translator.GetCheckedArithmeticSafety)
+                    .Aggregate((BoolExpr?)_ctx.MkTrue(), (all, next) => all == null || next == null ? null : _ctx.MkAnd(all, next))
+                : _ctx.MkTrue();
             if (arithmeticSafety == null)
             {
                 obligation.ApplyOutcome(ProofOutcome.Assign(ProofEvidence.Unsupported(
@@ -318,12 +363,13 @@ public sealed class ObligationSolver : IDisposable
                 if (!info.Facts.IsExact(obligation.Span))
                     inexact.Add("the path to the obligation is not fully modeled (an enclosing guard, loop, try, or earlier exit is not asserted)");
                 if (obligation.Kind == ObligationKind.ProofObligation
-                        ? info.Facts.IsStaleBefore(obligation.Condition, obligation.Span)
+                        ? info.Facts.IsStaleBefore(obligation.Condition, obligation.Span, resolvedLocals)
                         : info.Facts.IsStaleAfterEntry(obligation.Condition))
                     inexact.Add("the obligation reads a variable or heap state the body may change, whose current value is not modeled");
                 if (info.Preconditions.Select(pre => pre.Condition)
                         .Concat(info.CollectedFacts.Where(f => f.AppliesTo(obligation.Span)).Select(f => f.Fact))
                         .Append(obligation.Condition)
+                        .Concat(localDefinitions)
                         .Any(e => FactCollector.ReferencedNames(e).Overlaps(info.Facts.DroppedFactNames)))
                     inexact.Add("a dropped entry refinement constrains a variable this query reads");
                 if (info.Facts.ThrowsElsewhereInStatement(obligation.Span))
