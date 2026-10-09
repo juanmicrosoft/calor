@@ -90,8 +90,8 @@ platform.
 | linux-x64 | `ubuntu-24.04` | Linux / X64 | 4 | 16 GiB | 70 min |
 | linux-arm64 | `ubuntu-24.04-arm` | Linux / ARM64 | 4 | 16 GiB | 50 min |
 | osx-arm64 | `macos-14` | macOS / ARM64 | 3 | 7 GiB | 50 min |
-| win-x64 | `windows-2025` | Windows / X64 | 4 | 16 GiB | 75 min (1.3.0; was 50) |
-| win-arm64 | `windows-11-arm` | Windows / ARM64 | 4 | 16 GiB | 75 min (1.3.0; was 50) |
+| win-x64 | `windows-2025` | Windows / X64 | 4 | 16 GiB | 110 min (1.5.0; 75 from 1.3.0, 50 before) |
+| win-arm64 | `windows-11-arm` | Windows / ARM64 | 4 | 16 GiB | 110 min (1.5.0; 75 from 1.3.0, 50 before) |
 
 A different processor count, or memory below 90% of the registered value, is an
 `environment-violation`. Hosted runners cannot cap a process tree's memory; a memory kill is a
@@ -164,6 +164,8 @@ Runner-minutes are each job's duration rounded up to a minute, with no OS multip
 | One execution (1.3.0): plan 5 + decide 10 + 2 × (70 + 50 + 50 + 75 + 75) | 655 | 388 measured (g3-exec-1) |
 | One dispatched control run: plan 5 + decide 10 + 5 × 20 | 115 | 13 measured |
 | 3 executions, no dispatched control run (1.3.0) | **1,965 of 2,000** | about 1,200 |
+| One execution (1.5.0): plan 5 + decide 10 + 2 × (70 + 50 + 50 + 110 + 110) | 795 | about 400 (388, 401, 403 measured) |
+| 4 executions, no dispatched control run (1.5.0) | **3,180 of 3,200** | about 1,610 |
 
 Registration (1.0.0) had 555 per execution and 2 control runs (1,895). Amendment 1.3.0 raises the
 Windows job timeouts and sets `maxDispatchedControlRuns` to 0 so the worst case stays under the
@@ -313,6 +315,77 @@ only.**
   complete new execution on a new commit follows: #1424's execution on the re-frozen candidate.
   Executions used: 2 of 3 (C2's run 37642265108 started no attempt, so the plan does not count
   it). Budget: 13 + 388 + 401 + 2 recorded, plus 655 worst case, is 1,459 of 2,000.
+
+## Amendment 1.5.0: the harness-cut rule, Windows job time, and a fourth execution
+
+This amendment was made after execution `c2-1424-regen-2`: run 37826943308, commit `5e52d8ab`,
+protocol 1.4.0. That execution was `NON-DETERMINISTIC` and incomplete: 660 `AGREE-PASS`, 470
+`DISAGREE`, 1,174 `INCOMPLETE`, from 149 completed attempts and 1 invalid one. It follows the
+maintainer decision "Amend + 3rd freeze" (2026-10-08).
+
+**The cause, and only the cause.** win-x64 job 1 got a slow runner: its median
+`verification-full` took 233 s, against 149.5 s in job 2. The harness's own 75-minute deadline cut
+its 15th attempt. The 1.4.0 decider then compared the values the harness filled in for that cut
+attempt (`Timeout`), which `runPlan.harnessCutInconsistency` had already recorded as a known
+inconsistency. No two observed values differed.
+
+1. **Harness-cut rule** (`runPlan.harnessCutRule`, `decide()`).
+   - **What counts as a cut.** All of these must hold for the attempt's last profile:
+     - it is the last profile of an `invalid` attempt whose reason is "the job deadline cut an
+       invocation";
+     - its status is `invalid` and its invocation value starts `timeout|`;
+     - it ran for less than its process timeout.
+   - **What the decider does.** A cut invocation is excluded from every comparison, so its filled
+     values never make a case `DISAGREE`.
+   - **Agreement is unchanged.** The attempt is invalid, so it never counts toward agreement, and
+     every case it should have covered stays `INCOMPLETE`. The execution is then `INCOMPLETE`,
+     never `DETERMINISTIC`.
+   - **What is still compared.** Profiles that completed earlier in the same attempt. A real
+     difference between observed values is still `DISAGREE`. A process timeout (status `timeout`)
+     is an observed value and is still compared.
+   - **Visibility.** The result lists every cut invocation in `harnessCut`.
+2. **Windows job time.** win-x64 and win-arm64 `jobTimeoutMinutes` go from 75 to 110. The slow job
+   needed about 73 minutes for 15 attempts, plus setup and the harness's 5-minute stop margin. 110
+   minutes leaves about 1.5 times that.
+3. **A fourth execution, on the new candidate only.** `maxExecutions` goes from 3 to 4. Under
+   `budget.extraExecution`, the plan step allows the fourth execution only on the merge commit of
+   this amendment's PR, which is the re-frozen #1423 candidate. Every other guard still applies:
+   one execution per commit, a change outside `docs/` after a failure, and the budget.
+
+**Budget.**
+
+- Recorded so far: 13 + 388 + 401 + 2 + 403 = 1,207 runner-minutes.
+- One execution's worst case is now 795, so the validator total (`D008`) is 4 × 795 = 3,180.
+  That fits within the 3,200 `determinism-compute` ceiling set by contract amendment 1.5.0.
+- The plan step's own check is 1,207 + 795 = 2,002 ≤ 3,200.
+- Expected use after the fourth execution is about 1,610.
+
+**Replay, for the record only.** `replay-1.5.0-c2-1424-regen-2.json` re-decides regeneration 2's
+150 attempt records with both deciders. The records come from the archives branch (SHA-256
+`a3de2eb9…`), and both deciders use the candidate's protocol, registry, and harness bytes.
+
+| Decider | Verdict | DISAGREE | INCOMPLETE |
+|---|---|---|---|
+| 1.4.0 | `NON-DETERMINISTIC` (identical to the published result) | 470 | 1,174 |
+| 1.5.0 | **`INCOMPLETE`** | 0 | 1,644 |
+
+The 1.5.0 decider moves exactly 470 cases from `DISAGREE` to `INCOMPLETE`, and its `harnessCut`
+list names one invocation: win-x64 job 1, attempt 15, `verification-full`. The replay is not
+evidence. The published `NON-DETERMINISTIC` result stays the result of that execution.
+
+**Unchanged:** cases, cells, artifacts, profiles, environments, the attempt count, determinism
+rows, gates, the agreement rate, and record formats. The result gains the `harnessCut` list.
+
+**Controls** (`test_determinism_protocol.py`):
+
+- A cut attempt gives `INCOMPLETE`, not `DISAGREE`. Without the reason, the same records read
+  `NON-DETERMINISTIC`.
+- An observed disagreement elsewhere, or in a profile that completed before the cut, is still
+  `DISAGREE`.
+- A wrong reason, a run as long as the process timeout, or a non-timeout invocation is not
+  treated as a harness cut.
+- The fourth execution is refused on any commit other than the amendment PR's merge.
+- The budget controls are updated to 3,200 and 795.
 
 ## What G2 executed
 

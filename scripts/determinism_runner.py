@@ -97,10 +97,11 @@ def classify(run) -> str:
     return match.group(1) if match else "unknown"  # an unreadable title is charged and counted as an execution
 
 
-def plan_problems(protocol, *, mode, execution_id, env, inventory, ledger, changed_paths) -> list[str]:
+def plan_problems(protocol, *, mode, execution_id, env, inventory, ledger, changed_paths, commit_subject=None) -> list[str]:
     """Guards before any attempt runs. inventory is every run of the workflow from the GitHub API
     (fetch_inventory); ledger is #1135's ledger (entries with runId, commit, mode, runnerMinutes);
-    changed_paths(old, new) lists changed paths, or None if git cannot tell."""
+    changed_paths(old, new) lists changed paths, or None if git cannot tell; commit_subject(sha) gives that commit's
+    subject line, or None if git cannot tell (amendment 1.5.0)."""
     problems = []
     if env.get("GITHUB_EVENT_NAME") != "workflow_dispatch":
         problems.append(f"event {env.get('GITHUB_EVENT_NAME')}: only a workflow_dispatch run may execute the protocol")
@@ -139,6 +140,15 @@ def plan_problems(protocol, *, mode, execution_id, env, inventory, ledger, chang
     limit, count = (b["maxExecutions"], len(executions)) if mode == "execution" else (b["maxDispatchedControlRuns"], len(controls))
     if count >= limit:
         problems.append(f"the limit of {limit} {mode} runs is reached ({count} recorded)")
+    extra = b.get("extraExecution")
+    if mode == "execution" and extra and count >= extra["afterExecutions"]:
+        # Amendment 1.5.0: an execution beyond the first afterExecutions runs only on the merge commit of the PR that
+        # recorded the named protocol amendment (the re-frozen #1423 candidate), never on any other commit.
+        pr = next((a.get("pr") for a in protocol["amendments"]["amendmentLog"] if a.get("version") == extra["amendment"]), None)
+        subject = commit_subject(commit) if commit_subject else None
+        if not isinstance(pr, int) or pr <= 0 or subject is None or not subject.startswith(f"Merge pull request #{pr} from "):
+            problems.append(f"execution {count + 1} may run only on the merge commit of PR #{pr} (protocol amendment "
+                            f"{extra['amendment']}); {commit} is {subject!r}")
     if any((TITLE.match(r.get("title") or "") or [None, None, None])[2] == execution_id for r in prior):
         problems.append(f"execution id {execution_id} was already dispatched")
     if mode == "execution":
@@ -233,6 +243,11 @@ def changed_paths(old: str, new: str):
     return [p for p in result.stdout.decode("utf-8", "surrogateescape").split("\0") if p] if result.returncode == 0 else None
 
 
+def commit_subject(sha: str):
+    result = git("log", "-1", "--format=%s", sha)
+    return result.stdout.rstrip("\n") if result.returncode == 0 else None
+
+
 def load_ledger(protocol) -> dict:
     path = ROOT / protocol["executions"]["ledger"]
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"entries": []}
@@ -247,7 +262,7 @@ def cmd_plan(args, env=os.environ) -> int:
         problems.append(f"main's validator rejects this tree:\n{trusted.stdout}{trusted.stderr}")
     inventory = fetch_inventory(env["GITHUB_REPOSITORY"], env["GH_TOKEN"])
     problems += plan_problems(protocol, mode=args.mode, execution_id=args.execution_id, env=env, inventory=inventory,
-                              ledger=load_ledger(protocol), changed_paths=changed_paths)
+                              ledger=load_ledger(protocol), changed_paths=changed_paths, commit_subject=commit_subject)
     print(json.dumps({"inventory": inventory}, indent=1))
     if problems:
         print("\n".join(f"REFUSED: {p}" for p in problems))

@@ -143,7 +143,7 @@ internal static partial class EvidenceContractValidator
                 e.Ceiling == ceilingId && e.Value == raised && e.Amendment == recordedIn
                 && (e.Pr is { } registeredPr ? hasPr && pr == registeredPr && issue == e.Issue : !hasPr && issue == e.Issue));
             if (match is null || recordedIn is null || !amendmentVersions.Contains(recordedIn))
-                v.Add(new("C011", subject, "ceiling exception is not one registered by a logged amendment (1.1.0: pr-size, #1473, 1520; 1.2.0: s1-generated-cases, issue #1311, 3008; 1.3.0: s2-repairs, issue #1413, 7, and review-rounds-per-pr, #1496, 5; 1.3.1: review-rounds-per-pr, #1503 (revert-only), 5, and #1502, re-registered by 1.3.2 with value 6 (one change: the no-solver overflow rule))"));
+                v.Add(new("C011", subject, "ceiling exception is not one registered by a logged amendment (1.1.0: pr-size, #1473, 1520; 1.2.0: s1-generated-cases, issue #1311, 3008; 1.3.0: s2-repairs, issue #1413, 7, and review-rounds-per-pr, #1496, 5; 1.3.1: review-rounds-per-pr, #1503 (revert-only), 5, and #1502, re-registered by 1.3.2 with value 6 (one change: the no-solver overflow rule); 1.5.0: agent-prs-per-gate, issue #1423, 3, and regenerations, issue #1424, 3)"));
             // A later amendment that changed the registered text must itself be logged (1.2.1
             // amended condition 4 of the #1311 exception).
             if (match?.TextAmendment is { } textAmendment && !amendmentVersions.Contains(textAmendment))
@@ -308,7 +308,10 @@ internal static partial class EvidenceContractValidator
     /// to its base commit (the PR head when the amendment was drafted). Amendment 1.3.2 re-registers
     /// #1502's exception (value 6, base bdb430db, scope condition "One change only."): the 1.3.1 text
     /// of part (b) contradicted its own determinism condition, so the no-overflow decision becomes a
-    /// rule with no solver; the 1.3.1 text of #1502 no longer validates.
+    /// rule with no solver; the 1.3.1 text of #1502 no longer validates. Amendment 1.5.0 registers a
+    /// third C1 PR (agent-prs-per-gate, issue #1423) and a third C2 regeneration (regenerations, issue
+    /// #1424, recorded in addedRegenerations), each bound to its text; it also raises the
+    /// determinism-compute ceiling value itself (2,000 to 3,200), which is not an exception.
     /// </summary>
     private static readonly RegisteredException[] RegisteredCeilingExceptions =
     [
@@ -321,6 +324,9 @@ internal static partial class EvidenceContractValidator
             ["D-NUM-WHILE-BOUND"], BaseCommit: "bdb430db1c1dfdbcd578c5b1b74110841be95a2d", RevertOnly: false, ScopeCondition: "One change only."),
         new("review-rounds-per-pr", 1503, 1413, 5, "1.3.1", null, null, "1.3.1", "fd4a1147a5ebdf12ec319f87b3ac3e074d9a82c82e95509b52c127901b118bf7",
             BaseCommit: "9b54c9c3d8d7fb178c5594ddc757d871fbb34ab4", RevertOnly: true, ScopeCondition: "Revert only."),
+        // Amendment 1.5.0 ("Amend + 3rd freeze", 2026-10-08): one more C1 PR and one more C2 regeneration.
+        new("agent-prs-per-gate", null, 1423, 3, "1.5.0", "addedPrs", 1, "1.5.0", "e60cc4390a5390241f5db028a6e2cbb0252afa4f308ab0838c33346f773ec41d"),
+        new("regenerations", null, 1424, 3, "1.5.0", "addedRegenerations", 1, "1.5.0", "befbf57e1778aa8fe59eed79d26daa8a638e81c9aafd6fbf443a1516271496fa"),
     ];
 
     private sealed record RegisteredException(
@@ -329,7 +335,7 @@ internal static partial class EvidenceContractValidator
         string[]? Findings = null, string? BaseCommit = null, bool? RevertOnly = null, string? ScopeCondition = null);
 
     /// <summary>Fields in which an exception may record the amount it adds; at most the registered one appears.</summary>
-    private static readonly string[] AddedAmountFields = ["addedExecutions", "addedPrs"];
+    private static readonly string[] AddedAmountFields = ["addedExecutions", "addedPrs", "addedRegenerations"];
 
     /// <summary>
     /// Charge reallocations registered by amendments; they change no ceiling value. The work, rule,

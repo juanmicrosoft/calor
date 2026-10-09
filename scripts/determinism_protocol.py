@@ -335,6 +335,8 @@ POSITIONS, POLARITIES, MAX_DEPTH = ["precondition", "postcondition", "obligation
 PROFILE_KEYS = {"profile", "status", "exitCode", "seconds", "calorCacheExisted", "invocation", "tests", "cells",
                 "artifacts", "unregistered"}
 FILL_VALUES = {"Missing", "Timeout", "Crash"}
+# Amendment 1.5.0: the reason the runner records when its own job deadline cut an invocation.
+HARNESS_CUT_REASON = "the job deadline cut an invocation"
 CELL_VALUE = re.compile(r"^[0-9a-f]{32}\|[01]$")
 SHA = re.compile(r"^[0-9a-f]{64}$")
 
@@ -790,6 +792,20 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
         else:
             seen[key] = r
 
+    # Amendment 1.5.0 (harness-cut rule): an invocation that the harness's own job deadline cut is excluded from
+    # every comparison. It is the last profile of an invalid attempt whose reason is HARNESS_CUT_REASON, with status
+    # invalid, a 'timeout|' invocation, and less time than its process timeout. Its unobserved cases were filled
+    # (Timeout), not observed, so they never make a case DISAGREE. The attempt is invalid, so it never counts toward
+    # agreement either: every case it should have covered stays INCOMPLETE.
+    by_id = {p["id"]: p for p in profiles}
+    harness_cut = set()
+    for key, r in seen.items():
+        last = r["profiles"][-1] if r.get("profiles") else None
+        if r["status"] == "invalid" and r.get("reason") == HARNESS_CUT_REASON and last and last.get("status") == "invalid" \
+                and str(last.get("invocation")).startswith("timeout|") and last.get("profile") in by_id \
+                and isinstance(last.get("seconds"), (int, float)) and not isinstance(last.get("seconds"), bool) \
+                and last["seconds"] < by_id[last["profile"]]["processTimeoutMinutes"] * 60 - 0.5:
+            harness_cut.add(key + (last["profile"],))
     expected: dict[str, int] = {}
     values: dict[str, list[tuple[str, str]]] = {}
     establishing: dict[str, int] = {}
@@ -803,6 +819,8 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
                     results = {x["profile"]: x for x in (r["profiles"] if r and r["status"] not in ("environment-violation", "infrastructure-failure") else [])}
                     for p in (p for p in profiles if mode == "control" or p["id"] in env["profiles"]):
                         res = results.get(p["id"]) if results.get(p["id"], {}).get("status") in VALUE_STATUSES | {"invalid"} else None
+                        if (eid, env_id, job, attempt, p["id"]) in harness_cut:
+                            res = None
                         names = list(res["tests"]) if p["select"] == "observed" and res else []
                         for k in profile_keys(p, cases) + [f"test:control:{n}" for n in names]:
                             expected[k] = expected.get(k, 0) + (0 if k.startswith("test:control:") else 1)
@@ -847,6 +865,7 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
             "complete": not invalid and not counts["INCOMPLETE"] and all(status_counts[s] == 0 for s in
                                                                           ("missing", "invalid", "infrastructure-failure", "environment-violation")),
             "attempts": status_counts, "invalidReasons": invalid, "classCounts": counts, "cases": rows_out,
+            "harnessCut": [{"environment": k[1], "job": k[2], "attempt": k[3], "profile": k[4]} for k in sorted(harness_cut)],
             "determinismRows": det_rows, "environments": sorted(envs), "notCovered": protocol["scope"]["notCovered"],
             "limitations": protocol["limitations"] + (["CONTROL RUN: no registered case; never decision-bearing."] if mode == "control" else [])}
 

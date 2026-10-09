@@ -1,0 +1,64 @@
+{
+ "schema": "g2-1421/replay/1",
+ "purpose": "For the record only, not evidence: protocol amendment 1.5.0's harness-cut rule applied to execution c2-1424-regen-2 (run 37826943308). That execution was decided under protocol 1.4.0, and its NON-DETERMINISTIC result stays the reported result.",
+ "inputs": {
+  "attemptRecords": "evidence/v0.24-archives e1c65e27d8ec4dedee6ff1663b5b4fcc0d9dd487:docs/plans/evidence/c2-1424/regeneration-2/determinism/attempts.tar.gz",
+  "attemptRecordsSha256": "a3de2eb9a0b644550625a9471f4a11a0b0e28ce32d2bcaf7569615c5beac3294",
+  "attemptRecordCount": 150,
+  "protocolRegistryAndHarness": "5e52d8abb0881d0337e2ac12c6a031b2c2d2a14d (protocol 1.4.0), so every record's protocol and harness hashes bind",
+  "decider140": "scripts/determinism_protocol.py at the candidate",
+  "decider150": "scripts/determinism_protocol.py with amendment 1.5.0 (this PR); only decide() differs in behaviour"
+ },
+ "decider140": {
+  "verdict": "NON-DETERMINISTIC",
+  "complete": false,
+  "classCounts": {
+   "AGREE-PASS": 660,
+   "AGREE-FAIL": 0,
+   "DISAGREE": 470,
+   "INCOMPLETE": 1174
+  },
+  "attempts": {
+   "completed": 149,
+   "timeout": 0,
+   "crash": 0,
+   "infrastructure-failure": 0,
+   "environment-violation": 0,
+   "invalid": 1,
+   "missing": 0
+  },
+  "matchesPublishedResult": true
+ },
+ "decider150": {
+  "verdict": "INCOMPLETE",
+  "complete": false,
+  "classCounts": {
+   "AGREE-PASS": 660,
+   "AGREE-FAIL": 0,
+   "DISAGREE": 0,
+   "INCOMPLETE": 1644
+  },
+  "attempts": {
+   "completed": 149,
+   "timeout": 0,
+   "crash": 0,
+   "infrastructure-failure": 0,
+   "environment-violation": 0,
+   "invalid": 1,
+   "missing": 0
+  },
+  "harnessCut": [
+   {
+    "environment": "win-x64",
+    "job": 1,
+    "attempt": 15,
+    "profile": "verification-full"
+   }
+  ],
+  "disagreeCases": []
+ },
+ "classChanges": {
+  "DISAGREE -> INCOMPLETE": 470
+ },
+ "reading": "Every DISAGREE under 1.4.0 came from the one harness-cut invocation (win-x64 job 1, attempt 15, verification-full). Under 1.5.0 that invocation is excluded, no case is DISAGREE, and the cases it should have covered are INCOMPLETE, so the verdict is INCOMPLETE (complete false), never DETERMINISTIC."
+}
