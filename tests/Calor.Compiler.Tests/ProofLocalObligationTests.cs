@@ -15,11 +15,12 @@ namespace Calor.Compiler.Tests;
 /// </summary>
 public sealed class ProofLocalObligationTests
 {
-    private static Obligation SolveProof(string body, string parameters = "§I{i32:x}", string? proofId = "p1")
+    private static Obligation SolveProof(string body, string parameters = "§I{i32:x}", string? proofId = "p1", string prelude = "")
     {
         Skip.IfNot(Z3ContextFactory.IsAvailable, "Z3 not available");
         var source = $$"""
             §M{m001:Test}
+              {{prelude}}
               §F{f001:Check:priv}
                 {{parameters}}
                 §O{void}
@@ -191,6 +192,21 @@ public sealed class ProofLocalObligationTests
             §B{"{"}~ab:i32{"}"} INT:2
             §PROOF{"{"}p1{"}"} (== `a-b` {claimed})
             """), "shares its C# name with another variable");
+
+    // Review round 2: the refinement guard `(inc #)` runs after the binding and changes k to 2.
+    [SkippableFact]
+    public void LocalWithStateChangingRefinementGuard_IsRefused()
+        => AssertNotDischarged(SolveProof("""
+            §B{k:Bump} INT:1
+            §PROOF{p1} (== k INT:1)
+            """, prelude: "§RTYPE{r1:Bump:i32} (== (inc #) INT:2)"), "refinement guards may change state");
+
+    [SkippableFact]
+    public void LocalWithPureRefinementType_Discharges()
+        => Assert.Equal(ObligationStatus.Discharged, SolveProof("""
+            §B{k:Pos} INT:1
+            §PROOF{p1} (== k INT:1)
+            """, prelude: "§RTYPE{r1:Pos:i32} (> # INT:0)").Status);
 
     [SkippableFact]
     public void LocalBoundTwice_IsRefused()

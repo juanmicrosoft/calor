@@ -105,6 +105,7 @@ public sealed class FactCollector
 
     private HashSet<string> _assignedNames = new(StringComparer.Ordinal);
     private IReadOnlyList<StatementNode> _body = [];
+    private bool _refinementChangesState;
     private bool _heapWritten;
     private List<TextSpan> _heapReads = new();
     private readonly HashSet<string> _aliasWritten = new(StringComparer.Ordinal);
@@ -157,6 +158,11 @@ public sealed class FactCollector
         // #1413 (D-OBL-THROWING-PREDECESSOR): a binding or assignment to a refined name runs a
         // compiler-inserted refinement guard, which throws.
         _refinedTypes.UnionWith(refinementPredicates?.Keys ?? []);
+        // #1516 review round 2: a refinement guard runs its predicate after a binding or assignment
+        // (and on entry); one that changes state (`(inc #)`) changes a variable outside the body.
+        _refinementChangesState = (refinementPredicates?.Values ?? [])
+            .Concat(parameters.Select(p => p.InlineRefinement?.Predicate).OfType<ExpressionNode>())
+            .Any(predicate => IsOpaque(predicate) || DescendantsAndSelf(predicate).Any(node => IsIncrement(node) || IsHeapMutation(node)));
         _parameterNames.UnionWith(parameters.Select(p => p.Name));
         _refinedNames.UnionWith(parameters
             .Where(p => p.InlineRefinement != null || _refinedTypes.Contains(p.TypeName))
@@ -428,6 +434,8 @@ public sealed class FactCollector
         {
             if (HasOpaqueCode)
                 return "is in a body with raw C#, unsafe code, or a lambda, which the verifier cannot see and which may change it";
+            if (_refinementChangesState)
+                return "is in a function whose refinement guards may change state, which the verifier does not model";
             if (_hasJumps)
                 return "may be skipped by a goto, so its binding is not known to run before the proof";
             if (candidates.Count > 1)
