@@ -334,9 +334,9 @@ inconsistency. No two observed values differed.
      - it is the last profile of an `invalid` attempt whose reason is "the job deadline cut an
        invocation";
      - its status is `invalid` and its invocation value starts `timeout|`;
-     - its recorded duration is below its process timeout minus 1 s (`cut_by_deadline`). The runner
-       records the subprocess duration before it reads any result, and it decides the cut from that
-       same recorded value.
+     - the runner records that reason only when the job deadline, not the process timeout, was the
+       bound the invocation was given. It decides this from the bound, never from the measured
+       duration. A process timeout is status `timeout`.
    - **What the decider leaves out.** Only what the harness filled in for a cut invocation: its
      invocation value, every `Missing`, `Timeout`, or `Crash` fill, and `Malformed` cells (a cells
      file cut mid-write). Filled values therefore never make a case `DISAGREE`.
@@ -398,8 +398,10 @@ rows, gates, the agreement rate, and record formats. The result gains the `harne
   - in a partly observed theory row.
 - A wrong reason, a run as long as the process timeout, or a non-timeout invocation is not
   treated as a harness cut.
-- The runner's recorded duration is the one the cut was decided on, even after slow result
-  processing.
+- The runner decides a cut from the bound the invocation was given, not from its duration. The
+  controls cover a deadline 0.5 s before the process timeout with a late kill, an ordinary cut, and
+  the process-timeout bound (both a late and an early end). The cut is recorded with the
+  harness-cut reason and is never written as a record field.
 - The fourth execution is refused on any commit other than the merge SHA in GitHub's PR record.
   It is also refused when that record is unreadable, unmerged, or merged into another branch.
 - The budget controls are updated to 3,200 and 795.

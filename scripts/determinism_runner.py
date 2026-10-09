@@ -456,12 +456,14 @@ def run_profile(protocol, cases, profile, env, invocation_dir: Path, base, nuget
     existed = (Path(child["HOME"]) / ".calor").exists()
     started = time.monotonic()
     budget = profile["processTimeoutMinutes"] * 60
-    code, timed_out = run_with_timeout(test_command(profile, cases, trx_dir), child, min(budget, deadline - time.time()),
+    # Amendment 1.5.0: a timeout is a job-deadline cut exactly when the job deadline, not the process timeout, was the
+    # bound the invocation was given; the cause is decided from that bound, never from the measured duration.
+    allowed = deadline - time.time()
+    deadline_bound = allowed < budget
+    code, timed_out = run_with_timeout(test_command(profile, cases, trx_dir), child, min(budget, allowed),
                                        invocation_dir / "console.log")
-    # Amendment 1.5.0: the recorded duration is the subprocess's, taken before any result is read, and the cut is
-    # decided from that recorded value by the same rule the decider applies (dp.cut_by_deadline).
-    seconds = round(time.monotonic() - started, 1)
-    cut = timed_out and dp.cut_by_deadline(seconds, profile["processTimeoutMinutes"])  # the job deadline, not the process timeout
+    seconds = round(time.monotonic() - started, 1)  # the subprocess duration, taken before any result is read
+    cut = timed_out and deadline_bound
     trx, outcomes, summary, broken = trx_dir / f"{profile['id']}.trx", None, "Missing", None
     if trx.exists():  # read even after a timeout: every observed value is kept
         try:
@@ -488,7 +490,7 @@ def run_profile(protocol, cases, profile, env, invocation_dir: Path, base, nuget
     fills = any(part in dp.FILL_VALUES for val in values["tests"].values() for part in val.split(","))
     status = "invalid" if cut or (broken and outcomes is not None) else "timeout" if timed_out else "crash" if fills else \
         "invalid" if outcomes is None else "completed"
-    result = {"profile": profile["id"], "status": status, "exitCode": code, "seconds": seconds,
+    result = {"_cut": cut, "profile": profile["id"], "status": status, "exitCode": code, "seconds": seconds,
               "calorCacheExisted": existed, **values}
     # Amendment 1.3.0: the isolated home is scratch (its .calor state is recorded above). NuGet writes cache
     # files there whose names upload-artifact rejects (':'), which lost every Linux and macOS record of
@@ -558,12 +560,13 @@ def run_job(protocol, cases, *, env_id, job, mode, execution_id, out: Path, base
                     stop = "the job deadline was reached before this invocation"
                     break
                 result = run_profile(protocol, cases, profile, env, out / "raw" / f"a{attempt:02d}" / profile["id"], base, nuget, deadline)
+                cut = result.pop("_cut")  # amendment 1.5.0: the cause run_profile decided, never written to the record
                 record["profiles"].append(result)
                 modified = dirty()
                 if modified:
                     result["status"], stop = "invalid", f"an invocation modified tracked files: {modified}"
-                elif result["status"] == "invalid" and time.time() >= deadline - 1:
-                    stop = "the job deadline cut an invocation"
+                elif cut:
+                    stop = dp.HARNESS_CUT_REASON
                 if stop:
                     break
                 record.update(status="invalid", reason="attempt in progress")  # replaced when the attempt ends

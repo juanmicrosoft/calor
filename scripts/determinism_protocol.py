@@ -339,11 +339,6 @@ FILL_VALUES = {"Missing", "Timeout", "Crash"}
 # Amendment 1.5.0: the reason the runner records when its own job deadline cut an invocation.
 HARNESS_CUT_REASON = "the job deadline cut an invocation"
 
-
-def cut_by_deadline(seconds, process_timeout_minutes) -> bool:
-    """Amendment 1.5.0: a timed-out invocation that ended before its process timeout was cut by the job deadline.
-    The runner applies this to the subprocess duration it records (seconds), and the decider to the same field."""
-    return isinstance(seconds, (int, float)) and not isinstance(seconds, bool) and seconds < process_timeout_minutes * 60 - 1
 CELL_VALUE = re.compile(r"^[0-9a-f]{32}\|[01]$")
 SHA = re.compile(r"^[0-9a-f]{64}$")
 
@@ -800,8 +795,9 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
             seen[key] = r
 
     # Amendment 1.5.0 (harness-cut rule): an invocation that the harness's own job deadline cut is the last profile
-    # of an invalid attempt whose reason is HARNESS_CUT_REASON, with status invalid, a 'timeout|' invocation, and a
-    # recorded duration below its process timeout (cut_by_deadline). Only what the harness filled in for it is left
+    # of an invalid attempt whose reason is HARNESS_CUT_REASON, with status invalid and a 'timeout|' invocation. The
+    # runner records that reason only when the job deadline, not the process timeout, was the bound that ended the
+    # invocation (decided from the bound, never from the duration). Only what the harness filled in for it is left
     # out: its invocation value, every Missing/Timeout/Crash fill, and Malformed cells (a cells file cut mid-write).
     # Every value it did observe is still compared, so an observed difference is DISAGREE. The attempt is invalid,
     # so it never counts toward agreement: every case it should have covered stays INCOMPLETE.
@@ -810,8 +806,7 @@ def decide(root: Path, records: list[dict], run_ids: dict[str, str], expected_co
     for key, r in seen.items():
         last = r["profiles"][-1] if r.get("profiles") else None
         if r["status"] == "invalid" and r.get("reason") == HARNESS_CUT_REASON and last and last.get("status") == "invalid" \
-                and str(last.get("invocation")).startswith("timeout|") and last.get("profile") in by_id \
-                and cut_by_deadline(last.get("seconds"), by_id[last["profile"]]["processTimeoutMinutes"]):
+                and str(last.get("invocation")).startswith("timeout|") and last.get("profile") in by_id:
             harness_cut.add(key + (last["profile"],))
     partial: dict[str, list[tuple[str, list[str]]]] = {}
     expected: dict[str, int] = {}

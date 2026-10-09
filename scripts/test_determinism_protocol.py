@@ -402,7 +402,7 @@ class DecisionControls(unittest.TestCase):
 
     def test_only_a_genuine_harness_cut_is_excluded(self) -> None:
         for change in (lambda r: r.update(reason="the harness stopped before this attempt"),
-                       lambda r: r["profiles"][-1].update(seconds=15 * 60.0),  # the process timeout, not the job deadline
+                       lambda r: r.update(reason="the job deadline was reached before this invocation"),
                        lambda r: r["profiles"][-1].update(invocation="-9|Missing")):
             records = passing_records(self.protocol)
             change(self.cut(records))
@@ -870,30 +870,50 @@ class AttemptRunnerControls(unittest.TestCase):
         self.assertEqual([None, None], [self.problem(r) for r in self.records()])
         self.assertEqual([], self.lines())
 
-    def test_the_recorded_duration_is_the_one_the_cut_was_decided_on(self) -> None:
-        # Round 1 of #1537: a cut decided just under the process timeout must still read as a cut after slow result
-        # processing. The runner records the subprocess duration and decides the cut from that recorded value.
+    def test_a_cut_is_decided_by_the_bound_that_ended_the_invocation(self) -> None:
+        # Rounds 1-2 of #1537: the cause of a timeout is the bound the invocation was given (job deadline or process
+        # timeout), never its measured duration, so a deadline just under the process timeout, a delayed kill, or slow
+        # result processing cannot turn a cut into a compared Timeout value, nor a process timeout into a cut.
         from unittest import mock
-        clock = [1000.0]
         profile = PROTOCOL["control"]["profile"]
         limit = profile["processTimeoutMinutes"] * 60
+        for left, killed_after, expect in ((limit - 0.5, limit + 2.0, ("invalid", True)),   # deadline 0.5 s short; late kill
+                                           (limit - 120, limit - 119, ("invalid", True)),   # an ordinary cut
+                                           (limit + 600, limit + 0.1, ("timeout", False)),  # the process timeout bound
+                                           (limit + 600, limit - 300, ("timeout", False))):  # even if it ends early
+            clock = [1000.0]
 
-        def run(cmd, env, seconds, log):
-            Path(log).write_text("", encoding="utf-8")
-            clock[0] += limit - 1.2  # killed 1.2 s before the process timeout: a job-deadline cut
-            return None, True
+            def run(cmd, env, seconds, log, gone=killed_after):
+                Path(log).write_text("", encoding="utf-8")
+                clock[0] += gone
+                return None, True
 
-        def slow_values(*args, **kwargs):
-            clock[0] += 0.9  # result processing after the kill
-            return original(*args, **kwargs)
-        original = dp.profile_values
-        with mock.patch.object(dr, "run_with_timeout", run), mock.patch.object(dp, "profile_values", slow_values), \
-                mock.patch.object(dr.time, "monotonic", lambda: clock[0]):
-            result = dr.run_profile(PROTOCOL, CASES, profile, dp.env_by_id(PROTOCOL)["linux-x64"], self.out / "inv", self.base,
-                                    self.base["NUGET_PACKAGES"], time.time() + 3600)
-        self.assertEqual(("invalid", round(limit - 1.2, 1)), (result["status"], result["seconds"]))
-        self.assertTrue(dp.cut_by_deadline(result["seconds"], profile["processTimeoutMinutes"]))
-        self.assertFalse(dp.cut_by_deadline(limit - 0.9, profile["processTimeoutMinutes"]))  # a process timeout is not a cut
+            def slow_values(*args, **kwargs):
+                clock[0] += 0.9  # result processing after the kill
+                return original(*args, **kwargs)
+            original = dp.profile_values
+            directory = self.out / f"inv-{left}-{killed_after}"
+            with mock.patch.object(dr, "run_with_timeout", run), mock.patch.object(dp, "profile_values", slow_values), \
+                    mock.patch.object(dr.time, "monotonic", lambda: clock[0]):
+                result = dr.run_profile(PROTOCOL, CASES, profile, dp.env_by_id(PROTOCOL)["linux-x64"], directory, self.base,
+                                        self.base["NUGET_PACKAGES"], time.time() + left)
+            self.assertEqual(expect, (result["status"], result["_cut"]), left)
+            self.assertEqual(round(killed_after, 1), result["seconds"])  # recorded before the results were read
+
+    def test_a_deadline_cut_is_recorded_with_the_harness_cut_reason(self) -> None:
+        from unittest import mock
+        real = dr.run_profile
+
+        def cut_profile(*args, **kwargs):
+            result = real(*args, **kwargs)
+            result.update(_cut=True, status="invalid", invocation="timeout|Missing")
+            return result
+        with mock.patch.object(dr, "run_profile", cut_profile):
+            self.assertEqual(1, self.run_job())
+        records = self.records()
+        self.assertEqual([(dp.HARNESS_CUT_REASON, 1), (dp.HARNESS_CUT_REASON, 0)],
+                         [(r["reason"], len(r["profiles"])) for r in records])
+        self.assertNotIn("_cut", records[0]["profiles"][0])  # the cause is never written to the record
 
     def test_the_job_deadline_stops_starting_invocations(self) -> None:
         self.assertEqual(1, self.run_job(JOB_STARTED=str(time.time() - 16 * 60)))
