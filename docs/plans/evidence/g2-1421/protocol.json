@@ -544,8 +544,8 @@
       },
       {
         "version": "1.5.0",
-        "timestampUtc": "2026-10-09T00:00:00Z",
-        "pr": 1,
+        "timestampUtc": "2026-10-09T14:19:51Z",
+        "pr": 1537,
         "afterDecisionBearingExecution": true,
         "justification": "Maintainer decision 2026-10-08 ('Amend + 3rd freeze'), after execution c2-1424-regen-2 (run 37826943308, commit 5e52d8ab, protocol 1.4.0, NON-DETERMINISTIC, complete false: 660 AGREE-PASS, 470 DISAGREE, 1,174 INCOMPLETE; 149 completed attempts and 1 invalid). The only cause: win-x64 job 1 ran on a slow runner (verification-full median 233 s against 149.5 s in job 2), the harness's own 75-minute job deadline cut its 15th attempt, and the decider compared that attempt's filled Timeout values (runPlan.harnessCutInconsistency); no two observed values differed. Three changes: (1) harness-cut rule (runPlan.harnessCutRule): a harness-cut invocation is excluded from comparison and its attempt never counts toward agreement, so a cut gives INCOMPLETE, never DISAGREE and never DETERMINISTIC; observed differences are still DISAGREE. (2) win-x64 and win-arm64 jobTimeoutMinutes 75 -> 110, so a runner as slow as that job finishes all 15 attempts. (3) maxExecutions 3 -> 4, the fourth only on the merge commit of this PR (budget.extraExecution, checked by the plan step). Budget: worst case per execution 795, total 4 x 795 = 3,180 within the 3,200 determinism-compute ceiling of contract amendment 1.5.0; 1,207 recorded. Changes scripts/determinism_protocol.py (decide), scripts/determinism_runner.py (plan binding), scripts/test_determinism_protocol.py (controls), protocol.json, and the README. No case, cell, artifact, profile, environment, attempt count, determinism row, gate, agreement rate, or record format changes. Per the amendments rule, a complete new execution on a new commit follows: #1424's execution on the re-frozen candidate."
       }
