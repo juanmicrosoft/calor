@@ -10359,7 +10359,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
                 }
                 return new NewExpressionNode(GetTextSpan(implicitNew), inferredType, new List<string>(), new List<ExpressionNode>(), inits)
                 {
-                    CSharpSource = inits.Count > 0 ? implicitNew.ToString() : null
+                    CSharpSource = inits.Count > 0 ? CreationSourceText(implicitNew) : null
                 };
             }
             return new ReferenceNode(GetTextSpan(implicitNew), "default");
@@ -10401,7 +10401,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         return new NewExpressionNode(GetTextSpan(implicitNew), typeName, new List<string>(), args, initializers)
         {
-            CSharpSource = initializers.Count > 0 ? implicitNew.ToString() : null
+            CSharpSource = initializers.Count > 0 ? CreationSourceText(implicitNew) : null
         };
     }
 
@@ -10741,7 +10741,21 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
     {
         _context.RecordFeatureUsage("default-expression");
         _context.IncrementConverted();
-        var typeName = defaultExpr.Type.ToString();
+        // #1528: dispatch on the resolved type, not its spelling (`using Single = System.Int32;`).
+        var typeName = _semanticModel?.GetTypeInfo(defaultExpr.Type).Type?.SpecialType switch
+        {
+            null => defaultExpr.Type.ToString(),
+            SpecialType.System_Int32 => "int",
+            SpecialType.System_Int64 => "long",
+            SpecialType.System_Int16 => "short",
+            SpecialType.System_Byte => "byte",
+            SpecialType.System_Double => "double",
+            SpecialType.System_Single => "float",
+            SpecialType.System_Decimal => "decimal",
+            SpecialType.System_Boolean => "bool",
+            SpecialType.System_String => "string",
+            _ => ""
+        };
         return typeName switch
         {
             "int" or "Int32" or "long" or "Int64" or "short" or "byte" => new IntLiteralNode(GetTextSpan(defaultExpr), 0),
@@ -12419,12 +12433,47 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         return false;
     }
 
-    // A snapshot, not a count: converting a block lambda clears the queue (ConvertBlock),
-    // so the queue is not append-only while a creation is converted.
     private StatementNode[] SnapshotPendingStatements() => _pendingStatements.ToArray();
 
-    private bool PendingStatementsChanged(StatementNode[] snapshot) =>
-        !_pendingStatements.SequenceEqual(snapshot, ReferenceEqualityComparer.Instance);
+    // True when converting the creation queued a statement that evaluates something
+    // ahead of the constructor. Declaration-only binds (`out int x` → §B{~x:i32}) run
+    // nothing, so they keep the creation native, as before #1524.
+    private bool PendingStatementsChanged(StatementNode[] snapshot)
+    {
+        if (_pendingStatements.Count < snapshot.Length)
+            return true;
+        for (var i = 0; i < snapshot.Length; i++)
+        {
+            if (!ReferenceEquals(_pendingStatements[i], snapshot[i]))
+                return true;
+        }
+        for (var i = snapshot.Length; i < _pendingStatements.Count; i++)
+        {
+            if (_pendingStatements[i] is not BindStatementNode { Initializer: null })
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// A block-bodied lambda or anonymous method is its own statement scope: ConvertBlock
+    /// clears <see cref="_pendingStatements"/> per statement, which used to discard
+    /// hoists the enclosing statement had already queued (#1524 review).
+    /// </summary>
+    private List<StatementNode> ConvertNestedBodyBlock(BlockSyntax block)
+    {
+        var enclosing = _pendingStatements.ToList();
+        _pendingStatements.Clear();
+        try
+        {
+            return ConvertBlock(block).ToList();
+        }
+        finally
+        {
+            _pendingStatements.Clear();
+            _pendingStatements.AddRange(enclosing);
+        }
+    }
 
     private ExpressionNode RollBackAndPreserveObjectInitializer(
         BaseObjectCreationExpressionSyntax creation, StatementNode[] pendingBefore,
@@ -12441,7 +12490,27 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         _context.RecordLoss(ConversionLossKind.InteropPreserved, feature,
             "Object creation that §NEW cannot express in C# evaluation order preserved verbatim",
             creation.GetLocation().GetLineSpan().StartLinePosition.Line + 1);
-        return new RawCSharpExpressionNode(GetTextSpan(creation), creation.ToString());
+        return new RawCSharpExpressionNode(GetTextSpan(creation),
+            creation is BaseObjectCreationExpressionSyntax objectCreation
+                ? CreationSourceText(objectCreation)
+                : creation.ToString());
+    }
+
+    /// <summary>
+    /// The C# kept for a preserved creation. Target-typed <c>new()</c> spells out its
+    /// type: the preserved text can end up in an untyped binding (a hoisted argument),
+    /// where <c>new()</c> has no target type (CS8754).
+    /// </summary>
+    private string CreationSourceText(BaseObjectCreationExpressionSyntax creation)
+    {
+        if (creation is ImplicitObjectCreationExpressionSyntax implicitNew
+            && _semanticModel?.GetTypeInfo(implicitNew).Type is { TypeKind: not TypeKind.Error } type)
+        {
+            return "new " + type.ToMinimalDisplayString(_semanticModel, implicitNew.SpanStart)
+                + implicitNew.ArgumentList
+                + (implicitNew.Initializer is { } initializer ? " " + initializer : "");
+        }
+        return creation.ToString();
     }
 
     private DictionaryCreationNode ConvertDictionaryCreation(ObjectCreationExpressionSyntax objCreation, string keyType, string valueType)
@@ -13127,7 +13196,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         }
         else if (lambda.Body is BlockSyntax block)
         {
-            stmtBody = ConvertBlock(block).ToList();
+            stmtBody = ConvertNestedBodyBlock(block);
         }
 
         return new LambdaExpressionNode(
@@ -13169,7 +13238,7 @@ public sealed class RoslynSyntaxVisitor : CSharpSyntaxWalker
         List<StatementNode>? stmtBody = null;
         if (anonMethod.Body is BlockSyntax block)
         {
-            stmtBody = ConvertBlock(block).ToList();
+            stmtBody = ConvertNestedBodyBlock(block);
         }
 
         return new LambdaExpressionNode(

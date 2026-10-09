@@ -42,6 +42,9 @@ public sealed class ConverterInitializerAndFloatSemanticsTests
         public static int Ignored, Ci, Cj;
         public class PF { public Func<int>? F; public int A, B; }
         private static int UseF(int x, int y, object p) => 100 * Ci + 10 * Cj + ((PF)p).A;
+        public class PB { public bool B; }
+        private static bool Get(out int x) { x = 7; return true; }
+        public class PQ { public PQ(Q2 q) { Migrated.Trace += "k"; } public Func<int>? F; }
         """;
 
     private const string Holder = """
@@ -78,6 +81,11 @@ public sealed class ConverterInitializerAndFloatSemanticsTests
         { "var p = new P { A = new Q2().A }; return Trace + p.A;", "kq5", true },
         // A collection constructor argument would lose its elements (new List<int>(5)).
         { "var q = new P(7); q = new(new List<int> { 5 }) { A = 1 }; return Trace + q.L.Count + q.A;", "k7kl11", true },
+        { "var q = new P(7); q = new() { A = new Q2().A }; return Trace + q.A;", "k7kq5", true },
+        // A declaration-only hoist (out int x) evaluates nothing; x stays visible.
+        { "var p = new PB { B = Get(out int x) }; return x + \":\" + p.B;", "7:True", false },
+        // A block lambda no longer discards the constructor argument's hoist.
+        { "var p = new PQ(new Q2()) { F = () => { return 0; } }; return Trace + p.F!();", "qk0", true },
     };
 
     [Theory]
@@ -151,6 +159,31 @@ public sealed class ConverterInitializerAndFloatSemanticsTests
         AssertEquivalent(body, expected, types: "", typed: true);
 
     [Fact]
+    public void PreservedTargetTypedNew_SpellsOutItsType()
+    {
+        // The hoisted argument binding has no declared type, so a preserved `new()`
+        // would have no target type in C# (CS8754).
+        var conversion = new CSharpToCalorConverter().Convert($$"""
+            using System;
+            using System.Collections.Generic;
+            public class Migrated
+            {
+                public static string Trace = "";
+                public static object Probe() { return Use(new() { A = new Q2().A }); }
+                {{Types}}
+            }
+            """);
+        Assert.Contains("§CS{new P() { A = new Q2().A }}", conversion.CalorSource);
+        Assert.DoesNotContain("§CS{new()", conversion.CalorSource);
+        Assert.Contains(conversion.Losses, loss => loss.Feature == "object-initializer");
+    }
+
+    [Fact]
+    public void DefaultOfAliasedName_UsesTheResolvedType() =>
+        AssertEquivalent("return default(Single);", "Int32:0", types: "", typed: true,
+            usings: "using Single = System.Int32;");
+
+    [Fact]
     public void AttributeFloatArguments_KeepTheirOverload()
     {
         const string attributes = """
@@ -213,12 +246,13 @@ public sealed class ConverterInitializerAndFloatSemanticsTests
     }
 
     private static ConversionResult AssertEquivalent(
-        string body, string expected, string types = Types, bool typed = false)
+        string body, string expected, string types = Types, bool typed = false, string usings = "")
     {
         var source = $$"""
             using System;
             using System.Collections.Generic;
             using System.Text;
+            {{usings}}
             public class Migrated
             {
                 public static string Trace = "";
